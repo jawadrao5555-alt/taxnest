@@ -66,6 +66,17 @@ TaxNest is built on **Laravel 12** with **Breeze** for authentication, using **P
 - **FBR Settings UI Enhancement:** Added "Sandbox Test Mode" info section and environment badge (amber/red) on Token Health panel.
 - **FBR Value Breakdown:** Invoice create/edit forms show "FBR Value (qty × price)" and "FBR Tax (value × rate%)" per item for transparency.
 
+**Global HS Intelligence Control System (Feb 2026):**
+- **global_hs_master table:** Centralized HS code repository with hsCode (unique), description, pctCode, scheduleType, taxRate, defaultUom, sroRequired, sroNumber, sroItemSerialNo, mrpRequired, sectorTag, riskWeight, mappingStatus (Mapped/Partial/Unmapped), created_by, updated_by, timestamps. Seeded from ScheduleEngine, products, SRO rules, and invoice_items.
+- **hs_unmapped_log table:** Tracks unmapped HS codes per company with frequency_count, first_seen_at, last_seen_at. Auto-populated when HS codes not found in global master during invoice creation/update.
+- **GlobalHsService:** Resolves HS codes first from global_hs_master, then ScheduleEngine fallback. Logs unmapped codes automatically. Provides SRO suggestions with confidence scoring (non-destructive). Seed utility aggregates from all existing data sources.
+- **Invoice Flow Integration:** InvoiceController store/update methods call GlobalHsService::resolveForInvoiceItem() for auto-mapping of pct_code and default_uom. Unmapped HS codes logged transparently without blocking.
+- **Admin Panel (/admin/hs-master):** Three-tab interface (All HS, Unmapped HS, Intelligence Insights). Full CRUD for HS codes, inline editing, quick-map for unmapped codes, sync-from-sources button. Super_admin only.
+- **Validation Engine Upgrade:** 3rd Schedule <18% requires SRO+Serial+MRP; =18% requires MRP only; Exempt requires SRO; Zero Rated requires nothing. Dynamic 0-18 tax rate support.
+- **Sector Mapping Layer:** sectorTag on global_hs_master. Priority: Manual > Customer > Province > Sector > Global (via TaxResolutionService).
+- **Smart SRO Suggestion:** Non-destructive confidence scoring from GlobalHsService::suggestSro(). Sources: global_hs_master first, SroSuggestionService fallback. No auto-override.
+- **Search Upgrade:** API at /api/hs-search supports search by HS code, description, schedule, sector, SRO, taxRate, with optional usage frequency. Admin panel has multi-filter search.
+
 ## External Dependencies
 - **PostgreSQL:** Primary database managed by Replit.
 - **FBR (Federal Board of Revenue) Pakistan:** Integration for tax and invoice submission compliance.

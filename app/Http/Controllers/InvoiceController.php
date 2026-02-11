@@ -17,6 +17,7 @@ use App\Services\VendorRiskEngine;
 use App\Services\RiskIntelligenceEngine;
 use App\Services\SroSuggestionService;
 use App\Services\ScheduleEngine;
+use App\Services\GlobalHsService;
 use Illuminate\Http\Request;
 use App\Services\AuditLogService;
 use App\Services\InvoiceNumberingService;
@@ -181,16 +182,20 @@ class InvoiceController extends Controller
                 $scheduleType = $item['schedule_type'] ?? 'standard';
                 $saleType = ScheduleEngine::mapSaleType($scheduleType);
 
+                $hsResolved = GlobalHsService::resolveForInvoiceItem(
+                    $item['hs_code'], $standardTaxRate, $companyId, $invoice->id
+                );
+
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
                     'hs_code' => $item['hs_code'],
                     'schedule_type' => $scheduleType,
-                    'pct_code' => $item['pct_code'] ?? null,
+                    'pct_code' => $item['pct_code'] ?? ($hsResolved['pct_code'] ?? null),
                     'tax_rate' => $this->extractTaxRate($item),
                     'sro_schedule_no' => $item['sro_schedule_no'] ?? null,
                     'serial_no' => $item['serial_no'] ?? null,
                     'mrp' => !empty($item['mrp']) ? $item['mrp'] : null,
-                    'default_uom' => $item['default_uom'] ?? 'Numbers, pieces, units',
+                    'default_uom' => $item['default_uom'] ?? ($hsResolved['default_uom'] ?? 'Numbers, pieces, units'),
                     'sale_type' => $saleType,
                     'st_withheld_at_source' => !empty($item['st_withheld_at_source']),
                     'petroleum_levy' => !empty($item['petroleum_levy']) ? floatval($item['petroleum_levy']) : null,
@@ -409,16 +414,20 @@ class InvoiceController extends Controller
                 $scheduleType = $item['schedule_type'] ?? 'standard';
                 $saleType = ScheduleEngine::mapSaleType($scheduleType);
 
+                $hsResolved = GlobalHsService::resolveForInvoiceItem(
+                    $item['hs_code'], $standardTaxRate, $companyId, $invoice->id
+                );
+
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
                     'hs_code' => $item['hs_code'],
                     'schedule_type' => $scheduleType,
-                    'pct_code' => $item['pct_code'] ?? null,
+                    'pct_code' => $item['pct_code'] ?? ($hsResolved['pct_code'] ?? null),
                     'tax_rate' => $this->extractTaxRate($item),
                     'sro_schedule_no' => $item['sro_schedule_no'] ?? null,
                     'serial_no' => $item['serial_no'] ?? null,
                     'mrp' => !empty($item['mrp']) ? $item['mrp'] : null,
-                    'default_uom' => $item['default_uom'] ?? 'Numbers, pieces, units',
+                    'default_uom' => $item['default_uom'] ?? ($hsResolved['default_uom'] ?? 'Numbers, pieces, units'),
                     'sale_type' => $saleType,
                     'st_withheld_at_source' => !empty($item['st_withheld_at_source']),
                     'petroleum_levy' => !empty($item['petroleum_levy']) ? floatval($item['petroleum_levy']) : null,

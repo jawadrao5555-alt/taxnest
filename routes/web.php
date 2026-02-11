@@ -11,6 +11,7 @@ use App\Http\Controllers\RiskReportController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\MISController;
 use App\Http\Controllers\HsMasterExportController;
+use App\Http\Controllers\GlobalHsMasterController;
 use App\Http\Controllers\ShareController;
 use App\Http\Controllers\CompanyUserController;
 use App\Http\Controllers\CompanySettingsController;
@@ -93,29 +94,8 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
     Route::get('/api/schedule/config', function () {
         return response()->json(\App\Services\ScheduleEngine::$scheduleTypes);
     });
-    Route::get('/api/hs-lookup', function (\Illuminate\Http\Request $request) {
-        $hsCode = $request->get('hs_code', '');
-        $companyId = app('currentCompanyId');
-        $company = \App\Models\Company::find($companyId);
-        $standardTaxRate = $company ? $company->getStandardTaxRateValue() : 18.0;
-        $customerNtn = $request->get('customer_ntn');
-
-        $resolved = \App\Services\TaxResolutionService::resolve($hsCode, $company, $customerNtn);
-        if ($resolved['pct_code']) {
-            $rules = \App\Services\ScheduleEngine::resolveValidationRules($resolved['schedule_type'], $resolved['tax_rate'], $standardTaxRate);
-            $resolved['requires_sro'] = $rules['requires_sro'];
-            $resolved['requires_serial'] = $rules['requires_serial'];
-            $resolved['requires_mrp'] = $rules['requires_mrp'];
-            $resolved['standard_tax_rate'] = $standardTaxRate;
-            return response()->json($resolved);
-        }
-
-        $result = \App\Services\ScheduleEngine::lookupByHsCode($hsCode, $standardTaxRate);
-        if ($result) {
-            $result['standard_tax_rate'] = $standardTaxRate;
-        }
-        return response()->json($result ?: ['found' => false]);
-    });
+    Route::get('/api/hs-lookup', [GlobalHsMasterController::class, 'apiLookup']);
+    Route::get('/api/hs-search', [GlobalHsMasterController::class, 'apiSearch']);
     Route::get('/api/sro-suggest', function (\Illuminate\Http\Request $request) {
         $scheduleType = $request->get('schedule_type', 'standard');
         $taxRate = $request->get('tax_rate') ? floatval($request->get('tax_rate')) : null;
@@ -234,6 +214,12 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::post('/admin/company/{company}/change-plan', [AdminController::class, 'changePlan']);
         Route::post('/admin/company/{company}/toggle-internal', [AdminController::class, 'toggleInternalAccount']);
         Route::get('/admin/hs-master-export', [HsMasterExportController::class, 'index'])->name('admin.hs-master-export');
+
+        Route::get('/admin/hs-master', [GlobalHsMasterController::class, 'index'])->name('admin.hs-master');
+        Route::post('/admin/hs-master', [GlobalHsMasterController::class, 'store'])->name('admin.hs-master.store');
+        Route::put('/admin/hs-master/{id}', [GlobalHsMasterController::class, 'update'])->name('admin.hs-master.update');
+        Route::post('/admin/hs-master/seed', [GlobalHsMasterController::class, 'seed'])->name('admin.hs-master.seed');
+        Route::post('/admin/hs-master/map-unmapped', [GlobalHsMasterController::class, 'mapUnmapped'])->name('admin.hs-master.map-unmapped');
     });
 });
 

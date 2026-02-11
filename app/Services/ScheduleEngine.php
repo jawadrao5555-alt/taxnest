@@ -51,7 +51,7 @@ class ScheduleEngine
                 ];
 
             case '3rd_schedule':
-                if ($taxRate !== null && $taxRate >= $standardTaxRate) {
+                if ($taxRate !== null && $taxRate >= 18) {
                     return [
                         'requires_sro' => false,
                         'requires_serial' => false,

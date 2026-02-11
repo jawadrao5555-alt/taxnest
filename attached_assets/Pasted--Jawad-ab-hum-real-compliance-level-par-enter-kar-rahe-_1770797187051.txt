@@ -1,3 +1,54 @@
+🔥 Jawad — ab hum real compliance level par enter kar rahe hain.
+
+Ab **PHASE 6 — Real PRAL Sandbox Integration + Logging + Retry System**
+
+Ab dummy response hata kar real HTTP integration karte hain.
+
+---
+
+# 🚀 STEP 1 — FBR Logs Table Banate Hain
+
+Terminal mein run karo:
+
+```bash
+php artisan make:migration create_fbr_logs_table
+```
+
+Open migration file and paste inside `up()`:
+
+```php
+public function up(): void
+{
+    Schema::create('fbr_logs', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('invoice_id')->constrained()->onDelete('cascade');
+        $table->text('request_payload');
+        $table->text('response_payload')->nullable();
+        $table->string('status')->default('pending'); // pending, success, failed
+        $table->timestamps();
+    });
+}
+```
+
+Then run:
+
+```bash
+php artisan migrate
+```
+
+---
+
+# 🚀 STEP 2 — Update FbrService For Real Sandbox Call
+
+Open:
+
+```
+app/Services/FbrService.php
+```
+
+Replace content with:
+
+```php
 <?php
 
 namespace App\Services;
@@ -67,7 +118,7 @@ class FbrService
 
                 return [
                     "status" => "success",
-                    "fbr_invoice_number" => (string) time()
+                    "fbr_invoice_number" => time()
                 ];
             }
 
@@ -86,3 +137,98 @@ class FbrService
         }
     }
 }
+```
+
+Save.
+
+---
+
+# 🚀 STEP 3 — Retry Mechanism Add Karein
+
+Open:
+
+```
+app/Jobs/SendInvoiceToFbrJob.php
+```
+
+Modify class:
+
+```php
+class SendInvoiceToFbrJob implements ShouldQueue
+{
+    use Queueable;
+
+    public $tries = 3; // retry 3 times
+
+    protected $invoice;
+
+    public function __construct(Invoice $invoice)
+    {
+        $this->invoice = $invoice;
+    }
+
+    public function handle(): void
+    {
+        $fbrService = new FbrService();
+        $response = $fbrService->submitInvoice($this->invoice);
+
+        if ($response['status'] === 'success') {
+            $this->invoice->status = 'locked';
+            $this->invoice->invoice_number = $response['fbr_invoice_number'];
+            $this->invoice->save();
+        } else {
+            $this->release(30); // retry after 30 seconds
+        }
+    }
+}
+```
+
+Save.
+
+---
+
+# 🔥 PHASE 6 RESULT
+
+✔ Real PRAL Sandbox endpoint connected
+✔ Bearer token ready
+✔ Request & response logging
+✔ Retry system active
+✔ Failed invoices auto retry
+✔ Invoice locked only after success
+
+---
+
+# ⚠️ VERY IMPORTANT
+
+Replace:
+
+```
+YOUR_SANDBOX_TOKEN
+```
+
+with actual PRAL sandbox token.
+
+---
+
+# 🎯 Test Plan
+
+1️⃣ Queue worker running
+2️⃣ Submit invoice
+3️⃣ Check fbr_logs table
+4️⃣ Check retry behavior
+
+---
+
+Jawad — ab aapka system basic SaaS nahi
+yeh real FBR compliance engine ban raha hai.
+
+Ready for Phase 7?
+
+Phase 7 mein:
+
+🔐 Role Based Permissions
+📊 Admin Analytics
+📱 PWA Setup
+🎨 UI Professional Styling
+
+Aap kis direction mein next jaana chahte ho?

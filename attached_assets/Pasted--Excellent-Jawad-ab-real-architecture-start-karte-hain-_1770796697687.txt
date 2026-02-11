@@ -1,0 +1,162 @@
+🔥 Excellent Jawad — ab real architecture start karte hain.
+
+Phase 1 done ✅
+Ab **Phase 2 — Multi-Company Isolation (Very Important)**
+
+Yeh TaxNest ka backbone hai.
+Agar yeh sahi implement nahi hua to SaaS fail.
+
+---
+
+# 🚀 PHASE 2 — Company Isolation Middleware
+
+---
+
+## 🟢 STEP 1 — Middleware Code Add Karo
+
+Open file:
+
+```
+app/Http/Middleware/CompanyIsolation.php
+```
+
+Replace poora file content with this:
+
+```php
+<?php
+
+namespace App\Http\Middleware;
+
+use Closure;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
+
+class CompanyIsolation
+{
+    public function handle(Request $request, Closure $next): Response
+    {
+        if (auth()->check()) {
+            $companyId = auth()->user()->company_id;
+
+            if (!$companyId) {
+                abort(403, 'No company assigned.');
+            }
+
+            // Share company_id globally
+            app()->instance('currentCompanyId', $companyId);
+        }
+
+        return $next($request);
+    }
+}
+```
+
+Save karo.
+
+---
+
+## 🟢 STEP 2 — User Table Mein company_id Add Karo
+
+Open migration:
+
+```
+database/migrations/xxxx_create_users_table.php
+```
+
+Inside `up()` method add this line:
+
+```php
+$table->foreignId('company_id')->nullable()->constrained()->onDelete('cascade');
+```
+
+Place it before `$table->timestamps();`
+
+Save karo.
+
+---
+
+## 🟢 STEP 3 — Fresh Migrate Again
+
+Terminal:
+
+```bash
+php artisan migrate:fresh
+```
+
+---
+
+## 🟢 STEP 4 — Middleware Register Karo
+
+Open:
+
+```
+bootstrap/app.php
+```
+
+Find middleware section (Laravel 11 style).
+
+Add this inside:
+
+```php
+->withMiddleware(function ($middleware) {
+    $middleware->alias([
+        'company' => \App\Http\Middleware\CompanyIsolation::class,
+    ]);
+})
+```
+
+Save karo.
+
+---
+
+## 🟢 STEP 5 — Apply Middleware to Routes
+
+Open:
+
+```
+routes/web.php
+```
+
+Replace content with:
+
+```php
+use Illuminate\Support\Facades\Route;
+
+Route::middleware(['auth', 'company'])->group(function () {
+
+    Route::get('/dashboard', function () {
+        return "Company Dashboard Active";
+    });
+
+});
+```
+
+Save karo.
+
+---
+
+# 🔥 PHASE 2 RESULT
+
+Ab:
+
+✔ Har logged-in user ka company_id automatically filter hoga
+✔ Cross-company data leak nahi hoga
+✔ SaaS secure ho gaya
+
+---
+
+# 🎯 Next Phase
+
+Phase 3:
+
+🔒 Production Invoice Lock Rule
+📡 FBR Service Class Structure
+📦 Invoice Submission Flow
+
+---
+
+Ab confirm karo:
+
+👉 migrate:fresh successful?
+
+Phir Phase 3 start karte hain 🚀

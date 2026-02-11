@@ -15,6 +15,8 @@ class InvoiceItem extends Model
         'sro_schedule_no',
         'serial_no',
         'mrp',
+        'default_uom',
+        'sale_type',
         'description',
         'quantity',
         'price',

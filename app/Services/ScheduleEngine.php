@@ -8,7 +8,7 @@ class ScheduleEngine
         'standard' => ['label' => 'Standard Rate', 'tax_rate' => null, 'requires_sro' => false, 'requires_serial' => false, 'requires_mrp' => false],
         'reduced' => ['label' => 'Reduced Rate', 'tax_rate' => 10, 'requires_sro' => true, 'requires_serial' => true, 'requires_mrp' => false],
         '3rd_schedule' => ['label' => '3rd Schedule', 'tax_rate' => 17, 'requires_sro' => false, 'requires_serial' => false, 'requires_mrp' => false],
-        'exempt' => ['label' => 'Exempt', 'tax_rate' => 0, 'requires_sro' => true, 'requires_serial' => true, 'requires_mrp' => false],
+        'exempt' => ['label' => 'Exempt', 'tax_rate' => 0, 'requires_sro' => true, 'requires_serial' => false, 'requires_mrp' => false],
         'zero_rated' => ['label' => 'Zero Rated', 'tax_rate' => 0, 'requires_sro' => false, 'requires_serial' => false, 'requires_mrp' => false],
     ];
 
@@ -67,7 +67,7 @@ class ScheduleEngine
             case 'exempt':
                 return [
                     'requires_sro' => true,
-                    'requires_serial' => true,
+                    'requires_serial' => false,
                     'requires_mrp' => false,
                 ];
 
@@ -179,6 +179,60 @@ class ScheduleEngine
         if (count($uniqueSchedules) > 1) {
             $labels = array_map(fn($s) => self::getScheduleConfig($s)['label'], $uniqueSchedules);
             $errors[] = "Mixed schedule types in same invoice: " . implode(', ', $labels) . ". All items must use the same schedule type.";
+        }
+
+        return $errors;
+    }
+
+    public static function mapSaleType(string $scheduleType): string
+    {
+        return match ($scheduleType) {
+            'standard' => 'Goods at standard rate (default)',
+            'reduced' => 'Goods at reduced rate',
+            '3rd_schedule' => 'Goods under 3rd Schedule',
+            'exempt' => 'Exempt goods',
+            'zero_rated' => 'Zero rated goods',
+            default => 'Goods at standard rate (default)',
+        };
+    }
+
+    public static function validateFbrPayload(array $payload): array
+    {
+        $errors = [];
+
+        $requiredTop = ['invoiceType', 'invoiceDate', 'sellerNTNCNIC', 'sellerBusinessName', 'sellerProvince', 'buyerNTNCNIC', 'buyerBusinessName', 'buyerProvince'];
+        foreach ($requiredTop as $field) {
+            if (empty($payload[$field])) {
+                $errors[] = "Missing required field: {$field}";
+            }
+        }
+
+        if (empty($payload['items']) || !is_array($payload['items'])) {
+            $errors[] = "Invoice must contain at least one item";
+            return $errors;
+        }
+
+        $requiredItem = ['hsCode', 'productDescription', 'rate', 'uoM', 'quantity', 'valueSalesExcludingST', 'saleType'];
+        foreach ($payload['items'] as $idx => $item) {
+            $num = $idx + 1;
+            foreach ($requiredItem as $field) {
+                if (!isset($item[$field]) || (is_string($item[$field]) && $item[$field] === '')) {
+                    $errors[] = "Item #{$num}: Missing required field: {$field}";
+                }
+            }
+            if (isset($item['quantity']) && $item['quantity'] <= 0) {
+                $errors[] = "Item #{$num}: Quantity must be greater than 0";
+            }
+            if (isset($item['valueSalesExcludingST']) && $item['valueSalesExcludingST'] < 0) {
+                $errors[] = "Item #{$num}: valueSalesExcludingST cannot be negative";
+            }
+            if (isset($item['salesTaxApplicable']) && $item['salesTaxApplicable'] < 0) {
+                $errors[] = "Item #{$num}: salesTaxApplicable cannot be negative";
+            }
+            $saleType = $item['saleType'] ?? '';
+            if (str_contains($saleType, 'Exempt') && isset($item['salesTaxApplicable']) && $item['salesTaxApplicable'] != 0) {
+                $errors[] = "Item #{$num}: Exempt items must have zero salesTaxApplicable";
+            }
         }
 
         return $errors;

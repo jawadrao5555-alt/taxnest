@@ -1,0 +1,230 @@
+You are upgrading the existing TaxNest Enterprise System.
+
+CRITICAL:
+- Do NOT redesign architecture.
+- Do NOT modify FBR payload key names.
+- Do NOT break HS → PCT global engine.
+- Do NOT remove WHT manual selection.
+- Do NOT break multi-company isolation.
+- Do NOT break compliance scoring engine.
+
+Implement full FBR Excel Template + PRAL API alignment.
+
+========================================
+1️⃣ INVOICE STRUCTURE – FULL ALIGNMENT
+========================================
+
+Ensure invoice table contains:
+
+- id
+- company_id
+- branch_id
+- document_type (Sale Invoice, Credit Note, Debit Note)
+- reference_invoice_number (nullable)
+- invoice_number (internal continuous)
+- fbr_invoice_number (nullable)
+- invoice_date
+- buyer_id
+- buyer_name
+- buyer_ntn
+- buyer_registration_type
+- supplier_province
+- destination_province
+- total_value_excluding_st
+- total_sales_tax
+- total_amount
+- whtRate
+- whtAmount
+- net_receivable
+- status (Draft / Locked)
+- fbrStatus
+- sha256_hash
+
+Rules:
+- Credit/Debit require reference_invoice_number.
+- supplier_province auto from branch.
+- destination_province auto from customer.
+
+========================================
+2️⃣ ITEM STRUCTURE – FULL FBR MAPPING
+========================================
+
+Each invoice item must contain:
+
+- productDescription
+- hsCode
+- pctCode
+- uom
+- quantity
+- rate
+- valueSalesExcludingST
+- salesTaxApplicable
+- taxRate
+- scheduleType
+- sroScheduleNo (nullable)
+- sroItemSerialNo (nullable)
+- fixedNotifiedValueOrRetailPrice (MRP nullable)
+- st_withheld_at_source (boolean)
+- petroleum_levy (nullable)
+
+valueSalesExcludingST =
+    quantity × rate
+
+salesTaxApplicable =
+    valueSalesExcludingST × taxRate%
+
+========================================
+3️⃣ STRICT SCHEDULE VALIDATION ENGINE
+========================================
+
+IF scheduleType = "Standard":
+   No SRO required.
+
+IF scheduleType = "3rd Schedule" AND taxRate = 18:
+   MRP REQUIRED.
+
+IF scheduleType = "3rd Schedule" AND taxRate < 18:
+   MRP REQUIRED.
+   SRO REQUIRED.
+   sroItemSerialNo REQUIRED.
+
+IF scheduleType = "Exempt":
+   SRO REQUIRED.
+
+IF scheduleType = "Zero Rated":
+   No SRO required.
+
+Block submission if missing required fields.
+Show clear error messages.
+
+========================================
+4️⃣ FLEXIBLE TAX RATE ENGINE
+========================================
+
+Allow dynamic taxRate between 0%–18%.
+Do NOT hardcode 18%.
+
+Company setting:
+standard_tax_rate (default 18).
+
+Reduced logic:
+taxRate < standard_tax_rate.
+
+========================================
+5️⃣ COMPANY-WISE CONTINUOUS NUMBERING
+========================================
+
+Format:
+COMPANY_PREFIX-000001
+
+- No yearly reset.
+- No branch reset.
+- No environment reset.
+- Same sequence for Sandbox & Production.
+- Use DB-level locking to prevent duplication.
+
+Store separately:
+- invoice_number
+- fbr_invoice_number
+
+Search must support both.
+
+========================================
+6️⃣ COMPANY-LEVEL FBR ENVIRONMENT CONTROL
+========================================
+
+Environment stored in company settings:
+- Sandbox
+- Production
+
+Invoice page must NOT contain environment toggle.
+
+When switching to Production:
+- Show warning modal.
+- Require typing CONFIRM.
+- Log audit entry.
+
+Invoice submit button:
+"Submit to FBR"
+
+System auto-selects environment.
+
+Show badge:
+Sandbox (yellow)
+Production (green)
+
+========================================
+7️⃣ SANDBOX TEST PANEL
+========================================
+
+Inside FBR Settings:
+
+Add Testing Tools:
+
+- Test Connection
+- Validate Payload Only (no submission)
+- Send Sample Payload
+- View Last Request
+- View Last Response
+- View Retry Logs
+
+========================================
+8️⃣ INTERNAL COMPANY BYPASS
+========================================
+
+If company.is_internal = true:
+
+- Bypass invoice limits
+- Bypass subscription limits
+- Skip onboarding wizard
+- Always show Enterprise dashboard
+- Still log everything
+
+========================================
+9️⃣ AUDIT LOGGING (SHA256 PROTECTED)
+========================================
+
+Log:
+
+- Environment switch
+- Invoice creation
+- Invoice submission
+- FBR failure
+- Invoice lock
+- Manual tax override
+- Manual SRO entry
+- Internal bypass usage
+
+Each entry must contain:
+- company_id
+- user_id
+- invoice_id (if applicable)
+- action
+- timestamp
+- sha256 integrity hash
+
+========================================
+🔟 PDF REQUIREMENTS
+========================================
+
+If Draft:
+- Show DRAFT watermark.
+
+If Locked:
+- Show FBR logo.
+- Show FBR invoice number (if exists).
+- Show QR code.
+- Show WHT deduction.
+- Show SHA256 hash.
+
+Filename:
+If fbr_invoice_number exists:
+   invoice-{fbr_invoice_number}.pdf
+Else:
+   invoice-{invoice_number}.pdf
+
+========================================
+1️⃣1️⃣ SEARCH ENGINE UPGRADE
+========================================
+
+Search

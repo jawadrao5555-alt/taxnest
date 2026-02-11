@@ -39,6 +39,20 @@ TaxNest is built on **Laravel 12** with **Breeze** for authentication, using **P
 - **Tax Override Management:** Full CRUD admin panel (`/tax-overrides`) with tabbed interface for sector, province, customer, and SRO rules. Role-based access: super_admin manages all rule types, company_admin manages customer-specific rules only. Company isolation enforced on all customer rule operations.
 - **Override Analytics:** Admin dashboard includes Tax Intelligence stats (active rules count, total/monthly usage). Enhanced override-logs page with dual-tab view for MIS overrides and tax intelligence usage with layer distribution breakdown.
 
+**FBR Compliance Hardening (Feb 2026):**
+- **Corrected FBR Payload Math:** `valueSalesExcludingST = quantity × unit_price`, `salesTaxApplicable = valueSalesExcludingST × (taxRate/100)`, `totalValues = valueSalesExcludingST + salesTaxApplicable`. Previously used unit_price only.
+- **Dynamic Company Fields in Payload:** Seller province, business name, NTN, buyer registration type all sourced from company settings (no more hardcoded "Sindh"/"Karachi"). Buyer registration type auto-detected from NTN format.
+- **UOM Enforcement:** `default_uom` and `sale_type` columns added to `invoice_items` table. UOM dropdown in create/edit forms with 10 options. UOM sent in FBR payload per item.
+- **SaleType Mapping:** `ScheduleEngine::mapSaleType()` maps schedule types to FBR sale type strings (e.g., "Goods at standard rate", "Exempt goods", etc.).
+- **Exempt Schedule Fix:** Exempt items now require SRO Schedule No only (serial_no not required per FBR spec). Updated in ScheduleEngine backend and Alpine.js frontend.
+- **FBR Token from Company Settings:** Removed hardcoded "YOUR_SANDBOX_TOKEN". FbrService now reads encrypted tokens from company's `fbr_sandbox_token` or `fbr_production_token` based on `fbr_environment` setting.
+- **Pre-submission Payload Validator:** `ScheduleEngine::validateFbrPayload()` checks all required FBR fields (seller/buyer data, item fields, quantity/value constraints, exempt tax consistency) before sending to FBR.
+- **Validate-Only Sandbox Mode:** `FbrService::validateOnly()` tests payload against FBR sandbox validation endpoint without submitting. Available only in sandbox environment. Accessible via "Validate FBR Payload" button on invoice detail page.
+- **HS Code Search:** Invoice index search now includes HS code matching across invoice items via `orWhereHas`.
+- **Manual Override Audit Logging:** Tax rate, SRO, and MRP overrides are logged via `AuditLogService` during invoice creation/update with user attribution.
+- **FBR Settings UI Enhancement:** Added "Sandbox Test Mode" info section and environment badge (amber/red) on Token Health panel.
+- **FBR Value Breakdown:** Invoice create/edit forms show "FBR Value (qty × price)" and "FBR Tax (value × rate%)" per item for transparency.
+
 ## External Dependencies
 - **PostgreSQL:** Primary database managed by Replit.
 - **FBR (Federal Board of Revenue) Pakistan:** Integration for tax and invoice submission compliance.

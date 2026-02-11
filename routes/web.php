@@ -50,6 +50,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::put('/invoice/{invoice}', [InvoiceController::class, 'update']);
         Route::post('/invoice/{invoice}/submit', [InvoiceController::class, 'submit']);
         Route::post('/invoice/{invoice}/validate', [InvoiceController::class, 'validateInvoice']);
+        Route::post('/invoice/{invoice}/validate-fbr', [InvoiceController::class, 'validateFbrPayload']);
 
         Route::get('/customers', [CustomerLedgerController::class, 'index'])->name('customers.index');
         Route::get('/customers/{ntn}/ledger', [CustomerLedgerController::class, 'show']);

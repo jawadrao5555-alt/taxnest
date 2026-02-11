@@ -80,13 +80,26 @@
                     <p class="text-xs text-gray-400 mt-1">Set when your FBR token expires. You'll receive notifications 48 hours before expiry.</p>
                 </div>
 
+                <div class="border-2 border-emerald-200 rounded-lg p-6 bg-emerald-50">
+                    <h3 class="text-lg font-semibold text-emerald-900 mb-3">Sandbox Test Mode</h3>
+                    <div class="bg-white border border-emerald-200 rounded-lg p-4 mb-4">
+                        <p class="text-sm text-gray-700">Test your FBR payload without actually submitting invoices. Use this to verify your configuration and payload structure.</p>
+                    </div>
+                    <p class="text-xs text-emerald-700 font-medium">ℹ️ This feature is only available when using Sandbox environment</p>
+                </div>
+
                 <div class="flex justify-end">
                     <button type="submit" class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition">Save FBR Settings</button>
                 </div>
             </form>
 
             <div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-100 p-6" x-data="tokenHealth()">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4">Token Health</h3>
+                <div class="flex items-center gap-3 mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">Token Health</h3>
+                    <span class="px-3 py-1 rounded-full text-xs font-semibold"
+                        :class="environment === 'sandbox' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'"
+                        x-text="environment === 'sandbox' ? 'Sandbox' : 'Production'"></span>
+                </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div class="bg-gray-50 rounded-lg p-4">
@@ -151,6 +164,7 @@
     }
     function tokenHealth() {
         return {
+            environment: '{{ $company->fbr_environment ?? "sandbox" }}',
             connectionStatus: '{{ $company->fbr_connection_status ?? "unknown" }}',
             testing: false,
             testMessage: '',

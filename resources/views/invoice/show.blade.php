@@ -36,6 +36,54 @@
                         </div>
                     </div>
                 </div>
+                <div x-data="fbrValidator()">
+                    <button @click="doValidate()" :disabled="validating" class="inline-flex items-center px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition disabled:opacity-50">
+                        <svg x-show="validating" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        Validate FBR Payload
+                    </button>
+                    <div x-show="validationResult" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="validationResult = null">
+                        <div class="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 max-h-[80vh] overflow-y-auto">
+                            <h3 class="text-lg font-bold text-gray-900 mb-4">FBR Payload Validation</h3>
+                            <div x-show="validationResult?.status === 'valid'" class="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                                <p class="text-sm text-emerald-700 font-medium" x-text="validationResult?.message"></p>
+                            </div>
+                            <div x-show="validationResult?.status === 'invalid'" class="space-y-2">
+                                <div class="p-3 bg-red-50 border border-red-200 rounded-lg">
+                                    <p class="text-sm text-red-700 font-medium mb-2">Validation Failed</p>
+                                    <template x-for="err in validationResult?.errors || []">
+                                        <p class="text-xs text-red-600" x-text="err"></p>
+                                    </template>
+                                </div>
+                            </div>
+                            <div x-show="validationResult?.status === 'error'" class="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                                <p class="text-sm text-amber-700" x-text="validationResult?.message"></p>
+                            </div>
+                            <button @click="validationResult = null" class="mt-4 w-full text-center text-sm text-gray-500 hover:text-gray-700">Close</button>
+                        </div>
+                    </div>
+                </div>
+                <script>
+                function fbrValidator() {
+                    return {
+                        validating: false,
+                        validationResult: null,
+                        async doValidate() {
+                            this.validating = true;
+                            this.validationResult = null;
+                            try {
+                                let res = await fetch('/invoice/{{ $invoice->id }}/validate-fbr', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '', 'Accept': 'application/json' }
+                                });
+                                this.validationResult = await res.json();
+                            } catch(e) {
+                                this.validationResult = { status: 'error', message: 'Failed to validate. Please try again.' };
+                            }
+                            this.validating = false;
+                        }
+                    };
+                }
+                </script>
                 @endif
                 @if($invoice->status === 'locked')
                 <form method="POST" action="{{ route('invoice.verify', $invoice->id) }}" class="inline">

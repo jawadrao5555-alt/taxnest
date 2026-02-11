@@ -1,0 +1,187 @@
+You are upgrading the existing TaxNest Enterprise FBR system.
+
+DO NOT redesign architecture.
+DO NOT modify FBR payload key names.
+DO NOT remove existing features.
+DO NOT break compliance engine.
+DO NOT change WHT manual strategy.
+
+Implement the following compliance hardening upgrades.
+
+========================================
+1️⃣ ITEM-LEVEL VALUE CORRECTION
+========================================
+
+Ensure:
+
+valueSalesExcludingST =
+   quantity × unit_price
+
+salesTaxApplicable =
+   valueSalesExcludingST × taxRate%
+
+Total invoice must be:
+
+sum(valueSalesExcludingST)
+sum(salesTaxApplicable)
+
+DO NOT send gross including tax as base value.
+
+========================================
+2️⃣ UOM ENFORCEMENT
+========================================
+
+Each invoice item MUST contain:
+
+- defaultUom
+
+Logic:
+
+If Product Mode:
+   auto-fill from product.defaultUom
+
+If Manual Mode:
+   auto-fill from HS → PCT global engine mapping
+
+Block submission if UOM missing.
+
+========================================
+3️⃣ 3RD SCHEDULE VALIDATION ENGINE (STRICT MODE)
+========================================
+
+Apply rules EXACTLY:
+
+IF scheduleType = "3rd Schedule" AND taxRate = 18:
+   - MRP REQUIRED
+   - SRO NOT required
+   - Serial NOT required
+
+IF scheduleType = "3rd Schedule" AND taxRate < 18:
+   - MRP REQUIRED
+   - SRO REQUIRED
+   - sroItemSerialNo REQUIRED
+
+IF scheduleType = "Exempt":
+   - SRO REQUIRED
+
+IF scheduleType = "Zero Rated":
+   - SRO NOT required
+   - Serial NOT required
+   - MRP NOT required
+
+IF scheduleType = "Standard":
+   - No SRO required
+   - No Serial required
+
+Block submission if any required field missing.
+Show clear message:
+   "SRO number required for selected schedule"
+   "MRP required for 3rd Schedule"
+   etc.
+
+========================================
+4️⃣ FLEXIBLE TAX RATE ENGINE (0%–18%)
+========================================
+
+System must allow dynamic taxRate between:
+
+0% to 18%
+
+No hardcoded 18%.
+
+Validation:
+
+taxRate must match:
+   HS mapping defaultTaxRate
+OR
+   manually overridden with reason logged in audit trail.
+
+========================================
+5️⃣ EXEMPT & ZERO RATED DIFFERENTIATION
+========================================
+
+Ensure payload differentiates correctly:
+
+Exempt → scheduleType = EXEMPT
+Zero Rated → scheduleType = ZERO_RATED
+
+Do NOT mix both.
+
+========================================
+6️⃣ FBR PAYLOAD VALIDATION CHECK
+========================================
+
+Before submission:
+
+Run final validator:
+
+- Seller NTN present
+- Buyer NTN required if Registered
+- HS code valid
+- valueSalesExcludingST correct
+- taxRate consistent
+- Required SRO/Serial/MRP present
+- Invoice number exists
+- Company FBR token exists
+- Environment determined from company setting
+
+Block submission if failed.
+
+========================================
+7️⃣ SEARCH HARDENING
+========================================
+
+Search must support:
+
+- Internal invoice_number
+- fbr_invoice_number
+- Buyer name
+- Buyer NTN
+- HS code
+
+========================================
+8️⃣ AUDIT LOG ADDITION
+========================================
+
+If:
+- Tax rate manually overridden
+- SRO manually entered
+- MRP manually edited
+
+Log:
+
+company_id
+user_id
+invoice_id
+field_changed
+old_value
+new_value
+timestamp
+sha256_hash
+
+========================================
+9️⃣ SANDBOX TEST VALIDATION MODE
+========================================
+
+Inside FBR Settings:
+
+Add:
+- "Validate Payload Only" button
+   (Does NOT send to FBR)
+   (Runs full compliance check)
+   (Shows JSON preview)
+
+========================================
+🔟 FINAL VALIDATION
+========================================
+
+After implementation:
+
+- All routes return 200
+- Queue worker operational
+- No payload structure modified
+- No existing module broken
+- Compliance engine still running
+- WHT manual selection untouched
+
+Return summary of implemented changes.

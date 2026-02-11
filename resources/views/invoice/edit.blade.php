@@ -152,17 +152,33 @@
                                 <p class="text-xs text-blue-700" x-text="item.hsLookupInfo"></p>
                             </div>
 
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                <div class="lg:col-span-1">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                                <div>
                                     <label class="block text-xs font-medium text-gray-500 mb-1">Description</label>
                                     <input type="text" :name="'items[' + index + '][description]'" x-model="item.description" required class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">UOM</label>
+                                    <select :name="'items[' + index + '][default_uom]'" x-model="item.default_uom"
+                                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        <option value="Numbers, pieces, units">Numbers, pieces, units</option>
+                                        <option value="Kilograms">Kilograms</option>
+                                        <option value="Liters">Liters</option>
+                                        <option value="Meters">Meters</option>
+                                        <option value="Square meters">Square meters</option>
+                                        <option value="Cubic meters">Cubic meters</option>
+                                        <option value="Packs">Packs</option>
+                                        <option value="Dozens">Dozens</option>
+                                        <option value="Tons">Tons</option>
+                                        <option value="Others">Others</option>
+                                    </select>
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 mb-1">Quantity</label>
                                     <input type="number" step="0.01" :name="'items[' + index + '][quantity]'" x-model="item.quantity" @input="calcTax(index)" required class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-500 mb-1">Price (Rs.)</label>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Unit Price (Rs.)</label>
                                     <input type="number" step="0.01" :name="'items[' + index + '][price]'" x-model="item.price" @input="calcTax(index)" required class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 </div>
                             </div>
@@ -171,6 +187,9 @@
                                 <span>Subtotal: <span class="font-medium text-gray-800" x-text="'Rs. ' + itemSubtotal(index)"></span></span>
                                 <span>Tax (<span x-text="item.tax_rate"></span>%): <span class="font-medium text-gray-800" x-text="'Rs. ' + parseFloat(item.tax || 0).toFixed(2)"></span></span>
                                 <span>Line Total: <span class="font-medium text-gray-800" x-text="'Rs. ' + itemTotal(index)"></span></span>
+                            </div>
+                            <div class="mt-1 text-xs text-gray-400">
+                                <span x-text="'FBR Value (qty × price): Rs. ' + itemSubtotal(index) + ' | FBR Tax (value × ' + item.tax_rate + '%): Rs. ' + parseFloat(item.tax || 0).toFixed(2)"></span>
                             </div>
                         </div>
                     </template>
@@ -242,7 +261,7 @@
                 standard: 'Standard Rate: No SRO, Serial, or MRP required.',
                 '3rd_schedule_standard': '3rd Schedule (' + companyStandardRate + '%+): Only MRP/Retail Price required.',
                 '3rd_schedule_reduced': '3rd Schedule (reduced rate): SRO, Serial No, and Fixed/Notified Value all required.',
-                exempt: 'Exempt: SRO Schedule No and Serial No required.',
+                exempt: 'Exempt: SRO Schedule No required (Serial No not needed).',
                 zero_rated: 'Zero Rated: SRO and Serial are optional.',
                 reduced: 'Reduced Rate: SRO and Serial No required.',
             };
@@ -257,7 +276,7 @@
                         }
                         return { requires_sro: true, requires_serial: true, requires_mrp: true, optional_sro: false, optional_serial: false, hint: scheduleHints['3rd_schedule_reduced'] };
                     case 'exempt':
-                        return { requires_sro: true, requires_serial: true, requires_mrp: false, optional_sro: false, optional_serial: false, hint: scheduleHints.exempt };
+                        return { requires_sro: true, requires_serial: false, requires_mrp: false, optional_sro: false, optional_serial: false, hint: scheduleHints.exempt };
                     case 'zero_rated':
                         return { requires_sro: false, requires_serial: false, requires_mrp: false, optional_sro: true, optional_serial: true, hint: scheduleHints.zero_rated };
                     case 'reduced':
@@ -288,6 +307,7 @@
                         'sro_schedule_no' => $i->sro_schedule_no ?? '',
                         'serial_no' => $i->serial_no ?? '',
                         'mrp' => $i->mrp ?? '',
+                        'default_uom' => $i->default_uom ?? 'Numbers, pieces, units',
                         'requires_sro' => $rules['requires_sro'],
                         'requires_serial' => $rules['requires_serial'],
                         'requires_mrp' => $rules['requires_mrp'],
@@ -322,6 +342,7 @@
                         product_id: '', hs_code: '', pct_code: '', description: '',
                         quantity: 1, price: 0, tax_rate: companyStandardRate, tax: 0,
                         schedule_type: 'standard', sro_schedule_no: '', serial_no: '', mrp: '',
+                        default_uom: 'Numbers, pieces, units',
                         requires_sro: false, requires_serial: false, requires_mrp: false,
                         optional_sro: false, optional_serial: false, schedule_hint: '',
                         productSearch: '', showDropdown: false, productResults: [], hsLookupInfo: ''

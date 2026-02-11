@@ -36,7 +36,10 @@ class InvoiceController extends Controller
                   ->orWhere('fbr_invoice_number', 'ilike', "%{$search}%")
                   ->orWhere('invoice_number', 'ilike', "%{$search}%")
                   ->orWhere('buyer_name', 'ilike', "%{$search}%")
-                  ->orWhere('buyer_ntn', 'ilike', "%{$search}%");
+                  ->orWhere('buyer_ntn', 'ilike', "%{$search}%")
+                  ->orWhereHas('items', function ($iq) use ($search) {
+                      $iq->where('hs_code', 'ilike', "%{$search}%");
+                  });
             });
         }
 
@@ -82,6 +85,7 @@ class InvoiceController extends Controller
             'items.*.sro_schedule_no' => 'nullable|string|max:100',
             'items.*.serial_no' => 'nullable|string|max:100',
             'items.*.mrp' => 'nullable|numeric|min:0',
+            'items.*.default_uom' => 'nullable|string|max:100',
         ]);
 
         $itemsWithTaxRate = collect($request->items)->map(function ($item) {
@@ -128,20 +132,44 @@ class InvoiceController extends Controller
                 'branch_id' => $request->branch_id,
             ]);
 
-            foreach ($request->items as $item) {
+            $manualOverrides = [];
+            foreach ($request->items as $idx => $item) {
+                $scheduleType = $item['schedule_type'] ?? 'standard';
+                $saleType = ScheduleEngine::mapSaleType($scheduleType);
+
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
                     'hs_code' => $item['hs_code'],
-                    'schedule_type' => $item['schedule_type'] ?? 'standard',
+                    'schedule_type' => $scheduleType,
                     'pct_code' => $item['pct_code'] ?? null,
                     'tax_rate' => $this->extractTaxRate($item),
                     'sro_schedule_no' => $item['sro_schedule_no'] ?? null,
                     'serial_no' => $item['serial_no'] ?? null,
                     'mrp' => !empty($item['mrp']) ? $item['mrp'] : null,
+                    'default_uom' => $item['default_uom'] ?? 'Numbers, pieces, units',
+                    'sale_type' => $saleType,
                     'description' => $item['description'],
                     'quantity' => $item['quantity'],
                     'price' => $item['price'],
                     'tax' => $item['tax'],
+                ]);
+
+                if (!empty($item['tax_rate_override']) || !empty($item['sro_override']) || !empty($item['mrp_override'])) {
+                    $manualOverrides[] = [
+                        'item_index' => $idx + 1,
+                        'hs_code' => $item['hs_code'],
+                        'tax_rate' => $item['tax_rate'] ?? null,
+                        'sro' => $item['sro_schedule_no'] ?? null,
+                        'mrp' => $item['mrp'] ?? null,
+                    ];
+                }
+            }
+
+            if (!empty($manualOverrides)) {
+                AuditLogService::log('manual_tax_override', 'Invoice', $invoice->id, null, [
+                    'overrides' => $manualOverrides,
+                    'user' => auth()->user()->name,
+                    'action' => 'invoice_creation',
                 ]);
             }
 
@@ -242,6 +270,7 @@ class InvoiceController extends Controller
             'items.*.sro_schedule_no' => 'nullable|string|max:100',
             'items.*.serial_no' => 'nullable|string|max:100',
             'items.*.mrp' => 'nullable|numeric|min:0',
+            'items.*.default_uom' => 'nullable|string|max:100',
         ]);
 
         $itemsWithTaxRate = collect($request->items)->map(function ($item) {
@@ -285,20 +314,44 @@ class InvoiceController extends Controller
             ]);
 
             $invoice->items()->delete();
-            foreach ($request->items as $item) {
+            $manualOverrides = [];
+            foreach ($request->items as $idx => $item) {
+                $scheduleType = $item['schedule_type'] ?? 'standard';
+                $saleType = ScheduleEngine::mapSaleType($scheduleType);
+
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
                     'hs_code' => $item['hs_code'],
-                    'schedule_type' => $item['schedule_type'] ?? 'standard',
+                    'schedule_type' => $scheduleType,
                     'pct_code' => $item['pct_code'] ?? null,
                     'tax_rate' => $this->extractTaxRate($item),
                     'sro_schedule_no' => $item['sro_schedule_no'] ?? null,
                     'serial_no' => $item['serial_no'] ?? null,
                     'mrp' => !empty($item['mrp']) ? $item['mrp'] : null,
+                    'default_uom' => $item['default_uom'] ?? 'Numbers, pieces, units',
+                    'sale_type' => $saleType,
                     'description' => $item['description'],
                     'quantity' => $item['quantity'],
                     'price' => $item['price'],
                     'tax' => $item['tax'],
+                ]);
+
+                if (!empty($item['tax_rate_override']) || !empty($item['sro_override']) || !empty($item['mrp_override'])) {
+                    $manualOverrides[] = [
+                        'item_index' => $idx + 1,
+                        'hs_code' => $item['hs_code'],
+                        'tax_rate' => $item['tax_rate'] ?? null,
+                        'sro' => $item['sro_schedule_no'] ?? null,
+                        'mrp' => $item['mrp'] ?? null,
+                    ];
+                }
+            }
+
+            if (!empty($manualOverrides)) {
+                AuditLogService::log('manual_tax_override', 'Invoice', $invoice->id, $oldData, [
+                    'overrides' => $manualOverrides,
+                    'user' => auth()->user()->name,
+                    'action' => 'invoice_update',
                 ]);
             }
 
@@ -647,6 +700,25 @@ class InvoiceController extends Controller
 
         return redirect('/invoice/' . $invoice->id . '/preview')
             ->with('validation_result', $validationResult);
+    }
+
+    public function validateFbrPayload(Invoice $invoice)
+    {
+        $companyId = app('currentCompanyId');
+        if ($invoice->company_id !== $companyId && auth()->user()->role !== 'super_admin') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $invoice->load('items', 'company');
+        $fbrService = new \App\Services\FbrService();
+        $result = $fbrService->validateOnly($invoice);
+
+        AuditLogService::log('fbr_payload_validation', 'Invoice', $invoice->id, null, [
+            'status' => $result['status'],
+            'errors' => $result['errors'] ?? [],
+        ]);
+
+        return response()->json($result);
     }
 
     public function apiStatus(Invoice $invoice)

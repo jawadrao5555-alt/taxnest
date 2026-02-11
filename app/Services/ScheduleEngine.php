@@ -150,27 +150,27 @@ class ScheduleEngine
             $config = self::getScheduleConfig($scheduleType);
             $itemNum = $index + 1;
 
-            if ($rules['requires_sro'] && empty($item['sro_schedule_no'])) {
-                if ($scheduleType === '3rd_schedule') {
-                    $errors[] = "Item #{$itemNum}: SRO Schedule No is required for 3rd Schedule items with reduced tax rate (below {$standardTaxRate}%)";
-                } else {
+            if ($scheduleType === '3rd_schedule' && $taxRate !== null && $taxRate < $standardTaxRate) {
+                $missing = [];
+                if ($rules['requires_sro'] && empty($item['sro_schedule_no'])) $missing[] = 'SRO';
+                if ($rules['requires_serial'] && empty($item['serial_no'])) $missing[] = 'Serial No';
+                if ($rules['requires_mrp'] && (empty($item['mrp']) || floatval($item['mrp']) <= 0)) $missing[] = 'MRP';
+                if (!empty($missing)) {
+                    $errors[] = "Item #{$itemNum}: 3rd Schedule (Reduced Rate) requires " . implode(', ', $missing) . ".";
+                }
+            } else {
+                if ($rules['requires_sro'] && empty($item['sro_schedule_no'])) {
                     $errors[] = "Item #{$itemNum}: SRO Schedule No is required for {$config['label']}";
                 }
-            }
-            if ($rules['requires_serial'] && empty($item['serial_no'])) {
-                if ($scheduleType === '3rd_schedule') {
-                    $errors[] = "Item #{$itemNum}: SRO Item Serial No is required for 3rd Schedule items with reduced tax rate (below {$standardTaxRate}%)";
-                } else {
+                if ($rules['requires_serial'] && empty($item['serial_no'])) {
                     $errors[] = "Item #{$itemNum}: SRO Item Serial No is required for {$config['label']}";
                 }
-            }
-            if ($rules['requires_mrp'] && (empty($item['mrp']) || floatval($item['mrp']) <= 0)) {
-                if ($scheduleType === '3rd_schedule' && $taxRate !== null && $taxRate >= $standardTaxRate) {
-                    $errors[] = "Item #{$itemNum}: MRP (Retail Price) is required for 3rd Schedule items at standard {$standardTaxRate}% rate";
-                } elseif ($scheduleType === '3rd_schedule') {
-                    $errors[] = "Item #{$itemNum}: Fixed/Notified Value or Retail Price is required for 3rd Schedule items with reduced tax rate (below {$standardTaxRate}%)";
-                } else {
-                    $errors[] = "Item #{$itemNum}: MRP is required for {$config['label']}";
+                if ($rules['requires_mrp'] && (empty($item['mrp']) || floatval($item['mrp']) <= 0)) {
+                    if ($scheduleType === '3rd_schedule' && $taxRate !== null && $taxRate >= $standardTaxRate) {
+                        $errors[] = "Item #{$itemNum}: MRP (Retail Price) is required for 3rd Schedule items at standard {$standardTaxRate}% rate";
+                    } else {
+                        $errors[] = "Item #{$itemNum}: MRP is required for {$config['label']}";
+                    }
                 }
             }
         }

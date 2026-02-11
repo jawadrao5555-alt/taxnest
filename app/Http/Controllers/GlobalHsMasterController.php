@@ -196,6 +196,8 @@ class GlobalHsMasterController extends Controller
                 $result['sro_suggestion'] = $sroSuggestion;
             }
             $result['standard_tax_rate'] = $standardTaxRate;
+            $result['st_withheld_applicable'] = self::isStWithheldApplicable($hsCode, $result['schedule_type'] ?? 'standard');
+            $result['petroleum_levy_applicable'] = self::isPetroleumLevyApplicable($hsCode);
             return response()->json($result);
         }
 
@@ -207,12 +209,16 @@ class GlobalHsMasterController extends Controller
             $resolved['requires_serial'] = $rules['requires_serial'];
             $resolved['requires_mrp'] = $rules['requires_mrp'];
             $resolved['standard_tax_rate'] = $standardTaxRate;
+            $resolved['st_withheld_applicable'] = self::isStWithheldApplicable($hsCode, $resolved['schedule_type'] ?? 'standard');
+            $resolved['petroleum_levy_applicable'] = self::isPetroleumLevyApplicable($hsCode);
             return response()->json($resolved);
         }
 
         $scheduleResult = ScheduleEngine::lookupByHsCode($hsCode, $standardTaxRate);
         if ($scheduleResult) {
             $scheduleResult['standard_tax_rate'] = $standardTaxRate;
+            $scheduleResult['st_withheld_applicable'] = self::isStWithheldApplicable($hsCode, $scheduleResult['schedule_type'] ?? 'standard');
+            $scheduleResult['petroleum_levy_applicable'] = self::isPetroleumLevyApplicable($hsCode);
         }
         return response()->json($scheduleResult ?: ['found' => false]);
     }
@@ -261,5 +267,25 @@ class GlobalHsMasterController extends Controller
             'frequency' => $unmappedFreq,
             'total' => GlobalHsMaster::count(),
         ]);
+    }
+
+    private static function isStWithheldApplicable(string $hsCode, string $scheduleType): bool
+    {
+        $stWithheldPrefixes = ['2523', '7213', '7214', '7216', '7228', '7308', '8544'];
+        $normalized = preg_replace('/[^0-9]/', '', $hsCode);
+        foreach ($stWithheldPrefixes as $prefix) {
+            if (str_starts_with($normalized, $prefix)) return true;
+        }
+        return false;
+    }
+
+    private static function isPetroleumLevyApplicable(string $hsCode): bool
+    {
+        $petroleumPrefixes = ['2709', '2710', '2711', '2713'];
+        $normalized = preg_replace('/[^0-9]/', '', $hsCode);
+        foreach ($petroleumPrefixes as $prefix) {
+            if (str_starts_with($normalized, $prefix)) return true;
+        }
+        return false;
     }
 }

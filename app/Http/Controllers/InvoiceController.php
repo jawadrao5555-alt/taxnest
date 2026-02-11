@@ -85,9 +85,9 @@ class InvoiceController extends Controller
             'buyer_name' => 'required|string|max:255',
             'buyer_ntn' => 'required|string|max:50',
             'branch_id' => 'nullable|exists:branches,id',
-            'document_type' => 'nullable|string|in:Sale Invoice,Credit Note,Debit Note',
-            'reference_invoice_number' => 'nullable|string|max:255',
-            'destination_province' => 'nullable|string|max:100',
+            'document_type' => 'required|string|in:Sale Invoice,Credit Note,Debit Note',
+            'reference_invoice_number' => $request->input('document_type') !== 'Sale Invoice' ? 'required|string|max:255' : 'nullable|string|max:255',
+            'destination_province' => 'required|string|max:100',
             'wht_rate' => 'nullable|numeric|min:0|max:100',
             'items' => 'required|array|min:1',
             'items.*.hs_code' => 'required|string|max:50',
@@ -104,6 +104,10 @@ class InvoiceController extends Controller
             'items.*.default_uom' => 'nullable|string|max:100',
             'items.*.st_withheld_at_source' => 'nullable',
             'items.*.petroleum_levy' => 'nullable|numeric|min:0',
+        ], [
+            'document_type.required' => 'Document type is required.',
+            'destination_province.required' => 'Destination Province is required.',
+            'reference_invoice_number.required' => 'Reference Invoice is required for Credit/Debit Notes.',
         ]);
 
         $itemsWithTaxRate = collect($request->items)->map(function ($item) {
@@ -320,9 +324,9 @@ class InvoiceController extends Controller
             'buyer_name' => 'required|string|max:255',
             'buyer_ntn' => 'required|string|max:50',
             'branch_id' => 'nullable|exists:branches,id',
-            'document_type' => 'nullable|string|in:Sale Invoice,Credit Note,Debit Note',
-            'reference_invoice_number' => 'nullable|string|max:255',
-            'destination_province' => 'nullable|string|max:100',
+            'document_type' => 'required|string|in:Sale Invoice,Credit Note,Debit Note',
+            'reference_invoice_number' => $request->input('document_type') !== 'Sale Invoice' ? 'required|string|max:255' : 'nullable|string|max:255',
+            'destination_province' => 'required|string|max:100',
             'wht_rate' => 'nullable|numeric|min:0|max:100',
             'items' => 'required|array|min:1',
             'items.*.hs_code' => 'required|string|max:50',
@@ -339,6 +343,10 @@ class InvoiceController extends Controller
             'items.*.default_uom' => 'nullable|string|max:100',
             'items.*.st_withheld_at_source' => 'nullable',
             'items.*.petroleum_levy' => 'nullable|numeric|min:0',
+        ], [
+            'document_type.required' => 'Document type is required.',
+            'destination_province.required' => 'Destination Province is required.',
+            'reference_invoice_number.required' => 'Reference Invoice is required for Credit/Debit Notes.',
         ]);
 
         $itemsWithTaxRate = collect($request->items)->map(function ($item) {

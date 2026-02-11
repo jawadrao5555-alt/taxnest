@@ -6,7 +6,7 @@
         </div>
     </x-slot>
 
-    <div class="py-8">
+    <div class="py-8 pb-36">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <form method="POST" action="/invoice/{{ $invoice->id }}" x-data="invoiceEditForm()" class="space-y-6">
                 @csrf
@@ -87,13 +87,14 @@
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Destination Province</label>
-                            <select name="destination_province" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Destination Province *</label>
+                            <select name="destination_province" x-model="destination_province" required class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 <option value="">— Select Province —</option>
                                 @foreach($provinces as $prov)
-                                <option value="{{ $prov }}" {{ old('destination_province', $invoice->destination_province ?? '') == $prov ? 'selected' : '' }}>{{ $prov }}</option>
+                                <option value="{{ $prov }}">{{ $prov }}</option>
                                 @endforeach
                             </select>
+                            @error('destination_province') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">WHT Rate (%)</label>
@@ -224,15 +225,15 @@
                                     <input type="number" step="0.01" :name="'items[' + index + '][price]'" x-model="item.price" @input="calcTax(index)" required class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 </div>
                             </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                                <div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3" x-show="item.show_st_withheld || item.show_petroleum_levy" x-cloak>
+                                <div x-show="item.show_st_withheld">
                                     <label class="flex items-center gap-2 text-xs text-gray-500">
                                         <input type="checkbox" :name="'items[' + index + '][st_withheld_at_source]'" x-model="item.st_withheld_at_source" value="1"
                                             class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
                                         ST Withheld at Source
                                     </label>
                                 </div>
-                                <div>
+                                <div x-show="item.show_petroleum_levy">
                                     <label class="block text-xs font-medium text-gray-500 mb-1">Petroleum Levy (Rs.)</label>
                                     <input type="number" step="0.01" min="0" :name="'items[' + index + '][petroleum_levy]'" x-model="item.petroleum_levy" placeholder="0.00"
                                         class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
@@ -371,6 +372,7 @@
                 buyer_ntn: @js($invoice->buyer_ntn),
                 document_type: @js($invoice->document_type ?? 'Sale Invoice'),
                 reference_invoice_number: @js($invoice->reference_invoice_number ?? ''),
+                destination_province: @js($invoice->destination_province ?? ''),
                 wht_rate: @js($invoice->wht_rate ?? 0),
                 items: {!! json_encode($invoice->items->map(function($i) use ($standardTaxRate) {
                     $scheduleType = $i->schedule_type ?? 'standard';
@@ -393,6 +395,8 @@
                         'default_uom' => $i->default_uom ?? 'Numbers, pieces, units',
                         'st_withheld_at_source' => (bool)($i->st_withheld_at_source ?? false),
                         'petroleum_levy' => $i->petroleum_levy ?? '',
+                        'show_st_withheld' => (bool)($i->st_withheld_at_source ?? false),
+                        'show_petroleum_levy' => !empty($i->petroleum_levy),
                         'requires_sro' => $rules['requires_sro'],
                         'requires_serial' => $rules['requires_serial'],
                         'requires_mrp' => $rules['requires_mrp'],
@@ -433,6 +437,7 @@
                         schedule_type: 'standard', sro_schedule_no: '', serial_no: '', mrp: '',
                         default_uom: 'Numbers, pieces, units',
                         st_withheld_at_source: false, petroleum_levy: '',
+                        show_st_withheld: false, show_petroleum_levy: false,
                         requires_sro: false, requires_serial: false, requires_mrp: false,
                         optional_sro: false, optional_serial: false, schedule_hint: '',
                         productSearch: '', showDropdown: false, productResults: [], hsLookupInfo: ''
@@ -478,6 +483,11 @@
                             item.pct_code = data.pct_code;
                             item.schedule_type = data.schedule_type;
                             item.tax_rate = data.tax_rate;
+                            if (data.default_uom) item.default_uom = data.default_uom;
+                            item.show_st_withheld = !!data.st_withheld_applicable;
+                            item.show_petroleum_levy = !!data.petroleum_levy_applicable;
+                            if (!item.show_st_withheld) item.st_withheld_at_source = false;
+                            if (!item.show_petroleum_levy) item.petroleum_levy = '';
                             this.applyScheduleRules(item);
                             item.hsLookupInfo = 'Auto-detected: PCT ' + data.pct_code + ' | Schedule: ' + data.schedule_type + ' | Tax: ' + data.tax_rate + '%';
                             this.calcTax(index);

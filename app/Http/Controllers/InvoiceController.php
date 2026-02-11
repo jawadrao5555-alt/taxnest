@@ -6,6 +6,8 @@ use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Subscription;
 use App\Jobs\SendInvoiceToFbrJob;
+use App\Services\InvoiceActivityService;
+use App\Services\IntegrityHashService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -78,6 +80,12 @@ class InvoiceController extends Controller
                 ]);
             }
 
+            InvoiceActivityService::log($invoice->id, $companyId, 'created', [
+                'buyer_name' => $request->buyer_name,
+                'total_amount' => $totalAmount,
+                'items_count' => count($request->items),
+            ]);
+
             DB::commit();
             return redirect('/invoices')->with('success', 'Invoice created successfully.');
         } catch (\Exception $e) {
@@ -92,7 +100,7 @@ class InvoiceController extends Controller
         if ($invoice->company_id !== $companyId && auth()->user()->role !== 'super_admin') {
             abort(403);
         }
-        $invoice->load('items', 'company');
+        $invoice->load('items', 'company', 'activityLogs.user');
         return view('invoice.show', compact('invoice'));
     }
 
@@ -126,6 +134,12 @@ class InvoiceController extends Controller
             'items.*.tax' => 'required|numeric|min:0',
         ]);
 
+        $oldData = [
+            'buyer_name' => $invoice->buyer_name,
+            'buyer_ntn' => $invoice->buyer_ntn,
+            'total_amount' => $invoice->total_amount,
+        ];
+
         DB::beginTransaction();
         try {
             $totalAmount = 0;
@@ -151,6 +165,15 @@ class InvoiceController extends Controller
                 ]);
             }
 
+            InvoiceActivityService::log($invoice->id, $invoice->company_id, 'edited', [
+                'old' => $oldData,
+                'new' => [
+                    'buyer_name' => $request->buyer_name,
+                    'buyer_ntn' => $request->buyer_ntn,
+                    'total_amount' => $totalAmount,
+                ],
+            ]);
+
             DB::commit();
             return redirect('/invoice/' . $invoice->id)->with('success', 'Invoice updated successfully.');
         } catch (\Exception $e) {
@@ -168,9 +191,28 @@ class InvoiceController extends Controller
         $invoice->status = 'submitted';
         $invoice->save();
 
+        InvoiceActivityService::log($invoice->id, $invoice->company_id, 'submitted', null, request()->ip());
+
         SendInvoiceToFbrJob::dispatch($invoice->id);
 
         return redirect('/invoices')->with('success', 'Invoice submitted to FBR for processing.');
+    }
+
+    public function verifyIntegrity(Invoice $invoice)
+    {
+        $companyId = app('currentCompanyId');
+        if ($invoice->company_id !== $companyId && auth()->user()->role !== 'super_admin') {
+            abort(403);
+        }
+
+        $invoice->load('items');
+        $isValid = IntegrityHashService::verify($invoice);
+
+        if ($isValid) {
+            return back()->with('success', 'Integrity check passed. Invoice data has not been tampered with.');
+        }
+
+        return back()->with('error', 'Integrity check FAILED. Invoice data may have been altered after FBR submission.');
     }
 
     public function pdf(Invoice $invoice)

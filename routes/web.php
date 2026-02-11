@@ -32,6 +32,7 @@ Route::middleware(['auth', 'company'])->group(function () {
 
     Route::get('/invoice/{invoice}', [InvoiceController::class, 'show'])->name('invoice.show');
     Route::get('/invoice/{invoice}/pdf', [InvoiceController::class, 'pdf']);
+    Route::post('/invoice/{invoice}/verify', [InvoiceController::class, 'verifyIntegrity'])->name('invoice.verify');
 
     Route::middleware(['role:super_admin'])->group(function () {
         Route::get('/admin/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
@@ -41,6 +42,8 @@ Route::middleware(['auth', 'company'])->group(function () {
         Route::get('/admin/users', [AdminController::class, 'users']);
         Route::post('/admin/users', [AdminController::class, 'storeUser']);
         Route::get('/admin/fbr-logs', [AdminController::class, 'fbrLogs']);
+        Route::get('/admin/system-health', [AdminController::class, 'systemHealth']);
+        Route::get('/admin/security-logs', [AdminController::class, 'securityLogs']);
     });
 });
 

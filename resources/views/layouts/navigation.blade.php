@@ -33,6 +33,9 @@
                     <x-nav-link href="/admin/users" :active="request()->is('admin/users*')">
                         Users
                     </x-nav-link>
+                    <x-nav-link href="/admin/system-health" :active="request()->is('admin/system-health*')">
+                        System Health
+                    </x-nav-link>
                     @endif
                 </div>
             </div>

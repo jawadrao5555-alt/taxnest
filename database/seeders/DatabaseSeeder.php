@@ -9,6 +9,8 @@ use App\Models\PricingPlan;
 use App\Models\Subscription;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\InvoiceActivityLog;
+use App\Models\FbrLog;
 use Illuminate\Support\Facades\Hash;
 use Carbon\Carbon;
 
@@ -16,11 +18,9 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Ensure Pricing Plans exist
         $this->call(PricingPlanSeeder::class);
         $professionalPlan = PricingPlan::where('name', 'Professional')->first();
 
-        // 2. Create Super Admin
         User::updateOrCreate(
             ['email' => 'admin@test.com'],
             [
@@ -30,7 +30,6 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // 3. Create Company
         $company = Company::updateOrCreate(
             ['ntn' => '1234567-8'],
             [
@@ -39,11 +38,11 @@ class DatabaseSeeder extends Seeder
                 'phone' => '0300-1234567',
                 'address' => 'I-10 Industrial Area, Islamabad',
                 'fbr_token' => 'dummy-fbr-token-123',
+                'compliance_score' => 85,
             ]
         );
 
-        // 4. Create Company Admin
-        User::updateOrCreate(
+        $companyAdmin = User::updateOrCreate(
             ['email' => 'company_admin@test.com'],
             [
                 'name' => 'Company Admin',
@@ -53,8 +52,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // 5. Create Employee
-        User::updateOrCreate(
+        $employee = User::updateOrCreate(
             ['email' => 'jawad@test.com'],
             [
                 'name' => 'Jawad Employee',
@@ -64,7 +62,6 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // 6. Create Active Subscription
         Subscription::updateOrCreate(
             ['company_id' => $company->id, 'active' => true],
             [
@@ -74,29 +71,32 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // 7. Create 3 Sample Invoices with Items
         $invoicesData = [
             [
                 'buyer_name' => 'ABC Traders',
                 'buyer_ntn' => '7654321-0',
                 'status' => 'submitted',
                 'total_amount' => 15000,
+                'days_ago' => 1,
             ],
             [
                 'buyer_name' => 'XYZ Services',
                 'buyer_ntn' => '1122334-4',
                 'status' => 'draft',
                 'total_amount' => 8500,
+                'days_ago' => 3,
             ],
             [
                 'buyer_name' => 'Global Logistics',
                 'buyer_ntn' => '9988776-6',
                 'status' => 'locked',
                 'total_amount' => 45000,
+                'days_ago' => 10,
             ],
         ];
 
         foreach ($invoicesData as $index => $data) {
+            $createdAt = Carbon::now()->subDays($data['days_ago']);
             $invoice = Invoice::create([
                 'company_id' => $company->id,
                 'invoice_number' => 'INV-' . Carbon::now()->format('Ymd') . '-' . str_pad($index + 1, 3, '0', STR_PAD_LEFT),
@@ -104,9 +104,24 @@ class DatabaseSeeder extends Seeder
                 'buyer_ntn' => $data['buyer_ntn'],
                 'status' => $data['status'],
                 'total_amount' => $data['total_amount'],
+                'created_at' => $createdAt,
+                'updated_at' => $createdAt,
             ]);
 
-            // Create 2 items per invoice
+            if ($data['status'] === 'locked') {
+                $invoice->load('items');
+                $taxAmount = $data['total_amount'] * 0.2;
+                $hashData = implode('|', [
+                    $invoice->invoice_number,
+                    $invoice->total_amount,
+                    $taxAmount,
+                    $invoice->company_id,
+                    $invoice->created_at->toIso8601String(),
+                ]);
+                $invoice->integrity_hash = hash('sha256', $hashData);
+                $invoice->save();
+            }
+
             InvoiceItem::create([
                 'invoice_id' => $invoice->id,
                 'hs_code' => '8471.3010',
@@ -124,6 +139,48 @@ class DatabaseSeeder extends Seeder
                 'price' => 2000,
                 'tax' => 340,
             ]);
+
+            InvoiceActivityLog::create([
+                'invoice_id' => $invoice->id,
+                'company_id' => $company->id,
+                'user_id' => $companyAdmin->id,
+                'action' => 'created',
+                'changes_json' => ['buyer_name' => $data['buyer_name'], 'total_amount' => $data['total_amount']],
+                'ip_address' => '127.0.0.1',
+                'created_at' => $createdAt,
+            ]);
+
+            if ($data['status'] === 'submitted' || $data['status'] === 'locked') {
+                InvoiceActivityLog::create([
+                    'invoice_id' => $invoice->id,
+                    'company_id' => $company->id,
+                    'user_id' => $companyAdmin->id,
+                    'action' => 'submitted',
+                    'ip_address' => '127.0.0.1',
+                    'created_at' => $createdAt->copy()->addHours(2),
+                ]);
+            }
+
+            if ($data['status'] === 'locked') {
+                InvoiceActivityLog::create([
+                    'invoice_id' => $invoice->id,
+                    'company_id' => $company->id,
+                    'user_id' => null,
+                    'action' => 'locked',
+                    'changes_json' => ['fbr_invoice_number' => 'FBR-' . time()],
+                    'ip_address' => '127.0.0.1',
+                    'created_at' => $createdAt->copy()->addHours(3),
+                ]);
+
+                FbrLog::create([
+                    'invoice_id' => $invoice->id,
+                    'request_payload' => json_encode(['test' => true]),
+                    'response_payload' => json_encode(['status' => 'success']),
+                    'status' => 'success',
+                    'response_time_ms' => 1250,
+                    'retry_count' => 0,
+                ]);
+            }
         }
     }
 }

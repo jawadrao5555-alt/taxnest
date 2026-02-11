@@ -5,6 +5,9 @@ namespace App\Jobs;
 use App\Models\Invoice;
 use App\Models\FbrLog;
 use App\Services\FbrService;
+use App\Services\InvoiceActivityService;
+use App\Services\IntegrityHashService;
+use App\Services\ComplianceScoreService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -25,16 +28,34 @@ class SendInvoiceToFbrJob implements ShouldQueue
         $invoice = Invoice::with(['company', 'items'])->findOrFail($this->invoiceId);
 
         $fbrService = new FbrService();
-        $response = $fbrService->submitInvoice($invoice);
+        $response = $fbrService->submitInvoice($invoice, $this->attempts() - 1);
 
         if ($response['status'] === 'success') {
             $invoice->status = 'locked';
             if (!empty($response['fbr_invoice_number'])) {
                 $invoice->invoice_number = $response['fbr_invoice_number'];
             }
+            $invoice->integrity_hash = IntegrityHashService::generate($invoice);
             $invoice->save();
+
+            InvoiceActivityService::log(
+                $invoice->id,
+                $invoice->company_id,
+                'locked',
+                ['fbr_invoice_number' => $response['fbr_invoice_number'] ?? null]
+            );
+
+            ComplianceScoreService::recalculate($invoice->company_id);
         } else {
-            Log::warning("FBR submission failed for invoice #{$invoice->id}, attempt {$this->attempts()}");
+            Log::warning("FBR submission failed for invoice #{$invoice->id}, attempt {$this->attempts()}, type: " . ($response['failure_type'] ?? 'unknown'));
+
+            InvoiceActivityService::log(
+                $invoice->id,
+                $invoice->company_id,
+                'retry',
+                ['attempt' => $this->attempts(), 'failure_type' => $response['failure_type'] ?? 'unknown']
+            );
+
             $this->release($this->backoff[$this->attempts() - 1] ?? 120);
         }
     }
@@ -45,6 +66,15 @@ class SendInvoiceToFbrJob implements ShouldQueue
         if ($invoice) {
             $invoice->status = 'draft';
             $invoice->save();
+
+            InvoiceActivityService::log(
+                $invoice->id,
+                $invoice->company_id,
+                'fbr_failed',
+                ['error' => $exception->getMessage()]
+            );
+
+            ComplianceScoreService::recalculate($invoice->company_id);
         }
 
         Log::error("FBR submission permanently failed for invoice #{$this->invoiceId}: " . $exception->getMessage());

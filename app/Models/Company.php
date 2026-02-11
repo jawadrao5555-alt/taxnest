@@ -12,7 +12,8 @@ class Company extends Model
         'email',
         'phone',
         'address',
-        'fbr_token'
+        'fbr_token',
+        'compliance_score'
     ];
 
     public function users()
@@ -23,5 +24,15 @@ class Company extends Model
     public function invoices()
     {
         return $this->hasMany(Invoice::class);
+    }
+
+    public function subscriptions()
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
+    public function activeSubscription()
+    {
+        return $this->hasOne(Subscription::class)->where('active', true)->with('pricingPlan');
     }
 }

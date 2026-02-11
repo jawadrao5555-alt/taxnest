@@ -10,6 +10,7 @@ class Invoice extends Model
         'company_id',
         'invoice_number',
         'status',
+        'integrity_hash',
         'buyer_name',
         'buyer_ntn',
         'total_amount'
@@ -28,5 +29,15 @@ class Invoice extends Model
     public function company()
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function activityLogs()
+    {
+        return $this->hasMany(InvoiceActivityLog::class)->orderBy('created_at', 'desc');
+    }
+
+    public function fbrLogs()
+    {
+        return $this->hasMany(FbrLog::class);
     }
 }

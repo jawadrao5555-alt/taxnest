@@ -7,7 +7,7 @@ use App\Models\FbrLog;
 
 class FbrService
 {
-    public function submitInvoice($invoice)
+    public function submitInvoice($invoice, int $retryCount = 0)
     {
         $payload = [
             "invoiceType" => "Sale Invoice",
@@ -50,39 +50,91 @@ class FbrService
         $log = FbrLog::create([
             'invoice_id' => $invoice->id,
             'request_payload' => json_encode($payload),
-            'status' => 'pending'
+            'status' => 'pending',
+            'retry_count' => $retryCount,
         ]);
 
-        try {
+        $startTime = microtime(true);
 
-            $response = Http::withToken("YOUR_SANDBOX_TOKEN")
+        try {
+            $response = Http::timeout(30)
+                ->withToken("YOUR_SANDBOX_TOKEN")
                 ->post("https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata_sb", $payload);
 
+            $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
+            $log->response_time_ms = $responseTimeMs;
             $log->response_payload = $response->body();
 
             if ($response->successful()) {
-
                 $log->status = 'success';
                 $log->save();
 
                 return [
                     "status" => "success",
-                    "fbr_invoice_number" => (string) time()
+                    "fbr_invoice_number" => (string) time(),
+                    "response_time_ms" => $responseTimeMs,
                 ];
             }
 
+            $failureType = $this->classifyFailure($response->status(), $response->body());
             $log->status = 'failed';
+            $log->failure_type = $failureType;
             $log->save();
 
-            return ["status" => "failed"];
+            return [
+                "status" => "failed",
+                "failure_type" => $failureType,
+                "response_time_ms" => $responseTimeMs,
+            ];
 
-        } catch (\Exception $e) {
-
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
             $log->status = 'failed';
+            $log->failure_type = 'network_error';
+            $log->response_time_ms = $responseTimeMs;
             $log->response_payload = $e->getMessage();
             $log->save();
 
-            return ["status" => "failed"];
+            return [
+                "status" => "failed",
+                "failure_type" => "network_error",
+                "response_time_ms" => $responseTimeMs,
+            ];
+
+        } catch (\Exception $e) {
+            $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
+            $log->status = 'failed';
+            $log->failure_type = 'network_error';
+            $log->response_time_ms = $responseTimeMs;
+            $log->response_payload = $e->getMessage();
+            $log->save();
+
+            return [
+                "status" => "failed",
+                "failure_type" => "network_error",
+                "response_time_ms" => $responseTimeMs,
+            ];
         }
+    }
+
+    private function classifyFailure(int $statusCode, string $body): string
+    {
+        if ($statusCode === 401 || $statusCode === 403) {
+            return 'token_error';
+        }
+
+        if ($statusCode === 422 || $statusCode === 400) {
+            $decoded = json_decode($body, true);
+            if ($decoded && isset($decoded['errors'])) {
+                return 'validation_error';
+            }
+            return 'payload_error';
+        }
+
+        if ($statusCode >= 500) {
+            return 'network_error';
+        }
+
+        return 'payload_error';
     }
 }

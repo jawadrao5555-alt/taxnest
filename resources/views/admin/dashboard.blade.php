@@ -128,10 +128,12 @@
                 </div>
             </div>
 
-            <div class="flex space-x-4">
+            <div class="flex flex-wrap gap-3">
                 <a href="/admin/companies" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 transition">Manage Companies</a>
                 <a href="/admin/users" class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg font-medium text-sm hover:bg-purple-700 transition">Manage Users</a>
                 <a href="/admin/fbr-logs" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg font-medium text-sm hover:bg-gray-700 transition">FBR Logs</a>
+                <a href="/admin/system-health" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium text-sm hover:bg-emerald-700 transition">System Health</a>
+                <a href="/admin/security-logs" class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg font-medium text-sm hover:bg-red-700 transition">Security Logs</a>
             </div>
         </div>
     </div>

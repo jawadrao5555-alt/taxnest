@@ -9,7 +9,10 @@ use App\Models\FbrLog;
 use App\Models\User;
 use App\Models\Subscription;
 use App\Models\PricingPlan;
+use App\Models\SecurityLog;
+use App\Services\SecurityLogService;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 
 class AdminController extends Controller
 {
@@ -77,6 +80,8 @@ class AdminController extends Controller
             ]);
         }
 
+        SecurityLogService::log('company_created', auth()->id(), ['company_id' => $company->id, 'name' => $company->name]);
+
         return redirect('/admin/companies')->with('success', 'Company created successfully.');
     }
 
@@ -97,13 +102,15 @@ class AdminController extends Controller
             'company_id' => 'nullable|exists:companies,id',
         ]);
 
-        User::create([
+        $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role' => $request->role,
             'company_id' => $request->company_id,
         ]);
+
+        SecurityLogService::log('user_created', auth()->id(), ['new_user_id' => $user->id, 'role' => $request->role]);
 
         return redirect('/admin/users')->with('success', 'User created successfully.');
     }
@@ -115,5 +122,62 @@ class AdminController extends Controller
             ->paginate(20);
 
         return view('admin.fbr-logs', compact('logs'));
+    }
+
+    public function systemHealth()
+    {
+        $pendingJobs = DB::table('jobs')->count();
+        $failedJobs = DB::table('failed_jobs')->count();
+
+        $avgResponseTime = FbrLog::whereNotNull('response_time_ms')
+            ->where('created_at', '>=', now()->subDays(30))
+            ->avg('response_time_ms');
+
+        $totalRetries24h = FbrLog::where('retry_count', '>', 0)
+            ->where('created_at', '>=', now()->subDay())
+            ->count();
+
+        $fbrLogsToday = FbrLog::where('created_at', '>=', now()->subDay())->count();
+        $fbrSuccessToday = FbrLog::where('status', 'success')->where('created_at', '>=', now()->subDay())->count();
+
+        $failureBreakdown = FbrLog::where('status', 'failed')
+            ->whereNotNull('failure_type')
+            ->select('failure_type', DB::raw('count(*) as count'))
+            ->groupBy('failure_type')
+            ->get();
+
+        $companiesAtRisk = Company::where('compliance_score', '<', 50)->count();
+        $companiesModerate = Company::whereBetween('compliance_score', [50, 79])->count();
+        $companiesSafe = Company::where('compliance_score', '>=', 80)->count();
+
+        $recentSecurityLogs = SecurityLog::with('user')
+            ->orderBy('created_at', 'desc')
+            ->take(20)
+            ->get();
+
+        $healthScore = 100;
+        if ($failedJobs > 10) $healthScore -= 20;
+        elseif ($failedJobs > 0) $healthScore -= 5;
+        if ($pendingJobs > 50) $healthScore -= 15;
+        elseif ($pendingJobs > 10) $healthScore -= 5;
+        if ($avgResponseTime && $avgResponseTime > 5000) $healthScore -= 15;
+        if ($totalRetries24h > 20) $healthScore -= 10;
+        $healthScore = max(0, $healthScore);
+
+        return view('admin.system-health', compact(
+            'pendingJobs', 'failedJobs', 'avgResponseTime', 'totalRetries24h',
+            'fbrLogsToday', 'fbrSuccessToday', 'failureBreakdown',
+            'companiesAtRisk', 'companiesModerate', 'companiesSafe',
+            'recentSecurityLogs', 'healthScore'
+        ));
+    }
+
+    public function securityLogs()
+    {
+        $logs = SecurityLog::with('user')
+            ->orderBy('created_at', 'desc')
+            ->paginate(20);
+
+        return view('admin.security-logs', compact('logs'));
     }
 }

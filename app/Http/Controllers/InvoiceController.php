@@ -11,8 +11,27 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 use App\Jobs\SendInvoiceToFbrJob;
 
+use App\Models\Subscription;
+
 class InvoiceController extends Controller
 {
+    private function checkInvoiceLimit($companyId)
+    {
+        $subscription = Subscription::where('company_id', $companyId)
+            ->where('active', true)
+            ->first();
+
+        if (!$subscription) {
+            abort(403, 'No active subscription.');
+        }
+
+        $invoiceCount = \App\Models\Invoice::where('company_id', $companyId)->count();
+
+        if ($invoiceCount >= $subscription->pricingPlan->invoice_limit) {
+            abort(403, 'Invoice limit reached.');
+        }
+    }
+
     public function create()
     {
         return view('invoice.create');
@@ -68,6 +87,8 @@ class InvoiceController extends Controller
 
         $invoice->status = 'submitted';
         $invoice->save();
+
+        $this->checkInvoiceLimit($invoice->company_id);
 
         SendInvoiceToFbrJob::dispatch($invoice);
 

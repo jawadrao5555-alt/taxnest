@@ -5,7 +5,7 @@ expertMode = true
 [userenv]
 
 [userenv.shared]
-APP_URL = "http://0.0.0.0:5000"
+APP_URL = "https://deeb2ffc-615d-44ed-a0cd-b1cde9f84756-00-24lu1hpq4f5ka.worf.replit.dev"
 DB_CONNECTION = "pgsql"
 DB_PORT = "5432"
 DB_PASSWORD = ""
@@ -15,6 +15,7 @@ DB_DATABASE = "laravel"
 SESSION_SECURE_COOKIE = "true"
 SESSION_SAME_SITE = "none"
 SESSION_DOMAIN = ""
+SESSION_PARTITIONED_COOKIE = "true"
 
 [workflows]
 runButton = "Project"

@@ -73,12 +73,18 @@ class InvoiceController extends Controller
             'items.*.tax' => 'required|numeric|min:0',
             'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated',
             'items.*.pct_code' => 'nullable|string|max:50',
+            'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
             'items.*.sro_schedule_no' => 'nullable|string|max:100',
             'items.*.serial_no' => 'nullable|string|max:100',
             'items.*.mrp' => 'nullable|numeric|min:0',
         ]);
 
-        $scheduleErrors = ScheduleEngine::validateItems($request->items);
+        $itemsWithTaxRate = collect($request->items)->map(function ($item) {
+            $item['tax_rate'] = isset($item['tax_rate']) && is_numeric($item['tax_rate']) ? floatval($item['tax_rate']) : null;
+            return $item;
+        })->toArray();
+
+        $scheduleErrors = ScheduleEngine::validateItems($itemsWithTaxRate);
         if (!empty($scheduleErrors)) {
             return back()->withErrors($scheduleErrors)->withInput();
         }
@@ -201,12 +207,18 @@ class InvoiceController extends Controller
             'items.*.tax' => 'required|numeric|min:0',
             'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated',
             'items.*.pct_code' => 'nullable|string|max:50',
+            'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
             'items.*.sro_schedule_no' => 'nullable|string|max:100',
             'items.*.serial_no' => 'nullable|string|max:100',
             'items.*.mrp' => 'nullable|numeric|min:0',
         ]);
 
-        $scheduleErrors = ScheduleEngine::validateItems($request->items);
+        $itemsWithTaxRate = collect($request->items)->map(function ($item) {
+            $item['tax_rate'] = isset($item['tax_rate']) && is_numeric($item['tax_rate']) ? floatval($item['tax_rate']) : null;
+            return $item;
+        })->toArray();
+
+        $scheduleErrors = ScheduleEngine::validateItems($itemsWithTaxRate);
         if (!empty($scheduleErrors)) {
             return back()->withErrors($scheduleErrors)->withInput();
         }
@@ -303,6 +315,25 @@ class InvoiceController extends Controller
 
         $mode = $request->input('mode', 'smart');
         $invoice->load('items', 'company');
+
+        $itemsForValidation = $invoice->items->map(function ($item) {
+            return [
+                'schedule_type' => $item->schedule_type ?? 'standard',
+                'tax_rate' => $item->tax_rate,
+                'sro_schedule_no' => $item->sro_schedule_no,
+                'serial_no' => $item->serial_no,
+                'mrp' => $item->mrp,
+                'price' => $item->price,
+                'quantity' => $item->quantity,
+                'tax' => $item->tax,
+            ];
+        })->toArray();
+
+        $submissionCheck = ScheduleEngine::validateForSubmission($itemsForValidation);
+        if (!$submissionCheck['valid']) {
+            $errorHtml = $submissionCheck['message'] . ' ' . implode(' | ', $submissionCheck['errors']);
+            return redirect('/invoice/' . $invoice->id)->with('error', $errorHtml);
+        }
 
         if ($mode === 'direct_mis') {
             if (!in_array(auth()->user()->role, ['company_admin', 'super_admin'])) {
@@ -613,6 +644,9 @@ class InvoiceController extends Controller
 
     private function extractTaxRate(array $item): float
     {
+        if (isset($item['tax_rate']) && is_numeric($item['tax_rate'])) {
+            return floatval($item['tax_rate']);
+        }
         if (isset($item['tax']) && isset($item['price']) && isset($item['quantity'])) {
             $subtotal = floatval($item['price']) * floatval($item['quantity']);
             if ($subtotal > 0) {

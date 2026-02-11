@@ -7,9 +7,9 @@ class ScheduleEngine
     public static array $scheduleTypes = [
         'standard' => ['label' => 'Standard Rate', 'tax_rate' => 18, 'requires_sro' => false, 'requires_serial' => false, 'requires_mrp' => false],
         'reduced' => ['label' => 'Reduced Rate', 'tax_rate' => 10, 'requires_sro' => true, 'requires_serial' => true, 'requires_mrp' => false],
-        '3rd_schedule' => ['label' => '3rd Schedule', 'tax_rate' => 17, 'requires_sro' => true, 'requires_serial' => true, 'requires_mrp' => true],
+        '3rd_schedule' => ['label' => '3rd Schedule', 'tax_rate' => 17, 'requires_sro' => false, 'requires_serial' => false, 'requires_mrp' => false],
         'exempt' => ['label' => 'Exempt', 'tax_rate' => 0, 'requires_sro' => true, 'requires_serial' => true, 'requires_mrp' => false],
-        'zero_rated' => ['label' => 'Zero Rated', 'tax_rate' => 0, 'requires_sro' => true, 'requires_serial' => false, 'requires_mrp' => false],
+        'zero_rated' => ['label' => 'Zero Rated', 'tax_rate' => 0, 'requires_sro' => false, 'requires_serial' => false, 'requires_mrp' => false],
     ];
 
     public static array $hsLookupTable = [
@@ -35,14 +35,63 @@ class ScheduleEngine
         return self::$scheduleTypes[$scheduleType] ?? self::$scheduleTypes['standard'];
     }
 
-    public static function getRequiredFields(string $scheduleType): array
+    public static function getRequiredFields(string $scheduleType, ?float $taxRate = null): array
     {
-        $config = self::getScheduleConfig($scheduleType);
-        return [
-            'requires_sro' => $config['requires_sro'],
-            'requires_serial' => $config['requires_serial'],
-            'requires_mrp' => $config['requires_mrp'],
-        ];
+        return self::resolveValidationRules($scheduleType, $taxRate);
+    }
+
+    public static function resolveValidationRules(string $scheduleType, ?float $taxRate = null): array
+    {
+        switch ($scheduleType) {
+            case 'standard':
+                return [
+                    'requires_sro' => false,
+                    'requires_serial' => false,
+                    'requires_mrp' => false,
+                ];
+
+            case '3rd_schedule':
+                if ($taxRate !== null && $taxRate >= 18) {
+                    return [
+                        'requires_sro' => false,
+                        'requires_serial' => false,
+                        'requires_mrp' => true,
+                    ];
+                }
+                return [
+                    'requires_sro' => true,
+                    'requires_serial' => true,
+                    'requires_mrp' => true,
+                ];
+
+            case 'exempt':
+                return [
+                    'requires_sro' => true,
+                    'requires_serial' => true,
+                    'requires_mrp' => false,
+                ];
+
+            case 'zero_rated':
+                return [
+                    'requires_sro' => false,
+                    'requires_serial' => false,
+                    'requires_mrp' => false,
+                ];
+
+            case 'reduced':
+                return [
+                    'requires_sro' => true,
+                    'requires_serial' => true,
+                    'requires_mrp' => false,
+                ];
+
+            default:
+                return [
+                    'requires_sro' => false,
+                    'requires_serial' => false,
+                    'requires_mrp' => false,
+                ];
+        }
     }
 
     public static function getTaxRate(string $scheduleType): float
@@ -57,14 +106,14 @@ class ScheduleEngine
 
         if (isset(self::$hsLookupTable[$normalized])) {
             $data = self::$hsLookupTable[$normalized];
-            $config = self::getScheduleConfig($data['schedule_type']);
+            $rules = self::resolveValidationRules($data['schedule_type'], $data['tax_rate']);
             return [
                 'pct_code' => $data['pct_code'],
                 'schedule_type' => $data['schedule_type'],
                 'tax_rate' => $data['tax_rate'],
-                'requires_sro' => $config['requires_sro'],
-                'requires_serial' => $config['requires_serial'],
-                'requires_mrp' => $config['requires_mrp'],
+                'requires_sro' => $rules['requires_sro'],
+                'requires_serial' => $rules['requires_serial'],
+                'requires_mrp' => $rules['requires_mrp'],
             ];
         }
 
@@ -79,17 +128,42 @@ class ScheduleEngine
         foreach ($items as $index => $item) {
             $scheduleType = $item['schedule_type'] ?? 'standard';
             $scheduleTypes[] = $scheduleType;
+            $taxRate = isset($item['tax_rate']) ? floatval($item['tax_rate']) : null;
+
+            if ($taxRate === null) {
+                $taxFromAmount = isset($item['tax'], $item['price'], $item['quantity']) ? floatval($item['tax']) : 0;
+                $subtotal = (floatval($item['price'] ?? 0) * floatval($item['quantity'] ?? 1));
+                if ($subtotal > 0) {
+                    $taxRate = ($taxFromAmount / $subtotal) * 100;
+                }
+            }
+
+            $rules = self::resolveValidationRules($scheduleType, $taxRate);
             $config = self::getScheduleConfig($scheduleType);
             $itemNum = $index + 1;
 
-            if ($config['requires_sro'] && empty($item['sro_schedule_no'])) {
-                $errors[] = "Item #{$itemNum}: SRO Schedule No is required for {$config['label']}";
+            if ($rules['requires_sro'] && empty($item['sro_schedule_no'])) {
+                if ($scheduleType === '3rd_schedule') {
+                    $errors[] = "Item #{$itemNum}: SRO Schedule No is required for 3rd Schedule items with reduced tax rate (below 18%)";
+                } else {
+                    $errors[] = "Item #{$itemNum}: SRO Schedule No is required for {$config['label']}";
+                }
             }
-            if ($config['requires_serial'] && empty($item['serial_no'])) {
-                $errors[] = "Item #{$itemNum}: Serial No is required for {$config['label']}";
+            if ($rules['requires_serial'] && empty($item['serial_no'])) {
+                if ($scheduleType === '3rd_schedule') {
+                    $errors[] = "Item #{$itemNum}: SRO Item Serial No is required for 3rd Schedule items with reduced tax rate (below 18%)";
+                } else {
+                    $errors[] = "Item #{$itemNum}: SRO Item Serial No is required for {$config['label']}";
+                }
             }
-            if ($config['requires_mrp'] && (empty($item['mrp']) || floatval($item['mrp']) <= 0)) {
-                $errors[] = "Item #{$itemNum}: MRP is required for {$config['label']}";
+            if ($rules['requires_mrp'] && (empty($item['mrp']) || floatval($item['mrp']) <= 0)) {
+                if ($scheduleType === '3rd_schedule' && $taxRate !== null && $taxRate >= 18) {
+                    $errors[] = "Item #{$itemNum}: MRP (Retail Price) is required for 3rd Schedule items at standard 18% rate";
+                } elseif ($scheduleType === '3rd_schedule') {
+                    $errors[] = "Item #{$itemNum}: Fixed/Notified Value or Retail Price is required for 3rd Schedule items with reduced tax rate (below 18%)";
+                } else {
+                    $errors[] = "Item #{$itemNum}: MRP is required for {$config['label']}";
+                }
             }
         }
 
@@ -100,5 +174,18 @@ class ScheduleEngine
         }
 
         return $errors;
+    }
+
+    public static function validateForSubmission(array $items): array
+    {
+        $errors = self::validateItems($items);
+        if (!empty($errors)) {
+            return [
+                'valid' => false,
+                'errors' => $errors,
+                'message' => 'FBR submission blocked: ' . count($errors) . ' validation error(s) found. Please fix the following issues before submitting.',
+            ];
+        }
+        return ['valid' => true, 'errors' => [], 'message' => 'All schedule validation checks passed.'];
     }
 }

@@ -123,27 +123,33 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 mb-1">Tax Rate (%)</label>
-                                    <input type="number" step="0.01" min="0" x-model="item.tax_rate" @input="calcTax(index)"
+                                    <input type="number" step="0.01" min="0" x-model="item.tax_rate" @input="calcTax(index)" :name="'items[' + index + '][tax_rate]'"
                                         class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 </div>
                             </div>
 
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3" x-show="item.requires_sro || item.requires_serial || item.requires_mrp" x-cloak>
-                                <div x-show="item.requires_sro">
-                                    <label class="block text-xs font-medium text-amber-600 mb-1">SRO Schedule No *</label>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3" x-show="item.requires_sro || item.requires_serial || item.requires_mrp || item.optional_sro" x-cloak>
+                                <div x-show="item.requires_sro || item.optional_sro">
+                                    <label class="block text-xs font-medium mb-1" :class="item.requires_sro ? 'text-amber-600' : 'text-gray-500'" x-text="item.requires_sro ? 'SRO Schedule No *' : 'SRO Schedule No (optional)'"></label>
                                     <input type="text" :name="'items[' + index + '][sro_schedule_no]'" x-model="item.sro_schedule_no" placeholder="e.g. SRO 1125(I)/2011"
-                                        class="w-full rounded-lg border-amber-300 shadow-sm text-sm focus:ring-amber-500 focus:border-amber-500 bg-amber-50">
+                                        :class="item.requires_sro ? 'border-amber-300 bg-amber-50 focus:ring-amber-500 focus:border-amber-500' : 'border-gray-300 focus:ring-emerald-500 focus:border-emerald-500'"
+                                        class="w-full rounded-lg shadow-sm text-sm">
                                 </div>
-                                <div x-show="item.requires_serial">
-                                    <label class="block text-xs font-medium text-amber-600 mb-1">Serial No *</label>
+                                <div x-show="item.requires_serial || item.optional_serial">
+                                    <label class="block text-xs font-medium mb-1" :class="item.requires_serial ? 'text-amber-600' : 'text-gray-500'" x-text="item.requires_serial ? 'SRO Item Serial No *' : 'SRO Item Serial No (optional)'"></label>
                                     <input type="text" :name="'items[' + index + '][serial_no]'" x-model="item.serial_no" placeholder="e.g. 42"
-                                        class="w-full rounded-lg border-amber-300 shadow-sm text-sm focus:ring-amber-500 focus:border-amber-500 bg-amber-50">
+                                        :class="item.requires_serial ? 'border-amber-300 bg-amber-50 focus:ring-amber-500 focus:border-amber-500' : 'border-gray-300 focus:ring-emerald-500 focus:border-emerald-500'"
+                                        class="w-full rounded-lg shadow-sm text-sm">
                                 </div>
                                 <div x-show="item.requires_mrp">
-                                    <label class="block text-xs font-medium text-amber-600 mb-1">MRP (Rs.) *</label>
+                                    <label class="block text-xs font-medium text-amber-600 mb-1" x-text="item.schedule_type === '3rd_schedule' && parseFloat(item.tax_rate) < 18 ? 'Fixed/Notified Value (Rs.) *' : 'MRP / Retail Price (Rs.) *'"></label>
                                     <input type="number" step="0.01" min="0" :name="'items[' + index + '][mrp]'" x-model="item.mrp" placeholder="0.00"
                                         class="w-full rounded-lg border-amber-300 shadow-sm text-sm focus:ring-amber-500 focus:border-amber-500 bg-amber-50">
                                 </div>
+                            </div>
+
+                            <div x-show="item.schedule_hint" x-cloak class="mb-3 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg">
+                                <p class="text-xs text-indigo-700" x-text="item.schedule_hint"></p>
                             </div>
 
                             <div x-show="item.hsLookupInfo" x-cloak class="mb-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
@@ -236,13 +242,38 @@
 
     <script>
         function invoiceForm() {
-            const scheduleConfigs = {
-                standard:     { tax_rate: 18, requires_sro: false, requires_serial: false, requires_mrp: false },
-                reduced:      { tax_rate: 10, requires_sro: true,  requires_serial: true,  requires_mrp: false },
-                '3rd_schedule': { tax_rate: 17, requires_sro: true, requires_serial: true, requires_mrp: true },
-                exempt:       { tax_rate: 0,  requires_sro: true,  requires_serial: true,  requires_mrp: false },
-                zero_rated:   { tax_rate: 0,  requires_sro: true,  requires_serial: false, requires_mrp: false },
+            const defaultTaxRates = {
+                standard: 18, reduced: 10, '3rd_schedule': 17, exempt: 0, zero_rated: 0
             };
+
+            const scheduleHints = {
+                standard: 'Standard Rate: No SRO, Serial, or MRP required.',
+                '3rd_schedule_18': '3rd Schedule (18%): Only MRP/Retail Price required.',
+                '3rd_schedule_reduced': '3rd Schedule (reduced rate): SRO, Serial No, and Fixed/Notified Value all required.',
+                exempt: 'Exempt: SRO Schedule No and Serial No required.',
+                zero_rated: 'Zero Rated: SRO and Serial are optional.',
+                reduced: 'Reduced Rate: SRO and Serial No required.',
+            };
+
+            function getScheduleRules(scheduleType, taxRate) {
+                switch (scheduleType) {
+                    case 'standard':
+                        return { requires_sro: false, requires_serial: false, requires_mrp: false, optional_sro: false, optional_serial: false, hint: scheduleHints.standard };
+                    case '3rd_schedule':
+                        if (parseFloat(taxRate) >= 18) {
+                            return { requires_sro: false, requires_serial: false, requires_mrp: true, optional_sro: false, optional_serial: false, hint: scheduleHints['3rd_schedule_18'] };
+                        }
+                        return { requires_sro: true, requires_serial: true, requires_mrp: true, optional_sro: false, optional_serial: false, hint: scheduleHints['3rd_schedule_reduced'] };
+                    case 'exempt':
+                        return { requires_sro: true, requires_serial: true, requires_mrp: false, optional_sro: false, optional_serial: false, hint: scheduleHints.exempt };
+                    case 'zero_rated':
+                        return { requires_sro: false, requires_serial: false, requires_mrp: false, optional_sro: true, optional_serial: true, hint: scheduleHints.zero_rated };
+                    case 'reduced':
+                        return { requires_sro: true, requires_serial: true, requires_mrp: false, optional_sro: false, optional_serial: false, hint: scheduleHints.reduced };
+                    default:
+                        return { requires_sro: false, requires_serial: false, requires_mrp: false, optional_sro: false, optional_serial: false, hint: '' };
+                }
+            }
 
             function newItem() {
                 return {
@@ -250,6 +281,7 @@
                     quantity: 1, price: 0, tax_rate: 18, tax: 0,
                     schedule_type: 'standard', sro_schedule_no: '', serial_no: '', mrp: '',
                     requires_sro: false, requires_serial: false, requires_mrp: false,
+                    optional_sro: false, optional_serial: false, schedule_hint: '',
                     productSearch: '', showDropdown: false, productResults: [],
                     hsLookupInfo: ''
                 };
@@ -282,12 +314,9 @@
                     let item = newItem();
                     if (this.items.length > 0) {
                         item.schedule_type = this.items[0].schedule_type;
-                        let cfg = scheduleConfigs[item.schedule_type] || scheduleConfigs.standard;
-                        item.tax_rate = cfg.tax_rate;
-                        item.requires_sro = cfg.requires_sro;
-                        item.requires_serial = cfg.requires_serial;
-                        item.requires_mrp = cfg.requires_mrp;
+                        item.tax_rate = defaultTaxRates[item.schedule_type] ?? 18;
                     }
+                    this.applyScheduleRules(item);
                     this.items.push(item);
                 },
                 removeItem(index) {
@@ -295,16 +324,23 @@
                     this.validateMixedSchedules();
                 },
 
+                applyScheduleRules(item) {
+                    let rules = getScheduleRules(item.schedule_type, item.tax_rate);
+                    item.requires_sro = rules.requires_sro;
+                    item.requires_serial = rules.requires_serial;
+                    item.requires_mrp = rules.requires_mrp;
+                    item.optional_sro = rules.optional_sro;
+                    item.optional_serial = rules.optional_serial;
+                    item.schedule_hint = rules.hint;
+                    if (!rules.requires_sro && !rules.optional_sro) item.sro_schedule_no = '';
+                    if (!rules.requires_serial && !rules.optional_serial) item.serial_no = '';
+                    if (!rules.requires_mrp) item.mrp = '';
+                },
+
                 onScheduleChange(index) {
                     let item = this.items[index];
-                    let cfg = scheduleConfigs[item.schedule_type] || scheduleConfigs.standard;
-                    item.tax_rate = cfg.tax_rate;
-                    item.requires_sro = cfg.requires_sro;
-                    item.requires_serial = cfg.requires_serial;
-                    item.requires_mrp = cfg.requires_mrp;
-                    if (!cfg.requires_sro) item.sro_schedule_no = '';
-                    if (!cfg.requires_serial) item.serial_no = '';
-                    if (!cfg.requires_mrp) item.mrp = '';
+                    item.tax_rate = defaultTaxRates[item.schedule_type] ?? 18;
+                    this.applyScheduleRules(item);
                     this.calcTax(index);
                     this.validateMixedSchedules();
                 },
@@ -333,9 +369,7 @@
                             item.pct_code = data.pct_code;
                             item.schedule_type = data.schedule_type;
                             item.tax_rate = data.tax_rate;
-                            item.requires_sro = data.requires_sro;
-                            item.requires_serial = data.requires_serial;
-                            item.requires_mrp = data.requires_mrp;
+                            this.applyScheduleRules(item);
                             item.hsLookupInfo = 'Auto-detected: PCT ' + data.pct_code + ' | Schedule: ' + data.schedule_type + ' | Tax: ' + data.tax_rate + '%';
                             this.calcTax(index);
                             this.validateMixedSchedules();
@@ -349,6 +383,9 @@
                     let item = this.items[index];
                     let subtotal = parseFloat(item.price || 0) * parseFloat(item.quantity || 0);
                     item.tax = parseFloat(((parseFloat(item.tax_rate || 0) / 100) * subtotal).toFixed(2));
+                    if (item.schedule_type === '3rd_schedule') {
+                        this.applyScheduleRules(item);
+                    }
                 },
                 itemSubtotal(index) {
                     let item = this.items[index];
@@ -383,11 +420,8 @@
                     item.description = product.name;
                     item.price = parseFloat(product.default_price);
                     item.schedule_type = product.schedule_type || 'standard';
-                    let cfg = scheduleConfigs[item.schedule_type] || scheduleConfigs.standard;
                     item.tax_rate = parseFloat(product.default_tax_rate);
-                    item.requires_sro = product.requires_sro || cfg.requires_sro;
-                    item.requires_serial = product.requires_serial || cfg.requires_serial;
-                    item.requires_mrp = product.requires_mrp || cfg.requires_mrp;
+                    this.applyScheduleRules(item);
                     if (product.sro_reference) item.sro_schedule_no = product.sro_reference;
                     item.productSearch = product.name;
                     item.showDropdown = false;

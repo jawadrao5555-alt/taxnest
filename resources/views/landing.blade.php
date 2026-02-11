@@ -31,11 +31,12 @@
                 <a href="#features" class="text-sm font-medium text-gray-600 hover:text-emerald-600 transition">Features</a>
                 <a href="#how-it-works" class="text-sm font-medium text-gray-600 hover:text-emerald-600 transition">How It Works</a>
                 <a href="#pricing" class="text-sm font-medium text-gray-600 hover:text-emerald-600 transition">Pricing</a>
-                <a href="/login" class="text-sm font-medium text-gray-600 hover:text-emerald-600 transition">Login</a>
-                <a href="/register" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition shadow-sm">Start Free Trial</a>
+                <a href="/login" class="inline-flex items-center px-4 py-2 border-2 border-emerald-600 text-emerald-700 rounded-lg text-sm font-semibold hover:bg-emerald-50 transition">Login</a>
+                <a href="/register" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition shadow-sm">Sign Up Free</a>
             </div>
-            <div class="md:hidden">
-                <a href="/register" class="text-sm font-semibold text-white bg-emerald-600 px-3 py-1.5 rounded-lg">Free Trial</a>
+            <div class="md:hidden flex items-center space-x-2">
+                <a href="/login" class="text-sm font-semibold text-emerald-700 border border-emerald-600 px-3 py-1.5 rounded-lg hover:bg-emerald-50 transition">Login</a>
+                <a href="/register" class="text-sm font-semibold text-white bg-emerald-600 px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition">Sign Up</a>
             </div>
         </div>
     </nav>

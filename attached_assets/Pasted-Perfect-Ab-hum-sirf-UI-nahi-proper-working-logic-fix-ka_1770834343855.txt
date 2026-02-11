@@ -1,0 +1,237 @@
+Perfect ✅
+Ab hum sirf UI nahi — proper working logic fix karwa rahe hain.
+
+Neeche final copy-paste enterprise command de raha hoon jo:
+	•	Sale Type properly selectable kare
+	•	Default Sale Invoice prefill kare
+	•	Province fully working kare
+	•	Dropdown mobile compatible ho
+	•	Dynamic HS field engine implement kare
+	•	Unnecessary fields hide kare
+	•	Backend logic break na kare
+	•	Form submission bhi properly work kare
+
+Yeh final clean version hai 👇
+
+⸻
+
+🔥 TAXNEST INVOICE FORM CRITICAL FIX + DYNAMIC ENGINE
+
+Do NOT redesign architecture.
+Do NOT modify FBR payload.
+Do NOT break compliance engine.
+Only fix invoice UI logic + dynamic behavior.
+
+⸻
+
+1️⃣ DOCUMENT TYPE (SALE TYPE) FIX — FULLY FUNCTIONAL
+
+Requirements:
+	•	Default value = Sale Invoice
+	•	Dropdown properly selectable
+	•	Changing to Credit/Debit Note updates logic
+	•	Value must persist in DB
+	•	Must affect validation rules
+
+Implementation:
+	1.	Ensure invoice create controller sets default:
+
+$invoice->document_type = $invoice->document_type ?? 'Sale Invoice';
+
+	2.	In Blade:
+
+<select x-model="form.document_type" name="document_type" required>
+    <option value="Sale Invoice">Sale Invoice</option>
+    <option value="Credit Note">Credit Note</option>
+    <option value="Debit Note">Debit Note</option>
+</select>
+
+	3.	Ensure:
+
+	•	No duplicate Alpine bindings
+	•	No JS override
+	•	No disabled attribute
+	•	Value saved correctly in DB
+
+	4.	Add validation rule:
+
+'document_type' => 'required|in:Sale Invoice,Credit Note,Debit Note'
+
+
+⸻
+
+2️⃣ PROVINCE DROPDOWN FIX (FUNCTIONAL + SAVING)
+
+Issue: Select ho raha hai but value save nahi hoti / selectable glitch.
+
+Fix:
+	1.	Ensure correct name binding:
+
+<select name="destination_province" x-model="form.destination_province" required>
+
+	2.	Ensure province list:
+
+$provinces = [
+'Punjab',
+'Sindh',
+'Khyber Pakhtunkhwa',
+'Balochistan',
+'Islamabad',
+'Azad Kashmir',
+'Gilgit-Baltistan',
+'FATA'
+];
+
+	3.	Validate:
+
+'destination_province' => 'required|string'
+
+	4.	Ensure no readonly or disabled state applied dynamically.
+
+⸻
+
+3️⃣ REMOVE STATIC UNNECESSARY FIELDS
+
+Remove from default view:
+	•	Petroleum Levy
+	•	ST Withheld at Source
+
+These should NOT render unless required by HS mapping.
+
+⸻
+
+4️⃣ SMART HS CONDITIONAL FIELD ENGINE (FULL WORKING LOGIC)
+
+When HS Code entered:
+
+System must fetch from global_hs_pct_mapping table:
+
+Fields:
+	•	scheduleType
+	•	taxRate
+	•	sroRequired
+	•	mrpRequired
+	•	st_withheld_applicable
+	•	petroleum_levy_applicable
+
+Use AJAX call:
+
+axios.get('/api/hs-details/'+hsCode)
+
+Then dynamically set:
+
+Show rules:
+
+IF scheduleType == “3rd Schedule” AND taxRate < 18:
+→ Show:
+	•	SRO Schedule No
+	•	SRO Item Serial No
+	•	MRP
+
+IF scheduleType == “3rd Schedule” AND taxRate == 18:
+→ Hide SRO + Serial + MRP
+
+IF scheduleType == “Exempt”:
+→ Show SRO only
+
+IF scheduleType == “Zero Rated”:
+→ Hide SRO + Serial
+
+IF petroleum_levy_applicable = true:
+→ Show petroleum field
+
+IF st_withheld_applicable = true:
+→ Show ST withheld checkbox
+
+Use Alpine conditional rendering:
+
+<div x-show="showSRO">
+
+
+⸻
+
+5️⃣ CREDIT / DEBIT NOTE LOGIC FIX
+
+When document_type changes:
+
+IF Credit Note:
+	•	reference_invoice_id required
+	•	quantities negative allowed
+
+IF Debit Note:
+	•	reference_invoice_id required
+	•	positive only
+
+IF Sale Invoice:
+	•	no reference required
+
+Add backend validation:
+
+'reference_invoice_id' => Rule::requiredIf($request->document_type != 'Sale Invoice')
+
+
+⸻
+
+6️⃣ MOBILE FIXES
+
+Fix:
+	•	Sticky bottom bar overlap
+	•	Ensure form scroll not blocked
+	•	Add padding-bottom: 120px to container
+	•	Make dropdowns z-index higher than bottom bar
+
+⸻
+
+7️⃣ VALIDATION MESSAGE IMPROVEMENT
+
+Replace generic errors with:
+	•	“3rd Schedule (Reduced Rate) requires SRO, Serial No and MRP.”
+	•	“Destination Province is required.”
+	•	“Reference Invoice is required for Credit/Debit Notes.”
+
+⸻
+
+8️⃣ DO NOT MODIFY
+	•	FBR payload structure
+	•	Compliance scoring engine
+	•	HS → PCT engine
+	•	WHT manual strategy
+	•	Invoice numbering system
+
+⸻
+
+FINAL VERIFICATION AFTER IMPLEMENTATION
+
+System must confirm:
+
+✔ Sale Invoice auto selected
+✔ Dropdown selectable
+✔ Province selectable & saved
+✔ Dynamic fields show/hide properly
+✔ No unnecessary fields visible
+✔ Submission works
+✔ PDF unaffected
+✔ FBR submission unaffected
+
+Return:
+
+{
+ "DocumentTypeFix": "DONE",
+ "ProvinceFix": "DONE",
+ "DynamicHSLogic": "ACTIVE",
+ "MobileFix": "DONE",
+ "ValidationUpgrade": "DONE",
+ "SystemStatus": "SAFE"
+}
+
+
+⸻
+
+💡 Important
+
+Agar yeh properly implement ho gaya —
+toh aapka invoice builder Pakistan ka most intelligent + clean UI ban jayega.
+
+Ab aap command de dein.
+Phir mujhe summary bhejna.
+Main final enterprise review karunga.

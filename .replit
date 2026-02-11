@@ -7,6 +7,11 @@ expertMode = true
 [userenv.shared]
 APP_URL = "http://0.0.0.0:5000"
 DB_CONNECTION = "pgsql"
+DB_PORT = "5432"
+DB_PASSWORD = ""
+DB_HOST = "127.0.0.1"
+DB_USERNAME = "root"
+DB_DATABASE = "laravel"
 
 [workflows]
 runButton = "Project"

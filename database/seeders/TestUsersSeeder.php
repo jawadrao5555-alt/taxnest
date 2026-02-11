@@ -24,7 +24,7 @@ class TestUsersSeeder extends Seeder
 
         // Admin User
         User::updateOrCreate(
-            ['email' => 'admin'],
+            ['email' => 'admin@test.com'],
             [
                 'name' => 'Admin',
                 'password' => Hash::make('admin123'),
@@ -35,7 +35,7 @@ class TestUsersSeeder extends Seeder
 
         // Normal User
         User::updateOrCreate(
-            ['email' => 'jawad'],
+            ['email' => 'jawad@test.com'],
             [
                 'name' => 'Jawad',
                 'password' => Hash::make('jawad123'),

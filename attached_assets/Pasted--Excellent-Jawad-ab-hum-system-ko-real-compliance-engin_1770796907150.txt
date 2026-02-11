@@ -1,0 +1,223 @@
+🔥 Excellent Jawad — ab hum system ko real compliance engine bana rahe hain.
+
+Phase 3 start karte hain:
+
+# 🚀 PHASE 3 — Production Invoice Lock Rule + FBR Service Structure
+
+Yeh sabse important compliance logic hai.
+
+---
+
+# 🟢 STEP 1 — Invoice Model Update
+
+Open:
+
+```
+app/Models/Invoice.php
+```
+
+Replace with:
+
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class Invoice extends Model
+{
+    protected $fillable = [
+        'company_id',
+        'invoice_number',
+        'status',
+        'buyer_name',
+        'buyer_ntn',
+        'total_amount'
+    ];
+
+    public function items()
+    {
+        return $this->hasMany(InvoiceItem::class);
+    }
+
+    public function isLocked()
+    {
+        return $this->status === 'locked';
+    }
+}
+```
+
+Save.
+
+---
+
+# 🟢 STEP 2 — Production Lock Rule (Controller Logic)
+
+Open:
+
+```
+app/Http/Controllers/InvoiceController.php
+```
+
+Replace content with:
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Invoice;
+use Illuminate\Http\Request;
+
+class InvoiceController extends Controller
+{
+    public function update(Request $request, Invoice $invoice)
+    {
+        if ($invoice->isLocked()) {
+            return response()->json([
+                'error' => 'Production invoice cannot be edited.'
+            ], 403);
+        }
+
+        $invoice->update($request->all());
+
+        return response()->json(['message' => 'Invoice updated']);
+    }
+
+    public function submit(Invoice $invoice)
+    {
+        if ($invoice->isLocked()) {
+            return response()->json([
+                'error' => 'Invoice already locked.'
+            ], 403);
+        }
+
+        // Simulate FBR success
+        $invoice->status = 'locked';
+        $invoice->invoice_number = 'FBR' . time();
+        $invoice->save();
+
+        return response()->json([
+            'message' => 'Invoice submitted to FBR and locked.',
+            'invoice_number' => $invoice->invoice_number
+        ]);
+    }
+}
+```
+
+Save.
+
+---
+
+# 🟢 STEP 3 — Add Routes
+
+Open:
+
+```
+routes/web.php
+```
+
+Update inside middleware group:
+
+```php
+use App\Http\Controllers\InvoiceController;
+
+Route::middleware(['auth', 'company'])->group(function () {
+
+    Route::get('/dashboard', function () {
+        return "Company Dashboard Active";
+    });
+
+    Route::put('/invoice/{invoice}', [InvoiceController::class, 'update']);
+    Route::post('/invoice/{invoice}/submit', [InvoiceController::class, 'submit']);
+
+});
+```
+
+Save.
+
+---
+
+# 🟢 STEP 4 — FBR Service Structure
+
+Create new file:
+
+```
+app/Services/FbrService.php
+```
+
+Paste:
+
+```php
+<?php
+
+namespace App\Services;
+
+use Illuminate\Support\Facades\Http;
+
+class FbrService
+{
+    public function submitInvoice($invoice)
+    {
+        $payload = [
+            "invoiceType" => "Sale Invoice",
+            "invoiceDate" => now()->toDateString(),
+            "sellerNTNCNIC" => $invoice->company->ntn ?? "",
+            "buyerNTNCNIC" => $invoice->buyer_ntn,
+            "buyerBusinessName" => $invoice->buyer_name,
+            "items" => []
+        ];
+
+        foreach ($invoice->items as $item) {
+            $payload["items"][] = [
+                "hsCode" => $item->hs_code,
+                "quantity" => $item->quantity,
+                "valueSalesExcludingST" => $item->price,
+                "salesTaxApplicable" => $item->tax
+            ];
+        }
+
+        // Sandbox example
+        // $response = Http::withToken("YOUR_FBR_TOKEN")
+        //     ->post("https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata", $payload);
+
+        return [
+            "status" => "success",
+            "fbr_invoice_number" => "FBR" . time()
+        ];
+    }
+}
+```
+
+Save.
+
+---
+
+# 🔥 PHASE 3 RESULT
+
+✔ Invoice once submitted → locked
+✔ Locked invoice cannot edit
+✔ Locked invoice cannot resubmit
+✔ FBR service structure ready
+✔ SaaS compliance backbone active
+
+---
+
+# 🎯 Next Phase
+
+Phase 4:
+
+📦 Real Invoice Creation Form
+📊 Dashboard Summary
+📄 PDF Generation
+🔁 Retry Queue System
+
+---
+
+Ab confirm karo:
+
+Kya routes add ho gaye?
+Kya koi error aa raha hai?
+
+Phir hum Phase 4 start karte hain 🚀

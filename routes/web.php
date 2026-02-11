@@ -20,6 +20,9 @@ use App\Http\Controllers\TaxOverrideController;
 
 Route::get('/share/invoice/{uuid}', [ShareController::class, 'show']);
 
+Route::get('/demo-login/{role}', [\App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'demoLogin'])
+    ->where('role', 'super_admin|company_admin|demo');
+
 Route::get('/', function () {
     return \Illuminate\Support\Facades\Auth::check()
         ? redirect('/dashboard')

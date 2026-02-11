@@ -31,6 +31,23 @@ class AuthenticatedSessionController extends Controller
         return redirect()->intended(route('dashboard', absolute: false));
     }
 
+    public function demoLogin(Request $request, string $role): RedirectResponse
+    {
+        $credentials = match($role) {
+            'super_admin' => ['email' => 'admin@test.com', 'password' => 'admin123'],
+            'company_admin' => ['email' => 'company_admin@test.com', 'password' => 'admin123'],
+            'demo' => ['email' => 'demo@taxnest.pk', 'password' => 'admin123'],
+            default => null,
+        };
+
+        if (!$credentials || !Auth::attempt($credentials)) {
+            return redirect('/login')->with('error', 'Demo login failed.');
+        }
+
+        $request->session()->regenerate();
+        return redirect()->intended(route('dashboard', absolute: false));
+    }
+
     /**
      * Destroy an authenticated session.
      */

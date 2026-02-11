@@ -94,7 +94,10 @@
                     </td>
                     <td style="width: 40%; vertical-align: top; text-align: right;">
                         <div class="invoice-title">INVOICE</div>
-                        <div class="invoice-meta">#{{ $invoice->invoice_number ?? 'INV-' . $invoice->id }}</div>
+                        <div class="invoice-meta">#{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</div>
+@if($invoice->fbr_invoice_number)
+<div class="invoice-meta" style="color: #059669; font-weight: bold;">FBR: {{ $invoice->fbr_invoice_number }}</div>
+@endif
                         <div class="invoice-meta">{{ $invoice->created_at->format('d M Y') }}</div>
                         <div style="margin-top: 8px;">
                             <span class="status-badge status-{{ $invoice->status }}">{{ strtoupper($invoice->status) }}</span>
@@ -116,7 +119,10 @@
                 <td style="padding-left: 10px;">
                     <div class="info-box">
                         <div class="info-label">Invoice Details</div>
-                        <div class="info-value">Invoice #: <strong>{{ $invoice->invoice_number ?? 'INV-' . $invoice->id }}</strong></div>
+                        <div class="info-value">Internal #: <strong>{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</strong></div>
+@if($invoice->fbr_invoice_number)
+<div class="info-value">FBR #: <strong style="color: #059669;">{{ $invoice->fbr_invoice_number }}</strong></div>
+@endif
                         <div class="info-value">Date: <strong>{{ $invoice->created_at->format('d M Y') }}</strong></div>
                         @if($invoice->submission_mode)
                         <div class="info-value">Mode: <strong>{{ ucfirst($invoice->submission_mode) }}</strong></div>

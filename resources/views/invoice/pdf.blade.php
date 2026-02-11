@@ -35,7 +35,10 @@
         </div>
         <div style="text-align: right;">
             <div class="invoice-title">INVOICE</div>
-            <p style="font-size: 14px; margin: 4px 0;">#{{ $invoice->invoice_number ?? 'INV-' . $invoice->id }}</p>
+            <p style="font-size: 14px; margin: 4px 0;">#{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</p>
+@if($invoice->fbr_invoice_number)
+<p style="font-size: 13px; margin: 4px 0; color: #059669; font-weight: bold;">FBR: {{ $invoice->fbr_invoice_number }}</p>
+@endif
             <p style="font-size: 13px; color: #6b7280;">{{ $invoice->created_at->format('d M Y') }}</p>
             <span class="status status-{{ $invoice->status }}">{{ strtoupper($invoice->status) }}</span>
         </div>
@@ -49,7 +52,10 @@
         </div>
         <div class="info-box">
             <h4>Invoice Details</h4>
-            <p>Invoice Number: <strong>{{ $invoice->invoice_number ?? 'INV-' . $invoice->id }}</strong></p>
+            <p>Internal #: <strong>{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</strong></p>
+@if($invoice->fbr_invoice_number)
+<p>FBR #: <strong style="color: #059669;">{{ $invoice->fbr_invoice_number }}</strong></p>
+@endif
             <p>Date: <strong>{{ $invoice->created_at->format('d M Y') }}</strong></p>
         </div>
     </div>

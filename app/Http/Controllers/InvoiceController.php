@@ -21,13 +21,23 @@ use Illuminate\Support\Facades\DB;
 
 class InvoiceController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $companyId = app('currentCompanyId');
-        $invoices = Invoice::where('company_id', $companyId)
-            ->with('items', 'branch')
-            ->orderBy('created_at', 'desc')
-            ->paginate(15);
+        $query = Invoice::where('company_id', $companyId)
+            ->with('items', 'branch');
+
+        if ($search = $request->get('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('internal_invoice_number', 'ilike', "%{$search}%")
+                  ->orWhere('fbr_invoice_number', 'ilike', "%{$search}%")
+                  ->orWhere('invoice_number', 'ilike', "%{$search}%")
+                  ->orWhere('buyer_name', 'ilike', "%{$search}%")
+                  ->orWhere('buyer_ntn', 'ilike', "%{$search}%");
+            });
+        }
+
+        $invoices = $query->orderBy('created_at', 'desc')->paginate(15)->appends($request->query());
 
         return view('invoice.index', compact('invoices'));
     }
@@ -97,6 +107,7 @@ class InvoiceController extends Controller
             $invoice = Invoice::create([
                 'company_id' => $companyId,
                 'invoice_number' => $invoiceNumber,
+                'internal_invoice_number' => $invoiceNumber,
                 'buyer_name' => $request->buyer_name,
                 'buyer_ntn' => $request->buyer_ntn,
                 'total_amount' => $totalAmount,
@@ -447,7 +458,7 @@ class InvoiceController extends Controller
             'totalTax' => $totalTax,
         ]);
 
-        $filename = 'invoice-' . ($invoice->invoice_number ?? $invoice->id) . '.pdf';
+        $filename = 'invoice-' . ($invoice->fbr_invoice_number ?? $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id) . '.pdf';
         return $pdf->download($filename);
     }
 

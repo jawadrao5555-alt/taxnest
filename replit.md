@@ -16,6 +16,14 @@ TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with 
   - Invoice Flow Polish: auto-focus first field, Enter key navigation between fields, scroll-to-error on validation failure, branch display in preview
   - PDF Reliability: draft watermark, FBR header with invoice ID on locked, QR data section, WHT line, proper filename (invoice-{number}.pdf)
   - Dashboard Cleanup: role-based views — Retail (KPIs + recent invoices), Business (adds analytics/insights), Enterprise (full analytics + risk + branch stats); internal accounts get Enterprise view
+- 2026-02-12: Dual Invoice Number System
+  - internal_invoice_number: generated on creation, never overwritten
+  - fbr_invoice_number: stored on successful FBR submission, nullable
+  - fbr_submission_date: timestamp of FBR submission
+  - Display: FBR number shown prominently when available, internal number as reference
+  - Search: by internal #, FBR #, customer name, NTN
+  - PDF: shows both numbers, filename uses FBR # when available
+  - SendInvoiceToFbrJob: no longer overwrites invoice_number
 - 2026-02-12: High-Volume Market Capture Pricing
   - Aggressive pricing: Retail (999), Business (2999), Industrial (6999), Enterprise (15000)
   - Discount engine: Monthly 0%, Quarterly 1%, Semi-Annual 3%, Annual 6%
@@ -45,7 +53,7 @@ TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with 
 
 ## Database Tables
 - **companies** — name, ntn, email, phone, address, fbr_token, token_expires_at, compliance_score, fbr_environment, fbr_sandbox_token (encrypted), fbr_production_token (encrypted), fbr_registration_no, fbr_business_name, suspended_at, company_status (pending/active/suspended/rejected), token_expiry_date, last_successful_submission, fbr_connection_status
-- **invoices** — company_id, branch_id, invoice_number, status, integrity_hash, buyer_name, buyer_ntn, total_amount, override_reason, override_by, submission_mode, fbr_invoice_id, qr_data, share_uuid
+- **invoices** — company_id, branch_id, invoice_number, internal_invoice_number, fbr_invoice_number (nullable), fbr_submission_date (nullable), status, integrity_hash, buyer_name, buyer_ntn, total_amount, override_reason, override_by, submission_mode, fbr_invoice_id, qr_data, share_uuid
 - **invoice_items** — invoice_id, hs_code, schedule_type, pct_code, tax_rate, sro_schedule_no, serial_no, mrp, description, quantity, price, tax
 - **invoice_activity_logs** — invoice_id, company_id, user_id, action, changes_json, ip_address
 - **users** — name, email, password, company_id (nullable), role (super_admin/company_admin/employee/viewer), is_active

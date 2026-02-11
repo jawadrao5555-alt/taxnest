@@ -9,6 +9,9 @@ class Invoice extends Model
     protected $fillable = [
         'company_id',
         'invoice_number',
+        'internal_invoice_number',
+        'fbr_invoice_number',
+        'fbr_submission_date',
         'status',
         'integrity_hash',
         'buyer_name',
@@ -22,6 +25,18 @@ class Invoice extends Model
         'share_uuid',
         'branch_id',
     ];
+
+    protected $casts = [
+        'fbr_submission_date' => 'datetime',
+    ];
+
+    public function getDisplayInvoiceNumberAttribute()
+    {
+        if ($this->fbr_invoice_number) {
+            return $this->fbr_invoice_number;
+        }
+        return $this->internal_invoice_number ?? $this->invoice_number ?? 'INV-' . $this->id;
+    }
 
     protected static function boot()
     {

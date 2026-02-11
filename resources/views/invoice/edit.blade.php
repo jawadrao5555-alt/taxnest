@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h2 class="font-bold text-xl text-gray-800 leading-tight">Edit Invoice {{ $invoice->invoice_number ?? '#' . $invoice->id }}</h2>
+            <h2 class="font-bold text-xl text-gray-800 leading-tight">Edit Invoice {{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? '#' . $invoice->id }}</h2>
             <a href="/invoice/{{ $invoice->id }}" class="text-sm text-gray-600 hover:text-gray-800">Back to Invoice</a>
         </div>
     </x-slot>

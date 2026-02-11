@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h2 class="font-bold text-xl text-gray-800 leading-tight">Invoice {{ $invoice->invoice_number ?? '#' . $invoice->id }}</h2>
+            <h2 class="font-bold text-xl text-gray-800 leading-tight">Invoice {{ $invoice->display_invoice_number }}</h2>
             <div class="flex items-center space-x-3">
                 @if($invoice->status === 'draft')
                 <a href="/invoice/{{ $invoice->id }}/edit" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">Edit</a>
@@ -49,7 +49,7 @@
                 <a href="/invoice/{{ $invoice->id }}/preview" class="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition">Preview</a>
                 <a href="/invoice/{{ $invoice->id }}/download" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Download PDF</a>
                 @if($invoice->share_uuid)
-                <a href="https://wa.me/?text={{ urlencode('Invoice ' . $invoice->invoice_number . ': ' . url('/share/invoice/' . $invoice->share_uuid)) }}" target="_blank" class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition">WhatsApp</a>
+                <a href="https://wa.me/?text={{ urlencode('Invoice ' . $invoice->display_invoice_number . ': ' . url('/share/invoice/' . $invoice->share_uuid)) }}" target="_blank" class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition">WhatsApp</a>
                 <button onclick="navigator.clipboard.writeText('{{ url('/share/invoice/' . $invoice->share_uuid) }}').then(() => { this.textContent = 'Copied!'; setTimeout(() => { this.textContent = 'Copy Link'; }, 2000); })" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">Copy Link</button>
                 @endif
                 <a href="/invoices" class="text-sm text-gray-600 hover:text-gray-800">Back</a>
@@ -89,7 +89,13 @@
                         </div>
                         <div class="bg-gray-50 rounded-lg p-4">
                             <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Invoice Details</h4>
-                            <p class="text-sm text-gray-600">Invoice #: <span class="font-semibold text-gray-900">{{ $invoice->invoice_number ?? 'INV-' . $invoice->id }}</span></p>
+                            <p class="text-sm text-gray-600">Internal #: <span class="font-semibold text-gray-900">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</span></p>
+@if($invoice->fbr_invoice_number)
+<p class="text-sm text-gray-600">FBR #: <span class="font-semibold text-emerald-700">{{ $invoice->fbr_invoice_number }}</span></p>
+@endif
+@if($invoice->fbr_submission_date)
+<p class="text-sm text-gray-600">FBR Date: <span class="font-semibold text-gray-900">{{ $invoice->fbr_submission_date->format('d M Y H:i') }}</span></p>
+@endif
                             <p class="text-sm text-gray-600">Date: <span class="font-semibold text-gray-900">{{ $invoice->created_at->format('d M Y') }}</span></p>
                             @if($invoice->branch)
                             <p class="text-sm text-gray-600">Branch: <span class="font-semibold text-gray-900">{{ $invoice->branch->name }}</span></p>

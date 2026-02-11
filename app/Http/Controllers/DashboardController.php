@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Invoice;
+use App\Models\InvoiceItem;
 use App\Models\Company;
 use App\Models\Subscription;
 use App\Models\InvoiceActivityLog;
@@ -156,6 +157,51 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
+        $momGrowth = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $month = now()->subMonths($i);
+            $count = Invoice::where('company_id', $companyId)
+                ->whereMonth('created_at', $month->month)
+                ->whereYear('created_at', $month->year)
+                ->count();
+            $revenue = Invoice::where('company_id', $companyId)
+                ->whereMonth('created_at', $month->month)
+                ->whereYear('created_at', $month->year)
+                ->sum('total_amount');
+            $momGrowth[] = ['month' => $month->format('M'), 'count' => $count, 'revenue' => $revenue];
+        }
+
+        $taxVariance = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $month = now()->subMonths($i);
+            $invoiceIdsForTax = Invoice::where('company_id', $companyId)
+                ->whereMonth('created_at', $month->month)
+                ->whereYear('created_at', $month->year)
+                ->pluck('id');
+            $actualTax = InvoiceItem::whereIn('invoice_id', $invoiceIdsForTax)->sum('tax');
+            $subtotal = InvoiceItem::whereIn('invoice_id', $invoiceIdsForTax)
+                ->selectRaw('SUM(price * quantity) as s')->value('s') ?? 0;
+            $expectedTax = $subtotal * 0.18;
+            $taxVariance[] = [
+                'month' => $month->format('M'),
+                'actual' => round($actualTax),
+                'expected' => round($expectedTax),
+            ];
+        }
+
+        $hsRiskData = InvoiceItem::whereIn('invoice_id',
+                Invoice::where('company_id', $companyId)->pluck('id'))
+            ->select(
+                DB::raw("SUBSTRING(hs_code, 1, 2) as hs_prefix"),
+                DB::raw('COUNT(*) as count'),
+                DB::raw('SUM(tax) as total_tax'),
+                DB::raw('SUM(price * quantity) as total_value')
+            )
+            ->groupBy('hs_prefix')
+            ->orderByDesc('count')
+            ->take(10)
+            ->get();
+
         return view('dashboard', compact(
             'company', 'totalInvoices', 'draftCount', 'submittedCount', 'lockedCount',
             'totalRevenue', 'subscription', 'invoiceLimit', 'invoicesUsed',
@@ -164,7 +210,8 @@ class DashboardController extends Controller
             'hybridScore', 'riskLevel', 'riskBadge',
             'complianceTrend', 'recentActivity', 'smartInsights', 'recentAnomalies',
             'notifications', 'industryBenchmark', 'trialInfo',
-            'vendorRisks', 'auditProbability', 'recentReports'
+            'vendorRisks', 'auditProbability', 'recentReports',
+            'momGrowth', 'taxVariance', 'hsRiskData'
         ));
     }
 }

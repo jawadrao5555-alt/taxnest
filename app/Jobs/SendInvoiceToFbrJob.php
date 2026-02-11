@@ -36,6 +36,16 @@ class SendInvoiceToFbrJob implements ShouldQueue
                 $invoice->invoice_number = $response['fbr_invoice_number'];
             }
             $invoice->integrity_hash = IntegrityHashService::generate($invoice);
+
+            $qrData = json_encode([
+                'ntn' => $invoice->company->ntn ?? '',
+                'invoice_number' => $invoice->invoice_number,
+                'fbr_invoice_id' => $response['fbr_invoice_number'] ?? $invoice->invoice_number,
+                'date' => $invoice->created_at->format('Y-m-d'),
+                'total' => $invoice->total_amount,
+            ]);
+            $invoice->qr_data = $qrData;
+            $invoice->fbr_invoice_id = $response['fbr_invoice_number'] ?? null;
             $invoice->save();
 
             InvoiceActivityService::log(

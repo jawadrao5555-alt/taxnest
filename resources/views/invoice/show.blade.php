@@ -5,10 +5,37 @@
             <div class="flex items-center space-x-3">
                 @if($invoice->status === 'draft')
                 <a href="/invoice/{{ $invoice->id }}/edit" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">Edit</a>
-                <form method="POST" action="/invoice/{{ $invoice->id }}/submit" class="inline">
-                    @csrf
-                    <button type="submit" onclick="return confirm('Submit this invoice to FBR? Once submitted, it cannot be edited.')" class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition">Submit to FBR</button>
-                </form>
+                <div x-data="{ showSubmitModal: false }">
+                    <button @click="showSubmitModal = true" class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition">Submit to PRAL</button>
+                    <div x-show="showSubmitModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                        <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+                            <h3 class="text-lg font-bold text-gray-900 mb-4">Submit to PRAL</h3>
+                            <div class="space-y-4">
+                                <form method="POST" action="/invoice/{{ $invoice->id }}/submit">
+                                    @csrf
+                                    <input type="hidden" name="mode" value="smart">
+                                    <button type="submit" class="w-full p-4 border-2 border-emerald-200 rounded-lg hover:bg-emerald-50 text-left">
+                                        <p class="font-semibold text-emerald-700">Smart Mode (Recommended)</p>
+                                        <p class="text-xs text-gray-500">Runs compliance scoring, blocks CRITICAL risk invoices</p>
+                                    </button>
+                                </form>
+                                <div x-data="{ showOverride: false }">
+                                    <button @click="showOverride = !showOverride" class="w-full p-4 border-2 border-orange-200 rounded-lg hover:bg-orange-50 text-left">
+                                        <p class="font-semibold text-orange-700">Direct MIS Mode</p>
+                                        <p class="text-xs text-gray-500">Skips compliance check - requires override reason</p>
+                                    </button>
+                                    <form x-show="showOverride" method="POST" action="/invoice/{{ $invoice->id }}/submit" class="mt-3">
+                                        @csrf
+                                        <input type="hidden" name="mode" value="direct_mis">
+                                        <textarea name="override_reason" required minlength="10" placeholder="Enter override reason (min 10 characters)..." class="w-full rounded-lg border-gray-300 text-sm"></textarea>
+                                        <button type="submit" class="mt-2 w-full px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium">Submit with Override</button>
+                                    </form>
+                                </div>
+                            </div>
+                            <button @click="showSubmitModal = false" class="mt-4 w-full text-center text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+                        </div>
+                    </div>
+                </div>
                 @endif
                 @if($invoice->status === 'locked')
                 <form method="POST" action="{{ route('invoice.verify', $invoice->id) }}" class="inline">
@@ -19,6 +46,7 @@
                     </button>
                 </form>
                 @endif
+                <a href="/invoice/{{ $invoice->id }}/preview" class="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition">Preview</a>
                 <a href="/invoice/{{ $invoice->id }}/pdf" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Download PDF</a>
                 <a href="/invoices" class="text-sm text-gray-600 hover:text-gray-800">Back</a>
             </div>

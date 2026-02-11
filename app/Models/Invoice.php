@@ -13,7 +13,12 @@ class Invoice extends Model
         'integrity_hash',
         'buyer_name',
         'buyer_ntn',
-        'total_amount'
+        'total_amount',
+        'override_reason',
+        'override_by',
+        'submission_mode',
+        'fbr_invoice_id',
+        'qr_data',
     ];
 
     public function items()

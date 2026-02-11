@@ -312,6 +312,24 @@
                 </div>
             </div>
 
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">MoM Growth (6 Months)</h3>
+                    <canvas id="momGrowthChart" height="250"></canvas>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Tax Variance: Actual vs Expected</h3>
+                    <canvas id="taxVarianceChart" height="250"></canvas>
+                </div>
+            </div>
+
+            @if($hsRiskData->count() > 0)
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Risk Heatmap by HS Code</h3>
+                <canvas id="hsRiskChart" height="300"></canvas>
+            </div>
+            @endif
+
             @if($recentAnomalies->count() > 0)
             <div class="bg-white rounded-xl shadow-sm border border-red-100 p-6 mb-8">
                 <h3 class="text-lg font-semibold text-red-800 mb-4 flex items-center space-x-2">
@@ -475,6 +493,121 @@
                     scales: { y: { beginAtZero: true, max: 100 } }
                 }
             });
+
+            const momCtx = document.getElementById('momGrowthChart').getContext('2d');
+            new Chart(momCtx, {
+                type: 'bar',
+                data: {
+                    labels: {!! json_encode(collect($momGrowth)->pluck('month')) !!},
+                    datasets: [{
+                        label: 'Invoice Count',
+                        data: {!! json_encode(collect($momGrowth)->pluck('count')) !!},
+                        backgroundColor: '#10b981',
+                        borderRadius: 6,
+                        yAxisID: 'y',
+                        order: 2
+                    }, {
+                        label: 'Revenue (Rs.)',
+                        data: {!! json_encode(collect($momGrowth)->pluck('revenue')) !!},
+                        type: 'line',
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 4,
+                        fill: true,
+                        tension: 0.4,
+                        yAxisID: 'y1',
+                        order: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        y: { beginAtZero: true, position: 'left', title: { display: true, text: 'Count' }, ticks: { stepSize: 1 } },
+                        y1: { beginAtZero: true, position: 'right', title: { display: true, text: 'Revenue' }, grid: { drawOnChartArea: false } }
+                    }
+                }
+            });
+
+            const tvCtx = document.getElementById('taxVarianceChart').getContext('2d');
+            new Chart(tvCtx, {
+                type: 'line',
+                data: {
+                    labels: {!! json_encode(collect($taxVariance)->pluck('month')) !!},
+                    datasets: [{
+                        label: 'Actual Tax',
+                        data: {!! json_encode(collect($taxVariance)->pluck('actual')) !!},
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 2,
+                        pointRadius: 4
+                    }, {
+                        label: 'Expected Tax (18%)',
+                        data: {!! json_encode(collect($taxVariance)->pluck('expected')) !!},
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+
+            @if($hsRiskData->count() > 0)
+            const hsCtx = document.getElementById('hsRiskChart').getContext('2d');
+            const hsLabels = {!! json_encode($hsRiskData->pluck('hs_prefix')->map(fn($p) => 'HS ' . ($p ?? 'N/A'))) !!};
+            const hsCounts = {!! json_encode($hsRiskData->pluck('count')) !!};
+            const hsTax = {!! json_encode($hsRiskData->pluck('total_tax')) !!};
+            const hsValue = {!! json_encode($hsRiskData->pluck('total_value')) !!};
+            const hsColors = hsValue.map((v, i) => {
+                const rate = v > 0 ? (hsTax[i] / v) * 100 : 0;
+                if (rate >= 16 && rate <= 20) return '#10b981';
+                if (rate >= 10 && rate < 16) return '#f59e0b';
+                return '#ef4444';
+            });
+            new Chart(hsCtx, {
+                type: 'bar',
+                data: {
+                    labels: hsLabels,
+                    datasets: [{
+                        label: 'Item Count',
+                        data: hsCounts,
+                        backgroundColor: hsColors,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                afterLabel: function(ctx) {
+                                    const idx = ctx.dataIndex;
+                                    const rate = hsValue[idx] > 0 ? ((hsTax[idx] / hsValue[idx]) * 100).toFixed(1) : 0;
+                                    return 'Tax Rate: ' + rate + '%\nValue: Rs. ' + hsValue[idx].toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                }
+            });
+            @endif
 
             const gaugeCanvas = document.getElementById('auditGauge');
             if (gaugeCanvas) {

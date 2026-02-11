@@ -125,13 +125,16 @@ class AnomalyEngine
 
     private static function calculateRiskWeight(float $momSpike, float $taxDrop, bool $hsShift, bool $valueTaxAnomaly): float
     {
+        $momThreshold = (float) \App\Models\SystemSetting::get('mom_spike_threshold', '200');
+        $taxDropThreshold = (float) \App\Models\SystemSetting::get('tax_drop_threshold', '60');
+
         $weight = 0;
 
-        if ($momSpike > 200) $weight += 20;
+        if ($momSpike > $momThreshold) $weight += 20;
         elseif ($momSpike > 100) $weight += 10;
         elseif ($momSpike > 50) $weight += 5;
 
-        if ($taxDrop > 60) $weight += 20;
+        if ($taxDrop > $taxDropThreshold) $weight += 20;
         elseif ($taxDrop > 40) $weight += 15;
         elseif ($taxDrop > 20) $weight += 8;
 

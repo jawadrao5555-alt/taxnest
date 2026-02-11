@@ -196,7 +196,7 @@ class InvoiceController extends Controller
         }
     }
 
-    public function submit(Invoice $invoice)
+    public function submit(Request $request, Invoice $invoice)
     {
         if ($invoice->isLocked()) {
             return redirect('/invoices')->with('error', 'Invoice already locked.');
@@ -209,14 +209,55 @@ class InvoiceController extends Controller
             ->first();
 
         if ($subscription && $subscription->isExpired()) {
-            return redirect('/invoices')->with('error', 'Your subscription has expired. Please renew to submit invoices to FBR.');
+            return redirect('/invoices')->with('error', 'Your subscription has expired.');
         }
 
         if ($subscription && $subscription->trial_ends_at && $subscription->isTrialExpired()) {
-            return redirect('/invoices')->with('error', 'Your trial period has ended. Please subscribe to a plan to submit invoices.');
+            return redirect('/invoices')->with('error', 'Your trial period has ended.');
         }
 
+        $mode = $request->input('mode', 'smart');
         $invoice->load('items', 'company');
+
+        if ($mode === 'direct_mis') {
+            if (!in_array(auth()->user()->role, ['company_admin', 'super_admin'])) {
+                return redirect('/invoice/' . $invoice->id)->with('error', 'Only company admins can use Direct MIS mode.');
+            }
+
+            $request->validate(['override_reason' => 'required|string|min:10|max:500']);
+
+            $invoice->status = 'submitted';
+            $invoice->submission_mode = 'direct_mis';
+            $invoice->override_reason = $request->override_reason;
+            $invoice->override_by = auth()->id();
+            $invoice->save();
+
+            \App\Models\OverrideLog::create([
+                'invoice_id' => $invoice->id,
+                'company_id' => $invoice->company_id,
+                'user_id' => auth()->id(),
+                'action' => 'direct_mis_submission',
+                'reason' => $request->override_reason,
+                'metadata' => ['submission_mode' => 'direct_mis', 'user_role' => auth()->user()->role],
+                'ip_address' => $request->ip(),
+            ]);
+
+            InvoiceActivityService::log($invoice->id, $invoice->company_id, 'override_submitted', [
+                'mode' => 'direct_mis',
+                'override_reason' => $request->override_reason,
+                'override_by' => auth()->user()->name,
+            ], request()->ip());
+
+            SendInvoiceToFbrJob::dispatch($invoice->id);
+
+            if ($invoice->buyer_ntn) {
+                $vendorResult = VendorRiskEngine::calculateVendorScore($invoice->company_id, $invoice->buyer_ntn);
+                VendorRiskEngine::persistVendorProfile($invoice->company_id, $invoice->buyer_ntn, $invoice->buyer_name, $vendorResult);
+            }
+
+            return redirect('/invoices')->with('success', 'Invoice submitted via Direct MIS mode (compliance check skipped).');
+        }
+
         $scoreResult = HybridComplianceScorer::score($invoice);
 
         if ($scoreResult['risk_level'] === 'CRITICAL') {
@@ -237,9 +278,11 @@ class InvoiceController extends Controller
         }
 
         $invoice->status = 'submitted';
+        $invoice->submission_mode = 'smart';
         $invoice->save();
 
         InvoiceActivityService::log($invoice->id, $invoice->company_id, 'submitted', [
+            'mode' => 'smart',
             'compliance_score' => $scoreResult['final_score'],
             'risk_level' => $scoreResult['risk_level'],
         ], request()->ip());
@@ -288,6 +331,155 @@ class InvoiceController extends Controller
 
         return response($html)
             ->header('Content-Type', 'text/html');
+    }
+
+    public function complianceCheck(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = \App\Models\Company::find($companyId);
+
+        $invoice = new Invoice([
+            'company_id' => $companyId,
+            'invoice_number' => 'PREVIEW',
+            'buyer_name' => $request->buyer_name ?? '',
+            'buyer_ntn' => $request->buyer_ntn ?? '',
+            'total_amount' => 0,
+            'status' => 'draft',
+        ]);
+        $invoice->id = 0;
+        $invoice->setRelation('company', $company);
+
+        $items = collect();
+        $totalAmount = 0;
+        foreach ($request->items ?? [] as $itemData) {
+            $item = new InvoiceItem([
+                'hs_code' => $itemData['hs_code'] ?? '',
+                'description' => $itemData['description'] ?? '',
+                'quantity' => floatval($itemData['quantity'] ?? 0),
+                'price' => floatval($itemData['price'] ?? 0),
+                'tax' => floatval($itemData['tax'] ?? 0),
+            ]);
+            $items->push($item);
+            $totalAmount += ($item->price * $item->quantity) + $item->tax;
+        }
+        $invoice->total_amount = $totalAmount;
+        $invoice->setRelation('items', $items);
+
+        $result = ComplianceEngine::validate($invoice);
+        $score = 100 - $result['total_deduction'];
+        $riskLevel = HybridComplianceScorer::classifyRisk($score);
+        $badge = HybridComplianceScorer::getRiskBadge($riskLevel);
+
+        return response()->json([
+            'score' => $score,
+            'risk_level' => $riskLevel,
+            'badge' => $badge,
+            'flags' => $result['flags'],
+            'details' => $result['details'],
+        ]);
+    }
+
+    public function preview(Invoice $invoice)
+    {
+        $companyId = app('currentCompanyId');
+        if ($invoice->company_id !== $companyId && auth()->user()->role !== 'super_admin') {
+            abort(403);
+        }
+        $invoice->load('items', 'company');
+
+        $complianceReport = ComplianceReport::where('invoice_id', $invoice->id)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        $taxBreakdown = [];
+        $subtotal = 0;
+        $totalTax = 0;
+        foreach ($invoice->items as $item) {
+            $itemSubtotal = $item->price * $item->quantity;
+            $subtotal += $itemSubtotal;
+            $totalTax += $item->tax;
+            $effectiveRate = $itemSubtotal > 0 ? round(($item->tax / $itemSubtotal) * 100, 2) : 0;
+            $taxBreakdown[] = [
+                'hs_code' => $item->hs_code,
+                'description' => $item->description,
+                'subtotal' => $itemSubtotal,
+                'tax' => $item->tax,
+                'rate' => $effectiveRate,
+            ];
+        }
+
+        return view('invoice.preview', compact('invoice', 'complianceReport', 'taxBreakdown', 'subtotal', 'totalTax'));
+    }
+
+    public function validateInvoice(Invoice $invoice)
+    {
+        $companyId = app('currentCompanyId');
+        if ($invoice->company_id !== $companyId) abort(403);
+
+        $invoice->load('items', 'company');
+        $scoreResult = HybridComplianceScorer::score($invoice);
+
+        $validationResult = [
+            'score' => $scoreResult['final_score'],
+            'risk_level' => $scoreResult['risk_level'],
+            'rule_flags' => $scoreResult['rule_result']['flags'],
+            'details' => $scoreResult['rule_result']['details'],
+            'anomaly' => $scoreResult['anomaly_result'],
+            'stability_bonus' => $scoreResult['stability_bonus'],
+            'fbr_status' => 'ready',
+        ];
+
+        if ($scoreResult['risk_level'] === 'CRITICAL') {
+            $validationResult['fbr_status'] = 'blocked';
+        }
+
+        return redirect('/invoice/' . $invoice->id . '/preview')
+            ->with('validation_result', $validationResult);
+    }
+
+    public function apiStatus(Invoice $invoice)
+    {
+        $companyId = app('currentCompanyId');
+        if ($invoice->company_id !== $companyId && auth()->user()->role !== 'super_admin') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $invoice->load('items');
+        $report = ComplianceReport::where('invoice_id', $invoice->id)
+            ->orderBy('created_at', 'desc')->first();
+
+        return response()->json([
+            'invoice_number' => $invoice->invoice_number,
+            'status' => $invoice->status,
+            'submission_mode' => $invoice->submission_mode,
+            'total_amount' => $invoice->total_amount,
+            'fbr_invoice_id' => $invoice->fbr_invoice_id,
+            'compliance_score' => $report ? $report->final_score : null,
+            'risk_level' => $report ? $report->risk_level : null,
+            'integrity_hash' => $invoice->integrity_hash,
+            'qr_data' => $invoice->qr_data ? json_decode($invoice->qr_data) : null,
+            'created_at' => $invoice->created_at->toIso8601String(),
+        ]);
+    }
+
+    public function apiComplianceStatus()
+    {
+        $companyId = app('currentCompanyId');
+        $company = \App\Models\Company::find($companyId);
+
+        $totalInvoices = Invoice::where('company_id', $companyId)->count();
+        $lockedInvoices = Invoice::where('company_id', $companyId)->where('status', 'locked')->count();
+        $latestReport = ComplianceReport::where('company_id', $companyId)
+            ->orderBy('created_at', 'desc')->first();
+
+        return response()->json([
+            'company_name' => $company->name,
+            'ntn' => $company->ntn,
+            'compliance_score' => $company->compliance_score,
+            'total_invoices' => $totalInvoices,
+            'locked_invoices' => $lockedInvoices,
+            'latest_risk_level' => $latestReport ? $latestReport->risk_level : 'N/A',
+        ]);
     }
 
     private function checkInvoiceLimit($companyId)

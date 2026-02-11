@@ -22,6 +22,9 @@
                     <x-nav-link href="/billing/plans" :active="request()->is('billing*')">
                         Billing
                     </x-nav-link>
+                    <x-nav-link href="/mis" :active="request()->is('mis*')">
+                        MIS Reports
+                    </x-nav-link>
                     @endif
                     @if(auth()->user()->role === 'super_admin')
                     <x-nav-link href="/admin/dashboard" :active="request()->is('admin*')">
@@ -102,6 +105,9 @@
             </x-responsive-nav-link>
             <x-responsive-nav-link href="/billing/plans" :active="request()->is('billing*')">
                 Billing
+            </x-responsive-nav-link>
+            <x-responsive-nav-link href="/mis" :active="request()->is('mis*')">
+                MIS Reports
             </x-responsive-nav-link>
             @endif
             @if(auth()->user()->role === 'super_admin')

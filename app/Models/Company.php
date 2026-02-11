@@ -65,4 +65,9 @@ class Company extends Model
     {
         return $this->hasMany(VendorRiskProfile::class);
     }
+
+    public function products()
+    {
+        return $this->hasMany(Product::class);
+    }
 }

@@ -242,4 +242,44 @@ class AdminController extends Controller
 
         return view('admin.anomalies', compact('anomalies'));
     }
+
+    public function riskSettings()
+    {
+        $settings = [
+            'mom_spike_threshold' => \App\Models\SystemSetting::get('mom_spike_threshold', '200'),
+            'tax_drop_threshold' => \App\Models\SystemSetting::get('tax_drop_threshold', '60'),
+            'critical_score_threshold' => \App\Models\SystemSetting::get('critical_score_threshold', '40'),
+            'stability_bonus_weight' => \App\Models\SystemSetting::get('stability_bonus_weight', '10'),
+        ];
+        return view('admin.risk-settings', compact('settings'));
+    }
+
+    public function updateRiskSettings(Request $request)
+    {
+        $request->validate([
+            'mom_spike_threshold' => 'required|numeric|min:50|max:1000',
+            'tax_drop_threshold' => 'required|numeric|min:10|max:100',
+            'critical_score_threshold' => 'required|numeric|min:10|max:90',
+            'stability_bonus_weight' => 'required|numeric|min:0|max:30',
+        ]);
+
+        \App\Models\SystemSetting::set('mom_spike_threshold', $request->mom_spike_threshold);
+        \App\Models\SystemSetting::set('tax_drop_threshold', $request->tax_drop_threshold);
+        \App\Models\SystemSetting::set('critical_score_threshold', $request->critical_score_threshold);
+        \App\Models\SystemSetting::set('stability_bonus_weight', $request->stability_bonus_weight);
+
+        \App\Services\SecurityLogService::log('risk_settings_updated', auth()->id(), [
+            'settings' => $request->only(['mom_spike_threshold', 'tax_drop_threshold', 'critical_score_threshold', 'stability_bonus_weight']),
+        ]);
+
+        return redirect('/admin/risk-settings')->with('success', 'Risk settings updated successfully.');
+    }
+
+    public function overrideLogs()
+    {
+        $logs = \App\Models\OverrideLog::with('invoice', 'user', 'company')
+            ->orderBy('created_at', 'desc')
+            ->paginate(20);
+        return view('admin.override-logs', compact('logs'));
+    }
 }

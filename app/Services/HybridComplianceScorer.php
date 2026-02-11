@@ -93,6 +93,7 @@ class HybridComplianceScorer
 
     private static function calculateStabilityBonus(int $companyId): int
     {
+        $maxBonus = (int) \App\Models\SystemSetting::get('stability_bonus_weight', '10');
         $recentReports = ComplianceReport::where('company_id', $companyId)
             ->where('created_at', '>=', now()->subMonths(3))
             ->get();
@@ -102,16 +103,17 @@ class HybridComplianceScorer
         $lowRiskCount = $recentReports->where('risk_level', 'LOW')->count();
         $ratio = $lowRiskCount / $recentReports->count();
 
-        if ($ratio >= 0.9) return 10;
-        if ($ratio >= 0.7) return 5;
+        if ($ratio >= 0.9) return $maxBonus;
+        if ($ratio >= 0.7) return (int) round($maxBonus / 2);
         return 0;
     }
 
     public static function classifyRisk(int $score): string
     {
+        $criticalThreshold = (int) \App\Models\SystemSetting::get('critical_score_threshold', '40');
         if ($score >= 80) return 'LOW';
         if ($score >= 60) return 'MODERATE';
-        if ($score >= 40) return 'HIGH';
+        if ($score >= $criticalThreshold) return 'HIGH';
         return 'CRITICAL';
     }
 

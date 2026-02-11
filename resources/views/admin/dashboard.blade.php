@@ -160,6 +160,8 @@
                 <a href="/admin/system-health" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium text-sm hover:bg-emerald-700 transition">System Health</a>
                 <a href="/admin/security-logs" class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg font-medium text-sm hover:bg-red-700 transition">Security Logs</a>
                 <a href="/admin/anomalies" class="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg font-medium text-sm hover:bg-orange-700 transition">Anomalies</a>
+                <a href="/admin/risk-settings" class="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg font-medium text-sm hover:bg-teal-700 transition">Risk Settings</a>
+                <a href="/admin/override-logs" class="inline-flex items-center px-4 py-2 bg-amber-600 text-white rounded-lg font-medium text-sm hover:bg-amber-700 transition">Override Logs</a>
                 <a href="/admin/audit/export" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium text-sm hover:bg-indigo-700 transition">Export Audit CSV</a>
             </div>
         </div>

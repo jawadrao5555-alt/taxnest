@@ -1,0 +1,146 @@
+We are adding Demo + PDF + Share + Mock System to TaxNest.
+
+Follow tasks sequentially.
+
+====================================
+TASK 1 — PDF DOWNLOAD BUTTON
+====================================
+
+1. Add route:
+GET /invoice/{invoice}/download
+
+2. In InvoiceController:
+
+- If invoice.status = draft
+  Generate PDF with watermark "DRAFT COPY"
+
+- If invoice.status = locked
+  Show:
+    - FBR Logo
+    - FBR Invoice Number
+    - QR Code
+
+3. Add Download PDF button in:
+- Dashboard invoice list
+- Invoice preview page
+
+====================================
+TASK 2 — SOCIAL SHARE LINK
+====================================
+
+1. Create shareable public route:
+GET /share/invoice/{uuid}
+
+2. Generate unique UUID for each invoice.
+
+3. Share page shows:
+- Read-only invoice view
+- QR
+- FBR number (if submitted)
+- Download button
+
+4. Add share button:
+- WhatsApp share link
+- Copy link button
+
+====================================
+TASK 3 — MOCK USER CREATION
+====================================
+
+Create seeder:
+
+Mock User:
+Name: Demo Company Admin
+Email: demo@taxnest.pk
+Password: password123
+
+Assign:
+role = company_admin
+
+Create company:
+Demo Traders Pvt Ltd
+
+====================================
+TASK 4 — MOCK PRODUCT DATA
+====================================
+
+Insert sample products:
+
+1. Cooking Oil 1L
+   HS: 15179090
+   Tax: 18%
+
+2. Cement Bag
+   HS: 25232900
+   Tax: 18%
+
+3. Fertilizer
+   HS: 31021000
+   Tax: 0%
+
+====================================
+TASK 5 — MOCK INVOICE FLOW
+====================================
+
+Create 2 invoices:
+
+1. Draft Invoice:
+   Status: draft
+   No FBR number
+   Show draft watermark thumbnail
+
+2. Submitted Invoice:
+   Status: locked
+   FBR number: MOCK-FBR-0001
+   Show:
+     - FBR logo
+     - Generated QR
+     - No watermark
+
+====================================
+TASK 6 — THUMBNAIL PREVIEW MODE
+====================================
+
+On dashboard:
+
+Show mini invoice cards:
+
+- Draft badge (grey)
+- Submitted badge (green)
+- Risk level badge
+
+====================================
+TASK 7 — QR GENERATION
+====================================
+
+For mock submission:
+
+Generate QR with:
+- NTN
+- Invoice No
+- FBR Invoice No
+- Date
+- Total
+
+Use simple QR generator library.
+
+====================================
+TASK 8 — DEMO SAFETY MODE
+====================================
+
+Add system flag:
+
+DEMO_MODE=true
+
+If true:
+- PRAL API calls disabled
+- Use mock FBR number
+- Store fake response
+- Log as mock submission
+
+====================================
+Ensure:
+- Production lock rule unchanged
+- Multi-company isolation preserved
+- Demo user does not affect real companies
+- All routes return 200

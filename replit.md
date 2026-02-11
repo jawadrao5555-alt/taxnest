@@ -1,7 +1,7 @@
-# TaxNest - Enterprise Regulatory AI Hybrid Model
+# TaxNest - Enterprise V3 Smart Invoicing + MIS + PRAL Flow
 
 ## Overview
-TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with FBR (Federal Board of Revenue) compliance integration. The Enterprise Regulatory AI Hybrid Model combines rule-based compliance validation (Sales Tax Act 1990), anomaly detection, hybrid scoring, vendor risk profiling, and audit defense capabilities.
+TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with FBR (Federal Board of Revenue) compliance integration. Enterprise V3 adds Smart Invoicing with product master, preview/validate flows, dual PRAL submission modes, QR lock, MIS reporting, trend analytics, configurable governance, and enterprise API endpoints.
 
 ## Test Accounts
 - **Super Admin**: admin@test.com / admin123
@@ -9,84 +9,108 @@ TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with 
 - **Employee**: jawad@test.com / jawad123
 
 ## Recent Changes
-- 2026-02-12: Regulatory AI Hybrid Model — ComplianceEngine (Section 23/73 validation), AnomalyEngine (MoM spike, tax drop, HS shift, value-tax anomaly), HybridComplianceScorer (rule+anomaly+stability), VendorRiskEngine, AuditDefenseService, auto-run on submission with CRITICAL blocking
-- 2026-02-12: Enterprise V2 Phase A-D — API rate limiting, FBR token expiry, audit CSV, nightly cron, anomaly detection, trial mode, PDF watermark, compliance certificate, industry benchmark, smart insights
-- 2026-02-11: Phase 1-7 — Invoice hardening, FBR intelligence, compliance risk engine, executive dashboard, billing intelligence, security hardening, system health panel
+- 2026-02-12: Enterprise V3 — Product Master, Smart Invoice Builder, Preview/Validate flow, Smart+Direct MIS submission modes, QR+Lock, MIS Reporting, Trend Analytics, Governance Panel, Enterprise API
+- 2026-02-12: Regulatory AI Hybrid Model — ComplianceEngine, AnomalyEngine, HybridComplianceScorer, VendorRiskEngine, AuditDefenseService, auto-run with CRITICAL blocking
+- 2026-02-12: Enterprise V2 — API rate limiting, FBR token expiry, audit CSV, nightly cron, anomaly detection, trial mode, PDF watermark, compliance certificate
+- 2026-02-11: Phase 1-7 — Invoice hardening, FBR intelligence, compliance risk engine, executive dashboard, billing, security, system health
 
 ## Database Tables
 - **companies** — name, ntn, email, phone, address, fbr_token, token_expires_at, compliance_score
-- **invoices** — company_id (FK), invoice_number, status (draft/submitted/locked), integrity_hash, buyer_name, buyer_ntn, total_amount
-- **invoice_items** — invoice_id (FK), hs_code, description, quantity, price, tax
-- **invoice_activity_logs** — invoice_id (FK), company_id (FK), user_id (FK), action, changes_json, ip_address
-- **users** — name, email, password, company_id (FK nullable), role (super_admin/company_admin/employee/viewer)
-- **fbr_logs** — invoice_id (FK), request_payload, response_payload, status, failure_type, response_time_ms, retry_count
-- **security_logs** — user_id (FK), action, ip_address, user_agent, metadata
+- **invoices** — company_id, invoice_number, status, integrity_hash, buyer_name, buyer_ntn, total_amount, override_reason, override_by, submission_mode, fbr_invoice_id, qr_data
+- **invoice_items** — invoice_id, hs_code, description, quantity, price, tax
+- **invoice_activity_logs** — invoice_id, company_id, user_id, action, changes_json, ip_address
+- **users** — name, email, password, company_id (nullable), role (super_admin/company_admin/employee/viewer)
+- **products** — company_id, name, hs_code, pct_code, default_tax_rate, uom, schedule_type, sro_reference, default_price, is_active
+- **system_settings** — key (unique), value, description
+- **override_logs** — invoice_id, company_id, user_id, action, reason, metadata, ip_address
+- **fbr_logs** — invoice_id, request_payload, response_payload, status, failure_type, response_time_ms, retry_count
+- **security_logs** — user_id, action, ip_address, user_agent, metadata
 - **pricing_plans** — name, invoice_limit, price
-- **subscriptions** — company_id (FK), pricing_plan_id (FK), start_date, end_date, trial_ends_at, active
-- **notifications** — company_id (FK), user_id (FK), type, title, message, read, metadata
-- **compliance_scores** — company_id (FK), score, success_rate, retry_ratio, draft_aging, failure_ratio, category, calculated_date
-- **anomaly_logs** — company_id (FK), type, severity, description, metadata, resolved
-- **compliance_reports** — company_id (FK), invoice_id (FK), rule_flags (json), anomaly_flags (json), final_score, risk_level
-- **vendor_risk_profiles** — company_id (FK), vendor_ntn, vendor_name, vendor_score, total_invoices, rejected_invoices, tax_mismatches, anomaly_count, last_flagged_at
-- **cache / jobs / failed_jobs** — Laravel system tables
+- **subscriptions** — company_id, pricing_plan_id, start_date, end_date, trial_ends_at, active
+- **notifications** — company_id, user_id, type, title, message, read, metadata
+- **compliance_scores** — company_id, score, success_rate, retry_ratio, draft_aging, failure_ratio, category, calculated_date
+- **anomaly_logs** — company_id, type, severity, description, metadata, resolved
+- **compliance_reports** — company_id, invoice_id, rule_flags, anomaly_flags, final_score, risk_level
+- **vendor_risk_profiles** — company_id, vendor_ntn, vendor_name, vendor_score, total_invoices, rejected_invoices, tax_mismatches, anomaly_count, last_flagged_at
 
 ## Authentication
 - **Laravel Breeze** — Blade + Tailwind CSS based authentication
-- Routes: /login, /register, /forgot-password, /profile
 
 ## Middleware
-- **company** — CompanyIsolation enforces company_id scoping. Super admins bypass.
-- **role** — RoleMiddleware enforces role-based access.
-- **rate_limit_company** — RateLimitByCompany enforces 200 req/min per company. Super admins exempt.
+- **company** — CompanyIsolation enforces company_id scoping
+- **role** — RoleMiddleware enforces role-based access
+- **rate_limit_company** — RateLimitByCompany enforces 200 req/min per company
 
-## Routes
-- `/dashboard` — Dashboard with KPI, compliance trend, risk badge, vendor panel, audit probability meter
+## Routes — Company Users
+- `/dashboard` — Dashboard with KPIs, compliance trend, risk badge, vendor panel, audit probability, MoM growth, tax variance, HS risk heatmap
 - `/invoices` — Invoice list with pagination
-- `/invoice/create` — Create invoice (triggers ComplianceScoringJob)
+- `/invoice/create` — Smart Invoice Builder with product dropdown, auto-calc, live compliance check
 - `/invoice/{id}` — Invoice detail with compliance analysis card
-- `/invoice/{id}/edit` — Edit draft invoice (re-triggers scoring)
-- `/invoice/{id}/submit` — Submit to FBR (runs HybridComplianceScorer, blocks CRITICAL)
+- `/invoice/{id}/edit` — Edit draft invoice with smart builder
+- `/invoice/{id}/preview` — Preview with tax breakdown, risk score, QR, validate button
+- `/invoice/{id}/validate` — Run HybridComplianceScorer, show validation result
+- `/invoice/{id}/submit` — Submit to PRAL (Smart Mode or Direct MIS Mode)
 - `/invoice/{id}/verify` — Verify SHA256 integrity
-- `/invoice/{id}/pdf` — PDF view (watermark if subscription expired)
-- `/billing/plans` — Pricing plans with trial info
-- `/compliance/certificate` — Monthly compliance certificate PDF
-- `/compliance/risk-report` — Risk Explanation Report with SHA256 hash
-- `/admin/dashboard` — Super admin overview with anomalies
-- `/admin/companies` — Company management (14-day trial on new companies)
+- `/invoice/{id}/pdf` — PDF with QR data (if locked), watermark (if expired)
+- `/products` — Product master list
+- `/products/create` — Create product
+- `/products/{id}/edit` — Edit product
+- `/products/{id}/deactivate` — Toggle product active status
+- `/mis` — MIS Reports dashboard (monthly, tax, HS concentration, vendor risk)
+- `/mis/export?type=` — CSV export (monthly/tax/hs/vendor)
+- `/billing/plans` — Pricing plans
+- `/compliance/certificate` — Monthly compliance certificate
+- `/compliance/risk-report` — Risk Explanation Report
+- `/api/products/search` — Product search API (AJAX)
+- `/api/compliance/check` — Live compliance check API (AJAX)
+- `/api/enterprise/invoice/{id}/status` — Enterprise invoice status API
+- `/api/enterprise/company/compliance` — Enterprise compliance status API
+
+## Routes — Super Admin
+- `/admin/dashboard` — Super admin overview
+- `/admin/companies` — Company management
 - `/admin/users` — User management
 - `/admin/fbr-logs` — FBR submission logs
 - `/admin/system-health` — System health monitor
 - `/admin/security-logs` — Security event logs
-- `/admin/audit/export` — Immutable audit CSV with SHA256 signatures
+- `/admin/audit/export` — Immutable audit CSV
 - `/admin/anomalies` — Anomaly detection logs
+- `/admin/risk-settings` — Configurable risk thresholds (governance)
+- `/admin/override-logs` — Override audit trail
+
+## Smart Invoicing Flow
+1. Create invoice: Product dropdown auto-fills HS code, tax rate, price, description
+2. Auto-calculate: quantity * price for subtotal, tax = rate%, total = subtotal + tax
+3. Live compliance check via AJAX before submission
+4. Preview mode: Full layout with tax breakdown, risk score, QR placeholder
+5. Validate: Runs HybridComplianceScorer, shows score/flags/FBR status
+6. Submit Smart Mode: Score -> block CRITICAL -> send to PRAL -> QR -> lock
+7. Submit Direct MIS: Override reason required -> skip compliance block -> send to PRAL -> log override
+
+## PRAL Submission Modes
+- **Smart Mode**: Runs scoring, blocks CRITICAL risk, sends to PRAL, generates QR, locks invoice
+- **Direct MIS Mode**: Requires company_admin+ role, override_reason (min 10 chars), logs to override_logs, skips compliance block
+
+## QR + Lock
+After successful PRAL submission:
+- QR data generated (NTN, invoice number, FBR ID, date, total)
+- Embedded in PDF
+- Invoice locked (edit/delete disabled)
+- Integrity hash generated
+
+## Governance Settings (system_settings)
+- mom_spike_threshold: MoM invoice spike % (default 200)
+- tax_drop_threshold: Tax drop % (default 60)
+- critical_score_threshold: Score below = CRITICAL (default 40)
+- stability_bonus_weight: Max stability bonus (default 10)
+- AnomalyEngine and HybridComplianceScorer read from system_settings
 
 ## Regulatory AI Services
-- **ComplianceEngine** — Rule-based: tax rate vs HS code mismatch, buyer NTN validation (Section 23), banking violation (Section 73, >50K PKR), invoice structure check. Returns structured flags array with deductions.
-- **AnomalyEngine** — Detects: MoM invoice spike %, tax drop %, HS category shift, high-value/low-tax anomaly. Returns risk_weight (0-50).
-- **HybridComplianceScorer** — Merges: 100 - rule_deductions - anomaly_weight + stability_bonus. Returns final_score (0-100) and risk_level (LOW/MODERATE/HIGH/CRITICAL). Stores in compliance_reports table.
-- **VendorRiskEngine** — Scores vendors (0-100) based on rejection frequency, tax mismatch rate, anomaly count. Stores in vendor_risk_profiles table.
-- **AuditDefenseService** — Generates risk explanation reports with SHA256 hash, calculates audit probability based on compliance score and recent critical/high reports.
-
-## Other Services
-- **FbrService** — Posts to PRAL sandbox, measures response time, classifies failure types
-- **ComplianceRiskService** — Legacy: Calculates 0-100 score (success 40%, retry 20%, draft aging 20%, failure 20%)
-- **AnomalyDetectionService** — Legacy: Detects invoice spike (3x MoM), tax spike (40%+)
-- **SmartInsightsService** — Generates actionable insights
-- **ComplianceCertificateService** — Monthly compliance certificate HTML/PDF
-- **InvoiceActivityService** — Logs all invoice actions
-- **IntegrityHashService** — Generates/verifies SHA256 hash
-- **SecurityLogService** — Logs security events
-
-## Auto-Run Engine (Phase 8)
-On invoice creation/edit: ComplianceScoringJob dispatched to queue
-On invoice submission:
-1. HybridComplianceScorer::score() runs synchronously
-2. If risk_level = CRITICAL -> FBR submission blocked with detailed error
-3. If risk_level != CRITICAL -> Invoice submitted, SendInvoiceToFbrJob dispatched
-
-## Scheduled Jobs
-- **NightlyComplianceCronJob** — Runs daily at 02:00, recalculates all company scores
-- **CheckFbrTokenExpiryJob** — Runs daily at 06:00, checks for expiring FBR tokens (48h warning)
+- **ComplianceEngine** — Rule-based validation (tax rate, buyer NTN S.23, banking S.73, structure)
+- **AnomalyEngine** — MoM spike, tax drop, HS shift, value-tax anomaly (reads system_settings)
+- **HybridComplianceScorer** — Merges rule+anomaly+stability (reads system_settings for thresholds)
+- **VendorRiskEngine** — Vendor scoring with persistence
+- **AuditDefenseService** — Risk reports with SHA256, audit probability
 
 ## Project Architecture
 - **Framework**: Laravel 12 with Breeze
@@ -95,12 +119,11 @@ On invoice submission:
 - **Frontend**: Tailwind CSS + Alpine.js + Chart.js
 - **Server**: `php artisan serve` on port 5000
 - **Queue**: Database driver with SendInvoiceToFbrJob, ComplianceScoringJob
-- **Scheduler**: NightlyComplianceCronJob + CheckFbrTokenExpiryJob via routes/console.php
 
 ## Key Directories
-- `app/Http/Controllers/` — DashboardController, InvoiceController, BillingController, AdminController, ComplianceCertificateController, RiskReportController
+- `app/Http/Controllers/` — DashboardController, InvoiceController, ProductController, MISController, BillingController, AdminController, ComplianceCertificateController, RiskReportController
 - `app/Http/Middleware/` — CompanyIsolation, RoleMiddleware, RateLimitByCompany
-- `app/Models/` — User, Company, Invoice, InvoiceItem, FbrLog, InvoiceActivityLog, SecurityLog, PricingPlan, Subscription, Notification, ComplianceScore, AnomalyLog, ComplianceReport, VendorRiskProfile
+- `app/Models/` — User, Company, Invoice, InvoiceItem, Product, SystemSetting, OverrideLog, FbrLog, InvoiceActivityLog, SecurityLog, PricingPlan, Subscription, Notification, ComplianceScore, AnomalyLog, ComplianceReport, VendorRiskProfile
 - `app/Jobs/` — SendInvoiceToFbrJob, NightlyComplianceCronJob, CheckFbrTokenExpiryJob, ComplianceScoringJob
 - `app/Services/` — ComplianceEngine, AnomalyEngine, HybridComplianceScorer, VendorRiskEngine, AuditDefenseService, FbrService, ComplianceRiskService, AnomalyDetectionService, SmartInsightsService, ComplianceCertificateService, InvoiceActivityService, IntegrityHashService, SecurityLogService
 

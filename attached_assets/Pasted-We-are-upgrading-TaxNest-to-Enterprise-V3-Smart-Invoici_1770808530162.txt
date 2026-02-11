@@ -1,0 +1,186 @@
+We are upgrading TaxNest to Enterprise V3 Smart Invoicing + MIS + PRAL Flow.
+
+Follow tasks sequentially. Do not skip migrations.
+
+==================================
+TASK 1 — PRODUCT MASTER SYSTEM
+==================================
+
+1. Create products table:
+
+Fields:
+- company_id
+- name
+- hs_code
+- pct_code
+- default_tax_rate
+- uom
+- schedule_type
+- sro_reference
+- default_price
+- is_active
+
+2. Create ProductController:
+- index
+- create
+- store
+- edit
+- update
+- deactivate
+
+3. Auto-validate HS code using hs_codes table.
+
+4. When creating invoice:
+- Product selection auto-fills:
+  hs_code
+  tax_rate
+  uom
+
+==================================
+TASK 2 — SMART INVOICE BUILDER
+==================================
+
+Upgrade invoice form:
+
+1. Add product dropdown per row
+2. Auto-calculate:
+   quantity × price
+   tax = rate %
+   total
+
+3. Live Compliance Check:
+   Run ComplianceEngine preview on frontend via AJAX.
+
+4. Show:
+   - Risk badge
+   - Compliance score preview
+   - Warning panel
+
+==================================
+TASK 3 — PREVIEW MODE
+==================================
+
+Create:
+Route: /invoice/{id}/preview
+
+Preview shows:
+- Invoice layout
+- Tax breakdown
+- Risk score
+- QR placeholder (if not submitted)
+
+Add:
+"Validate Before PRAL" button
+
+==================================
+TASK 4 — VALIDATE FLOW
+==================================
+
+Before submission:
+
+1. Call validateinvoicedata API
+2. Run HybridComplianceScorer
+3. Store temporary validation result
+4. Show result modal:
+
+   - Compliance score
+   - Risk flags
+   - FBR validation status
+
+==================================
+TASK 5 — SEND TO PRAL FLOW
+==================================
+
+Add two submission modes:
+
+1. Smart Mode (default)
+   - Run scoring
+   - Block CRITICAL
+   - Send to PRAL
+   - Store FBR number
+   - Lock invoice
+
+2. Direct MIS Mode
+   - Skip compliance block
+   - Log override
+   - Send to PRAL
+   - Store override flag
+
+Add:
+override_reason field
+
+==================================
+TASK 6 — QR + LOCK MODE
+==================================
+
+After successful PRAL submission:
+
+1. Generate QR code:
+   - NTN
+   - Invoice number
+   - FBR invoice ID
+   - Date
+   - Total
+
+2. Embed in PDF
+
+3. Disable edit/delete
+
+4. Enable credit note only
+
+==================================
+TASK 7 — MIS REPORTING MODULE
+==================================
+
+Create MISController:
+
+1. Monthly summary
+2. Tax collected summary
+3. HS concentration report
+4. Vendor risk ranking
+5. Export CSV
+
+==================================
+TASK 8 — TREND + ANALYTICS UPGRADE
+==================================
+
+Add:
+
+1. MoM growth chart
+2. Tax variance graph
+3. Compliance score trend
+4. Audit probability meter
+5. Risk heatmap (HS based)
+
+Use Chart.js.
+
+==================================
+TASK 9 — GOVERNANCE PANEL
+==================================
+
+Create Admin > Risk Settings page:
+
+Configurable:
+- MoM spike threshold
+- Tax drop threshold
+- Critical score threshold
+- Stability bonus weight
+
+Store in system_settings table.
+
+==================================
+TASK 10 — ENTERPRISE POLISH
+==================================
+
+Add:
+
+- Role-based override permission
+- Audit trail for every override
+- Immutable scoring log
+- API endpoint for enterprise clients
+
+Ensure:
+- Multi-company isolation preserved
+- Production lock preserved
+- FBR integration untouched
+- All routes return 200

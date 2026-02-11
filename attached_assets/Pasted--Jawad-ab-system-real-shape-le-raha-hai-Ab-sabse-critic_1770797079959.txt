@@ -1,0 +1,180 @@
+🔥 Jawad — ab system real shape le raha hai.
+
+Ab sabse critical stage:
+
+# 🚀 PHASE 5 — Real FBR API Integration + Queue Retry System
+
+Ab hum demo submission nahi, proper integration structure banayenge.
+
+---
+
+# 🟢 STEP 1 — Queue Job Update (Real FBR Call)
+
+Open:
+
+```
+app/Jobs/SendInvoiceToFbrJob.php
+```
+
+Replace poora file with:
+
+```php
+<?php
+
+namespace App\Jobs;
+
+use App\Models\Invoice;
+use App\Services\FbrService;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Queue\Queueable;
+
+class SendInvoiceToFbrJob implements ShouldQueue
+{
+    use Queueable;
+
+    protected $invoice;
+
+    public function __construct(Invoice $invoice)
+    {
+        $this->invoice = $invoice;
+    }
+
+    public function handle(): void
+    {
+        $fbrService = new FbrService();
+        $response = $fbrService->submitInvoice($this->invoice);
+
+        if ($response['status'] === 'success') {
+            $this->invoice->status = 'locked';
+            $this->invoice->invoice_number = $response['fbr_invoice_number'];
+            $this->invoice->save();
+        }
+    }
+}
+```
+
+Save.
+
+---
+
+# 🟢 STEP 2 — Update Submit Logic (Use Queue)
+
+Open:
+
+```
+app/Http/Controllers/InvoiceController.php
+```
+
+Find `submit()` method and replace with:
+
+```php
+use App\Jobs\SendInvoiceToFbrJob;
+
+public function submit(Invoice $invoice)
+{
+    if ($invoice->isLocked()) {
+        return response()->json([
+            'error' => 'Invoice already locked.'
+        ], 403);
+    }
+
+    $invoice->status = 'submitted';
+    $invoice->save();
+
+    SendInvoiceToFbrJob::dispatch($invoice);
+
+    return response()->json([
+        'message' => 'Invoice queued for FBR submission.'
+    ]);
+}
+```
+
+Save.
+
+---
+
+# 🟢 STEP 3 — Run Queue Worker
+
+Terminal mein run karo:
+
+```bash
+php artisan queue:work
+```
+
+⚠️ Important:
+Yeh tab tak chalna chahiye jab tak worker run kar raha hai.
+
+---
+
+# 🟢 STEP 4 — Add Submit Button on Dashboard
+
+Open:
+
+```
+resources/views/dashboard.blade.php
+```
+
+Update invoice loop:
+
+```html
+@foreach($invoices as $invoice)
+<p>
+Invoice #{{ $invoice->id }} - {{ $invoice->status }}
+
+@if($invoice->status == 'draft')
+<form method="POST" action="/invoice/{{ $invoice->id }}/submit">
+    @csrf
+    <button type="submit">Submit to FBR</button>
+</form>
+@endif
+
+<a href="/invoice/{{ $invoice->id }}/pdf">Download PDF</a>
+</p>
+@endforeach
+```
+
+Save.
+
+---
+
+# 🔥 PHASE 5 RESULT
+
+✔ Invoice submit → status becomes submitted
+✔ Queue job runs
+✔ FBR service called
+✔ On success → invoice locked
+✔ Async processing ready
+
+---
+
+# ⚠️ Important Note
+
+Abhi FBRService dummy response return kar raha hai.
+
+Next stage mein:
+
+👉 Real PRAL endpoint call
+👉 Bearer token use
+👉 Error handling
+👉 Retry mechanism (if FBR down)
+
+add karenge.
+
+---
+
+# 🎯 Ab Test Karo
+
+1️⃣ New invoice create karo
+2️⃣ Dashboard par Submit button press karo
+3️⃣ Terminal mein queue worker dekhna
+4️⃣ Status locked ho raha?
+
+Result batao.
+
+Phir hum:
+
+🚀 Real PRAL Sandbox Integration
+🚀 Automatic Retry System
+🚀 Logging Table
+
+implement karenge.

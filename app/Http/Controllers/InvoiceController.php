@@ -9,6 +9,8 @@ use App\Models\InvoiceItem;
 use Illuminate\Support\Facades\Auth;
 use Barryvdh\DomPDF\Facade\Pdf;
 
+use App\Jobs\SendInvoiceToFbrJob;
+
 class InvoiceController extends Controller
 {
     public function create()
@@ -64,14 +66,13 @@ class InvoiceController extends Controller
             ], 403);
         }
 
-        // Simulate FBR success
-        $invoice->status = 'locked';
-        $invoice->invoice_number = 'FBR' . time();
+        $invoice->status = 'submitted';
         $invoice->save();
 
+        SendInvoiceToFbrJob::dispatch($invoice);
+
         return response()->json([
-            'message' => 'Invoice submitted to FBR and locked.',
-            'invoice_number' => $invoice->invoice_number
+            'message' => 'Invoice queued for FBR submission.'
         ]);
     }
 }

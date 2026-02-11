@@ -25,6 +25,8 @@ class Company extends Model
         'token_expiry_date',
         'last_successful_submission',
         'fbr_connection_status',
+        'is_internal_account',
+        'onboarding_completed',
     ];
 
     protected $casts = [
@@ -32,6 +34,8 @@ class Company extends Model
         'suspended_at' => 'datetime',
         'token_expiry_date' => 'date',
         'last_successful_submission' => 'datetime',
+        'is_internal_account' => 'boolean',
+        'onboarding_completed' => 'boolean',
     ];
 
     protected $hidden = [

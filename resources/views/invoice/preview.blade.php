@@ -91,6 +91,9 @@
                             <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Invoice Details</h4>
                             <p class="text-sm text-gray-600">Invoice #: <span class="font-semibold text-gray-900">{{ $invoice->invoice_number ?? 'INV-' . $invoice->id }}</span></p>
                             <p class="text-sm text-gray-600">Date: <span class="font-semibold text-gray-900">{{ $invoice->created_at->format('d M Y') }}</span></p>
+                            @if($invoice->branch)
+                            <p class="text-sm text-gray-600">Branch: <span class="font-semibold text-gray-900">{{ $invoice->branch->name }}</span></p>
+                            @endif
                         </div>
                     </div>
                 </div>

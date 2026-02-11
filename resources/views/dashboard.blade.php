@@ -150,6 +150,47 @@
                 </div>
             </div>
 
+            @if($planTier === 'retail')
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-8">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-gray-800">Recent Invoices</h3>
+                    <a href="/invoices" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View All</a>
+                </div>
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice #</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Buyer</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        @forelse($recentInvoices->take(5) as $inv)
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 text-sm font-mono font-medium text-gray-900">{{ $inv->invoice_number ?? 'INV-'.$inv->id }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-700">{{ $inv->buyer_name }}</td>
+                            <td class="px-6 py-4">
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold
+                                    @if($inv->status === 'locked') bg-green-100 text-green-800
+                                    @elseif($inv->status === 'submitted') bg-blue-100 text-blue-800
+                                    @elseif($inv->status === 'draft') bg-gray-100 text-gray-700
+                                    @else bg-red-100 text-red-800
+                                    @endif">{{ ucfirst($inv->status) }}</span>
+                            </td>
+                            <td class="px-6 py-4 text-sm font-semibold text-gray-900 text-right">Rs. {{ number_format($inv->total_amount, 2) }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-500 text-right">{{ $inv->created_at->format('d M Y') }}</td>
+                        </tr>
+                        @empty
+                        <tr><td colspan="5" class="px-6 py-8 text-center text-gray-400">No invoices yet. Create your first invoice!</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+            @endif
+
+            @if($planTier !== 'retail')
             @if(count($smartInsights) > 0)
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center space-x-2">
@@ -179,7 +220,9 @@
                 </div>
             </div>
             @endif
+            @endif
 
+            @if($planTier !== 'retail')
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                     <h3 class="text-lg font-semibold text-gray-800 mb-4">Draft Aging Breakdown</h3>
@@ -234,7 +277,9 @@
                     </div>
                 </div>
             </div>
+            @endif
 
+            @if($planTier !== 'retail')
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <div class="bg-white rounded-xl shadow-sm border {{ $riskBadge['border'] ?? 'border-gray-100' }} p-6">
                     <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center space-x-2">
@@ -271,6 +316,7 @@
                     </div>
                 </div>
 
+                @if($planTier === 'enterprise')
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                     <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center space-x-2">
                         <svg class="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
@@ -295,8 +341,11 @@
                     <p class="text-center text-gray-400 py-8">No vendor risk data yet. Submit invoices to build vendor profiles.</p>
                     @endif
                 </div>
+                @endif
             </div>
+            @endif
 
+            @if($planTier !== 'retail')
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                     <h3 class="text-lg font-semibold text-gray-800 mb-4">Invoice Status</h3>
@@ -311,7 +360,9 @@
                     <canvas id="complianceChart" height="200"></canvas>
                 </div>
             </div>
+            @endif
 
+            @if($planTier === 'enterprise')
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                     <h3 class="text-lg font-semibold text-gray-800 mb-4">MoM Growth (6 Months)</h3>
@@ -328,6 +379,7 @@
                 <h3 class="text-lg font-semibold text-gray-800 mb-4">Risk Heatmap by HS Code</h3>
                 <canvas id="hsRiskChart" height="300"></canvas>
             </div>
+            @endif
             @endif
 
             @if($recentAnomalies->count() > 0)
@@ -352,6 +404,7 @@
             </div>
             @endif
 
+            @if($planTier === 'enterprise')
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                     <div class="flex items-center justify-between">
@@ -390,7 +443,9 @@
                     <p class="text-xs text-gray-400 mt-2">Failed FBR submissions / Total</p>
                 </div>
             </div>
+            @endif
 
+            @if($planTier === 'enterprise')
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 @if($topCustomers->count() > 0)
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100">
@@ -446,6 +501,7 @@
                 </div>
                 @endif
             </div>
+            @endif
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100">
@@ -528,7 +584,9 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const statusCtx = document.getElementById('statusChart').getContext('2d');
+            const statusEl = document.getElementById('statusChart');
+            if (statusEl) {
+            const statusCtx = statusEl.getContext('2d');
             new Chart(statusCtx, {
                 type: 'doughnut',
                 data: {
@@ -545,8 +603,11 @@
                     plugins: { legend: { position: 'bottom' } }
                 }
             });
+            }
 
-            const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
+            const monthlyEl = document.getElementById('monthlyChart');
+            if (monthlyEl) {
+            const monthlyCtx = monthlyEl.getContext('2d');
             new Chart(monthlyCtx, {
                 type: 'bar',
                 data: {
@@ -565,8 +626,11 @@
                     scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
                 }
             });
+            }
 
-            const complianceCtx = document.getElementById('complianceChart').getContext('2d');
+            const complianceEl = document.getElementById('complianceChart');
+            if (complianceEl) {
+            const complianceCtx = complianceEl.getContext('2d');
             new Chart(complianceCtx, {
                 type: 'line',
                 data: {
@@ -589,8 +653,11 @@
                     scales: { y: { beginAtZero: true, max: 100 } }
                 }
             });
+            }
 
-            const momCtx = document.getElementById('momGrowthChart').getContext('2d');
+            const momEl = document.getElementById('momGrowthChart');
+            if (momEl) {
+            const momCtx = momEl.getContext('2d');
             new Chart(momCtx, {
                 type: 'bar',
                 data: {
@@ -626,8 +693,11 @@
                     }
                 }
             });
+            }
 
-            const tvCtx = document.getElementById('taxVarianceChart').getContext('2d');
+            const tvEl = document.getElementById('taxVarianceChart');
+            if (tvEl) {
+            const tvCtx = tvEl.getContext('2d');
             new Chart(tvCtx, {
                 type: 'line',
                 data: {
@@ -660,9 +730,12 @@
                     scales: { y: { beginAtZero: true } }
                 }
             });
+            }
 
             @if($hsRiskData->count() > 0)
-            const hsCtx = document.getElementById('hsRiskChart').getContext('2d');
+            const hsRiskEl = document.getElementById('hsRiskChart');
+            if (hsRiskEl) {
+            const hsCtx = hsRiskEl.getContext('2d');
             const hsLabels = {!! json_encode($hsRiskData->pluck('hs_prefix')->map(fn($p) => 'HS ' . ($p ?? 'N/A'))) !!};
             const hsCounts = {!! json_encode($hsRiskData->pluck('count')) !!};
             const hsTax = {!! json_encode($hsRiskData->pluck('total_tax')) !!};
@@ -703,6 +776,7 @@
                     scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }
                 }
             });
+            }
             @endif
 
             const gaugeCanvas = document.getElementById('auditGauge');

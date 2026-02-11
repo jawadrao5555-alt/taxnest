@@ -15,6 +15,7 @@ use App\Http\Controllers\CompanyUserController;
 use App\Http\Controllers\CompanySettingsController;
 use App\Http\Controllers\CustomerLedgerController;
 use App\Http\Controllers\BranchController;
+use App\Http\Controllers\OnboardingController;
 
 Route::get('/share/invoice/{uuid}', [ShareController::class, 'show']);
 
@@ -25,6 +26,10 @@ Route::get('/', function () {
 });
 
 Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () {
+
+    Route::get('/onboarding', [OnboardingController::class, 'index'])->name('onboarding');
+    Route::post('/onboarding/complete', [OnboardingController::class, 'complete']);
+    Route::post('/onboarding/skip', [OnboardingController::class, 'skip']);
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
@@ -124,6 +129,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::post('/admin/company/{company}/reject', [AdminController::class, 'rejectCompany']);
         Route::get('/admin/companies/pending', [AdminController::class, 'pendingCompanies']);
         Route::post('/admin/company/{company}/change-plan', [AdminController::class, 'changePlan']);
+        Route::post('/admin/company/{company}/toggle-internal', [AdminController::class, 'toggleInternalAccount']);
     });
 });
 

@@ -1,0 +1,135 @@
+We are entering 30-Day Launch Mode.
+Feature Freeze enabled.
+No new heavy modules.
+
+STRICT:
+- Do NOT modify FBR payload.
+- Do NOT modify WHT logic.
+- Do NOT modify HS→PCT engine.
+- Do NOT modify production lock.
+- Multi-company isolation must remain intact.
+
+========================================
+TASK 1 — INTERNAL COMPANY BYPASS SYSTEM
+========================================
+
+Add boolean column to companies:
+
+is_internal_account (default false)
+
+If true:
+- Bypass invoice limit enforcement
+- Bypass subscription enforcement
+- Bypass payment required logic
+- Company never auto-suspended
+- Still enforce production lock
+- Still log audits
+- Still enforce compliance engine
+
+Only Super Admin can toggle this flag.
+
+Add toggle in:
+Admin → Company Deep View → Settings tab
+
+========================================
+TASK 2 — ONBOARDING WIZARD
+========================================
+
+On first login (if setup incomplete):
+
+Redirect to /onboarding
+
+Steps:
+1. Add Branch
+2. Add FBR Token
+3. Add First Product
+4. Create First Invoice
+
+Store onboarding_completed = true
+
+Do not force wizard for internal accounts.
+
+========================================
+TASK 3 — INVOICE FLOW POLISH
+========================================
+
+Improve UX only:
+
+- Auto focus first input
+- Enter key moves to next field
+- Clear validation errors
+- Scroll to first error
+- Reduce unnecessary fields for retail mode
+- Clean preview layout
+
+No logic changes.
+
+========================================
+TASK 4 — PDF RELIABILITY CHECK
+========================================
+
+Verify:
+- Draft watermark works
+- Locked invoice shows:
+   FBR logo
+   FBR number
+   QR code
+- WHT manual selection respected
+- Proper filename: invoice-{number}.pdf
+- No rendering errors
+
+========================================
+TASK 5 — SETTINGS VALIDATION CHECK
+========================================
+
+Verify:
+
+- FBR token encrypted
+- Sandbox/Production toggle works
+- CONFIRM required for production
+- Token expiry date logic works
+- Test connection button works
+- Status indicator shows correctly
+
+========================================
+TASK 6 — BILLING BYPASS SAFETY
+========================================
+
+If is_internal_account = true:
+
+Skip:
+- Invoice limit check
+- Subscription expiry block
+- Payment enforcement
+
+But:
+Still log usage internally.
+
+========================================
+TASK 7 — DASHBOARD CLEANUP
+========================================
+
+Role-based dashboard:
+
+Retail view:
+- Simple KPI
+- Recent invoices
+
+Enterprise view:
+- Full analytics
+- Risk score
+- Branch stats
+
+========================================
+FINAL VERIFY
+========================================
+
+- All routes return 200
+- No cross-company data leak
+- Invoice limits bypass for internal accounts works
+- Billing bypass works
+- Production lock intact
+- FBR submission intact
+- Queue worker running
+- No SQL errors
+- No 500 errors

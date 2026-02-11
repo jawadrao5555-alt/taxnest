@@ -19,6 +19,11 @@ class PlanLimitService
 
     public static function canCreateInvoice(int $companyId): array
     {
+        $company = \App\Models\Company::find($companyId);
+        if ($company && $company->is_internal_account) {
+            return ['allowed' => true, 'internal' => true];
+        }
+
         $sub = self::getActiveSubscription($companyId);
 
         if (!$sub) {
@@ -48,6 +53,11 @@ class PlanLimitService
 
     public static function canAddUser(int $companyId): array
     {
+        $company = \App\Models\Company::find($companyId);
+        if ($company && $company->is_internal_account) {
+            return ['allowed' => true, 'internal' => true];
+        }
+
         $sub = self::getActiveSubscription($companyId);
 
         if (!$sub) {
@@ -69,6 +79,11 @@ class PlanLimitService
 
     public static function canAddBranch(int $companyId): array
     {
+        $company = \App\Models\Company::find($companyId);
+        if ($company && $company->is_internal_account) {
+            return ['allowed' => true, 'internal' => true];
+        }
+
         $sub = self::getActiveSubscription($companyId);
 
         if (!$sub) {

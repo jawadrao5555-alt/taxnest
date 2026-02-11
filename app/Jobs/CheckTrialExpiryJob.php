@@ -23,6 +23,9 @@ class CheckTrialExpiryJob implements ShouldQueue
             ->whereHas('pricingPlan', function ($q) {
                 $q->where('is_trial', true);
             })
+            ->whereHas('company', function ($q) {
+                $q->where('is_internal_account', false);
+            })
             ->with('company')
             ->get();
 

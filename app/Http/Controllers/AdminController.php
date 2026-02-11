@@ -475,6 +475,21 @@ class AdminController extends Controller
         return view('admin.company-show', compact('company', 'stats', 'activePlan', 'users', 'financial', 'compliance', 'activityLogs', 'plans'));
     }
 
+    public function toggleInternalAccount(Request $request, Company $company)
+    {
+        $company->update(['is_internal_account' => !$company->is_internal_account]);
+        AuditLogService::log(
+            $company->is_internal_account ? 'internal_account_enabled' : 'internal_account_disabled',
+            'Company', $company->id, null,
+            ['is_internal_account' => $company->is_internal_account]
+        );
+        SecurityLogService::log('internal_account_toggled', auth()->id(), [
+            'company_id' => $company->id,
+            'is_internal_account' => $company->is_internal_account,
+        ]);
+        return redirect('/admin/company/' . $company->id)->with('success', 'Internal account status updated.');
+    }
+
     private function calcAuditProbability(Company $company)
     {
         $score = $company->compliance_score ?? 75;

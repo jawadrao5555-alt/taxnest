@@ -8,7 +8,7 @@
 
     <div class="py-8">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <form method="POST" action="/invoice/store" x-data="invoiceForm()" class="space-y-6">
+            <form method="POST" action="/invoice/store" x-data="invoiceForm()" @keydown.enter.prevent="focusNext($event)" class="space-y-6">
                 @csrf
 
                 @if(session('error'))
@@ -25,6 +25,7 @@
                         @endforeach
                     </ul>
                 </div>
+                <script>document.addEventListener('DOMContentLoaded', function() { document.querySelector('.bg-red-50')?.scrollIntoView({behavior: 'smooth', block: 'center'}); });</script>
                 @endif
 
                 @if(isset($branches) && $branches->count() > 0)
@@ -261,6 +262,21 @@
                 complianceResult: null,
                 complianceLoading: false,
                 scheduleError: '',
+
+                init() {
+                    this.$nextTick(() => {
+                        const firstInput = document.querySelector('input[name="buyer_name"]');
+                        if (firstInput) firstInput.focus();
+                    });
+                },
+
+                focusNext($event) {
+                    const inputs = Array.from(document.querySelectorAll('input:not([type=hidden]), select, textarea'));
+                    const currentIndex = inputs.indexOf($event.target);
+                    if (currentIndex > -1 && currentIndex < inputs.length - 1) {
+                        inputs[currentIndex + 1].focus();
+                    }
+                },
 
                 addItem() {
                     let item = newItem();

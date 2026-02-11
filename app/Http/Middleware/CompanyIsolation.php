@@ -50,6 +50,14 @@ class CompanyIsolation
             }
 
             app()->instance('currentCompanyId', $companyId);
+
+            if (!$request->is('onboarding*') && !$request->is('billing/*') && !$request->is('api/*')) {
+                if ($company && !$company->onboarding_completed && !$company->is_internal_account) {
+                    if (!$request->is('branches*') && !$request->is('company/fbr-settings*') && !$request->is('products*') && !$request->is('invoice*') && !$request->is('invoices*')) {
+                        return redirect('/onboarding');
+                    }
+                }
+            }
         }
 
         return $next($request);

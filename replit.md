@@ -10,6 +10,12 @@ TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with 
 - **Demo User**: demo@taxnest.pk / password123
 
 ## Recent Changes
+- 2026-02-12: 30-Day Launch Mode Features
+  - Internal Company Bypass: is_internal_account flag bypasses invoice/subscription/payment limits; admin toggle in Company Deep View; excluded from trial expiry
+  - Onboarding Wizard: 4-step guided setup (Branch → FBR Token → Product → Invoice) with progress tracking; onboarding_completed flag; automatic redirect for new users; skip option; internal accounts bypass
+  - Invoice Flow Polish: auto-focus first field, Enter key navigation between fields, scroll-to-error on validation failure, branch display in preview
+  - PDF Reliability: draft watermark, FBR header with invoice ID on locked, QR data section, WHT line, proper filename (invoice-{number}.pdf)
+  - Dashboard Cleanup: role-based views — Retail (KPIs + recent invoices), Business (adds analytics/insights), Enterprise (full analytics + risk + branch stats); internal accounts get Enterprise view
 - 2026-02-12: High-Volume Market Capture Pricing
   - Aggressive pricing: Retail (999), Business (2999), Industrial (6999), Enterprise (15000)
   - Discount engine: Monthly 0%, Quarterly 1%, Semi-Annual 3%, Annual 6%

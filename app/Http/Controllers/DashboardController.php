@@ -53,6 +53,20 @@ class DashboardController extends Controller
         $invoiceLimit = $subscription ? $subscription->pricingPlan->invoice_limit : 0;
         $invoicesUsed = $totalInvoices;
 
+        $planTier = 'retail';
+        if ($subscription && $subscription->pricingPlan) {
+            $planName = strtolower($subscription->pricingPlan->name);
+            if (in_array($planName, ['enterprise', 'industrial'])) {
+                $planTier = 'enterprise';
+            } elseif ($planName === 'business') {
+                $planTier = 'business';
+            }
+        }
+
+        if ($company && $company->is_internal_account) {
+            $planTier = 'enterprise';
+        }
+
         $statusData = [
             'draft' => $draftCount,
             'submitted' => $submittedCount,
@@ -241,7 +255,7 @@ class DashboardController extends Controller
             'notifications', 'industryBenchmark', 'trialInfo',
             'vendorRisks', 'auditProbability', 'recentReports',
             'momGrowth', 'taxVariance', 'hsRiskData',
-            'topCustomers', 'branchComparison', 'kpis'
+            'topCustomers', 'branchComparison', 'kpis', 'planTier'
         ));
     }
 }

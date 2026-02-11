@@ -56,6 +56,9 @@
                             @elseif($company->company_status === 'suspended') bg-red-100 text-red-800
                             @else bg-gray-100 text-gray-800
                             @endif">{{ ucfirst($company->company_status ?? 'unknown') }}</span>
+                        @if($company->is_internal_account)
+<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 ml-1">Internal</span>
+@endif
                     </div>
                     <div>
                         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Active Plan</p>
@@ -95,6 +98,7 @@
                 <button @click="activeTab = 'financial'" :class="activeTab === 'financial' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'" class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition">Financial</button>
                 <button @click="activeTab = 'compliance'" :class="activeTab === 'compliance' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'" class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition">Compliance</button>
                 <button @click="activeTab = 'activity'" :class="activeTab === 'activity' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'" class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition">Activity</button>
+                <button @click="activeTab = 'settings'" :class="activeTab === 'settings' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'" class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition">Settings</button>
             </div>
 
             <div x-show="activeTab === 'overview'" class="space-y-6">
@@ -304,6 +308,25 @@
                         @endforelse
                     </tbody>
                 </table>
+            </div>
+
+            <div x-show="activeTab === 'settings'" class="space-y-6">
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <h4 class="text-sm font-bold text-gray-800 mb-4">Internal Account</h4>
+                    <p class="text-sm text-gray-600 mb-4">Internal accounts bypass invoice limits, subscription enforcement, and payment requirements. Audit logs and compliance engine remain active.</p>
+                    <div class="flex items-center justify-between p-4 rounded-lg {{ $company->is_internal_account ? 'bg-emerald-50 border border-emerald-200' : 'bg-gray-50 border border-gray-200' }}">
+                        <div class="flex items-center space-x-3">
+                            <span class="inline-block w-3 h-3 rounded-full {{ $company->is_internal_account ? 'bg-emerald-500' : 'bg-gray-400' }}"></span>
+                            <span class="text-sm font-semibold {{ $company->is_internal_account ? 'text-emerald-800' : 'text-gray-700' }}">{{ $company->is_internal_account ? 'Internal Account Active' : 'Standard Account' }}</span>
+                        </div>
+                        <form method="POST" action="/admin/company/{{ $company->id }}/toggle-internal" onsubmit="return confirm('{{ $company->is_internal_account ? 'Remove internal account status? This will re-enable subscription enforcement.' : 'Enable internal account? This will bypass all subscription/billing limits.' }}')">
+                            @csrf
+                            <button type="submit" class="px-4 py-2 {{ $company->is_internal_account ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700' }} text-white text-sm rounded-lg font-medium transition">
+                                {{ $company->is_internal_account ? 'Disable Internal' : 'Enable Internal' }}
+                            </button>
+                        </form>
+                    </div>
+                </div>
             </div>
 
         </div>

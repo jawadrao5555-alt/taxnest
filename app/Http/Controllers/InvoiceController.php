@@ -5,9 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Subscription;
+use App\Models\ComplianceReport;
 use App\Jobs\SendInvoiceToFbrJob;
+use App\Jobs\ComplianceScoringJob;
 use App\Services\InvoiceActivityService;
 use App\Services\IntegrityHashService;
+use App\Services\ComplianceEngine;
+use App\Services\HybridComplianceScorer;
+use App\Services\VendorRiskEngine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -86,6 +91,8 @@ class InvoiceController extends Controller
                 'items_count' => count($request->items),
             ]);
 
+            ComplianceScoringJob::dispatch($invoice->id);
+
             DB::commit();
             return redirect('/invoices')->with('success', 'Invoice created successfully.');
         } catch (\Exception $e) {
@@ -101,7 +108,12 @@ class InvoiceController extends Controller
             abort(403);
         }
         $invoice->load('items', 'company', 'activityLogs.user');
-        return view('invoice.show', compact('invoice'));
+
+        $complianceReport = ComplianceReport::where('invoice_id', $invoice->id)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        return view('invoice.show', compact('invoice', 'complianceReport'));
     }
 
     public function edit(Invoice $invoice)
@@ -174,6 +186,8 @@ class InvoiceController extends Controller
                 ],
             ]);
 
+            ComplianceScoringJob::dispatch($invoice->id);
+
             DB::commit();
             return redirect('/invoice/' . $invoice->id)->with('success', 'Invoice updated successfully.');
         } catch (\Exception $e) {
@@ -202,14 +216,42 @@ class InvoiceController extends Controller
             return redirect('/invoices')->with('error', 'Your trial period has ended. Please subscribe to a plan to submit invoices.');
         }
 
+        $invoice->load('items', 'company');
+        $scoreResult = HybridComplianceScorer::score($invoice);
+
+        if ($scoreResult['risk_level'] === 'CRITICAL') {
+            InvoiceActivityService::log($invoice->id, $invoice->company_id, 'blocked', [
+                'reason' => 'CRITICAL risk level',
+                'score' => $scoreResult['final_score'],
+                'rule_flags' => $scoreResult['rule_result']['flags'],
+            ]);
+
+            $flagMessages = [];
+            if ($scoreResult['rule_result']['flags']['RATE_MISMATCH'] ?? false) $flagMessages[] = 'Tax rate mismatch detected';
+            if ($scoreResult['rule_result']['flags']['BUYER_RISK'] ?? false) $flagMessages[] = 'Buyer NTN risk (Section 23)';
+            if ($scoreResult['rule_result']['flags']['BANKING_RISK'] ?? false) $flagMessages[] = 'Banking violation (Section 73)';
+            if ($scoreResult['rule_result']['flags']['STRUCTURE_ERROR'] ?? false) $flagMessages[] = 'Invoice structure error';
+
+            $message = 'FBR submission blocked - CRITICAL compliance risk (Score: ' . $scoreResult['final_score'] . '). Issues: ' . implode(', ', $flagMessages) . '. Please fix and resubmit.';
+            return redirect('/invoice/' . $invoice->id)->with('error', $message);
+        }
+
         $invoice->status = 'submitted';
         $invoice->save();
 
-        InvoiceActivityService::log($invoice->id, $invoice->company_id, 'submitted', null, request()->ip());
+        InvoiceActivityService::log($invoice->id, $invoice->company_id, 'submitted', [
+            'compliance_score' => $scoreResult['final_score'],
+            'risk_level' => $scoreResult['risk_level'],
+        ], request()->ip());
 
         SendInvoiceToFbrJob::dispatch($invoice->id);
 
-        return redirect('/invoices')->with('success', 'Invoice submitted to FBR for processing.');
+        if ($invoice->buyer_ntn) {
+            $vendorResult = VendorRiskEngine::calculateVendorScore($invoice->company_id, $invoice->buyer_ntn);
+            VendorRiskEngine::persistVendorProfile($invoice->company_id, $invoice->buyer_ntn, $invoice->buyer_name, $vendorResult);
+        }
+
+        return redirect('/invoices')->with('success', 'Invoice submitted to FBR (Compliance Score: ' . $scoreResult['final_score'] . ' - ' . $scoreResult['risk_level'] . ' risk).');
     }
 
     public function verifyIntegrity(Invoice $invoice)

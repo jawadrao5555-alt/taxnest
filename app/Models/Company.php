@@ -55,4 +55,14 @@ class Company extends Model
     {
         return $this->hasMany(Notification::class);
     }
+
+    public function complianceReports()
+    {
+        return $this->hasMany(ComplianceReport::class);
+    }
+
+    public function vendorRiskProfiles()
+    {
+        return $this->hasMany(VendorRiskProfile::class);
+    }
 }

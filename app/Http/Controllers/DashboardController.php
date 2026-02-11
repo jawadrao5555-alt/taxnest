@@ -9,10 +9,15 @@ use App\Models\Subscription;
 use App\Models\InvoiceActivityLog;
 use App\Models\FbrLog;
 use App\Models\ComplianceScore;
+use App\Models\ComplianceReport;
 use App\Models\AnomalyLog;
 use App\Models\Notification;
+use App\Models\VendorRiskProfile;
 use App\Services\ComplianceRiskService;
 use App\Services\SmartInsightsService;
+use App\Services\HybridComplianceScorer;
+use App\Services\AuditDefenseService;
+use App\Services\VendorRiskEngine;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -73,32 +78,31 @@ class DashboardController extends Controller
         $fbrSuccessRate = $totalFbrLogs > 0 ? round(($successFbrLogs / $totalFbrLogs) * 100, 1) : 100;
 
         $complianceScore = $company->compliance_score ?? 100;
-        $complianceBadge = ComplianceRiskService::getBadge($complianceScore);
+
+        $hybridResult = HybridComplianceScorer::scoreForCompany($companyId);
+        $hybridScore = $hybridResult['final_score'];
+        $riskLevel = $hybridResult['risk_level'];
+        $riskBadge = HybridComplianceScorer::getRiskBadge($riskLevel);
 
         $complianceTrend = [];
         for ($i = 5; $i >= 0; $i--) {
             $month = now()->subMonths($i);
-            $scoreRecord = ComplianceScore::where('company_id', $companyId)
-                ->whereMonth('calculated_date', $month->month)
-                ->whereYear('calculated_date', $month->year)
-                ->orderBy('calculated_date', 'desc')
-                ->first();
+            $monthReports = ComplianceReport::where('company_id', $companyId)
+                ->whereMonth('created_at', $month->month)
+                ->whereYear('created_at', $month->year)
+                ->get();
 
-            if ($scoreRecord) {
-                $complianceTrend[] = ['month' => $month->format('M'), 'score' => $scoreRecord->score];
+            if ($monthReports->isNotEmpty()) {
+                $complianceTrend[] = ['month' => $month->format('M'), 'score' => round($monthReports->avg('final_score'))];
             } else {
-                $monthInvoices = Invoice::where('company_id', $companyId)
-                    ->whereYear('created_at', $month->year)
-                    ->whereMonth('created_at', $month->month)
-                    ->count();
-                $monthLocked = Invoice::where('company_id', $companyId)
-                    ->where('status', 'locked')
-                    ->whereYear('created_at', $month->year)
-                    ->whereMonth('created_at', $month->month)
-                    ->count();
+                $scoreRecord = ComplianceScore::where('company_id', $companyId)
+                    ->whereMonth('calculated_date', $month->month)
+                    ->whereYear('calculated_date', $month->year)
+                    ->orderBy('calculated_date', 'desc')
+                    ->first();
                 $complianceTrend[] = [
                     'month' => $month->format('M'),
-                    'score' => $monthInvoices > 0 ? round(($monthLocked / $monthInvoices) * 100) : 100,
+                    'score' => $scoreRecord ? $scoreRecord->score : 100,
                 ];
             }
         }
@@ -126,8 +130,8 @@ class DashboardController extends Controller
         $avgComplianceAllCompanies = Company::whereNotNull('compliance_score')->avg('compliance_score');
         $industryBenchmark = [
             'average' => round($avgComplianceAllCompanies ?? 100),
-            'your_score' => $complianceScore,
-            'above_average' => $complianceScore >= ($avgComplianceAllCompanies ?? 100),
+            'your_score' => $hybridScore,
+            'above_average' => $hybridScore >= ($avgComplianceAllCompanies ?? 100),
         ];
 
         $trialInfo = null;
@@ -140,13 +144,27 @@ class DashboardController extends Controller
             ];
         }
 
+        $vendorRisks = VendorRiskProfile::where('company_id', $companyId)
+            ->orderBy('vendor_score', 'asc')
+            ->take(5)
+            ->get();
+
+        $auditProbability = AuditDefenseService::calculateAuditProbability($companyId);
+
+        $recentReports = ComplianceReport::where('company_id', $companyId)
+            ->orderBy('created_at', 'desc')
+            ->take(5)
+            ->get();
+
         return view('dashboard', compact(
             'company', 'totalInvoices', 'draftCount', 'submittedCount', 'lockedCount',
             'totalRevenue', 'subscription', 'invoiceLimit', 'invoicesUsed',
             'statusData', 'monthlyData', 'recentInvoices',
-            'draftAging', 'fbrSuccessRate', 'complianceScore', 'complianceBadge',
+            'draftAging', 'fbrSuccessRate', 'complianceScore',
+            'hybridScore', 'riskLevel', 'riskBadge',
             'complianceTrend', 'recentActivity', 'smartInsights', 'recentAnomalies',
-            'notifications', 'industryBenchmark', 'trialInfo'
+            'notifications', 'industryBenchmark', 'trialInfo',
+            'vendorRisks', 'auditProbability', 'recentReports'
         ));
     }
 }

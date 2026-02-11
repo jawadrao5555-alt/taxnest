@@ -7,6 +7,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ComplianceCertificateController;
+use App\Http\Controllers\RiskReportController;
 
 Route::get('/', function () {
     return \Illuminate\Support\Facades\Auth::check()
@@ -36,6 +37,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
     Route::post('/invoice/{invoice}/verify', [InvoiceController::class, 'verifyIntegrity'])->name('invoice.verify');
 
     Route::get('/compliance/certificate', [ComplianceCertificateController::class, 'generate'])->name('compliance.certificate');
+    Route::get('/compliance/risk-report', [RiskReportController::class, 'show'])->name('compliance.risk-report');
 
     Route::middleware(['role:super_admin'])->group(function () {
         Route::get('/admin/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');

@@ -5,8 +5,8 @@
                 <h2 class="font-bold text-xl text-gray-800 leading-tight">
                     Dashboard - {{ $company->name ?? 'My Company' }}
                 </h2>
-                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold {{ $complianceBadge['bg'] }} {{ $complianceBadge['text'] }}">
-                    {{ $complianceScore }} - {{ $complianceBadge['label'] }}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold {{ $riskBadge['bg'] }} {{ $riskBadge['text'] }}">
+                    {{ $hybridScore }} - {{ $riskBadge['label'] }}
                 </span>
             </div>
             <div class="flex items-center space-x-3">
@@ -235,6 +235,68 @@
                 </div>
             </div>
 
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-sm border {{ $riskBadge['border'] ?? 'border-gray-100' }} p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                        <span>Audit Probability Meter</span>
+                    </h3>
+                    <div class="flex items-center justify-center mb-4">
+                        <div class="relative w-40 h-40">
+                            <canvas id="auditGauge" width="160" height="160"></canvas>
+                            <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                <span class="text-3xl font-bold {{ $auditProbability['level'] === 'LOW' ? 'text-green-600' : ($auditProbability['level'] === 'MODERATE' ? 'text-yellow-600' : ($auditProbability['level'] === 'HIGH' ? 'text-orange-600' : 'text-red-600')) }}">{{ $auditProbability['probability'] }}%</span>
+                                <span class="text-xs text-gray-500">Audit Risk</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <span class="inline-flex px-3 py-1 rounded-full text-xs font-bold {{ $auditProbability['level'] === 'LOW' ? 'bg-green-100 text-green-800' : ($auditProbability['level'] === 'MODERATE' ? 'bg-yellow-100 text-yellow-800' : ($auditProbability['level'] === 'HIGH' ? 'bg-orange-100 text-orange-800' : 'bg-red-100 text-red-800')) }}">
+                            {{ $auditProbability['level'] }} RISK
+                        </span>
+                    </div>
+                    <div class="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                        <div class="p-2 bg-gray-50 rounded">
+                            <p class="font-bold text-gray-700">{{ $auditProbability['factors']['compliance_score'] }}</p>
+                            <p class="text-gray-500">Score</p>
+                        </div>
+                        <div class="p-2 bg-gray-50 rounded">
+                            <p class="font-bold text-gray-700">{{ $auditProbability['factors']['critical_reports_3m'] }}</p>
+                            <p class="text-gray-500">Critical (3m)</p>
+                        </div>
+                        <div class="p-2 bg-gray-50 rounded">
+                            <p class="font-bold text-gray-700">{{ $auditProbability['factors']['high_risk_reports_3m'] }}</p>
+                            <p class="text-gray-500">High Risk (3m)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                        <span>Vendor Risk Panel</span>
+                    </h3>
+                    @if($vendorRisks->count() > 0)
+                    <div class="space-y-3">
+                        @foreach($vendorRisks as $vendor)
+                        <div class="flex items-center justify-between p-3 rounded-lg {{ $vendor->vendor_score < 40 ? 'bg-red-50' : ($vendor->vendor_score < 70 ? 'bg-yellow-50' : 'bg-green-50') }}">
+                            <div>
+                                <p class="text-sm font-medium text-gray-800">{{ $vendor->vendor_name ?? $vendor->vendor_ntn }}</p>
+                                <p class="text-xs text-gray-500">NTN: {{ $vendor->vendor_ntn }} | {{ $vendor->total_invoices }} invoices</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-lg font-bold {{ $vendor->vendor_score < 40 ? 'text-red-600' : ($vendor->vendor_score < 70 ? 'text-yellow-600' : 'text-green-600') }}">{{ $vendor->vendor_score }}</p>
+                                <p class="text-xs text-gray-500">Risk Score</p>
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                    @else
+                    <p class="text-center text-gray-400 py-8">No vendor risk data yet. Submit invoices to build vendor profiles.</p>
+                    @endif
+                </div>
+            </div>
+
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                     <h3 class="text-lg font-semibold text-gray-800 mb-4">Invoice Status</h3>
@@ -413,6 +475,30 @@
                     scales: { y: { beginAtZero: true, max: 100 } }
                 }
             });
+
+            const gaugeCanvas = document.getElementById('auditGauge');
+            if (gaugeCanvas) {
+                const gCtx = gaugeCanvas.getContext('2d');
+                const prob = {{ $auditProbability['probability'] }};
+                const cx = 80, cy = 90, r = 60;
+                const startAngle = Math.PI;
+                const endAngle = 2 * Math.PI;
+                const valueAngle = startAngle + (prob / 100) * Math.PI;
+
+                gCtx.beginPath();
+                gCtx.arc(cx, cy, r, startAngle, endAngle);
+                gCtx.lineWidth = 12;
+                gCtx.strokeStyle = '#e5e7eb';
+                gCtx.lineCap = 'round';
+                gCtx.stroke();
+
+                gCtx.beginPath();
+                gCtx.arc(cx, cy, r, startAngle, valueAngle);
+                gCtx.lineWidth = 12;
+                gCtx.strokeStyle = prob < 25 ? '#10b981' : (prob < 50 ? '#f59e0b' : (prob < 70 ? '#f97316' : '#ef4444'));
+                gCtx.lineCap = 'round';
+                gCtx.stroke();
+            }
         });
     </script>
 </x-app-layout>

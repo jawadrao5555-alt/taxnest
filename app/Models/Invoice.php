@@ -40,4 +40,9 @@ class Invoice extends Model
     {
         return $this->hasMany(FbrLog::class);
     }
+
+    public function complianceReports()
+    {
+        return $this->hasMany(ComplianceReport::class);
+    }
 }

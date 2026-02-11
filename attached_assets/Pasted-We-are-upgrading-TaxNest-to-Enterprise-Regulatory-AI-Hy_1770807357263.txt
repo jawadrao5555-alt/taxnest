@@ -1,0 +1,167 @@
+We are upgrading TaxNest to Enterprise Regulatory AI Hybrid Model.
+
+Use attached documents:
+1) PRAL Digital Invoice API v1.12
+2) Sales Tax Act 1990 (Updated 2025)
+
+Implement everything step-by-step in structured phases.
+
+===============================
+PHASE 1 — RULE-BASED COMPLIANCE ENGINE
+===============================
+
+Create new service:
+app/Services/ComplianceEngine.php
+
+This engine must:
+
+1. Validate invoice tax rate vs HS default
+2. Validate buyer NTN presence
+3. Check Section 23 invoice structure
+4. Flag Section 73 banking violation
+5. Block modified production invoice
+6. Return structured flags array:
+
+[
+  'RATE_MISMATCH' => true/false,
+  'BUYER_RISK' => true/false,
+  'BANKING_RISK' => true/false,
+  'STRUCTURE_ERROR' => true/false
+]
+
+Add compliance_score base deduction per rule.
+
+===============================
+PHASE 2 — ANOMALY DETECTION ENGINE
+===============================
+
+Create:
+app/Services/AnomalyEngine.php
+
+Implement:
+
+1. Month-over-Month invoice volume comparison
+2. Tax drop > 40% detection
+3. HS category change spike detection
+4. High value / low tax ratio anomaly
+
+Return:
+
+[
+  'MOM_SPIKE' => percentage,
+  'TAX_DROP' => percentage,
+  'HS_SHIFT' => true/false,
+  'VALUE_TAX_ANOMALY' => true/false,
+  'risk_weight' => numeric
+]
+
+===============================
+PHASE 3 — HYBRID SCORE MERGER
+===============================
+
+Create:
+app/Services/HybridComplianceScorer.php
+
+Combine:
+
+RuleEngine deductions
++
+AnomalyEngine risk_weight
+
+Formula:
+
+score = 100
+- rule_deductions
+- anomaly_weight
++ stability_bonus
+
+Return:
+
+[
+  'final_score' => integer,
+  'risk_level' => LOW/MODERATE/HIGH/CRITICAL
+]
+
+===============================
+PHASE 4 — DATABASE UPGRADES
+===============================
+
+Create new tables:
+
+1. compliance_reports
+   - company_id
+   - invoice_id
+   - rule_flags (json)
+   - anomaly_flags (json)
+   - final_score
+   - risk_level
+
+2. vendor_risk_profiles
+   - company_id
+   - vendor_ntn
+   - vendor_score
+   - last_flagged_at
+
+Run migrations.
+
+===============================
+PHASE 5 — SUPPLY CHAIN RISK ENGINE
+===============================
+
+Create:
+app/Services/VendorRiskEngine.php
+
+Logic:
+
+1. Calculate vendor risk based on:
+   - rejection frequency
+   - tax mismatch
+   - anomaly frequency
+
+Return vendor risk score (0–100)
+
+===============================
+PHASE 6 — DASHBOARD INTEGRATION
+===============================
+
+Update DashboardController:
+
+Add:
+
+- Compliance Score Trend (last 6 months)
+- Risk Level Badge
+- Vendor Risk Panel
+- Audit Probability Meter
+
+Use Chart.js.
+
+===============================
+PHASE 7 — AUDIT DEFENSE MODULE
+===============================
+
+Create:
+
+1. Monthly Compliance Certificate PDF
+2. Risk Explanation Report
+3. Immutable SHA256 report hash
+
+===============================
+PHASE 8 — AUTO RUN ENGINE
+===============================
+
+On invoice submission:
+
+1. Run ComplianceEngine
+2. Run AnomalyEngine
+3. Merge score
+4. Store in compliance_reports
+5. Block FBR submission if risk_level = CRITICAL
+
+===============================
+Ensure:
+
+- All routes return 200
+- Queue worker handles scoring async
+- No breaking of existing FBR integration
+- Multi-company isolation preserved
+- Production invoice lock preserved

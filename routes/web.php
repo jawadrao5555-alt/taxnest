@@ -8,7 +8,7 @@ use App\Http\Controllers\BillingController;
 use App\Http\Controllers\DashboardController;
 
 Route::get('/', function () {
-    return auth()->check()
+    return \Illuminate\Support\Facades\Auth::check()
         ? redirect('/dashboard')
         : redirect('/login');
 });

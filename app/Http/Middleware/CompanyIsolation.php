@@ -14,7 +14,7 @@ class CompanyIsolation
             $companyId = auth()->user()->company_id;
 
             if (!$companyId) {
-                abort(403, 'No company assigned.');
+                return redirect('/billing/plans')->with('error', 'Please set up your company first.');
             }
 
             app()->instance('currentCompanyId', $companyId);

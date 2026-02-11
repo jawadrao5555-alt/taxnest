@@ -143,6 +143,111 @@
                 </div>
             </div>
 
+            @if(!empty($riskAnalysis) && $riskAnalysis['risk_count'] > 0)
+            <div class="bg-white rounded-xl shadow-sm border {{ $riskAnalysis['risk_color']['border'] }} overflow-hidden mb-8">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-gray-800 flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <span>Intelligence Risk Analysis</span>
+                    </h3>
+                    <div class="flex items-center space-x-3">
+                        <span class="inline-flex px-3 py-1 rounded-full text-xs font-bold {{ $riskAnalysis['risk_color']['bg'] }} {{ $riskAnalysis['risk_color']['text'] }}">
+                            Score: {{ $riskAnalysis['risk_score'] }}/100 - {{ ucfirst($riskAnalysis['risk_level']) }}
+                        </span>
+                        <span class="text-xs text-gray-500">{{ $riskAnalysis['risk_count'] }} risk(s)</span>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <div class="space-y-3">
+                        @foreach($riskAnalysis['risks'] as $risk)
+                        <div class="flex items-start space-x-3 p-3 rounded-lg {{ $risk['severity'] === 'high' ? 'bg-red-50 border border-red-200' : ($risk['severity'] === 'medium' ? 'bg-yellow-50 border border-yellow-200' : 'bg-blue-50 border border-blue-200') }}">
+                            @if($risk['severity'] === 'high')
+                            <svg class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+                            @else
+                            <svg class="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+                            @endif
+                            <div class="flex-1">
+                                <p class="text-sm font-medium {{ $risk['severity'] === 'high' ? 'text-red-800' : 'text-yellow-800' }}">
+                                    {{ ucfirst(str_replace('_', ' ', $risk['type'])) }}
+                                    <span class="text-xs font-normal ml-1">(weight: {{ $risk['weight'] }})</span>
+                                </p>
+                                <p class="text-sm {{ $risk['severity'] === 'high' ? 'text-red-700' : 'text-yellow-700' }} mt-0.5">{{ $risk['message'] }}</p>
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                    @if($riskAnalysis['should_block'])
+                    <div class="mt-4 p-3 bg-red-100 border border-red-300 rounded-lg">
+                        <p class="text-sm font-bold text-red-800">FBR submission will be BLOCKED due to critical risk level. Resolve the issues above before submitting.</p>
+                    </div>
+                    @endif
+                </div>
+            </div>
+            @endif
+
+            @if(!empty($sroSuggestions) && count($sroSuggestions) > 0)
+            <div class="bg-white rounded-xl shadow-sm border border-blue-200 overflow-hidden mb-8">
+                <div class="px-6 py-4 border-b border-blue-100 flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-gray-800 flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                        <span>SRO Suggestions</span>
+                    </h3>
+                    <span class="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">Non-mandatory - Verify before use</span>
+                </div>
+                <div class="p-6">
+                    <div class="space-y-2">
+                        @foreach($sroSuggestions as $itemIndex => $suggestion)
+                        <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
+                            <div>
+                                <p class="text-sm font-medium text-blue-800">Item #{{ $itemIndex + 1 }}: {{ $suggestion['sro'] }} / Serial {{ $suggestion['serial'] }}</p>
+                                <p class="text-xs text-blue-600">{{ $suggestion['description'] }}</p>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium {{ $suggestion['confidence'] === 'high' ? 'bg-green-100 text-green-700' : ($suggestion['confidence'] === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700') }}">
+                                    {{ ucfirst($suggestion['confidence']) }} confidence
+                                </span>
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            @if(!empty($vendorRisk) && $vendorRisk->vendor_score < 70)
+            <div class="bg-white rounded-xl shadow-sm border border-orange-200 overflow-hidden mb-8">
+                <div class="px-6 py-4 border-b border-orange-100 flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-gray-800 flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                        <span>Vendor Risk Alert</span>
+                    </h3>
+                    <span class="inline-flex px-3 py-1 rounded-full text-xs font-bold {{ $vendorRisk->vendor_score < 40 ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800' }}">
+                        Score: {{ $vendorRisk->vendor_score }}/100
+                    </span>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div class="p-3 bg-gray-50 rounded-lg text-center">
+                            <p class="text-xs text-gray-500">Total Invoices</p>
+                            <p class="text-lg font-bold text-gray-900">{{ $vendorRisk->total_invoices }}</p>
+                        </div>
+                        <div class="p-3 {{ $vendorRisk->rejected_invoices > 0 ? 'bg-red-50' : 'bg-gray-50' }} rounded-lg text-center">
+                            <p class="text-xs text-gray-500">Rejected</p>
+                            <p class="text-lg font-bold {{ $vendorRisk->rejected_invoices > 0 ? 'text-red-700' : 'text-gray-900' }}">{{ $vendorRisk->rejected_invoices }}</p>
+                        </div>
+                        <div class="p-3 {{ $vendorRisk->tax_mismatches > 0 ? 'bg-orange-50' : 'bg-gray-50' }} rounded-lg text-center">
+                            <p class="text-xs text-gray-500">Tax Mismatches</p>
+                            <p class="text-lg font-bold {{ $vendorRisk->tax_mismatches > 0 ? 'text-orange-700' : 'text-gray-900' }}">{{ $vendorRisk->tax_mismatches }}</p>
+                        </div>
+                        <div class="p-3 {{ $vendorRisk->anomaly_count > 0 ? 'bg-yellow-50' : 'bg-gray-50' }} rounded-lg text-center">
+                            <p class="text-xs text-gray-500">Anomalies</p>
+                            <p class="text-lg font-bold {{ $vendorRisk->anomaly_count > 0 ? 'text-yellow-700' : 'text-gray-900' }}">{{ $vendorRisk->anomaly_count }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
+
             @if(!empty($complianceReport))
             <div class="bg-white rounded-xl shadow-sm border {{ $complianceReport->risk_level === 'CRITICAL' ? 'border-red-200' : ($complianceReport->risk_level === 'HIGH' ? 'border-orange-200' : 'border-gray-100') }} overflow-hidden mb-8">
                 <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">

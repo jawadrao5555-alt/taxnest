@@ -15,9 +15,11 @@ use App\Models\AnomalyLog;
 use App\Models\Notification;
 use App\Models\VendorRiskProfile;
 use App\Services\ComplianceRiskService;
+use App\Services\ComplianceScoreService;
 use App\Services\SmartInsightsService;
 use App\Services\HybridComplianceScorer;
 use App\Services\AuditDefenseService;
+use App\Services\RiskIntelligenceEngine;
 use App\Services\VendorRiskEngine;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -164,7 +166,11 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
-        $auditProbability = AuditDefenseService::calculateAuditProbability($companyId);
+        $auditProbability = ComplianceScoreService::getAuditProbability($companyId);
+
+        $complianceDetails = ComplianceScoreService::calculateDetailed($companyId);
+
+        $companyRiskSummary = RiskIntelligenceEngine::getCompanyRiskSummary($companyId);
 
         $recentReports = ComplianceReport::where('company_id', $companyId)
             ->orderBy('created_at', 'desc')
@@ -255,7 +261,8 @@ class DashboardController extends Controller
             'notifications', 'industryBenchmark', 'trialInfo',
             'vendorRisks', 'auditProbability', 'recentReports',
             'momGrowth', 'taxVariance', 'hsRiskData',
-            'topCustomers', 'branchComparison', 'kpis', 'planTier'
+            'topCustomers', 'branchComparison', 'kpis', 'planTier',
+            'complianceDetails', 'companyRiskSummary'
         ));
     }
 }

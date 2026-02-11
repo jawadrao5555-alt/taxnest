@@ -8,11 +8,14 @@ use App\Models\Subscription;
 use App\Models\ComplianceReport;
 use App\Jobs\SendInvoiceToFbrJob;
 use App\Jobs\ComplianceScoringJob;
+use App\Jobs\IntelligenceProcessingJob;
 use App\Services\InvoiceActivityService;
 use App\Services\IntegrityHashService;
 use App\Services\ComplianceEngine;
 use App\Services\HybridComplianceScorer;
 use App\Services\VendorRiskEngine;
+use App\Services\RiskIntelligenceEngine;
+use App\Services\SroSuggestionService;
 use App\Services\ScheduleEngine;
 use Illuminate\Http\Request;
 use App\Services\AuditLogService;
@@ -172,7 +175,29 @@ class InvoiceController extends Controller
             ->orderBy('created_at', 'desc')
             ->first();
 
-        return view('invoice.show', compact('invoice', 'complianceReport'));
+        $riskAnalysis = null;
+        if ($invoice->status === 'draft') {
+            $riskAnalysis = RiskIntelligenceEngine::analyzeInvoice($invoice);
+        }
+
+        $sroSuggestions = [];
+        if ($invoice->status === 'draft') {
+            $itemsData = $invoice->items->map(fn($item) => [
+                'schedule_type' => $item->schedule_type ?? 'standard',
+                'tax_rate' => $item->tax_rate,
+                'hs_code' => $item->hs_code,
+            ])->toArray();
+            $sroSuggestions = SroSuggestionService::suggestForItems($itemsData);
+        }
+
+        $vendorRisk = null;
+        if ($invoice->buyer_ntn) {
+            $vendorRisk = \App\Models\VendorRiskProfile::where('company_id', $companyId)
+                ->where('vendor_ntn', $invoice->buyer_ntn)
+                ->first();
+        }
+
+        return view('invoice.show', compact('invoice', 'complianceReport', 'riskAnalysis', 'sroSuggestions', 'vendorRisk'));
     }
 
     public function edit(Invoice $invoice)
@@ -334,6 +359,22 @@ class InvoiceController extends Controller
             $errorHtml = $submissionCheck['message'] . ' ' . implode(' | ', $submissionCheck['errors']);
             return redirect('/invoice/' . $invoice->id)->with('error', $errorHtml);
         }
+
+        $riskAnalysis = RiskIntelligenceEngine::analyzeForPreSubmission($invoice);
+        $isInternalCompany = $invoice->company && $invoice->company->is_internal_account;
+
+        if ($riskAnalysis['should_block'] && !$isInternalCompany) {
+            $riskMessages = array_map(fn($r) => $r['message'], $riskAnalysis['risks']);
+            InvoiceActivityService::log($invoice->id, $invoice->company_id, 'intelligence_blocked', [
+                'risk_score' => $riskAnalysis['risk_score'],
+                'risk_level' => $riskAnalysis['risk_level'],
+                'risks' => $riskMessages,
+            ]);
+            $message = 'FBR submission blocked - CRITICAL intelligence risk (Score: ' . $riskAnalysis['risk_score'] . '/100). Issues: ' . implode(' | ', array_slice($riskMessages, 0, 3)) . '. Please resolve and resubmit.';
+            return redirect('/invoice/' . $invoice->id)->with('error', $message);
+        }
+
+        IntelligenceProcessingJob::dispatch($invoice->id);
 
         if ($mode === 'direct_mis') {
             if (!in_array(auth()->user()->role, ['company_admin', 'super_admin'])) {

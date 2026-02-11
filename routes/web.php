@@ -91,6 +91,19 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         $result = \App\Services\ScheduleEngine::lookupByHsCode($hsCode);
         return response()->json($result ?: ['found' => false]);
     });
+    Route::get('/api/sro-suggest', function (\Illuminate\Http\Request $request) {
+        $scheduleType = $request->get('schedule_type', 'standard');
+        $taxRate = $request->get('tax_rate') ? floatval($request->get('tax_rate')) : null;
+        $hsCode = $request->get('hs_code');
+        return response()->json(\App\Services\SroSuggestionService::getApiResponse($scheduleType, $taxRate, $hsCode));
+    });
+    Route::get('/api/invoice/{invoice}/risk-analysis', function (\Illuminate\Http\Request $request, \App\Models\Invoice $invoice) {
+        $companyId = app('currentCompanyId');
+        if ($invoice->company_id !== $companyId && auth()->user()->role !== 'super_admin') {
+            abort(403);
+        }
+        return response()->json(\App\Services\RiskIntelligenceEngine::analyzeInvoice($invoice));
+    });
     Route::post('/api/compliance/check', [InvoiceController::class, 'complianceCheck']);
     Route::get('/api/enterprise/invoice/{invoice}/status', [InvoiceController::class, 'apiStatus']);
     Route::get('/api/enterprise/company/compliance', [InvoiceController::class, 'apiComplianceStatus']);

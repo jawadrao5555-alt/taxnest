@@ -134,6 +134,12 @@
                                     <input type="text" :name="'items[' + index + '][sro_schedule_no]'" x-model="item.sro_schedule_no" placeholder="e.g. SRO 1125(I)/2011"
                                         :class="item.requires_sro ? 'border-amber-300 bg-amber-50 focus:ring-amber-500 focus:border-amber-500' : 'border-gray-300 focus:ring-emerald-500 focus:border-emerald-500'"
                                         class="w-full rounded-lg shadow-sm text-sm">
+                                    <template x-if="item.sroSuggestion">
+                                        <div class="mt-1 p-1.5 rounded text-xs" :class="item.sroSuggestion.confidence === 'high' ? 'bg-green-50 text-green-700' : (item.sroSuggestion.confidence === 'medium' ? 'bg-yellow-50 text-yellow-700' : 'bg-gray-50 text-gray-600')">
+                                            <span class="font-medium">Suggested:</span> <span x-text="item.sroSuggestion.sro_schedule_no"></span>
+                                            <span class="ml-1 opacity-70" x-text="'(' + item.sroSuggestion.confidence + ' confidence)'"></span>
+                                        </div>
+                                    </template>
                                 </div>
                                 <div x-show="item.requires_serial || item.optional_serial">
                                     <label class="block text-xs font-medium mb-1" :class="item.requires_serial ? 'text-amber-600' : 'text-gray-500'" x-text="item.requires_serial ? 'SRO Item Serial No *' : 'SRO Item Serial No (optional)'"></label>
@@ -279,7 +285,7 @@
                 return {
                     product_id: '', hs_code: '', pct_code: '', description: '',
                     quantity: 1, price: 0, tax_rate: 18, tax: 0,
-                    schedule_type: 'standard', sro_schedule_no: '', serial_no: '', mrp: '',
+                    schedule_type: 'standard', sro_schedule_no: '', serial_no: '', mrp: '', sroSuggestion: null,
                     requires_sro: false, requires_serial: false, requires_mrp: false,
                     optional_sro: false, optional_serial: false, schedule_hint: '',
                     productSearch: '', showDropdown: false, productResults: [],
@@ -373,10 +379,29 @@
                             item.hsLookupInfo = 'Auto-detected: PCT ' + data.pct_code + ' | Schedule: ' + data.schedule_type + ' | Tax: ' + data.tax_rate + '%';
                             this.calcTax(index);
                             this.validateMixedSchedules();
+                            this.fetchSroSuggestion(item);
                         } else {
                             item.hsLookupInfo = '';
                         }
                     } catch(e) { item.hsLookupInfo = ''; }
+                },
+
+                async fetchSroSuggestion(item) {
+                    if (item.schedule_type === 'standard') { item.sroSuggestion = null; return; }
+                    try {
+                        let params = 'schedule_type=' + item.schedule_type;
+                        if (item.tax_rate) params += '&tax_rate=' + item.tax_rate;
+                        if (item.hs_code) params += '&hs_code=' + encodeURIComponent(item.hs_code);
+                        let res = await fetch('/api/sro-suggest?' + params);
+                        let data = await res.json();
+                        if (data.has_suggestion) {
+                            item.sroSuggestion = data;
+                            if (data.auto_fill && !item.sro_schedule_no) {
+                                item.sro_schedule_no = data.sro_schedule_no;
+                                item.serial_no = data.serial_no;
+                            }
+                        }
+                    } catch(e) {}
                 },
 
                 calcTax(index) {

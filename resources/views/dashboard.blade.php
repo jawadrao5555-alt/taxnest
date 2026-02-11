@@ -314,6 +314,20 @@
                             <p class="text-gray-500">High Risk (3m)</p>
                         </div>
                     </div>
+                    <div class="mt-3 grid grid-cols-2 gap-2 text-center text-xs">
+                        <div class="p-2 bg-gray-50 rounded">
+                            <p class="font-bold text-gray-700">{{ $auditProbability['factors']['active_anomalies'] }}</p>
+                            <p class="text-gray-500">Active Anomalies</p>
+                        </div>
+                        <div class="p-2 bg-gray-50 rounded">
+                            <p class="font-bold text-gray-700">{{ $auditProbability['factors']['risky_vendors'] }}</p>
+                            <p class="text-gray-500">Risky Vendors</p>
+                        </div>
+                    </div>
+                    <div class="mt-3 p-2 bg-indigo-50 rounded text-xs text-center">
+                        <p class="text-indigo-600 font-mono">{{ $complianceDetails['formula'] }}</p>
+                        <p class="text-indigo-500 mt-0.5">base - anomaly - vendor + stability</p>
+                    </div>
                 </div>
 
                 @if($planTier === 'enterprise')
@@ -343,6 +357,49 @@
                 </div>
                 @endif
             </div>
+
+            @if($companyRiskSummary['total_active_risks'] > 0)
+            <div class="bg-white rounded-xl shadow-sm border border-orange-200 overflow-hidden mb-8">
+                <div class="px-6 py-4 border-b border-orange-100 flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-gray-800 flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <span>Intelligence Risk Summary</span>
+                    </h3>
+                    <span class="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800">
+                        {{ $companyRiskSummary['total_active_risks'] }} Active Risk(s)
+                    </span>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="p-3 bg-red-50 rounded-lg text-center border border-red-100">
+                            <p class="text-2xl font-bold text-red-700">{{ $companyRiskSummary['severity_breakdown']['high'] }}</p>
+                            <p class="text-xs text-red-600">High Severity</p>
+                        </div>
+                        <div class="p-3 bg-yellow-50 rounded-lg text-center border border-yellow-100">
+                            <p class="text-2xl font-bold text-yellow-700">{{ $companyRiskSummary['severity_breakdown']['medium'] }}</p>
+                            <p class="text-xs text-yellow-600">Medium Severity</p>
+                        </div>
+                        <div class="p-3 bg-blue-50 rounded-lg text-center border border-blue-100">
+                            <p class="text-2xl font-bold text-blue-700">{{ $companyRiskSummary['severity_breakdown']['low'] }}</p>
+                            <p class="text-xs text-blue-600">Low Severity</p>
+                        </div>
+                        <div class="p-3 bg-gray-50 rounded-lg text-center border border-gray-100">
+                            <p class="text-2xl font-bold text-gray-700">{{ count($companyRiskSummary['risks_by_type']) }}</p>
+                            <p class="text-xs text-gray-600">Risk Types</p>
+                        </div>
+                    </div>
+                    @if(!empty($companyRiskSummary['risks_by_type']))
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        @foreach($companyRiskSummary['risks_by_type'] as $type => $count)
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                            {{ ucfirst(str_replace('_', ' ', $type)) }}: {{ $count }}
+                        </span>
+                        @endforeach
+                    </div>
+                    @endif
+                </div>
+            </div>
+            @endif
             @endif
 
             @if($planTier !== 'retail')

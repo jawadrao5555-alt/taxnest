@@ -101,7 +101,16 @@ class ProductController extends Controller
                   ->orWhere('hs_code', 'ilike', "%{$query}%");
             })
             ->take(20)
-            ->get(['id', 'name', 'hs_code', 'pct_code', 'default_tax_rate', 'uom', 'default_price']);
+            ->get(['id', 'name', 'hs_code', 'pct_code', 'default_tax_rate', 'uom', 'default_price', 'schedule_type', 'sro_reference']);
+
+        $products->transform(function ($product) {
+            $config = \App\Services\ScheduleEngine::getScheduleConfig($product->schedule_type ?? 'standard');
+            $product->requires_sro = $config['requires_sro'];
+            $product->requires_serial = $config['requires_serial'];
+            $product->requires_mrp = $config['requires_mrp'];
+            return $product;
+        });
+
         return response()->json($products);
     }
 }

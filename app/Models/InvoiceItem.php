@@ -9,6 +9,12 @@ class InvoiceItem extends Model
     protected $fillable = [
         'invoice_id',
         'hs_code',
+        'schedule_type',
+        'pct_code',
+        'tax_rate',
+        'sro_schedule_no',
+        'serial_no',
+        'mrp',
         'description',
         'quantity',
         'price',

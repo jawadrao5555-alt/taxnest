@@ -10,6 +10,7 @@ TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with 
 - **Demo User**: demo@taxnest.pk / password123
 
 ## Recent Changes
+- 2026-02-12: Hybrid Product + Schedule + Manual Control Model — Schedule selection (Standard/Reduced/3rd Schedule/Exempt/Zero Rated), dynamic SRO/Serial/MRP fields, product auto-fill with schedule data, manual HS→PCT lookup, validation layer (missing required fields + mixed schedule blocking), ScheduleEngine service
 - 2026-02-12: UI + Admin + PDF Upgrade — VIP landing page at /, super admin company deep view with 4 tabs, real PDF generation via dompdf, professional PDF layout with WHT/net receivable, context-aware download buttons, status badge polish (Draft=Gray, Locked=Green, Failed=Red)
 - 2026-02-12: Demo + PDF + Share + Mock — PDF download with draft/FBR watermarks, social share links with UUID, demo user/company/products/invoices seeder, dashboard thumbnail cards, QR code generation, demo safety mode
 - 2026-02-12: Enterprise V3 — Product Master, Smart Invoice Builder, Preview/Validate flow, Smart+Direct MIS submission modes, QR+Lock, MIS Reporting, Trend Analytics, Governance Panel, Enterprise API
@@ -20,7 +21,7 @@ TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with 
 ## Database Tables
 - **companies** — name, ntn, email, phone, address, fbr_token, token_expires_at, compliance_score
 - **invoices** — company_id, invoice_number, status, integrity_hash, buyer_name, buyer_ntn, total_amount, override_reason, override_by, submission_mode, fbr_invoice_id, qr_data, share_uuid
-- **invoice_items** — invoice_id, hs_code, description, quantity, price, tax
+- **invoice_items** — invoice_id, hs_code, schedule_type, pct_code, tax_rate, sro_schedule_no, serial_no, mrp, description, quantity, price, tax
 - **invoice_activity_logs** — invoice_id, company_id, user_id, action, changes_json, ip_address
 - **users** — name, email, password, company_id (nullable), role (super_admin/company_admin/employee/viewer)
 - **products** — company_id, name, hs_code, pct_code, default_tax_rate, uom, schedule_type, sro_reference, default_price, is_active
@@ -70,6 +71,8 @@ TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with 
 - `/compliance/certificate` — Monthly compliance certificate
 - `/compliance/risk-report` — Risk Explanation Report
 - `/api/products/search` — Product search API (AJAX)
+- `/api/schedule/config` — Schedule types config API (AJAX)
+- `/api/hs-lookup` — HS code to PCT/schedule/tax lookup API (AJAX)
 - `/api/compliance/check` — Live compliance check API (AJAX)
 - `/api/enterprise/invoice/{id}/status` — Enterprise invoice status API
 - `/api/enterprise/company/compliance` — Enterprise compliance status API
@@ -150,7 +153,7 @@ TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with 
 - `app/Http/Middleware/` — CompanyIsolation, RoleMiddleware, RateLimitByCompany
 - `app/Models/` — User, Company, Invoice, InvoiceItem, Product, SystemSetting, OverrideLog, FbrLog, InvoiceActivityLog, SecurityLog, PricingPlan, Subscription, Notification, ComplianceScore, AnomalyLog, ComplianceReport, VendorRiskProfile
 - `app/Jobs/` — SendInvoiceToFbrJob, NightlyComplianceCronJob, CheckFbrTokenExpiryJob, ComplianceScoringJob
-- `app/Services/` — ComplianceEngine, AnomalyEngine, HybridComplianceScorer, VendorRiskEngine, AuditDefenseService, FbrService, ComplianceRiskService, AnomalyDetectionService, SmartInsightsService, ComplianceCertificateService, InvoiceActivityService, IntegrityHashService, SecurityLogService
+- `app/Services/` — ComplianceEngine, AnomalyEngine, HybridComplianceScorer, VendorRiskEngine, AuditDefenseService, FbrService, ComplianceRiskService, AnomalyDetectionService, SmartInsightsService, ComplianceCertificateService, InvoiceActivityService, IntegrityHashService, SecurityLogService, ScheduleEngine
 - `database/seeders/` — DatabaseSeeder, PricingPlanSeeder, SystemSettingsSeeder, TestUsersSeeder, DemoSeeder
 
 ## Running

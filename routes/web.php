@@ -47,6 +47,14 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
     });
 
     Route::get('/api/products/search', [ProductController::class, 'search']);
+    Route::get('/api/schedule/config', function () {
+        return response()->json(\App\Services\ScheduleEngine::$scheduleTypes);
+    });
+    Route::get('/api/hs-lookup', function (\Illuminate\Http\Request $request) {
+        $hsCode = $request->get('hs_code', '');
+        $result = \App\Services\ScheduleEngine::lookupByHsCode($hsCode);
+        return response()->json($result ?: ['found' => false]);
+    });
     Route::post('/api/compliance/check', [InvoiceController::class, 'complianceCheck']);
     Route::get('/api/enterprise/invoice/{invoice}/status', [InvoiceController::class, 'apiStatus']);
     Route::get('/api/enterprise/company/compliance', [InvoiceController::class, 'apiComplianceStatus']);

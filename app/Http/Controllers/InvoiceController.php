@@ -13,6 +13,7 @@ use App\Services\IntegrityHashService;
 use App\Services\ComplianceEngine;
 use App\Services\HybridComplianceScorer;
 use App\Services\VendorRiskEngine;
+use App\Services\ScheduleEngine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -48,7 +49,17 @@ class InvoiceController extends Controller
             'items.*.quantity' => 'required|numeric|min:0.01',
             'items.*.price' => 'required|numeric|min:0',
             'items.*.tax' => 'required|numeric|min:0',
+            'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated',
+            'items.*.pct_code' => 'nullable|string|max:50',
+            'items.*.sro_schedule_no' => 'nullable|string|max:100',
+            'items.*.serial_no' => 'nullable|string|max:100',
+            'items.*.mrp' => 'nullable|numeric|min:0',
         ]);
+
+        $scheduleErrors = ScheduleEngine::validateItems($request->items);
+        if (!empty($scheduleErrors)) {
+            return back()->withErrors($scheduleErrors)->withInput();
+        }
 
         $companyId = app('currentCompanyId');
         $this->checkInvoiceLimit($companyId);
@@ -78,6 +89,12 @@ class InvoiceController extends Controller
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
                     'hs_code' => $item['hs_code'],
+                    'schedule_type' => $item['schedule_type'] ?? 'standard',
+                    'pct_code' => $item['pct_code'] ?? null,
+                    'tax_rate' => $this->extractTaxRate($item),
+                    'sro_schedule_no' => $item['sro_schedule_no'] ?? null,
+                    'serial_no' => $item['serial_no'] ?? null,
+                    'mrp' => !empty($item['mrp']) ? $item['mrp'] : null,
                     'description' => $item['description'],
                     'quantity' => $item['quantity'],
                     'price' => $item['price'],
@@ -144,7 +161,17 @@ class InvoiceController extends Controller
             'items.*.quantity' => 'required|numeric|min:0.01',
             'items.*.price' => 'required|numeric|min:0',
             'items.*.tax' => 'required|numeric|min:0',
+            'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated',
+            'items.*.pct_code' => 'nullable|string|max:50',
+            'items.*.sro_schedule_no' => 'nullable|string|max:100',
+            'items.*.serial_no' => 'nullable|string|max:100',
+            'items.*.mrp' => 'nullable|numeric|min:0',
         ]);
+
+        $scheduleErrors = ScheduleEngine::validateItems($request->items);
+        if (!empty($scheduleErrors)) {
+            return back()->withErrors($scheduleErrors)->withInput();
+        }
 
         $oldData = [
             'buyer_name' => $invoice->buyer_name,
@@ -170,6 +197,12 @@ class InvoiceController extends Controller
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
                     'hs_code' => $item['hs_code'],
+                    'schedule_type' => $item['schedule_type'] ?? 'standard',
+                    'pct_code' => $item['pct_code'] ?? null,
+                    'tax_rate' => $this->extractTaxRate($item),
+                    'sro_schedule_no' => $item['sro_schedule_no'] ?? null,
+                    'serial_no' => $item['serial_no'] ?? null,
+                    'mrp' => !empty($item['mrp']) ? $item['mrp'] : null,
                     'description' => $item['description'],
                     'quantity' => $item['quantity'],
                     'price' => $item['price'],
@@ -513,6 +546,17 @@ class InvoiceController extends Controller
             'locked_invoices' => $lockedInvoices,
             'latest_risk_level' => $latestReport ? $latestReport->risk_level : 'N/A',
         ]);
+    }
+
+    private function extractTaxRate(array $item): float
+    {
+        if (isset($item['tax']) && isset($item['price']) && isset($item['quantity'])) {
+            $subtotal = floatval($item['price']) * floatval($item['quantity']);
+            if ($subtotal > 0) {
+                return round((floatval($item['tax']) / $subtotal) * 100, 2);
+            }
+        }
+        return ScheduleEngine::getTaxRate($item['schedule_type'] ?? 'standard');
     }
 
     private function checkInvoiceLimit($companyId)

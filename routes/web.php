@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\AdminController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -25,6 +26,7 @@ Route::middleware(['auth', 'company'])->group(function () {
     Route::get('/invoice/{invoice}/pdf', [InvoiceController::class, 'pdf']);
 
     Route::middleware(['role:super_admin'])->group(function () {
+        Route::get('/admin/dashboard', [AdminController::class, 'dashboard']);
         Route::get('/admin', function () {
             return "Super Admin Panel";
         });

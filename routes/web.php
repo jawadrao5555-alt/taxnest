@@ -10,6 +10,7 @@ use App\Http\Controllers\ComplianceCertificateController;
 use App\Http\Controllers\RiskReportController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\MISController;
+use App\Http\Controllers\HsMasterExportController;
 use App\Http\Controllers\ShareController;
 use App\Http\Controllers\CompanyUserController;
 use App\Http\Controllers\CompanySettingsController;
@@ -232,6 +233,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::get('/admin/companies/pending', [AdminController::class, 'pendingCompanies']);
         Route::post('/admin/company/{company}/change-plan', [AdminController::class, 'changePlan']);
         Route::post('/admin/company/{company}/toggle-internal', [AdminController::class, 'toggleInternalAccount']);
+        Route::get('/admin/hs-master-export', [HsMasterExportController::class, 'index'])->name('admin.hs-master-export');
     });
 });
 

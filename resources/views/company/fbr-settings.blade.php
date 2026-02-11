@@ -80,12 +80,69 @@
                     <p class="text-xs text-gray-400 mt-1">Set when your FBR token expires. You'll receive notifications 48 hours before expiry.</p>
                 </div>
 
-                <div class="border-2 border-emerald-200 rounded-lg p-6 bg-emerald-50">
-                    <h3 class="text-lg font-semibold text-emerald-900 mb-3">Sandbox Test Mode</h3>
-                    <div class="bg-white border border-emerald-200 rounded-lg p-4 mb-4">
-                        <p class="text-sm text-gray-700">Test your FBR payload without actually submitting invoices. Use this to verify your configuration and payload structure.</p>
+                <div class="border-2 border-emerald-200 rounded-lg p-6 bg-emerald-50" x-data="sandboxPanel()">
+                    <h3 class="text-lg font-semibold text-emerald-900 mb-3">Sandbox Testing Panel</h3>
+                    <p class="text-sm text-gray-600 mb-4">Test your FBR integration without submitting real invoices. These tools are only available in Sandbox mode.</p>
+
+                    <template x-if="environment !== 'sandbox'">
+                        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                            <p class="text-sm text-amber-700">Switch to Sandbox environment to access testing tools.</p>
+                        </div>
+                    </template>
+
+                    <template x-if="environment === 'sandbox'">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <!-- Tool 1: Ping Endpoint -->
+                            <button type="button" @click="runTest('ping')" :disabled="running" class="p-3 border border-emerald-200 rounded-lg bg-white hover:bg-emerald-50 text-left transition">
+                                <p class="text-sm font-semibold text-emerald-800">1. Ping FBR Endpoint</p>
+                                <p class="text-xs text-gray-500">Check if FBR sandbox API is reachable</p>
+                            </button>
+
+                            <!-- Tool 2: Validate Token -->
+                            <button type="button" @click="runTest('token')" :disabled="running" class="p-3 border border-emerald-200 rounded-lg bg-white hover:bg-emerald-50 text-left transition">
+                                <p class="text-sm font-semibold text-emerald-800">2. Validate Token</p>
+                                <p class="text-xs text-gray-500">Verify sandbox token is valid and not expired</p>
+                            </button>
+
+                            <!-- Tool 3: Test Payload Structure -->
+                            <button type="button" @click="runTest('payload')" :disabled="running" class="p-3 border border-emerald-200 rounded-lg bg-white hover:bg-emerald-50 text-left transition">
+                                <p class="text-sm font-semibold text-emerald-800">3. Test Payload Structure</p>
+                                <p class="text-xs text-gray-500">Validate a sample invoice payload format</p>
+                            </button>
+
+                            <!-- Tool 4: Check Company Config -->
+                            <button type="button" @click="runTest('config')" :disabled="running" class="p-3 border border-emerald-200 rounded-lg bg-white hover:bg-emerald-50 text-left transition">
+                                <p class="text-sm font-semibold text-emerald-800">4. Check Company Config</p>
+                                <p class="text-xs text-gray-500">Verify company settings for FBR submissions</p>
+                            </button>
+
+                            <!-- Tool 5: Dry Run Invoice -->
+                            <button type="button" @click="runTest('dryrun')" :disabled="running" class="p-3 border border-emerald-200 rounded-lg bg-white hover:bg-emerald-50 text-left transition">
+                                <p class="text-sm font-semibold text-emerald-800">5. Dry Run Invoice</p>
+                                <p class="text-xs text-gray-500">Submit test invoice to sandbox (no real submission)</p>
+                            </button>
+
+                            <!-- Tool 6: Province Mapping Check -->
+                            <button type="button" @click="runTest('provinces')" :disabled="running" class="p-3 border border-emerald-200 rounded-lg bg-white hover:bg-emerald-50 text-left transition">
+                                <p class="text-sm font-semibold text-emerald-800">6. Province Mapping</p>
+                                <p class="text-xs text-gray-500">Verify province codes are mapped correctly</p>
+                            </button>
+                        </div>
+                    </template>
+
+                    <div x-show="running" x-cloak class="mt-3 flex items-center gap-2 text-sm text-emerald-700">
+                        <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        Running test...
                     </div>
-                    <p class="text-xs text-emerald-700 font-medium">ℹ️ This feature is only available when using Sandbox environment</p>
+
+                    <div x-show="testResult" x-cloak class="mt-3 p-3 rounded-lg text-sm border"
+                        :class="testResult?.success ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'">
+                        <p class="font-semibold" x-text="testResult?.title"></p>
+                        <p class="mt-1 text-xs" x-text="testResult?.message"></p>
+                        <template x-if="testResult?.details">
+                            <pre class="mt-2 text-xs bg-white p-2 rounded border overflow-x-auto" x-text="JSON.stringify(testResult?.details, null, 2)"></pre>
+                        </template>
+                    </div>
                 </div>
 
                 <div class="flex justify-end">
@@ -188,6 +245,31 @@
                     this.testMessage = 'Connection test failed. Please try again.';
                 }
                 this.testing = false;
+            }
+        }
+    }
+    function sandboxPanel() {
+        return {
+            running: false,
+            testResult: null,
+            environment: '{{ $company->fbr_environment ?? "sandbox" }}',
+            async runTest(type) {
+                this.running = true;
+                this.testResult = null;
+                try {
+                    let res = await fetch('/company/sandbox-test/' + type, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json'
+                        }
+                    });
+                    this.testResult = await res.json();
+                } catch(e) {
+                    this.testResult = { success: false, title: 'Error', message: 'Test failed. Please try again.' };
+                }
+                this.running = false;
             }
         }
     }

@@ -19,6 +19,7 @@ use App\Services\SroSuggestionService;
 use App\Services\ScheduleEngine;
 use Illuminate\Http\Request;
 use App\Services\AuditLogService;
+use App\Services\InvoiceNumberingService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -58,7 +59,17 @@ class InvoiceController extends Controller
         $branches = \App\Models\Branch::where('company_id', $companyId)->orderBy('name')->get();
         $company = \App\Models\Company::find($companyId);
         $standardTaxRate = $company ? $company->getStandardTaxRateValue() : 18.0;
-        return view('invoice.create', compact('branches', 'standardTaxRate'));
+        $nextInvoiceNumber = InvoiceNumberingService::peekNextNumber($companyId);
+        $provinces = self::getPakistanProvinces();
+        return view('invoice.create', compact('branches', 'standardTaxRate', 'nextInvoiceNumber', 'provinces'));
+    }
+
+    public static function getPakistanProvinces(): array
+    {
+        return [
+            'Punjab', 'Sindh', 'Khyber Pakhtunkhwa', 'Balochistan',
+            'Islamabad', 'Azad Kashmir', 'Gilgit-Baltistan', 'FATA',
+        ];
     }
 
     public function store(Request $request)
@@ -73,6 +84,10 @@ class InvoiceController extends Controller
             'buyer_name' => 'required|string|max:255',
             'buyer_ntn' => 'required|string|max:50',
             'branch_id' => 'nullable|exists:branches,id',
+            'document_type' => 'nullable|string|in:Sale Invoice,Credit Note,Debit Note',
+            'reference_invoice_number' => 'nullable|string|max:255',
+            'destination_province' => 'nullable|string|max:100',
+            'wht_rate' => 'nullable|numeric|min:0|max:100',
             'items' => 'required|array|min:1',
             'items.*.hs_code' => 'required|string|max:50',
             'items.*.description' => 'required|string|max:255',
@@ -86,6 +101,8 @@ class InvoiceController extends Controller
             'items.*.serial_no' => 'nullable|string|max:100',
             'items.*.mrp' => 'nullable|numeric|min:0',
             'items.*.default_uom' => 'nullable|string|max:100',
+            'items.*.st_withheld_at_source' => 'nullable',
+            'items.*.petroleum_levy' => 'nullable|numeric|min:0',
         ]);
 
         $itemsWithTaxRate = collect($request->items)->map(function ($item) {
@@ -102,34 +119,61 @@ class InvoiceController extends Controller
             return back()->withErrors($scheduleErrors)->withInput();
         }
 
+        $selectedBranch = null;
         if ($request->branch_id) {
-            $branch = \App\Models\Branch::where('id', $request->branch_id)->where('company_id', $companyId)->first();
-            if (!$branch) {
+            $selectedBranch = \App\Models\Branch::where('id', $request->branch_id)->where('company_id', $companyId)->first();
+            if (!$selectedBranch) {
                 return back()->with('error', 'Invalid branch selected.')->withInput();
             }
         }
 
+        $documentType = $request->input('document_type', 'Sale Invoice');
+        if (in_array($documentType, ['Credit Note', 'Debit Note']) && empty($request->reference_invoice_number)) {
+            return back()->with('error', 'Reference invoice number is required for Credit/Debit Notes.')->withInput();
+        }
+
         DB::beginTransaction();
         try {
-            $totalAmount = 0;
+            $totalValueExcludingST = 0;
+            $totalSalesTax = 0;
             foreach ($request->items as $item) {
-                $totalAmount += ($item['price'] * $item['quantity']) + $item['tax'];
+                $itemValue = floatval($item['price']) * floatval($item['quantity']);
+                $totalValueExcludingST += $itemValue;
+                $totalSalesTax += floatval($item['tax']);
             }
+            $totalAmount = round($totalValueExcludingST + $totalSalesTax, 2);
 
-            $invoiceNumber = 'INV-' . now()->format('Ymd') . '-' . str_pad(
-                Invoice::where('company_id', $companyId)->count() + 1,
-                4, '0', STR_PAD_LEFT
-            );
+            $whtRate = floatval($request->input('wht_rate', 0));
+            $whtAmount = round($totalValueExcludingST * ($whtRate / 100), 2);
+            $netReceivable = round($totalAmount - $whtAmount, 2);
+
+            $invoiceNumber = InvoiceNumberingService::generateNextNumber($companyId);
+
+            $supplierProvince = $selectedBranch?->province ?? $company->province ?? null;
+            $buyerNtn = $request->buyer_ntn;
+            $buyerRegType = self::detectBuyerRegistrationType($buyerNtn);
 
             $invoice = Invoice::create([
                 'company_id' => $companyId,
                 'invoice_number' => $invoiceNumber,
                 'internal_invoice_number' => $invoiceNumber,
                 'buyer_name' => $request->buyer_name,
-                'buyer_ntn' => $request->buyer_ntn,
+                'buyer_ntn' => $buyerNtn,
+                'buyer_registration_type' => $buyerRegType,
                 'total_amount' => $totalAmount,
+                'total_value_excluding_st' => round($totalValueExcludingST, 2),
+                'total_sales_tax' => round($totalSalesTax, 2),
+                'wht_rate' => $whtRate,
+                'wht_amount' => $whtAmount,
+                'net_receivable' => $netReceivable,
                 'status' => 'draft',
+                'fbr_status' => null,
                 'branch_id' => $request->branch_id,
+                'document_type' => $documentType,
+                'reference_invoice_number' => $request->reference_invoice_number,
+                'supplier_province' => $supplierProvince,
+                'destination_province' => $request->destination_province,
+                'invoice_date' => now()->toDateString(),
             ]);
 
             $manualOverrides = [];
@@ -148,6 +192,8 @@ class InvoiceController extends Controller
                     'mrp' => !empty($item['mrp']) ? $item['mrp'] : null,
                     'default_uom' => $item['default_uom'] ?? 'Numbers, pieces, units',
                     'sale_type' => $saleType,
+                    'st_withheld_at_source' => !empty($item['st_withheld_at_source']),
+                    'petroleum_levy' => !empty($item['petroleum_levy']) ? floatval($item['petroleum_levy']) : null,
                     'description' => $item['description'],
                     'quantity' => $item['quantity'],
                     'price' => $item['price'],
@@ -177,12 +223,14 @@ class InvoiceController extends Controller
                 'buyer_name' => $request->buyer_name,
                 'total_amount' => $totalAmount,
                 'items_count' => count($request->items),
+                'document_type' => $documentType,
             ]);
 
             AuditLogService::log('invoice_created', 'Invoice', $invoice->id, null, [
                 'invoice_number' => $invoiceNumber,
                 'buyer_name' => $request->buyer_name,
                 'total_amount' => $totalAmount,
+                'document_type' => $documentType,
             ]);
 
             ComplianceScoringJob::dispatch($invoice->id);
@@ -193,6 +241,14 @@ class InvoiceController extends Controller
             DB::rollBack();
             return back()->with('error', 'Failed to create invoice: ' . $e->getMessage())->withInput();
         }
+    }
+
+    public static function detectBuyerRegistrationType(?string $buyerNtn): string
+    {
+        if (empty($buyerNtn)) return 'Unregistered';
+        $clean = preg_replace('/[^0-9]/', '', $buyerNtn);
+        if (strlen($clean) >= 7) return 'Registered';
+        return 'Unregistered';
     }
 
     public function show(Invoice $invoice)
@@ -245,7 +301,8 @@ class InvoiceController extends Controller
         $branches = \App\Models\Branch::where('company_id', $companyId)->orderBy('name')->get();
         $company = \App\Models\Company::find($companyId);
         $standardTaxRate = $company ? $company->getStandardTaxRateValue() : 18.0;
-        return view('invoice.edit', compact('invoice', 'branches', 'standardTaxRate'));
+        $provinces = self::getPakistanProvinces();
+        return view('invoice.edit', compact('invoice', 'branches', 'standardTaxRate', 'provinces'));
     }
 
     public function update(Request $request, Invoice $invoice)
@@ -258,6 +315,10 @@ class InvoiceController extends Controller
             'buyer_name' => 'required|string|max:255',
             'buyer_ntn' => 'required|string|max:50',
             'branch_id' => 'nullable|exists:branches,id',
+            'document_type' => 'nullable|string|in:Sale Invoice,Credit Note,Debit Note',
+            'reference_invoice_number' => 'nullable|string|max:255',
+            'destination_province' => 'nullable|string|max:100',
+            'wht_rate' => 'nullable|numeric|min:0|max:100',
             'items' => 'required|array|min:1',
             'items.*.hs_code' => 'required|string|max:50',
             'items.*.description' => 'required|string|max:255',
@@ -271,6 +332,8 @@ class InvoiceController extends Controller
             'items.*.serial_no' => 'nullable|string|max:100',
             'items.*.mrp' => 'nullable|numeric|min:0',
             'items.*.default_uom' => 'nullable|string|max:100',
+            'items.*.st_withheld_at_source' => 'nullable',
+            'items.*.petroleum_levy' => 'nullable|numeric|min:0',
         ]);
 
         $itemsWithTaxRate = collect($request->items)->map(function ($item) {
@@ -286,11 +349,17 @@ class InvoiceController extends Controller
             return back()->withErrors($scheduleErrors)->withInput();
         }
 
+        $selectedBranch = null;
         if ($request->branch_id) {
-            $branch = \App\Models\Branch::where('id', $request->branch_id)->where('company_id', $invoice->company_id)->first();
-            if (!$branch) {
+            $selectedBranch = \App\Models\Branch::where('id', $request->branch_id)->where('company_id', $invoice->company_id)->first();
+            if (!$selectedBranch) {
                 return back()->with('error', 'Invalid branch selected.')->withInput();
             }
+        }
+
+        $documentType = $request->input('document_type', $invoice->document_type ?? 'Sale Invoice');
+        if (in_array($documentType, ['Credit Note', 'Debit Note']) && empty($request->reference_invoice_number)) {
+            return back()->with('error', 'Reference invoice number is required for Credit/Debit Notes.')->withInput();
         }
 
         $oldData = [
@@ -301,16 +370,37 @@ class InvoiceController extends Controller
 
         DB::beginTransaction();
         try {
-            $totalAmount = 0;
+            $totalValueExcludingST = 0;
+            $totalSalesTax = 0;
             foreach ($request->items as $item) {
-                $totalAmount += ($item['price'] * $item['quantity']) + $item['tax'];
+                $itemValue = floatval($item['price']) * floatval($item['quantity']);
+                $totalValueExcludingST += $itemValue;
+                $totalSalesTax += floatval($item['tax']);
             }
+            $totalAmount = round($totalValueExcludingST + $totalSalesTax, 2);
+
+            $whtRate = floatval($request->input('wht_rate', 0));
+            $whtAmount = round($totalValueExcludingST * ($whtRate / 100), 2);
+            $netReceivable = round($totalAmount - $whtAmount, 2);
+
+            $supplierProvince = $selectedBranch?->province ?? $company->province ?? $invoice->supplier_province;
+            $buyerRegType = self::detectBuyerRegistrationType($request->buyer_ntn);
 
             $invoice->update([
                 'buyer_name' => $request->buyer_name,
                 'buyer_ntn' => $request->buyer_ntn,
+                'buyer_registration_type' => $buyerRegType,
                 'total_amount' => $totalAmount,
+                'total_value_excluding_st' => round($totalValueExcludingST, 2),
+                'total_sales_tax' => round($totalSalesTax, 2),
+                'wht_rate' => $whtRate,
+                'wht_amount' => $whtAmount,
+                'net_receivable' => $netReceivable,
                 'branch_id' => $request->branch_id,
+                'document_type' => $documentType,
+                'reference_invoice_number' => $request->reference_invoice_number,
+                'supplier_province' => $supplierProvince,
+                'destination_province' => $request->destination_province,
             ]);
 
             $invoice->items()->delete();
@@ -330,6 +420,8 @@ class InvoiceController extends Controller
                     'mrp' => !empty($item['mrp']) ? $item['mrp'] : null,
                     'default_uom' => $item['default_uom'] ?? 'Numbers, pieces, units',
                     'sale_type' => $saleType,
+                    'st_withheld_at_source' => !empty($item['st_withheld_at_source']),
+                    'petroleum_levy' => !empty($item['petroleum_levy']) ? floatval($item['petroleum_levy']) : null,
                     'description' => $item['description'],
                     'quantity' => $item['quantity'],
                     'price' => $item['price'],

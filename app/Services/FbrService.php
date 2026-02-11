@@ -16,20 +16,24 @@ class FbrService
         $company = $invoice->company;
 
         $payload = [
-            "invoiceType" => "Sale Invoice",
-            "invoiceDate" => $invoice->created_at ? $invoice->created_at->toDateString() : now()->toDateString(),
+            "invoiceType" => $invoice->document_type ?? "Sale Invoice",
+            "invoiceDate" => $invoice->invoice_date ?? ($invoice->created_at ? $invoice->created_at->toDateString() : now()->toDateString()),
             "sellerNTNCNIC" => $company->ntn ?? "",
             "sellerBusinessName" => $company->fbr_business_name ?: ($company->name ?? ""),
-            "sellerProvince" => $company->province ?? "Punjab",
+            "sellerProvince" => $invoice->supplier_province ?? $company->province ?? "",
             "sellerAddress" => $company->address ?? "",
             "buyerNTNCNIC" => $invoice->buyer_ntn,
             "buyerBusinessName" => $invoice->buyer_name,
-            "buyerProvince" => $invoice->buyer_province ?? ($company->province ?? "Punjab"),
+            "buyerProvince" => $invoice->destination_province ?? "",
             "buyerAddress" => $invoice->buyer_address ?? "",
-            "buyerRegistrationType" => $this->determineBuyerRegistrationType($invoice->buyer_ntn),
+            "buyerRegistrationType" => $invoice->buyer_registration_type ?? $this->determineBuyerRegistrationType($invoice->buyer_ntn),
             "invoiceRefNo" => $invoice->internal_invoice_number ?? $invoice->invoice_number ?? "",
             "items" => []
         ];
+
+        if (in_array($invoice->document_type, ['Credit Note', 'Debit Note']) && $invoice->reference_invoice_number) {
+            $payload["referenceInvoiceNo"] = $invoice->reference_invoice_number;
+        }
 
         foreach ($invoice->items as $item) {
             $scheduleType = $item->schedule_type ?? 'standard';
@@ -40,7 +44,7 @@ class FbrService
             $salesTaxApplicable = round($valueSalesExcludingST * ($taxRate / 100), 2);
             $totalValues = round($valueSalesExcludingST + $salesTaxApplicable, 2);
 
-            $payload["items"][] = [
+            $itemPayload = [
                 "hsCode" => $item->hs_code,
                 "productDescription" => $item->description,
                 "rate" => $taxRate . "%",
@@ -50,7 +54,7 @@ class FbrService
                 "valueSalesExcludingST" => $valueSalesExcludingST,
                 "fixedNotifiedValueOrRetailPrice" => floatval($item->mrp ?? 0),
                 "salesTaxApplicable" => $salesTaxApplicable,
-                "salesTaxWithheldAtSource" => 0,
+                "salesTaxWithheldAtSource" => $item->st_withheld_at_source ? $salesTaxApplicable : 0,
                 "extraTax" => 0,
                 "furtherTax" => 0,
                 "sroScheduleNo" => $item->sro_schedule_no ?? "",
@@ -59,6 +63,12 @@ class FbrService
                 "saleType" => $item->sale_type ?: ScheduleEngine::mapSaleType($scheduleType),
                 "sroItemSerialNo" => $item->serial_no ?? ""
             ];
+
+            if ($item->petroleum_levy && $item->petroleum_levy > 0) {
+                $itemPayload["petroleumLevy"] = round(floatval($item->petroleum_levy), 2);
+            }
+
+            $payload["items"][] = $itemPayload;
         }
 
         return $payload;

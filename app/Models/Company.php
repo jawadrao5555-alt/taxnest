@@ -30,6 +30,8 @@ class Company extends Model
         'standard_tax_rate',
         'sector_type',
         'province',
+        'invoice_number_prefix',
+        'next_invoice_number',
     ];
 
     protected $casts = [

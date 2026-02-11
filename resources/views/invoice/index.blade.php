@@ -25,6 +25,7 @@
                         <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice #</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Buyer</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NTN</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch</th>
@@ -46,6 +47,15 @@
         <div class="text-sm font-medium text-gray-900">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-'.$invoice->id }}</div>
     @endif
 </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-xs">
+                                    @if($invoice->document_type === 'Credit Note')
+                                        <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">CN</span>
+                                    @elseif($invoice->document_type === 'Debit Note')
+                                        <span class="px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-medium">DN</span>
+                                    @else
+                                        <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-600 font-medium">INV</span>
+                                    @endif
+                                </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{{ $invoice->buyer_name }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $invoice->buyer_ntn }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $invoice->branch->name ?? '—' }}</td>
@@ -60,6 +70,15 @@
                                         @endif">
                                         {{ ucfirst($invoice->status) }}
                                     </span>
+                                    @if($invoice->fbr_status && $invoice->fbr_status !== 'pending')
+                                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium ml-1
+                                        @if($invoice->fbr_status === 'submitted') bg-blue-100 text-blue-700
+                                        @elseif($invoice->fbr_status === 'validated') bg-emerald-100 text-emerald-700
+                                        @elseif($invoice->fbr_status === 'failed') bg-red-100 text-red-700
+                                        @endif">
+                                        {{ ucfirst($invoice->fbr_status) }}
+                                    </span>
+                                    @endif
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $invoice->created_at->format('d M Y') }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm space-x-2">
@@ -76,7 +95,7 @@
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="9" class="px-6 py-12 text-center">
+                                <td colspan="10" class="px-6 py-12 text-center">
                                     <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                                     <p class="mt-2 text-gray-500">No invoices yet</p>
                                     <a href="/invoice/create" class="mt-3 inline-block text-emerald-600 hover:text-emerald-700 font-medium">Create your first invoice</a>

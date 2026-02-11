@@ -17,10 +17,21 @@ class InvoiceItem extends Model
         'mrp',
         'default_uom',
         'sale_type',
+        'st_withheld_at_source',
+        'petroleum_levy',
         'description',
         'quantity',
         'price',
         'tax'
+    ];
+
+    protected $casts = [
+        'st_withheld_at_source' => 'boolean',
+        'petroleum_levy' => 'float',
+        'tax_rate' => 'float',
+        'quantity' => 'float',
+        'price' => 'float',
+        'tax' => 'float',
     ];
 
     public function invoice()

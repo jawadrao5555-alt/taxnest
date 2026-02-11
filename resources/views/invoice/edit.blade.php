@@ -47,6 +47,30 @@
                 @endif
 
                 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Document Information</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Document Type</label>
+                            <select name="document_type" x-model="document_type" @change="onDocTypeChange()" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                <option value="Sale Invoice">Sale Invoice</option>
+                                <option value="Credit Note">Credit Note</option>
+                                <option value="Debit Note">Debit Note</option>
+                            </select>
+                        </div>
+                        <div x-show="document_type !== 'Sale Invoice'" x-cloak>
+                            <label class="block text-sm font-medium text-amber-600 mb-1">Reference Invoice No *</label>
+                            <input type="text" name="reference_invoice_number" x-model="reference_invoice_number" placeholder="Original invoice number"
+                                class="w-full rounded-lg border-amber-300 shadow-sm bg-amber-50 focus:ring-amber-500 focus:border-amber-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Invoice #</label>
+                            <input type="text" value="{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? '#' . $invoice->id }}" disabled
+                                class="w-full rounded-lg border-gray-200 shadow-sm bg-gray-50 text-gray-500">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                     <h3 class="text-lg font-semibold text-gray-800 mb-4">Buyer Information</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -58,6 +82,24 @@
                             <label class="block text-sm font-medium text-gray-700 mb-1">Buyer NTN</label>
                             <input type="text" name="buyer_ntn" x-model="buyer_ntn" required
                                 class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <p class="text-xs mt-1" :class="buyerRegType === 'Registered' ? 'text-green-600' : 'text-gray-400'" x-text="'Registration: ' + buyerRegType"></p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Destination Province</label>
+                            <select name="destination_province" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                <option value="">— Select Province —</option>
+                                @foreach($provinces as $prov)
+                                <option value="{{ $prov }}" {{ old('destination_province', $invoice->destination_province ?? '') == $prov ? 'selected' : '' }}>{{ $prov }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">WHT Rate (%)</label>
+                            <input type="number" step="0.01" min="0" max="100" name="wht_rate" x-model="wht_rate" placeholder="0"
+                                class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <p class="text-xs text-gray-400 mt-1">Withholding Tax deduction rate (manual selection)</p>
                         </div>
                     </div>
                 </div>
@@ -182,6 +224,20 @@
                                     <input type="number" step="0.01" :name="'items[' + index + '][price]'" x-model="item.price" @input="calcTax(index)" required class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 </div>
                             </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                                <div>
+                                    <label class="flex items-center gap-2 text-xs text-gray-500">
+                                        <input type="checkbox" :name="'items[' + index + '][st_withheld_at_source]'" x-model="item.st_withheld_at_source" value="1"
+                                            class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                        ST Withheld at Source
+                                    </label>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Petroleum Levy (Rs.)</label>
+                                    <input type="number" step="0.01" min="0" :name="'items[' + index + '][petroleum_levy]'" x-model="item.petroleum_levy" placeholder="0.00"
+                                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                </div>
+                            </div>
                             <input type="hidden" :name="'items[' + index + '][tax]'" :value="item.tax">
                             <div class="mt-2 flex justify-between text-sm text-gray-500">
                                 <span>Subtotal: <span class="font-medium text-gray-800" x-text="'Rs. ' + itemSubtotal(index)"></span></span>
@@ -194,9 +250,27 @@
                         </div>
                     </template>
 
-                    <div class="mt-4 p-4 bg-gray-50 rounded-lg flex justify-between items-center">
-                        <span class="text-lg font-semibold text-gray-700">Grand Total</span>
-                        <span class="text-2xl font-bold text-emerald-600" x-text="'Rs. ' + grandTotal()"></span>
+                    <div class="mt-4 p-4 bg-gray-50 rounded-lg space-y-2">
+                        <div class="flex justify-between items-center text-sm text-gray-600">
+                            <span>Value Excl. ST</span>
+                            <span class="font-medium" x-text="'Rs. ' + totalExclST()"></span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm text-gray-600">
+                            <span>Total Sales Tax</span>
+                            <span class="font-medium" x-text="'Rs. ' + totalSalesTax()"></span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm font-semibold text-gray-700 border-t border-gray-200 pt-2">
+                            <span>Grand Total</span>
+                            <span class="text-lg text-emerald-600" x-text="'Rs. ' + grandTotal()"></span>
+                        </div>
+                        <div x-show="parseFloat(wht_rate) > 0" x-cloak class="flex justify-between items-center text-sm text-red-600">
+                            <span>WHT Deduction (<span x-text="wht_rate"></span>%)</span>
+                            <span class="font-medium" x-text="'- Rs. ' + whtAmount()"></span>
+                        </div>
+                        <div x-show="parseFloat(wht_rate) > 0" x-cloak class="flex justify-between items-center text-sm font-bold text-emerald-700 border-t border-gray-200 pt-2">
+                            <span>Net Receivable</span>
+                            <span class="text-lg" x-text="'Rs. ' + netReceivable()"></span>
+                        </div>
                     </div>
                 </div>
 
@@ -266,6 +340,12 @@
                 reduced: 'Reduced Rate: SRO and Serial No required.',
             };
 
+            function detectRegType(ntn) {
+                if (!ntn) return 'Unregistered';
+                let clean = ntn.replace(/[^0-9]/g, '');
+                return clean.length >= 7 ? 'Registered' : 'Unregistered';
+            }
+
             function getScheduleRules(scheduleType, taxRate) {
                 switch (scheduleType) {
                     case 'standard':
@@ -289,6 +369,9 @@
             return {
                 buyer_name: @js($invoice->buyer_name),
                 buyer_ntn: @js($invoice->buyer_ntn),
+                document_type: @js($invoice->document_type ?? 'Sale Invoice'),
+                reference_invoice_number: @js($invoice->reference_invoice_number ?? ''),
+                wht_rate: @js($invoice->wht_rate ?? 0),
                 items: {!! json_encode($invoice->items->map(function($i) use ($standardTaxRate) {
                     $scheduleType = $i->schedule_type ?? 'standard';
                     $defaultRate = $standardTaxRate ?? 18;
@@ -308,6 +391,8 @@
                         'serial_no' => $i->serial_no ?? '',
                         'mrp' => $i->mrp ?? '',
                         'default_uom' => $i->default_uom ?? 'Numbers, pieces, units',
+                        'st_withheld_at_source' => (bool)($i->st_withheld_at_source ?? false),
+                        'petroleum_levy' => $i->petroleum_levy ?? '',
                         'requires_sro' => $rules['requires_sro'],
                         'requires_serial' => $rules['requires_serial'],
                         'requires_mrp' => $rules['requires_mrp'],
@@ -323,6 +408,10 @@
                 complianceResult: null,
                 complianceLoading: false,
                 scheduleError: '',
+
+                get buyerRegType() {
+                    return detectRegType(this.buyer_ntn);
+                },
 
                 applyScheduleRules(item) {
                     let rules = getScheduleRules(item.schedule_type, item.tax_rate);
@@ -343,6 +432,7 @@
                         quantity: 1, price: 0, tax_rate: companyStandardRate, tax: 0,
                         schedule_type: 'standard', sro_schedule_no: '', serial_no: '', mrp: '',
                         default_uom: 'Numbers, pieces, units',
+                        st_withheld_at_source: false, petroleum_levy: '',
                         requires_sro: false, requires_serial: false, requires_mrp: false,
                         optional_sro: false, optional_serial: false, schedule_hint: '',
                         productSearch: '', showDropdown: false, productResults: [], hsLookupInfo: ''
@@ -414,10 +504,27 @@
                     let item = this.items[index];
                     return ((parseFloat(item.price || 0) * parseFloat(item.quantity || 0)) + parseFloat(item.tax || 0)).toFixed(2);
                 },
-                grandTotal() {
+                onDocTypeChange() {},
+
+                totalExclST() {
                     return this.items.reduce((total, item) => {
-                        return total + (parseFloat(item.price || 0) * parseFloat(item.quantity || 0)) + parseFloat(item.tax || 0);
+                        return total + (parseFloat(item.price || 0) * parseFloat(item.quantity || 0));
                     }, 0).toFixed(2);
+                },
+                totalSalesTax() {
+                    return this.items.reduce((total, item) => {
+                        return total + parseFloat(item.tax || 0);
+                    }, 0).toFixed(2);
+                },
+                grandTotal() {
+                    return (parseFloat(this.totalExclST()) + parseFloat(this.totalSalesTax())).toFixed(2);
+                },
+                whtAmount() {
+                    let exclST = parseFloat(this.totalExclST());
+                    return (exclST * (parseFloat(this.wht_rate || 0) / 100)).toFixed(2);
+                },
+                netReceivable() {
+                    return (parseFloat(this.grandTotal()) - parseFloat(this.whtAmount())).toFixed(2);
                 },
 
                 async searchProducts(index) {

@@ -39,6 +39,19 @@ TaxNest is built on **Laravel 12** with **Breeze** for authentication, using **P
 - **Tax Override Management:** Full CRUD admin panel (`/tax-overrides`) with tabbed interface for sector, province, customer, and SRO rules. Role-based access: super_admin manages all rule types, company_admin manages customer-specific rules only. Company isolation enforced on all customer rule operations.
 - **Override Analytics:** Admin dashboard includes Tax Intelligence stats (active rules count, total/monthly usage). Enhanced override-logs page with dual-tab view for MIS overrides and tax intelligence usage with layer distribution breakdown.
 
+**FBR Excel Template + PRAL API Alignment (Feb 2026):**
+- **Document Types:** Support for Sale Invoice (default), Credit Note, and Debit Note with reference invoice tracking for CN/DN.
+- **Company-Wise Continuous Numbering:** `InvoiceNumberingService` generates `COMPANY_PREFIX-000001` format numbers using DB-level `lockForUpdate()` in transactions. No yearly/branch/environment resets. Fields: `invoice_number_prefix`, `next_invoice_number` on companies table.
+- **Province Mapping:** `supplier_province` (auto from branch/company), `destination_province` (user-selected). 8 Pakistan provinces/territories.
+- **WHT Calculations:** Manual `wht_rate` selection, `wht_amount = total_value_excluding_st × (wht_rate/100)`, `net_receivable = total_amount - wht_amount`. All displayed in create/edit/show/PDF views.
+- **Buyer Registration Type:** Auto-detected from NTN format (7+ digits = Registered, else Unregistered). Stored per invoice.
+- **Per-Item FBR Fields:** `st_withheld_at_source` (boolean), `petroleum_levy` (decimal) on invoice_items. Included in FBR payload.
+- **FBR Status Tracking:** Separate `fbr_status` field (pending/submitted/validated/failed) alongside existing `status` (Draft/Locked).
+- **Enhanced FBR Payload:** `document_type` mapping, `referenceInvoiceNo` for CN/DN, `st_withheld_at_source` and `petroleum_levy` per item, invoice-level supplier/destination provinces.
+- **Sandbox Test Panel:** 6 testing tools on FBR Settings page (Ping Endpoint, Validate Token, Test Payload Structure, Check Company Config, Dry Run Invoice, Province Mapping). Available only in Sandbox environment.
+- **Production Confirmation:** Switching to Production environment requires typing "CONFIRM" to prevent accidental switches.
+- **PDF Template:** Shows document type, WHT deduction, net receivable, SHA256 hash, buyer registration type, and province info.
+
 **FBR Compliance Hardening (Feb 2026):**
 - **Corrected FBR Payload Math:** `valueSalesExcludingST = quantity × unit_price`, `salesTaxApplicable = valueSalesExcludingST × (taxRate/100)`, `totalValues = valueSalesExcludingST + salesTaxApplicable`. Previously used unit_price only.
 - **Dynamic Company Fields in Payload:** Seller province, business name, NTN, buyer registration type all sourced from company settings (no more hardcoded "Sindh"/"Karachi"). Buyer registration type auto-detected from NTN format.

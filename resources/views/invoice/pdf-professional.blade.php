@@ -72,7 +72,7 @@
         <div class="fbr-header">
             <div class="fbr-header-title">FBR VERIFIED INVOICE</div>
             <div class="fbr-header-sub">Federal Board of Revenue &mdash; Government of Pakistan</div>
-            <div class="fbr-number">FBR Invoice #: {{ $invoice->fbr_invoice_id }}</div>
+            <div class="fbr-number">FBR Invoice #: {{ $invoice->fbr_invoice_number ?? $invoice->fbr_invoice_id }}</div>
         </div>
         @endif
 
@@ -93,7 +93,7 @@
                         @endif
                     </td>
                     <td style="width: 40%; vertical-align: top; text-align: right;">
-                        <div class="invoice-title">INVOICE</div>
+                        <div class="invoice-title">{{ strtoupper($invoice->document_type ?? 'INVOICE') }}</div>
                         <div class="invoice-meta">#{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</div>
 @if($invoice->fbr_invoice_number)
 <div class="invoice-meta" style="color: #059669; font-weight: bold;">FBR: {{ $invoice->fbr_invoice_number }}</div>
@@ -114,6 +114,12 @@
                         <div class="info-label">Bill To</div>
                         <div class="info-value"><strong>{{ $invoice->buyer_name }}</strong></div>
                         <div class="info-value">NTN: {{ $invoice->buyer_ntn }}</div>
+                        @if($invoice->buyer_registration_type)
+                        <div class="info-value">Registration: <strong>{{ $invoice->buyer_registration_type }}</strong></div>
+                        @endif
+                        @if($invoice->destination_province)
+                        <div class="info-value">Destination: <strong>{{ $invoice->destination_province }}</strong></div>
+                        @endif
                     </div>
                 </td>
                 <td style="padding-left: 10px;">
@@ -124,6 +130,15 @@
 <div class="info-value">FBR #: <strong style="color: #059669;">{{ $invoice->fbr_invoice_number }}</strong></div>
 @endif
                         <div class="info-value">Date: <strong>{{ $invoice->created_at->format('d M Y') }}</strong></div>
+                        @if($invoice->document_type && $invoice->document_type !== 'Sale Invoice')
+                        <div class="info-value">Type: <strong style="color: #d97706;">{{ $invoice->document_type }}</strong></div>
+                        @endif
+                        @if($invoice->reference_invoice_number)
+                        <div class="info-value">Ref Invoice: <strong>{{ $invoice->reference_invoice_number }}</strong></div>
+                        @endif
+                        @if($invoice->supplier_province)
+                        <div class="info-value">From: <strong>{{ $invoice->supplier_province }}</strong></div>
+                        @endif
                         @if($invoice->submission_mode)
                         <div class="info-value">Mode: <strong>{{ ucfirst($invoice->submission_mode) }}</strong></div>
                         @endif
@@ -176,12 +191,12 @@
                         <td class="value">Rs. {{ number_format($invoice->total_amount, 2) }}</td>
                     </tr>
                     <tr>
-                        <td class="label">WHT (if applicable)</td>
-                        <td class="value">Rs. 0.00</td>
+                        <td class="label">WHT {{ $invoice->wht_rate ? '(' . $invoice->wht_rate . '%)' : '' }}</td>
+                        <td class="value">Rs. {{ number_format($invoice->wht_amount ?? 0, 2) }}</td>
                     </tr>
                     <tr class="net">
                         <td class="label" style="font-weight: 800;">Net Receivable</td>
-                        <td class="value" style="font-weight: 800; color: #059669;">Rs. {{ number_format($invoice->total_amount, 2) }}</td>
+                        <td class="value" style="font-weight: 800; color: #059669;">Rs. {{ number_format($invoice->net_receivable ?? $invoice->total_amount, 2) }}</td>
                     </tr>
                 </table>
             </div>
@@ -204,7 +219,7 @@
                 <tr><td class="qlabel">Total</td><td class="qvalue">Rs. {{ number_format($qrInfo['total'] ?? 0, 2) }}</td></tr>
             </table>
             @if($invoice->integrity_hash)
-            <div class="hash-bar">Integrity Hash: {{ $invoice->integrity_hash }}</div>
+            <div class="hash-bar">SHA256 Hash: {{ $invoice->integrity_hash }}</div>
             @endif
         </div>
         @endif

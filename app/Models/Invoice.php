@@ -13,10 +13,17 @@ class Invoice extends Model
         'fbr_invoice_number',
         'fbr_submission_date',
         'status',
+        'fbr_status',
         'integrity_hash',
         'buyer_name',
         'buyer_ntn',
+        'buyer_registration_type',
         'total_amount',
+        'total_value_excluding_st',
+        'total_sales_tax',
+        'wht_rate',
+        'wht_amount',
+        'net_receivable',
         'override_reason',
         'override_by',
         'submission_mode',
@@ -24,10 +31,20 @@ class Invoice extends Model
         'qr_data',
         'share_uuid',
         'branch_id',
+        'document_type',
+        'reference_invoice_number',
+        'supplier_province',
+        'destination_province',
+        'invoice_date',
     ];
 
     protected $casts = [
         'fbr_submission_date' => 'datetime',
+        'total_value_excluding_st' => 'float',
+        'total_sales_tax' => 'float',
+        'wht_rate' => 'float',
+        'wht_amount' => 'float',
+        'net_receivable' => 'float',
     ];
 
     public function getDisplayInvoiceNumberAttribute()

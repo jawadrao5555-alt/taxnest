@@ -123,6 +123,15 @@
                                 @endif">
                                 {{ ucfirst($invoice->status) }}
                             </span>
+                            @if($invoice->fbr_status)
+                            <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ml-2
+                                @if($invoice->fbr_status === 'submitted') bg-blue-100 text-blue-800
+                                @elseif($invoice->fbr_status === 'validated') bg-emerald-100 text-emerald-800
+                                @elseif($invoice->fbr_status === 'failed') bg-red-100 text-red-800
+                                @else bg-gray-100 text-gray-800 @endif">
+                                FBR: {{ ucfirst($invoice->fbr_status) }}
+                            </span>
+                            @endif
                             @if($invoice->status === 'locked' && $invoice->integrity_hash)
                             <p class="text-xs text-green-600 mt-1">SHA256 Protected</p>
                             @endif
@@ -134,6 +143,10 @@
                             <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Buyer Details</h4>
                             <p class="text-sm font-semibold text-gray-900">{{ $invoice->buyer_name }}</p>
                             <p class="text-sm text-gray-600">NTN: {{ $invoice->buyer_ntn }}</p>
+                            <p class="text-sm text-gray-600">Registration: <span class="font-medium {{ $invoice->buyer_registration_type === 'Registered' ? 'text-green-700' : 'text-gray-600' }}">{{ $invoice->buyer_registration_type ?? 'N/A' }}</span></p>
+                            @if($invoice->destination_province)
+                            <p class="text-sm text-gray-600">Destination: {{ $invoice->destination_province }}</p>
+                            @endif
                         </div>
                         <div class="bg-gray-50 rounded-lg p-4">
                             <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Invoice Details</h4>
@@ -147,6 +160,15 @@
                             <p class="text-sm text-gray-600">Date: <span class="font-semibold text-gray-900">{{ $invoice->created_at->format('d M Y') }}</span></p>
                             @if($invoice->branch)
                             <p class="text-sm text-gray-600">Branch: <span class="font-semibold text-gray-900">{{ $invoice->branch->name }}</span></p>
+                            @endif
+                            @if($invoice->document_type && $invoice->document_type !== 'Sale Invoice')
+                            <p class="text-sm text-gray-600">Type: <span class="font-semibold text-amber-700">{{ $invoice->document_type }}</span></p>
+                            @endif
+                            @if($invoice->reference_invoice_number)
+                            <p class="text-sm text-gray-600">Ref Invoice: <span class="font-semibold text-gray-900">{{ $invoice->reference_invoice_number }}</span></p>
+                            @endif
+                            @if($invoice->supplier_province)
+                            <p class="text-sm text-gray-600">Supplier Province: <span class="font-semibold text-gray-900">{{ $invoice->supplier_province }}</span></p>
                             @endif
                             @if($invoice->integrity_hash)
                             <p class="text-xs text-gray-400 mt-2 font-mono break-all">Hash: {{ $invoice->integrity_hash }}</p>
@@ -165,6 +187,8 @@
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qty</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Price</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tax</th>
+                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">ST WHT</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Pet. Levy</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
                             </tr>
                         </thead>
@@ -177,15 +201,37 @@
                                 <td class="px-6 py-4 text-sm text-gray-700 text-right">{{ $item->quantity }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-700 text-right">Rs. {{ number_format($item->price, 2) }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-700 text-right">Rs. {{ number_format($item->tax, 2) }}</td>
+                                <td class="px-6 py-4 text-sm text-center">
+                                    @if($item->st_withheld_at_source) <span class="text-emerald-600 font-medium">Yes</span> @else <span class="text-gray-400">—</span> @endif
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-700 text-right">{{ $item->petroleum_levy ? 'Rs. ' . number_format($item->petroleum_levy, 2) : '—' }}</td>
                                 <td class="px-6 py-4 text-sm font-semibold text-gray-900 text-right">Rs. {{ number_format(($item->price * $item->quantity) + $item->tax, 2) }}</td>
                             </tr>
                             @endforeach
                         </tbody>
                         <tfoot class="bg-gray-50">
                             <tr>
-                                <td colspan="6" class="px-6 py-4 text-right text-sm font-bold text-gray-700 uppercase">Grand Total</td>
-                                <td class="px-6 py-4 text-right text-lg font-bold text-emerald-600">Rs. {{ number_format($invoice->total_amount, 2) }}</td>
+                                <td colspan="7" class="px-6 py-3 text-right text-sm text-gray-600">Value Excl. ST</td>
+                                <td class="px-6 py-3 text-right text-sm font-semibold text-gray-800">Rs. {{ number_format($invoice->total_value_excluding_st ?? ($invoice->total_amount - $invoice->items->sum('tax')), 2) }}</td>
                             </tr>
+                            <tr>
+                                <td colspan="7" class="px-6 py-3 text-right text-sm text-gray-600">Total Sales Tax</td>
+                                <td class="px-6 py-3 text-right text-sm font-semibold text-gray-800">Rs. {{ number_format($invoice->total_sales_tax ?? $invoice->items->sum('tax'), 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="7" class="px-6 py-3 text-right text-sm font-bold text-gray-700 uppercase border-t-2 border-emerald-500">Grand Total</td>
+                                <td class="px-6 py-3 text-right text-lg font-bold text-emerald-600 border-t-2 border-emerald-500">Rs. {{ number_format($invoice->total_amount, 2) }}</td>
+                            </tr>
+                            @if($invoice->wht_rate > 0)
+                            <tr>
+                                <td colspan="7" class="px-6 py-2 text-right text-sm text-red-600">WHT Deduction ({{ $invoice->wht_rate }}%)</td>
+                                <td class="px-6 py-2 text-right text-sm font-semibold text-red-600">- Rs. {{ number_format($invoice->wht_amount ?? 0, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="7" class="px-6 py-3 text-right text-sm font-bold text-emerald-700">Net Receivable</td>
+                                <td class="px-6 py-3 text-right text-lg font-bold text-emerald-700">Rs. {{ number_format($invoice->net_receivable ?? $invoice->total_amount, 2) }}</td>
+                            </tr>
+                            @endif
                         </tfoot>
                     </table>
                 </div>

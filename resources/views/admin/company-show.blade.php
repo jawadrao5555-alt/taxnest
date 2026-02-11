@@ -6,11 +6,12 @@
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                 </a>
                 <h2 class="font-bold text-xl text-gray-800 leading-tight">{{ $company->name }}</h2>
+                <span class="text-xs font-medium text-gray-400">VIEW ONLY</span>
             </div>
         </div>
     </x-slot>
 
-    <div class="py-8" x-data="{ activeTab: 'users' }">
+    <div class="py-8" x-data="{ activeTab: 'overview' }">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
             @if(session('success'))
@@ -18,10 +19,23 @@
             @endif
 
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
-                @if($company->suspended_at)
+                @if($company->company_status === 'pending')
+                <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between">
+                    <span class="text-sm text-amber-700 font-medium">This company is pending approval</span>
+                    <div class="flex items-center gap-2">
+                        <form method="POST" action="/admin/company/{{ $company->id }}/approve">@csrf<button type="submit" class="text-xs px-3 py-1 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">Approve</button></form>
+                        <form method="POST" action="/admin/company/{{ $company->id }}/reject" onsubmit="return confirm('Are you sure you want to reject this company?')">@csrf<button type="submit" class="text-xs px-3 py-1 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700">Reject</button></form>
+                    </div>
+                </div>
+                @elseif($company->company_status === 'suspended')
                 <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
-                    <span class="text-sm text-red-700 font-medium">This company is suspended (since {{ $company->suspended_at->format('d M Y') }})</span>
+                    <span class="text-sm text-red-700 font-medium">This company is suspended{{ $company->suspended_at ? ' (since ' . $company->suspended_at->format('d M Y') . ')' : '' }}</span>
                     <form method="POST" action="/admin/company/{{ $company->id }}/suspend">@csrf<button type="submit" class="text-xs px-3 py-1 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">Unsuspend</button></form>
+                </div>
+                @elseif($company->company_status === 'rejected')
+                <div class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-between">
+                    <span class="text-sm text-gray-700 font-medium">This company registration was rejected</span>
+                    <form method="POST" action="/admin/company/{{ $company->id }}/approve">@csrf<button type="submit" class="text-xs px-3 py-1 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">Approve</button></form>
                 </div>
                 @endif
 
@@ -35,8 +49,13 @@
                         <p class="text-sm font-mono font-bold text-gray-900 mt-1">{{ $company->ntn }}</p>
                     </div>
                     <div>
-                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">FBR Environment</p>
-                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium mt-1 {{ $company->fbr_environment === 'production' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800' }}">{{ ucfirst($company->fbr_environment ?? 'sandbox') }}</span>
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Status</p>
+                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium mt-1
+                            @if($company->company_status === 'active') bg-green-100 text-green-800
+                            @elseif($company->company_status === 'pending') bg-amber-100 text-amber-800
+                            @elseif($company->company_status === 'suspended') bg-red-100 text-red-800
+                            @else bg-gray-100 text-gray-800
+                            @endif">{{ ucfirst($company->company_status ?? 'unknown') }}</span>
                     </div>
                     <div>
                         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Active Plan</p>
@@ -49,7 +68,7 @@
                 </div>
 
                 <div class="mt-6 pt-4 border-t border-gray-100 flex flex-wrap items-center gap-3">
-                    @if(!$company->suspended_at)
+                    @if($company->company_status === 'active')
                     <form method="POST" action="/admin/company/{{ $company->id }}/suspend" onsubmit="return confirm('Are you sure you want to suspend this company?')">
                         @csrf
                         <button type="submit" class="px-4 py-2 bg-red-600 text-white text-sm rounded-lg font-medium hover:bg-red-700 transition">Suspend Company</button>
@@ -69,111 +88,145 @@
                         </form>
                     </div>
                 </div>
+            </div>
 
-                <div class="grid grid-cols-2 md:grid-cols-5 gap-6 mt-6 pt-6 border-t border-gray-100">
-                    <div class="bg-gray-50 rounded-xl p-4 text-center">
-                        <p class="text-2xl font-extrabold text-gray-900">{{ $stats['total_users'] }}</p>
-                        <p class="text-xs font-medium text-gray-500 mt-1">Total Users</p>
+            <div class="mb-6 flex space-x-1 bg-gray-100 rounded-xl p-1">
+                <button @click="activeTab = 'overview'" :class="activeTab === 'overview' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'" class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition">Overview</button>
+                <button @click="activeTab = 'financial'" :class="activeTab === 'financial' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'" class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition">Financial</button>
+                <button @click="activeTab = 'compliance'" :class="activeTab === 'compliance' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'" class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition">Compliance</button>
+                <button @click="activeTab = 'activity'" :class="activeTab === 'activity' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'" class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition">Activity</button>
+            </div>
+
+            <div x-show="activeTab === 'overview'" class="space-y-6">
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+                        <p class="text-2xl font-extrabold text-blue-600">{{ $activePlan ?? 'None' }}</p>
+                        <p class="text-xs font-medium text-gray-500 mt-1">Plan</p>
                     </div>
-                    <div class="bg-gray-50 rounded-xl p-4 text-center">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+                        <p class="text-2xl font-extrabold text-gray-900">{{ $stats['total_users'] }}</p>
+                        <p class="text-xs font-medium text-gray-500 mt-1">Users</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+                        <p class="text-2xl font-extrabold text-gray-900">{{ $stats['total_branches'] }}</p>
+                        <p class="text-xs font-medium text-gray-500 mt-1">Branches</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
                         <p class="text-2xl font-extrabold text-gray-900">{{ $stats['total_invoices'] }}</p>
                         <p class="text-xs font-medium text-gray-500 mt-1">Total Invoices</p>
                     </div>
-                    <div class="bg-emerald-50 rounded-xl p-4 text-center">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
                         <p class="text-2xl font-extrabold text-emerald-600">{{ $stats['locked'] }}</p>
                         <p class="text-xs font-medium text-gray-500 mt-1">Locked</p>
                     </div>
-                    <div class="bg-gray-50 rounded-xl p-4 text-center">
-                        <p class="text-2xl font-extrabold text-gray-500">{{ $stats['draft'] }}</p>
-                        <p class="text-xs font-medium text-gray-500 mt-1">Draft</p>
-                    </div>
-                    <div class="bg-red-50 rounded-xl p-4 text-center">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
                         <p class="text-2xl font-extrabold text-red-600">{{ $stats['failed'] }}</p>
                         <p class="text-xs font-medium text-gray-500 mt-1">Failed</p>
                     </div>
                 </div>
-            </div>
 
-            <div class="mb-6 flex space-x-1 bg-gray-100 rounded-xl p-1">
-                <button @click="activeTab = 'users'" :class="activeTab === 'users' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'" class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition">Users</button>
-                <button @click="activeTab = 'invoices'" :class="activeTab === 'invoices' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'" class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition">Invoices</button>
-                <button @click="activeTab = 'compliance'" :class="activeTab === 'compliance' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'" class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition">Compliance</button>
-                <button @click="activeTab = 'activity'" :class="activeTab === 'activity' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'" class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition">Activity Logs</button>
-            </div>
-
-            <div x-show="activeTab === 'users'" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Invoices</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        @forelse($users as $user)
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $user->name }}</td>
-                            <td class="px-6 py-4 text-sm text-gray-600">{{ $user->email }}</td>
-                            <td class="px-6 py-4">
-                                <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold
-                                    @if($user->role === 'company_admin') bg-blue-100 text-blue-800
-                                    @elseif($user->role === 'employee') bg-gray-100 text-gray-700
-                                    @else bg-purple-100 text-purple-800
-                                    @endif">{{ str_replace('_', ' ', ucfirst($user->role)) }}</span>
-                            </td>
-                            <td class="px-6 py-4 text-sm font-semibold text-gray-900 text-right">{{ $user->user_invoice_count }}</td>
-                        </tr>
-                        @empty
-                        <tr><td colspan="4" class="px-6 py-8 text-center text-gray-400">No users found</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            <div x-show="activeTab === 'invoices'" x-data="{ filter: 'all' }" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-100 flex items-center space-x-2">
-                    <button @click="filter = 'all'" :class="filter === 'all' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'" class="px-3 py-1.5 rounded-lg text-xs font-bold transition">All ({{ $stats['total_invoices'] }})</button>
-                    <button @click="filter = 'draft'" :class="filter === 'draft' ? 'bg-gray-200 text-gray-800' : 'bg-gray-100 text-gray-600'" class="px-3 py-1.5 rounded-lg text-xs font-bold transition">Draft ({{ $stats['draft'] }})</button>
-                    <button @click="filter = 'locked'" :class="filter === 'locked' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'" class="px-3 py-1.5 rounded-lg text-xs font-bold transition">Locked ({{ $stats['locked'] }})</button>
-                    <button @click="filter = 'failed'" :class="filter === 'failed' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'" class="px-3 py-1.5 rounded-lg text-xs font-bold transition">Failed ({{ $stats['failed'] }})</button>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Draft Invoices</p>
+                        <p class="text-3xl font-extrabold text-gray-500">{{ $stats['draft'] }}</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">FBR Environment</p>
+                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $company->fbr_environment === 'production' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800' }}">{{ ucfirst($company->fbr_environment ?? 'sandbox') }}</span>
+                    </div>
                 </div>
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice #</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Buyer</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Date</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        @forelse($invoices as $inv)
-                        <tr class="hover:bg-gray-50" x-show="filter === 'all' || filter === '{{ $inv->status }}' || (filter === 'failed' && '{{ $inv->status }}' === 'failed')">
-                            <td class="px-6 py-4 text-sm font-mono font-medium text-gray-900">{{ $inv->invoice_number ?? 'INV-'.$inv->id }}</td>
-                            <td class="px-6 py-4 text-sm text-gray-700">{{ $inv->buyer_name }}</td>
-                            <td class="px-6 py-4">
-                                <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold
-                                    @if($inv->status === 'draft') bg-gray-200 text-gray-700
-                                    @elseif($inv->status === 'locked') bg-green-100 text-green-800
-                                    @elseif($inv->status === 'submitted') bg-blue-100 text-blue-800
-                                    @else bg-red-100 text-red-800
-                                    @endif">{{ ucfirst($inv->status) }}</span>
-                            </td>
-                            <td class="px-6 py-4 text-sm font-semibold text-gray-900 text-right">Rs. {{ number_format($inv->total_amount, 2) }}</td>
-                            <td class="px-6 py-4 text-sm text-gray-500 text-right">{{ $inv->created_at->format('d M Y') }}</td>
-                        </tr>
-                        @empty
-                        <tr><td colspan="5" class="px-6 py-8 text-center text-gray-400">No invoices found</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100">
+                        <h4 class="text-sm font-bold text-gray-800">Users ({{ $stats['total_users'] }})</h4>
+                    </div>
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Invoices</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            @forelse($users as $user)
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $user->name }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-600">{{ $user->email }}</td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold
+                                        @if($user->role === 'company_admin') bg-blue-100 text-blue-800
+                                        @elseif($user->role === 'employee') bg-gray-100 text-gray-700
+                                        @else bg-purple-100 text-purple-800
+                                        @endif">{{ str_replace('_', ' ', ucfirst($user->role)) }}</span>
+                                </td>
+                                <td class="px-6 py-4 text-sm font-semibold text-gray-900 text-right">{{ $user->user_invoice_count }}</td>
+                            </tr>
+                            @empty
+                            <tr><td colspan="4" class="px-6 py-8 text-center text-gray-400">No users found</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div x-show="activeTab === 'financial'" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Total Invoiced Amount</p>
+                        <p class="text-3xl font-extrabold text-emerald-600">Rs. {{ number_format($financial['total_invoiced'], 2) }}</p>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Total Tax Collected</p>
+                        <p class="text-3xl font-extrabold text-orange-600">Rs. {{ number_format($financial['total_tax'], 2) }}</p>
+                        @if($financial['tax_rate_summary']->count() > 0)
+                        <div class="mt-3 space-y-1">
+                            @foreach($financial['tax_rate_summary'] as $item)
+                            <div class="flex justify-between text-xs">
+                                <span class="text-gray-500">Rate {{ $item->tax_rate }}%</span>
+                                <span class="font-medium text-gray-700">{{ $item->count }} items (Rs. {{ number_format($item->total_tax) }})</span>
+                            </div>
+                            @endforeach
+                        </div>
+                        @else
+                        <p class="text-xs text-gray-400 mt-2">No tax data recorded</p>
+                        @endif
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Outstanding Balance</p>
+                        <p class="text-3xl font-extrabold {{ $financial['outstanding'] > 0 ? 'text-red-600' : 'text-gray-900' }}">Rs. {{ number_format($financial['outstanding'], 2) }}</p>
+                        <p class="text-xs text-gray-400 mt-2">Sum of last customer ledger balances</p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100">
+                        <h4 class="text-sm font-bold text-gray-800">Monthly Revenue (Last 6 Months)</h4>
+                    </div>
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Month</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Invoices</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Revenue</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            @foreach($financial['monthly_revenue'] as $mr)
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-3 text-sm font-medium text-gray-900">{{ $mr['month'] }}</td>
+                                <td class="px-6 py-3 text-sm text-gray-700 text-right">{{ $mr['count'] }}</td>
+                                <td class="px-6 py-3 text-sm font-semibold text-gray-900 text-right">Rs. {{ number_format($mr['revenue'], 2) }}</td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <div x-show="activeTab === 'compliance'" class="space-y-6">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Avg Compliance Score</p>
                         <p class="text-3xl font-extrabold {{ ($compliance['avg_score'] ?? 0) >= 70 ? 'text-emerald-600' : (($compliance['avg_score'] ?? 0) >= 40 ? 'text-orange-600' : 'text-red-600') }}">{{ number_format($compliance['avg_score'] ?? 0, 1) }}</p>
@@ -185,6 +238,10 @@
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Total Reports</p>
                         <p class="text-3xl font-extrabold text-gray-900">{{ $compliance['total_reports'] ?? 0 }}</p>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Failed Submissions</p>
+                        <p class="text-3xl font-extrabold text-red-600">{{ $compliance['failed_submissions'] ?? 0 }}</p>
                     </div>
                 </div>
 

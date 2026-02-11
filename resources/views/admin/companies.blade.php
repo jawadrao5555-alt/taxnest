@@ -31,10 +31,14 @@
                             <td class="px-6 py-4 text-sm font-medium text-emerald-700 hover:text-emerald-900"><a href="/admin/company/{{ $company->id }}">{{ $company->name }}</a></td>
                             <td class="px-6 py-4 text-sm font-mono text-gray-600">{{ $company->ntn }}</td>
                             <td class="px-6 py-4">
-                                @if($company->suspended_at)
-                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Suspended</span>
-                                @else
+                                @if($company->company_status === 'pending')
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Pending</span>
+                                @elseif($company->company_status === 'active')
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
+                                @elseif($company->company_status === 'suspended')
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Suspended</span>
+                                @elseif($company->company_status === 'rejected')
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Rejected</span>
                                 @endif
                             </td>
                             <td class="px-6 py-4">

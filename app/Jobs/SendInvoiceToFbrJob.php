@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Invoice;
 use App\Models\FbrLog;
+use App\Models\CustomerLedger;
 use App\Services\FbrService;
 use App\Services\InvoiceActivityService;
 use App\Services\IntegrityHashService;
@@ -54,6 +55,27 @@ class SendInvoiceToFbrJob implements ShouldQueue
                 'locked',
                 ['fbr_invoice_number' => $response['fbr_invoice_number'] ?? null]
             );
+
+            $lastEntry = CustomerLedger::where('company_id', $invoice->company_id)
+                ->where('customer_ntn', $invoice->buyer_ntn)
+                ->orderBy('id', 'desc')
+                ->first();
+            $lastBalance = $lastEntry ? $lastEntry->balance_after : 0;
+            $newBalance = $lastBalance + $invoice->total_amount;
+
+            CustomerLedger::create([
+                'company_id' => $invoice->company_id,
+                'customer_name' => $invoice->buyer_name,
+                'customer_ntn' => $invoice->buyer_ntn,
+                'invoice_id' => $invoice->id,
+                'debit' => $invoice->total_amount,
+                'credit' => 0,
+                'balance_after' => $newBalance,
+                'type' => 'invoice',
+                'notes' => 'Invoice ' . $invoice->invoice_number . ' locked',
+            ]);
+
+            $invoice->company->update(['last_successful_submission' => now()]);
 
             ComplianceScoreService::recalculate($invoice->company_id);
         } else {

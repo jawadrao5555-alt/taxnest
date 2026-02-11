@@ -202,6 +202,35 @@ class DashboardController extends Controller
             ->take(10)
             ->get();
 
+        $topCustomers = Invoice::where('company_id', $companyId)
+            ->select('buyer_ntn', 'buyer_name', DB::raw('SUM(total_amount) as total_amount'), DB::raw('COUNT(*) as invoice_count'))
+            ->groupBy('buyer_ntn', 'buyer_name')
+            ->orderByDesc('total_amount')
+            ->take(5)
+            ->get();
+
+        $branchComparison = Invoice::where('invoices.company_id', $companyId)
+            ->leftJoin('branches', 'invoices.branch_id', '=', 'branches.id')
+            ->select(
+                DB::raw("COALESCE(branches.name, 'Unassigned') as branch_name"),
+                DB::raw('COUNT(invoices.id) as invoice_count'),
+                DB::raw('SUM(invoices.total_amount) as total_revenue')
+            )
+            ->groupBy('branches.name')
+            ->orderByDesc('total_revenue')
+            ->get();
+
+        $compliancePercent = $totalInvoices > 0 ? round(($lockedCount / $totalInvoices) * 100, 1) : 0;
+        $avgInvoiceValue = $totalInvoices > 0 ? round($totalRevenue / $totalInvoices, 2) : 0;
+        $failedFbrLogs = FbrLog::whereIn('invoice_id', $invoiceIds)->where('status', 'failed')->count();
+        $rejectionRate = $totalFbrLogs > 0 ? round(($failedFbrLogs / $totalFbrLogs) * 100, 1) : 0;
+
+        $kpis = [
+            'compliance_percent' => $compliancePercent,
+            'avg_invoice_value' => $avgInvoiceValue,
+            'rejection_rate' => $rejectionRate,
+        ];
+
         return view('dashboard', compact(
             'company', 'totalInvoices', 'draftCount', 'submittedCount', 'lockedCount',
             'totalRevenue', 'subscription', 'invoiceLimit', 'invoicesUsed',
@@ -211,7 +240,8 @@ class DashboardController extends Controller
             'complianceTrend', 'recentActivity', 'smartInsights', 'recentAnomalies',
             'notifications', 'industryBenchmark', 'trialInfo',
             'vendorRisks', 'auditProbability', 'recentReports',
-            'momGrowth', 'taxVariance', 'hsRiskData'
+            'momGrowth', 'taxVariance', 'hsRiskData',
+            'topCustomers', 'branchComparison', 'kpis'
         ));
     }
 }

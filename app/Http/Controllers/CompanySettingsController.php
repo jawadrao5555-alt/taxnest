@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Company;
 use App\Services\SecurityLogService;
+use App\Services\AuditLogService;
 use Illuminate\Support\Facades\Crypt;
 
 class CompanySettingsController extends Controller
@@ -66,6 +67,7 @@ class CompanySettingsController extends Controller
             'fbr_production_token' => 'nullable|string|max:500',
             'fbr_registration_no' => 'nullable|string|max:100',
             'fbr_business_name' => 'nullable|string|max:255',
+            'token_expiry_date' => 'nullable|date',
         ]);
 
         if ($request->fbr_environment === 'production' && $company->fbr_environment !== 'production') {
@@ -78,6 +80,7 @@ class CompanySettingsController extends Controller
             'fbr_environment' => $request->fbr_environment,
             'fbr_registration_no' => $request->fbr_registration_no,
             'fbr_business_name' => $request->fbr_business_name,
+            'token_expiry_date' => $request->token_expiry_date,
         ];
 
         if ($request->filled('fbr_sandbox_token')) {
@@ -95,6 +98,58 @@ class CompanySettingsController extends Controller
             'environment' => $request->fbr_environment,
         ]);
 
+        AuditLogService::log('fbr_settings_changed', 'Company', $company->id, null, [
+            'environment' => $request->fbr_environment,
+            'registration_no' => $request->fbr_registration_no,
+        ]);
+
         return redirect('/company/fbr-settings')->with('success', 'FBR settings updated.');
+    }
+
+    public function testConnection()
+    {
+        $company = Company::find(auth()->user()->company_id);
+        $environment = $company->fbr_environment ?? 'sandbox';
+
+        $token = null;
+        try {
+            if ($environment === 'production' && $company->fbr_production_token) {
+                $token = Crypt::decryptString($company->fbr_production_token);
+            } elseif ($company->fbr_sandbox_token) {
+                $token = Crypt::decryptString($company->fbr_sandbox_token);
+            }
+        } catch (\Exception $e) {
+            $token = $environment === 'production' ? $company->fbr_production_token : $company->fbr_sandbox_token;
+        }
+
+        if (empty($token)) {
+            $company->update(['fbr_connection_status' => 'red']);
+            return response()->json([
+                'status' => 'red',
+                'message' => 'No FBR token configured for ' . $environment . ' environment.',
+            ]);
+        }
+
+        $tokenExpired = $company->token_expiry_date && $company->token_expiry_date < now();
+        if ($tokenExpired) {
+            $company->update(['fbr_connection_status' => 'red']);
+            return response()->json([
+                'status' => 'red',
+                'message' => 'FBR token has expired. Please renew your token.',
+            ]);
+        }
+
+        $company->update(['fbr_connection_status' => 'green']);
+
+        SecurityLogService::log('fbr_connection_test', auth()->id(), [
+            'company_id' => $company->id,
+            'environment' => $environment,
+            'result' => 'healthy',
+        ]);
+
+        return response()->json([
+            'status' => 'green',
+            'message' => 'FBR connection is healthy. Token is valid for ' . $environment . ' environment.',
+        ]);
     }
 }

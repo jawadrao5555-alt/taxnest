@@ -6,6 +6,23 @@
     <div class="py-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
+            @if($pendingCompanies > 0)
+            <div class="mb-8">
+                <a href="/admin/companies/pending" class="block bg-amber-50 rounded-xl shadow-sm border-2 border-amber-300 p-6 hover:bg-amber-100 transition">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-bold text-amber-700 uppercase tracking-wider">Pending Approvals</p>
+                            <p class="text-4xl font-extrabold text-amber-600 mt-2">{{ $pendingCompanies }}</p>
+                            <p class="text-sm text-amber-600 mt-1">Companies awaiting approval</p>
+                        </div>
+                        <div class="p-4 bg-amber-200 rounded-xl">
+                            <svg class="w-8 h-8 text-amber-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            @endif
+
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                     <div class="flex items-center justify-between">

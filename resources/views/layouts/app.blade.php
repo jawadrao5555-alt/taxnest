@@ -18,6 +18,20 @@
         <div class="min-h-screen bg-gray-50">
             @include('layouts.navigation')
 
+            @if(auth()->check() && auth()->user()->company_id)
+                @php $currentCompany = \App\Models\Company::find(auth()->user()->company_id); @endphp
+                @if($currentCompany && $currentCompany->company_status === 'pending')
+                <div class="bg-amber-500 text-white text-center py-2 px-4 text-sm font-medium">
+                    Your company registration is pending approval. Some features may be limited.
+                </div>
+                @endif
+                @if($currentCompany && $currentCompany->company_status === 'suspended')
+                <div class="bg-red-600 text-white text-center py-2 px-4 text-sm font-medium">
+                    Your company has been suspended. Please contact support.
+                </div>
+                @endif
+            @endif
+
             @isset($header)
                 <header class="bg-white shadow-sm border-b border-gray-200">
                     <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">

@@ -352,6 +352,101 @@
             </div>
             @endif
 
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">Compliance %</p>
+                            <p class="text-3xl font-bold mt-1 {{ $kpis['compliance_percent'] >= 70 ? 'text-emerald-600' : ($kpis['compliance_percent'] >= 40 ? 'text-orange-600' : 'text-red-600') }}">{{ $kpis['compliance_percent'] }}%</p>
+                        </div>
+                        <div class="p-3 bg-emerald-50 rounded-lg">
+                            <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2">Locked / Total Invoices</p>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">Avg Invoice Value</p>
+                            <p class="text-3xl font-bold text-gray-900 mt-1">Rs. {{ number_format($kpis['avg_invoice_value']) }}</p>
+                        </div>
+                        <div class="p-3 bg-blue-50 rounded-lg">
+                            <svg class="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2">Average total_amount per invoice</p>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">Rejection Rate</p>
+                            <p class="text-3xl font-bold mt-1 {{ $kpis['rejection_rate'] <= 10 ? 'text-emerald-600' : ($kpis['rejection_rate'] <= 30 ? 'text-orange-600' : 'text-red-600') }}">{{ $kpis['rejection_rate'] }}%</p>
+                        </div>
+                        <div class="p-3 bg-red-50 rounded-lg">
+                            <svg class="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2">Failed FBR submissions / Total</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                @if($topCustomers->count() > 0)
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+                    <div class="px-6 py-4 border-b border-gray-100">
+                        <h3 class="text-lg font-semibold text-gray-800">Top 5 Customers</h3>
+                    </div>
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">NTN</th>
+                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Invoices</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            @foreach($topCustomers as $cust)
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ $cust->buyer_name }}</td>
+                                <td class="px-4 py-2 text-sm font-mono text-gray-600">{{ $cust->buyer_ntn }}</td>
+                                <td class="px-4 py-2 text-sm font-semibold text-emerald-600 text-right">Rs. {{ number_format($cust->total_amount) }}</td>
+                                <td class="px-4 py-2 text-sm text-gray-700 text-right">{{ $cust->invoice_count }}</td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                @endif
+
+                @if($branchComparison->count() > 0)
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+                    <div class="px-6 py-4 border-b border-gray-100">
+                        <h3 class="text-lg font-semibold text-gray-800">Branch Comparison</h3>
+                    </div>
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Branch</th>
+                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Invoices</th>
+                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Revenue</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            @foreach($branchComparison as $branch)
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ $branch->branch_name }}</td>
+                                <td class="px-4 py-2 text-sm text-gray-700 text-right">{{ $branch->invoice_count }}</td>
+                                <td class="px-4 py-2 text-sm font-semibold text-emerald-600 text-right">Rs. {{ number_format($branch->total_revenue) }}</td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                @endif
+            </div>
+
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100">
                     <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">

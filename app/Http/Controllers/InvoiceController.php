@@ -15,6 +15,7 @@ use App\Services\HybridComplianceScorer;
 use App\Services\VendorRiskEngine;
 use App\Services\ScheduleEngine;
 use Illuminate\Http\Request;
+use App\Services\AuditLogService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -24,7 +25,7 @@ class InvoiceController extends Controller
     {
         $companyId = app('currentCompanyId');
         $invoices = Invoice::where('company_id', $companyId)
-            ->with('items')
+            ->with('items', 'branch')
             ->orderBy('created_at', 'desc')
             ->paginate(15);
 
@@ -35,7 +36,8 @@ class InvoiceController extends Controller
     {
         $companyId = app('currentCompanyId');
         $this->checkInvoiceLimit($companyId);
-        return view('invoice.create');
+        $branches = \App\Models\Branch::where('company_id', $companyId)->orderBy('name')->get();
+        return view('invoice.create', compact('branches'));
     }
 
     public function store(Request $request)
@@ -43,6 +45,7 @@ class InvoiceController extends Controller
         $request->validate([
             'buyer_name' => 'required|string|max:255',
             'buyer_ntn' => 'required|string|max:50',
+            'branch_id' => 'nullable|exists:branches,id',
             'items' => 'required|array|min:1',
             'items.*.hs_code' => 'required|string|max:50',
             'items.*.description' => 'required|string|max:255',
@@ -64,6 +67,13 @@ class InvoiceController extends Controller
         $companyId = app('currentCompanyId');
         $this->checkInvoiceLimit($companyId);
 
+        if ($request->branch_id) {
+            $branch = \App\Models\Branch::where('id', $request->branch_id)->where('company_id', $companyId)->first();
+            if (!$branch) {
+                return back()->with('error', 'Invalid branch selected.')->withInput();
+            }
+        }
+
         DB::beginTransaction();
         try {
             $totalAmount = 0;
@@ -83,6 +93,7 @@ class InvoiceController extends Controller
                 'buyer_ntn' => $request->buyer_ntn,
                 'total_amount' => $totalAmount,
                 'status' => 'draft',
+                'branch_id' => $request->branch_id,
             ]);
 
             foreach ($request->items as $item) {
@@ -108,6 +119,12 @@ class InvoiceController extends Controller
                 'items_count' => count($request->items),
             ]);
 
+            AuditLogService::log('invoice_created', 'Invoice', $invoice->id, null, [
+                'invoice_number' => $invoiceNumber,
+                'buyer_name' => $request->buyer_name,
+                'total_amount' => $totalAmount,
+            ]);
+
             ComplianceScoringJob::dispatch($invoice->id);
 
             DB::commit();
@@ -124,7 +141,7 @@ class InvoiceController extends Controller
         if ($invoice->company_id !== $companyId && auth()->user()->role !== 'super_admin') {
             abort(403);
         }
-        $invoice->load('items', 'company', 'activityLogs.user');
+        $invoice->load('items', 'company', 'activityLogs.user', 'branch');
 
         $complianceReport = ComplianceReport::where('invoice_id', $invoice->id)
             ->orderBy('created_at', 'desc')
@@ -143,7 +160,8 @@ class InvoiceController extends Controller
             return redirect('/invoices')->with('error', 'Locked invoices cannot be edited.');
         }
         $invoice->load('items');
-        return view('invoice.edit', compact('invoice'));
+        $branches = \App\Models\Branch::where('company_id', $companyId)->orderBy('name')->get();
+        return view('invoice.edit', compact('invoice', 'branches'));
     }
 
     public function update(Request $request, Invoice $invoice)
@@ -155,6 +173,7 @@ class InvoiceController extends Controller
         $request->validate([
             'buyer_name' => 'required|string|max:255',
             'buyer_ntn' => 'required|string|max:50',
+            'branch_id' => 'nullable|exists:branches,id',
             'items' => 'required|array|min:1',
             'items.*.hs_code' => 'required|string|max:50',
             'items.*.description' => 'required|string|max:255',
@@ -171,6 +190,13 @@ class InvoiceController extends Controller
         $scheduleErrors = ScheduleEngine::validateItems($request->items);
         if (!empty($scheduleErrors)) {
             return back()->withErrors($scheduleErrors)->withInput();
+        }
+
+        if ($request->branch_id) {
+            $branch = \App\Models\Branch::where('id', $request->branch_id)->where('company_id', $invoice->company_id)->first();
+            if (!$branch) {
+                return back()->with('error', 'Invalid branch selected.')->withInput();
+            }
         }
 
         $oldData = [
@@ -190,6 +216,7 @@ class InvoiceController extends Controller
                 'buyer_name' => $request->buyer_name,
                 'buyer_ntn' => $request->buyer_ntn,
                 'total_amount' => $totalAmount,
+                'branch_id' => $request->branch_id,
             ]);
 
             $invoice->items()->delete();
@@ -217,6 +244,12 @@ class InvoiceController extends Controller
                     'buyer_ntn' => $request->buyer_ntn,
                     'total_amount' => $totalAmount,
                 ],
+            ]);
+
+            AuditLogService::log('invoice_edited', 'Invoice', $invoice->id, $oldData, [
+                'buyer_name' => $request->buyer_name,
+                'buyer_ntn' => $request->buyer_ntn,
+                'total_amount' => $totalAmount,
             ]);
 
             ComplianceScoringJob::dispatch($invoice->id);
@@ -281,6 +314,11 @@ class InvoiceController extends Controller
                 'override_by' => auth()->user()->name,
             ], request()->ip());
 
+            AuditLogService::log('invoice_submitted', 'Invoice', $invoice->id, null, [
+                'mode' => 'direct_mis',
+                'override_reason' => $request->override_reason,
+            ]);
+
             SendInvoiceToFbrJob::dispatch($invoice->id);
 
             if ($invoice->buyer_ntn) {
@@ -319,6 +357,12 @@ class InvoiceController extends Controller
             'compliance_score' => $scoreResult['final_score'],
             'risk_level' => $scoreResult['risk_level'],
         ], request()->ip());
+
+        AuditLogService::log('invoice_submitted', 'Invoice', $invoice->id, null, [
+            'mode' => 'smart',
+            'compliance_score' => $scoreResult['final_score'],
+            'risk_level' => $scoreResult['risk_level'],
+        ]);
 
         SendInvoiceToFbrJob::dispatch($invoice->id);
 

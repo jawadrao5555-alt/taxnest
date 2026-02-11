@@ -13,6 +13,8 @@ use App\Http\Controllers\MISController;
 use App\Http\Controllers\ShareController;
 use App\Http\Controllers\CompanyUserController;
 use App\Http\Controllers\CompanySettingsController;
+use App\Http\Controllers\CustomerLedgerController;
+use App\Http\Controllers\BranchController;
 
 Route::get('/share/invoice/{uuid}', [ShareController::class, 'show']);
 
@@ -39,6 +41,11 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::post('/invoice/{invoice}/submit', [InvoiceController::class, 'submit']);
         Route::post('/invoice/{invoice}/validate', [InvoiceController::class, 'validateInvoice']);
 
+        Route::get('/customers', [CustomerLedgerController::class, 'index'])->name('customers.index');
+        Route::get('/customers/{ntn}/ledger', [CustomerLedgerController::class, 'show']);
+        Route::post('/customers/payment', [CustomerLedgerController::class, 'addPayment']);
+        Route::post('/customers/adjustment', [CustomerLedgerController::class, 'addAdjustment']);
+
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/products/create', [ProductController::class, 'create'])->name('products.create');
         Route::post('/products', [ProductController::class, 'store'])->name('products.store');
@@ -59,6 +66,14 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::put('/company/profile', [CompanySettingsController::class, 'updateProfile']);
         Route::get('/company/fbr-settings', [CompanySettingsController::class, 'fbrSettings']);
         Route::put('/company/fbr-settings', [CompanySettingsController::class, 'updateFbrSettings']);
+        Route::post('/company/test-connection', [CompanySettingsController::class, 'testConnection']);
+
+        Route::get('/branches', [BranchController::class, 'index'])->name('branches.index');
+        Route::get('/branches/create', [BranchController::class, 'create'])->name('branches.create');
+        Route::post('/branches', [BranchController::class, 'store'])->name('branches.store');
+        Route::get('/branches/{branch}/edit', [BranchController::class, 'edit'])->name('branches.edit');
+        Route::put('/branches/{branch}', [BranchController::class, 'update'])->name('branches.update');
+        Route::delete('/branches/{branch}', [BranchController::class, 'destroy'])->name('branches.destroy');
     });
 
     Route::get('/api/products/search', [ProductController::class, 'search']);
@@ -97,12 +112,16 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::get('/admin/system-health', [AdminController::class, 'systemHealth']);
         Route::get('/admin/security-logs', [AdminController::class, 'securityLogs']);
         Route::get('/admin/audit/export', [AdminController::class, 'auditExport'])->name('admin.audit.export');
+        Route::get('/admin/audit-logs', [AdminController::class, 'auditLogs'])->name('admin.audit-logs');
         Route::get('/admin/anomalies', [AdminController::class, 'anomalies'])->name('admin.anomalies');
         Route::get('/admin/risk-settings', [AdminController::class, 'riskSettings']);
         Route::post('/admin/risk-settings', [AdminController::class, 'updateRiskSettings']);
         Route::get('/admin/override-logs', [AdminController::class, 'overrideLogs']);
         Route::get('/admin/company/{company}', [AdminController::class, 'companyShow']);
         Route::post('/admin/company/{company}/suspend', [AdminController::class, 'suspendCompany']);
+        Route::post('/admin/company/{company}/approve', [AdminController::class, 'approveCompany']);
+        Route::post('/admin/company/{company}/reject', [AdminController::class, 'rejectCompany']);
+        Route::get('/admin/companies/pending', [AdminController::class, 'pendingCompanies']);
         Route::post('/admin/company/{company}/change-plan', [AdminController::class, 'changePlan']);
     });
 });

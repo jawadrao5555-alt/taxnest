@@ -1,0 +1,204 @@
+We are upgrading NestPay into a Heavy Enterprise Product.
+
+STRICT RULES:
+- Do NOT modify FBR payload structure.
+- Do NOT change WHT logic (manual only: 0%, 0.5%, 2.5%).
+- Do NOT modify HS→PCT engine.
+- Do NOT change Production Lock logic.
+- Multi-company isolation must remain intact.
+
+=====================================
+PHASE 1 — COMPANY APPROVAL SYSTEM
+=====================================
+
+1. Add company_status column:
+   - pending
+   - active
+   - suspended
+   - rejected
+
+2. On self-registration:
+   - company_status = pending
+   - Login blocked until approved.
+
+3. Super Admin Dashboard:
+   Add:
+   - Pending Companies widget
+   - Approve button
+   - Reject button
+   - Suspend / Unsuspend toggle
+
+4. Middleware:
+   Block login if company_status != active.
+
+=====================================
+PHASE 2 — CUSTOMER LEDGER SYSTEM
+=====================================
+
+Create ledger system:
+
+New table: customer_ledgers
+Fields:
+- id
+- company_id
+- customer_id
+- invoice_id
+- debit
+- credit
+- balance_after
+- type (invoice, payment, adjustment)
+- created_at
+
+Logic:
+- On invoice lock → create debit entry
+- WHT shown separately but NOT deducted in FBR
+- Allow manual payment entry
+- Auto-calculate running balance
+
+Add:
+Route: /customers/{id}/ledger
+Show:
+- Total invoiced
+- Total received
+- Outstanding balance
+
+=====================================
+PHASE 3 — MULTI-BRANCH SYSTEM
+=====================================
+
+Create branches table:
+- id
+- company_id
+- name
+- address
+- is_head_office
+
+Add branch_id to invoices.
+
+Rules:
+- Invoice must belong to branch
+- Branch dropdown during invoice creation
+- Admin can create branches
+- Branch-level invoice reporting
+
+Super Admin view:
+Company → Branch stats
+
+=====================================
+PHASE 4 — FBR TOKEN HEALTH MONITOR
+=====================================
+
+Enhance FBR Settings:
+
+Add fields:
+- token_expiry_date
+- last_successful_submission
+- fbr_connection_status (green/red)
+
+Add:
+"Test Connection" button:
+Calls sandbox endpoint.
+Show response status.
+
+Daily job:
+- Check token expiry
+- Notify company_admin if expiring in 48 hours
+
+=====================================
+PHASE 5 — ADVANCED ADMIN VIEW
+=====================================
+
+Enhance:
+GET /admin/company/{id}
+
+Add tabs:
+
+1. Overview
+   - Plan
+   - Status
+   - Users count
+   - Branch count
+   - Invoice stats
+
+2. Financial
+   - Total invoiced
+   - WHT summary
+   - Outstanding amount
+
+3. Compliance
+   - Risk distribution
+   - Failed submissions
+
+4. Activity
+   - Last 20 actions
+
+Admin is VIEW ONLY.
+No editing allowed from here.
+
+=====================================
+PHASE 6 — AUDIT LOG SYSTEM
+=====================================
+
+Create immutable audit_logs table:
+
+Fields:
+- id
+- company_id
+- user_id
+- action
+- entity_type
+- entity_id
+- old_values (JSON)
+- new_values (JSON)
+- created_at
+- sha256_hash
+
+Log:
+- Invoice create/edit
+- Invoice submit
+- User creation
+- FBR setting change
+- Branch creation
+
+Make export:
+GET /admin/audit/export
+Generate signed CSV.
+
+=====================================
+PHASE 7 — ENTERPRISE ANALYTICS
+=====================================
+
+Enhance Dashboard:
+
+Add:
+- Monthly sales chart
+- Branch comparison chart
+- Top 5 customers
+- Risk score badge
+- Invoice trend analysis
+
+Add KPI:
+- Compliance %
+- Average invoice value
+- Rejection rate
+
+=====================================
+PHASE 8 — SECURITY HARDENING
+=====================================
+
+1. Force HTTPS.
+2. Add rate limiting per company (200/min).
+3. Block login if user deactivated.
+4. Block FBR submit if subscription expired.
+5. Add "Company Suspended" banner.
+
+=====================================
+VERIFY ALL:
+=====================================
+
+- All routes return HTTP 200.
+- No cross-company data leak.
+- Production invoices remain immutable.
+- FBR payload unchanged.
+- WHT manual logic preserved.
+- Queue worker running.

@@ -19,9 +19,8 @@ class CompanyIsolation
             }
 
             if ($user->role === 'super_admin') {
-                $companyId = $request->query('company_id', $user->company_id);
-                if ($companyId) {
-                    app()->instance('currentCompanyId', (int) $companyId);
+                if ($user->company_id) {
+                    app()->instance('currentCompanyId', $user->company_id);
                 }
                 return $next($request);
             }
@@ -36,9 +35,18 @@ class CompanyIsolation
             }
 
             $company = \App\Models\Company::find($companyId);
-            if ($company && $company->suspended_at) {
+            if ($company && $company->company_status !== 'active') {
                 auth()->logout();
-                return redirect('/login')->with('error', 'Your company has been suspended. Please contact support.');
+                if ($company->company_status === 'pending') {
+                    return redirect('/login')->with('error', 'Your company registration is pending approval.');
+                }
+                if ($company->company_status === 'suspended') {
+                    return redirect('/login')->with('error', 'Your company has been suspended.');
+                }
+                if ($company->company_status === 'rejected') {
+                    return redirect('/login')->with('error', 'Your company registration was rejected.');
+                }
+                return redirect('/login')->with('error', 'Your company account is not active.');
             }
 
             app()->instance('currentCompanyId', $companyId);

@@ -39,6 +39,7 @@ class RegisteredUserController extends Controller
                 'name' => $request->company_name,
                 'ntn' => $request->company_ntn,
                 'email' => $request->email,
+                'company_status' => 'pending',
             ]);
 
             $freePlan = PricingPlan::orderBy('price')->first();
@@ -70,8 +71,7 @@ class RegisteredUserController extends Controller
         });
 
         event(new Registered($user));
-        Auth::login($user);
 
-        return redirect(route('dashboard', absolute: false));
+        return redirect('/login')->with('success', 'Registration submitted! Your company is pending approval.');
     }
 }

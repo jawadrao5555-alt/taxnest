@@ -27,6 +27,24 @@
                 </div>
                 @endif
 
+                @if(isset($branches) && $branches->count() > 0)
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Branch</h3>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Select Branch (Optional)</label>
+                        <select name="branch_id" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <option value="">— Select Branch —</option>
+                            @foreach($branches as $branch)
+                            <option value="{{ $branch->id }}" {{ old('branch_id') == $branch->id ? 'selected' : '' }}>
+                                {{ $branch->name }}{{ $branch->is_head_office ? ' (Head Office)' : '' }}
+                            </option>
+                            @endforeach
+                        </select>
+                        @error('branch_id') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                    </div>
+                </div>
+                @endif
+
                 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                     <h3 class="text-lg font-semibold text-gray-800 mb-4">Buyer Information</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">

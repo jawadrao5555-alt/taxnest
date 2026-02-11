@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Services\SecurityLogService;
+use App\Services\AuditLogService;
 
 class CompanyUserController extends Controller
 {
@@ -42,6 +43,12 @@ class CompanyUserController extends Controller
             'company_id' => $companyId,
         ]);
 
+        AuditLogService::log('user_created', 'User', $user->id, null, [
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $request->role,
+        ]);
+
         return redirect('/company/users')->with('success', 'User added successfully.');
     }
 
@@ -64,6 +71,8 @@ class CompanyUserController extends Controller
             'old_role' => $oldRole,
             'new_role' => $request->role,
         ]);
+
+        AuditLogService::log('user_role_changed', 'User', $user->id, ['role' => $oldRole], ['role' => $request->role]);
 
         return redirect('/company/users')->with('success', 'Role updated successfully.');
     }
@@ -107,6 +116,8 @@ class CompanyUserController extends Controller
         ]);
 
         $action = $user->is_active ? 'activated' : 'deactivated';
+        AuditLogService::log("user_{$action}", 'User', $user->id, null, ['is_active' => $user->is_active]);
+
         return redirect('/company/users')->with('success', "User {$action} successfully.");
     }
 }

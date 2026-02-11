@@ -20,6 +20,7 @@ class Invoice extends Model
         'fbr_invoice_id',
         'qr_data',
         'share_uuid',
+        'branch_id',
     ];
 
     protected static function boot()
@@ -66,5 +67,10 @@ class Invoice extends Model
     public function complianceReports()
     {
         return $this->hasMany(ComplianceReport::class);
+    }
+
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
     }
 }

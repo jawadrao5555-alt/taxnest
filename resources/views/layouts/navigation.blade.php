@@ -19,6 +19,9 @@
                     <x-nav-link href="/invoices" :active="request()->is('invoices*') || request()->is('invoice*')">
                         Invoices
                     </x-nav-link>
+                    <x-nav-link href="/customers" :active="request()->is('customers*')">
+                        Customers
+                    </x-nav-link>
                     <x-nav-link href="/billing/plans" :active="request()->is('billing*')">
                         Billing
                     </x-nav-link>
@@ -26,6 +29,9 @@
                         MIS Reports
                     </x-nav-link>
                     @if(auth()->user()->role === 'company_admin')
+                    <x-nav-link href="/branches" :active="request()->is('branches*')">
+                        Branches
+                    </x-nav-link>
                     <x-nav-link href="/company/users" :active="request()->is('company/users*')">
                         Team
                     </x-nav-link>
@@ -110,6 +116,9 @@
             @if(auth()->user()->role !== 'super_admin' || auth()->user()->company_id)
             <x-responsive-nav-link href="/invoices" :active="request()->is('invoices*')">
                 Invoices
+            </x-responsive-nav-link>
+            <x-responsive-nav-link href="/customers" :active="request()->is('customers*')">
+                Customers
             </x-responsive-nav-link>
             <x-responsive-nav-link href="/billing/plans" :active="request()->is('billing*')">
                 Billing

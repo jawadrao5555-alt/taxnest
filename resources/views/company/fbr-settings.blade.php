@@ -72,10 +72,73 @@
                     </div>
                 </template>
 
+                <hr class="border-gray-200">
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Token Expiry Date</label>
+                    <input type="date" name="token_expiry_date" value="{{ old('token_expiry_date', $company->token_expiry_date ? \Carbon\Carbon::parse($company->token_expiry_date)->format('Y-m-d') : '') }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                    <p class="text-xs text-gray-400 mt-1">Set when your FBR token expires. You'll receive notifications 48 hours before expiry.</p>
+                </div>
+
                 <div class="flex justify-end">
                     <button type="submit" class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition">Save FBR Settings</button>
                 </div>
             </form>
+
+            <div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-100 p-6" x-data="tokenHealth()">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Token Health</h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Token Expiry</p>
+                        <p class="text-sm font-semibold text-gray-900">
+                            @if($company->token_expiry_date)
+                                {{ \Carbon\Carbon::parse($company->token_expiry_date)->format('d M Y') }}
+                                @if(\Carbon\Carbon::parse($company->token_expiry_date)->isPast())
+                                    <span class="text-red-600 text-xs ml-1">(Expired)</span>
+                                @elseif(\Carbon\Carbon::parse($company->token_expiry_date)->diffInHours(now()) <= 48)
+                                    <span class="text-amber-600 text-xs ml-1">(Expiring Soon)</span>
+                                @endif
+                            @else
+                                Not Set
+                            @endif
+                        </p>
+                    </div>
+
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Last Successful Submission</p>
+                        <p class="text-sm font-semibold text-gray-900">
+                            @if($company->last_successful_submission)
+                                {{ \Carbon\Carbon::parse($company->last_successful_submission)->format('d M Y, h:i A') }}
+                            @else
+                                No submissions yet
+                            @endif
+                        </p>
+                    </div>
+
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Connection Status</p>
+                        <div class="flex items-center space-x-2">
+                            <span class="inline-block w-3 h-3 rounded-full"
+                                :class="{
+                                    'bg-green-500': connectionStatus === 'green',
+                                    'bg-red-500': connectionStatus === 'red',
+                                    'bg-gray-400': connectionStatus !== 'green' && connectionStatus !== 'red'
+                                }"></span>
+                            <span class="text-sm font-semibold" x-text="connectionStatus === 'green' ? 'Healthy' : (connectionStatus === 'red' ? 'Unhealthy' : 'Unknown')"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div x-show="testMessage" x-cloak class="mb-4 p-3 rounded-lg text-sm"
+                    :class="connectionStatus === 'green' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'"
+                    x-text="testMessage"></div>
+
+                <button type="button" @click="testConn()" :disabled="testing" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-50">
+                    <svg x-show="testing" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    Test Connection
+                </button>
+            </div>
         </div>
     </div>
 
@@ -84,6 +147,34 @@
         return {
             environment: '{{ $company->fbr_environment ?? "sandbox" }}',
             originalEnv: '{{ $company->fbr_environment ?? "sandbox" }}'
+        }
+    }
+    function tokenHealth() {
+        return {
+            connectionStatus: '{{ $company->fbr_connection_status ?? "unknown" }}',
+            testing: false,
+            testMessage: '',
+            async testConn() {
+                this.testing = true;
+                this.testMessage = '';
+                try {
+                    let res = await fetch('/company/test-connection', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json'
+                        }
+                    });
+                    let data = await res.json();
+                    this.connectionStatus = data.status;
+                    this.testMessage = data.message;
+                } catch(e) {
+                    this.connectionStatus = 'red';
+                    this.testMessage = 'Connection test failed. Please try again.';
+                }
+                this.testing = false;
+            }
         }
     }
     </script>

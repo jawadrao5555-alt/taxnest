@@ -13,6 +13,7 @@ use App\Models\SecurityLog;
 use App\Models\ComplianceScore;
 use App\Models\AnomalyLog;
 use App\Services\SecurityLogService;
+use App\Services\AuditLogService;
 use App\Services\IntegrityHashService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -49,11 +50,14 @@ class AdminController extends Controller
             ->take(10)
             ->get();
 
+        $pendingCompanies = Company::where('company_status', 'pending')->count();
+
         return view('admin.dashboard', compact(
             'totalCompanies', 'totalUsers', 'totalInvoices',
             'draftInvoices', 'submittedInvoices', 'lockedInvoices',
             'failedLogs', 'totalRevenue', 'activeSubscriptions',
-            'recentInvoices', 'recentCompanies', 'recentAnomalies'
+            'recentInvoices', 'recentCompanies', 'recentAnomalies',
+            'pendingCompanies'
         ));
     }
 
@@ -81,7 +85,7 @@ class AdminController extends Controller
             'admin_password' => 'nullable|string|min:6',
         ]);
 
-        $company = Company::create($request->only(['name', 'ntn', 'email', 'phone', 'address']));
+        $company = Company::create(array_merge($request->only(['name', 'ntn', 'email', 'phone', 'address']), ['company_status' => 'active']));
 
         $freePlan = PricingPlan::orderBy('price')->first();
         if ($freePlan) {
@@ -112,17 +116,40 @@ class AdminController extends Controller
 
     public function suspendCompany(Company $company)
     {
-        if ($company->suspended_at) {
-            $company->update(['suspended_at' => null]);
+        if ($company->company_status === 'suspended') {
+            $company->update(['company_status' => 'active', 'suspended_at' => null]);
             $action = 'unsuspended';
         } else {
-            $company->update(['suspended_at' => now()]);
+            $company->update(['company_status' => 'suspended', 'suspended_at' => now()]);
             $action = 'suspended';
         }
 
         SecurityLogService::log("company_{$action}", auth()->id(), ['company_id' => $company->id]);
+        AuditLogService::log("company_{$action}", 'Company', $company->id, null, ['status' => $company->company_status]);
 
         return redirect('/admin/company/' . $company->id)->with('success', "Company {$action} successfully.");
+    }
+
+    public function pendingCompanies()
+    {
+        $companies = Company::where('company_status', 'pending')->withCount('invoices', 'users')->paginate(15);
+        return view('admin.companies', compact('companies'));
+    }
+
+    public function approveCompany(Company $company)
+    {
+        $company->update(['company_status' => 'active']);
+        SecurityLogService::log('company_approved', auth()->id(), ['company_id' => $company->id, 'name' => $company->name]);
+        AuditLogService::log('company_approved', 'Company', $company->id, null, ['name' => $company->name]);
+        return redirect('/admin/company/' . $company->id)->with('success', 'Company approved successfully.');
+    }
+
+    public function rejectCompany(Company $company)
+    {
+        $company->update(['company_status' => 'rejected']);
+        SecurityLogService::log('company_rejected', auth()->id(), ['company_id' => $company->id, 'name' => $company->name]);
+        AuditLogService::log('company_rejected', 'Company', $company->id, null, ['name' => $company->name]);
+        return redirect('/admin/company/' . $company->id)->with('success', 'Company rejected successfully.');
     }
 
     public function changePlan(Request $request, Company $company)
@@ -143,6 +170,10 @@ class AdminController extends Controller
 
         SecurityLogService::log('company_plan_changed', auth()->id(), [
             'company_id' => $company->id,
+            'new_plan_id' => $request->pricing_plan_id,
+        ]);
+
+        AuditLogService::log('company_plan_changed', 'Company', $company->id, null, [
             'new_plan_id' => $request->pricing_plan_id,
         ]);
 
@@ -252,38 +283,54 @@ class AdminController extends Controller
 
     public function auditExport()
     {
-        $invoices = Invoice::with('items', 'company')->orderBy('id')->get();
+        $auditLogs = \App\Models\AuditLog::with('company', 'user')->orderBy('id')->get();
 
-        $csvContent = "Invoice Number,Company,Buyer Name,Buyer NTN,Total Amount,Tax Amount,Status,Created At,SHA256 Signature\n";
+        $csvContent = "ID,Date,Company,User,Action,Entity Type,Entity ID,New Values,SHA256 Hash\n";
 
-        foreach ($invoices as $invoice) {
-            $taxAmount = $invoice->items->sum('tax');
-            $hashData = implode('|', [
-                $invoice->invoice_number,
-                $invoice->total_amount,
-                $taxAmount,
-                $invoice->company_id,
-                $invoice->created_at->toIso8601String(),
-            ]);
-            $sha256 = hash('sha256', $hashData);
+        $runningHash = '';
+        foreach ($auditLogs as $log) {
+            $rowHash = $log->sha256_hash ?: hash('sha256', implode('|', [
+                $log->id, $log->action, $log->entity_type, $log->entity_id,
+                json_encode($log->new_values), $log->created_at?->toIso8601String(),
+            ]));
 
             $csvContent .= implode(',', [
-                '"' . ($invoice->invoice_number ?? '') . '"',
-                '"' . ($invoice->company->name ?? '') . '"',
-                '"' . $invoice->buyer_name . '"',
-                '"' . $invoice->buyer_ntn . '"',
-                $invoice->total_amount,
-                $taxAmount,
-                $invoice->status,
-                '"' . $invoice->created_at->toIso8601String() . '"',
-                $sha256,
+                $log->id,
+                '"' . ($log->created_at?->toIso8601String() ?? '') . '"',
+                '"' . ($log->company->name ?? 'System') . '"',
+                '"' . ($log->user->name ?? 'System') . '"',
+                '"' . $log->action . '"',
+                '"' . ($log->entity_type ?? '') . '"',
+                $log->entity_id ?? '',
+                '"' . str_replace('"', '""', json_encode($log->new_values) ?? '') . '"',
+                $rowHash,
             ]) . "\n";
+
+            $runningHash = hash('sha256', $runningHash . $rowHash);
         }
+
+        $csvContent .= "\n# Verification Hash: " . $runningHash . "\n";
+        $csvContent .= "# Generated: " . now()->toIso8601String() . "\n";
+        $csvContent .= "# Total Records: " . $auditLogs->count() . "\n";
 
         return Response::make($csvContent, 200, [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => 'attachment; filename="taxnest_audit_export_' . now()->format('Y-m-d') . '.csv"',
         ]);
+    }
+
+    public function auditLogs(Request $request)
+    {
+        $query = \App\Models\AuditLog::with('company', 'user')->orderBy('created_at', 'desc');
+
+        if ($request->filled('action')) {
+            $query->where('action', $request->action);
+        }
+
+        $actionTypes = \App\Models\AuditLog::select('action')->distinct()->orderBy('action')->pluck('action');
+        $logs = $query->paginate(25)->appends($request->query());
+
+        return view('admin.audit-logs', compact('logs', 'actionTypes'));
     }
 
     public function anomalies()
@@ -337,12 +384,15 @@ class AdminController extends Controller
 
     public function companyShow(Company $company)
     {
+        $invoiceIds = Invoice::where('company_id', $company->id)->pluck('id');
+
         $stats = [
             'total_users' => User::where('company_id', $company->id)->count(),
             'total_invoices' => Invoice::where('company_id', $company->id)->count(),
             'locked' => Invoice::where('company_id', $company->id)->where('status', 'locked')->count(),
             'draft' => Invoice::where('company_id', $company->id)->where('status', 'draft')->count(),
-            'failed' => FbrLog::whereIn('invoice_id', Invoice::where('company_id', $company->id)->pluck('id'))->where('status', 'failed')->count(),
+            'failed' => FbrLog::whereIn('invoice_id', $invoiceIds)->where('status', 'failed')->count(),
+            'total_branches' => \App\Models\Branch::where('company_id', $company->id)->count(),
         ];
 
         $activePlan = null;
@@ -357,13 +407,55 @@ class AdminController extends Controller
             return $user;
         });
 
-        $invoices = Invoice::where('company_id', $company->id)->orderBy('created_at', 'desc')->get();
+        $totalInvoicedAmount = Invoice::where('company_id', $company->id)->sum('total_amount');
+
+        $totalTaxCollected = \App\Models\InvoiceItem::whereIn('invoice_id', $invoiceIds)->sum('tax');
+
+        $taxRateSummary = \App\Models\InvoiceItem::whereIn('invoice_id', $invoiceIds)
+            ->whereNotNull('tax_rate')
+            ->where('tax_rate', '>', 0)
+            ->select('tax_rate', DB::raw('count(*) as count'), DB::raw('SUM(tax) as total_tax'))
+            ->groupBy('tax_rate')
+            ->get();
+
+        $outstandingAmount = \App\Models\CustomerLedger::where('company_id', $company->id)
+            ->select('customer_ntn', DB::raw('MAX(id) as max_id'))
+            ->groupBy('customer_ntn')
+            ->get()
+            ->sum(function ($row) {
+                $entry = \App\Models\CustomerLedger::find($row->max_id);
+                return $entry ? $entry->balance_after : 0;
+            });
+
+        $monthlyRevenue = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $month = now()->subMonths($i);
+            $revenue = Invoice::where('company_id', $company->id)
+                ->whereMonth('created_at', $month->month)
+                ->whereYear('created_at', $month->year)
+                ->sum('total_amount');
+            $count = Invoice::where('company_id', $company->id)
+                ->whereMonth('created_at', $month->month)
+                ->whereYear('created_at', $month->year)
+                ->count();
+            $monthlyRevenue[] = ['month' => $month->format('M Y'), 'revenue' => $revenue, 'count' => $count];
+        }
+
+        $financial = [
+            'total_invoiced' => $totalInvoicedAmount,
+            'total_tax' => $totalTaxCollected,
+            'tax_rate_summary' => $taxRateSummary,
+            'outstanding' => $outstandingAmount,
+            'monthly_revenue' => $monthlyRevenue,
+        ];
 
         $complianceReports = \App\Models\ComplianceReport::where('company_id', $company->id)->get();
+        $failedSubmissions = FbrLog::whereIn('invoice_id', $invoiceIds)->where('status', 'failed')->count();
         $compliance = [
             'avg_score' => $complianceReports->avg('final_score') ?? 0,
             'total_reports' => $complianceReports->count(),
             'audit_probability' => $this->calcAuditProbability($company),
+            'failed_submissions' => $failedSubmissions,
             'risk_distribution' => [
                 'LOW' => $complianceReports->where('risk_level', 'LOW')->count(),
                 'MEDIUM' => $complianceReports->where('risk_level', 'MEDIUM')->count(),
@@ -375,12 +467,12 @@ class AdminController extends Controller
         $activityLogs = \App\Models\InvoiceActivityLog::where('company_id', $company->id)
             ->with('invoice', 'user')
             ->orderBy('created_at', 'desc')
-            ->take(50)
+            ->take(20)
             ->get();
 
         $plans = PricingPlan::all();
 
-        return view('admin.company-show', compact('company', 'stats', 'activePlan', 'users', 'invoices', 'compliance', 'activityLogs', 'plans'));
+        return view('admin.company-show', compact('company', 'stats', 'activePlan', 'users', 'financial', 'compliance', 'activityLogs', 'plans'));
     }
 
     private function calcAuditProbability(Company $company)

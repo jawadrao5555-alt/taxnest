@@ -20,12 +20,18 @@ class Company extends Model
         'fbr_production_token',
         'fbr_registration_no',
         'fbr_business_name',
-        'suspended_at'
+        'suspended_at',
+        'company_status',
+        'token_expiry_date',
+        'last_successful_submission',
+        'fbr_connection_status',
     ];
 
     protected $casts = [
         'token_expires_at' => 'datetime',
         'suspended_at' => 'datetime',
+        'token_expiry_date' => 'date',
+        'last_successful_submission' => 'datetime',
     ];
 
     protected $hidden = [
@@ -35,7 +41,17 @@ class Company extends Model
 
     public function isSuspended()
     {
-        return $this->suspended_at !== null;
+        return $this->company_status === 'suspended';
+    }
+
+    public function isActive()
+    {
+        return $this->company_status === 'active';
+    }
+
+    public function isPending()
+    {
+        return $this->company_status === 'pending';
     }
 
     public function getActiveFbrTokenAttribute()
@@ -94,5 +110,15 @@ class Company extends Model
     public function products()
     {
         return $this->hasMany(Product::class);
+    }
+
+    public function branches()
+    {
+        return $this->hasMany(Branch::class);
+    }
+
+    public function ledgerEntries()
+    {
+        return $this->hasMany(CustomerLedger::class);
     }
 }

@@ -1,7 +1,7 @@
-# TaxNest - Enterprise V3 Smart Invoicing + MIS + PRAL Flow
+# TaxNest - Heavy Enterprise Product
 
 ## Overview
-TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with FBR (Federal Board of Revenue) compliance integration. Enterprise V3 adds Smart Invoicing with product master, preview/validate flows, dual PRAL submission modes, QR lock, MIS reporting, trend analytics, configurable governance, enterprise API endpoints, PDF download, social sharing, and demo mode.
+TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with FBR (Federal Board of Revenue) compliance integration. Heavy Enterprise adds Company Approval System, Customer Ledger, Multi-Branch, FBR Token Health Monitor, Advanced Admin View, Immutable Audit Logs, Enterprise Analytics, and Security Hardening on top of Smart Invoicing, product master, preview/validate flows, dual PRAL submission modes, QR lock, MIS reporting, trend analytics, configurable governance, enterprise API endpoints, PDF download, social sharing, and demo mode.
 
 ## Test Accounts
 - **Super Admin**: admin@test.com / admin123
@@ -10,22 +10,34 @@ TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with 
 - **Demo User**: demo@taxnest.pk / password123
 
 ## Recent Changes
-- 2026-02-12: Company Governance + FBR Settings — Self-registration (company+admin), super admin manual company creation with admin, CompanyUserController (add/role/reset/deactivate), FBR Integration Settings (encrypted tokens, sandbox/production toggle, double confirmation), role-based access control (viewer/employee/company_admin/super_admin), company suspend/unsuspend, plan change, suspended company login block, deactivated user login block
-- 2026-02-12: Hybrid Product + Schedule + Manual Control Model — Schedule selection (Standard/Reduced/3rd Schedule/Exempt/Zero Rated), dynamic SRO/Serial/MRP fields, product auto-fill with schedule data, manual HS→PCT lookup, validation layer (missing required fields + mixed schedule blocking), ScheduleEngine service
-- 2026-02-12: UI + Admin + PDF Upgrade — VIP landing page at /, super admin company deep view with 4 tabs, real PDF generation via dompdf, professional PDF layout with WHT/net receivable, context-aware download buttons, status badge polish (Draft=Gray, Locked=Green, Failed=Red)
-- 2026-02-12: Demo + PDF + Share + Mock — PDF download with draft/FBR watermarks, social share links with UUID, demo user/company/products/invoices seeder, dashboard thumbnail cards, QR code generation, demo safety mode
-- 2026-02-12: Enterprise V3 — Product Master, Smart Invoice Builder, Preview/Validate flow, Smart+Direct MIS submission modes, QR+Lock, MIS Reporting, Trend Analytics, Governance Panel, Enterprise API
-- 2026-02-12: Regulatory AI Hybrid Model — ComplianceEngine, AnomalyEngine, HybridComplianceScorer, VendorRiskEngine, AuditDefenseService, auto-run with CRITICAL blocking
-- 2026-02-12: Enterprise V2 — API rate limiting, FBR token expiry, audit CSV, nightly cron, anomaly detection, trial mode, PDF watermark, compliance certificate
+- 2026-02-12: Heavy Enterprise 8-Phase Upgrade
+  - Phase 1: Company Approval System — company_status (pending/active/suspended/rejected), self-registration creates pending, admin approve/reject, middleware blocks non-active
+  - Phase 2: Customer Ledger System — customer_ledgers table, auto debit on invoice lock, manual payment/adjustment entry, running balance
+  - Phase 3: Multi-Branch System — branches table, branch_id on invoices, branch CRUD, branch dropdown in invoice create, branch-level reporting
+  - Phase 4: FBR Token Health Monitor — token_expiry_date, last_successful_submission, fbr_connection_status, test connection button, daily expiry notification job
+  - Phase 5: Advanced Admin View — company show with Overview/Financial/Compliance/Activity tabs, branch stats, tax summary, outstanding balance, VIEW ONLY
+  - Phase 6: Audit Log System — immutable audit_logs with SHA256, log all events (invoice/user/FBR/branch), signed CSV export
+  - Phase 7: Enterprise Analytics — top 5 customers, branch comparison, compliance %, avg invoice value, rejection rate KPIs
+  - Phase 8: Security Hardening — ForceHttps middleware, subscription expired FBR block, company suspended/pending banners
+- 2026-02-12: Company Governance + FBR Settings
+- 2026-02-12: Hybrid Product + Schedule + Manual Control Model
+- 2026-02-12: UI + Admin + PDF Upgrade
+- 2026-02-12: Demo + PDF + Share + Mock
+- 2026-02-12: Enterprise V3 — Product Master, Smart Invoice Builder, Preview/Validate flow, Smart+Direct MIS submission modes
+- 2026-02-12: Regulatory AI Hybrid Model
+- 2026-02-12: Enterprise V2
 - 2026-02-11: Phase 1-7 — Invoice hardening, FBR intelligence, compliance risk engine, executive dashboard, billing, security, system health
 
 ## Database Tables
-- **companies** — name, ntn, email, phone, address, fbr_token, token_expires_at, compliance_score, fbr_environment, fbr_sandbox_token (encrypted), fbr_production_token (encrypted), fbr_registration_no, fbr_business_name, suspended_at
-- **invoices** — company_id, invoice_number, status, integrity_hash, buyer_name, buyer_ntn, total_amount, override_reason, override_by, submission_mode, fbr_invoice_id, qr_data, share_uuid
+- **companies** — name, ntn, email, phone, address, fbr_token, token_expires_at, compliance_score, fbr_environment, fbr_sandbox_token (encrypted), fbr_production_token (encrypted), fbr_registration_no, fbr_business_name, suspended_at, company_status (pending/active/suspended/rejected), token_expiry_date, last_successful_submission, fbr_connection_status
+- **invoices** — company_id, branch_id, invoice_number, status, integrity_hash, buyer_name, buyer_ntn, total_amount, override_reason, override_by, submission_mode, fbr_invoice_id, qr_data, share_uuid
 - **invoice_items** — invoice_id, hs_code, schedule_type, pct_code, tax_rate, sro_schedule_no, serial_no, mrp, description, quantity, price, tax
 - **invoice_activity_logs** — invoice_id, company_id, user_id, action, changes_json, ip_address
 - **users** — name, email, password, company_id (nullable), role (super_admin/company_admin/employee/viewer), is_active
 - **products** — company_id, name, hs_code, pct_code, default_tax_rate, uom, schedule_type, sro_reference, default_price, is_active
+- **branches** — company_id, name, address, is_head_office
+- **customer_ledgers** — company_id, customer_name, customer_ntn, invoice_id, debit, credit, balance_after, type (invoice/payment/adjustment), notes
+- **audit_logs** — company_id, user_id, action, entity_type, entity_id, old_values (JSON), new_values (JSON), ip_address, sha256_hash, created_at (immutable, no updated_at)
 - **system_settings** — key (unique), value, description
 - **override_logs** — invoice_id, company_id, user_id, action, reason, metadata, ip_address
 - **fbr_logs** — invoice_id, request_payload, response_payload, status, failure_type, response_time_ms, retry_count
@@ -41,113 +53,102 @@ TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with 
 ## Authentication
 - **Laravel Breeze** — Blade + Tailwind CSS based authentication
 
+## Company Approval Flow
+- Self-registration creates company with company_status='pending'
+- User NOT logged in after registration, redirected to login with pending message
+- Super admin can approve (sets active), reject, suspend, unsuspend
+- CompanyIsolation middleware blocks login for non-active companies with specific messages
+
 ## Middleware
-- **company** — CompanyIsolation enforces company_id scoping
+- **company** — CompanyIsolation enforces company_id scoping, blocks pending/suspended/rejected companies
 - **role** — RoleMiddleware enforces role-based access
 - **rate_limit_company** — RateLimitByCompany enforces 200 req/min per company
+- **ForceHttps** — Redirects to HTTPS in production
 
 ## Routes — Public
-- `/` — VIP landing page with hero, features, how-it-works, pricing, footer (redirects to /dashboard if authenticated)
-- `/share/invoice/{uuid}` — Public shareable invoice view (no auth required)
+- `/` — VIP landing page (redirects to /dashboard if authenticated)
+- `/share/invoice/{uuid}` — Public shareable invoice view
 
 ## Routes — Company Users
-- `/dashboard` — Dashboard with KPIs, invoice thumbnail cards, compliance trend, risk badge, vendor panel, audit probability, MoM growth, tax variance, HS risk heatmap
-- `/invoices` — Invoice list with pagination and download links
-- `/invoice/create` — Smart Invoice Builder with product dropdown, auto-calc, live compliance check
-- `/invoice/{id}` — Invoice detail with compliance analysis card, share buttons
-- `/invoice/{id}/edit` — Edit draft invoice with smart builder
-- `/invoice/{id}/preview` — Preview with tax breakdown, risk score, QR image, validate button, download/share buttons
-- `/invoice/{id}/validate` — Run HybridComplianceScorer, show validation result
-- `/invoice/{id}/submit` — Submit to PRAL (Smart Mode or Direct MIS Mode)
+- `/dashboard` — Dashboard with KPIs, top 5 customers, branch comparison, compliance %, avg invoice value, rejection rate
+- `/invoices` — Invoice list with branch column
+- `/invoice/create` — Smart Invoice Builder with branch dropdown, product dropdown, auto-calc
+- `/invoice/{id}` — Invoice detail with branch info
+- `/invoice/{id}/edit` — Edit draft invoice
+- `/invoice/{id}/preview` — Preview with tax breakdown, risk score, QR
+- `/invoice/{id}/validate` — Run HybridComplianceScorer
+- `/invoice/{id}/submit` — Submit to PRAL (Smart or Direct MIS)
 - `/invoice/{id}/verify` — Verify SHA256 integrity
-- `/invoice/{id}/pdf` — PDF with QR data (if locked), watermark (if expired)
-- `/invoice/{id}/download` — PDF download with draft watermark or FBR verified header
+- `/invoice/{id}/pdf` — PDF with QR data
+- `/invoice/{id}/download` — PDF download
 - `/products` — Product master list
 - `/products/create` — Create product
 - `/products/{id}/edit` — Edit product
-- `/products/{id}/deactivate` — Toggle product active status
-- `/mis` — MIS Reports dashboard (monthly, tax, HS concentration, vendor risk)
-- `/mis/export?type=` — CSV export (monthly/tax/hs/vendor)
+- `/customers` — Customer list with totals
+- `/customers/{ntn}/ledger` — Customer ledger with running balance
+- `/branches` — Branch management (company_admin only)
+- `/branches/create` — Create branch
+- `/branches/{id}/edit` — Edit branch
+- `/mis` — MIS Reports dashboard
+- `/mis/export` — CSV export
 - `/billing/plans` — Pricing plans
 - `/compliance/certificate` — Monthly compliance certificate
 - `/compliance/risk-report` — Risk Explanation Report
-- `/api/products/search` — Product search API (AJAX)
-- `/api/schedule/config` — Schedule types config API (AJAX)
-- `/api/hs-lookup` — HS code to PCT/schedule/tax lookup API (AJAX)
-- `/api/compliance/check` — Live compliance check API (AJAX)
-- `/api/enterprise/invoice/{id}/status` — Enterprise invoice status API
-- `/api/enterprise/company/compliance` — Enterprise compliance status API
 
 ## Routes — Company Admin Settings
-- `/company/users` — Team member management (add, role, reset password, deactivate)
+- `/company/users` — Team management
 - `/company/profile` — Edit company profile
-- `/company/fbr-settings` — FBR Integration Settings (tokens, environment toggle)
+- `/company/fbr-settings` — FBR Integration Settings with token health, test connection
+- `/company/test-connection` — AJAX endpoint for FBR connection test
 
 ## Routes — Super Admin
-- `/admin/dashboard` — Super admin overview
-- `/admin/companies` — Company management (with status/environment columns)
-- `/admin/companies/create` — Create company with optional admin user
+- `/admin/dashboard` — Super admin overview with pending approvals widget
+- `/admin/companies` — Company management with status badges
+- `/admin/companies/pending` — Pending companies list
+- `/admin/companies/create` — Create company with optional admin
+- `/admin/company/{id}` — Company deep view (Overview/Financial/Compliance/Activity), VIEW ONLY
+- `/admin/company/{id}/approve` — Approve pending company
+- `/admin/company/{id}/reject` — Reject company
+- `/admin/company/{id}/suspend` — Toggle suspend/unsuspend
+- `/admin/company/{id}/change-plan` — Change pricing plan
 - `/admin/users` — User management
 - `/admin/fbr-logs` — FBR submission logs
 - `/admin/system-health` — System health monitor
 - `/admin/security-logs` — Security event logs
-- `/admin/audit/export` — Immutable audit CSV
+- `/admin/audit-logs` — Immutable audit log viewer
+- `/admin/audit/export` — Signed audit CSV export with SHA256
 - `/admin/anomalies` — Anomaly detection logs
-- `/admin/risk-settings` — Configurable risk thresholds (governance)
+- `/admin/risk-settings` — Configurable risk thresholds
 - `/admin/override-logs` — Override audit trail
-- `/admin/company/{id}` — Company deep view with suspend/plan controls + 4 tabs
-- `/admin/company/{id}/suspend` — Toggle suspend/unsuspend company
-- `/admin/company/{id}/change-plan` — Change company pricing plan
 
-## Demo Mode
-- **Demo User**: demo@taxnest.pk / password123 (company_admin role)
-- **Demo Company**: Demo Traders Pvt Ltd (NTN: 9876543-2)
-- **Demo Products**: Cooking Oil 1L (HS 15179090, 18%), Cement Bag (HS 25232900, 18%), Fertilizer (HS 31021000, 0%)
-- **Demo Invoices**: DEMO-INV-001 (draft), DEMO-INV-002 (locked with FBR MOCK-FBR-0001)
-- **DEMO_MODE flag**: system_settings key 'demo_mode' = 'true' disables real PRAL API calls, uses mock FBR numbers
-- DemoSeeder creates all demo data, registered in DatabaseSeeder
+## Customer Ledger System
+- Auto debit entry when invoice is locked (via SendInvoiceToFbrJob)
+- Manual payment entry (credit) by company_admin/employee
+- Manual adjustment entry (debit or credit)
+- Running balance calculated per customer (by company_id + customer_ntn)
+- WHT shown separately but NOT deducted in FBR payload
 
-## PDF Download
-- Draft invoices: Show "DRAFT COPY" watermark
-- Locked invoices: Show FBR VERIFIED header, FBR invoice number, QR code image
-- Expired subscriptions: Show "Subscription Expired" watermark
+## Multi-Branch System
+- Branch CRUD for company_admin
+- branch_id on invoices (optional)
+- Branch dropdown during invoice creation
+- Branch-level invoice reporting on dashboard
+- Admin can see branch count in company deep view
 
-## Social Sharing
-- Each invoice gets auto-generated UUID (share_uuid)
-- Public shareable link: /share/invoice/{uuid}
-- WhatsApp share button and Copy Link button on invoice preview/show pages
+## FBR Token Health Monitor
+- token_expiry_date (editable in FBR settings)
+- last_successful_submission (auto-updated on successful FBR submission)
+- fbr_connection_status (green/red/unknown indicator)
+- Test Connection button (AJAX)
+- Daily CheckTokenExpiryJob notifies company_admin if expiring in 48 hours
 
-## QR Code Generation
-- QR code images generated via qrserver.com API
-- Invoice model accessor: qr_image_url attribute
-- QR displayed in PDF, preview, share pages
-
-## Smart Invoicing Flow
-1. Create invoice: Product dropdown auto-fills HS code, tax rate, price, description
-2. Auto-calculate: quantity * price for subtotal, tax = rate%, total = subtotal + tax
-3. Live compliance check via AJAX before submission
-4. Preview mode: Full layout with tax breakdown, risk score, QR image
-5. Validate: Runs HybridComplianceScorer, shows score/flags/FBR status
-6. Submit Smart Mode: Score -> block CRITICAL -> send to PRAL -> QR -> lock
-7. Submit Direct MIS: Override reason required -> skip compliance block -> send to PRAL -> log override
-
-## PRAL Submission Modes
-- **Smart Mode**: Runs scoring, blocks CRITICAL risk, sends to PRAL, generates QR, locks invoice
-- **Direct MIS Mode**: Requires company_admin+ role, override_reason (min 10 chars), logs to override_logs, skips compliance block
-
-## Governance Settings (system_settings)
-- mom_spike_threshold: MoM invoice spike % (default 200)
-- tax_drop_threshold: Tax drop % (default 60)
-- critical_score_threshold: Score below = CRITICAL (default 40)
-- stability_bonus_weight: Max stability bonus (default 10)
-- demo_mode: Enable/disable demo safety mode (default false)
-
-## Regulatory AI Services
-- **ComplianceEngine** — Rule-based validation (tax rate, buyer NTN S.23, banking S.73, structure)
-- **AnomalyEngine** — MoM spike, tax drop, HS shift, value-tax anomaly (reads system_settings)
-- **HybridComplianceScorer** — Merges rule+anomaly+stability (reads system_settings for thresholds)
-- **VendorRiskEngine** — Vendor scoring with persistence
-- **AuditDefenseService** — Risk reports with SHA256, audit probability
+## Audit Log System
+- Immutable audit_logs table (no updated_at)
+- SHA256 hash on each entry for tamper detection
+- Logs: invoice create/edit/submit, user creation/role change, FBR settings, branch CRUD, company approve/reject/suspend
+- AuditLogService::log() static method
+- Admin audit log viewer with pagination and filtering
+- Signed CSV export with per-row SHA256 and file verification hash
 
 ## Project Architecture
 - **Framework**: Laravel 12 with Breeze
@@ -158,11 +159,11 @@ TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with 
 - **Queue**: Database driver with SendInvoiceToFbrJob, ComplianceScoringJob
 
 ## Key Directories
-- `app/Http/Controllers/` — DashboardController, InvoiceController, ProductController, MISController, BillingController, AdminController, ComplianceCertificateController, RiskReportController, ShareController, CompanyUserController, CompanySettingsController
-- `app/Http/Middleware/` — CompanyIsolation, RoleMiddleware, RateLimitByCompany
-- `app/Models/` — User, Company, Invoice, InvoiceItem, Product, SystemSetting, OverrideLog, FbrLog, InvoiceActivityLog, SecurityLog, PricingPlan, Subscription, Notification, ComplianceScore, AnomalyLog, ComplianceReport, VendorRiskProfile
+- `app/Http/Controllers/` — DashboardController, InvoiceController, ProductController, MISController, BillingController, AdminController, ComplianceCertificateController, RiskReportController, ShareController, CompanyUserController, CompanySettingsController, CustomerLedgerController, BranchController
+- `app/Http/Middleware/` — CompanyIsolation, RoleMiddleware, RateLimitByCompany, ForceHttps
+- `app/Models/` — User, Company, Invoice, InvoiceItem, Product, Branch, CustomerLedger, AuditLog, SystemSetting, OverrideLog, FbrLog, InvoiceActivityLog, SecurityLog, PricingPlan, Subscription, Notification, ComplianceScore, AnomalyLog, ComplianceReport, VendorRiskProfile
 - `app/Jobs/` — SendInvoiceToFbrJob, NightlyComplianceCronJob, CheckFbrTokenExpiryJob, ComplianceScoringJob
-- `app/Services/` — ComplianceEngine, AnomalyEngine, HybridComplianceScorer, VendorRiskEngine, AuditDefenseService, FbrService, ComplianceRiskService, AnomalyDetectionService, SmartInsightsService, ComplianceCertificateService, InvoiceActivityService, IntegrityHashService, SecurityLogService, ScheduleEngine
+- `app/Services/` — ComplianceEngine, AnomalyEngine, HybridComplianceScorer, VendorRiskEngine, AuditDefenseService, AuditLogService, FbrService, ComplianceRiskService, AnomalyDetectionService, SmartInsightsService, ComplianceCertificateService, InvoiceActivityService, IntegrityHashService, SecurityLogService, ScheduleEngine
 - `database/seeders/` — DatabaseSeeder, PricingPlanSeeder, SystemSettingsSeeder, TestUsersSeeder, DemoSeeder
 
 ## Running

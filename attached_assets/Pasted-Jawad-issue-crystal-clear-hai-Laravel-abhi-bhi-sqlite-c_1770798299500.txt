@@ -1,0 +1,156 @@
+Jawad ✅ issue crystal clear hai.
+
+Laravel abhi bhi **sqlite connection use kar raha hai** — aur specifically **sessions table ke liye**.
+
+Error line dekho:
+
+```
+SQL: select * from "sessions"
+(Connection: sqlite)
+```
+
+Matlab 2 cheezein ho sakti hain:
+
+1️⃣ DB_CONNECTION abhi bhi sqlite hai
+YA
+2️⃣ SESSION_DRIVER=database hai lekin database connection sqlite pe point kar raha hai
+
+---
+
+# 🚀 Exact Fix (Step by Step)
+
+## 🟢 STEP 1 — .env Open Karo
+
+Ensure yeh lines ho:
+
+```
+DB_CONNECTION=pgsql
+```
+
+Agar PostgreSQL use kar rahe ho (Replit native)
+
+Aur ensure yeh **na ho**:
+
+```
+DB_CONNECTION=sqlite
+```
+
+---
+
+## 🟢 STEP 2 — Session Driver Check
+
+.env mein search karo:
+
+```
+SESSION_DRIVER=
+```
+
+Agar likha hai:
+
+```
+SESSION_DRIVER=database
+```
+
+To Laravel sessions DB mein save kar raha hai.
+
+Ab ensure karo DB correct hai (pgsql).
+
+Temporary safe fix:
+
+```
+SESSION_DRIVER=file
+```
+
+Is se session DB use nahi karega.
+
+---
+
+## 🟢 STEP 3 — Cache Clear (VERY IMPORTANT)
+
+Run:
+
+```bash
+php artisan optimize:clear
+php artisan config:clear
+php artisan cache:clear
+```
+
+---
+
+## 🟢 STEP 4 — Confirm Connection
+
+Run:
+
+```bash
+php artisan tinker
+```
+
+Phir:
+
+```php
+config('database.default');
+```
+
+Output hona chahiye:
+
+```
+"pgsql"
+```
+
+Agar "sqlite" aa raha hai → .env load nahi ho raha.
+
+---
+
+## 🟢 STEP 5 — Restart Server
+
+Stop karo.
+
+Phir:
+
+```bash
+php artisan serve --host=0.0.0.0 --port=5000
+```
+
+---
+
+# 🧠 Why This Happened?
+
+Laravel config cache karta hai.
+
+Aap ne:
+
+* SQLite delete ki
+* PostgreSQL pe shift kiya
+* Lekin config cache clear nahi hua
+
+Isliye Laravel purani sqlite config use kar raha tha.
+
+---
+
+# 🔥 Quickest Temporary Fix (Guaranteed Work)
+
+.env mein:
+
+```
+SESSION_DRIVER=file
+```
+
+Phir:
+
+```
+DB_CONNECTION=pgsql
+```
+
+Phir:
+
+```bash
+php artisan optimize:clear
+```
+
+Run again.
+
+---
+
+Ab mujhe sirf ek cheez confirm karo:
+
+`config('database.default')` kya return kar raha hai?

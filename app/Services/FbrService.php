@@ -47,6 +47,27 @@ class FbrService
             ];
         }
 
+        $demoMode = \App\Models\SystemSetting::get('demo_mode', 'false') === 'true';
+
+        if ($demoMode) {
+            $mockFbrNumber = 'MOCK-FBR-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+            
+            $log = FbrLog::create([
+                'invoice_id' => $invoice->id,
+                'request_payload' => json_encode(array_merge($payload, ['demo_mode' => true])),
+                'status' => 'success',
+                'response_payload' => json_encode(['status' => 'success', 'fbr_invoice_number' => $mockFbrNumber, 'mock' => true]),
+                'response_time_ms' => rand(500, 1500),
+                'retry_count' => 0,
+            ]);
+
+            return [
+                'status' => 'success',
+                'fbr_invoice_number' => $mockFbrNumber,
+                'response_time_ms' => $log->response_time_ms,
+            ];
+        }
+
         $log = FbrLog::create([
             'invoice_id' => $invoice->id,
             'request_payload' => json_encode($payload),

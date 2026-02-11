@@ -19,7 +19,24 @@ class Invoice extends Model
         'submission_mode',
         'fbr_invoice_id',
         'qr_data',
+        'share_uuid',
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+        static::creating(function ($invoice) {
+            if (!$invoice->share_uuid) {
+                $invoice->share_uuid = (string) \Illuminate\Support\Str::uuid();
+            }
+        });
+    }
+
+    public function getQrImageUrlAttribute()
+    {
+        if (!$this->qr_data) return null;
+        return 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' . urlencode($this->qr_data);
+    }
 
     public function items()
     {

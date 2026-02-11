@@ -87,12 +87,27 @@
         </tfoot>
     </table>
 
+    @if($invoice->status === 'locked')
+    <div style="text-align: center; margin-bottom: 15px; padding: 10px; background: #f0fdf4; border: 2px solid #10b981; border-radius: 8px;">
+        <div style="font-size: 20px; font-weight: bold; color: #065f46; letter-spacing: 2px;">FBR VERIFIED INVOICE</div>
+        <p style="margin: 4px 0 0 0; font-size: 13px; color: #047857;">Federal Board of Revenue — Government of Pakistan</p>
+        @if($invoice->fbr_invoice_id)
+        <p style="margin: 8px 0 0 0; font-size: 14px; font-weight: bold; color: #065f46;">FBR Invoice #: {{ $invoice->fbr_invoice_id }}</p>
+        @endif
+    </div>
+    @endif
+
     @if($invoice->qr_data)
     @php $qrInfo = json_decode($invoice->qr_data, true); @endphp
     <div style="border: 2px solid #10b981; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
         <div style="text-align: center; margin-bottom: 10px;">
             <span style="background: #d1fae5; color: #065f46; padding: 4px 16px; border-radius: 20px; font-size: 13px; font-weight: bold;">FBR Verified</span>
         </div>
+        @if($invoice->qr_image_url)
+        <div style="text-align: center; margin: 10px 0;">
+            <img src="{{ $invoice->qr_image_url }}" alt="QR Code" style="width: 150px; height: 150px; display: inline-block;">
+        </div>
+        @endif
         <table style="width: 100%; border: none; margin: 0;">
             <tr><td style="border: none; padding: 4px 8px; font-size: 13px; color: #6b7280;">NTN</td><td style="border: none; padding: 4px 8px; font-size: 13px; font-weight: bold;">{{ $qrInfo['ntn'] ?? '' }}</td></tr>
             <tr><td style="border: none; padding: 4px 8px; font-size: 13px; color: #6b7280;">Invoice #</td><td style="border: none; padding: 4px 8px; font-size: 13px; font-weight: bold;">{{ $qrInfo['invoice_number'] ?? '' }}</td></tr>
@@ -116,6 +131,12 @@
     @if(!empty($showWatermark) && $showWatermark)
     <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 48px; color: rgba(239, 68, 68, 0.15); font-weight: bold; text-transform: uppercase; pointer-events: none; z-index: 9999; white-space: nowrap; letter-spacing: 4px;">
         Subscription Expired - Upgrade Required
+    </div>
+    @endif
+
+    @if(!empty($isDraft) && $isDraft)
+    <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 72px; color: rgba(156, 163, 175, 0.2); font-weight: bold; text-transform: uppercase; pointer-events: none; z-index: 9999; white-space: nowrap; letter-spacing: 8px;">
+        DRAFT COPY
     </div>
     @endif
 </body>

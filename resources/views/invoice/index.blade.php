@@ -52,7 +52,7 @@
                                         <button type="submit" class="text-purple-600 hover:text-purple-800 font-medium" onclick="return confirm('Submit this invoice to FBR?')">Submit to FBR</button>
                                     </form>
                                     @endif
-                                    <a href="/invoice/{{ $invoice->id }}/pdf" class="text-gray-600 hover:text-gray-800 font-medium">PDF</a>
+                                    <a href="/invoice/{{ $invoice->id }}/download" class="text-gray-600 hover:text-gray-800 font-medium">Download</a>
                                 </td>
                             </tr>
                             @empty

@@ -358,37 +358,38 @@
                         <h3 class="text-lg font-semibold text-gray-800">Recent Invoices</h3>
                         <a href="/invoices" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View All</a>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice #</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Buyer</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                @forelse($recentInvoices as $invoice)
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-4 py-3 text-sm font-medium text-gray-900">
-                                        <a href="/invoice/{{ $invoice->id }}" class="text-emerald-600 hover:underline">{{ $invoice->invoice_number ?? 'INV-' . $invoice->id }}</a>
-                                    </td>
-                                    <td class="px-4 py-3 text-sm text-gray-600">{{ $invoice->buyer_name }}</td>
-                                    <td class="px-4 py-3 text-sm font-medium text-gray-900">Rs. {{ number_format($invoice->total_amount) }}</td>
-                                    <td class="px-4 py-3">
-                                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium
-                                            @if($invoice->status === 'draft') bg-yellow-100 text-yellow-800
-                                            @elseif($invoice->status === 'submitted') bg-blue-100 text-blue-800
-                                            @elseif($invoice->status === 'locked') bg-green-100 text-green-800
-                                            @endif">{{ ucfirst($invoice->status) }}</span>
-                                    </td>
-                                </tr>
-                                @empty
-                                <tr><td colspan="4" class="px-4 py-6 text-center text-gray-400">No invoices yet</td></tr>
-                                @endforelse
-                            </tbody>
-                        </table>
+                    <div class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        @forelse($recentInvoices as $invoice)
+                        <a href="/invoice/{{ $invoice->id }}" class="block p-4 rounded-lg border border-gray-200 hover:border-emerald-300 hover:shadow-sm transition group">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-mono text-gray-500">{{ $invoice->invoice_number ?? 'INV-' . $invoice->id }}</span>
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold
+                                    @if($invoice->status === 'draft') bg-gray-200 text-gray-700
+                                    @elseif($invoice->status === 'submitted') bg-blue-100 text-blue-800
+                                    @elseif($invoice->status === 'locked') bg-green-100 text-green-800
+                                    @endif">{{ ucfirst($invoice->status) }}</span>
+                            </div>
+                            <p class="text-sm font-semibold text-gray-900 truncate">{{ $invoice->buyer_name }}</p>
+                            <div class="flex items-center justify-between mt-2">
+                                <span class="text-sm font-bold text-emerald-600">Rs. {{ number_format($invoice->total_amount) }}</span>
+                                <div class="flex items-center space-x-2">
+                                    <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="text-xs text-gray-400 hover:text-emerald-600" onclick="event.stopPropagation();">PDF</a>
+                                    <span class="text-xs text-gray-400">{{ $invoice->created_at->format('d M') }}</span>
+                                </div>
+                            </div>
+                            @php
+                                $report = \App\Models\ComplianceReport::where('invoice_id', $invoice->id)->orderBy('created_at', 'desc')->first();
+                            @endphp
+                            @if($report)
+                            @php $cardBadge = \App\Services\HybridComplianceScorer::getRiskBadge($report->risk_level); @endphp
+                            <div class="mt-2">
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $cardBadge['bg'] }} {{ $cardBadge['text'] }}">{{ $report->risk_level }}</span>
+                            </div>
+                            @endif
+                        </a>
+                        @empty
+                        <div class="col-span-2 text-center py-8 text-gray-400">No invoices yet</div>
+                        @endforelse
                     </div>
                 </div>
 

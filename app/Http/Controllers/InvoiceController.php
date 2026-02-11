@@ -333,6 +333,31 @@ class InvoiceController extends Controller
             ->header('Content-Type', 'text/html');
     }
 
+    public function download(Invoice $invoice)
+    {
+        $companyId = app('currentCompanyId');
+        if ($invoice->company_id !== $companyId && auth()->user()->role !== 'super_admin') {
+            abort(403);
+        }
+        $invoice->load('items', 'company');
+
+        $showWatermark = false;
+        $isDraft = $invoice->status === 'draft';
+        
+        $subscription = Subscription::where('company_id', $invoice->company_id)
+            ->where('active', true)
+            ->first();
+        if (!$subscription || $subscription->isExpired()) {
+            $showWatermark = true;
+        }
+
+        $html = view('invoice.pdf', compact('invoice', 'showWatermark', 'isDraft'))->render();
+
+        return response($html)
+            ->header('Content-Type', 'text/html')
+            ->header('Content-Disposition', 'inline; filename="invoice-' . ($invoice->invoice_number ?? $invoice->id) . '.html"');
+    }
+
     public function complianceCheck(Request $request)
     {
         $companyId = app('currentCompanyId');

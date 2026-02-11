@@ -10,6 +10,9 @@ use App\Http\Controllers\ComplianceCertificateController;
 use App\Http\Controllers\RiskReportController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\MISController;
+use App\Http\Controllers\ShareController;
+
+Route::get('/share/invoice/{uuid}', [ShareController::class, 'show']);
 
 Route::get('/', function () {
     return \Illuminate\Support\Facades\Auth::check()
@@ -51,6 +54,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
     Route::get('/invoice/{invoice}', [InvoiceController::class, 'show'])->name('invoice.show');
     Route::get('/invoice/{invoice}/preview', [InvoiceController::class, 'preview']);
     Route::get('/invoice/{invoice}/pdf', [InvoiceController::class, 'pdf']);
+    Route::get('/invoice/{invoice}/download', [InvoiceController::class, 'download']);
     Route::post('/invoice/{invoice}/verify', [InvoiceController::class, 'verifyIntegrity'])->name('invoice.verify');
 
     Route::get('/compliance/certificate', [ComplianceCertificateController::class, 'generate'])->name('compliance.certificate');

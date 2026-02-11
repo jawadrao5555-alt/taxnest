@@ -1,0 +1,146 @@
+Perfect 👌
+Professional tareeke se temporary testing accounts bana dete hain.
+
+Hum 2 cheezein karenge:
+
+* 1 Super Admin account
+* 1 Normal User account (company ke saath linked)
+
+Safe aur clean tareeke se — seeders ke through.
+
+---
+
+# 🚀 STEP 1 — Seeder Create Karo
+
+Terminal mein run karo:
+
+```bash
+php artisan make:seeder TestUsersSeeder
+```
+
+---
+
+# 🟢 STEP 2 — Seeder Code Paste Karo
+
+Open:
+
+```
+database/seeders/TestUsersSeeder.php
+```
+
+Replace with:
+
+```php
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use App\Models\User;
+use App\Models\Company;
+use Illuminate\Support\Facades\Hash;
+
+class TestUsersSeeder extends Seeder
+{
+    public function run(): void
+    {
+        // Create Company
+        $company = Company::firstOrCreate([
+            'name' => 'Test Company',
+        ], [
+            'ntn' => '1234567-8',
+            'email' => 'test@company.com',
+            'phone' => '03000000000',
+            'address' => 'Test Address',
+            'fbr_token' => 'dummy-token'
+        ]);
+
+        // Admin User
+        User::updateOrCreate(
+            ['email' => 'admin@test.com'],
+            [
+                'name' => 'Admin',
+                'password' => Hash::make('admin123'),
+                'role' => 'super_admin',
+                'company_id' => $company->id,
+            ]
+        );
+
+        // Normal User
+        User::updateOrCreate(
+            ['email' => 'jawad@test.com'],
+            [
+                'name' => 'Jawad',
+                'password' => Hash::make('jawad123'),
+                'role' => 'employee',
+                'company_id' => $company->id,
+            ]
+        );
+    }
+}
+```
+
+---
+
+# 🟢 STEP 3 — Run Seeder
+
+Terminal:
+
+```bash
+php artisan db:seed --class=TestUsersSeeder
+```
+
+---
+
+# ✅ Login Credentials
+
+## 🔐 Super Admin
+
+Email:
+
+```
+admin@test.com
+```
+
+Password:
+
+```
+admin123
+```
+
+---
+
+## 👤 Normal User
+
+Email:
+
+```
+jawad@test.com
+```
+
+Password:
+
+```
+jawad123
+```
+
+---
+
+# 🎯 Ab Test Flow
+
+1. `/login`
+2. Admin se login karo → `/admin/dashboard` test karo
+3. Jawad user se login karo → invoice create karo
+
+---
+
+# 🧠 Important
+
+Passwords plain text nahi rakhe —
+Hash use kiya gaya hai (secure practice).
+
+---
+
+Ab login try karo.
+
+Dashboard aa raha hai ya koi error? 🚀

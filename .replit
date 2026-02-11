@@ -1,4 +1,4 @@
-modules = ["php-8.4"]
+modules = ["php-8.4", "nodejs-20"]
 [agent]
 expertMode = true
 
@@ -34,3 +34,6 @@ outputType = "webview"
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[nix]
+channel = "stable-25_05"

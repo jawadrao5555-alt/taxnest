@@ -5,8 +5,44 @@ namespace App\Http\Controllers;
 use App\Models\Invoice;
 use Illuminate\Http\Request;
 
+use App\Models\InvoiceItem;
+use Illuminate\Support\Facades\Auth;
+use Barryvdh\DomPDF\Facade\Pdf;
+
 class InvoiceController extends Controller
 {
+    public function create()
+    {
+        return view('invoice.create');
+    }
+
+    public function store(Request $request)
+    {
+        $invoice = Invoice::create([
+            'company_id' => app('currentCompanyId'),
+            'buyer_name' => $request->buyer_name,
+            'buyer_ntn' => $request->buyer_ntn,
+            'total_amount' => $request->total_amount
+        ]);
+
+        InvoiceItem::create([
+            'invoice_id' => $invoice->id,
+            'hs_code' => $request->hs_code,
+            'description' => $request->description,
+            'quantity' => $request->quantity,
+            'price' => $request->price,
+            'tax' => $request->tax
+        ]);
+
+        return redirect('/dashboard');
+    }
+
+    public function pdf(Invoice $invoice)
+    {
+        $pdf = Pdf::loadView('invoice.pdf', compact('invoice'));
+        return $pdf->download('invoice_'.$invoice->id.'.pdf');
+    }
+
     public function update(Request $request, Invoice $invoice)
     {
         if ($invoice->isLocked()) {

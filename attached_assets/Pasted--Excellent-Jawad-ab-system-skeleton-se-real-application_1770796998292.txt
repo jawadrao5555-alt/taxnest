@@ -1,0 +1,250 @@
+🔥 Excellent Jawad — ab system skeleton se real application ban raha hai.
+
+Ab **PHASE 4 — Real Invoice Creation + Dashboard + PDF**
+
+Ab tak backend logic ready hai.
+Ab user interface + real flow banate hain.
+
+---
+
+# 🚀 PHASE 4 — Real Invoice Creation Flow
+
+---
+
+# 🟢 STEP 1 — Invoice Create Route Add Karo
+
+Open:
+
+```
+routes/web.php
+```
+
+Inside middleware group add:
+
+```php
+Route::get('/invoice/create', [InvoiceController::class, 'create']);
+Route::post('/invoice/store', [InvoiceController::class, 'store']);
+Route::get('/invoice/{invoice}/pdf', [InvoiceController::class, 'pdf']);
+```
+
+Save.
+
+---
+
+# 🟢 STEP 2 — InvoiceController Expand Karo
+
+Open:
+
+```
+app/Http/Controllers/InvoiceController.php
+```
+
+Add these methods inside class:
+
+```php
+use App\Models\InvoiceItem;
+use Illuminate\Support\Facades\Auth;
+use Barryvdh\DomPDF\Facade\Pdf;
+
+public function create()
+{
+    return view('invoice.create');
+}
+
+public function store(Request $request)
+{
+    $invoice = Invoice::create([
+        'company_id' => app('currentCompanyId'),
+        'buyer_name' => $request->buyer_name,
+        'buyer_ntn' => $request->buyer_ntn,
+        'total_amount' => $request->total_amount
+    ]);
+
+    InvoiceItem::create([
+        'invoice_id' => $invoice->id,
+        'hs_code' => $request->hs_code,
+        'description' => $request->description,
+        'quantity' => $request->quantity,
+        'price' => $request->price,
+        'tax' => $request->tax
+    ]);
+
+    return redirect('/dashboard');
+}
+
+public function pdf(Invoice $invoice)
+{
+    $pdf = Pdf::loadView('invoice.pdf', compact('invoice'));
+    return $pdf->download('invoice_'.$invoice->id.'.pdf');
+}
+```
+
+Save.
+
+---
+
+# 🟢 STEP 3 — Create Invoice Form View
+
+Create folder:
+
+```
+resources/views/invoice
+```
+
+Create file:
+
+```
+create.blade.php
+```
+
+Paste:
+
+```html
+<h2>Create Invoice</h2>
+
+<form method="POST" action="/invoice/store">
+    @csrf
+
+    Buyer Name:
+    <input type="text" name="buyer_name"><br>
+
+    Buyer NTN:
+    <input type="text" name="buyer_ntn"><br>
+
+    Total Amount:
+    <input type="number" step="0.01" name="total_amount"><br>
+
+    <h4>Item Details</h4>
+
+    HS Code:
+    <input type="text" name="hs_code"><br>
+
+    Description:
+    <input type="text" name="description"><br>
+
+    Quantity:
+    <input type="number" step="0.01" name="quantity"><br>
+
+    Price:
+    <input type="number" step="0.01" name="price"><br>
+
+    Tax:
+    <input type="number" step="0.01" name="tax"><br>
+
+    <button type="submit">Save Invoice</button>
+</form>
+```
+
+Save.
+
+---
+
+# 🟢 STEP 4 — Create PDF View
+
+Create file:
+
+```
+resources/views/invoice/pdf.blade.php
+```
+
+Paste:
+
+```html
+<h2>Invoice #{{ $invoice->invoice_number ?? $invoice->id }}</h2>
+
+<p>Buyer: {{ $invoice->buyer_name }}</p>
+<p>NTN: {{ $invoice->buyer_ntn }}</p>
+<p>Total: {{ $invoice->total_amount }}</p>
+
+<hr>
+
+@foreach($invoice->items as $item)
+<p>
+HS: {{ $item->hs_code }} <br>
+Desc: {{ $item->description }} <br>
+Qty: {{ $item->quantity }} <br>
+Price: {{ $item->price }} <br>
+Tax: {{ $item->tax }}
+</p>
+<hr>
+@endforeach
+```
+
+Save.
+
+---
+
+# 🟢 STEP 5 — Simple Dashboard View
+
+Open:
+
+```
+routes/web.php
+```
+
+Replace dashboard route with:
+
+```php
+Route::get('/dashboard', function () {
+    $invoices = \App\Models\Invoice::where('company_id', app('currentCompanyId'))->get();
+    return view('dashboard', compact('invoices'));
+});
+```
+
+Create:
+
+```
+resources/views/dashboard.blade.php
+```
+
+Paste:
+
+```html
+<h2>Company Dashboard</h2>
+
+<a href="/invoice/create">Create Invoice</a>
+
+<hr>
+
+@foreach($invoices as $invoice)
+<p>
+Invoice #{{ $invoice->id }} - {{ $invoice->status }}
+<a href="/invoice/{{ $invoice->id }}/pdf">Download PDF</a>
+</p>
+@endforeach
+```
+
+Save.
+
+---
+
+# 🔥 PHASE 4 RESULT
+
+✔ Real invoice create form
+✔ Invoice stored in DB
+✔ Dashboard listing
+✔ PDF download working
+✔ Company isolation active
+✔ Production lock active
+
+---
+
+# 🎯 Next Phase (Major Upgrade)
+
+Phase 5:
+
+📡 Real FBR API call integration
+🔁 Retry Queue
+📊 Proper UI styling
+📱 PWA setup
+
+---
+
+Ab test karo:
+
+1️⃣ /invoice/create open ho raha?
+2️⃣ Invoice save ho raha?
+3️⃣ Dashboard list aa rahi?
+4️⃣ PDF download ho raha?
+
+Result batao — phir Phase 5 start karte hain 🚀

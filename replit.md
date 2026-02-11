@@ -35,6 +35,9 @@ TaxNest is built on **Laravel 12** with **Breeze** for authentication, using **P
 - **Enhanced Compliance Scoring:** Formula: `finalScore = base - anomalyWeight - vendorWeight + stabilityBonus`. Anomaly weight from unresolved anomaly logs (max 30), vendor weight from risky vendor profiles (max 20), stability bonus from consistent performance (max 10).
 - **Intelligence Processing:** Async queue-based processing via `IntelligenceProcessingJob`, vendor risk tracking, and compliance recalculation.
 - **Dashboard Intelligence Panels:** Audit probability with 6 factors (compliance score, anomalies, critical/high risk reports, risky vendors, severity bonuses), compliance formula breakdown, and company-wide risk summary with severity breakdown.
+- **Multi-Layer Tax Intelligence:** 5-table override architecture (sector_tax_rules, province_tax_rules, customer_tax_rules, special_sro_rules, override_usage_logs) with priority: manual > customer > province > sector > global. TaxResolutionService resolves overrides with logging. Dynamic standard_tax_rate per company (no hardcoded rates).
+- **Tax Override Management:** Full CRUD admin panel (`/tax-overrides`) with tabbed interface for sector, province, customer, and SRO rules. Role-based access: super_admin manages all rule types, company_admin manages customer-specific rules only. Company isolation enforced on all customer rule operations.
+- **Override Analytics:** Admin dashboard includes Tax Intelligence stats (active rules count, total/monthly usage). Enhanced override-logs page with dual-tab view for MIS overrides and tax intelligence usage with layer distribution breakdown.
 
 ## External Dependencies
 - **PostgreSQL:** Primary database managed by Replit.

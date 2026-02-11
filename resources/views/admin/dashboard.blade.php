@@ -145,6 +145,42 @@
                 </div>
             </div>
 
+            <div class="bg-white rounded-xl shadow-sm border border-cyan-100 p-6 mb-8">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800 flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-cyan-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+                        <span>Tax Override Intelligence</span>
+                    </h3>
+                    <a href="/tax-overrides" class="text-sm text-cyan-600 hover:text-cyan-700 font-medium">Manage Rules</a>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    <div class="text-center p-3 bg-blue-50 rounded-lg">
+                        <p class="text-2xl font-bold text-blue-700">{{ $overrideStats['sector_rules'] }}</p>
+                        <p class="text-xs text-blue-600 mt-1">Sector Rules</p>
+                    </div>
+                    <div class="text-center p-3 bg-purple-50 rounded-lg">
+                        <p class="text-2xl font-bold text-purple-700">{{ $overrideStats['province_rules'] }}</p>
+                        <p class="text-xs text-purple-600 mt-1">Province Rules</p>
+                    </div>
+                    <div class="text-center p-3 bg-emerald-50 rounded-lg">
+                        <p class="text-2xl font-bold text-emerald-700">{{ $overrideStats['customer_rules'] }}</p>
+                        <p class="text-xs text-emerald-600 mt-1">Customer Rules</p>
+                    </div>
+                    <div class="text-center p-3 bg-amber-50 rounded-lg">
+                        <p class="text-2xl font-bold text-amber-700">{{ $overrideStats['sro_rules'] }}</p>
+                        <p class="text-xs text-amber-600 mt-1">SRO Rules</p>
+                    </div>
+                    <div class="text-center p-3 bg-cyan-50 rounded-lg">
+                        <p class="text-2xl font-bold text-cyan-700">{{ $overrideStats['total_overrides_applied'] }}</p>
+                        <p class="text-xs text-cyan-600 mt-1">Total Applied</p>
+                    </div>
+                    <div class="text-center p-3 bg-teal-50 rounded-lg">
+                        <p class="text-2xl font-bold text-teal-700">{{ $overrideStats['overrides_this_month'] }}</p>
+                        <p class="text-xs text-teal-600 mt-1">This Month</p>
+                    </div>
+                </div>
+            </div>
+
             @if($recentAnomalies->count() > 0)
             <div class="bg-white rounded-xl shadow-sm border border-red-100 p-6 mb-8">
                 <div class="flex items-center justify-between mb-4">
@@ -179,6 +215,7 @@
                 <a href="/admin/anomalies" class="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg font-medium text-sm hover:bg-orange-700 transition">Anomalies</a>
                 <a href="/admin/risk-settings" class="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg font-medium text-sm hover:bg-teal-700 transition">Risk Settings</a>
                 <a href="/admin/override-logs" class="inline-flex items-center px-4 py-2 bg-amber-600 text-white rounded-lg font-medium text-sm hover:bg-amber-700 transition">Override Logs</a>
+                <a href="/tax-overrides" class="inline-flex items-center px-4 py-2 bg-cyan-600 text-white rounded-lg font-medium text-sm hover:bg-cyan-700 transition">Tax Override Rules</a>
                 <a href="/admin/audit/export" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium text-sm hover:bg-indigo-700 transition">Export Audit CSV</a>
             </div>
         </div>

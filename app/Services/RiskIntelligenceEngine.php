@@ -147,7 +147,8 @@ class RiskIntelligenceEngine
             $scheduleType = $item->schedule_type ?? 'standard';
             $taxRate = $item->tax_rate ?? null;
 
-            if ($scheduleType === '3rd_schedule' && $taxRate !== null && $taxRate < 18) {
+            $standardTaxRate = $invoice->company ? ($invoice->company->standard_tax_rate ?? 18.0) : 18.0;
+            if ($scheduleType === '3rd_schedule' && $taxRate !== null && $taxRate < $standardTaxRate) {
                 if (empty($item->sro_schedule_no)) {
                     return [
                         'type' => 'reduced_without_sro',

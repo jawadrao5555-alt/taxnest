@@ -27,6 +27,9 @@ class Company extends Model
         'fbr_connection_status',
         'is_internal_account',
         'onboarding_completed',
+        'standard_tax_rate',
+        'sector_type',
+        'province',
     ];
 
     protected $casts = [
@@ -36,6 +39,7 @@ class Company extends Model
         'last_successful_submission' => 'datetime',
         'is_internal_account' => 'boolean',
         'onboarding_completed' => 'boolean',
+        'standard_tax_rate' => 'float',
     ];
 
     protected $hidden = [
@@ -124,5 +128,15 @@ class Company extends Model
     public function ledgerEntries()
     {
         return $this->hasMany(CustomerLedger::class);
+    }
+
+    public function customerTaxRules()
+    {
+        return $this->hasMany(CustomerTaxRule::class);
+    }
+
+    public function getStandardTaxRateValue(): float
+    {
+        return $this->standard_tax_rate ?? 18.0;
     }
 }

@@ -8,7 +8,6 @@ use App\Models\Company;
 
 class ComplianceEngine
 {
-    private const STANDARD_TAX_RATE = 18.0;
     private const RATE_TOLERANCE = 2.0;
 
     private const DEDUCTION_RATE_MISMATCH = 15;
@@ -19,6 +18,7 @@ class ComplianceEngine
     public static function validate(Invoice $invoice): array
     {
         $invoice->load('items', 'company');
+        $standardTaxRate = $invoice->company ? ($invoice->company->standard_tax_rate ?? 18.0) : 18.0;
 
         $flags = [
             'RATE_MISMATCH' => self::checkRateMismatch($invoice),
@@ -39,12 +39,13 @@ class ComplianceEngine
 
     private static function checkRateMismatch(Invoice $invoice): bool
     {
+        $standardTaxRate = $invoice->company ? ($invoice->company->standard_tax_rate ?? 18.0) : 18.0;
         foreach ($invoice->items as $item) {
             $subtotal = $item->price * $item->quantity;
             if ($subtotal <= 0) continue;
 
             $effectiveRate = ($item->tax / $subtotal) * 100;
-            $expectedRate = self::getExpectedRateForHsCode($item->hs_code);
+            $expectedRate = self::getExpectedRateForHsCode($item->hs_code, $standardTaxRate);
 
             if (abs($effectiveRate - $expectedRate) > self::RATE_TOLERANCE) {
                 return true;
@@ -114,7 +115,7 @@ class ComplianceEngine
         return false;
     }
 
-    private static function getExpectedRateForHsCode(string $hsCode): float
+    private static function getExpectedRateForHsCode(string $hsCode, float $standardTaxRate = 18.0): float
     {
         $prefix = substr($hsCode, 0, 2);
 
@@ -125,10 +126,10 @@ class ComplianceEngine
 
         $reducedRatePrefixes = ['30', '84', '85'];
         if (in_array($prefix, $reducedRatePrefixes)) {
-            return 18.0;
+            return $standardTaxRate;
         }
 
-        return self::STANDARD_TAX_RATE;
+        return $standardTaxRate;
     }
 
     private static function calculateDeductions(array $flags): array

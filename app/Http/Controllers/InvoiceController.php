@@ -53,7 +53,9 @@ class InvoiceController extends Controller
             return redirect('/invoices')->with('error', $limitCheck['reason']);
         }
         $branches = \App\Models\Branch::where('company_id', $companyId)->orderBy('name')->get();
-        return view('invoice.create', compact('branches'));
+        $company = \App\Models\Company::find($companyId);
+        $standardTaxRate = $company ? $company->getStandardTaxRateValue() : 18.0;
+        return view('invoice.create', compact('branches', 'standardTaxRate'));
     }
 
     public function store(Request $request)
@@ -87,12 +89,14 @@ class InvoiceController extends Controller
             return $item;
         })->toArray();
 
-        $scheduleErrors = ScheduleEngine::validateItems($itemsWithTaxRate);
+        $companyId = app('currentCompanyId');
+        $company = \App\Models\Company::find($companyId);
+        $standardTaxRate = $company ? $company->getStandardTaxRateValue() : 18.0;
+
+        $scheduleErrors = ScheduleEngine::validateItems($itemsWithTaxRate, $standardTaxRate);
         if (!empty($scheduleErrors)) {
             return back()->withErrors($scheduleErrors)->withInput();
         }
-
-        $companyId = app('currentCompanyId');
 
         if ($request->branch_id) {
             $branch = \App\Models\Branch::where('id', $request->branch_id)->where('company_id', $companyId)->first();
@@ -211,7 +215,9 @@ class InvoiceController extends Controller
         }
         $invoice->load('items');
         $branches = \App\Models\Branch::where('company_id', $companyId)->orderBy('name')->get();
-        return view('invoice.edit', compact('invoice', 'branches'));
+        $company = \App\Models\Company::find($companyId);
+        $standardTaxRate = $company ? $company->getStandardTaxRateValue() : 18.0;
+        return view('invoice.edit', compact('invoice', 'branches', 'standardTaxRate'));
     }
 
     public function update(Request $request, Invoice $invoice)
@@ -243,7 +249,10 @@ class InvoiceController extends Controller
             return $item;
         })->toArray();
 
-        $scheduleErrors = ScheduleEngine::validateItems($itemsWithTaxRate);
+        $company = \App\Models\Company::find($invoice->company_id);
+        $standardTaxRate = $company ? $company->getStandardTaxRateValue() : 18.0;
+
+        $scheduleErrors = ScheduleEngine::validateItems($itemsWithTaxRate, $standardTaxRate);
         if (!empty($scheduleErrors)) {
             return back()->withErrors($scheduleErrors)->withInput();
         }
@@ -354,7 +363,9 @@ class InvoiceController extends Controller
             ];
         })->toArray();
 
-        $submissionCheck = ScheduleEngine::validateForSubmission($itemsForValidation);
+        $company = \App\Models\Company::find($invoice->company_id);
+        $standardTaxRate = $company ? $company->getStandardTaxRateValue() : 18.0;
+        $submissionCheck = ScheduleEngine::validateForSubmission($itemsForValidation, $standardTaxRate);
         if (!$submissionCheck['valid']) {
             $errorHtml = $submissionCheck['message'] . ' ' . implode(' | ', $submissionCheck['errors']);
             return redirect('/invoice/' . $invoice->id)->with('error', $errorHtml);

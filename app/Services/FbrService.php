@@ -29,7 +29,7 @@ class FbrService
             $payload["items"][] = [
                 "hsCode" => $item->hs_code,
                 "productDescription" => $item->description,
-                "rate" => "18%",
+                "rate" => ($item->tax_rate ?? 18) . "%",
                 "uoM" => "Numbers, pieces, units",
                 "quantity" => $item->quantity,
                 "totalValues" => $item->price + $item->tax,

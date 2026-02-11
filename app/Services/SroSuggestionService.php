@@ -35,7 +35,7 @@ class SroSuggestionService
         ],
     ];
 
-    public static function suggest(string $scheduleType, ?float $taxRate = null, ?string $hsCode = null): ?array
+    public static function suggest(string $scheduleType, ?float $taxRate = null, ?string $hsCode = null, float $standardTaxRate = 18.0): ?array
     {
         if ($scheduleType === 'standard') {
             return null;
@@ -46,7 +46,7 @@ class SroSuggestionService
             return null;
         }
 
-        if ($scheduleType === '3rd_schedule' && $taxRate !== null && $taxRate < 18) {
+        if ($scheduleType === '3rd_schedule' && $taxRate !== null && $taxRate < $standardTaxRate) {
             $roundedRate = (int) round($taxRate);
             if (isset($scheduleData['rates'][$roundedRate])) {
                 $suggestion = $scheduleData['rates'][$roundedRate];
@@ -95,9 +95,9 @@ class SroSuggestionService
         return $suggestions;
     }
 
-    public static function getApiResponse(string $scheduleType, ?float $taxRate = null, ?string $hsCode = null): array
+    public static function getApiResponse(string $scheduleType, ?float $taxRate = null, ?string $hsCode = null, float $standardTaxRate = 18.0): array
     {
-        $suggestion = self::suggest($scheduleType, $taxRate, $hsCode);
+        $suggestion = self::suggest($scheduleType, $taxRate, $hsCode, $standardTaxRate);
 
         if (!$suggestion) {
             return ['has_suggestion' => false];

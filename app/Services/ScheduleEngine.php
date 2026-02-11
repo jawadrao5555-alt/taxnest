@@ -5,7 +5,7 @@ namespace App\Services;
 class ScheduleEngine
 {
     public static array $scheduleTypes = [
-        'standard' => ['label' => 'Standard Rate', 'tax_rate' => 18, 'requires_sro' => false, 'requires_serial' => false, 'requires_mrp' => false],
+        'standard' => ['label' => 'Standard Rate', 'tax_rate' => null, 'requires_sro' => false, 'requires_serial' => false, 'requires_mrp' => false],
         'reduced' => ['label' => 'Reduced Rate', 'tax_rate' => 10, 'requires_sro' => true, 'requires_serial' => true, 'requires_mrp' => false],
         '3rd_schedule' => ['label' => '3rd Schedule', 'tax_rate' => 17, 'requires_sro' => false, 'requires_serial' => false, 'requires_mrp' => false],
         'exempt' => ['label' => 'Exempt', 'tax_rate' => 0, 'requires_sro' => true, 'requires_serial' => true, 'requires_mrp' => false],
@@ -35,12 +35,12 @@ class ScheduleEngine
         return self::$scheduleTypes[$scheduleType] ?? self::$scheduleTypes['standard'];
     }
 
-    public static function getRequiredFields(string $scheduleType, ?float $taxRate = null): array
+    public static function getRequiredFields(string $scheduleType, ?float $taxRate = null, float $standardTaxRate = 18.0): array
     {
-        return self::resolveValidationRules($scheduleType, $taxRate);
+        return self::resolveValidationRules($scheduleType, $taxRate, $standardTaxRate);
     }
 
-    public static function resolveValidationRules(string $scheduleType, ?float $taxRate = null): array
+    public static function resolveValidationRules(string $scheduleType, ?float $taxRate = null, float $standardTaxRate = 18.0): array
     {
         switch ($scheduleType) {
             case 'standard':
@@ -51,7 +51,7 @@ class ScheduleEngine
                 ];
 
             case '3rd_schedule':
-                if ($taxRate !== null && $taxRate >= 18) {
+                if ($taxRate !== null && $taxRate >= $standardTaxRate) {
                     return [
                         'requires_sro' => false,
                         'requires_serial' => false,
@@ -97,16 +97,16 @@ class ScheduleEngine
     public static function getTaxRate(string $scheduleType): float
     {
         $config = self::getScheduleConfig($scheduleType);
-        return $config['tax_rate'];
+        return $config['tax_rate'] ?? 18.0;
     }
 
-    public static function lookupByHsCode(string $hsCode): ?array
+    public static function lookupByHsCode(string $hsCode, float $standardTaxRate = 18.0): ?array
     {
         $normalized = preg_replace('/[^0-9]/', '', $hsCode);
 
         if (isset(self::$hsLookupTable[$normalized])) {
             $data = self::$hsLookupTable[$normalized];
-            $rules = self::resolveValidationRules($data['schedule_type'], $data['tax_rate']);
+            $rules = self::resolveValidationRules($data['schedule_type'], $data['tax_rate'], $standardTaxRate);
             return [
                 'pct_code' => $data['pct_code'],
                 'schedule_type' => $data['schedule_type'],
@@ -120,7 +120,7 @@ class ScheduleEngine
         return null;
     }
 
-    public static function validateItems(array $items): array
+    public static function validateItems(array $items, float $standardTaxRate = 18.0): array
     {
         $errors = [];
         $scheduleTypes = [];
@@ -138,29 +138,37 @@ class ScheduleEngine
                 }
             }
 
-            $rules = self::resolveValidationRules($scheduleType, $taxRate);
+            if ($scheduleType === 'exempt' && $taxRate !== null && $taxRate != 0) {
+                $errors[] = "Item #" . ($index + 1) . ": Exempt items must have 0% tax rate";
+            }
+
+            if ($scheduleType === 'zero_rated' && $taxRate !== null && $taxRate != 0) {
+                $errors[] = "Item #" . ($index + 1) . ": Zero Rated items must have 0% tax rate";
+            }
+
+            $rules = self::resolveValidationRules($scheduleType, $taxRate, $standardTaxRate);
             $config = self::getScheduleConfig($scheduleType);
             $itemNum = $index + 1;
 
             if ($rules['requires_sro'] && empty($item['sro_schedule_no'])) {
                 if ($scheduleType === '3rd_schedule') {
-                    $errors[] = "Item #{$itemNum}: SRO Schedule No is required for 3rd Schedule items with reduced tax rate (below 18%)";
+                    $errors[] = "Item #{$itemNum}: SRO Schedule No is required for 3rd Schedule items with reduced tax rate (below {$standardTaxRate}%)";
                 } else {
                     $errors[] = "Item #{$itemNum}: SRO Schedule No is required for {$config['label']}";
                 }
             }
             if ($rules['requires_serial'] && empty($item['serial_no'])) {
                 if ($scheduleType === '3rd_schedule') {
-                    $errors[] = "Item #{$itemNum}: SRO Item Serial No is required for 3rd Schedule items with reduced tax rate (below 18%)";
+                    $errors[] = "Item #{$itemNum}: SRO Item Serial No is required for 3rd Schedule items with reduced tax rate (below {$standardTaxRate}%)";
                 } else {
                     $errors[] = "Item #{$itemNum}: SRO Item Serial No is required for {$config['label']}";
                 }
             }
             if ($rules['requires_mrp'] && (empty($item['mrp']) || floatval($item['mrp']) <= 0)) {
-                if ($scheduleType === '3rd_schedule' && $taxRate !== null && $taxRate >= 18) {
-                    $errors[] = "Item #{$itemNum}: MRP (Retail Price) is required for 3rd Schedule items at standard 18% rate";
+                if ($scheduleType === '3rd_schedule' && $taxRate !== null && $taxRate >= $standardTaxRate) {
+                    $errors[] = "Item #{$itemNum}: MRP (Retail Price) is required for 3rd Schedule items at standard {$standardTaxRate}% rate";
                 } elseif ($scheduleType === '3rd_schedule') {
-                    $errors[] = "Item #{$itemNum}: Fixed/Notified Value or Retail Price is required for 3rd Schedule items with reduced tax rate (below 18%)";
+                    $errors[] = "Item #{$itemNum}: Fixed/Notified Value or Retail Price is required for 3rd Schedule items with reduced tax rate (below {$standardTaxRate}%)";
                 } else {
                     $errors[] = "Item #{$itemNum}: MRP is required for {$config['label']}";
                 }
@@ -176,9 +184,9 @@ class ScheduleEngine
         return $errors;
     }
 
-    public static function validateForSubmission(array $items): array
+    public static function validateForSubmission(array $items, float $standardTaxRate = 18.0): array
     {
-        $errors = self::validateItems($items);
+        $errors = self::validateItems($items, $standardTaxRate);
         if (!empty($errors)) {
             return [
                 'valid' => false,

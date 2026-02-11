@@ -148,7 +148,7 @@
                                         class="w-full rounded-lg shadow-sm text-sm">
                                 </div>
                                 <div x-show="item.requires_mrp">
-                                    <label class="block text-xs font-medium text-amber-600 mb-1" x-text="item.schedule_type === '3rd_schedule' && parseFloat(item.tax_rate) < 18 ? 'Fixed/Notified Value (Rs.) *' : 'MRP / Retail Price (Rs.) *'"></label>
+                                    <label class="block text-xs font-medium text-amber-600 mb-1" x-text="item.schedule_type === '3rd_schedule' && parseFloat(item.tax_rate) < companyStandardRate ? 'Fixed/Notified Value (Rs.) *' : 'MRP / Retail Price (Rs.) *'"></label>
                                     <input type="number" step="0.01" min="0" :name="'items[' + index + '][mrp]'" x-model="item.mrp" placeholder="0.00"
                                         class="w-full rounded-lg border-amber-300 shadow-sm text-sm focus:ring-amber-500 focus:border-amber-500 bg-amber-50">
                                 </div>
@@ -248,13 +248,14 @@
 
     <script>
         function invoiceForm() {
+            const companyStandardRate = {{ $standardTaxRate ?? 18 }};
             const defaultTaxRates = {
-                standard: 18, reduced: 10, '3rd_schedule': 17, exempt: 0, zero_rated: 0
+                standard: companyStandardRate, reduced: 10, '3rd_schedule': 17, exempt: 0, zero_rated: 0
             };
 
             const scheduleHints = {
                 standard: 'Standard Rate: No SRO, Serial, or MRP required.',
-                '3rd_schedule_18': '3rd Schedule (18%): Only MRP/Retail Price required.',
+                '3rd_schedule_standard': '3rd Schedule (' + companyStandardRate + '%+): Only MRP/Retail Price required.',
                 '3rd_schedule_reduced': '3rd Schedule (reduced rate): SRO, Serial No, and Fixed/Notified Value all required.',
                 exempt: 'Exempt: SRO Schedule No and Serial No required.',
                 zero_rated: 'Zero Rated: SRO and Serial are optional.',
@@ -266,8 +267,8 @@
                     case 'standard':
                         return { requires_sro: false, requires_serial: false, requires_mrp: false, optional_sro: false, optional_serial: false, hint: scheduleHints.standard };
                     case '3rd_schedule':
-                        if (parseFloat(taxRate) >= 18) {
-                            return { requires_sro: false, requires_serial: false, requires_mrp: true, optional_sro: false, optional_serial: false, hint: scheduleHints['3rd_schedule_18'] };
+                        if (parseFloat(taxRate) >= companyStandardRate) {
+                            return { requires_sro: false, requires_serial: false, requires_mrp: true, optional_sro: false, optional_serial: false, hint: scheduleHints['3rd_schedule_standard'] };
                         }
                         return { requires_sro: true, requires_serial: true, requires_mrp: true, optional_sro: false, optional_serial: false, hint: scheduleHints['3rd_schedule_reduced'] };
                     case 'exempt':
@@ -284,7 +285,7 @@
             function newItem() {
                 return {
                     product_id: '', hs_code: '', pct_code: '', description: '',
-                    quantity: 1, price: 0, tax_rate: 18, tax: 0,
+                    quantity: 1, price: 0, tax_rate: companyStandardRate, tax: 0,
                     schedule_type: 'standard', sro_schedule_no: '', serial_no: '', mrp: '', sroSuggestion: null,
                     requires_sro: false, requires_serial: false, requires_mrp: false,
                     optional_sro: false, optional_serial: false, schedule_hint: '',
@@ -320,7 +321,7 @@
                     let item = newItem();
                     if (this.items.length > 0) {
                         item.schedule_type = this.items[0].schedule_type;
-                        item.tax_rate = defaultTaxRates[item.schedule_type] ?? 18;
+                        item.tax_rate = defaultTaxRates[item.schedule_type] ?? companyStandardRate;
                     }
                     this.applyScheduleRules(item);
                     this.items.push(item);
@@ -345,7 +346,7 @@
 
                 onScheduleChange(index) {
                     let item = this.items[index];
-                    item.tax_rate = defaultTaxRates[item.schedule_type] ?? 18;
+                    item.tax_rate = defaultTaxRates[item.schedule_type] ?? companyStandardRate;
                     this.applyScheduleRules(item);
                     this.calcTax(index);
                     this.validateMixedSchedules();

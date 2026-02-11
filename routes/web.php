@@ -16,6 +16,7 @@ use App\Http\Controllers\CompanySettingsController;
 use App\Http\Controllers\CustomerLedgerController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\OnboardingController;
+use App\Http\Controllers\TaxOverrideController;
 
 Route::get('/share/invoice/{uuid}', [ShareController::class, 'show']);
 
@@ -88,14 +89,41 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
     });
     Route::get('/api/hs-lookup', function (\Illuminate\Http\Request $request) {
         $hsCode = $request->get('hs_code', '');
-        $result = \App\Services\ScheduleEngine::lookupByHsCode($hsCode);
+        $companyId = app('currentCompanyId');
+        $company = \App\Models\Company::find($companyId);
+        $standardTaxRate = $company ? $company->getStandardTaxRateValue() : 18.0;
+        $customerNtn = $request->get('customer_ntn');
+
+        $resolved = \App\Services\TaxResolutionService::resolve($hsCode, $company, $customerNtn);
+        if ($resolved['pct_code']) {
+            $rules = \App\Services\ScheduleEngine::resolveValidationRules($resolved['schedule_type'], $resolved['tax_rate'], $standardTaxRate);
+            $resolved['requires_sro'] = $rules['requires_sro'];
+            $resolved['requires_serial'] = $rules['requires_serial'];
+            $resolved['requires_mrp'] = $rules['requires_mrp'];
+            $resolved['standard_tax_rate'] = $standardTaxRate;
+            return response()->json($resolved);
+        }
+
+        $result = \App\Services\ScheduleEngine::lookupByHsCode($hsCode, $standardTaxRate);
+        if ($result) {
+            $result['standard_tax_rate'] = $standardTaxRate;
+        }
         return response()->json($result ?: ['found' => false]);
     });
     Route::get('/api/sro-suggest', function (\Illuminate\Http\Request $request) {
         $scheduleType = $request->get('schedule_type', 'standard');
         $taxRate = $request->get('tax_rate') ? floatval($request->get('tax_rate')) : null;
         $hsCode = $request->get('hs_code');
-        return response()->json(\App\Services\SroSuggestionService::getApiResponse($scheduleType, $taxRate, $hsCode));
+        $companyId = app('currentCompanyId');
+        $company = \App\Models\Company::find($companyId);
+        $standardTaxRate = $company ? $company->getStandardTaxRateValue() : 18.0;
+        return response()->json(\App\Services\SroSuggestionService::getApiResponse($scheduleType, $taxRate, $hsCode, $standardTaxRate));
+    });
+    Route::get('/api/tax-resolve', function (\Illuminate\Http\Request $request) {
+        $companyId = app('currentCompanyId');
+        $hsCode = $request->get('hs_code', '');
+        $customerNtn = $request->get('customer_ntn');
+        return response()->json(\App\Services\TaxResolutionService::resolveForApi($hsCode, $companyId, $customerNtn));
     });
     Route::get('/api/invoice/{invoice}/risk-analysis', function (\Illuminate\Http\Request $request, \App\Models\Invoice $invoice) {
         $companyId = app('currentCompanyId');
@@ -120,7 +148,25 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
     Route::get('/mis', [MISController::class, 'index'])->name('mis.index');
     Route::get('/mis/export', [MISController::class, 'exportCsv'])->name('mis.export');
 
+    Route::middleware(['role:company_admin,super_admin'])->group(function () {
+        Route::get('/tax-overrides', [TaxOverrideController::class, 'index'])->name('tax-overrides.index');
+        Route::post('/tax-overrides/customer', [TaxOverrideController::class, 'storeCustomerRule'])->name('tax-overrides.customer.store');
+        Route::put('/tax-overrides/customer/{id}', [TaxOverrideController::class, 'updateCustomerRule'])->name('tax-overrides.customer.update');
+        Route::delete('/tax-overrides/customer/{id}', [TaxOverrideController::class, 'deleteCustomerRule'])->name('tax-overrides.customer.delete');
+    });
+
     Route::middleware(['role:super_admin'])->group(function () {
+        Route::post('/tax-overrides/sector', [TaxOverrideController::class, 'storeSectorRule'])->name('tax-overrides.sector.store');
+        Route::put('/tax-overrides/sector/{id}', [TaxOverrideController::class, 'updateSectorRule'])->name('tax-overrides.sector.update');
+        Route::delete('/tax-overrides/sector/{id}', [TaxOverrideController::class, 'deleteSectorRule'])->name('tax-overrides.sector.delete');
+        Route::post('/tax-overrides/province', [TaxOverrideController::class, 'storeProvinceRule'])->name('tax-overrides.province.store');
+        Route::put('/tax-overrides/province/{id}', [TaxOverrideController::class, 'updateProvinceRule'])->name('tax-overrides.province.update');
+        Route::delete('/tax-overrides/province/{id}', [TaxOverrideController::class, 'deleteProvinceRule'])->name('tax-overrides.province.delete');
+        Route::post('/tax-overrides/sro', [TaxOverrideController::class, 'storeSroRule'])->name('tax-overrides.sro.store');
+        Route::put('/tax-overrides/sro/{id}', [TaxOverrideController::class, 'updateSroRule'])->name('tax-overrides.sro.update');
+        Route::delete('/tax-overrides/sro/{id}', [TaxOverrideController::class, 'deleteSroRule'])->name('tax-overrides.sro.delete');
+        Route::get('/tax-overrides/analytics', [TaxOverrideController::class, 'overrideAnalytics'])->name('tax-overrides.analytics');
+
         Route::get('/admin/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
         Route::get('/admin/companies', [AdminController::class, 'companies']);
         Route::get('/admin/companies/create', [AdminController::class, 'createCompany']);

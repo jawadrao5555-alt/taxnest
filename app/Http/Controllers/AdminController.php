@@ -52,12 +52,21 @@ class AdminController extends Controller
 
         $pendingCompanies = Company::where('company_status', 'pending')->count();
 
+        $overrideStats = [
+            'sector_rules' => \App\Models\SectorTaxRule::where('is_active', true)->count(),
+            'province_rules' => \App\Models\ProvinceTaxRule::where('is_active', true)->count(),
+            'customer_rules' => \App\Models\CustomerTaxRule::where('is_active', true)->count(),
+            'sro_rules' => \App\Models\SpecialSroRule::where('is_active', true)->count(),
+            'total_overrides_applied' => \App\Models\OverrideUsageLog::count(),
+            'overrides_this_month' => \App\Models\OverrideUsageLog::where('created_at', '>=', now()->startOfMonth())->count(),
+        ];
+
         return view('admin.dashboard', compact(
             'totalCompanies', 'totalUsers', 'totalInvoices',
             'draftInvoices', 'submittedInvoices', 'lockedInvoices',
             'failedLogs', 'totalRevenue', 'activeSubscriptions',
             'recentInvoices', 'recentCompanies', 'recentAnomalies',
-            'pendingCompanies'
+            'pendingCompanies', 'overrideStats'
         ));
     }
 
@@ -379,7 +388,18 @@ class AdminController extends Controller
         $logs = \App\Models\OverrideLog::with('invoice', 'user', 'company')
             ->orderBy('created_at', 'desc')
             ->paginate(20);
-        return view('admin.override-logs', compact('logs'));
+
+        $taxOverrideUsage = \App\Models\OverrideUsageLog::with('company', 'invoice')
+            ->orderBy('created_at', 'desc')
+            ->take(50)
+            ->get();
+
+        $layerStats = \App\Models\OverrideUsageLog::select('override_layer', DB::raw('count(*) as count'))
+            ->groupBy('override_layer')
+            ->get()
+            ->pluck('count', 'override_layer');
+
+        return view('admin.override-logs', compact('logs', 'taxOverrideUsage', 'layerStats'));
     }
 
     public function companyShow(Company $company)

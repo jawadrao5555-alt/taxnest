@@ -35,6 +35,9 @@
                     <x-nav-link href="/company/users" :active="request()->is('company/users*')">
                         Team
                     </x-nav-link>
+                    <x-nav-link href="/tax-overrides" :active="request()->is('tax-overrides*')">
+                        Tax Rules
+                    </x-nav-link>
                     <x-nav-link href="/company/fbr-settings" :active="request()->is('company/fbr*') || request()->is('company/profile*')">
                         Settings
                     </x-nav-link>

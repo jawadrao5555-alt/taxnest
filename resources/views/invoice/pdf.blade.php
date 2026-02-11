@@ -1,18 +1,95 @@
-<h2>Invoice #{{ $invoice->invoice_number ?? $invoice->id }}</h2>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Invoice {{ $invoice->invoice_number ?? $invoice->id }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
+        .header { display: flex; justify-content: space-between; border-bottom: 3px solid #10b981; padding-bottom: 20px; margin-bottom: 30px; }
+        .company-name { font-size: 24px; font-weight: bold; color: #10b981; }
+        .invoice-title { font-size: 28px; font-weight: bold; color: #333; text-align: right; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+        .info-box { background: #f9fafb; padding: 15px; border-radius: 8px; }
+        .info-box h4 { font-size: 11px; text-transform: uppercase; color: #6b7280; margin: 0 0 8px 0; letter-spacing: 1px; }
+        .info-box p { margin: 4px 0; font-size: 14px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th { background: #f3f4f6; padding: 12px; text-align: left; font-size: 12px; text-transform: uppercase; color: #6b7280; border-bottom: 2px solid #e5e7eb; }
+        td { padding: 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+        .text-right { text-align: right; }
+        .total-row { background: #f0fdf4; }
+        .total-row td { font-size: 16px; font-weight: bold; color: #10b981; }
+        .status { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+        .status-draft { background: #fef3c7; color: #92400e; }
+        .status-submitted { background: #dbeafe; color: #1e40af; }
+        .status-locked { background: #d1fae5; color: #065f46; }
+        .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <div class="company-name">{{ $invoice->company->name ?? 'TaxNest' }}</div>
+            <p style="margin: 4px 0; font-size: 13px; color: #6b7280;">NTN: {{ $invoice->company->ntn ?? 'N/A' }}</p>
+            <p style="margin: 4px 0; font-size: 13px; color: #6b7280;">{{ $invoice->company->address ?? '' }}</p>
+            <p style="margin: 4px 0; font-size: 13px; color: #6b7280;">{{ $invoice->company->phone ?? '' }}</p>
+        </div>
+        <div style="text-align: right;">
+            <div class="invoice-title">INVOICE</div>
+            <p style="font-size: 14px; margin: 4px 0;">#{{ $invoice->invoice_number ?? 'INV-' . $invoice->id }}</p>
+            <p style="font-size: 13px; color: #6b7280;">{{ $invoice->created_at->format('d M Y') }}</p>
+            <span class="status status-{{ $invoice->status }}">{{ strtoupper($invoice->status) }}</span>
+        </div>
+    </div>
 
-<p>Buyer: {{ $invoice->buyer_name }}</p>
-<p>NTN: {{ $invoice->buyer_ntn }}</p>
-<p>Total: {{ $invoice->total_amount }}</p>
+    <div class="info-grid">
+        <div class="info-box">
+            <h4>Bill To</h4>
+            <p><strong>{{ $invoice->buyer_name }}</strong></p>
+            <p>NTN: {{ $invoice->buyer_ntn }}</p>
+        </div>
+        <div class="info-box">
+            <h4>Invoice Details</h4>
+            <p>Invoice Number: <strong>{{ $invoice->invoice_number ?? 'INV-' . $invoice->id }}</strong></p>
+            <p>Date: <strong>{{ $invoice->created_at->format('d M Y') }}</strong></p>
+        </div>
+    </div>
 
-<hr>
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>HS Code</th>
+                <th>Description</th>
+                <th class="text-right">Qty</th>
+                <th class="text-right">Price</th>
+                <th class="text-right">Tax</th>
+                <th class="text-right">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($invoice->items as $index => $item)
+            <tr>
+                <td>{{ $index + 1 }}</td>
+                <td>{{ $item->hs_code }}</td>
+                <td>{{ $item->description }}</td>
+                <td class="text-right">{{ $item->quantity }}</td>
+                <td class="text-right">Rs. {{ number_format($item->price, 2) }}</td>
+                <td class="text-right">Rs. {{ number_format($item->tax, 2) }}</td>
+                <td class="text-right">Rs. {{ number_format(($item->price * $item->quantity) + $item->tax, 2) }}</td>
+            </tr>
+            @endforeach
+        </tbody>
+        <tfoot>
+            <tr class="total-row">
+                <td colspan="6" class="text-right"><strong>Grand Total</strong></td>
+                <td class="text-right">Rs. {{ number_format($invoice->total_amount, 2) }}</td>
+            </tr>
+        </tfoot>
+    </table>
 
-@foreach($invoice->items as $item)
-<p>
-HS: {{ $item->hs_code }} <br>
-Desc: {{ $item->description }} <br>
-Qty: {{ $item->quantity }} <br>
-Price: {{ $item->price }} <br>
-Tax: {{ $item->tax }}
-</p>
-<hr>
-@endforeach
+    <div class="footer">
+        <p>Generated by TaxNest - Tax & Invoice Management System</p>
+        <p>This is a computer-generated document. No signature required.</p>
+    </div>
+</body>
+</html>

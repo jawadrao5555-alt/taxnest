@@ -27,13 +27,17 @@ class BranchController extends Controller
 
     public function store(Request $request)
     {
+        $companyId = app('currentCompanyId');
+        $limitCheck = \App\Services\PlanLimitService::canAddBranch($companyId);
+        if (!$limitCheck['allowed']) {
+            return back()->with('error', $limitCheck['reason']);
+        }
+
         $request->validate([
             'name' => 'required|string|max:255',
             'address' => 'nullable|string|max:1000',
             'is_head_office' => 'nullable|boolean',
         ]);
-
-        $companyId = app('currentCompanyId');
 
         if ($request->is_head_office) {
             Branch::where('company_id', $companyId)->update(['is_head_office' => false]);

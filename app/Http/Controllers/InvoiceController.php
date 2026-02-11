@@ -35,13 +35,22 @@ class InvoiceController extends Controller
     public function create()
     {
         $companyId = app('currentCompanyId');
-        $this->checkInvoiceLimit($companyId);
+        $limitCheck = \App\Services\PlanLimitService::canCreateInvoice($companyId);
+        if (!$limitCheck['allowed']) {
+            return redirect('/invoices')->with('error', $limitCheck['reason']);
+        }
         $branches = \App\Models\Branch::where('company_id', $companyId)->orderBy('name')->get();
         return view('invoice.create', compact('branches'));
     }
 
     public function store(Request $request)
     {
+        $companyId = app('currentCompanyId');
+        $limitCheck = \App\Services\PlanLimitService::canCreateInvoice($companyId);
+        if (!$limitCheck['allowed']) {
+            return back()->with('error', $limitCheck['reason']);
+        }
+
         $request->validate([
             'buyer_name' => 'required|string|max:255',
             'buyer_ntn' => 'required|string|max:50',
@@ -65,7 +74,6 @@ class InvoiceController extends Controller
         }
 
         $companyId = app('currentCompanyId');
-        $this->checkInvoiceLimit($companyId);
 
         if ($request->branch_id) {
             $branch = \App\Models\Branch::where('id', $request->branch_id)->where('company_id', $companyId)->first();
@@ -603,20 +611,4 @@ class InvoiceController extends Controller
         return ScheduleEngine::getTaxRate($item['schedule_type'] ?? 'standard');
     }
 
-    private function checkInvoiceLimit($companyId)
-    {
-        $subscription = Subscription::where('company_id', $companyId)
-            ->where('active', true)
-            ->first();
-
-        if (!$subscription) {
-            abort(403, 'No active subscription. Please subscribe to a plan first.');
-        }
-
-        $invoiceCount = Invoice::where('company_id', $companyId)->count();
-
-        if ($invoiceCount >= $subscription->pricingPlan->invoice_limit) {
-            abort(403, 'Invoice limit reached. Please upgrade your plan.');
-        }
-    }
 }

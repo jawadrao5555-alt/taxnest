@@ -10,6 +10,15 @@ TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with 
 - **Demo User**: demo@taxnest.pk / password123
 
 ## Recent Changes
+- 2026-02-12: High-Volume Market Capture Pricing
+  - Aggressive pricing: Retail (999), Business (2999), Industrial (6999), Enterprise (15000)
+  - Discount engine: Monthly 0%, Quarterly 1%, Semi-Annual 3%, Annual 6%
+  - 14-day free trial with 20 invoice limit on registration
+  - Plan limits: invoice_limit, user_limit, branch_limit enforced server-side
+  - PlanLimitService: canCreateInvoice, canAddUser, canAddBranch checks
+  - CheckTrialExpiryJob: auto-downgrade expired trials
+  - Landing page: pricing display, billing calculator, feature comparison, trust badges, WhatsApp CTA
+  - Billing page: cycle selector, dynamic pricing, usage dashboard
 - 2026-02-12: Heavy Enterprise 8-Phase Upgrade
   - Phase 1: Company Approval System — company_status (pending/active/suspended/rejected), self-registration creates pending, admin approve/reject, middleware blocks non-active
   - Phase 2: Customer Ledger System — customer_ledgers table, auto debit on invoice lock, manual payment/adjustment entry, running balance

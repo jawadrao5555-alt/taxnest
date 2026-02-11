@@ -42,13 +42,16 @@ class RegisteredUserController extends Controller
                 'company_status' => 'pending',
             ]);
 
-            $freePlan = PricingPlan::orderBy('price')->first();
-            if ($freePlan) {
+            $trialPlan = PricingPlan::where('is_trial', true)->first();
+            if ($trialPlan) {
                 Subscription::create([
                     'company_id' => $company->id,
-                    'pricing_plan_id' => $freePlan->id,
+                    'pricing_plan_id' => $trialPlan->id,
+                    'billing_cycle' => 'monthly',
+                    'discount_percent' => 0,
+                    'final_price' => 0,
                     'start_date' => now(),
-                    'end_date' => now()->addMonth(),
+                    'end_date' => now()->addDays(14),
                     'trial_ends_at' => now()->addDays(14),
                     'active' => true,
                 ]);
@@ -72,6 +75,6 @@ class RegisteredUserController extends Controller
 
         event(new Registered($user));
 
-        return redirect('/login')->with('success', 'Registration submitted! Your company is pending approval.');
+        return redirect('/login')->with('success', 'Registration submitted! Your company is pending approval. You have a 14-day free trial with 20 invoices.');
     }
 }

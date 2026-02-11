@@ -19,14 +19,18 @@ class CompanyUserController extends Controller
 
     public function store(Request $request)
     {
+        $companyId = auth()->user()->company_id;
+        $limitCheck = \App\Services\PlanLimitService::canAddUser($companyId);
+        if (!$limitCheck['allowed']) {
+            return back()->with('error', $limitCheck['reason']);
+        }
+
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6',
             'role' => 'required|in:company_admin,employee,viewer',
         ]);
-
-        $companyId = auth()->user()->company_id;
 
         $user = User::create([
             'name' => $request->name,

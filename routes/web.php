@@ -30,6 +30,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
 
     Route::get('/billing/plans', [BillingController::class, 'plans'])->name('billing.plans');
     Route::post('/billing/subscribe', [BillingController::class, 'subscribe']);
+    Route::post('/api/billing/calculate', [BillingController::class, 'calculatePrice']);
 
     Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
 

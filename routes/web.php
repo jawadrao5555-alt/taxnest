@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\BillingController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -15,6 +16,9 @@ Route::middleware(['auth', 'company'])->group(function () {
         $invoices = \App\Models\Invoice::where('company_id', app('currentCompanyId'))->get();
         return view('dashboard', compact('invoices'));
     });
+
+    Route::get('/billing/plans', [BillingController::class, 'plans']);
+    Route::post('/billing/subscribe', [BillingController::class, 'subscribe']);
 
     Route::middleware(['role:company_admin,employee'])->group(function () {
         Route::get('/invoice/create', [InvoiceController::class, 'create']);

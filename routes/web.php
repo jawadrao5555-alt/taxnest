@@ -137,6 +137,44 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         }
         return response()->json(\App\Services\RiskIntelligenceEngine::analyzeInvoice($invoice));
     });
+    Route::get('/api/smart-tax-recommend', function (\Illuminate\Http\Request $request) {
+        $companyId = app('currentCompanyId');
+        $hsCode = $request->get('hs_code', '');
+        $province = $request->get('province');
+        $buyerRegType = $request->get('buyer_registration_type');
+        $sectorType = $request->get('sector_type');
+        return response()->json(\App\Services\SmartTaxEngine::recommend($hsCode, $province, $buyerRegType, $sectorType, $companyId));
+    });
+
+    Route::post('/api/rejection-probability', function (\Illuminate\Http\Request $request) {
+        $companyId = app('currentCompanyId');
+        return response()->json(\App\Services\RejectionProbabilityEngine::simulateFromRequest($request->all(), $companyId));
+    });
+
+    Route::get('/api/invoice/{invoice}/rejection-probability', function (\App\Models\Invoice $invoice) {
+        $companyId = app('currentCompanyId');
+        if ($invoice->company_id !== $companyId && auth()->user()->role !== 'super_admin') {
+            abort(403);
+        }
+        return response()->json(\App\Services\RejectionProbabilityEngine::simulate($invoice));
+    });
+
+    Route::get('/api/audit-probability', function () {
+        $companyId = app('currentCompanyId');
+        return response()->json(\App\Services\AuditProbabilityEngine::calculate($companyId));
+    });
+
+    Route::get('/api/risk-heatmap', [DashboardController::class, 'riskHeatmap']);
+
+    Route::get('/executive-dashboard', [DashboardController::class, 'executive'])->name('executive.dashboard');
+
+    Route::post('/toggle-dark-mode', function () {
+        $user = auth()->user();
+        $user->dark_mode = !$user->dark_mode;
+        $user->save();
+        return back();
+    })->name('toggle.dark-mode');
+
     Route::post('/api/compliance/check', [InvoiceController::class, 'complianceCheck']);
     Route::get('/api/enterprise/invoice/{invoice}/status', [InvoiceController::class, 'apiStatus']);
     Route::get('/api/enterprise/company/compliance', [InvoiceController::class, 'apiComplianceStatus']);

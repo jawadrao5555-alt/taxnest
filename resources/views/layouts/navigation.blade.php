@@ -1,4 +1,4 @@
-<nav x-data="{ open: false }" class="bg-white border-b border-gray-200 shadow-sm">
+<nav x-data="{ open: false }" class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
             <div class="flex">
@@ -7,7 +7,7 @@
                         <svg class="h-8 w-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
                         </svg>
-                        <span class="text-xl font-bold text-gray-800">TaxNest</span>
+                        <span class="text-xl font-bold text-gray-800 dark:text-white">TaxNest</span>
                     </a>
                 </div>
 
@@ -90,6 +90,12 @@
                         <x-dropdown-link :href="route('profile.edit')">
                             Profile
                         </x-dropdown-link>
+                        <form method="POST" action="{{ route('toggle.dark-mode') }}">
+                            @csrf
+                            <x-dropdown-link href="#" onclick="event.preventDefault(); this.closest('form').submit();">
+                                {{ auth()->user()->dark_mode ? 'Light Mode' : 'Dark Mode' }}
+                            </x-dropdown-link>
+                        </form>
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
                             <x-dropdown-link :href="route('logout')" onclick="event.preventDefault(); this.closest('form').submit();">

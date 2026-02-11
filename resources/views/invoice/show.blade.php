@@ -342,6 +342,46 @@
             </div>
             @endif
 
+            <div x-data="{ rejResult: null, rejLoading: false }" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-8">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                        <span>Rejection Probability Shield</span>
+                    </h3>
+                    <button @click="rejLoading=true; fetch('/api/invoice/{{ $invoice->id }}/rejection-probability').then(r=>r.json()).then(d=>{rejResult=d;rejLoading=false}).catch(()=>rejLoading=false)" :disabled="rejLoading" class="px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition">
+                        <span x-show="!rejLoading">Analyze</span>
+                        <span x-show="rejLoading">Analyzing...</span>
+                    </button>
+                </div>
+                <template x-if="rejResult">
+                    <div>
+                        <div class="flex items-center space-x-4 mb-3">
+                            <div class="flex-1 bg-gray-200 dark:bg-gray-600 rounded-full h-4">
+                                <div class="h-4 rounded-full transition-all duration-500" :class="rejResult.probability <= 25 ? 'bg-green-500' : (rejResult.probability <= 60 ? 'bg-yellow-500' : 'bg-red-500')" :style="'width:'+rejResult.probability+'%'"></div>
+                            </div>
+                            <span class="text-2xl font-bold" :class="rejResult.probability <= 25 ? 'text-green-600' : (rejResult.probability <= 60 ? 'text-yellow-600' : 'text-red-600')" x-text="rejResult.probability+'%'"></span>
+                        </div>
+                        <p class="text-sm font-semibold mb-2" :class="rejResult.probability <= 25 ? 'text-green-600' : (rejResult.probability <= 60 ? 'text-yellow-600' : 'text-red-600')" x-text="rejResult.label"></p>
+                        <template x-if="rejResult.checks && rejResult.checks.length > 0">
+                            <div class="space-y-1 mt-3">
+                                <template x-for="check in rejResult.checks" :key="check.message">
+                                    <div class="flex items-center space-x-2 text-xs p-2 rounded" :class="check.severity === 'critical' ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300' : (check.severity === 'high' ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300' : 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300')">
+                                        <span class="font-bold uppercase" x-text="check.severity"></span>
+                                        <span x-text="check.message"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                        <template x-if="!rejResult.checks || rejResult.checks.length === 0">
+                            <p class="text-sm text-green-600 dark:text-green-400 mt-2">All pre-submission checks passed.</p>
+                        </template>
+                    </div>
+                </template>
+                <template x-if="!rejResult">
+                    <p class="text-sm text-gray-400 text-center py-4">Click "Analyze" to run pre-submission rejection simulation</p>
+                </template>
+            </div>
+
             @if(!empty($complianceReport))
             <div class="bg-white rounded-xl shadow-sm border {{ $complianceReport->risk_level === 'CRITICAL' ? 'border-red-200' : ($complianceReport->risk_level === 'HIGH' ? 'border-orange-200' : 'border-gray-100') }} overflow-hidden mb-8">
                 <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">

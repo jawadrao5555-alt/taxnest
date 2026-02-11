@@ -21,6 +21,7 @@ use App\Services\HybridComplianceScorer;
 use App\Services\AuditDefenseService;
 use App\Services\RiskIntelligenceEngine;
 use App\Services\VendorRiskEngine;
+use App\Services\AuditProbabilityEngine;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -251,6 +252,9 @@ class DashboardController extends Controller
             'rejection_rate' => $rejectionRate,
         ];
 
+        $riskHeatmapData = self::buildRiskHeatmap($companyId);
+        $auditEngine = AuditProbabilityEngine::calculate($companyId);
+
         return view('dashboard', compact(
             'company', 'totalInvoices', 'draftCount', 'submittedCount', 'lockedCount',
             'totalRevenue', 'subscription', 'invoiceLimit', 'invoicesUsed',
@@ -262,7 +266,155 @@ class DashboardController extends Controller
             'vendorRisks', 'auditProbability', 'recentReports',
             'momGrowth', 'taxVariance', 'hsRiskData',
             'topCustomers', 'branchComparison', 'kpis', 'planTier',
-            'complianceDetails', 'companyRiskSummary'
+            'complianceDetails', 'companyRiskSummary',
+            'riskHeatmapData', 'auditEngine'
         ));
+    }
+
+    public function executive()
+    {
+        $user = auth()->user();
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        $monthlyVolume = [];
+        $failureRateTrend = [];
+        $taxCollectedTrend = [];
+        $riskTrend = [];
+
+        for ($i = 5; $i >= 0; $i--) {
+            $month = now()->subMonths($i);
+            $monthStart = $month->copy()->startOfMonth();
+            $monthEnd = $month->copy()->endOfMonth();
+
+            $invoices = Invoice::where('company_id', $companyId)
+                ->whereBetween('created_at', [$monthStart, $monthEnd]);
+
+            $count = $invoices->count();
+            $revenue = Invoice::where('company_id', $companyId)
+                ->whereBetween('created_at', [$monthStart, $monthEnd])
+                ->sum('total_amount');
+            $taxCollected = Invoice::where('company_id', $companyId)
+                ->whereBetween('created_at', [$monthStart, $monthEnd])
+                ->sum('total_sales_tax');
+
+            $invoiceIds = Invoice::where('company_id', $companyId)
+                ->whereBetween('created_at', [$monthStart, $monthEnd])
+                ->pluck('id');
+            $totalLogs = FbrLog::whereIn('invoice_id', $invoiceIds)->count();
+            $failedLogs = FbrLog::whereIn('invoice_id', $invoiceIds)->where('status', 'failed')->count();
+            $failRate = $totalLogs > 0 ? round(($failedLogs / $totalLogs) * 100, 1) : 0;
+
+            $monthReport = ComplianceReport::where('company_id', $companyId)
+                ->whereBetween('created_at', [$monthStart, $monthEnd])
+                ->avg('final_score');
+
+            $monthlyVolume[] = ['month' => $month->format('M'), 'count' => $count, 'revenue' => round($revenue)];
+            $failureRateTrend[] = ['month' => $month->format('M'), 'rate' => $failRate];
+            $taxCollectedTrend[] = ['month' => $month->format('M'), 'amount' => round($taxCollected)];
+            $riskTrend[] = ['month' => $month->format('M'), 'score' => round($monthReport ?? 100)];
+        }
+
+        $auditTrend = AuditProbabilityEngine::getTrend($companyId);
+        $auditEngine = AuditProbabilityEngine::calculate($companyId);
+
+        $topCustomers = Invoice::where('company_id', $companyId)
+            ->select('buyer_ntn', 'buyer_name', DB::raw('SUM(total_amount) as total_amount'), DB::raw('COUNT(*) as invoice_count'))
+            ->groupBy('buyer_ntn', 'buyer_name')
+            ->orderByDesc('total_amount')
+            ->take(5)
+            ->get();
+
+        $totalInvoices = Invoice::where('company_id', $companyId)->count();
+        $totalRevenue = Invoice::where('company_id', $companyId)->sum('total_amount');
+        $lockedCount = Invoice::where('company_id', $companyId)->where('status', 'locked')->count();
+
+        return view('executive-dashboard', compact(
+            'company', 'monthlyVolume', 'failureRateTrend', 'taxCollectedTrend',
+            'riskTrend', 'auditTrend', 'auditEngine', 'topCustomers',
+            'totalInvoices', 'totalRevenue', 'lockedCount'
+        ));
+    }
+
+    public function riskHeatmap()
+    {
+        $companyId = app('currentCompanyId');
+        return response()->json(self::buildRiskHeatmap($companyId));
+    }
+
+    private static function buildRiskHeatmap(int $companyId): array
+    {
+        $invoiceIds = Invoice::where('company_id', $companyId)->pluck('id');
+
+        $hsCategories = InvoiceItem::whereIn('invoice_id', $invoiceIds)
+            ->select(
+                DB::raw("SUBSTRING(hs_code, 1, 2) as hs_prefix"),
+                DB::raw('COUNT(*) as total_items'),
+                DB::raw("SUM(CASE WHEN schedule_type IN ('reduced', '3rd_schedule') THEN 1 ELSE 0 END) as reduced_items"),
+                DB::raw('SUM(CAST(tax_rate AS FLOAT)) as total_tax_rate'),
+                DB::raw('AVG(CAST(tax_rate AS FLOAT)) as avg_tax_rate')
+            )
+            ->groupBy('hs_prefix')
+            ->orderByDesc('total_items')
+            ->take(10)
+            ->get()
+            ->map(function ($row) {
+                $reducedPct = $row->total_items > 0 ? round(($row->reduced_items / $row->total_items) * 100, 1) : 0;
+                $riskPct = min(100, $reducedPct * 1.5);
+                return [
+                    'label' => 'HS ' . ($row->hs_prefix ?: 'N/A'),
+                    'total' => $row->total_items,
+                    'reduced_pct' => $reducedPct,
+                    'risk_pct' => round($riskPct, 1),
+                    'avg_rate' => round($row->avg_tax_rate ?? 0, 1),
+                ];
+            });
+
+        $branchData = Invoice::where('invoices.company_id', $companyId)
+            ->leftJoin('branches', 'invoices.branch_id', '=', 'branches.id')
+            ->select(
+                DB::raw("COALESCE(branches.name, 'Main') as branch_name"),
+                DB::raw('COUNT(invoices.id) as total_invoices'),
+                DB::raw('SUM(invoices.total_amount) as total_revenue')
+            )
+            ->groupBy('branches.name')
+            ->get();
+
+        $branchHeatmap = [];
+        foreach ($branchData as $branch) {
+            $branchInvoiceIds = Invoice::where('company_id', $companyId)
+                ->when($branch->branch_name !== 'Main', function ($q) use ($branch, $companyId) {
+                    $branchId = \App\Models\Branch::where('company_id', $companyId)->where('name', $branch->branch_name)->value('id');
+                    return $q->where('branch_id', $branchId);
+                }, function ($q) {
+                    return $q->whereNull('branch_id');
+                })
+                ->pluck('id');
+
+            $totalLogs = FbrLog::whereIn('invoice_id', $branchInvoiceIds)->count();
+            $failedLogs = FbrLog::whereIn('invoice_id', $branchInvoiceIds)->where('status', 'failed')->count();
+            $failPct = $totalLogs > 0 ? round(($failedLogs / $totalLogs) * 100, 1) : 0;
+
+            $reducedItems = InvoiceItem::whereIn('invoice_id', $branchInvoiceIds)
+                ->whereIn('schedule_type', ['reduced', '3rd_schedule'])
+                ->count();
+            $totalItems = InvoiceItem::whereIn('invoice_id', $branchInvoiceIds)->count();
+            $reducedPct = $totalItems > 0 ? round(($reducedItems / $totalItems) * 100, 1) : 0;
+
+            $riskPct = min(100, ($failPct * 2) + ($reducedPct * 0.5));
+
+            $branchHeatmap[] = [
+                'label' => $branch->branch_name,
+                'total_invoices' => $branch->total_invoices,
+                'risk_pct' => round($riskPct, 1),
+                'failure_pct' => $failPct,
+                'reduced_pct' => $reducedPct,
+            ];
+        }
+
+        return [
+            'hs_categories' => $hsCategories,
+            'branches' => $branchHeatmap,
+        ];
     }
 }

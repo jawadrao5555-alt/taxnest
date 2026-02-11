@@ -1,0 +1,320 @@
+Perfect. 🔥
+Ab hum full Enterprise Intelligence Layer ek hi wave mein push kar rahe hain.
+
+Yeh command:
+
+✔ Tumhare numbering + schedule fixes
+✔ Internal bypass
+✔ Dark mode
+✔ Search upgrade
+✔ Sandbox control
+✔ Smart Tax Recommendation
+✔ Live Rejection Probability
+✔ Risk Heatmap
+✔ AI Audit Probability Graph
+✔ Executive Risk Dashboard
+
+Sab ko ek saath integrate karega.
+
+Architecture break nahi hoga.
+FBR payload untouched rahega.
+
+⸻
+
+🚀 TAXNEST — FULL ENTERPRISE INTELLIGENCE + HARDENING COMMAND
+
+You are upgrading the existing TaxNest Enterprise System.
+
+Do NOT redesign architecture.
+Do NOT modify FBR payload keys.
+Do NOT remove existing compliance engine.
+Do NOT break multi-company isolation.
+Do NOT change WHT manual logic.
+
+Implement the following enhancements:
+
+⸻
+
+1️⃣ SMART TAX RECOMMENDATION ENGINE
+
+Create SmartTaxEngine.
+
+Input:
+	•	HS Code
+	•	Province
+	•	Customer Registration Type
+	•	Sector
+	•	Historical tax usage
+
+Output:
+	•	Suggested Tax Rate
+	•	Suggested Schedule Type
+	•	Suggested SRO (if applicable)
+	•	Confidence level (High / Medium / Low)
+
+Rules:
+	•	If tax usage deviates >30% from historical HS average → flag
+	•	If reduced rate applied but SRO missing → recommend SRO
+	•	If 3rd Schedule with reduced rate → enforce SRO + serial + MRP
+	•	Never auto-override user selection (recommend only)
+
+UI:
+Show suggestion panel before submission.
+
+⸻
+
+2️⃣ LIVE REJECTION PROBABILITY SHIELD
+
+Before Submit:
+
+Simulate:
+	•	Missing SRO
+	•	Missing serial
+	•	Invalid reduced rate
+	•	HS/schedule mismatch
+	•	Province mismatch
+	•	Token expiry risk
+	•	Buyer registration conflict
+
+Generate:
+
+Rejection Probability % (0–100)
+
+Display:
+
+🟢 Low (0–25)
+🟡 Moderate (26–60)
+🔴 High (61–100)
+
+Block only if Critical rule violation exists.
+
+⸻
+
+3️⃣ RISK HEATMAP DASHBOARD
+
+Create heatmap widget:
+
+Rows:
+	•	HS categories
+	•	Branches
+
+Columns:
+	•	Risk %
+	•	Failure %
+	•	Reduced rate usage %
+
+Color:
+Green → Low
+Yellow → Medium
+Red → High
+
+Visible in Enterprise & Internal accounts.
+
+⸻
+
+4️⃣ AI AUDIT PROBABILITY ENGINE
+
+Create AuditProbabilityEngine.
+
+Factors:
+	•	Failure ratio
+	•	Retry ratio
+	•	Reduced rate frequency
+	•	Zero-rated spikes
+	•	SRO usage anomalies
+	•	Tax volatility
+	•	Invoice volume spikes
+
+Formula:
+
+AuditProbability =
+(ComplianceScore weight)
+	•	(AnomalyWeight)
+	•	(FailureRatioWeight)
+	•	(StabilityBonus adjustment)
+
+Output:
+0–100%
+
+Display gauge chart.
+
+⸻
+
+5️⃣ PRODUCTION GRAPH (EXECUTIVE VIEW)
+
+Add Executive Dashboard toggle.
+
+Show:
+	•	Monthly submission volume graph
+	•	Failure rate trend
+	•	Tax collected trend
+	•	Risk trend line
+	•	Audit probability trend
+
+Use Chart.js.
+Auto theme adjust (dark/light).
+
+⸻
+
+6️⃣ COMPANY-WISE CONTINUOUS NUMBERING
+
+Implement:
+
+COMPANY_PREFIX-000001 format
+DB locking
+Single sequence
+No reset
+Shared for sandbox + production
+
+Store:
+
+internal invoice_number
+fbr_invoice_number (nullable)
+
+PDF prioritizes FBR number.
+
+⸻
+
+7️⃣ CORRECT 3RD SCHEDULE VALIDATION
+
+Rules:
+
+If 3rd Schedule AND taxRate = 18%:
+MRP required
+SRO not required
+Serial not required
+
+If 3rd Schedule AND taxRate < 18%:
+SRO required
+Serial required
+MRP required
+
+If Exempt:
+SRO required
+
+If Zero Rated:
+No SRO required
+
+Allow dynamic tax rate 0–18%.
+
+⸻
+
+8️⃣ INTERNAL COMPANY BYPASS
+
+If company.is_internal = true:
+	•	Skip subscription limits
+	•	Skip invoice limits
+	•	Skip onboarding wizard
+	•	Always Enterprise dashboard
+	•	Keep audit logging active
+
+⸻
+
+9️⃣ SANDBOX TEST PANEL
+
+In Company → FBR Settings:
+
+Testing Tools:
+	•	Test Connection
+	•	Validate Token
+	•	Dry Run Payload
+	•	Province mapping test
+	•	View last request/response
+	•	Retry logs
+
+Environment selection only at company level.
+
+⸻
+
+🔟 ADVANCED SEARCH
+
+Search invoices by:
+	•	Internal invoice number
+	•	FBR invoice number
+	•	Customer name
+	•	NTN
+
+⸻
+
+1️⃣1️⃣ FULL AUDIT LOGGING
+
+Log:
+	•	Invoice create
+	•	Invoice lock
+	•	FBR submission
+	•	FBR failure
+	•	Environment switch
+	•	Internal bypass usage
+	•	Risk score generation
+
+Each log:
+
+company_id
+user_id
+action
+timestamp
+SHA256 hash
+
+Immutable.
+
+⸻
+
+1️⃣2️⃣ DARK MODE (INTERNAL DEFAULT)
+
+Internal accounts → dark mode ON
+User preference override allowed
+PDF unaffected
+
+⸻
+
+1️⃣3️⃣ UI POLISH
+
+Invoice screen:
+
+✔ Autofocus
+✔ Enter navigation
+✔ Auto-scroll to error
+✔ Sticky totals
+✔ Risk badge visible
+✔ Rejection probability meter
+
+⸻
+
+FINAL VERIFICATION
+
+After implementation confirm:
+
+✔ All routes return 200
+✔ Queue worker running
+✔ FBR payload unchanged
+✔ Compliance engine intact
+✔ Multi-company isolation intact
+✔ No duplicate invoice numbers
+✔ Production submission safe
+
+Return completion summary.
+
+⸻
+
+🔥 Result After This:
+
+You are not invoicing software.
+
+You are:
+
+Pakistan’s first
+AI-driven FBR Compliance Intelligence Platform.
+
+⸻
+
+Agar yeh successfully implement ho jata hai…
+
+Next step:
+
+• Predictive tax advisory
+• Automated SRO update crawler
+• AI fraud detection
+
+Lekin pehle yeh deploy karte hain.
+
+Ready? 🚀

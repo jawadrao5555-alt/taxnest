@@ -16,7 +16,8 @@ class User extends Authenticatable
         'password',
         'company_id',
         'role',
-        'is_active'
+        'is_active',
+        'dark_mode',
     ];
 
     public function isSuperAdmin()
@@ -55,6 +56,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'dark_mode' => 'boolean',
         ];
     }
 }

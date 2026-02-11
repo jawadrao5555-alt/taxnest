@@ -25,7 +25,6 @@
                         @endforeach
                     </ul>
                 </div>
-                <script>document.addEventListener('DOMContentLoaded', function() { document.querySelector('.bg-red-50')?.scrollIntoView({behavior: 'smooth', block: 'center'}); });</script>
                 @endif
 
                 @if(isset($branches) && $branches->count() > 0)
@@ -76,8 +75,8 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Buyer Name</label>
-                            <input type="text" name="buyer_name" x-model="buyer_name" value="{{ old('buyer_name') }}" required
-                                class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <input type="text" name="buyer_name" x-model="buyer_name" value="{{ old('buyer_name') }}" required autofocus
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             @error('buyer_name') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
@@ -156,7 +155,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 mb-1">HS Code</label>
-                                    <input type="text" :name="'items[' + index + '][hs_code]'" x-model="item.hs_code" @blur="lookupHsCode(index)" required placeholder="8471.3010"
+                                    <input type="text" :name="'items[' + index + '][hs_code]'" x-model="item.hs_code" @blur="lookupHsCode(index); fetchTaxRecommendation(index)" required placeholder="8471.3010"
                                         class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 </div>
                                 <div>
@@ -201,8 +200,25 @@
                                 <p class="text-xs text-indigo-700" x-text="item.schedule_hint"></p>
                             </div>
 
-                            <div x-show="item.hsLookupInfo" x-cloak class="mb-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-                                <p class="text-xs text-blue-700" x-text="item.hsLookupInfo"></p>
+                            <div x-show="item.hsLookupInfo" x-cloak class="mb-3 px-3 py-2 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg">
+                                <p class="text-xs text-blue-700 dark:text-blue-300" x-text="item.hsLookupInfo"></p>
+                            </div>
+
+                            <div x-show="item.taxRecommendation" x-cloak class="mb-3 px-3 py-2 bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700 rounded-lg">
+                                <div class="flex items-center justify-between mb-1">
+                                    <p class="text-xs font-semibold text-purple-700 dark:text-purple-300">Smart Tax Recommendation</p>
+                                    <span class="text-xs px-2 py-0.5 rounded-full"
+                                        :class="{
+                                            'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300': item.taxRecommendation?.confidence === 'high',
+                                            'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300': item.taxRecommendation?.confidence === 'medium',
+                                            'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300': item.taxRecommendation?.confidence === 'low'
+                                        }"
+                                        x-text="(item.taxRecommendation?.confidence || '') + ' confidence'"></span>
+                                </div>
+                                <p class="text-xs text-purple-600 dark:text-purple-400" x-text="item.taxRecommendation?.suggestion || ''"></p>
+                                <template x-if="item.taxRecommendation?.recommended_rate !== undefined">
+                                    <p class="text-xs mt-1 text-purple-800 dark:text-purple-200 font-medium" x-text="'Recommended rate: ' + item.taxRecommendation.recommended_rate + '% | Schedule: ' + (item.taxRecommendation.recommended_schedule || 'N/A')"></p>
+                                </template>
                             </div>
 
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -330,13 +346,83 @@
                     <p x-show="!complianceResult && !complianceLoading" class="text-sm text-gray-400">Click "Check Compliance" to preview compliance status before submitting.</p>
                 </div>
 
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Rejection Probability</h3>
+                        <button type="button" @click="checkRejectionProbability()" :disabled="rejectionLoading" class="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 transition disabled:opacity-50">
+                            <svg x-show="rejectionLoading" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            Analyze Risk
+                        </button>
+                    </div>
+
+                    <div x-show="rejectionResult" x-cloak class="space-y-3">
+                        <div class="flex items-center space-x-4">
+                            <div class="flex-1">
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Rejection Probability</span>
+                                    <span class="text-sm font-bold" :class="{
+                                        'text-green-600': rejectionResult?.probability <= 30,
+                                        'text-yellow-600': rejectionResult?.probability > 30 && rejectionResult?.probability <= 60,
+                                        'text-red-600': rejectionResult?.probability > 60
+                                    }" x-text="(rejectionResult?.probability || 0) + '%'"></span>
+                                </div>
+                                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                                    <div class="h-3 rounded-full transition-all duration-500" :class="{
+                                        'bg-green-500': rejectionResult?.probability <= 30,
+                                        'bg-yellow-500': rejectionResult?.probability > 30 && rejectionResult?.probability <= 60,
+                                        'bg-red-500': rejectionResult?.probability > 60
+                                    }" :style="'width: ' + (rejectionResult?.probability || 0) + '%'"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <template x-if="rejectionResult?.reasons && rejectionResult.reasons.length > 0">
+                            <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-3">
+                                <p class="text-xs font-semibold text-yellow-800 dark:text-yellow-300 mb-1">Risk Factors:</p>
+                                <ul class="list-disc list-inside text-xs text-yellow-700 dark:text-yellow-400 space-y-0.5">
+                                    <template x-for="reason in rejectionResult.reasons" :key="reason">
+                                        <li x-text="reason"></li>
+                                    </template>
+                                </ul>
+                            </div>
+                        </template>
+                    </div>
+
+                    <p x-show="!rejectionResult && !rejectionLoading" class="text-sm text-gray-400 dark:text-gray-500">Click "Analyze Risk" to check rejection probability before submitting.</p>
+                </div>
+
                 <div class="flex justify-end space-x-3">
-                    <a href="/invoices" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition">Cancel</a>
+                    <a href="/invoices" class="px-6 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition">Cancel</a>
                     <button type="submit" class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition">
                         Create Invoice
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <div x-data="{ get form() { return Alpine.$data(document.querySelector('form[x-data]')) } }"
+         class="sticky bottom-0 z-50 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700 shadow-lg">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div class="flex flex-wrap items-center justify-between gap-3 text-sm">
+                <div class="flex items-center space-x-6">
+                    <div>
+                        <span class="text-gray-500 dark:text-gray-400">Value Excl. ST:</span>
+                        <span class="font-semibold text-gray-800 dark:text-gray-100 ml-1" x-text="'Rs. ' + form.totalExclST()"></span>
+                    </div>
+                    <div>
+                        <span class="text-gray-500 dark:text-gray-400">Tax:</span>
+                        <span class="font-semibold text-gray-800 dark:text-gray-100 ml-1" x-text="'Rs. ' + form.totalSalesTax()"></span>
+                    </div>
+                    <div x-show="parseFloat(form.wht_rate) > 0">
+                        <span class="text-red-500 dark:text-red-400">WHT:</span>
+                        <span class="font-semibold text-red-600 dark:text-red-400 ml-1" x-text="'- Rs. ' + form.whtAmount()"></span>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-gray-500 dark:text-gray-400">Net Receivable:</span>
+                    <span class="font-bold text-lg text-emerald-600 dark:text-emerald-400" x-text="'Rs. ' + form.netReceivable()"></span>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -386,7 +472,8 @@
                     requires_sro: false, requires_serial: false, requires_mrp: false,
                     optional_sro: false, optional_serial: false, schedule_hint: '',
                     productSearch: '', showDropdown: false, productResults: [],
-                    hsLookupInfo: ''
+                    hsLookupInfo: '',
+                    taxRecommendation: null
                 };
             }
 
@@ -405,6 +492,8 @@
                 items: [newItem()],
                 complianceResult: null,
                 complianceLoading: false,
+                rejectionResult: null,
+                rejectionLoading: false,
                 scheduleError: '',
 
                 get buyerRegType() {
@@ -413,8 +502,15 @@
 
                 init() {
                     this.$nextTick(() => {
-                        const firstInput = document.querySelector('input[name="buyer_name"]');
-                        if (firstInput) firstInput.focus();
+                        const errorEl = document.querySelector('.bg-red-50');
+                        if (errorEl) {
+                            errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            const firstErrorInput = document.querySelector('.text-red-500')?.closest('div')?.querySelector('input, select, textarea');
+                            if (firstErrorInput) firstErrorInput.focus();
+                        } else {
+                            const firstInput = document.querySelector('input[name="buyer_name"]');
+                            if (firstInput) firstInput.focus();
+                        }
                     });
                 },
 
@@ -595,6 +691,43 @@
                         this.complianceResult = await res.json();
                     } catch(e) { console.error(e); }
                     this.complianceLoading = false;
+                },
+
+                async checkRejectionProbability() {
+                    this.rejectionLoading = true;
+                    this.rejectionResult = null;
+                    try {
+                        let province = document.querySelector('select[name="destination_province"]')?.value || '';
+                        let res = await fetch('/api/rejection-probability', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' },
+                            body: JSON.stringify({
+                                buyer_name: this.buyer_name,
+                                buyer_ntn: this.buyer_ntn,
+                                document_type: this.document_type,
+                                destination_province: province,
+                                wht_rate: this.wht_rate,
+                                items: this.items
+                            })
+                        });
+                        this.rejectionResult = await res.json();
+                    } catch(e) { console.error(e); }
+                    this.rejectionLoading = false;
+                },
+
+                async fetchTaxRecommendation(index) {
+                    let item = this.items[index];
+                    if (!item.hs_code || item.hs_code.length < 4) { item.taxRecommendation = null; return; }
+                    let province = document.querySelector('select[name="destination_province"]')?.value || '';
+                    try {
+                        let res = await fetch('/api/smart-tax-recommend?hs_code=' + encodeURIComponent(item.hs_code) + '&province=' + encodeURIComponent(province));
+                        let data = await res.json();
+                        if (data && data.suggestion) {
+                            item.taxRecommendation = data;
+                        } else {
+                            item.taxRecommendation = null;
+                        }
+                    } catch(e) { item.taxRecommendation = null; }
                 }
             };
         }

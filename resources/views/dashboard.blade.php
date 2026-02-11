@@ -420,20 +420,98 @@
             @endif
 
             @if($planTier === 'enterprise')
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-indigo-200 dark:border-indigo-800 p-6 mb-8">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                        <span>Risk Heatmap</span>
+                    </h3>
+                    <a href="/executive-dashboard" class="inline-flex items-center px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition">Executive View</a>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-3">By HS Category</h4>
+                        <div class="space-y-2">
+                            @foreach($riskHeatmapData['hs_categories'] ?? [] as $hs)
+                            <div class="flex items-center justify-between p-2 rounded-lg {{ $hs['risk_pct'] > 60 ? 'bg-red-50 dark:bg-red-900/20' : ($hs['risk_pct'] > 30 ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'bg-green-50 dark:bg-green-900/20') }}">
+                                <span class="text-sm font-mono font-medium text-gray-700 dark:text-gray-300">{{ $hs['label'] }}</span>
+                                <div class="flex items-center space-x-3">
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">{{ $hs['total'] }} items</span>
+                                    <span class="text-xs font-bold {{ $hs['risk_pct'] > 60 ? 'text-red-600' : ($hs['risk_pct'] > 30 ? 'text-yellow-600' : 'text-green-600') }}">{{ $hs['risk_pct'] }}% risk</span>
+                                    <div class="w-16 bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                                        <div class="h-2 rounded-full {{ $hs['risk_pct'] > 60 ? 'bg-red-500' : ($hs['risk_pct'] > 30 ? 'bg-yellow-500' : 'bg-green-500') }}" style="width: {{ min(100, $hs['risk_pct']) }}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            @endforeach
+                            @if(empty($riskHeatmapData['hs_categories'] ?? []))
+                            <p class="text-sm text-gray-400 text-center py-4">No HS data yet</p>
+                            @endif
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-3">By Branch</h4>
+                        <div class="space-y-2">
+                            @foreach($riskHeatmapData['branches'] ?? [] as $br)
+                            <div class="flex items-center justify-between p-2 rounded-lg {{ $br['risk_pct'] > 60 ? 'bg-red-50 dark:bg-red-900/20' : ($br['risk_pct'] > 30 ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'bg-green-50 dark:bg-green-900/20') }}">
+                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ $br['label'] }}</span>
+                                <div class="flex items-center space-x-3">
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">{{ $br['total_invoices'] }} inv</span>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">Fail: {{ $br['failure_pct'] }}%</span>
+                                    <span class="text-xs font-bold {{ $br['risk_pct'] > 60 ? 'text-red-600' : ($br['risk_pct'] > 30 ? 'text-yellow-600' : 'text-green-600') }}">{{ $br['risk_pct'] }}%</span>
+                                    <div class="w-16 bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                                        <div class="h-2 rounded-full {{ $br['risk_pct'] > 60 ? 'bg-red-500' : ($br['risk_pct'] > 30 ? 'bg-yellow-500' : 'bg-green-500') }}" style="width: {{ min(100, $br['risk_pct']) }}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            @endforeach
+                            @if(empty($riskHeatmapData['branches'] ?? []))
+                            <p class="text-sm text-gray-400 text-center py-4">No branch data yet</p>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-8">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center space-x-2">
+                    <svg class="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                    <span>AI Audit Probability Engine</span>
+                </h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-4">
+                    @foreach($auditEngine['factors'] as $key => $factor)
+                    <div class="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ $factor['label'] }}</p>
+                        <p class="text-lg font-bold {{ $factor['weight'] > 50 ? 'text-red-600' : ($factor['weight'] > 25 ? 'text-yellow-600' : 'text-green-600') }}">{{ $factor['value'] }}</p>
+                        <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-1.5 mt-2">
+                            <div class="h-1.5 rounded-full {{ $factor['weight'] > 50 ? 'bg-red-500' : ($factor['weight'] > 25 ? 'bg-yellow-500' : 'bg-green-500') }}" style="width: {{ min(100, $factor['weight']) }}%"></div>
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+                <div class="flex items-center justify-between p-3 rounded-lg" style="background-color: {{ $auditEngine['color'] }}15; border: 1px solid {{ $auditEngine['color'] }}30">
+                    <div>
+                        <span class="text-sm font-semibold" style="color: {{ $auditEngine['color'] }}">Audit Probability: {{ $auditEngine['probability'] }}%</span>
+                        <span class="ml-2 text-xs px-2 py-0.5 rounded-full font-bold text-white" style="background-color: {{ $auditEngine['color'] }}">{{ $auditEngine['level'] }}</span>
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 font-mono">{{ $auditEngine['formula'] }}</p>
+                </div>
+            </div>
+
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">MoM Growth (6 Months)</h3>
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">MoM Growth (6 Months)</h3>
                     <canvas id="momGrowthChart" height="250"></canvas>
                 </div>
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Tax Variance: Actual vs Expected</h3>
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Tax Variance: Actual vs Expected</h3>
                     <canvas id="taxVarianceChart" height="250"></canvas>
                 </div>
             </div>
 
             @if($hsRiskData->count() > 0)
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4">Risk Heatmap by HS Code</h3>
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-8">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Risk Heatmap by HS Code</h3>
                 <canvas id="hsRiskChart" height="300"></canvas>
             </div>
             @endif

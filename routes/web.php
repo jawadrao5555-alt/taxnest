@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\BillingController;
+use App\Http\Controllers\DashboardController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -12,10 +13,7 @@ Route::get('/', function () {
 
 Route::middleware(['auth', 'company'])->group(function () {
 
-    Route::get('/dashboard', function () {
-        $invoices = \App\Models\Invoice::where('company_id', app('currentCompanyId'))->get();
-        return view('dashboard', compact('invoices'));
-    });
+    Route::get('/dashboard', [DashboardController::class, 'index']);
 
     Route::get('/billing/plans', [BillingController::class, 'plans']);
     Route::post('/billing/subscribe', [BillingController::class, 'subscribe']);

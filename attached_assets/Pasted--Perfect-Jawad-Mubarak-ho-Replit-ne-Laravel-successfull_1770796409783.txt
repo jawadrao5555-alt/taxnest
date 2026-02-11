@@ -1,0 +1,122 @@
+🔥 Perfect Jawad — Mubarak ho!
+
+Replit ne Laravel successfully install kar diya hai:
+
+✔ PHP 8.4
+✔ Latest Laravel
+✔ SQLite ready
+✔ Migrations run ho chuki
+✔ Server port 5000 par chal raha hai
+
+Ab hum real TaxNest development start karte hain.
+
+⸻
+
+🚀 PHASE 1 — Multi-Company Structure Setup
+
+Ab terminal open karo (agar already open hai to direct paste karo):
+
+⸻
+
+🟢 STEP 1 — Company Table Structure Edit
+
+Open this file:
+
+database/migrations/xxxx_create_companies_table.php
+
+Uske andar ka content replace karo is se:
+
+public function up(): void
+{
+    Schema::create('companies', function (Blueprint $table) {
+        $table->id();
+        $table->string('name');
+        $table->string('ntn')->unique();
+        $table->string('email')->nullable();
+        $table->string('phone')->nullable();
+        $table->string('address')->nullable();
+        $table->string('fbr_token')->nullable();
+        $table->timestamps();
+    });
+}
+
+Save karo.
+
+⸻
+
+🟢 STEP 2 — Invoice Table Edit
+
+Open:
+
+database/migrations/xxxx_create_invoices_table.php
+
+Replace content inside up() with:
+
+public function up(): void
+{
+    Schema::create('invoices', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('company_id')->constrained()->onDelete('cascade');
+        $table->string('invoice_number')->nullable();
+        $table->string('status')->default('draft'); // draft, submitted, locked
+        $table->string('buyer_name');
+        $table->string('buyer_ntn')->nullable();
+        $table->decimal('total_amount', 15, 2)->default(0);
+        $table->timestamps();
+    });
+}
+
+Save karo.
+
+⸻
+
+🟢 STEP 3 — Invoice Items Table Edit
+
+Open:
+
+database/migrations/xxxx_create_invoice_items_table.php
+
+Replace up() content with:
+
+public function up(): void
+{
+    Schema::create('invoice_items', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('invoice_id')->constrained()->onDelete('cascade');
+        $table->string('hs_code');
+        $table->string('description');
+        $table->decimal('quantity', 10, 2);
+        $table->decimal('price', 15, 2);
+        $table->decimal('tax', 15, 2);
+        $table->timestamps();
+    });
+}
+
+Save karo.
+
+⸻
+
+🟢 STEP 4 — Fresh Migrate
+
+Terminal mein run karo:
+
+php artisan migrate:fresh
+
+
+⸻
+
+🔥 Agar migrate successful ho gaya:
+
+Hum next step mein:
+
+🔐 Company Isolation Middleware
+🔒 Production Lock Rule
+📡 FBR Service Class structure
+
+banayenge.
+
+⸻
+
+Ab mujhe sirf yeh batao:
+
+👉 migrate successful message aa gaya?

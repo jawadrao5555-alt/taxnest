@@ -1,10 +1,19 @@
-# Laravel Project
+# TaxNest - Laravel Project
 
 ## Overview
-Blank Laravel project ready for development. Uses PHP 8.4 with Laravel framework and SQLite database.
+TaxNest multi-company tax/invoice management system. Uses PHP 8.4 with Laravel framework and SQLite database.
 
 ## Recent Changes
+- 2026-02-11: Phase 1 — Multi-Company Structure Setup (companies, invoices, invoice_items tables)
 - 2026-02-11: Initial Laravel project setup with PHP 8.4
+
+## Database Tables
+- **companies** — name, ntn (unique), email, phone, address, fbr_token
+- **invoices** — company_id (FK), invoice_number, status (draft/submitted/locked), buyer_name, buyer_ntn, total_amount
+- **invoice_items** — invoice_id (FK), hs_code, description, quantity, price, tax
+- **users** — default Laravel users table
+- **cache** — default Laravel cache table
+- **jobs** — default Laravel jobs table
 
 ## Project Architecture
 - **Framework**: Laravel (latest)

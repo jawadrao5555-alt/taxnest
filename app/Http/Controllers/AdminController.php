@@ -76,6 +76,9 @@ class AdminController extends Controller
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:50',
             'address' => 'nullable|string|max:500',
+            'admin_name' => 'nullable|string|max:255',
+            'admin_email' => 'nullable|email|unique:users,email',
+            'admin_password' => 'nullable|string|min:6',
         ]);
 
         $company = Company::create($request->only(['name', 'ntn', 'email', 'phone', 'address']));
@@ -92,9 +95,58 @@ class AdminController extends Controller
             ]);
         }
 
+        if ($request->filled('admin_name') && $request->filled('admin_email') && $request->filled('admin_password')) {
+            User::create([
+                'name' => $request->admin_name,
+                'email' => $request->admin_email,
+                'password' => Hash::make($request->admin_password),
+                'role' => 'company_admin',
+                'company_id' => $company->id,
+            ]);
+        }
+
         SecurityLogService::log('company_created', auth()->id(), ['company_id' => $company->id, 'name' => $company->name]);
 
         return redirect('/admin/companies')->with('success', 'Company created successfully.');
+    }
+
+    public function suspendCompany(Company $company)
+    {
+        if ($company->suspended_at) {
+            $company->update(['suspended_at' => null]);
+            $action = 'unsuspended';
+        } else {
+            $company->update(['suspended_at' => now()]);
+            $action = 'suspended';
+        }
+
+        SecurityLogService::log("company_{$action}", auth()->id(), ['company_id' => $company->id]);
+
+        return redirect('/admin/company/' . $company->id)->with('success', "Company {$action} successfully.");
+    }
+
+    public function changePlan(Request $request, Company $company)
+    {
+        $request->validate([
+            'pricing_plan_id' => 'required|exists:pricing_plans,id',
+        ]);
+
+        Subscription::where('company_id', $company->id)->where('active', true)->update(['active' => false]);
+
+        Subscription::create([
+            'company_id' => $company->id,
+            'pricing_plan_id' => $request->pricing_plan_id,
+            'start_date' => now(),
+            'end_date' => now()->addMonth(),
+            'active' => true,
+        ]);
+
+        SecurityLogService::log('company_plan_changed', auth()->id(), [
+            'company_id' => $company->id,
+            'new_plan_id' => $request->pricing_plan_id,
+        ]);
+
+        return redirect('/admin/company/' . $company->id)->with('success', 'Plan changed successfully.');
     }
 
     public function users()
@@ -326,7 +378,9 @@ class AdminController extends Controller
             ->take(50)
             ->get();
 
-        return view('admin.company-show', compact('company', 'stats', 'activePlan', 'users', 'invoices', 'compliance', 'activityLogs'));
+        $plans = PricingPlan::all();
+
+        return view('admin.company-show', compact('company', 'stats', 'activePlan', 'users', 'invoices', 'compliance', 'activityLogs', 'plans'));
     }
 
     private function calcAuditProbability(Company $company)

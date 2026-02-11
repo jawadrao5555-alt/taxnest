@@ -13,7 +13,18 @@
     <div class="py-8" x-data="{ activeTab: 'users' }">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
+            @if(session('success'))
+            <div class="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700">{{ session('success') }}</div>
+            @endif
+
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
+                @if($company->suspended_at)
+                <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
+                    <span class="text-sm text-red-700 font-medium">This company is suspended (since {{ $company->suspended_at->format('d M Y') }})</span>
+                    <form method="POST" action="/admin/company/{{ $company->id }}/suspend">@csrf<button type="submit" class="text-xs px-3 py-1 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">Unsuspend</button></form>
+                </div>
+                @endif
+
                 <div class="grid grid-cols-2 md:grid-cols-5 gap-6">
                     <div>
                         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Company Name</p>
@@ -25,7 +36,7 @@
                     </div>
                     <div>
                         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">FBR Environment</p>
-                        <p class="text-sm font-bold mt-1 {{ $company->fbr_token ? 'text-emerald-600' : 'text-gray-400' }}">{{ $company->fbr_token ? 'Connected' : 'Not Connected' }}</p>
+                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium mt-1 {{ $company->fbr_environment === 'production' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800' }}">{{ ucfirst($company->fbr_environment ?? 'sandbox') }}</span>
                     </div>
                     <div>
                         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Active Plan</p>
@@ -34,6 +45,28 @@
                     <div>
                         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Compliance Score</p>
                         <p class="text-sm font-bold mt-1 {{ ($company->compliance_score ?? 0) >= 70 ? 'text-emerald-600' : (($company->compliance_score ?? 0) >= 40 ? 'text-orange-600' : 'text-red-600') }}">{{ $company->compliance_score ?? 'N/A' }}</p>
+                    </div>
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-gray-100 flex flex-wrap items-center gap-3">
+                    @if(!$company->suspended_at)
+                    <form method="POST" action="/admin/company/{{ $company->id }}/suspend" onsubmit="return confirm('Are you sure you want to suspend this company?')">
+                        @csrf
+                        <button type="submit" class="px-4 py-2 bg-red-600 text-white text-sm rounded-lg font-medium hover:bg-red-700 transition">Suspend Company</button>
+                    </form>
+                    @endif
+
+                    <div x-data="{ showPlan: false }" class="inline-flex items-center gap-2">
+                        <button @click="showPlan = !showPlan" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg font-medium hover:bg-blue-700 transition">Change Plan</button>
+                        <form x-show="showPlan" method="POST" action="/admin/company/{{ $company->id }}/change-plan" class="inline-flex items-center gap-2">
+                            @csrf
+                            <select name="pricing_plan_id" class="text-sm rounded-lg border-gray-300">
+                                @foreach($plans as $plan)
+                                <option value="{{ $plan->id }}">{{ $plan->name }} (Rs. {{ number_format($plan->price) }})</option>
+                                @endforeach
+                            </select>
+                            <button type="submit" class="px-3 py-2 bg-emerald-600 text-white text-sm rounded-lg font-medium hover:bg-emerald-700">Apply</button>
+                        </form>
                     </div>
                 </div>
 

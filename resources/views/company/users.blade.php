@@ -1,0 +1,142 @@
+<x-app-layout>
+    <x-slot name="header">
+        <div class="flex items-center justify-between">
+            <h2 class="font-bold text-xl text-gray-800 leading-tight">Team Members</h2>
+            <button onclick="document.getElementById('addUserModal').classList.toggle('hidden')" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">+ Add User</button>
+        </div>
+    </x-slot>
+
+    <div class="py-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+            @if(session('success'))
+            <div class="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700">{{ session('success') }}</div>
+            @endif
+            @if(session('error'))
+            <div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">{{ session('error') }}</div>
+            @endif
+
+            <div id="addUserModal" class="hidden mb-6">
+                <form method="POST" action="/company/users" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    @csrf
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Add New Team Member</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                            <input type="text" name="name" required class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            @error('name') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                            <input type="email" name="email" required class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            @error('email') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                            <input type="password" name="password" required minlength="6" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            @error('password') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                            <select name="role" required class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                <option value="employee">Employee</option>
+                                <option value="company_admin">Company Admin</option>
+                                <option value="viewer">Viewer</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex justify-end">
+                        <button type="submit" class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition">Add User</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Joined</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        @forelse($users as $user)
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 text-sm font-medium text-gray-900">
+                                {{ $user->name }}
+                                @if($user->id === auth()->id())
+                                <span class="text-xs text-emerald-600 font-normal">(You)</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-600">{{ $user->email }}</td>
+                            <td class="px-6 py-4">
+                                <div x-data="{ editing: false }" class="inline-flex items-center gap-2">
+                                    <span x-show="!editing" class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium
+                                        @if($user->role === 'company_admin') bg-blue-100 text-blue-800
+                                        @elseif($user->role === 'employee') bg-green-100 text-green-800
+                                        @else bg-gray-100 text-gray-800
+                                        @endif">
+                                        {{ ucfirst(str_replace('_', ' ', $user->role)) }}
+                                    </span>
+                                    @if($user->id !== auth()->id())
+                                    <button x-show="!editing" @click="editing = true" class="text-xs text-blue-600 hover:text-blue-800">Change</button>
+                                    <form x-show="editing" method="POST" action="/company/users/{{ $user->id }}/role" class="inline-flex items-center gap-1">
+                                        @csrf
+                                        @method('PATCH')
+                                        <select name="role" class="text-xs rounded border-gray-300 py-1">
+                                            <option value="company_admin" {{ $user->role === 'company_admin' ? 'selected' : '' }}>Company Admin</option>
+                                            <option value="employee" {{ $user->role === 'employee' ? 'selected' : '' }}>Employee</option>
+                                            <option value="viewer" {{ $user->role === 'viewer' ? 'selected' : '' }}>Viewer</option>
+                                        </select>
+                                        <button type="submit" class="text-xs text-emerald-600 hover:text-emerald-800 font-medium">Save</button>
+                                        <button type="button" @click="editing = false" class="text-xs text-gray-500">Cancel</button>
+                                    </form>
+                                    @endif
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                @if($user->is_active)
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
+                                @else
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Inactive</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-500">{{ $user->created_at->format('d M Y') }}</td>
+                            <td class="px-6 py-4 text-sm">
+                                @if($user->id !== auth()->id())
+                                <div class="flex items-center gap-2">
+                                    <div x-data="{ showReset: false }">
+                                        <button @click="showReset = !showReset" class="text-xs text-amber-600 hover:text-amber-800">Reset Password</button>
+                                        <form x-show="showReset" method="POST" action="/company/users/{{ $user->id }}/reset-password" class="mt-1 flex items-center gap-1">
+                                            @csrf
+                                            @method('PATCH')
+                                            <input type="password" name="password" minlength="6" placeholder="New password" required class="text-xs rounded border-gray-300 py-1 w-28">
+                                            <button type="submit" class="text-xs text-emerald-600 font-medium">Set</button>
+                                        </form>
+                                    </div>
+                                    <form method="POST" action="/company/users/{{ $user->id }}/toggle">
+                                        @csrf
+                                        @method('PATCH')
+                                        <button type="submit" class="text-xs {{ $user->is_active ? 'text-red-600 hover:text-red-800' : 'text-green-600 hover:text-green-800' }}">
+                                            {{ $user->is_active ? 'Deactivate' : 'Activate' }}
+                                        </button>
+                                    </form>
+                                </div>
+                                @else
+                                <span class="text-xs text-gray-400">-</span>
+                                @endif
+                            </td>
+                        </tr>
+                        @empty
+                        <tr><td colspan="6" class="px-6 py-8 text-center text-gray-400">No team members found</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</x-app-layout>

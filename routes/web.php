@@ -11,6 +11,8 @@ use App\Http\Controllers\RiskReportController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\MISController;
 use App\Http\Controllers\ShareController;
+use App\Http\Controllers\CompanyUserController;
+use App\Http\Controllers\CompanySettingsController;
 
 Route::get('/share/invoice/{uuid}', [ShareController::class, 'show']);
 
@@ -44,6 +46,19 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
         Route::post('/products/{product}/toggle', [ProductController::class, 'deactivate'])->name('products.toggle');
         Route::get('/products/search', [ProductController::class, 'search'])->name('products.search');
+    });
+
+    Route::middleware(['role:company_admin'])->group(function () {
+        Route::get('/company/users', [CompanyUserController::class, 'index']);
+        Route::post('/company/users', [CompanyUserController::class, 'store']);
+        Route::patch('/company/users/{user}/role', [CompanyUserController::class, 'updateRole']);
+        Route::patch('/company/users/{user}/reset-password', [CompanyUserController::class, 'resetPassword']);
+        Route::patch('/company/users/{user}/toggle', [CompanyUserController::class, 'toggleActive']);
+
+        Route::get('/company/profile', [CompanySettingsController::class, 'profile']);
+        Route::put('/company/profile', [CompanySettingsController::class, 'updateProfile']);
+        Route::get('/company/fbr-settings', [CompanySettingsController::class, 'fbrSettings']);
+        Route::put('/company/fbr-settings', [CompanySettingsController::class, 'updateFbrSettings']);
     });
 
     Route::get('/api/products/search', [ProductController::class, 'search']);
@@ -87,6 +102,8 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::post('/admin/risk-settings', [AdminController::class, 'updateRiskSettings']);
         Route::get('/admin/override-logs', [AdminController::class, 'overrideLogs']);
         Route::get('/admin/company/{company}', [AdminController::class, 'companyShow']);
+        Route::post('/admin/company/{company}/suspend', [AdminController::class, 'suspendCompany']);
+        Route::post('/admin/company/{company}/change-plan', [AdminController::class, 'changePlan']);
     });
 });
 

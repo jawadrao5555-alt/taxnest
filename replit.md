@@ -10,6 +10,7 @@ TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with 
 - **Demo User**: demo@taxnest.pk / password123
 
 ## Recent Changes
+- 2026-02-12: Company Governance + FBR Settings — Self-registration (company+admin), super admin manual company creation with admin, CompanyUserController (add/role/reset/deactivate), FBR Integration Settings (encrypted tokens, sandbox/production toggle, double confirmation), role-based access control (viewer/employee/company_admin/super_admin), company suspend/unsuspend, plan change, suspended company login block, deactivated user login block
 - 2026-02-12: Hybrid Product + Schedule + Manual Control Model — Schedule selection (Standard/Reduced/3rd Schedule/Exempt/Zero Rated), dynamic SRO/Serial/MRP fields, product auto-fill with schedule data, manual HS→PCT lookup, validation layer (missing required fields + mixed schedule blocking), ScheduleEngine service
 - 2026-02-12: UI + Admin + PDF Upgrade — VIP landing page at /, super admin company deep view with 4 tabs, real PDF generation via dompdf, professional PDF layout with WHT/net receivable, context-aware download buttons, status badge polish (Draft=Gray, Locked=Green, Failed=Red)
 - 2026-02-12: Demo + PDF + Share + Mock — PDF download with draft/FBR watermarks, social share links with UUID, demo user/company/products/invoices seeder, dashboard thumbnail cards, QR code generation, demo safety mode
@@ -19,11 +20,11 @@ TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with 
 - 2026-02-11: Phase 1-7 — Invoice hardening, FBR intelligence, compliance risk engine, executive dashboard, billing, security, system health
 
 ## Database Tables
-- **companies** — name, ntn, email, phone, address, fbr_token, token_expires_at, compliance_score
+- **companies** — name, ntn, email, phone, address, fbr_token, token_expires_at, compliance_score, fbr_environment, fbr_sandbox_token (encrypted), fbr_production_token (encrypted), fbr_registration_no, fbr_business_name, suspended_at
 - **invoices** — company_id, invoice_number, status, integrity_hash, buyer_name, buyer_ntn, total_amount, override_reason, override_by, submission_mode, fbr_invoice_id, qr_data, share_uuid
 - **invoice_items** — invoice_id, hs_code, schedule_type, pct_code, tax_rate, sro_schedule_no, serial_no, mrp, description, quantity, price, tax
 - **invoice_activity_logs** — invoice_id, company_id, user_id, action, changes_json, ip_address
-- **users** — name, email, password, company_id (nullable), role (super_admin/company_admin/employee/viewer)
+- **users** — name, email, password, company_id (nullable), role (super_admin/company_admin/employee/viewer), is_active
 - **products** — company_id, name, hs_code, pct_code, default_tax_rate, uom, schedule_type, sro_reference, default_price, is_active
 - **system_settings** — key (unique), value, description
 - **override_logs** — invoice_id, company_id, user_id, action, reason, metadata, ip_address
@@ -77,9 +78,15 @@ TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with 
 - `/api/enterprise/invoice/{id}/status` — Enterprise invoice status API
 - `/api/enterprise/company/compliance` — Enterprise compliance status API
 
+## Routes — Company Admin Settings
+- `/company/users` — Team member management (add, role, reset password, deactivate)
+- `/company/profile` — Edit company profile
+- `/company/fbr-settings` — FBR Integration Settings (tokens, environment toggle)
+
 ## Routes — Super Admin
 - `/admin/dashboard` — Super admin overview
-- `/admin/companies` — Company management
+- `/admin/companies` — Company management (with status/environment columns)
+- `/admin/companies/create` — Create company with optional admin user
 - `/admin/users` — User management
 - `/admin/fbr-logs` — FBR submission logs
 - `/admin/system-health` — System health monitor
@@ -88,7 +95,9 @@ TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with 
 - `/admin/anomalies` — Anomaly detection logs
 - `/admin/risk-settings` — Configurable risk thresholds (governance)
 - `/admin/override-logs` — Override audit trail
-- `/admin/company/{id}` — Company deep view with profile card + 4 tabs (Users, Invoices, Compliance, Activity)
+- `/admin/company/{id}` — Company deep view with suspend/plan controls + 4 tabs
+- `/admin/company/{id}/suspend` — Toggle suspend/unsuspend company
+- `/admin/company/{id}/change-plan` — Change company pricing plan
 
 ## Demo Mode
 - **Demo User**: demo@taxnest.pk / password123 (company_admin role)
@@ -149,7 +158,7 @@ TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with 
 - **Queue**: Database driver with SendInvoiceToFbrJob, ComplianceScoringJob
 
 ## Key Directories
-- `app/Http/Controllers/` — DashboardController, InvoiceController, ProductController, MISController, BillingController, AdminController, ComplianceCertificateController, RiskReportController, ShareController
+- `app/Http/Controllers/` — DashboardController, InvoiceController, ProductController, MISController, BillingController, AdminController, ComplianceCertificateController, RiskReportController, ShareController, CompanyUserController, CompanySettingsController
 - `app/Http/Middleware/` — CompanyIsolation, RoleMiddleware, RateLimitByCompany
 - `app/Models/` — User, Company, Invoice, InvoiceItem, Product, SystemSetting, OverrideLog, FbrLog, InvoiceActivityLog, SecurityLog, PricingPlan, Subscription, Notification, ComplianceScore, AnomalyLog, ComplianceReport, VendorRiskProfile
 - `app/Jobs/` — SendInvoiceToFbrJob, NightlyComplianceCronJob, CheckFbrTokenExpiryJob, ComplianceScoringJob

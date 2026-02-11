@@ -8,14 +8,19 @@
 
     <div class="py-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+            @if(session('success'))
+            <div class="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700">{{ session('success') }}</div>
+            @endif
+
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">NTN</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Environment</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoices</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Users</th>
                         </tr>
@@ -25,8 +30,18 @@
                         <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/admin/company/{{ $company->id }}'">
                             <td class="px-6 py-4 text-sm font-medium text-emerald-700 hover:text-emerald-900"><a href="/admin/company/{{ $company->id }}">{{ $company->name }}</a></td>
                             <td class="px-6 py-4 text-sm font-mono text-gray-600">{{ $company->ntn }}</td>
-                            <td class="px-6 py-4 text-sm text-gray-600">{{ $company->email ?? '-' }}</td>
-                            <td class="px-6 py-4 text-sm text-gray-600">{{ $company->phone ?? '-' }}</td>
+                            <td class="px-6 py-4">
+                                @if($company->suspended_at)
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Suspended</span>
+                                @else
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4">
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $company->fbr_environment === 'production' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800' }}">
+                                    {{ ucfirst($company->fbr_environment ?? 'sandbox') }}
+                                </span>
+                            </td>
                             <td class="px-6 py-4 text-sm text-gray-900 font-medium">{{ $company->invoices_count }}</td>
                             <td class="px-6 py-4 text-sm text-gray-900 font-medium">{{ $company->users_count }}</td>
                         </tr>

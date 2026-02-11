@@ -25,6 +25,14 @@
                     <x-nav-link href="/mis" :active="request()->is('mis*')">
                         MIS Reports
                     </x-nav-link>
+                    @if(auth()->user()->role === 'company_admin')
+                    <x-nav-link href="/company/users" :active="request()->is('company/users*')">
+                        Team
+                    </x-nav-link>
+                    <x-nav-link href="/company/fbr-settings" :active="request()->is('company/fbr*') || request()->is('company/profile*')">
+                        Settings
+                    </x-nav-link>
+                    @endif
                     @endif
                     @if(auth()->user()->role === 'super_admin')
                     <x-nav-link href="/admin/dashboard" :active="request()->is('admin*')">

@@ -21,7 +21,29 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'company_id',
+        'role'
     ];
+
+    public function isSuperAdmin()
+    {
+        return $this->role === 'super_admin';
+    }
+
+    public function isCompanyAdmin()
+    {
+        return $this->role === 'company_admin';
+    }
+
+    public function isEmployee()
+    {
+        return $this->role === 'employee';
+    }
+
+    public function isViewer()
+    {
+        return $this->role === 'viewer';
+    }
 
     /**
      * The attributes that should be hidden for serialization.

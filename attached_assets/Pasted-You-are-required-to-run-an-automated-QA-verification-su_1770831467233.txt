@@ -1,0 +1,130 @@
+You are required to run an automated QA verification suite on the existing TaxNest Enterprise system using the Demo User account.
+
+DO NOT modify architecture.
+DO NOT change logic.
+DO NOT refactor code.
+ONLY run controlled validation tests and return structured results.
+
+Use demo company account only.
+
+========================================
+TEST SUITE – ENTERPRISE VALIDATION
+========================================
+
+Run the following 5 tests:
+
+----------------------------------------
+TEST 1 – Parallel Invoice Number Safety
+----------------------------------------
+
+Simulate:
+- Open 2 concurrent invoice creation transactions
+- Attempt to generate invoice numbers at same time
+
+Verify:
+- No duplicate internal invoice_number generated
+- Database-level locking works
+- Sequence increments correctly
+
+Return:
+- PASS or FAIL
+- Generated invoice numbers
+- DB locking method used
+
+----------------------------------------
+TEST 2 – 3rd Schedule Reduced Validation
+----------------------------------------
+
+Create invoice item with:
+- scheduleType = 3rd Schedule
+- taxRate = 10% (reduced)
+- Missing SRO
+- Missing sroItemSerialNo
+- Missing MRP
+
+Attempt submission.
+
+Expected:
+- Submission blocked
+- Clear validation error message
+
+Return:
+- PASS or FAIL
+- Exact validation message returned
+
+----------------------------------------
+TEST 3 – Dual Invoice Number Integrity
+----------------------------------------
+
+Create normal invoice.
+Submit to Sandbox FBR.
+
+Verify:
+- internal invoice_number remains unchanged
+- fbr_invoice_number stored separately
+- PDF shows FBR Invoice Number
+- Search works using:
+    - internal number
+    - fbr_invoice_number
+
+Return:
+- PASS or FAIL
+- Both numbers displayed
+- PDF filename generated
+
+----------------------------------------
+TEST 4 – Internal Company Bypass
+----------------------------------------
+
+Mark demo company as is_internal = true.
+
+Simulate:
+- Exceed invoice limit
+- Exceed subscription limit
+
+Verify:
+- System allows invoice creation
+- Audit log records bypass usage
+- No FBR submission blocked
+
+Return:
+- PASS or FAIL
+- Audit log entry snapshot
+
+----------------------------------------
+TEST 5 – Environment Switch Control
+----------------------------------------
+
+Switch company FBR environment to Production.
+
+Verify:
+- CONFIRM text required
+- Audit entry logged
+- Invoice submission auto-uses production endpoint
+- No invoice-level environment toggle exists
+
+Return:
+- PASS or FAIL
+- Audit log entry
+- Endpoint used
+
+========================================
+
+After running all tests:
+
+Return structured summary:
+
+{
+  "Test1": "PASS/FAIL",
+  "Test2": "PASS/FAIL",
+  "Test3": "PASS/FAIL",
+  "Test4": "PASS/FAIL",
+  "Test5": "PASS/FAIL",
+  "OverallStatus": "SYSTEM SAFE / NEEDS FIX"
+}
+
+Do not assume.
+Do not simulate.
+Run actual validation against current system.
+
+Return real results only.

@@ -4,6 +4,7 @@
 TaxNest multi-company tax/invoice management system. Uses PHP 8.4 with Laravel framework and SQLite database.
 
 ## Recent Changes
+- 2026-02-11: Phase 2 — Company Isolation Middleware (CompanyIsolation middleware, company_id on users, route protection)
 - 2026-02-11: Phase 1 — Multi-Company Structure Setup (companies, invoices, invoice_items tables)
 - 2026-02-11: Initial Laravel project setup with PHP 8.4
 
@@ -11,9 +12,12 @@ TaxNest multi-company tax/invoice management system. Uses PHP 8.4 with Laravel f
 - **companies** — name, ntn (unique), email, phone, address, fbr_token
 - **invoices** — company_id (FK), invoice_number, status (draft/submitted/locked), buyer_name, buyer_ntn, total_amount
 - **invoice_items** — invoice_id (FK), hs_code, description, quantity, price, tax
-- **users** — default Laravel users table
+- **users** — name, email, password, company_id (FK nullable to companies)
 - **cache** — default Laravel cache table
 - **jobs** — default Laravel jobs table
+
+## Middleware
+- **company** — `CompanyIsolation` middleware enforces company_id on authenticated users, stores `currentCompanyId` in app container
 
 ## Project Architecture
 - **Framework**: Laravel (latest)

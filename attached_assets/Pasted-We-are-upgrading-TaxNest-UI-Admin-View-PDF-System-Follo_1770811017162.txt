@@ -1,0 +1,182 @@
+We are upgrading TaxNest UI + Admin View + PDF System.
+
+Follow tasks sequentially.
+
+========================================
+TASK 1 — VIP LANDING PAGE
+========================================
+
+Create modern SaaS landing page at route: /
+
+Sections required:
+
+1. Hero Section
+   - Title: "TaxNest — Pakistan’s Smart FBR Compliance Platform"
+   - Subtitle: Validate Before You Submit
+   - Buttons:
+     - Start Free Trial
+     - Book Demo
+
+2. Features Section (Grid Cards)
+   - FBR Digital Integration
+   - Compliance Score Engine
+   - Smart Withholding Module
+   - Vendor Risk Detection
+   - Enterprise Analytics
+
+3. How It Works (3 Steps)
+   - Create Invoice
+   - Validate & Submit to FBR
+   - Download & Share
+
+4. Pricing Preview (Basic / Pro / Enterprise)
+
+5. Footer
+   - About
+   - Contact
+   - Terms
+   - Login
+
+Use Tailwind CSS with gradient hero and glass-card design.
+Make it responsive.
+
+========================================
+TASK 2 — SUPER ADMIN COMPANY DEEP VIEW
+========================================
+
+Create route:
+GET /admin/company/{company_id}
+
+When super admin clicks a company:
+
+Show:
+
+Company Profile Card:
+- Company Name
+- NTN
+- Registration No
+- FBR Environment
+- Active Plan
+- Total Users
+- Total Invoices
+- Locked
+- Draft
+- Failed
+
+Tabs inside page:
+
+TAB 1 — Users
+Show all users of company with:
+- Role
+- Email
+- Invoice count
+
+TAB 2 — Invoices
+Filter:
+- All
+- Draft
+- Locked
+- Failed
+
+TAB 3 — Compliance
+- Avg compliance score
+- Risk distribution
+- Audit probability
+
+TAB 4 — Activity Logs
+- Recent submissions
+- Print history
+- Overrides
+
+Super admin can VIEW everything but cannot edit invoices.
+
+========================================
+TASK 3 — PDF DOWNLOAD FIX
+========================================
+
+Fix PDF route:
+GET /invoice/{id}/download
+
+Conditions:
+
+If invoice.status == draft:
+- Add watermark "DRAFT COPY"
+
+If invoice.status == locked:
+- Show:
+   - FBR Logo
+   - FBR Invoice Number
+   - QR Code
+
+Ensure:
+- PDF downloads automatically
+- No preview-only mode
+- Proper file name:
+   invoice-{invoice_number}.pdf
+
+========================================
+TASK 4 — PROFESSIONAL PDF DESIGN
+========================================
+
+PDF Layout:
+
+Header:
+- Company Logo (left)
+- Invoice Title (right)
+- FBR Logo (if locked)
+
+Buyer Section:
+- Name
+- NTN
+- Address
+
+Items Table:
+- Product
+- HS Code
+- Qty
+- Price
+- Tax
+- Total
+
+Totals Section:
+- Subtotal
+- Sales Tax
+- Total
+- WHT (if selected at print stage)
+- Net Receivable
+
+Footer:
+- "This is a system generated invoice."
+- Compliance Score Badge (optional small)
+
+Use clean spacing and professional typography.
+
+========================================
+TASK 5 — PDF TEST BUTTON
+========================================
+
+On invoice preview page add:
+
+Buttons:
+- Download Draft PDF
+- Download Final PDF (if locked)
+
+========================================
+TASK 6 — UI POLISH
+========================================
+
+- Use soft shadows
+- Rounded cards
+- Status badges:
+   Draft (Gray)
+   Locked (Green)
+   Failed (Red)
+   Risk High (Orange)
+
+========================================
+Ensure:
+- Multi-company isolation preserved
+- Production lock untouched
+- FBR payload untouched
+- All routes return 200
+- PDF properly downloads

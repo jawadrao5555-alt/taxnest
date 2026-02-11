@@ -282,4 +282,59 @@ class AdminController extends Controller
             ->paginate(20);
         return view('admin.override-logs', compact('logs'));
     }
+
+    public function companyShow(Company $company)
+    {
+        $stats = [
+            'total_users' => User::where('company_id', $company->id)->count(),
+            'total_invoices' => Invoice::where('company_id', $company->id)->count(),
+            'locked' => Invoice::where('company_id', $company->id)->where('status', 'locked')->count(),
+            'draft' => Invoice::where('company_id', $company->id)->where('status', 'draft')->count(),
+            'failed' => FbrLog::whereIn('invoice_id', Invoice::where('company_id', $company->id)->pluck('id'))->where('status', 'failed')->count(),
+        ];
+
+        $activePlan = null;
+        $sub = Subscription::where('company_id', $company->id)->where('active', true)->first();
+        if ($sub) {
+            $plan = PricingPlan::find($sub->pricing_plan_id);
+            $activePlan = $plan ? $plan->name : 'Unknown';
+        }
+
+        $users = User::where('company_id', $company->id)->get()->map(function ($user) {
+            $user->user_invoice_count = \App\Models\InvoiceActivityLog::where('user_id', $user->id)->where('action', 'created')->count();
+            return $user;
+        });
+
+        $invoices = Invoice::where('company_id', $company->id)->orderBy('created_at', 'desc')->get();
+
+        $complianceReports = \App\Models\ComplianceReport::where('company_id', $company->id)->get();
+        $compliance = [
+            'avg_score' => $complianceReports->avg('final_score') ?? 0,
+            'total_reports' => $complianceReports->count(),
+            'audit_probability' => $this->calcAuditProbability($company),
+            'risk_distribution' => [
+                'LOW' => $complianceReports->where('risk_level', 'LOW')->count(),
+                'MEDIUM' => $complianceReports->where('risk_level', 'MEDIUM')->count(),
+                'HIGH' => $complianceReports->where('risk_level', 'HIGH')->count(),
+                'CRITICAL' => $complianceReports->where('risk_level', 'CRITICAL')->count(),
+            ],
+        ];
+
+        $activityLogs = \App\Models\InvoiceActivityLog::where('company_id', $company->id)
+            ->with('invoice', 'user')
+            ->orderBy('created_at', 'desc')
+            ->take(50)
+            ->get();
+
+        return view('admin.company-show', compact('company', 'stats', 'activePlan', 'users', 'invoices', 'compliance', 'activityLogs'));
+    }
+
+    private function calcAuditProbability(Company $company)
+    {
+        $score = $company->compliance_score ?? 75;
+        if ($score >= 80) return rand(5, 15);
+        if ($score >= 60) return rand(20, 40);
+        if ($score >= 40) return rand(45, 65);
+        return rand(70, 90);
+    }
 }

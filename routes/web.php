@@ -17,7 +17,7 @@ Route::get('/share/invoice/{uuid}', [ShareController::class, 'show']);
 Route::get('/', function () {
     return \Illuminate\Support\Facades\Auth::check()
         ? redirect('/dashboard')
-        : redirect('/login');
+        : view('landing');
 });
 
 Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () {
@@ -78,6 +78,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::get('/admin/risk-settings', [AdminController::class, 'riskSettings']);
         Route::post('/admin/risk-settings', [AdminController::class, 'updateRiskSettings']);
         Route::get('/admin/override-logs', [AdminController::class, 'overrideLogs']);
+        Route::get('/admin/company/{company}', [AdminController::class, 'companyShow']);
     });
 });
 

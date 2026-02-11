@@ -59,7 +59,7 @@
 
     <div class="py-8">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-8">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-8">
                 <div class="p-6 border-b border-gray-100">
                     <div class="flex items-center justify-between mb-6">
                         <div>
@@ -67,10 +67,11 @@
                             <p class="text-sm text-gray-500 mt-1">NTN: {{ $invoice->company->ntn ?? 'N/A' }}</p>
                         </div>
                         <div class="text-right">
-                            <span class="inline-flex px-3 py-1 rounded-full text-sm font-medium
-                                @if($invoice->status === 'draft') bg-yellow-100 text-yellow-800
+                            <span class="inline-flex px-3 py-1 rounded-full text-sm font-bold
+                                @if($invoice->status === 'draft') bg-gray-200 text-gray-700
                                 @elseif($invoice->status === 'submitted') bg-blue-100 text-blue-800
                                 @elseif($invoice->status === 'locked') bg-green-100 text-green-800
+                                @elseif($invoice->status === 'failed') bg-red-100 text-red-800
                                 @endif">
                                 {{ ucfirst($invoice->status) }}
                             </span>

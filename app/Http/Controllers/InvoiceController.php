@@ -343,7 +343,7 @@ class InvoiceController extends Controller
 
         $showWatermark = false;
         $isDraft = $invoice->status === 'draft';
-        
+
         $subscription = Subscription::where('company_id', $invoice->company_id)
             ->where('active', true)
             ->first();
@@ -351,11 +351,19 @@ class InvoiceController extends Controller
             $showWatermark = true;
         }
 
-        $html = view('invoice.pdf', compact('invoice', 'showWatermark', 'isDraft'))->render();
+        $subtotal = $invoice->items->sum(fn($item) => $item->price * $item->quantity);
+        $totalTax = $invoice->items->sum('tax');
 
-        return response($html)
-            ->header('Content-Type', 'text/html')
-            ->header('Content-Disposition', 'inline; filename="invoice-' . ($invoice->invoice_number ?? $invoice->id) . '.html"');
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-professional', [
+            'invoice' => $invoice,
+            'showWatermark' => $showWatermark,
+            'isDraft' => $isDraft,
+            'subtotal' => $subtotal,
+            'totalTax' => $totalTax,
+        ]);
+
+        $filename = 'invoice-' . ($invoice->invoice_number ?? $invoice->id) . '.pdf';
+        return $pdf->download($filename);
     }
 
     public function complianceCheck(Request $request)

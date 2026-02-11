@@ -10,6 +10,7 @@ TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with 
 - **Demo User**: demo@taxnest.pk / password123
 
 ## Recent Changes
+- 2026-02-12: UI + Admin + PDF Upgrade — VIP landing page at /, super admin company deep view with 4 tabs, real PDF generation via dompdf, professional PDF layout with WHT/net receivable, context-aware download buttons, status badge polish (Draft=Gray, Locked=Green, Failed=Red)
 - 2026-02-12: Demo + PDF + Share + Mock — PDF download with draft/FBR watermarks, social share links with UUID, demo user/company/products/invoices seeder, dashboard thumbnail cards, QR code generation, demo safety mode
 - 2026-02-12: Enterprise V3 — Product Master, Smart Invoice Builder, Preview/Validate flow, Smart+Direct MIS submission modes, QR+Lock, MIS Reporting, Trend Analytics, Governance Panel, Enterprise API
 - 2026-02-12: Regulatory AI Hybrid Model — ComplianceEngine, AnomalyEngine, HybridComplianceScorer, VendorRiskEngine, AuditDefenseService, auto-run with CRITICAL blocking
@@ -44,6 +45,7 @@ TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with 
 - **rate_limit_company** — RateLimitByCompany enforces 200 req/min per company
 
 ## Routes — Public
+- `/` — VIP landing page with hero, features, how-it-works, pricing, footer (redirects to /dashboard if authenticated)
 - `/share/invoice/{uuid}` — Public shareable invoice view (no auth required)
 
 ## Routes — Company Users
@@ -83,6 +85,7 @@ TaxNest is a multi-company SaaS tax/invoice management system for Pakistan with 
 - `/admin/anomalies` — Anomaly detection logs
 - `/admin/risk-settings` — Configurable risk thresholds (governance)
 - `/admin/override-logs` — Override audit trail
+- `/admin/company/{id}` — Company deep view with profile card + 4 tabs (Users, Invoices, Compliance, Activity)
 
 ## Demo Mode
 - **Demo User**: demo@taxnest.pk / password123 (company_admin role)

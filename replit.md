@@ -30,6 +30,11 @@ TaxNest is built on **Laravel 12** with **Breeze** for authentication, using **P
 - **Hybrid Compliance Scorer:** Validates invoices against FBR rules before submission, generating risk scores.
 - **PDF Generation:** Generates FBR-compliant PDFs with QR data, draft watermarks, and proper filenames.
 - **Admin Company Deep View:** Comprehensive overview for super admins with financial, compliance, and activity tabs (view-only).
+- **Risk Intelligence Engine:** Pre-submission risk detection with 6 detection types (HS/tax mismatch, reduced 3rd Schedule without SRO, missing MRP, zero-rated domestic anomaly, invoice spikes >3x average, price deviation >40%). Risk scoring 0-100 with Safe/Review/High/Critical levels. Critical-level submission blocking with internal company bypass. Idempotent anomaly logging only on submit/job paths (not on read-only views).
+- **SRO Suggestion System:** Non-mandatory autofill with confidence-based suggestions (high/medium/low), integrated with HS lookup for 3rd Schedule, Exempt, and Zero Rated items via `/api/sro-suggest`.
+- **Enhanced Compliance Scoring:** Formula: `finalScore = base - anomalyWeight - vendorWeight + stabilityBonus`. Anomaly weight from unresolved anomaly logs (max 30), vendor weight from risky vendor profiles (max 20), stability bonus from consistent performance (max 10).
+- **Intelligence Processing:** Async queue-based processing via `IntelligenceProcessingJob`, vendor risk tracking, and compliance recalculation.
+- **Dashboard Intelligence Panels:** Audit probability with 6 factors (compliance score, anomalies, critical/high risk reports, risky vendors, severity bonuses), compliance formula breakdown, and company-wide risk summary with severity breakdown.
 
 ## External Dependencies
 - **PostgreSQL:** Primary database managed by Replit.

@@ -6,6 +6,7 @@ use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ComplianceCertificateController;
 
 Route::get('/', function () {
     return \Illuminate\Support\Facades\Auth::check()
@@ -13,7 +14,7 @@ Route::get('/', function () {
         : redirect('/login');
 });
 
-Route::middleware(['auth', 'company'])->group(function () {
+Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
@@ -34,6 +35,8 @@ Route::middleware(['auth', 'company'])->group(function () {
     Route::get('/invoice/{invoice}/pdf', [InvoiceController::class, 'pdf']);
     Route::post('/invoice/{invoice}/verify', [InvoiceController::class, 'verifyIntegrity'])->name('invoice.verify');
 
+    Route::get('/compliance/certificate', [ComplianceCertificateController::class, 'generate'])->name('compliance.certificate');
+
     Route::middleware(['role:super_admin'])->group(function () {
         Route::get('/admin/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
         Route::get('/admin/companies', [AdminController::class, 'companies']);
@@ -44,6 +47,8 @@ Route::middleware(['auth', 'company'])->group(function () {
         Route::get('/admin/fbr-logs', [AdminController::class, 'fbrLogs']);
         Route::get('/admin/system-health', [AdminController::class, 'systemHealth']);
         Route::get('/admin/security-logs', [AdminController::class, 'securityLogs']);
+        Route::get('/admin/audit/export', [AdminController::class, 'auditExport'])->name('admin.audit.export');
+        Route::get('/admin/anomalies', [AdminController::class, 'anomalies'])->name('admin.anomalies');
     });
 });
 

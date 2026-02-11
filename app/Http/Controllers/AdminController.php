@@ -10,9 +10,14 @@ use App\Models\User;
 use App\Models\Subscription;
 use App\Models\PricingPlan;
 use App\Models\SecurityLog;
+use App\Models\ComplianceScore;
+use App\Models\AnomalyLog;
 use App\Services\SecurityLogService;
+use App\Services\IntegrityHashService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Response;
+use Carbon\Carbon;
 
 class AdminController extends Controller
 {
@@ -38,11 +43,17 @@ class AdminController extends Controller
             ->take(5)
             ->get();
 
+        $recentAnomalies = AnomalyLog::with('company')
+            ->where('resolved', false)
+            ->orderBy('created_at', 'desc')
+            ->take(10)
+            ->get();
+
         return view('admin.dashboard', compact(
             'totalCompanies', 'totalUsers', 'totalInvoices',
             'draftInvoices', 'submittedInvoices', 'lockedInvoices',
             'failedLogs', 'totalRevenue', 'activeSubscriptions',
-            'recentInvoices', 'recentCompanies'
+            'recentInvoices', 'recentCompanies', 'recentAnomalies'
         ));
     }
 
@@ -76,6 +87,7 @@ class AdminController extends Controller
                 'pricing_plan_id' => $freePlan->id,
                 'start_date' => now(),
                 'end_date' => now()->addMonth(),
+                'trial_ends_at' => now()->addDays(14),
                 'active' => true,
             ]);
         }
@@ -164,11 +176,16 @@ class AdminController extends Controller
         if ($totalRetries24h > 20) $healthScore -= 10;
         $healthScore = max(0, $healthScore);
 
+        $recentAnomalies = AnomalyLog::with('company')
+            ->orderBy('created_at', 'desc')
+            ->take(10)
+            ->get();
+
         return view('admin.system-health', compact(
             'pendingJobs', 'failedJobs', 'avgResponseTime', 'totalRetries24h',
             'fbrLogsToday', 'fbrSuccessToday', 'failureBreakdown',
             'companiesAtRisk', 'companiesModerate', 'companiesSafe',
-            'recentSecurityLogs', 'healthScore'
+            'recentSecurityLogs', 'healthScore', 'recentAnomalies'
         ));
     }
 
@@ -179,5 +196,50 @@ class AdminController extends Controller
             ->paginate(20);
 
         return view('admin.security-logs', compact('logs'));
+    }
+
+    public function auditExport()
+    {
+        $invoices = Invoice::with('items', 'company')->orderBy('id')->get();
+
+        $csvContent = "Invoice Number,Company,Buyer Name,Buyer NTN,Total Amount,Tax Amount,Status,Created At,SHA256 Signature\n";
+
+        foreach ($invoices as $invoice) {
+            $taxAmount = $invoice->items->sum('tax');
+            $hashData = implode('|', [
+                $invoice->invoice_number,
+                $invoice->total_amount,
+                $taxAmount,
+                $invoice->company_id,
+                $invoice->created_at->toIso8601String(),
+            ]);
+            $sha256 = hash('sha256', $hashData);
+
+            $csvContent .= implode(',', [
+                '"' . ($invoice->invoice_number ?? '') . '"',
+                '"' . ($invoice->company->name ?? '') . '"',
+                '"' . $invoice->buyer_name . '"',
+                '"' . $invoice->buyer_ntn . '"',
+                $invoice->total_amount,
+                $taxAmount,
+                $invoice->status,
+                '"' . $invoice->created_at->toIso8601String() . '"',
+                $sha256,
+            ]) . "\n";
+        }
+
+        return Response::make($csvContent, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="taxnest_audit_export_' . now()->format('Y-m-d') . '.csv"',
+        ]);
+    }
+
+    public function anomalies()
+    {
+        $anomalies = AnomalyLog::with('company')
+            ->orderBy('created_at', 'desc')
+            ->paginate(20);
+
+        return view('admin.anomalies', compact('anomalies'));
     }
 }

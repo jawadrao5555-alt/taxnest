@@ -1,0 +1,136 @@
+Upgrade current TaxNest Laravel 12 SaaS system to Enterprise V2.
+
+STRICT RULE:
+Do NOT modify existing invoice submission logic, FBR payload structure, company isolation, RBAC roles, or production lock rule.
+Only extend system with new modules.
+
+Implement the following modules step-by-step:
+
+====================================
+PHASE A — INFRASTRUCTURE UPGRADE
+====================================
+
+1) API Rate Limiting (Per Company)
+- Add rate limit middleware based on company_id.
+- Default: 200 requests/minute per company.
+- Super Admin exempt.
+
+2) FBR Token Expiry Monitor
+- Add column: token_expires_at in companies table.
+- Create scheduled job that checks expiry daily.
+- If token expiring in 48 hours → send warning notification (store in notifications table).
+
+3) Immutable Audit Export
+- Create /admin/audit/export route.
+- Export CSV of invoices + SHA256 signature appended.
+- Hash must include: invoice_number + total_amount + tax + company_id + created_at.
+
+4) Background Compliance Cron
+- Nightly scheduled job recalculates:
+  - success rate
+  - retry ratio
+  - draft aging
+  - failure ratio
+- Store in compliance_scores table.
+
+====================================
+PHASE B — COMPLIANCE INTELLIGENCE
+====================================
+
+5) Risk Scoring Engine
+- Create service ComplianceRiskService.
+- Score formula:
+  40% success rate
+  20% retry ratio
+  20% draft aging
+  20% failure ratio
+- Save score 0–100.
+- Categorize:
+  80-100 SAFE
+  50-79 MODERATE
+  0-49 AT-RISK
+
+6) Anomaly Detection
+- Detect if monthly invoice count > 3x previous month.
+- Flag anomaly_logs table.
+
+7) Tax Spike Detection
+- If tax value increases 40% month-over-month.
+- Store alert.
+
+8) Executive Dashboard Widgets
+Add:
+- Risk Score Badge
+- Draft Aging Breakdown
+- 6 Month Compliance Trend Chart
+
+Use existing Tailwind + Chart.js stack.
+
+====================================
+PHASE C — BILLING INTELLIGENCE
+====================================
+
+9) Trial Mode
+- Add trial_ends_at column in subscriptions.
+- 14 day default trial.
+- After expiry → block FBR submission.
+
+10) Usage Warning Banner
+- If usage > 80% → show upgrade banner.
+
+11) Watermark PDFs
+- If subscription inactive:
+  Add watermark:
+  "Subscription Expired - Upgrade Required"
+
+12) Auto Suspension
+- Expired subscription → invoice submission disabled.
+- Draft creation allowed.
+
+====================================
+PHASE D — MARKET DOMINATION
+====================================
+
+13) Compliance Certificate Generator
+- Monthly downloadable PDF:
+  "TaxNest Compliance Certificate"
+  Show:
+   Company Name
+   Score
+   Status Badge
+   Month
+
+14) Industry Benchmark
+- Compare average compliance score across all companies.
+- Show comparison widget.
+
+15) Smart Insights Panel
+- Suggest:
+   - High draft aging warning
+   - High retry warning
+   - Low success rate warning
+
+====================================
+
+TECH REQUIREMENTS:
+- Keep PostgreSQL
+- Keep Queue system
+- Keep existing database driver
+- Use migrations properly
+- Use services layer pattern
+- Do NOT break current routes
+- Add new routes under /admin or /dashboard enhancements
+
+After completion:
+- Run migrations
+- Clear cache
+- Restart queue
+- Ensure no existing feature breaks
+
+Return summary of:
+- New tables created
+- New services created
+- New routes added
+- Dashboard upgrades added
+
+System must remain production-safe.

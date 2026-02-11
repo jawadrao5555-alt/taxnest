@@ -128,12 +128,39 @@
                 </div>
             </div>
 
+            @if($recentAnomalies->count() > 0)
+            <div class="bg-white rounded-xl shadow-sm border border-red-100 p-6 mb-8">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-red-800 flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+                        <span>Recent Anomalies</span>
+                    </h3>
+                    <a href="/admin/anomalies" class="text-sm text-red-600 hover:text-red-700 font-medium">View All</a>
+                </div>
+                <div class="space-y-2">
+                    @foreach($recentAnomalies as $anomaly)
+                    <div class="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $anomaly->type === 'invoice_spike' ? 'bg-orange-100 text-orange-800' : 'bg-red-100 text-red-800' }}">
+                                {{ str_replace('_', ' ', ucfirst($anomaly->type)) }}
+                            </span>
+                            <span class="text-sm text-gray-700">{{ $anomaly->company->name ?? 'N/A' }} - {{ $anomaly->description }}</span>
+                        </div>
+                        <span class="text-xs text-gray-500">{{ $anomaly->created_at->diffForHumans() }}</span>
+                    </div>
+                    @endforeach
+                </div>
+            </div>
+            @endif
+
             <div class="flex flex-wrap gap-3">
                 <a href="/admin/companies" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 transition">Manage Companies</a>
                 <a href="/admin/users" class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg font-medium text-sm hover:bg-purple-700 transition">Manage Users</a>
                 <a href="/admin/fbr-logs" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg font-medium text-sm hover:bg-gray-700 transition">FBR Logs</a>
                 <a href="/admin/system-health" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium text-sm hover:bg-emerald-700 transition">System Health</a>
                 <a href="/admin/security-logs" class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg font-medium text-sm hover:bg-red-700 transition">Security Logs</a>
+                <a href="/admin/anomalies" class="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg font-medium text-sm hover:bg-orange-700 transition">Anomalies</a>
+                <a href="/admin/audit/export" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium text-sm hover:bg-indigo-700 transition">Export Audit CSV</a>
             </div>
         </div>
     </div>

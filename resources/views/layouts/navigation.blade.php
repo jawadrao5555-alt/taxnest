@@ -36,6 +36,9 @@
                     <x-nav-link href="/admin/system-health" :active="request()->is('admin/system-health*')">
                         System Health
                     </x-nav-link>
+                    <x-nav-link href="/admin/anomalies" :active="request()->is('admin/anomalies*')">
+                        Anomalies
+                    </x-nav-link>
                     @endif
                 </div>
             </div>

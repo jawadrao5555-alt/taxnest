@@ -188,6 +188,20 @@ class InvoiceController extends Controller
             return redirect('/invoices')->with('error', 'Invoice already locked.');
         }
 
+        $companyId = $invoice->company_id;
+        $subscription = Subscription::where('company_id', $companyId)
+            ->where('active', true)
+            ->with('pricingPlan')
+            ->first();
+
+        if ($subscription && $subscription->isExpired()) {
+            return redirect('/invoices')->with('error', 'Your subscription has expired. Please renew to submit invoices to FBR.');
+        }
+
+        if ($subscription && $subscription->trial_ends_at && $subscription->isTrialExpired()) {
+            return redirect('/invoices')->with('error', 'Your trial period has ended. Please subscribe to a plan to submit invoices.');
+        }
+
         $invoice->status = 'submitted';
         $invoice->save();
 
@@ -218,7 +232,17 @@ class InvoiceController extends Controller
     public function pdf(Invoice $invoice)
     {
         $invoice->load('items', 'company');
-        $html = view('invoice.pdf', compact('invoice'))->render();
+
+        $showWatermark = false;
+        $subscription = Subscription::where('company_id', $invoice->company_id)
+            ->where('active', true)
+            ->first();
+
+        if (!$subscription || $subscription->isExpired()) {
+            $showWatermark = true;
+        }
+
+        $html = view('invoice.pdf', compact('invoice', 'showWatermark'))->render();
 
         return response($html)
             ->header('Content-Type', 'text/html');

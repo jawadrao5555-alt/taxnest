@@ -9,14 +9,73 @@
                     {{ $complianceScore }} - {{ $complianceBadge['label'] }}
                 </span>
             </div>
-            <a href="/invoice/create" class="inline-flex items-center px-4 py-2 bg-emerald-600 border border-transparent rounded-lg font-semibold text-xs text-white uppercase tracking-widest hover:bg-emerald-700 transition">
-                + New Invoice
-            </a>
+            <div class="flex items-center space-x-3">
+                <a href="/compliance/certificate" target="_blank" class="inline-flex items-center px-3 py-2 bg-indigo-600 border border-transparent rounded-lg font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 transition">
+                    Certificate
+                </a>
+                <a href="/invoice/create" class="inline-flex items-center px-4 py-2 bg-emerald-600 border border-transparent rounded-lg font-semibold text-xs text-white uppercase tracking-widest hover:bg-emerald-700 transition">
+                    + New Invoice
+                </a>
+            </div>
         </div>
     </x-slot>
 
     <div class="py-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+            @if(!empty($trialInfo) && $trialInfo['is_trial'])
+            <div class="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <div>
+                        <p class="text-sm font-semibold text-blue-800">Trial Mode Active</p>
+                        <p class="text-xs text-blue-600">{{ $trialInfo['days_left'] }} days remaining (expires {{ $trialInfo['ends_at'] }})</p>
+                    </div>
+                </div>
+                <a href="/billing/plans" class="px-4 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition">Upgrade Now</a>
+            </div>
+            @endif
+
+            @if(!empty($trialInfo) && !empty($trialInfo['is_expired']) && $trialInfo['is_expired'])
+            <div class="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <svg class="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+                    <div>
+                        <p class="text-sm font-semibold text-red-800">Trial Expired</p>
+                        <p class="text-xs text-red-600">FBR submissions are blocked. Subscribe to continue.</p>
+                    </div>
+                </div>
+                <a href="/billing/plans" class="px-4 py-1.5 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition">Subscribe Now</a>
+            </div>
+            @endif
+
+            @if($notifications->count() > 0)
+            <div class="mb-6 space-y-2">
+                @foreach($notifications as $notif)
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center space-x-3">
+                    <svg class="w-5 h-5 text-yellow-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                    <div class="flex-1">
+                        <p class="text-sm font-medium text-yellow-800">{{ $notif->title }}</p>
+                        <p class="text-xs text-yellow-600">{{ $notif->message }}</p>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+            @endif
+
+            @php $usagePercent = $invoiceLimit > 0 ? min(100, ($invoicesUsed / $invoiceLimit) * 100) : 0; @endphp
+            @if($usagePercent >= 80)
+            <div class="mb-6 bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <svg class="w-6 h-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                    <div>
+                        <p class="text-sm font-semibold text-orange-800">Usage Warning - {{ round($usagePercent) }}% Used</p>
+                        <p class="text-xs text-orange-600">You've used {{ $invoicesUsed }} of {{ $invoiceLimit }} invoices. Upgrade to avoid hitting your limit.</p>
+                    </div>
+                </div>
+                <a href="/billing/plans" class="px-4 py-1.5 bg-orange-600 text-white text-xs font-semibold rounded-lg hover:bg-orange-700 transition">Upgrade Plan</a>
+            </div>
+            @endif
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
@@ -84,7 +143,6 @@
                     </div>
                     @if($subscription)
                     <p class="mt-2 text-sm text-gray-500">{{ $subscription->pricingPlan->name }} Plan</p>
-                    @php $usagePercent = $invoiceLimit > 0 ? min(100, ($invoicesUsed / $invoiceLimit) * 100) : 0; @endphp
                     <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
                         <div class="h-2 rounded-full {{ $usagePercent > 80 ? 'bg-red-500' : 'bg-emerald-500' }}" style="width: {{ $usagePercent }}%"></div>
                     </div>
@@ -92,20 +150,87 @@
                 </div>
             </div>
 
+            @if(count($smartInsights) > 0)
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4">Draft Aging Breakdown</h3>
-                <div class="grid grid-cols-3 gap-4">
-                    <div class="text-center p-4 bg-green-50 rounded-lg">
-                        <p class="text-2xl font-bold text-green-700">{{ $draftAging['1_day'] }}</p>
-                        <p class="text-sm text-green-600 mt-1">Less than 1 day</p>
+                <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center space-x-2">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                    <span>Smart Insights</span>
+                </h3>
+                <div class="space-y-3">
+                    @foreach($smartInsights as $insight)
+                    <div class="flex items-start space-x-3 p-3 rounded-lg {{ $insight['type'] === 'danger' ? 'bg-red-50' : 'bg-yellow-50' }}">
+                        <div class="flex-shrink-0 mt-0.5">
+                            @if($insight['icon'] === 'clock')
+                            <svg class="w-5 h-5 {{ $insight['type'] === 'danger' ? 'text-red-600' : 'text-yellow-600' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            @elseif($insight['icon'] === 'refresh')
+                            <svg class="w-5 h-5 {{ $insight['type'] === 'danger' ? 'text-red-600' : 'text-yellow-600' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                            @elseif($insight['icon'] === 'alert')
+                            <svg class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+                            @else
+                            <svg class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                            @endif
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold {{ $insight['type'] === 'danger' ? 'text-red-800' : 'text-yellow-800' }}">{{ $insight['title'] }}</p>
+                            <p class="text-xs {{ $insight['type'] === 'danger' ? 'text-red-600' : 'text-yellow-600' }} mt-0.5">{{ $insight['message'] }}</p>
+                        </div>
                     </div>
-                    <div class="text-center p-4 bg-yellow-50 rounded-lg">
-                        <p class="text-2xl font-bold text-yellow-700">{{ $draftAging['3_days'] }}</p>
-                        <p class="text-sm text-yellow-600 mt-1">1 - 3 days</p>
+                    @endforeach
+                </div>
+            </div>
+            @endif
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Draft Aging Breakdown</h3>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="text-center p-4 bg-green-50 rounded-lg">
+                            <p class="text-2xl font-bold text-green-700">{{ $draftAging['1_day'] }}</p>
+                            <p class="text-sm text-green-600 mt-1">Less than 1 day</p>
+                        </div>
+                        <div class="text-center p-4 bg-yellow-50 rounded-lg">
+                            <p class="text-2xl font-bold text-yellow-700">{{ $draftAging['3_days'] }}</p>
+                            <p class="text-sm text-yellow-600 mt-1">1 - 3 days</p>
+                        </div>
+                        <div class="text-center p-4 bg-red-50 rounded-lg">
+                            <p class="text-2xl font-bold text-red-700">{{ $draftAging['7_plus'] }}</p>
+                            <p class="text-sm text-red-600 mt-1">7+ days old</p>
+                        </div>
                     </div>
-                    <div class="text-center p-4 bg-red-50 rounded-lg">
-                        <p class="text-2xl font-bold text-red-700">{{ $draftAging['7_plus'] }}</p>
-                        <p class="text-sm text-red-600 mt-1">7+ days old</p>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Industry Benchmark</h3>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="text-center">
+                            <p class="text-3xl font-bold {{ $industryBenchmark['above_average'] ? 'text-green-600' : 'text-red-600' }}">{{ $complianceScore }}</p>
+                            <p class="text-xs text-gray-500 mt-1">Your Score</p>
+                        </div>
+                        <div class="text-center px-6">
+                            <p class="text-sm font-medium {{ $industryBenchmark['above_average'] ? 'text-green-600' : 'text-red-600' }}">
+                                {{ $industryBenchmark['above_average'] ? 'Above' : 'Below' }} Average
+                            </p>
+                            <div class="flex items-center justify-center mt-1">
+                                @if($industryBenchmark['above_average'])
+                                <svg class="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+                                @else
+                                <svg class="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                                @endif
+                            </div>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-3xl font-bold text-gray-400">{{ $industryBenchmark['average'] }}</p>
+                            <p class="text-xs text-gray-500 mt-1">Industry Avg</p>
+                        </div>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3 relative">
+                        <div class="h-3 rounded-full bg-indigo-500" style="width: {{ $complianceScore }}%"></div>
+                        <div class="absolute top-0 h-3 w-0.5 bg-gray-800" style="left: {{ $industryBenchmark['average'] }}%"></div>
+                    </div>
+                    <div class="flex justify-between text-xs text-gray-400 mt-1">
+                        <span>0</span>
+                        <span>Industry Avg: {{ $industryBenchmark['average'] }}</span>
+                        <span>100</span>
                     </div>
                 </div>
             </div>
@@ -124,6 +249,28 @@
                     <canvas id="complianceChart" height="200"></canvas>
                 </div>
             </div>
+
+            @if($recentAnomalies->count() > 0)
+            <div class="bg-white rounded-xl shadow-sm border border-red-100 p-6 mb-8">
+                <h3 class="text-lg font-semibold text-red-800 mb-4 flex items-center space-x-2">
+                    <svg class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+                    <span>Active Anomalies</span>
+                </h3>
+                <div class="space-y-2">
+                    @foreach($recentAnomalies as $anomaly)
+                    <div class="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $anomaly->type === 'invoice_spike' ? 'bg-orange-100 text-orange-800' : 'bg-red-100 text-red-800' }}">
+                                {{ str_replace('_', ' ', ucfirst($anomaly->type)) }}
+                            </span>
+                            <span class="text-sm text-gray-700">{{ $anomaly->description }}</span>
+                        </div>
+                        <span class="text-xs text-gray-500">{{ $anomaly->created_at->diffForHumans() }}</span>
+                    </div>
+                    @endforeach
+                </div>
+            </div>
+            @endif
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100">

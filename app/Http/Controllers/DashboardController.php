@@ -8,7 +8,11 @@ use App\Models\Company;
 use App\Models\Subscription;
 use App\Models\InvoiceActivityLog;
 use App\Models\FbrLog;
-use App\Services\ComplianceScoreService;
+use App\Models\ComplianceScore;
+use App\Models\AnomalyLog;
+use App\Models\Notification;
+use App\Services\ComplianceRiskService;
+use App\Services\SmartInsightsService;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -69,24 +73,34 @@ class DashboardController extends Controller
         $fbrSuccessRate = $totalFbrLogs > 0 ? round(($successFbrLogs / $totalFbrLogs) * 100, 1) : 100;
 
         $complianceScore = $company->compliance_score ?? 100;
-        $complianceBadge = ComplianceScoreService::getBadge($complianceScore);
+        $complianceBadge = ComplianceRiskService::getBadge($complianceScore);
 
         $complianceTrend = [];
         for ($i = 5; $i >= 0; $i--) {
             $month = now()->subMonths($i);
-            $monthInvoices = Invoice::where('company_id', $companyId)
-                ->whereYear('created_at', $month->year)
-                ->whereMonth('created_at', $month->month)
-                ->count();
-            $monthLocked = Invoice::where('company_id', $companyId)
-                ->where('status', 'locked')
-                ->whereYear('created_at', $month->year)
-                ->whereMonth('created_at', $month->month)
-                ->count();
-            $complianceTrend[] = [
-                'month' => $month->format('M'),
-                'score' => $monthInvoices > 0 ? round(($monthLocked / $monthInvoices) * 100) : 100,
-            ];
+            $scoreRecord = ComplianceScore::where('company_id', $companyId)
+                ->whereMonth('calculated_date', $month->month)
+                ->whereYear('calculated_date', $month->year)
+                ->orderBy('calculated_date', 'desc')
+                ->first();
+
+            if ($scoreRecord) {
+                $complianceTrend[] = ['month' => $month->format('M'), 'score' => $scoreRecord->score];
+            } else {
+                $monthInvoices = Invoice::where('company_id', $companyId)
+                    ->whereYear('created_at', $month->year)
+                    ->whereMonth('created_at', $month->month)
+                    ->count();
+                $monthLocked = Invoice::where('company_id', $companyId)
+                    ->where('status', 'locked')
+                    ->whereYear('created_at', $month->year)
+                    ->whereMonth('created_at', $month->month)
+                    ->count();
+                $complianceTrend[] = [
+                    'month' => $month->format('M'),
+                    'score' => $monthInvoices > 0 ? round(($monthLocked / $monthInvoices) * 100) : 100,
+                ];
+            }
         }
 
         $recentActivity = InvoiceActivityLog::where('company_id', $companyId)
@@ -95,12 +109,44 @@ class DashboardController extends Controller
             ->take(10)
             ->get();
 
+        $smartInsights = SmartInsightsService::getInsights($companyId);
+
+        $recentAnomalies = AnomalyLog::where('company_id', $companyId)
+            ->where('resolved', false)
+            ->orderBy('created_at', 'desc')
+            ->take(5)
+            ->get();
+
+        $notifications = Notification::where('company_id', $companyId)
+            ->where('read', false)
+            ->orderBy('created_at', 'desc')
+            ->take(5)
+            ->get();
+
+        $avgComplianceAllCompanies = Company::whereNotNull('compliance_score')->avg('compliance_score');
+        $industryBenchmark = [
+            'average' => round($avgComplianceAllCompanies ?? 100),
+            'your_score' => $complianceScore,
+            'above_average' => $complianceScore >= ($avgComplianceAllCompanies ?? 100),
+        ];
+
+        $trialInfo = null;
+        if ($subscription && $subscription->trial_ends_at) {
+            $trialInfo = [
+                'is_trial' => $subscription->isTrialActive(),
+                'is_expired' => $subscription->isTrialExpired(),
+                'days_left' => $subscription->trial_ends_at->isFuture() ? now()->diffInDays($subscription->trial_ends_at) : 0,
+                'ends_at' => $subscription->trial_ends_at->format('M d, Y'),
+            ];
+        }
+
         return view('dashboard', compact(
             'company', 'totalInvoices', 'draftCount', 'submittedCount', 'lockedCount',
             'totalRevenue', 'subscription', 'invoiceLimit', 'invoicesUsed',
             'statusData', 'monthlyData', 'recentInvoices',
             'draftAging', 'fbrSuccessRate', 'complianceScore', 'complianceBadge',
-            'complianceTrend', 'recentActivity'
+            'complianceTrend', 'recentActivity', 'smartInsights', 'recentAnomalies',
+            'notifications', 'industryBenchmark', 'trialInfo'
         ));
     }
 }

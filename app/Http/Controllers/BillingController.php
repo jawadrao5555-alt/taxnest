@@ -28,21 +28,33 @@ class BillingController extends Controller
                 $invoiceCount = Invoice::where('company_id', $companyId)->count();
                 $limit = $currentSubscription->pricingPlan->invoice_limit;
                 $usagePercent = $limit > 0 ? round(($invoiceCount / $limit) * 100, 1) : 0;
-                $daysLeft = Carbon::parse($currentSubscription->end_date)->diffInDays(now(), false);
-                $daysLeft = max(0, Carbon::parse($currentSubscription->end_date)->diffInDays(now()));
+                $daysLeft = Carbon::parse($currentSubscription->end_date)->isFuture()
+                    ? Carbon::parse($currentSubscription->end_date)->diffInDays(now())
+                    : 0;
                 $totalDays = Carbon::parse($currentSubscription->start_date)->diffInDays(Carbon::parse($currentSubscription->end_date));
+
+                $trialInfo = null;
+                if ($currentSubscription->trial_ends_at) {
+                    $trialInfo = [
+                        'is_trial' => $currentSubscription->isTrialActive(),
+                        'is_expired' => $currentSubscription->isTrialExpired(),
+                        'days_left' => $currentSubscription->trial_ends_at->isFuture()
+                            ? now()->diffInDays($currentSubscription->trial_ends_at)
+                            : 0,
+                        'ends_at' => $currentSubscription->trial_ends_at->format('M d, Y'),
+                    ];
+                }
 
                 $usageData = [
                     'invoice_count' => $invoiceCount,
                     'invoice_limit' => $limit,
                     'usage_percent' => min(100, $usagePercent),
-                    'days_left' => Carbon::parse($currentSubscription->end_date)->isFuture()
-                        ? Carbon::parse($currentSubscription->end_date)->diffInDays(now())
-                        : 0,
+                    'days_left' => $daysLeft,
                     'total_days' => $totalDays > 0 ? $totalDays : 30,
-                    'is_expiring_soon' => Carbon::parse($currentSubscription->end_date)->diffInDays(now()) <= 7 && Carbon::parse($currentSubscription->end_date)->isFuture(),
+                    'is_expiring_soon' => $daysLeft <= 7 && Carbon::parse($currentSubscription->end_date)->isFuture(),
                     'is_expired' => Carbon::parse($currentSubscription->end_date)->isPast(),
                     'needs_upgrade' => $usagePercent >= 80,
+                    'trial' => $trialInfo,
                 ];
             }
         }

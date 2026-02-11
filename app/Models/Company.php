@@ -13,7 +13,12 @@ class Company extends Model
         'phone',
         'address',
         'fbr_token',
+        'token_expires_at',
         'compliance_score'
+    ];
+
+    protected $casts = [
+        'token_expires_at' => 'datetime',
     ];
 
     public function users()
@@ -34,5 +39,20 @@ class Company extends Model
     public function activeSubscription()
     {
         return $this->hasOne(Subscription::class)->where('active', true)->with('pricingPlan');
+    }
+
+    public function complianceScores()
+    {
+        return $this->hasMany(ComplianceScore::class);
+    }
+
+    public function anomalyLogs()
+    {
+        return $this->hasMany(AnomalyLog::class);
+    }
+
+    public function notifications()
+    {
+        return $this->hasMany(Notification::class);
     }
 }

@@ -4,6 +4,9 @@
 TaxNest multi-company tax/invoice management system. Uses PHP 8.4 with Laravel framework and PostgreSQL database. Features Laravel Breeze authentication with Tailwind CSS.
 
 ## Recent Changes
+- 2026-02-11: Fixed database connection — explicit DB_HOST/DB_PORT/DB_DATABASE in .env from parsed DATABASE_URL
+- 2026-02-11: Fixed DatabaseSeeder to call PricingPlanSeeder + TestUsersSeeder properly
+- 2026-02-11: Test accounts updated to admin@test.com / jawad@test.com
 - 2026-02-11: Phase 12 — Visual Analytics (Chart.js integration, KPI cards, DashboardController)
 - 2026-02-11: Phase 11 — Billing UI (Plan selection, subscription management, PricingPlanSeeder)
 - 2026-02-11: Phase 10 — Billing Enforcement (Invoice limit checking, PricingPlan/Subscription models)
@@ -41,7 +44,7 @@ TaxNest multi-company tax/invoice management system. Uses PHP 8.4 with Laravel f
 ## Project Architecture
 - **Framework**: Laravel 12 with Breeze
 - **PHP Version**: 8.4
-- **Database**: PostgreSQL (Production-ready, managed by Replit)
+- **Database**: PostgreSQL (Replit-managed, explicit host/port/db in .env parsed from DATABASE_URL)
 - **Frontend**: Tailwind CSS + Chart.js
 - **Server**: `php artisan serve` on port 5000
 - **Proxy Trust**: All proxies trusted via `bootstrap/app.php` for Replit compatibility

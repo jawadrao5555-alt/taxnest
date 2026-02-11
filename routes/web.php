@@ -8,7 +8,9 @@ use App\Http\Controllers\BillingController;
 use App\Http\Controllers\DashboardController;
 
 Route::get('/', function () {
-    return view('welcome');
+    return auth()->check()
+        ? redirect('/dashboard')
+        : redirect('/login');
 });
 
 Route::middleware(['auth', 'company'])->group(function () {

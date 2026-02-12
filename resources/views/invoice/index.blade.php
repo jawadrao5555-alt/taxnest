@@ -153,7 +153,7 @@
                                                             <span class="text-sm font-semibold text-gray-800">WHT 2.5%</span>
                                                         </label>
                                                     </div>
-                                                    <a :href="'/invoice/{{ $invoice->id }}/download?wht_rate=' + pdfWhtRate" class="block w-full text-center px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition">Download PDF</a>
+                                                    <a :href="'/invoice/{{ $invoice->id }}/download?wht_rate=' + pdfWhtRate" target="_blank" class="block w-full text-center px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition">Download PDF</a>
                                                 </div>
                                             </div>
                                         </div>

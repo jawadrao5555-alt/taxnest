@@ -1,7 +1,13 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h2 class="font-bold text-xl text-gray-800 leading-tight">Invoice {{ $invoice->display_invoice_number }}</h2>
+            <div class="flex items-center space-x-3">
+                <a href="/invoice" class="inline-flex items-center text-gray-500 hover:text-gray-700 transition">
+                    <svg class="w-5 h-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    Back
+                </a>
+                <h2 class="font-bold text-xl text-gray-800 leading-tight">Invoice {{ $invoice->display_invoice_number }}</h2>
+            </div>
             <div class="flex items-center space-x-3">
                 @if($invoice->status === 'draft')
                 <a href="/invoice/{{ $invoice->id }}/edit" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">Edit</a>
@@ -148,11 +154,11 @@
                                     <span class="text-sm font-semibold text-gray-800">WHT 2.5%</span>
                                 </label>
                             </div>
-                            <a :href="'/invoice/{{ $invoice->id }}/download?wht_rate=' + pdfWhtRate" class="block w-full text-center px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition">Download PDF</a>
+                            <a :href="'/invoice/{{ $invoice->id }}/download?wht_rate=' + pdfWhtRate" target="_blank" class="block w-full text-center px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition">Download PDF</a>
                         </div>
                     </div>
                     @else
-                    <a href="/invoice/{{ $invoice->id }}/download" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Download PDF</a>
+                    <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Download PDF</a>
                     @endif
                 </div>
                 @if($invoice->share_uuid)

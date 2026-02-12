@@ -198,19 +198,19 @@
                     </div>
                     <span class="text-xs font-bold text-gray-700 dark:text-gray-200 group-hover:text-blue-700 dark:group-hover:text-blue-400 transition">Customers</span>
                 </a>
-                <a href="/mis-reports" class="premium-card group flex items-center space-x-3 p-3.5 bg-white dark:bg-gray-800/80 border border-gray-100/80 dark:border-gray-700/50 rounded-2xl hover:border-purple-300 dark:hover:border-purple-700 transition-all duration-300">
+                <a href="/reports/wht" class="premium-card group flex items-center space-x-3 p-3.5 bg-white dark:bg-gray-800/80 border border-gray-100/80 dark:border-gray-700/50 rounded-2xl hover:border-purple-300 dark:hover:border-purple-700 transition-all duration-300">
                     <div class="p-2.5 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl shadow-md shadow-purple-500/20 group-hover:shadow-lg group-hover:shadow-purple-500/30 transition-all duration-300">
                         <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                     </div>
                     <span class="text-xs font-bold text-gray-700 dark:text-gray-200 group-hover:text-purple-700 dark:group-hover:text-purple-400 transition">Reports</span>
                 </a>
-                <a href="/ledger" class="premium-card group flex items-center space-x-3 p-3.5 bg-white dark:bg-gray-800/80 border border-gray-100/80 dark:border-gray-700/50 rounded-2xl hover:border-amber-300 dark:hover:border-amber-700 transition-all duration-300">
+                <a href="/customers" class="premium-card group flex items-center space-x-3 p-3.5 bg-white dark:bg-gray-800/80 border border-gray-100/80 dark:border-gray-700/50 rounded-2xl hover:border-amber-300 dark:hover:border-amber-700 transition-all duration-300">
                     <div class="p-2.5 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl shadow-md shadow-amber-500/20 group-hover:shadow-lg group-hover:shadow-amber-500/30 transition-all duration-300">
                         <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
                     </div>
                     <span class="text-xs font-bold text-gray-700 dark:text-gray-200 group-hover:text-amber-700 dark:group-hover:text-amber-400 transition">Ledger</span>
                 </a>
-                <a href="/company/settings" class="premium-card group flex items-center space-x-3 p-3.5 bg-white dark:bg-gray-800/80 border border-gray-100/80 dark:border-gray-700/50 rounded-2xl hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-300">
+                <a href="/company/fbr-settings" class="premium-card group flex items-center space-x-3 p-3.5 bg-white dark:bg-gray-800/80 border border-gray-100/80 dark:border-gray-700/50 rounded-2xl hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-300">
                     <div class="p-2.5 bg-gradient-to-br from-gray-500 to-gray-700 rounded-xl shadow-md shadow-gray-500/20 group-hover:shadow-lg group-hover:shadow-gray-500/30 transition-all duration-300">
                         <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     </div>

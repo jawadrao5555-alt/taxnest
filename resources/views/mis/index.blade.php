@@ -13,8 +13,8 @@
                         <a href="{{ route('mis.export', ['type' => 'monthly', 'view' => 'whole']) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Whole CSV</a>
                         <a href="{{ route('mis.export', ['type' => 'monthly', 'view' => 'partywise']) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Party-wise CSV</a>
                         <div class="border-t border-gray-200 dark:border-gray-700"></div>
-                        <a href="{{ route('mis.pdf', ['type' => 'monthly', 'view' => 'whole']) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Whole PDF</a>
-                        <a href="{{ route('mis.pdf', ['type' => 'monthly', 'view' => 'partywise']) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Party-wise PDF</a>
+                        <a href="{{ route('mis.pdf', ['type' => 'monthly', 'view' => 'whole']) }}" onclick="event.preventDefault(); downloadPdf(this.href);" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">Whole PDF</a>
+                        <a href="{{ route('mis.pdf', ['type' => 'monthly', 'view' => 'partywise']) }}" onclick="event.preventDefault(); downloadPdf(this.href);" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">Party-wise PDF</a>
                     </div>
                 </div>
                 <div x-data="{ open: false }" class="relative">
@@ -25,7 +25,7 @@
                     </button>
                     <div x-show="open" @click.away="open = false" class="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
                         <a href="{{ route('mis.export', ['type' => 'tax']) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">CSV</a>
-                        <a href="{{ route('mis.pdf', ['type' => 'tax']) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">PDF</a>
+                        <a href="{{ route('mis.pdf', ['type' => 'tax']) }}" onclick="event.preventDefault(); downloadPdf(this.href);" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">PDF</a>
                     </div>
                 </div>
                 <div x-data="{ open: false }" class="relative">
@@ -36,7 +36,7 @@
                     </button>
                     <div x-show="open" @click.away="open = false" class="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
                         <a href="{{ route('mis.export', ['type' => 'hs']) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">CSV</a>
-                        <a href="{{ route('mis.pdf', ['type' => 'hs']) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">PDF</a>
+                        <a href="{{ route('mis.pdf', ['type' => 'hs']) }}" onclick="event.preventDefault(); downloadPdf(this.href);" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">PDF</a>
                     </div>
                 </div>
                 <div x-data="{ open: false }" class="relative">
@@ -47,7 +47,7 @@
                     </button>
                     <div x-show="open" @click.away="open = false" class="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
                         <a href="{{ route('mis.export', ['type' => 'vendor']) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">CSV</a>
-                        <a href="{{ route('mis.pdf', ['type' => 'vendor']) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">PDF</a>
+                        <a href="{{ route('mis.pdf', ['type' => 'vendor']) }}" onclick="event.preventDefault(); downloadPdf(this.href);" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">PDF</a>
                     </div>
                 </div>
             </div>
@@ -196,4 +196,16 @@
 
         </div>
     </div>
+<script>
+function downloadPdf(url) {
+    var iframe = document.getElementById('pdf-download-frame');
+    if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'pdf-download-frame';
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+    }
+    iframe.src = url;
+}
+</script>
 </x-app-layout>

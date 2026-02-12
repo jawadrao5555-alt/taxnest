@@ -200,7 +200,7 @@ class ScheduleEngine
     {
         $errors = [];
 
-        $requiredTop = ['invoiceType', 'invoiceDate', 'sellerNTNCNIC', 'sellerBusinessName', 'sellerProvince', 'buyerNTNCNIC', 'buyerBusinessName', 'buyerProvince'];
+        $requiredTop = ['invoiceType', 'invoiceDate', 'sellerNTNCNIC', 'sellerBusinessName'];
         foreach ($requiredTop as $field) {
             if (empty($payload[$field])) {
                 $errors[] = "Missing required field: {$field}";

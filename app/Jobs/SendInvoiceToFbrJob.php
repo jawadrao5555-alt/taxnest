@@ -9,6 +9,7 @@ use App\Services\FbrService;
 use App\Services\InvoiceActivityService;
 use App\Services\IntegrityHashService;
 use App\Services\ComplianceScoreService;
+use App\Services\HsIntelligenceService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -83,6 +84,8 @@ class SendInvoiceToFbrJob implements ShouldQueue
         } else {
             Log::warning("FBR submission failed for invoice #{$invoice->id}, attempt {$this->attempts()}, type: " . ($response['failure_type'] ?? 'unknown'));
 
+            $this->captureHsRejections($invoice, $response);
+
             InvoiceActivityService::log(
                 $invoice->id,
                 $invoice->company_id,
@@ -96,10 +99,15 @@ class SendInvoiceToFbrJob implements ShouldQueue
 
     public function failed(\Throwable $exception): void
     {
-        $invoice = Invoice::find($this->invoiceId);
+        $invoice = Invoice::with(['company', 'items'])->find($this->invoiceId);
         if ($invoice) {
             $invoice->status = 'draft';
             $invoice->save();
+
+            $this->captureHsRejections($invoice, [
+                'failure_type' => 'exception',
+                'errors' => [$exception->getMessage()],
+            ]);
 
             InvoiceActivityService::log(
                 $invoice->id,
@@ -112,5 +120,34 @@ class SendInvoiceToFbrJob implements ShouldQueue
         }
 
         Log::error("FBR submission permanently failed for invoice #{$this->invoiceId}: " . $exception->getMessage());
+    }
+
+    private function captureHsRejections($invoice, array $response): void
+    {
+        try {
+            $environment = $invoice->company->fbr_environment ?? 'sandbox';
+            $errorCode = $response['failure_type'] ?? null;
+            $errors = $response['errors'] ?? [];
+            $errorMessage = is_array($errors) ? implode('; ', array_slice($errors, 0, 3)) : (string)$errors;
+            if (empty($errorMessage)) {
+                $errorMessage = $response['failure_type'] ?? 'FBR submission failed';
+            }
+
+            foreach ($invoice->items as $item) {
+                if (!empty($item->hs_code)) {
+                    HsIntelligenceService::recordFbrRejection(
+                        $item->hs_code,
+                        $errorCode,
+                        $errorMessage,
+                        $item->schedule_type ?? 'standard',
+                        $item->tax_rate ?? 18,
+                        $item->sro_schedule_no ?? null,
+                        $environment
+                    );
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning("Failed to capture HS rejections for invoice #{$invoice->id}: " . $e->getMessage());
+        }
     }
 }

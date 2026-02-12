@@ -1,0 +1,183 @@
+You are upgrading the existing TaxNest Enterprise System.
+
+DO NOT:
+- Modify FBR payload structure
+- Change invoice lifecycle
+- Break multi-company isolation
+- Auto-apply intelligence suggestions
+- Modify existing HS→PCT engine
+
+Only extend intelligence layer.
+
+========================================
+PHASE 4B – LIVE REJECTION LEARNING ENGINE
+========================================
+
+OBJECTIVE:
+Make the system self-learning from real FBR rejection responses.
+
+----------------------------------------
+1️⃣ REJECTION CAPTURE ENGINE
+----------------------------------------
+
+When FBR submission returns:
+- status = FAILED
+- or HTTP error
+- or validation error from PRAL
+
+Extract:
+- hsCode (per item)
+- errorCode (if available)
+- errorMessage
+- scheduleType
+- taxRate
+- sroNumber (if present)
+
+Store in:
+hs_rejection_history
+
+Add fields:
+- error_code
+- error_message
+- rejection_count (increment per HS)
+- last_rejected_at
+- environment (sandbox/production)
+
+Do NOT affect invoice status logic.
+
+----------------------------------------
+2️⃣ INTELLIGENCE FEEDBACK LOOP
+----------------------------------------
+
+Modify HsIntelligenceService:
+
+When generating suggestion:
+
+Reduce confidence score if:
+- hs_code has rejection_count > 0
+- specific taxRate has rejection history
+- specific scheduleType rejected before
+
+Weight Adjustment Rule:
+If rejection_count > 3:
+   - deduct 15% confidence
+If rejection_count > 5:
+   - deduct 25% confidence
+If rejection_count > 10:
+   - mark risk_level = HIGH
+
+Log new weighted output in:
+hs_intelligence_logs
+
+Do NOT auto-fix anything.
+Admin approval required always.
+
+----------------------------------------
+3️⃣ ADMIN ALERT SYSTEM
+----------------------------------------
+
+In Admin Dashboard:
+
+Add widget:
+"Top Rejected HS Codes (Last 30 Days)"
+
+Show:
+- hsCode
+- rejection count
+- last rejected date
+- risk level
+- quick link to mapping page
+
+Only Super Admin visible.
+
+----------------------------------------
+4️⃣ TOP 500 HS MASTER SEEDING
+----------------------------------------
+
+Create Seeder:
+TopHsMasterSeeder
+
+Purpose:
+Insert high-frequency Pakistan commercial HS codes.
+
+Categories to cover:
+- Cement (2523)
+- Iron & Steel (7213, 7214, 7216, 7228, 7308)
+- Electrical Cables (8544)
+- Petroleum (2709–2713)
+- FMCG Food Chapters (02–21)
+- Plastics (39)
+- Machinery (84)
+- Vehicles (87)
+- Chemicals (28–38)
+
+Each seed record must include:
+- hs_code
+- description
+- schedule_type
+- default_tax_rate (dynamic allowed 0–18)
+- sro_required flag
+- mrp_required flag
+- serial_required flag
+- default_uom
+- confidence_score = 90
+- last_source = "seed"
+
+DO NOT overwrite existing hs_master_global entries.
+
+Use upsert only if not exists.
+
+----------------------------------------
+5️⃣ CONFIDENCE SCALE STANDARDIZATION
+----------------------------------------
+
+Define levels:
+
+0–40   = LOW
+41–70  = MEDIUM
+71–89  = HIGH
+90–100 = VERIFIED
+
+Show badge colors in admin:
+LOW      = red
+MEDIUM   = yellow
+HIGH     = blue
+VERIFIED = green
+
+----------------------------------------
+6️⃣ SAFETY CHECK
+----------------------------------------
+
+After implementation verify:
+
+- Existing invoices unaffected
+- FBR submission unchanged
+- Queue worker operational
+- No payload key change
+- No migration alters invoice tables
+- Multi-company isolation intact
+
+----------------------------------------
+7️⃣ FINAL VALIDATION REPORT
+----------------------------------------
+
+Return:
+
+- Total HS master count
+- Total seeded records
+- Total rejection history entries
+- System health status
+- Queue status
+- Route health (200 check)
+
+Return JSON:
+{
+ "Seeded": X,
+ "TotalHS": X,
+ "RejectionTracked": X,
+ "SystemStatus": "SAFE"
+}
+
+----------------------------------------
+END OF IMPLEMENTATION
+----------------------------------------

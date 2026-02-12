@@ -15,6 +15,7 @@ use App\Models\AnomalyLog;
 use App\Services\SecurityLogService;
 use App\Services\AuditLogService;
 use App\Services\IntegrityHashService;
+use App\Services\HsIntelligenceService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
@@ -61,12 +62,17 @@ class AdminController extends Controller
             'overrides_this_month' => \App\Models\OverrideUsageLog::where('created_at', '>=', now()->startOfMonth())->count(),
         ];
 
+        $topRejectedHsCodes = HsIntelligenceService::getTopRejectedHsCodes(30, 10);
+        $totalHsMaster = \App\Models\HsMasterGlobal::count();
+        $totalUnmapped = DB::table('hs_unmapped_queue')->count();
+
         return view('admin.dashboard', compact(
             'totalCompanies', 'totalUsers', 'totalInvoices',
             'draftInvoices', 'submittedInvoices', 'lockedInvoices',
             'failedLogs', 'totalRevenue', 'activeSubscriptions',
             'recentInvoices', 'recentCompanies', 'recentAnomalies',
-            'pendingCompanies', 'overrideStats'
+            'pendingCompanies', 'overrideStats',
+            'topRejectedHsCodes', 'totalHsMaster', 'totalUnmapped'
         ));
     }
 

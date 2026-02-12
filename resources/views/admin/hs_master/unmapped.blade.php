@@ -41,13 +41,14 @@
 
                                 <div class="flex items-center space-x-2">
                                     @if($suggestion)
+                                        @php $badge = \App\Services\HsIntelligenceService::getConfidenceBadge($confScore); @endphp
                                         <span class="px-3 py-1.5 rounded-full text-xs font-semibold
-                                            @if($riskColor === 'green') bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300
-                                            @elseif($riskColor === 'amber') bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300
-                                            @elseif($riskColor === 'orange') bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300
+                                            @if($badge['color'] === 'green') bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300
+                                            @elseif($badge['color'] === 'blue') bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300
+                                            @elseif($badge['color'] === 'amber') bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300
                                             @else bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300
                                             @endif">
-                                            Risk: {{ ucfirst($riskLevel) }} ({{ $confScore }}%)
+                                            {{ $badge['label'] }} ({{ $confScore }}%)
                                         </span>
                                     @else
                                         <span class="px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">No Suggestion</span>
@@ -124,7 +125,16 @@
                                             <div class="mt-3 pt-3 border-t border-indigo-200 dark:border-indigo-700">
                                                 <h5 class="text-xs font-semibold text-red-600 dark:text-red-400 mb-1">Rejection History</h5>
                                                 <p class="text-xs text-gray-600 dark:text-gray-400">{{ $rejection->rejection_count }} rejection(s) &middot; Last: {{ $rejection->last_rejection_reason ?? '—' }}</p>
-                                                <p class="text-xs text-gray-400 dark:text-gray-500">Last seen: {{ $rejection->last_seen_at?->format('M d, Y H:i') ?? '—' }}</p>
+                                                @if($rejection->error_code)
+                                                <p class="text-xs text-red-500 dark:text-red-400">Error Code: {{ $rejection->error_code }}</p>
+                                                @endif
+                                                @if($rejection->error_message)
+                                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ Str::limit($rejection->error_message, 150) }}</p>
+                                                @endif
+                                                <p class="text-xs text-gray-400 dark:text-gray-500">
+                                                    {{ $rejection->environment ? ucfirst($rejection->environment) : '' }}
+                                                    &middot; Last rejected: {{ $rejection->last_rejected_at?->format('M d, Y H:i') ?? ($rejection->last_seen_at?->format('M d, Y H:i') ?? '—') }}
+                                                </p>
                                             </div>
                                         @endif
                                     </div>

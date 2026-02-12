@@ -181,6 +181,69 @@
                 </div>
             </div>
 
+            @if(auth()->user()->role === 'super_admin')
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-sm border border-rose-100 p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800 flex items-center space-x-2">
+                            <svg class="w-5 h-5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                            <span>Top Rejected HS Codes (Last 30 Days)</span>
+                        </h3>
+                        <a href="/admin/hs-unmapped" class="text-sm text-rose-600 hover:text-rose-700 font-medium">Manage HS</a>
+                    </div>
+                    @if($topRejectedHsCodes->count() > 0)
+                    <div class="space-y-2 max-h-64 overflow-y-auto">
+                        @foreach($topRejectedHsCodes as $rejected)
+                        @php
+                            $badge = \App\Services\HsIntelligenceService::getConfidenceBadge(max(0, 100 - ($rejected->rejection_count * 10)));
+                        @endphp
+                        <div class="flex items-center justify-between p-3 bg-rose-50 rounded-lg">
+                            <div class="flex items-center space-x-3">
+                                <span class="font-mono text-sm font-bold text-gray-800">{{ $rejected->hs_code }}</span>
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-{{ $badge['color'] }}-100 text-{{ $badge['color'] }}-800">{{ $badge['label'] }}</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-sm font-bold text-rose-700">{{ $rejected->rejection_count }}x</span>
+                                <p class="text-xs text-gray-500">{{ $rejected->last_rejected_at ? $rejected->last_rejected_at->diffForHumans() : ($rejected->last_seen_at ? $rejected->last_seen_at->diffForHumans() : 'N/A') }}</p>
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                    @else
+                    <p class="text-gray-400 text-center py-4">No HS rejections in the last 30 days</p>
+                    @endif
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-indigo-100 p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800 flex items-center space-x-2">
+                            <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
+                            <span>HS Intelligence Summary</span>
+                        </h3>
+                        <a href="/admin/hs-master" class="text-sm text-indigo-600 hover:text-indigo-700 font-medium">HS Master</a>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="text-center p-4 bg-indigo-50 rounded-lg">
+                            <p class="text-3xl font-bold text-indigo-700">{{ $totalHsMaster }}</p>
+                            <p class="text-xs text-indigo-600 mt-1">Total HS Codes</p>
+                        </div>
+                        <div class="text-center p-4 bg-amber-50 rounded-lg">
+                            <p class="text-3xl font-bold text-amber-700">{{ $totalUnmapped }}</p>
+                            <p class="text-xs text-amber-600 mt-1">Unmapped Queue</p>
+                        </div>
+                        <div class="text-center p-4 bg-rose-50 rounded-lg">
+                            <p class="text-3xl font-bold text-rose-700">{{ $topRejectedHsCodes->sum('rejection_count') }}</p>
+                            <p class="text-xs text-rose-600 mt-1">Total Rejections</p>
+                        </div>
+                        <div class="text-center p-4 bg-green-50 rounded-lg">
+                            <p class="text-3xl font-bold text-green-700">{{ $topRejectedHsCodes->count() }}</p>
+                            <p class="text-xs text-green-600 mt-1">Affected HS Codes</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
+
             @if($recentAnomalies->count() > 0)
             <div class="bg-white rounded-xl shadow-sm border border-red-100 p-6 mb-8">
                 <div class="flex items-center justify-between mb-4">

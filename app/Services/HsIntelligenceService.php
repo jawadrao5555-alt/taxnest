@@ -111,9 +111,26 @@ class HsIntelligenceService
         }
 
         $rejectionFactor = 0;
+        $fbrRejectionPenalty = 0;
         if ($rejection && $rejection->rejection_count > 0) {
             $rejectionFactor = min($rejection->rejection_count * 5, self::WEIGHT_REJECTION_HISTORY);
-            $breakdown['rejection_history'] = ['weight' => self::WEIGHT_REJECTION_HISTORY, 'penalty' => $rejectionFactor, 'count' => $rejection->rejection_count];
+
+            if ($rejection->rejection_count > 10) {
+                $fbrRejectionPenalty = 25;
+            } elseif ($rejection->rejection_count > 5) {
+                $fbrRejectionPenalty = 25;
+            } elseif ($rejection->rejection_count > 3) {
+                $fbrRejectionPenalty = 15;
+            }
+
+            $breakdown['rejection_history'] = [
+                'weight' => self::WEIGHT_REJECTION_HISTORY,
+                'penalty' => $rejectionFactor,
+                'fbr_penalty' => $fbrRejectionPenalty,
+                'count' => $rejection->rejection_count,
+                'last_error' => $rejection->error_code,
+                'environment' => $rejection->environment ?? 'unknown',
+            ];
         }
 
         $industryFactor = 0;
@@ -143,7 +160,12 @@ class HsIntelligenceService
 
         $rawConfidence = min(100, (int)(($maxScore / max($totalWeight, 1)) * 100));
         $rawConfidence = max(0, $rawConfidence - $rejectionFactor);
+        $rawConfidence = max(0, $rawConfidence - $fbrRejectionPenalty);
         $rawConfidence = min(100, $rawConfidence + $industryFactor);
+
+        if ($rejection && $rejection->rejection_count > 10) {
+            $rawConfidence = min($rawConfidence, 40);
+        }
 
         $suggestedSro = in_array($suggestedSchedule, ['3rd_schedule', 'exempt', 'zero_rated']);
         $suggestedSerial = ($suggestedSchedule === '3rd_schedule');
@@ -163,7 +185,7 @@ class HsIntelligenceService
             'confidence_score' => $rawConfidence,
             'weight_breakdown' => $breakdown,
             'based_on_records_count' => $totalRecords,
-            'rejection_factor' => $rejectionFactor,
+            'rejection_factor' => $rejectionFactor + $fbrRejectionPenalty,
             'industry_factor' => $industryFactor,
         ];
 
@@ -212,22 +234,76 @@ class HsIntelligenceService
         }
     }
 
+    public static function recordFbrRejection(string $hsCode, ?string $errorCode, ?string $errorMessage, string $scheduleType, $taxRate, ?string $sroNumber, string $environment): void
+    {
+        $normalizedHs = preg_replace('/[^0-9]/', '', $hsCode);
+        $existing = HsRejectionHistory::where('hs_code', $normalizedHs)->first();
+
+        $reason = "FBR rejection: " . ($errorMessage ?? $errorCode ?? 'Unknown error');
+
+        if ($existing) {
+            $existing->update([
+                'rejection_count' => $existing->rejection_count + 1,
+                'last_rejection_reason' => $reason,
+                'error_code' => $errorCode,
+                'error_message' => $errorMessage,
+                'last_rejected_at' => now(),
+                'environment' => $environment,
+                'last_seen_at' => now(),
+                'updated_at' => now(),
+            ]);
+        } else {
+            HsRejectionHistory::create([
+                'hs_code' => $normalizedHs,
+                'rejection_count' => 1,
+                'last_rejection_reason' => $reason,
+                'error_code' => $errorCode,
+                'error_message' => $errorMessage,
+                'last_rejected_at' => now(),
+                'environment' => $environment,
+                'last_seen_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    public static function getTopRejectedHsCodes(int $days = 30, int $limit = 10)
+    {
+        return HsRejectionHistory::where('last_rejected_at', '>=', now()->subDays($days))
+            ->orWhere(function ($q) use ($days) {
+                $q->whereNull('last_rejected_at')
+                  ->where('last_seen_at', '>=', now()->subDays($days));
+            })
+            ->where('rejection_count', '>', 0)
+            ->orderByDesc('rejection_count')
+            ->limit($limit)
+            ->get();
+    }
+
     public static function getRiskLevel(int $confidenceScore): string
     {
-        if ($confidenceScore >= 80) return 'low';
-        if ($confidenceScore >= 50) return 'medium';
-        if ($confidenceScore >= 25) return 'high';
-        return 'critical';
+        if ($confidenceScore >= 90) return 'verified';
+        if ($confidenceScore >= 71) return 'high';
+        if ($confidenceScore >= 41) return 'medium';
+        return 'low';
     }
 
     public static function getRiskColor(string $level): string
     {
         return match($level) {
-            'low' => 'green',
+            'verified' => 'green',
+            'high' => 'blue',
             'medium' => 'amber',
-            'high' => 'orange',
-            'critical' => 'red',
+            'low' => 'red',
             default => 'gray',
         };
+    }
+
+    public static function getConfidenceBadge(int $score): array
+    {
+        $level = self::getRiskLevel($score);
+        $color = self::getRiskColor($level);
+        $label = strtoupper($level);
+        return ['level' => $level, 'color' => $color, 'label' => $label, 'score' => $score];
     }
 }

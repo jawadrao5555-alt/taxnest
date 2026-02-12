@@ -28,7 +28,7 @@ Route::get('/demo-login/{role}', [\App\Http\Controllers\Auth\AuthenticatedSessio
     ->where('role', 'super_admin|company_admin|demo');
 
 Route::get('/', function () {
-    return view('landing');
+    return view('landing', ['showLogin' => false]);
 });
 
 Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () {

@@ -109,29 +109,34 @@
                 </form>
                 @endif
                 <a href="/invoice/{{ $invoice->id }}/preview" class="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition">Preview</a>
-                <div x-data="{ showWhtModal: false, pdfWhtRate: 0 }" class="inline-block relative">
+                <div x-data="{ showWhtModal: false, pdfWhtRate: 0 }" class="inline-block">
                     @if($invoice->status === 'locked')
-                    <button @click="showWhtModal = !showWhtModal" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Download PDF</button>
-                    <div x-show="showWhtModal" x-cloak @click.away="showWhtModal = false" class="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-lg border border-gray-200 p-4 z-50">
-                        <p class="text-sm font-semibold text-gray-800 mb-3">Select Withholding Tax Rate</p>
-                        <div class="space-y-2 mb-3">
-                            <label class="flex items-center gap-2 p-2 rounded-lg border-2 cursor-pointer transition"
-                                :class="pdfWhtRate == 0 ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 hover:bg-gray-50'">
-                                <input type="radio" value="0" x-model.number="pdfWhtRate" class="text-emerald-500">
-                                <span class="text-sm font-medium">No WHT (0%)</span>
-                            </label>
-                            <label class="flex items-center gap-2 p-2 rounded-lg border-2 cursor-pointer transition"
-                                :class="pdfWhtRate == 0.5 ? 'border-amber-400 bg-amber-50' : 'border-gray-200 hover:bg-gray-50'">
-                                <input type="radio" value="0.5" x-model.number="pdfWhtRate" class="text-amber-500">
-                                <span class="text-sm font-medium">WHT 0.5%</span>
-                            </label>
-                            <label class="flex items-center gap-2 p-2 rounded-lg border-2 cursor-pointer transition"
-                                :class="pdfWhtRate == 2.5 ? 'border-red-400 bg-red-50' : 'border-gray-200 hover:bg-gray-50'">
-                                <input type="radio" value="2.5" x-model.number="pdfWhtRate" class="text-red-500">
-                                <span class="text-sm font-medium">WHT 2.5%</span>
-                            </label>
+                    <button @click="showWhtModal = true" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Download PDF</button>
+                    <div x-show="showWhtModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background-color: rgba(0,0,0,0.4);">
+                        <div @click.away="showWhtModal = false" class="bg-white rounded-2xl shadow-2xl border border-gray-200 p-6 w-80 max-w-[90vw]">
+                            <div class="flex items-center justify-between mb-4">
+                                <p class="text-base font-bold text-gray-800">Withholding Tax Rate</p>
+                                <button @click="showWhtModal = false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                            </div>
+                            <div class="space-y-2 mb-4">
+                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                    :class="pdfWhtRate == 0 ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 hover:bg-gray-50'">
+                                    <input type="radio" value="0" x-model.number="pdfWhtRate" class="text-emerald-500">
+                                    <span class="text-sm font-semibold text-gray-800">No WHT (0%)</span>
+                                </label>
+                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                    :class="pdfWhtRate == 0.5 ? 'border-amber-400 bg-amber-50' : 'border-gray-200 hover:bg-gray-50'">
+                                    <input type="radio" value="0.5" x-model.number="pdfWhtRate" class="text-amber-500">
+                                    <span class="text-sm font-semibold text-gray-800">WHT 0.5%</span>
+                                </label>
+                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                    :class="pdfWhtRate == 2.5 ? 'border-red-400 bg-red-50' : 'border-gray-200 hover:bg-gray-50'">
+                                    <input type="radio" value="2.5" x-model.number="pdfWhtRate" class="text-red-500">
+                                    <span class="text-sm font-semibold text-gray-800">WHT 2.5%</span>
+                                </label>
+                            </div>
+                            <a :href="'/invoice/{{ $invoice->id }}/download?wht_rate=' + pdfWhtRate" class="block w-full text-center px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition">Download PDF</a>
                         </div>
-                        <a :href="'/invoice/{{ $invoice->id }}/download?wht_rate=' + pdfWhtRate" class="block w-full text-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">Download PDF</a>
                     </div>
                     @else
                     <a href="/invoice/{{ $invoice->id }}/download" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Download PDF</a>
@@ -271,8 +276,8 @@
                             </tr>
                             @if($invoice->wht_rate > 0)
                             <tr>
-                                <td colspan="8" class="px-6 py-2 text-right text-sm text-red-600">WHT Deduction ({{ $invoice->wht_rate }}%)</td>
-                                <td class="px-6 py-2 text-right text-sm font-semibold text-red-600">- Rs. {{ number_format($invoice->wht_amount ?? 0, 2) }}</td>
+                                <td colspan="8" class="px-6 py-2 text-right text-sm text-blue-600">WHT ({{ $invoice->wht_rate }}%)</td>
+                                <td class="px-6 py-2 text-right text-sm font-semibold text-blue-600">+ Rs. {{ number_format($invoice->wht_amount ?? 0, 2) }}</td>
                             </tr>
                             <tr>
                                 <td colspan="8" class="px-6 py-3 text-right text-sm font-bold text-emerald-700">Net Receivable</td>

@@ -732,7 +732,7 @@ class InvoiceController extends Controller
 
         $whtRate = floatval(request()->query('wht_rate', $invoice->wht_rate ?? 0));
         $whtAmount = round($subtotal * ($whtRate / 100), 2);
-        $netReceivable = round(($subtotal + $totalTax) - $whtAmount, 2);
+        $netReceivable = round(($subtotal + $totalTax) + $whtAmount, 2);
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-professional', [
             'invoice' => $invoice,

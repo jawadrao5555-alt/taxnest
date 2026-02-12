@@ -217,10 +217,10 @@
                     @if(($wht_rate ?? 0) > 0)
                     <tr>
                         <td class="label">WHT ({{ $wht_rate }}%)</td>
-                        <td class="value">Rs. {{ number_format($wht_amount ?? 0, 2) }}</td>
+                        <td class="value" style="color: #2563eb;">+ Rs. {{ number_format($wht_amount ?? 0, 2) }}</td>
                     </tr>
                     <tr class="net">
-                        <td class="label" style="font-weight: 800;">Net Receivable</td>
+                        <td class="label" style="font-weight: 800;">Total with WHT</td>
                         <td class="value" style="font-weight: 800; color: #059669;">Rs. {{ number_format($net_receivable ?? $invoice->total_amount, 2) }}</td>
                     </tr>
                     @endif

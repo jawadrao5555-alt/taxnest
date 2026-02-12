@@ -109,7 +109,7 @@
                     <div x-show="buyerRegType === 'Registered'" x-cloak class="grid grid-cols-1 gap-4 mt-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer CNIC</label>
-                            <input type="text" name="buyer_cnic" x-model="buyer_cnic" maxlength="15" pattern="\d{5}-\d{7}-\d{1}" placeholder="xxxxx-xxxxxxx-x" :required="buyerRegType === 'Registered'"
+                            <input type="text" name="buyer_cnic" x-model="buyer_cnic" maxlength="15" placeholder="xxxxx-xxxxxxx-x"
                                 class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             @error('buyer_cnic') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>

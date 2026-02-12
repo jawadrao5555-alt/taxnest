@@ -67,7 +67,8 @@ class CompanySettingsController extends Controller
             'fbr_production_token' => 'nullable|string|max:500',
             'fbr_registration_no' => 'nullable|string|max:100',
             'fbr_business_name' => 'nullable|string|max:255',
-            'token_expiry_date' => 'nullable|date',
+            'fbr_sandbox_url' => 'nullable|url|max:500',
+            'fbr_production_url' => 'nullable|url|max:500',
         ]);
 
         if ($request->fbr_environment === 'production' && $company->fbr_environment !== 'production') {
@@ -80,7 +81,8 @@ class CompanySettingsController extends Controller
             'fbr_environment' => $request->fbr_environment,
             'fbr_registration_no' => $request->fbr_registration_no,
             'fbr_business_name' => $request->fbr_business_name,
-            'token_expiry_date' => $request->token_expiry_date,
+            'fbr_sandbox_url' => $request->fbr_sandbox_url,
+            'fbr_production_url' => $request->fbr_production_url,
         ];
 
         if ($request->filled('fbr_sandbox_token')) {

@@ -20,6 +20,7 @@ use App\Http\Controllers\CustomerLedgerController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\TaxOverrideController;
+use App\Http\Controllers\CustomerProfileController;
 
 Route::get('/share/invoice/{uuid}', [ShareController::class, 'show']);
 
@@ -67,6 +68,13 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
         Route::post('/products/{product}/toggle', [ProductController::class, 'deactivate'])->name('products.toggle');
         Route::get('/products/search', [ProductController::class, 'search'])->name('products.search');
+
+        Route::get('/customer-profiles', [CustomerProfileController::class, 'index'])->name('customer-profiles.index');
+        Route::get('/customer-profiles/create', [CustomerProfileController::class, 'create'])->name('customer-profiles.create');
+        Route::post('/customer-profiles', [CustomerProfileController::class, 'store'])->name('customer-profiles.store');
+        Route::get('/customer-profiles/{customerProfile}/edit', [CustomerProfileController::class, 'edit'])->name('customer-profiles.edit');
+        Route::put('/customer-profiles/{customerProfile}', [CustomerProfileController::class, 'update'])->name('customer-profiles.update');
+        Route::post('/customer-profiles/{customerProfile}/toggle', [CustomerProfileController::class, 'toggle'])->name('customer-profiles.toggle');
     });
 
     Route::middleware(['role:company_admin'])->group(function () {
@@ -92,6 +100,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
     });
 
     Route::get('/api/products/search', [ProductController::class, 'search']);
+    Route::get('/api/customer-profiles/search', [CustomerProfileController::class, 'search']);
     Route::get('/api/schedule/config', function () {
         return response()->json(\App\Services\ScheduleEngine::$scheduleTypes);
     });

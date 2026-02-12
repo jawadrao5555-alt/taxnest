@@ -94,7 +94,10 @@ class FbrService
     private function getApiUrl($company): string
     {
         $env = $company->fbr_environment ?? 'sandbox';
-        return $env === 'production' ? self::PRODUCTION_URL : self::SANDBOX_URL;
+        if ($env === 'production') {
+            return $company->fbr_production_url ?: self::PRODUCTION_URL;
+        }
+        return $company->fbr_sandbox_url ?: self::SANDBOX_URL;
     }
 
     public function submitInvoice($invoice, int $retryCount = 0)

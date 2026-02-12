@@ -10,12 +10,23 @@
 
     <div class="py-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex gap-2 mb-6">
+                <a href="/invoices?tab=draft" class="px-4 py-2 rounded-lg text-sm font-medium transition {{ $tab === 'draft' ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+                    Drafted Invoices
+                    <span class="ml-1 px-2 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-800">{{ $draftCount }}</span>
+                </a>
+                <a href="/invoices?tab=completed" class="px-4 py-2 rounded-lg text-sm font-medium transition {{ $tab === 'completed' ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+                    Completed Invoices
+                    <span class="ml-1 px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-800">{{ $completedCount }}</span>
+                </a>
+            </div>
             <div class="mb-6">
                 <form method="GET" action="/invoices" class="flex gap-3">
                     <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by invoice #, FBR #, customer name, or NTN..." class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+                    <input type="hidden" name="tab" value="{{ $tab }}">
                     <button type="submit" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">Search</button>
                     @if(request('search'))
-                    <a href="/invoices" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">Clear</a>
+                    <a href="/invoices?tab={{ $tab }}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">Clear</a>
                     @endif
                 </form>
             </div>
@@ -83,14 +94,17 @@
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $invoice->created_at->format('d M Y') }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm space-x-2">
                                     <a href="/invoice/{{ $invoice->id }}" class="text-emerald-600 hover:text-emerald-800 font-medium">View</a>
-                                    @if($invoice->status === 'draft')
-                                    <a href="/invoice/{{ $invoice->id }}/edit" class="text-blue-600 hover:text-blue-800 font-medium">Edit</a>
-                                    <form method="POST" action="/invoice/{{ $invoice->id }}/submit" class="inline">
-                                        @csrf
-                                        <button type="submit" class="text-purple-600 hover:text-purple-800 font-medium" onclick="return confirm('Submit this invoice to FBR?')">Submit to FBR</button>
-                                    </form>
+                                    @if($tab === 'draft')
+                                        @if($invoice->status === 'draft')
+                                        <a href="/invoice/{{ $invoice->id }}/edit" class="text-blue-600 hover:text-blue-800 font-medium">Edit</a>
+                                        <form method="POST" action="/invoice/{{ $invoice->id }}/submit" class="inline">
+                                            @csrf
+                                            <button type="submit" class="text-purple-600 hover:text-purple-800 font-medium" onclick="return confirm('Submit this invoice to FBR?')">Submit to FBR</button>
+                                        </form>
+                                        @endif
+                                    @else
+                                        <a href="/invoice/{{ $invoice->id }}/download" class="text-gray-600 hover:text-gray-800 font-medium">Download</a>
                                     @endif
-                                    <a href="/invoice/{{ $invoice->id }}/download" class="text-gray-600 hover:text-gray-800 font-medium">Download</a>
                                 </td>
                             </tr>
                             @empty

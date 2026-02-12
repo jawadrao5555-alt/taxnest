@@ -16,6 +16,16 @@
                 </div>
             @endif
 
+            <div class="mb-6">
+                <form method="GET" action="/products" class="flex gap-3">
+                    <input type="text" name="search" value="{{ $search }}" placeholder="Search by name, HS code, PCT code, or schedule type..." class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+                    <button type="submit" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">Search</button>
+                    @if($search)
+                    <a href="/products" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">Clear</a>
+                    @endif
+                </form>
+            </div>
+
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
@@ -23,7 +33,9 @@
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">HS Code</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PCT Code</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Schedule Type</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tax Rate</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SRO Reference</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">UOM</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
@@ -36,7 +48,27 @@
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $product->name }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $product->hs_code }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $product->pct_code ?? '-' }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    @if($product->schedule_type)
+                                        @php
+                                            $badges = [
+                                                'standard' => ['bg-gray-100', 'text-gray-800'],
+                                                'reduced' => ['bg-blue-100', 'text-blue-800'],
+                                                '3rd_schedule' => ['bg-amber-100', 'text-amber-800'],
+                                                'exempt' => ['bg-green-100', 'text-green-800'],
+                                                'zero_rated' => ['bg-purple-100', 'text-purple-800'],
+                                            ];
+                                            $badgeClass = $badges[$product->schedule_type] ?? ['bg-gray-100', 'text-gray-800'];
+                                        @endphp
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $badgeClass[0] }} {{ $badgeClass[1] }}">
+                                            {{ str_replace('_', ' ', ucfirst($product->schedule_type)) }}
+                                        </span>
+                                    @else
+                                        <span class="text-gray-400 text-sm">-</span>
+                                    @endif
+                                </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $product->default_tax_rate }}%</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $product->sro_reference ?? '-' }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $product->uom }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">Rs. {{ number_format($product->default_price, 2) }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap">
@@ -58,7 +90,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="px-6 py-12 text-center text-gray-500">
+                                <td colspan="10" class="px-6 py-12 text-center text-gray-500">
                                     No products found. <a href="/products/create" class="text-emerald-600 hover:text-emerald-800 font-medium">Create your first product</a>.
                                 </td>
                             </tr>

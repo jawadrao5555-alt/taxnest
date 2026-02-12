@@ -92,6 +92,15 @@ TaxNest is built on Laravel 12 with Breeze for authentication, using PHP 8.4. Th
 - **Confidence Scale Standardization:** 4-tier system: LOW (0-40, red), MEDIUM (41-70, yellow/amber), HIGH (71-89, blue), VERIFIED (90-100, green). Badge colors applied across all admin views.
 - **Top 500 HS Master Seeder:** `TopHsMasterSeeder` seeds 612 high-frequency Pakistan commercial HS codes covering cement (2523), iron/steel (7213-7308), electrical cables (8544), petroleum (2709-2713), FMCG food (02-21), plastics (39), machinery (84-85), vehicles (87), chemicals (28-38), textiles (52-63), rubber/tyres (40), furniture (94), leather (41-42), solar (8541), paper (47-48), ceramics/glass (69-70), aluminum (76), copper (74), wood (44), footwear (64), precious metals (71), tools (82-83), instruments (90), beverages (22), tobacco (24), ores (26), pharma (30). All seeded with confidence_score=90, last_source="seed". Upsert only if not exists.
 
+**UI/UX Improvements (Feb 2026):**
+- **FBR Settings Redesign:** Separate Sandbox and Production sections with configurable endpoint URLs (`fbr_sandbox_url`, `fbr_production_url`) and tokens. Removed expiry date requirement.
+- **Invoice Submission Environment Selection:** Radio buttons in submit modal allow choosing Sandbox or Production environment per-submission, passed to `SendInvoiceToFbrJob`.
+- **Customer Profile Management:** Standalone `customer_profiles` table with CRUD at `/customer-profiles`. Search API for autocomplete in invoice forms.
+- **Invoice Customer/Product Autocomplete:** Invoice create/edit forms have customer lookup (auto-fills buyer fields) and product search (auto-fills item fields). Fields remain editable after selection.
+- **Invoice List Tabs:** Split into "Drafted" (draft/submitted) and "Completed" (locked/failed) tabs with counts and tab-preserving pagination.
+- **Products Page Upgrade:** Search functionality, schedule type color badges, HS code mapping sections in create/edit forms.
+- **Dashboard Compactness:** Reduced chart heights, compressed spacing (mb-8→mb-6, gap-6→gap-4, py-8→py-6).
+
 ## External Dependencies
 - **PostgreSQL:** Primary database.
 - **FBR (Federal Board of Revenue) Pakistan:** Integration for tax and invoice submission compliance.

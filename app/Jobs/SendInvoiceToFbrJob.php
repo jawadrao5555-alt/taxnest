@@ -21,13 +21,17 @@ class SendInvoiceToFbrJob implements ShouldQueue
     public $tries = 3;
     public $backoff = [30, 60, 120];
 
-    public function __construct(public int $invoiceId)
+    public function __construct(public int $invoiceId, public ?string $fbrEnvironment = null)
     {
     }
 
     public function handle(): void
     {
         $invoice = Invoice::with(['company', 'items'])->findOrFail($this->invoiceId);
+
+        if ($this->fbrEnvironment && in_array($this->fbrEnvironment, ['sandbox', 'production'])) {
+            $invoice->company->fbr_environment = $this->fbrEnvironment;
+        }
 
         $fbrService = new FbrService();
         $response = $fbrService->submitInvoice($invoice, $this->attempts() - 1);

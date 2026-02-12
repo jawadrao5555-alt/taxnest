@@ -19,8 +19,11 @@
                     <x-nav-link href="/invoices" :active="request()->is('invoices*') || request()->is('invoice*')">
                         Invoices
                     </x-nav-link>
-                    <x-nav-link href="/customers" :active="request()->is('customers*')">
+                    <x-nav-link href="/customer-profiles" :active="request()->is('customer-profiles*')">
                         Customers
+                    </x-nav-link>
+                    <x-nav-link href="/customers" :active="request()->is('customers*')">
+                        Ledger
                     </x-nav-link>
                     <x-nav-link href="/billing/plans" :active="request()->is('billing*')">
                         Billing
@@ -126,8 +129,11 @@
             <x-responsive-nav-link href="/invoices" :active="request()->is('invoices*')">
                 Invoices
             </x-responsive-nav-link>
-            <x-responsive-nav-link href="/customers" :active="request()->is('customers*')">
+            <x-responsive-nav-link href="/customer-profiles" :active="request()->is('customer-profiles*')">
                 Customers
+            </x-responsive-nav-link>
+            <x-responsive-nav-link href="/customers" :active="request()->is('customers*')">
+                Ledger
             </x-responsive-nav-link>
             <x-responsive-nav-link href="/billing/plans" :active="request()->is('billing*')">
                 Billing

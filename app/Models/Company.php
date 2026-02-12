@@ -25,6 +25,8 @@ class Company extends Model
         'token_expiry_date',
         'last_successful_submission',
         'fbr_connection_status',
+        'fbr_sandbox_url',
+        'fbr_production_url',
         'is_internal_account',
         'onboarding_completed',
         'standard_tax_rate',

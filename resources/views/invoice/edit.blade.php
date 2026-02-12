@@ -72,6 +72,27 @@
 
                 <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Buyer Information</h3>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer Lookup</label>
+                        <div class="relative">
+                            <div class="flex gap-2">
+                                <input type="text" x-model="customerSearch" @input.debounce.300ms="searchCustomers()" @focus="searchCustomers()" @click.away="showCustomerDropdown = false" placeholder="Search saved customers or enter manually"
+                                    class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                <button type="button" x-show="selectedCustomerId" x-cloak @click="clearCustomer()" class="px-3 py-1.5 text-sm text-red-600 hover:text-red-800 border border-red-300 rounded-lg hover:bg-red-50 transition">Clear</button>
+                            </div>
+                            <div x-show="showCustomerDropdown && customerResults.length > 0" x-cloak class="absolute z-20 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                <template x-for="customer in customerResults" :key="customer.id">
+                                    <button type="button" @click="selectCustomer(customer)" class="w-full text-left px-4 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-sm border-b border-gray-100 dark:border-gray-600 last:border-0">
+                                        <span class="font-medium text-gray-800 dark:text-gray-100" x-text="customer.name"></span>
+                                        <span class="text-gray-500 dark:text-gray-400 text-xs ml-2" x-text="(customer.ntn ? 'NTN: ' + customer.ntn : '') + (customer.phone ? ' | ' + customer.phone : '')"></span>
+                                    </button>
+                                </template>
+                            </div>
+                            <p x-show="selectedCustomerId" x-cloak class="text-xs text-emerald-600 mt-1">Customer selected. Fields auto-filled but remain editable.</p>
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer Name *</label>
@@ -438,6 +459,10 @@
                         'hsUnmapped' => false,
                     ];
                 })) !!},
+                customerSearch: '',
+                customerResults: [],
+                showCustomerDropdown: false,
+                selectedCustomerId: null,
                 complianceResult: null,
                 complianceLoading: false,
                 scheduleError: '',
@@ -566,6 +591,36 @@
                 },
                 netReceivable() {
                     return this.grandTotal();
+                },
+
+                async searchCustomers() {
+                    let q = this.customerSearch || '';
+                    if (q.length < 1) { this.showCustomerDropdown = false; return; }
+                    try {
+                        let res = await fetch('/api/customer-profiles/search?q=' + encodeURIComponent(q));
+                        this.customerResults = await res.json();
+                        this.showCustomerDropdown = true;
+                    } catch(e) { this.showCustomerDropdown = false; }
+                },
+
+                selectCustomer(customer) {
+                    this.selectedCustomerId = customer.id;
+                    this.buyer_name = customer.name || '';
+                    this.buyer_ntn = customer.ntn || '';
+                    this.buyer_cnic = customer.cnic || '';
+                    this.buyer_address = customer.address || '';
+                    this.customerSearch = customer.name;
+                    this.showCustomerDropdown = false;
+                },
+
+                clearCustomer() {
+                    this.selectedCustomerId = null;
+                    this.customerSearch = '';
+                    this.buyer_name = '';
+                    this.buyer_ntn = '';
+                    this.buyer_cnic = '';
+                    this.buyer_address = '';
+                    this.customerResults = [];
                 },
 
                 async searchProducts(index) {

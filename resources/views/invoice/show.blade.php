@@ -5,15 +5,28 @@
             <div class="flex items-center space-x-3">
                 @if($invoice->status === 'draft')
                 <a href="/invoice/{{ $invoice->id }}/edit" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">Edit</a>
-                <div x-data="{ showSubmitModal: false }">
+                <div x-data="{ showSubmitModal: false, submitEnv: '{{ $invoice->company->fbr_environment ?? 'sandbox' }}' }">
                     <button @click="showSubmitModal = true" class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition">Submit to PRAL</button>
                     <div x-show="showSubmitModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
                         <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
                             <h3 class="text-lg font-bold text-gray-900 mb-4">Submit to PRAL</h3>
+                            <div class="flex gap-3 mb-4">
+                                <label class="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border-2 cursor-pointer transition text-sm"
+                                    :class="submitEnv === 'sandbox' ? 'border-amber-400 bg-amber-50' : 'border-gray-200'">
+                                    <input type="radio" value="sandbox" x-model="submitEnv" class="text-amber-500">
+                                    <span class="font-medium">Sandbox</span>
+                                </label>
+                                <label class="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border-2 cursor-pointer transition text-sm"
+                                    :class="submitEnv === 'production' ? 'border-red-400 bg-red-50' : 'border-gray-200'">
+                                    <input type="radio" value="production" x-model="submitEnv" class="text-red-500">
+                                    <span class="font-medium">Production</span>
+                                </label>
+                            </div>
                             <div class="space-y-4">
                                 <form method="POST" action="/invoice/{{ $invoice->id }}/submit">
                                     @csrf
                                     <input type="hidden" name="mode" value="smart">
+                                    <input type="hidden" name="fbr_environment" :value="submitEnv">
                                     <button type="submit" class="w-full p-4 border-2 border-emerald-200 rounded-lg hover:bg-emerald-50 text-left">
                                         <p class="font-semibold text-emerald-700">Smart Mode (Recommended)</p>
                                         <p class="text-xs text-gray-500">Runs compliance scoring, blocks CRITICAL risk invoices</p>
@@ -27,6 +40,7 @@
                                     <form x-show="showOverride" method="POST" action="/invoice/{{ $invoice->id }}/submit" class="mt-3">
                                         @csrf
                                         <input type="hidden" name="mode" value="direct_mis">
+                                        <input type="hidden" name="fbr_environment" :value="submitEnv">
                                         <textarea name="override_reason" required minlength="10" placeholder="Enter override reason (min 10 characters)..." class="w-full rounded-lg border-gray-300 text-sm"></textarea>
                                         <button type="submit" class="mt-2 w-full px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium">Submit with Override</button>
                                     </form>

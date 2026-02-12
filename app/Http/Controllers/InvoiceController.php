@@ -29,8 +29,28 @@ class InvoiceController extends Controller
     public function index(Request $request)
     {
         $companyId = app('currentCompanyId');
-        $query = Invoice::where('company_id', $companyId)
+        $tab = $request->get('tab', 'draft');
+        
+        $baseQuery = Invoice::where('company_id', $companyId)
             ->with('items', 'branch');
+
+        // Filter by tab
+        if ($tab === 'completed') {
+            $baseQuery->whereIn('status', ['locked', 'failed']);
+        } else {
+            $baseQuery->whereIn('status', ['draft', 'submitted']);
+        }
+
+        // Get counts for both tabs
+        $draftCount = Invoice::where('company_id', $companyId)
+            ->whereIn('status', ['draft', 'submitted'])
+            ->count();
+        
+        $completedCount = Invoice::where('company_id', $companyId)
+            ->whereIn('status', ['locked', 'failed'])
+            ->count();
+
+        $query = $baseQuery;
 
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
@@ -47,7 +67,7 @@ class InvoiceController extends Controller
 
         $invoices = $query->orderBy('created_at', 'desc')->paginate(15)->appends($request->query());
 
-        return view('invoice.index', compact('invoices'));
+        return view('invoice.index', compact('invoices', 'tab', 'draftCount', 'completedCount'));
     }
 
     public function create()
@@ -524,6 +544,7 @@ class InvoiceController extends Controller
         }
 
         $mode = $request->input('mode', 'smart');
+        $fbrEnvironment = $request->input('fbr_environment');
         $invoice->load('items', 'company');
 
         $itemsForValidation = $invoice->items->map(function ($item) {
@@ -597,7 +618,7 @@ class InvoiceController extends Controller
                 'override_reason' => $request->override_reason,
             ]);
 
-            SendInvoiceToFbrJob::dispatch($invoice->id);
+            SendInvoiceToFbrJob::dispatch($invoice->id, $fbrEnvironment);
 
             if ($invoice->buyer_ntn) {
                 $vendorResult = VendorRiskEngine::calculateVendorScore($invoice->company_id, $invoice->buyer_ntn);
@@ -642,7 +663,7 @@ class InvoiceController extends Controller
             'risk_level' => $scoreResult['risk_level'],
         ]);
 
-        SendInvoiceToFbrJob::dispatch($invoice->id);
+        SendInvoiceToFbrJob::dispatch($invoice->id, $fbrEnvironment);
 
         if ($invoice->buyer_ntn) {
             $vendorResult = VendorRiskEngine::calculateVendorScore($invoice->company_id, $invoice->buyer_ntn);

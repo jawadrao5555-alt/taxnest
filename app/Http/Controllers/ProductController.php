@@ -7,13 +7,24 @@ use Illuminate\Http\Request;
 
 class ProductController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $companyId = app('currentCompanyId');
-        $products = Product::where('company_id', $companyId)
-            ->orderBy('name')
-            ->paginate(20);
-        return view('products.index', compact('products'));
+        $search = $request->get('search', '');
+
+        $query = Product::where('company_id', $companyId);
+
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'ilike', "%{$search}%")
+                  ->orWhere('hs_code', 'ilike', "%{$search}%")
+                  ->orWhere('pct_code', 'ilike', "%{$search}%")
+                  ->orWhere('schedule_type', 'ilike', "%{$search}%");
+            });
+        }
+
+        $products = $query->orderBy('name')->paginate(20);
+        return view('products.index', compact('products', 'search'));
     }
 
     public function create()

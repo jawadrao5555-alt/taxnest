@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\Company;
 use App\Models\ComplianceReport;
 use App\Models\VendorRiskProfile;
 use Illuminate\Http\Request;
@@ -78,29 +79,46 @@ class MISController extends Controller
     {
         $companyId = app('currentCompanyId');
         $type = $request->get('type', 'monthly');
+        $viewType = $request->get('view', 'whole');
 
         if ($type === 'monthly') {
             $invoices = Invoice::where('company_id', $companyId)
-                ->with('items')
                 ->whereMonth('created_at', now()->month)
                 ->whereYear('created_at', now()->year)
                 ->orderBy('created_at')
                 ->get();
 
-            $csv = "Invoice Number,Date,Buyer Name,Buyer NTN,Subtotal,Tax,Total,Status\n";
-            foreach ($invoices as $inv) {
-                $taxAmt = $inv->items->sum('tax');
-                $subtotal = $inv->total_amount - $taxAmt;
-                $csv .= implode(',', [
-                    '"' . $inv->invoice_number . '"',
-                    '"' . $inv->created_at->format('Y-m-d') . '"',
-                    '"' . str_replace('"', '""', $inv->buyer_name) . '"',
-                    '"' . $inv->buyer_ntn . '"',
-                    round($subtotal, 2),
-                    round($taxAmt, 2),
-                    $inv->total_amount,
-                    $inv->status,
-                ]) . "\n";
+            if ($viewType === 'partywise') {
+                $csv = "Party Name,NTN,Invoice No,Date,Subtotal,Sales Tax,WHT,Total,Status\n";
+                $grouped = $invoices->groupBy('buyer_name');
+                foreach ($grouped as $party => $rows) {
+                    foreach ($rows as $inv) {
+                        $csv .= '"' . str_replace('"', '""', $party) . '",'
+                            . '"' . ($inv->buyer_ntn ?? '') . '",'
+                            . '"' . ($inv->internal_invoice_number ?? $inv->invoice_number) . '",'
+                            . '"' . $inv->invoice_date . '",'
+                            . number_format($inv->total_value_excluding_st ?? ($inv->total_amount - $inv->total_sales_tax), 2, '.', '') . ','
+                            . number_format($inv->total_sales_tax, 2, '.', '') . ','
+                            . number_format($inv->wht_amount, 2, '.', '') . ','
+                            . number_format($inv->total_amount, 2, '.', '') . ','
+                            . $inv->status . "\n";
+                    }
+                }
+            } else {
+                $csv = "Invoice Number,Date,Buyer Name,Buyer NTN,Subtotal,Sales Tax,WHT,Total,Status\n";
+                foreach ($invoices as $inv) {
+                    $csv .= implode(',', [
+                        '"' . ($inv->internal_invoice_number ?? $inv->invoice_number) . '"',
+                        '"' . $inv->invoice_date . '"',
+                        '"' . str_replace('"', '""', $inv->buyer_name) . '"',
+                        '"' . ($inv->buyer_ntn ?? '') . '"',
+                        number_format($inv->total_value_excluding_st ?? ($inv->total_amount - $inv->total_sales_tax), 2, '.', ''),
+                        number_format($inv->total_sales_tax, 2, '.', ''),
+                        number_format($inv->wht_amount, 2, '.', ''),
+                        number_format($inv->total_amount, 2, '.', ''),
+                        $inv->status,
+                    ]) . "\n";
+                }
             }
             $filename = "mis_monthly_" . now()->format('Y_m') . ".csv";
         } elseif ($type === 'tax') {
@@ -166,5 +184,78 @@ class MISController extends Controller
             'Content-Type' => 'text/csv',
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         ]);
+    }
+
+    public function exportPdf(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $type = $request->get('type', 'monthly');
+        $viewType = $request->get('view', 'whole');
+        $title = 'MIS Report';
+
+        if ($type === 'monthly') {
+            $reportTitle = 'Monthly Invoice Report - ' . now()->format('F Y');
+            $invoices = Invoice::where('company_id', $companyId)
+                ->whereMonth('created_at', now()->month)
+                ->whereYear('created_at', now()->year)
+                ->orderBy('created_at')
+                ->get();
+
+            $partyGroups = null;
+            if ($viewType === 'partywise') {
+                $partyGroups = $invoices->groupBy('buyer_name');
+            }
+
+            return view('reports.mis-pdf', compact('company', 'title', 'reportTitle', 'type', 'invoices', 'viewType', 'partyGroups'));
+
+        } elseif ($type === 'tax') {
+            $reportTitle = 'Tax Collection Summary (Last 6 Months)';
+            $taxSummary = [];
+            for ($i = 5; $i >= 0; $i--) {
+                $month = now()->subMonths($i);
+                $invoiceIds = Invoice::where('company_id', $companyId)
+                    ->whereMonth('created_at', $month->month)
+                    ->whereYear('created_at', $month->year)
+                    ->pluck('id');
+                $totalTax = InvoiceItem::whereIn('invoice_id', $invoiceIds)->sum('tax');
+                $totalSub = InvoiceItem::whereIn('invoice_id', $invoiceIds)
+                    ->selectRaw('SUM(price * quantity) as s')->value('s') ?? 0;
+                $taxSummary[] = [
+                    'month' => $month->format('M Y'),
+                    'tax_collected' => $totalTax,
+                    'subtotal' => $totalSub,
+                    'effective_rate' => $totalSub > 0 ? round(($totalTax / $totalSub) * 100, 2) : 0,
+                ];
+            }
+
+            return view('reports.mis-pdf', compact('company', 'title', 'reportTitle', 'type', 'taxSummary'));
+
+        } elseif ($type === 'hs') {
+            $reportTitle = 'HS Code Concentration Report';
+            $hsData = InvoiceItem::whereIn('invoice_id',
+                    Invoice::where('company_id', $companyId)->pluck('id'))
+                ->select(
+                    DB::raw("SUBSTRING(hs_code, 1, 2) as hs_prefix"),
+                    DB::raw('COUNT(*) as item_count'),
+                    DB::raw('SUM(price * quantity) as total_value'),
+                    DB::raw('SUM(tax) as total_tax')
+                )
+                ->groupBy('hs_prefix')
+                ->orderByDesc('total_value')
+                ->get();
+
+            return view('reports.mis-pdf', compact('company', 'title', 'reportTitle', 'type', 'hsData'));
+
+        } elseif ($type === 'vendor') {
+            $reportTitle = 'Vendor Risk Profile Report';
+            $vendors = VendorRiskProfile::where('company_id', $companyId)
+                ->orderBy('vendor_score', 'asc')
+                ->get();
+
+            return view('reports.mis-pdf', compact('company', 'title', 'reportTitle', 'type', 'vendors'));
+        }
+
+        return back()->with('error', 'Invalid export type.');
     }
 }

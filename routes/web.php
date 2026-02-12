@@ -186,11 +186,14 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
 
     Route::get('/reports/wht', [WhtReportController::class, 'index'])->name('reports.wht');
     Route::get('/reports/wht/download', [WhtReportController::class, 'downloadWht'])->name('reports.wht.download');
+    Route::get('/reports/wht/pdf', [WhtReportController::class, 'pdfWht'])->name('reports.wht.pdf');
     Route::get('/reports/tax-summary', [WhtReportController::class, 'taxSummary'])->name('reports.tax-summary');
     Route::get('/reports/tax-summary/download', [WhtReportController::class, 'downloadTaxSummary'])->name('reports.tax-summary.download');
+    Route::get('/reports/tax-summary/pdf', [WhtReportController::class, 'pdfTaxSummary'])->name('reports.tax-summary.pdf');
 
     Route::get('/mis', [MISController::class, 'index'])->name('mis.index');
     Route::get('/mis/export', [MISController::class, 'exportCsv'])->name('mis.export');
+    Route::get('/mis/pdf', [MISController::class, 'exportPdf'])->name('mis.pdf');
 
     Route::middleware(['role:company_admin,super_admin'])->group(function () {
         Route::get('/tax-overrides', [TaxOverrideController::class, 'index'])->name('tax-overrides.index');

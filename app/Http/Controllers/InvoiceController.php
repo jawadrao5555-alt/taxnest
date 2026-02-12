@@ -345,6 +345,7 @@ class InvoiceController extends Controller
 
     public function update(Request $request, Invoice $invoice)
     {
+        $companyId = app('currentCompanyId');
         if ($invoice->isLocked()) {
             return redirect('/invoices')->with('error', 'Locked invoices cannot be edited.');
         }
@@ -433,7 +434,7 @@ class InvoiceController extends Controller
             $supplierProvince = $selectedBranch?->province ?? $company->province ?? $invoice->supplier_province;
             $buyerRegType = self::detectBuyerRegistrationType($request->buyer_ntn);
 
-            $invoice->update([
+            $updateData = [
                 'buyer_name' => $request->buyer_name,
                 'buyer_ntn' => $request->buyer_ntn,
                 'buyer_cnic' => $request->buyer_cnic,
@@ -450,7 +451,14 @@ class InvoiceController extends Controller
                 'reference_invoice_number' => $request->reference_invoice_number,
                 'supplier_province' => $supplierProvince,
                 'destination_province' => $request->destination_province,
-            ]);
+            ];
+
+            if ($invoice->status === 'failed') {
+                $updateData['status'] = 'draft';
+                $updateData['fbr_status'] = 'pending';
+            }
+
+            $invoice->update($updateData);
 
             $invoice->items()->delete();
             $manualOverrides = [];

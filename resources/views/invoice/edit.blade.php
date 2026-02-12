@@ -74,18 +74,32 @@
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Buyer Information</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer Name</label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer Name *</label>
                             <input type="text" name="buyer_name" x-model="buyer_name" required
                                 class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer NTN</label>
-                            <input type="text" name="buyer_ntn" x-model="buyer_ntn" required
+                            <input type="text" name="buyer_ntn" x-model="buyer_ntn" placeholder="Optional for unregistered"
                                 class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             <p class="text-xs mt-1" :class="buyerRegType === 'Registered' ? 'text-green-600' : 'text-gray-400'" x-text="'Registration: ' + buyerRegType"></p>
                         </div>
                     </div>
+                    <div x-show="buyerRegType === 'Registered'" x-cloak class="grid grid-cols-1 gap-4 mt-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer CNIC</label>
+                            <input type="text" name="buyer_cnic" x-model="buyer_cnic" maxlength="15" pattern="\d{5}-\d{7}-\d{1}" placeholder="xxxxx-xxxxxxx-x" :required="buyerRegType === 'Registered'"
+                                class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            @error('buyer_cnic') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer Address *</label>
+                            <textarea name="buyer_address" x-model="buyer_address" required rows="2"
+                                class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">{{ $invoice->buyer_address }}</textarea>
+                            @error('buyer_address') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Destination Province *</label>
                             <select name="destination_province" x-model="destination_province" required class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
@@ -95,12 +109,6 @@
                                 @endforeach
                             </select>
                             @error('destination_province') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">WHT Rate (%)</label>
-                            <input type="number" step="0.01" min="0" max="100" name="wht_rate" x-model="wht_rate" placeholder="0"
-                                class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Withholding Tax deduction rate (manual selection)</p>
                         </div>
                     </div>
                 </div>
@@ -269,14 +277,6 @@
                             <span>Grand Total</span>
                             <span class="text-lg text-emerald-600" x-text="'Rs. ' + grandTotal()"></span>
                         </div>
-                        <div x-show="parseFloat(wht_rate) > 0" x-cloak class="flex justify-between items-center text-sm text-red-600">
-                            <span>WHT Deduction (<span x-text="wht_rate"></span>%)</span>
-                            <span class="font-medium" x-text="'- Rs. ' + whtAmount()"></span>
-                        </div>
-                        <div x-show="parseFloat(wht_rate) > 0" x-cloak class="flex justify-between items-center text-sm font-bold text-emerald-700 border-t border-gray-200 dark:border-gray-600 pt-2">
-                            <span>Net Receivable</span>
-                            <span class="text-lg" x-text="'Rs. ' + netReceivable()"></span>
-                        </div>
                     </div>
                 </div>
 
@@ -343,10 +343,6 @@
                         <span class="text-gray-500 dark:text-gray-400">Tax:</span>
                         <span class="font-semibold text-gray-800 dark:text-gray-100 ml-1" x-text="'Rs. ' + form.totalSalesTax()"></span>
                     </div>
-                    <div x-show="parseFloat(form.wht_rate) > 0">
-                        <span class="text-red-500 dark:text-red-400">WHT:</span>
-                        <span class="font-semibold text-red-600 dark:text-red-400 ml-1" x-text="'- Rs. ' + form.whtAmount()"></span>
-                    </div>
                 </div>
                 <div class="flex items-center space-x-2">
                     <span class="text-gray-500 dark:text-gray-400">Net Receivable:</span>
@@ -401,10 +397,11 @@
             return {
                 buyer_name: @js($invoice->buyer_name),
                 buyer_ntn: @js($invoice->buyer_ntn),
+                buyer_cnic: @js($invoice->buyer_cnic ?? ''),
+                buyer_address: @js($invoice->buyer_address ?? ''),
                 document_type: @js($invoice->document_type ?? 'Sale Invoice'),
                 reference_invoice_number: @js($invoice->reference_invoice_number ?? ''),
                 destination_province: @js($invoice->destination_province ?? ''),
-                wht_rate: @js($invoice->wht_rate ?? 0),
                 items: {!! json_encode($invoice->items->map(function($i) use ($standardTaxRate) {
                     $scheduleType = $i->schedule_type ?? 'standard';
                     $defaultRate = $standardTaxRate ?? 18;
@@ -565,11 +562,10 @@
                     return (parseFloat(this.totalExclST()) + parseFloat(this.totalSalesTax())).toFixed(2);
                 },
                 whtAmount() {
-                    let exclST = parseFloat(this.totalExclST());
-                    return (exclST * (parseFloat(this.wht_rate || 0) / 100)).toFixed(2);
+                    return '0.00';
                 },
                 netReceivable() {
-                    return (parseFloat(this.grandTotal()) - parseFloat(this.whtAmount())).toFixed(2);
+                    return this.grandTotal();
                 },
 
                 async searchProducts(index) {

@@ -17,6 +17,8 @@ class Invoice extends Model
         'integrity_hash',
         'buyer_name',
         'buyer_ntn',
+        'buyer_cnic',
+        'buyer_address',
         'buyer_registration_type',
         'total_amount',
         'total_value_excluding_st',

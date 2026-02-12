@@ -95,7 +95,18 @@
                 </form>
                 @endif
                 <a href="/invoice/{{ $invoice->id }}/preview" class="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition">Preview</a>
-                <a href="/invoice/{{ $invoice->id }}/download" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Download PDF</a>
+                <div x-data="{ showWhtModal: false, pdfWhtRate: 0 }" class="inline-block relative">
+                    @if($invoice->status === 'locked')
+                    <button @click="showWhtModal = !showWhtModal" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Download PDF</button>
+                    <div x-show="showWhtModal" x-cloak @click.away="showWhtModal = false" class="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-50">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">WHT Rate (%)</label>
+                        <input type="number" step="0.01" min="0" max="100" x-model="pdfWhtRate" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500 mb-3" placeholder="0">
+                        <a :href="'/invoice/{{ $invoice->id }}/download?wht_rate=' + pdfWhtRate" class="block w-full text-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">Download</a>
+                    </div>
+                    @else
+                    <a href="/invoice/{{ $invoice->id }}/download" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Download PDF</a>
+                    @endif
+                </div>
                 @if($invoice->share_uuid)
                 <a href="https://wa.me/?text={{ urlencode('Invoice ' . $invoice->display_invoice_number . ': ' . url('/share/invoice/' . $invoice->share_uuid)) }}" target="_blank" class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition">WhatsApp</a>
                 <button onclick="navigator.clipboard.writeText('{{ url('/share/invoice/' . $invoice->share_uuid) }}').then(() => { this.textContent = 'Copied!'; setTimeout(() => { this.textContent = 'Copy Link'; }, 2000); })" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">Copy Link</button>
@@ -142,7 +153,11 @@
                         <div class="bg-gray-50 rounded-lg p-4">
                             <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Buyer Details</h4>
                             <p class="text-sm font-semibold text-gray-900">{{ $invoice->buyer_name }}</p>
-                            <p class="text-sm text-gray-600">NTN: {{ $invoice->buyer_ntn }}</p>
+                            <p class="text-sm text-gray-600">NTN: {{ $invoice->buyer_ntn ?: 'N/A' }}</p>
+                            @if($invoice->buyer_cnic)
+                            <p class="text-sm text-gray-600">CNIC: {{ $invoice->buyer_cnic }}</p>
+                            @endif
+                            <p class="text-sm text-gray-600">Address: {{ $invoice->buyer_address }}</p>
                             <p class="text-sm text-gray-600">Registration: <span class="font-medium {{ $invoice->buyer_registration_type === 'Registered' ? 'text-green-700' : 'text-gray-600' }}">{{ $invoice->buyer_registration_type ?? 'N/A' }}</span></p>
                             @if($invoice->destination_province)
                             <p class="text-sm text-gray-600">Destination: {{ $invoice->destination_province }}</p>
@@ -187,6 +202,7 @@
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qty</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Price</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tax</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">MRP</th>
                                 <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">ST WHT</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Pet. Levy</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
@@ -201,6 +217,7 @@
                                 <td class="px-6 py-4 text-sm text-gray-700 text-right">{{ $item->quantity }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-700 text-right">Rs. {{ number_format($item->price, 2) }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-700 text-right">Rs. {{ number_format($item->tax, 2) }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-700 text-right">{{ ($item->schedule_type === '3rd_schedule' && $item->mrp) ? 'Rs. ' . number_format($item->mrp, 2) : '—' }}</td>
                                 <td class="px-6 py-4 text-sm text-center">
                                     @if($item->st_withheld_at_source) <span class="text-emerald-600 font-medium">Yes</span> @else <span class="text-gray-400">—</span> @endif
                                 </td>
@@ -211,24 +228,24 @@
                         </tbody>
                         <tfoot class="bg-gray-50">
                             <tr>
-                                <td colspan="7" class="px-6 py-3 text-right text-sm text-gray-600">Value Excl. ST</td>
+                                <td colspan="8" class="px-6 py-3 text-right text-sm text-gray-600">Value Excl. ST</td>
                                 <td class="px-6 py-3 text-right text-sm font-semibold text-gray-800">Rs. {{ number_format($invoice->total_value_excluding_st ?? ($invoice->total_amount - $invoice->items->sum('tax')), 2) }}</td>
                             </tr>
                             <tr>
-                                <td colspan="7" class="px-6 py-3 text-right text-sm text-gray-600">Total Sales Tax</td>
+                                <td colspan="8" class="px-6 py-3 text-right text-sm text-gray-600">Total Sales Tax</td>
                                 <td class="px-6 py-3 text-right text-sm font-semibold text-gray-800">Rs. {{ number_format($invoice->total_sales_tax ?? $invoice->items->sum('tax'), 2) }}</td>
                             </tr>
                             <tr>
-                                <td colspan="7" class="px-6 py-3 text-right text-sm font-bold text-gray-700 uppercase border-t-2 border-emerald-500">Grand Total</td>
+                                <td colspan="8" class="px-6 py-3 text-right text-sm font-bold text-gray-700 uppercase border-t-2 border-emerald-500">Grand Total</td>
                                 <td class="px-6 py-3 text-right text-lg font-bold text-emerald-600 border-t-2 border-emerald-500">Rs. {{ number_format($invoice->total_amount, 2) }}</td>
                             </tr>
                             @if($invoice->wht_rate > 0)
                             <tr>
-                                <td colspan="7" class="px-6 py-2 text-right text-sm text-red-600">WHT Deduction ({{ $invoice->wht_rate }}%)</td>
+                                <td colspan="8" class="px-6 py-2 text-right text-sm text-red-600">WHT Deduction ({{ $invoice->wht_rate }}%)</td>
                                 <td class="px-6 py-2 text-right text-sm font-semibold text-red-600">- Rs. {{ number_format($invoice->wht_amount ?? 0, 2) }}</td>
                             </tr>
                             <tr>
-                                <td colspan="7" class="px-6 py-3 text-right text-sm font-bold text-emerald-700">Net Receivable</td>
+                                <td colspan="8" class="px-6 py-3 text-right text-sm font-bold text-emerald-700">Net Receivable</td>
                                 <td class="px-6 py-3 text-right text-lg font-bold text-emerald-700">Rs. {{ number_format($invoice->net_receivable ?? $invoice->total_amount, 2) }}</td>
                             </tr>
                             @endif

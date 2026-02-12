@@ -113,7 +113,15 @@
                     <div class="info-box">
                         <div class="info-label">Bill To</div>
                         <div class="info-value"><strong>{{ $invoice->buyer_name }}</strong></div>
+                        @if($invoice->buyer_ntn)
                         <div class="info-value">NTN: {{ $invoice->buyer_ntn }}</div>
+                        @endif
+                        @if($invoice->buyer_cnic)
+                        <div class="info-value">CNIC: {{ $invoice->buyer_cnic }}</div>
+                        @endif
+                        @if($invoice->buyer_address)
+                        <div class="info-value">Address: {{ $invoice->buyer_address }}</div>
+                        @endif
                         @if($invoice->buyer_registration_type)
                         <div class="info-value">Registration: <strong>{{ $invoice->buyer_registration_type }}</strong></div>
                         @endif
@@ -156,6 +164,7 @@
                     <th class="text-right">Qty</th>
                     <th class="text-right">Price</th>
                     <th class="text-right">Tax</th>
+                    <th class="text-right">MRP</th>
                     <th class="text-right">Total</th>
                 </tr>
             </thead>
@@ -169,6 +178,7 @@
                     <td class="text-right">{{ $item->quantity }}</td>
                     <td class="text-right">Rs. {{ number_format($item->price, 2) }}</td>
                     <td class="text-right">Rs. {{ number_format($item->tax, 2) }}</td>
+                    <td class="text-right">{{ ($item->schedule_type === '3rd_schedule' && $item->mrp) ? 'Rs. ' . number_format($item->mrp, 2) : '—' }}</td>
                     <td class="text-right" style="font-weight: 600;">Rs. {{ number_format($lineTotal, 2) }}</td>
                 </tr>
                 @endforeach
@@ -190,14 +200,16 @@
                         <td class="label" style="font-size: 14px;">Total</td>
                         <td class="value">Rs. {{ number_format($invoice->total_amount, 2) }}</td>
                     </tr>
+                    @if(($wht_rate ?? 0) > 0)
                     <tr>
-                        <td class="label">WHT {{ $invoice->wht_rate ? '(' . $invoice->wht_rate . '%)' : '' }}</td>
-                        <td class="value">Rs. {{ number_format($invoice->wht_amount ?? 0, 2) }}</td>
+                        <td class="label">WHT ({{ $wht_rate }}%)</td>
+                        <td class="value">Rs. {{ number_format($wht_amount ?? 0, 2) }}</td>
                     </tr>
                     <tr class="net">
                         <td class="label" style="font-weight: 800;">Net Receivable</td>
-                        <td class="value" style="font-weight: 800; color: #059669;">Rs. {{ number_format($invoice->net_receivable ?? $invoice->total_amount, 2) }}</td>
+                        <td class="value" style="font-weight: 800; color: #059669;">Rs. {{ number_format($net_receivable ?? $invoice->total_amount, 2) }}</td>
                     </tr>
+                    @endif
                 </table>
             </div>
         </div>

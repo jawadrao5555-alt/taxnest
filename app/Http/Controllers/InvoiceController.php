@@ -81,14 +81,17 @@ class InvoiceController extends Controller
             return back()->with('error', $limitCheck['reason']);
         }
 
+        $isRegistered = self::detectBuyerRegistrationType($request->buyer_ntn) === 'Registered';
+
         $request->validate([
             'buyer_name' => 'required|string|max:255',
-            'buyer_ntn' => 'required|string|max:50',
+            'buyer_ntn' => $isRegistered ? 'required|string|max:50' : 'nullable|string|max:50',
+            'buyer_cnic' => $isRegistered ? 'required|string|max:15' : 'nullable|string|max:15',
+            'buyer_address' => 'required|string|max:500',
             'branch_id' => 'nullable|exists:branches,id',
             'document_type' => 'required|string|in:Sale Invoice,Credit Note,Debit Note',
             'reference_invoice_number' => $request->input('document_type') !== 'Sale Invoice' ? 'required|string|max:255' : 'nullable|string|max:255',
             'destination_province' => 'required|string|max:100',
-            'wht_rate' => 'nullable|numeric|min:0|max:100',
             'items' => 'required|array|min:1',
             'items.*.hs_code' => 'required|string|max:50',
             'items.*.description' => 'required|string|max:255',
@@ -108,6 +111,8 @@ class InvoiceController extends Controller
             'document_type.required' => 'Document type is required.',
             'destination_province.required' => 'Destination Province is required.',
             'reference_invoice_number.required' => 'Reference Invoice is required for Credit/Debit Notes.',
+            'buyer_cnic.required' => 'CNIC is required for registered buyers.',
+            'buyer_ntn.required' => 'NTN is required for registered buyers.',
         ]);
 
         $itemsWithTaxRate = collect($request->items)->map(function ($item) {
@@ -148,9 +153,9 @@ class InvoiceController extends Controller
             }
             $totalAmount = round($totalValueExcludingST + $totalSalesTax, 2);
 
-            $whtRate = floatval($request->input('wht_rate', 0));
-            $whtAmount = round($totalValueExcludingST * ($whtRate / 100), 2);
-            $netReceivable = round($totalAmount - $whtAmount, 2);
+            $whtRate = 0;
+            $whtAmount = 0;
+            $netReceivable = $totalAmount;
 
             $invoiceNumber = InvoiceNumberingService::generateNextNumber($companyId);
 
@@ -164,6 +169,8 @@ class InvoiceController extends Controller
                 'internal_invoice_number' => $invoiceNumber,
                 'buyer_name' => $request->buyer_name,
                 'buyer_ntn' => $buyerNtn,
+                'buyer_cnic' => $request->buyer_cnic,
+                'buyer_address' => $request->buyer_address,
                 'buyer_registration_type' => $buyerRegType,
                 'total_amount' => $totalAmount,
                 'total_value_excluding_st' => round($totalValueExcludingST, 2),
@@ -320,14 +327,17 @@ class InvoiceController extends Controller
             return redirect('/invoices')->with('error', 'Locked invoices cannot be edited.');
         }
 
+        $isRegistered = self::detectBuyerRegistrationType($request->buyer_ntn) === 'Registered';
+
         $request->validate([
             'buyer_name' => 'required|string|max:255',
-            'buyer_ntn' => 'required|string|max:50',
+            'buyer_ntn' => $isRegistered ? 'required|string|max:50' : 'nullable|string|max:50',
+            'buyer_cnic' => $isRegistered ? 'required|string|max:15' : 'nullable|string|max:15',
+            'buyer_address' => 'required|string|max:500',
             'branch_id' => 'nullable|exists:branches,id',
             'document_type' => 'required|string|in:Sale Invoice,Credit Note,Debit Note',
             'reference_invoice_number' => $request->input('document_type') !== 'Sale Invoice' ? 'required|string|max:255' : 'nullable|string|max:255',
             'destination_province' => 'required|string|max:100',
-            'wht_rate' => 'nullable|numeric|min:0|max:100',
             'items' => 'required|array|min:1',
             'items.*.hs_code' => 'required|string|max:50',
             'items.*.description' => 'required|string|max:255',
@@ -347,6 +357,8 @@ class InvoiceController extends Controller
             'document_type.required' => 'Document type is required.',
             'destination_province.required' => 'Destination Province is required.',
             'reference_invoice_number.required' => 'Reference Invoice is required for Credit/Debit Notes.',
+            'buyer_cnic.required' => 'CNIC is required for registered buyers.',
+            'buyer_ntn.required' => 'NTN is required for registered buyers.',
         ]);
 
         $itemsWithTaxRate = collect($request->items)->map(function ($item) {
@@ -392,9 +404,9 @@ class InvoiceController extends Controller
             }
             $totalAmount = round($totalValueExcludingST + $totalSalesTax, 2);
 
-            $whtRate = floatval($request->input('wht_rate', 0));
-            $whtAmount = round($totalValueExcludingST * ($whtRate / 100), 2);
-            $netReceivable = round($totalAmount - $whtAmount, 2);
+            $whtRate = 0;
+            $whtAmount = 0;
+            $netReceivable = $totalAmount;
 
             $supplierProvince = $selectedBranch?->province ?? $company->province ?? $invoice->supplier_province;
             $buyerRegType = self::detectBuyerRegistrationType($request->buyer_ntn);
@@ -402,6 +414,8 @@ class InvoiceController extends Controller
             $invoice->update([
                 'buyer_name' => $request->buyer_name,
                 'buyer_ntn' => $request->buyer_ntn,
+                'buyer_cnic' => $request->buyer_cnic,
+                'buyer_address' => $request->buyer_address,
                 'buyer_registration_type' => $buyerRegType,
                 'total_amount' => $totalAmount,
                 'total_value_excluding_st' => round($totalValueExcludingST, 2),
@@ -695,12 +709,19 @@ class InvoiceController extends Controller
         $subtotal = $invoice->items->sum(fn($item) => $item->price * $item->quantity);
         $totalTax = $invoice->items->sum('tax');
 
+        $whtRate = floatval(request()->query('wht_rate', $invoice->wht_rate ?? 0));
+        $whtAmount = round($subtotal * ($whtRate / 100), 2);
+        $netReceivable = round(($subtotal + $totalTax) - $whtAmount, 2);
+
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-professional', [
             'invoice' => $invoice,
             'showWatermark' => $showWatermark,
             'isDraft' => $isDraft,
             'subtotal' => $subtotal,
             'totalTax' => $totalTax,
+            'wht_rate' => $whtRate,
+            'wht_amount' => $whtAmount,
+            'net_receivable' => $netReceivable,
         ]);
 
         $filename = 'invoice-' . ($invoice->fbr_invoice_number ?? $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id) . '.pdf';

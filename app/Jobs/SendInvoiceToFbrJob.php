@@ -73,7 +73,7 @@ class SendInvoiceToFbrJob implements ShouldQueue
             CustomerLedger::create([
                 'company_id' => $invoice->company_id,
                 'customer_name' => $invoice->buyer_name,
-                'customer_ntn' => $invoice->buyer_ntn,
+                'customer_ntn' => $invoice->buyer_ntn ?? '',
                 'invoice_id' => $invoice->id,
                 'debit' => $invoice->total_amount,
                 'credit' => 0,

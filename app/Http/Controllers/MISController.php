@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
 use Carbon\Carbon;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class MISController extends Controller
 {
@@ -207,7 +208,9 @@ class MISController extends Controller
                 $partyGroups = $invoices->groupBy('buyer_name');
             }
 
-            return view('reports.mis-pdf', compact('company', 'title', 'reportTitle', 'type', 'invoices', 'viewType', 'partyGroups'));
+            $pdf = Pdf::loadView('reports.mis-pdf', compact('company', 'title', 'reportTitle', 'type', 'invoices', 'viewType', 'partyGroups'));
+            $pdf->setPaper('a4', 'landscape');
+            return $pdf->download('MIS_Monthly_' . now()->format('Y-m') . '_' . $viewType . '.pdf');
 
         } elseif ($type === 'tax') {
             $reportTitle = 'Tax Collection Summary (Last 6 Months)';
@@ -229,7 +232,9 @@ class MISController extends Controller
                 ];
             }
 
-            return view('reports.mis-pdf', compact('company', 'title', 'reportTitle', 'type', 'taxSummary'));
+            $pdf = Pdf::loadView('reports.mis-pdf', compact('company', 'title', 'reportTitle', 'type', 'taxSummary'));
+            $pdf->setPaper('a4', 'landscape');
+            return $pdf->download('MIS_Tax_Summary.pdf');
 
         } elseif ($type === 'hs') {
             $reportTitle = 'HS Code Concentration Report';
@@ -245,7 +250,9 @@ class MISController extends Controller
                 ->orderByDesc('total_value')
                 ->get();
 
-            return view('reports.mis-pdf', compact('company', 'title', 'reportTitle', 'type', 'hsData'));
+            $pdf = Pdf::loadView('reports.mis-pdf', compact('company', 'title', 'reportTitle', 'type', 'hsData'));
+            $pdf->setPaper('a4', 'landscape');
+            return $pdf->download('MIS_HS_Code_Report.pdf');
 
         } elseif ($type === 'vendor') {
             $reportTitle = 'Vendor Risk Profile Report';
@@ -253,7 +260,9 @@ class MISController extends Controller
                 ->orderBy('vendor_score', 'asc')
                 ->get();
 
-            return view('reports.mis-pdf', compact('company', 'title', 'reportTitle', 'type', 'vendors'));
+            $pdf = Pdf::loadView('reports.mis-pdf', compact('company', 'title', 'reportTitle', 'type', 'vendors'));
+            $pdf->setPaper('a4', 'landscape');
+            return $pdf->download('MIS_Vendor_Risk_Report.pdf');
         }
 
         return back()->with('error', 'Invalid export type.');

@@ -90,8 +90,8 @@
                                 <svg class="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                             </button>
                             <div x-show="open" @click.away="open = false" class="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
-                                <a href="{{ route('reports.tax-summary.pdf', array_merge(request()->query(), ['view' => 'whole'])) }}" target="_blank" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg">Whole Report PDF</a>
-                                <a href="{{ route('reports.tax-summary.pdf', array_merge(request()->query(), ['view' => 'partywise'])) }}" target="_blank" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg">Party-wise PDF</a>
+                                <a href="{{ route('reports.tax-summary.pdf', array_merge(request()->query(), ['view' => 'whole'])) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg">Whole Report PDF</a>
+                                <a href="{{ route('reports.tax-summary.pdf', array_merge(request()->query(), ['view' => 'partywise'])) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg">Party-wise PDF</a>
                             </div>
                         </div>
                         @php

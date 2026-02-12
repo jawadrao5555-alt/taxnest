@@ -7,6 +7,7 @@ use App\Models\Company;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class WhtReportController extends Controller
 {
@@ -107,7 +108,10 @@ class WhtReportController extends Controller
             $partyGroups = $results->groupBy('buyer_name');
         }
 
-        return view('reports.wht-pdf', compact('results', 'totals', 'fromDate', 'toDate', 'partyFilter', 'period', 'company', 'title', 'viewType', 'partyGroups', 'partyName'));
+        $pdf = Pdf::loadView('reports.wht-pdf', compact('results', 'totals', 'fromDate', 'toDate', 'partyFilter', 'period', 'company', 'title', 'viewType', 'partyGroups', 'partyName'));
+        $pdf->setPaper('a4', 'landscape');
+        $filename = 'WHT_Report_' . $fromDate . '_to_' . $toDate . '_' . $viewType . '.pdf';
+        return $pdf->download($filename);
     }
 
     public function taxSummary(Request $request)
@@ -210,7 +214,9 @@ class WhtReportController extends Controller
                 'total_net' => $monthly->sum('total_net'),
             ];
 
-            return view('reports.tax-summary-pdf', compact('monthly', 'yearTotals', 'year', 'partyFilter', 'company', 'title', 'viewType', 'partyGroups'));
+            $pdf = Pdf::loadView('reports.tax-summary-pdf', compact('monthly', 'yearTotals', 'year', 'partyFilter', 'company', 'title', 'viewType', 'partyGroups'));
+            $pdf->setPaper('a4', 'landscape');
+            return $pdf->download('Tax_Summary_' . $year . '_partywise.pdf');
         }
 
         $query = Invoice::where('company_id', $companyId)
@@ -247,7 +253,9 @@ class WhtReportController extends Controller
 
         $partyName = $partyFilter;
 
-        return view('reports.tax-summary-pdf', compact('monthly', 'yearTotals', 'year', 'partyFilter', 'company', 'title', 'viewType', 'partyName'));
+        $pdf = Pdf::loadView('reports.tax-summary-pdf', compact('monthly', 'yearTotals', 'year', 'partyFilter', 'company', 'title', 'viewType', 'partyName'));
+        $pdf->setPaper('a4', 'landscape');
+        return $pdf->download('Tax_Summary_' . $year . '_whole.pdf');
     }
 
     public function downloadWht(Request $request)

@@ -3,31 +3,43 @@
 @section('content')
     <div class="report-title">
         <h2>WHT Collection Report</h2>
-        <div class="period">Period: {{ $fromDate }} to {{ $toDate }} | View: {{ ucfirst($viewType ?? 'Whole') }}{{ isset($partyName) ? ' | Party: ' . $partyName : '' }}</div>
+        <div class="period">Period: {{ $fromDate }} to {{ $toDate }} | View: {{ ucfirst($viewType ?? 'Whole') }}{{ isset($partyName) && $partyName ? ' | Party: ' . $partyName : '' }}</div>
     </div>
 
-    <div class="summary-grid">
-        <div class="summary-card highlight">
-            <div class="value">{{ number_format($totals['invoice_count']) }}</div>
-            <div class="label">Total Invoices</div>
-        </div>
-        <div class="summary-card">
-            <div class="value">{{ number_format($totals['total_value'], 2) }}</div>
-            <div class="label">Total Value (Excl ST)</div>
-        </div>
-        <div class="summary-card">
-            <div class="value">{{ number_format($totals['total_sales_tax'], 2) }}</div>
-            <div class="label">Sales Tax</div>
-        </div>
-        <div class="summary-card warning">
-            <div class="value">{{ number_format($totals['total_wht'], 2) }}</div>
-            <div class="label">WHT Collected</div>
-        </div>
-        <div class="summary-card highlight">
-            <div class="value">{{ number_format($totals['total_net_receivable'], 2) }}</div>
-            <div class="label">Net Receivable</div>
-        </div>
-    </div>
+    <table class="summary-table">
+        <tr>
+            <td style="width:20%; padding:4px;">
+                <div class="summary-card highlight">
+                    <div class="value">{{ number_format($totals['invoice_count']) }}</div>
+                    <div class="label">Total Invoices</div>
+                </div>
+            </td>
+            <td style="width:20%; padding:4px;">
+                <div class="summary-card">
+                    <div class="value">{{ number_format($totals['total_value'], 2) }}</div>
+                    <div class="label">Total Value (Excl ST)</div>
+                </div>
+            </td>
+            <td style="width:20%; padding:4px;">
+                <div class="summary-card">
+                    <div class="value">{{ number_format($totals['total_sales_tax'], 2) }}</div>
+                    <div class="label">Sales Tax</div>
+                </div>
+            </td>
+            <td style="width:20%; padding:4px;">
+                <div class="summary-card warning">
+                    <div class="value">{{ number_format($totals['total_wht'], 2) }}</div>
+                    <div class="label">WHT Collected</div>
+                </div>
+            </td>
+            <td style="width:20%; padding:4px;">
+                <div class="summary-card highlight">
+                    <div class="value">{{ number_format($totals['total_net_receivable'], 2) }}</div>
+                    <div class="label">Net Receivable</div>
+                </div>
+            </td>
+        </tr>
+    </table>
 
     @if(isset($viewType) && $viewType === 'partywise')
         @foreach($partyGroups as $party => $rows)
@@ -35,7 +47,7 @@
             <h3>{{ $party }}</h3>
             <div class="detail">NTN: {{ $rows->first()->buyer_ntn ?? '-' }} | CNIC: {{ $rows->first()->buyer_cnic ?? '-' }} | Invoices: {{ $rows->sum('invoice_count') }}</div>
         </div>
-        <table>
+        <table class="data-table">
             <thead>
                 <tr>
                     <th>Period</th>
@@ -74,7 +86,7 @@
         </table>
         @endforeach
     @else
-        <table>
+        <table class="data-table">
             <thead>
                 <tr>
                     <th>Period</th>

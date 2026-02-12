@@ -3,28 +3,38 @@
 @section('content')
     <div class="report-title">
         <h2>MIS Report - {{ $reportTitle }}</h2>
-        <div class="period">Generated: {{ now()->format('d M Y') }}{{ isset($partyName) ? ' | Party: ' . $partyName : '' }}</div>
+        <div class="period">Generated: {{ now()->format('d M Y') }}{{ isset($viewType) && $viewType === 'partywise' ? ' | View: Party-wise' : '' }}</div>
     </div>
 
     @if($type === 'monthly')
-        <div class="summary-grid">
-            <div class="summary-card highlight">
-                <div class="value">{{ count($invoices) }}</div>
-                <div class="label">Total Invoices</div>
-            </div>
-            <div class="summary-card">
-                <div class="value">{{ number_format($invoices->sum('total_amount'), 2) }}</div>
-                <div class="label">Total Revenue</div>
-            </div>
-            <div class="summary-card highlight">
-                <div class="value">{{ number_format($invoices->sum('total_sales_tax'), 2) }}</div>
-                <div class="label">Sales Tax</div>
-            </div>
-            <div class="summary-card warning">
-                <div class="value">{{ number_format($invoices->sum('wht_amount'), 2) }}</div>
-                <div class="label">WHT</div>
-            </div>
-        </div>
+        <table class="summary-table">
+            <tr>
+                <td style="width:25%; padding:4px;">
+                    <div class="summary-card highlight">
+                        <div class="value">{{ count($invoices) }}</div>
+                        <div class="label">Total Invoices</div>
+                    </div>
+                </td>
+                <td style="width:25%; padding:4px;">
+                    <div class="summary-card">
+                        <div class="value">{{ number_format($invoices->sum('total_amount'), 2) }}</div>
+                        <div class="label">Total Revenue</div>
+                    </div>
+                </td>
+                <td style="width:25%; padding:4px;">
+                    <div class="summary-card highlight">
+                        <div class="value">{{ number_format($invoices->sum('total_sales_tax'), 2) }}</div>
+                        <div class="label">Sales Tax</div>
+                    </div>
+                </td>
+                <td style="width:25%; padding:4px;">
+                    <div class="summary-card warning">
+                        <div class="value">{{ number_format($invoices->sum('wht_amount'), 2) }}</div>
+                        <div class="label">WHT</div>
+                    </div>
+                </td>
+            </tr>
+        </table>
 
         @if(isset($viewType) && $viewType === 'partywise')
             @foreach($partyGroups as $party => $rows)
@@ -32,7 +42,7 @@
                 <h3>{{ $party }}</h3>
                 <div class="detail">Invoices: {{ count($rows) }} | Total: {{ number_format($rows->sum('total_amount'), 2) }}</div>
             </div>
-            <table>
+            <table class="data-table">
                 <thead>
                     <tr>
                         <th>Invoice No</th>
@@ -72,7 +82,7 @@
             </table>
             @endforeach
         @else
-            <table>
+            <table class="data-table">
                 <thead>
                     <tr>
                         <th>Invoice No</th>
@@ -119,7 +129,7 @@
         @endif
 
     @elseif($type === 'tax')
-        <table>
+        <table class="data-table">
             <thead>
                 <tr>
                     <th>Month</th>
@@ -149,7 +159,7 @@
         </table>
 
     @elseif($type === 'hs')
-        <table>
+        <table class="data-table">
             <thead>
                 <tr>
                     <th>HS Prefix</th>
@@ -182,7 +192,7 @@
         </table>
 
     @elseif($type === 'vendor')
-        <table>
+        <table class="data-table">
             <thead>
                 <tr>
                     <th>Vendor Name</th>

@@ -28,6 +28,8 @@ class CompanyUserController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
+            'phone' => 'nullable|string|max:20|unique:users,phone',
+            'username' => 'nullable|string|max:100|alpha_dash|unique:users,username',
             'password' => 'required|string|min:6',
             'role' => 'required|in:company_admin,employee,viewer',
         ]);
@@ -35,6 +37,8 @@ class CompanyUserController extends Controller
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
+            'phone' => $request->phone ? preg_replace('/[^0-9]/', '', $request->phone) : null,
+            'username' => $request->username ?: null,
             'password' => Hash::make($request->password),
             'role' => $request->role,
             'company_id' => $companyId,

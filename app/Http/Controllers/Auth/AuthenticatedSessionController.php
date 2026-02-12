@@ -16,9 +16,6 @@ class AuthenticatedSessionController extends Controller
      */
     public function create(): View|RedirectResponse
     {
-        if (request()->query('direct')) {
-            return view('auth.login');
-        }
         return view('landing', ['showLogin' => true]);
     }
 
@@ -36,17 +33,23 @@ class AuthenticatedSessionController extends Controller
 
     public function demoLogin(Request $request, string $role): RedirectResponse
     {
-        $credentials = match($role) {
-            'super_admin' => ['email' => 'admin@test.com', 'password' => 'admin123'],
-            'company_admin' => ['email' => 'company_admin@test.com', 'password' => 'admin123'],
-            'demo' => ['email' => 'demo@taxnest.pk', 'password' => 'admin123'],
-            default => null,
-        };
+        $demoUsers = [
+            'super_admin' => 'admin@test.com',
+            'company_admin' => 'company_admin@test.com',
+            'demo' => 'demo@taxnest.pk',
+        ];
 
-        if (!$credentials || !Auth::attempt($credentials)) {
-            return redirect('/login')->with('error', 'Demo login failed.');
+        $email = $demoUsers[$role] ?? null;
+        if (!$email) {
+            return redirect('/login')->with('error', 'Invalid demo role.');
         }
 
+        $user = \App\Models\User::where('email', $email)->first();
+        if (!$user) {
+            return redirect('/login')->with('error', 'Demo user not found. Please run database seeder.');
+        }
+
+        Auth::login($user);
         $request->session()->regenerate();
         return redirect()->intended(route('dashboard', absolute: false));
     }

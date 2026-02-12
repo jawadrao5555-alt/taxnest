@@ -1,0 +1,109 @@
+You are upgrading the TaxNest Enterprise system.
+
+Do NOT modify existing logic.
+Do NOT break invoice flow.
+Do NOT change FBR payload.
+Do NOT modify HS → PCT engine.
+
+Implement Phase 1: Global HS Intelligence Master Foundation only.
+
+========================================
+STEP 1 — CREATE TABLE: hs_master_global
+========================================
+
+Create migration for:
+
+Table: hs_master_global
+
+Columns:
+
+- id (bigint, primary)
+- hs_code (string, unique, indexed)
+- description (text, nullable)
+- schedule_type (string, nullable)
+- default_tax_rate (decimal 5,2, nullable)
+- sro_required (boolean, default false)
+- default_sro_number (string, nullable)
+- serial_required (boolean, default false)
+- default_serial_no (string, nullable)
+- mrp_required (boolean, default false)
+- st_withheld_applicable (boolean, default false)
+- petroleum_levy_applicable (boolean, default false)
+- default_uom (string, nullable)
+- confidence_score (integer, default 100)
+- last_source (string, default 'manual')
+- is_active (boolean, default true)
+- created_at
+- updated_at
+
+Add index on:
+- hs_code
+- schedule_type
+- default_tax_rate
+- is_active
+
+========================================
+STEP 2 — CREATE TABLE: hs_unmapped_queue
+========================================
+
+Table: hs_unmapped_queue
+
+Columns:
+
+- id
+- hs_code (string, indexed)
+- company_id (foreign key to companies)
+- usage_count (integer default 1)
+- first_seen_at (timestamp)
+- flagged_reason (string, nullable)
+- created_at
+- updated_at
+
+Ensure:
+No duplication per company per HS.
+Use unique constraint (hs_code + company_id).
+
+========================================
+STEP 3 — MODEL CREATION
+========================================
+
+Create models:
+
+App\Models\HsMasterGlobal
+App\Models\HsUnmappedQueue
+
+Include:
+
+fillable protection
+casts for booleans
+casts for decimal
+
+No business logic yet.
+
+========================================
+STEP 4 — SAFE MIGRATION
+========================================
+
+Run migration safely.
+
+Do NOT modify existing tables.
+Do NOT alter hs_codes table.
+
+========================================
+STEP 5 — VALIDATION
+========================================
+
+Confirm:
+
+- Tables created successfully
+- No existing route broken
+- No invoice creation affected
+- Queue worker still operational
+- Server running clean
+
+Return:
+
+- Confirmation
+- Table structure summary
+- Record count (should be 0 initially)
+- System health status

@@ -70,9 +70,23 @@
 
         @if($invoice->status === 'locked' && $invoice->fbr_invoice_id)
         <div class="fbr-header">
-            <div class="fbr-header-title">FBR VERIFIED INVOICE</div>
-            <div class="fbr-header-sub">Federal Board of Revenue &mdash; Government of Pakistan</div>
-            <div class="fbr-number">FBR Invoice #: {{ $invoice->fbr_invoice_number ?? $invoice->fbr_invoice_id }}</div>
+            <table style="width: 100%;">
+                <tr>
+                    <td style="vertical-align: middle; text-align: center;">
+                        <div class="fbr-header-title">FBR VERIFIED INVOICE</div>
+                        <div class="fbr-header-sub">Federal Board of Revenue &mdash; Government of Pakistan</div>
+                        <div class="fbr-number">FBR Invoice #: {{ $invoice->fbr_invoice_number ?? $invoice->fbr_invoice_id }}</div>
+                    </td>
+                    @if($invoice->qr_image_url)
+                    <td style="width: 100px; vertical-align: middle; text-align: right;">
+                        <img src="{{ $invoice->qr_image_url }}" alt="QR Code" style="width: 80px; height: 80px;">
+                    </td>
+                    @endif
+                </tr>
+            </table>
+            @if($invoice->integrity_hash)
+            <div style="margin-top: 6px; font-size: 8px; color: #6b7280; font-family: 'Courier New', monospace; word-break: break-all;">SHA256: {{ $invoice->integrity_hash }}</div>
+            @endif
         </div>
         @endif
 
@@ -213,28 +227,6 @@
                 </table>
             </div>
         </div>
-
-        @if($invoice->qr_data)
-        @php $qrInfo = json_decode($invoice->qr_data, true); @endphp
-        <div class="qr-section">
-            <div class="qr-badge">FBR Verified</div>
-            @if($invoice->qr_image_url)
-            <div style="margin: 8px 0;">
-                <img src="{{ $invoice->qr_image_url }}" alt="QR Code" style="width: 120px; height: 120px; display: inline-block;">
-            </div>
-            @endif
-            <table class="qr-details">
-                <tr><td class="qlabel">NTN</td><td class="qvalue">{{ $qrInfo['ntn'] ?? '' }}</td></tr>
-                <tr><td class="qlabel">Invoice #</td><td class="qvalue">{{ $qrInfo['invoice_number'] ?? '' }}</td></tr>
-                <tr><td class="qlabel">FBR ID</td><td class="qvalue">{{ $qrInfo['fbr_invoice_id'] ?? '' }}</td></tr>
-                <tr><td class="qlabel">Date</td><td class="qvalue">{{ $qrInfo['date'] ?? '' }}</td></tr>
-                <tr><td class="qlabel">Total</td><td class="qvalue">Rs. {{ number_format($qrInfo['total'] ?? 0, 2) }}</td></tr>
-            </table>
-            @if($invoice->integrity_hash)
-            <div class="hash-bar">SHA256 Hash: {{ $invoice->integrity_hash }}</div>
-            @endif
-        </div>
-        @endif
 
         <div class="footer">
             <p>This is a system generated invoice. No signature is required.</p>

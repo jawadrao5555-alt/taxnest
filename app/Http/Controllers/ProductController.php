@@ -34,16 +34,22 @@ class ProductController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate([
+        $rules = [
             'name' => 'required|string|max:255',
             'hs_code' => 'required|string|max:50',
             'pct_code' => 'nullable|string|max:50',
-            'default_tax_rate' => 'required|numeric|min:0|max:100',
+            'default_tax_rate' => 'required|integer|min:0|max:100',
             'uom' => 'required|string|max:20',
             'schedule_type' => 'nullable|string|max:100',
             'sro_reference' => 'nullable|string|max:100',
             'default_price' => 'required|numeric|min:0',
-        ]);
+        ];
+
+        if ((int) $request->default_tax_rate < 18) {
+            $rules['sro_reference'] = 'required|string|max:100';
+        }
+
+        $request->validate($rules);
 
         $companyId = app('currentCompanyId');
 
@@ -74,16 +80,22 @@ class ProductController extends Controller
         $companyId = app('currentCompanyId');
         if ($product->company_id !== $companyId) abort(403);
 
-        $request->validate([
+        $rules = [
             'name' => 'required|string|max:255',
             'hs_code' => 'required|string|max:50',
             'pct_code' => 'nullable|string|max:50',
-            'default_tax_rate' => 'required|numeric|min:0|max:100',
+            'default_tax_rate' => 'required|integer|min:0|max:100',
             'uom' => 'required|string|max:20',
             'schedule_type' => 'nullable|string|max:100',
             'sro_reference' => 'nullable|string|max:100',
             'default_price' => 'required|numeric|min:0',
-        ]);
+        ];
+
+        if ((int) $request->default_tax_rate < 18) {
+            $rules['sro_reference'] = 'required|string|max:100';
+        }
+
+        $request->validate($rules);
 
         $product->update($request->only([
             'name', 'hs_code', 'pct_code', 'default_tax_rate',

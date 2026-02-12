@@ -191,7 +191,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tax Rate (%)</label>
-                                    <input type="number" step="0.01" min="0" x-model="item.tax_rate" @input="calcTax(index)" :name="'items[' + index + '][tax_rate]'"
+                                    <input type="number" step="1" min="0" x-model="item.tax_rate" @input="item.tax_rate = Math.round(item.tax_rate); calcTax(index)" :name="'items[' + index + '][tax_rate]'"
                                         class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 </div>
                             </div>
@@ -544,7 +544,7 @@
                         if (data && data.pct_code) {
                             item.pct_code = data.pct_code;
                             item.schedule_type = data.schedule_type;
-                            item.tax_rate = data.tax_rate;
+                            item.tax_rate = Math.round(parseFloat(data.tax_rate) || 0);
                             if (data.default_uom) item.default_uom = data.default_uom;
                             item.show_st_withheld = !!data.st_withheld_applicable;
                             item.show_petroleum_levy = !!data.petroleum_levy_applicable;
@@ -649,7 +649,7 @@
                     item.description = product.name;
                     item.price = parseFloat(product.default_price);
                     item.schedule_type = product.schedule_type || 'standard';
-                    item.tax_rate = parseFloat(product.default_tax_rate);
+                    item.tax_rate = Math.round(parseFloat(product.default_tax_rate));
                     this.applyScheduleRules(item);
                     if (product.sro_reference) item.sro_schedule_no = product.sro_reference;
                     item.productSearch = product.name;

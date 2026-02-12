@@ -122,7 +122,7 @@ class InvoiceController extends Controller
             'items.*.tax' => 'required|numeric|min:0',
             'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated',
             'items.*.pct_code' => 'nullable|string|max:50',
-            'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
+            'items.*.tax_rate' => 'nullable|integer|min:0|max:100',
             'items.*.sro_schedule_no' => 'nullable|string|max:100',
             'items.*.serial_no' => 'nullable|string|max:100',
             'items.*.mrp' => 'nullable|numeric|min:0',
@@ -138,7 +138,7 @@ class InvoiceController extends Controller
         ]);
 
         $itemsWithTaxRate = collect($request->items)->map(function ($item) {
-            $item['tax_rate'] = isset($item['tax_rate']) && is_numeric($item['tax_rate']) ? floatval($item['tax_rate']) : null;
+            $item['tax_rate'] = isset($item['tax_rate']) && is_numeric($item['tax_rate']) ? intval($item['tax_rate']) : null;
             return $item;
         })->toArray();
 
@@ -369,7 +369,7 @@ class InvoiceController extends Controller
             'items.*.tax' => 'required|numeric|min:0',
             'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated',
             'items.*.pct_code' => 'nullable|string|max:50',
-            'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
+            'items.*.tax_rate' => 'nullable|integer|min:0|max:100',
             'items.*.sro_schedule_no' => 'nullable|string|max:100',
             'items.*.serial_no' => 'nullable|string|max:100',
             'items.*.mrp' => 'nullable|numeric|min:0',
@@ -385,7 +385,7 @@ class InvoiceController extends Controller
         ]);
 
         $itemsWithTaxRate = collect($request->items)->map(function ($item) {
-            $item['tax_rate'] = isset($item['tax_rate']) && is_numeric($item['tax_rate']) ? floatval($item['tax_rate']) : null;
+            $item['tax_rate'] = isset($item['tax_rate']) && is_numeric($item['tax_rate']) ? intval($item['tax_rate']) : null;
             return $item;
         })->toArray();
 

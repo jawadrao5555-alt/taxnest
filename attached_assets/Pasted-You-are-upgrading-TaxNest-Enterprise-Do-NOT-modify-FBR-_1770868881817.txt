@@ -1,0 +1,128 @@
+You are upgrading TaxNest Enterprise.
+
+Do NOT modify FBR payload.
+Do NOT modify HS → PCT engine.
+Do NOT change compliance scoring.
+Integrate HS Master Intelligence into Invoice Form only.
+
+========================================
+STEP 1 — INVOICE FORM INTELLIGENCE LOOKUP
+========================================
+
+On HS code entry (create + edit form):
+
+Before applying legacy logic:
+
+Check hs_master_global where:
+- hs_code matches
+- is_active = true
+
+If found:
+
+Auto-apply:
+
+- schedule_type
+- default_tax_rate
+- default_uom
+- sro_required
+- serial_required
+- mrp_required
+- st_withheld_applicable
+- petroleum_levy_applicable
+
+Populate form dynamically using AJAX.
+
+========================================
+STEP 2 — FIELD VISIBILITY RULES
+========================================
+
+If sro_required = true:
+   Show SRO Number field
+Else:
+   Hide SRO field
+
+If serial_required = true:
+   Show Serial No field
+Else:
+   Hide
+
+If mrp_required = true:
+   Show MRP field
+Else:
+   Hide
+
+If st_withheld_applicable = true:
+   Show ST Withheld field
+Else:
+   Hide
+
+If petroleum_levy_applicable = true:
+   Show Petroleum Levy field
+Else:
+   Hide
+
+========================================
+STEP 3 — UNMAPPED QUEUE AUTO INSERT
+========================================
+
+If HS not found in hs_master_global:
+
+Check if already exists in hs_unmapped_queue for company.
+
+If not:
+
+Insert:
+
+- hs_code
+- company_id
+- usage_count = 1
+- first_seen_at = now
+- flagged_reason = "Not in master"
+
+If exists:
+   Increment usage_count
+
+========================================
+STEP 4 — UI WARNING
+========================================
+
+If HS unmapped:
+
+Show yellow badge:
+"HS mapping incomplete. Please verify compliance."
+
+Do NOT block invoice creation.
+
+========================================
+STEP 5 — SAFETY RULE
+========================================
+
+Do NOT modify:
+
+- Existing validation logic
+- Existing schedule engine
+- Existing tax calculations
+- Existing payload structure
+
+This layer only pre-fills data.
+
+========================================
+STEP 6 — VALIDATION
+========================================
+
+Confirm:
+
+- Invoice form loads correctly
+- No JavaScript conflicts
+- All dropdowns selectable
+- All typing works (fix black text issue)
+- No select freezing
+- Mobile layout intact
+- Queue worker unaffected
+
+Return summary:
+
+- Intelligence integration status
+- Field auto-fill working (Yes/No)
+- Unmapped auto queue working (Yes/No)
+- System health

@@ -205,6 +205,11 @@
                                 <p class="text-xs text-blue-700 dark:text-blue-300" x-text="item.hsLookupInfo"></p>
                             </div>
 
+                            <div x-show="item.hsUnmapped" x-cloak class="mb-3 px-3 py-2 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 rounded-lg flex items-center space-x-2">
+                                <svg class="w-4 h-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+                                <p class="text-xs font-medium text-yellow-700 dark:text-yellow-300">HS mapping incomplete. Please verify compliance.</p>
+                            </div>
+
                             <div x-show="item.taxRecommendation" x-cloak class="mb-3 px-3 py-2 bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700 rounded-lg">
                                 <div class="flex items-center justify-between mb-1">
                                     <p class="text-xs font-semibold text-purple-700 dark:text-purple-300">Smart Tax Recommendation</p>
@@ -475,6 +480,7 @@
                     optional_sro: false, optional_serial: false, schedule_hint: '',
                     productSearch: '', showDropdown: false, productResults: [],
                     hsLookupInfo: '',
+                    hsUnmapped: false,
                     taxRecommendation: null
                 };
             }
@@ -580,6 +586,7 @@
                     try {
                         let res = await fetch('/api/hs-lookup?hs_code=' + encodeURIComponent(item.hs_code));
                         let data = await res.json();
+                        item.hsUnmapped = !!data.hs_unmapped;
                         if (data && data.pct_code) {
                             item.pct_code = data.pct_code;
                             item.schedule_type = data.schedule_type;
@@ -589,15 +596,19 @@
                             item.show_petroleum_levy = !!data.petroleum_levy_applicable;
                             if (!item.show_st_withheld) item.st_withheld_at_source = false;
                             if (!item.show_petroleum_levy) item.petroleum_levy = '';
+                            if (data.default_sro_number && !item.sro_schedule_no) item.sro_schedule_no = data.default_sro_number;
+                            if (data.default_serial_no && !item.serial_no) item.serial_no = data.default_serial_no;
                             this.applyScheduleRules(item);
-                            item.hsLookupInfo = 'Auto-detected: PCT ' + data.pct_code + ' | Schedule: ' + data.schedule_type + ' | Tax: ' + data.tax_rate + '%';
+                            let sourceLabel = data.source === 'hs_master_global' ? 'Intelligence' : 'Auto-detected';
+                            item.hsLookupInfo = sourceLabel + ': PCT ' + data.pct_code + ' | Schedule: ' + data.schedule_type + ' | Tax: ' + data.tax_rate + '%';
+                            if (data.confidence_score !== undefined) item.hsLookupInfo += ' | Confidence: ' + data.confidence_score + '%';
                             this.calcTax(index);
                             this.validateMixedSchedules();
                             this.fetchSroSuggestion(item);
                         } else {
                             item.hsLookupInfo = '';
                         }
-                    } catch(e) { item.hsLookupInfo = ''; }
+                    } catch(e) { item.hsLookupInfo = ''; item.hsUnmapped = false; }
                 },
 
                 async fetchSroSuggestion(item) {

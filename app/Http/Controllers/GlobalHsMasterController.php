@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\GlobalHsMaster;
 use App\Models\HsUnmappedLog;
+use App\Models\HsMasterGlobal;
+use App\Models\HsUnmappedQueue;
 use App\Services\GlobalHsService;
 use App\Services\ScheduleEngine;
 use Illuminate\Http\Request;
@@ -183,6 +185,44 @@ class GlobalHsMasterController extends Controller
         $company = \App\Models\Company::find($companyId);
         $standardTaxRate = $company ? $company->getStandardTaxRateValue() : 18.0;
 
+        $normalizedHs = preg_replace('/[^0-9]/', '', $hsCode);
+
+        $masterGlobal = HsMasterGlobal::where('hs_code', $normalizedHs)
+            ->where('is_active', true)
+            ->first();
+
+        if ($masterGlobal) {
+            $scheduleType = $masterGlobal->schedule_type ?? 'standard';
+            $taxRate = $masterGlobal->default_tax_rate ?? $standardTaxRate;
+            $rules = ScheduleEngine::resolveValidationRules($scheduleType, $taxRate, $standardTaxRate);
+
+            $result = [
+                'found' => true,
+                'source' => 'hs_master_global',
+                'pct_code' => $normalizedHs,
+                'schedule_type' => $scheduleType,
+                'tax_rate' => $taxRate,
+                'default_uom' => $masterGlobal->default_uom,
+                'requires_sro' => $masterGlobal->sro_required,
+                'requires_serial' => $masterGlobal->serial_required,
+                'requires_mrp' => $masterGlobal->mrp_required,
+                'default_sro_number' => $masterGlobal->default_sro_number,
+                'default_serial_no' => $masterGlobal->default_serial_no,
+                'st_withheld_applicable' => $masterGlobal->st_withheld_applicable,
+                'petroleum_levy_applicable' => $masterGlobal->petroleum_levy_applicable,
+                'confidence_score' => $masterGlobal->confidence_score,
+                'standard_tax_rate' => $standardTaxRate,
+                'hs_unmapped' => false,
+            ];
+
+            $sroSuggestion = GlobalHsService::suggestSro($hsCode, $scheduleType, $taxRate, $standardTaxRate);
+            if ($sroSuggestion) {
+                $result['sro_suggestion'] = $sroSuggestion;
+            }
+
+            return response()->json($result);
+        }
+
         $result = GlobalHsService::resolveForInvoiceItem($hsCode, $standardTaxRate, $companyId);
 
         if (isset($result['found']) && $result['found']) {
@@ -198,6 +238,7 @@ class GlobalHsMasterController extends Controller
             $result['standard_tax_rate'] = $standardTaxRate;
             $result['st_withheld_applicable'] = self::isStWithheldApplicable($hsCode, $result['schedule_type'] ?? 'standard');
             $result['petroleum_levy_applicable'] = self::isPetroleumLevyApplicable($hsCode);
+            $result['hs_unmapped'] = false;
             return response()->json($result);
         }
 
@@ -211,6 +252,7 @@ class GlobalHsMasterController extends Controller
             $resolved['standard_tax_rate'] = $standardTaxRate;
             $resolved['st_withheld_applicable'] = self::isStWithheldApplicable($hsCode, $resolved['schedule_type'] ?? 'standard');
             $resolved['petroleum_levy_applicable'] = self::isPetroleumLevyApplicable($hsCode);
+            $resolved['hs_unmapped'] = false;
             return response()->json($resolved);
         }
 
@@ -219,8 +261,34 @@ class GlobalHsMasterController extends Controller
             $scheduleResult['standard_tax_rate'] = $standardTaxRate;
             $scheduleResult['st_withheld_applicable'] = self::isStWithheldApplicable($hsCode, $scheduleResult['schedule_type'] ?? 'standard');
             $scheduleResult['petroleum_levy_applicable'] = self::isPetroleumLevyApplicable($hsCode);
+            $scheduleResult['hs_unmapped'] = false;
+            return response()->json($scheduleResult);
         }
-        return response()->json($scheduleResult ?: ['found' => false]);
+
+        self::trackUnmappedHs($normalizedHs, $companyId);
+
+        return response()->json(['found' => false, 'hs_unmapped' => true]);
+    }
+
+    private static function trackUnmappedHs(string $hsCode, $companyId): void
+    {
+        if (!$companyId || strlen($hsCode) < 4) return;
+
+        $existing = HsUnmappedQueue::where('hs_code', $hsCode)
+            ->where('company_id', $companyId)
+            ->first();
+
+        if ($existing) {
+            $existing->increment('usage_count');
+        } else {
+            HsUnmappedQueue::create([
+                'hs_code' => $hsCode,
+                'company_id' => $companyId,
+                'usage_count' => 1,
+                'first_seen_at' => now(),
+                'flagged_reason' => 'Not in master',
+            ]);
+        }
     }
 
     public function apiSearch(Request $request)

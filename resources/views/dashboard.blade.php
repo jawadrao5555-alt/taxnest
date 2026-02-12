@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-4">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3">
                 <div>
                     <h2 class="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
                         Welcome back<span class="text-emerald-600">,</span> {{ Auth::user()->name }}
@@ -106,7 +106,7 @@
             </div>
             @endif
 
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
                 <div class="premium-card animate-slide-up animate-slide-up-1 relative overflow-hidden bg-white dark:bg-gray-800/80 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-700/50 p-5 group">
                     <div class="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-blue-500/10 to-transparent rounded-bl-full"></div>
                     <div class="relative">
@@ -185,7 +185,7 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 mb-5">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 mb-5">
                 <a href="/invoice/create" class="premium-card group flex items-center space-x-3 p-3.5 bg-white dark:bg-gray-800/80 border border-gray-100/80 dark:border-gray-700/50 rounded-2xl hover:border-emerald-300 dark:hover:border-emerald-700 transition-all duration-300">
                     <div class="p-2.5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-md shadow-emerald-500/20 group-hover:shadow-lg group-hover:shadow-emerald-500/30 transition-all duration-300">
                         <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>

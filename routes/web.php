@@ -22,6 +22,7 @@ use App\Http\Controllers\BranchController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\TaxOverrideController;
 use App\Http\Controllers\CustomerProfileController;
+use App\Http\Controllers\WhtReportController;
 
 Route::get('/share/invoice/{uuid}', [ShareController::class, 'show']);
 
@@ -177,10 +178,16 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
     Route::get('/invoice/{invoice}/preview', [InvoiceController::class, 'preview']);
     Route::get('/invoice/{invoice}/pdf', [InvoiceController::class, 'pdf']);
     Route::get('/invoice/{invoice}/download', [InvoiceController::class, 'download']);
+    Route::post('/invoice/{invoice}/update-wht', [InvoiceController::class, 'updateWht'])->name('invoice.updateWht');
     Route::post('/invoice/{invoice}/verify', [InvoiceController::class, 'verifyIntegrity'])->name('invoice.verify');
 
     Route::get('/compliance/certificate', [ComplianceCertificateController::class, 'generate'])->name('compliance.certificate');
     Route::get('/compliance/risk-report', [RiskReportController::class, 'show'])->name('compliance.risk-report');
+
+    Route::get('/reports/wht', [WhtReportController::class, 'index'])->name('reports.wht');
+    Route::get('/reports/wht/download', [WhtReportController::class, 'downloadWht'])->name('reports.wht.download');
+    Route::get('/reports/tax-summary', [WhtReportController::class, 'taxSummary'])->name('reports.tax-summary');
+    Route::get('/reports/tax-summary/download', [WhtReportController::class, 'downloadTaxSummary'])->name('reports.tax-summary.download');
 
     Route::get('/mis', [MISController::class, 'index'])->name('mis.index');
     Route::get('/mis/export', [MISController::class, 'exportCsv'])->name('mis.export');

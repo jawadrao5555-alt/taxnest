@@ -13,6 +13,12 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+        <meta name="theme-color" content="#059669">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+        <meta name="apple-mobile-web-app-title" content="TaxNest">
+        <link rel="manifest" href="/manifest.json">
+        <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
         <title>{{ config('app.name', 'TaxNest') }}</title>
 
@@ -69,5 +75,23 @@
                 {{ $slot }}
             </main>
         </div>
+        <script>
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js').catch(() => {});
+            }
+            let deferredPrompt;
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                const btn = document.getElementById('pwa-install-btn');
+                if (btn) btn.classList.remove('hidden');
+            });
+            function installPwa() {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
+                }
+            }
+        </script>
     </body>
 </html>

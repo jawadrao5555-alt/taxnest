@@ -787,6 +787,30 @@ class InvoiceController extends Controller
         return $pdf->download($filename);
     }
 
+    public function updateWht(Request $request, Invoice $invoice)
+    {
+        $companyId = app('currentCompanyId');
+        if ($invoice->company_id !== $companyId) abort(403);
+
+        $request->validate([
+            'wht_rate' => 'required|numeric|min:0|max:100',
+        ]);
+
+        $whtRate = floatval($request->wht_rate);
+        $subtotal = $invoice->items->sum(fn($item) => $item->price * $item->quantity);
+        $totalTax = $invoice->items->sum('tax');
+        $whtAmount = round($subtotal * ($whtRate / 100), 2);
+        $netReceivable = round(($subtotal + $totalTax) + $whtAmount, 2);
+
+        $invoice->update([
+            'wht_rate' => $whtRate,
+            'wht_amount' => $whtAmount,
+            'net_receivable' => $netReceivable,
+        ]);
+
+        return redirect()->back()->with('success', 'WHT rate updated to ' . $whtRate . '%. Invoice and PDF updated.');
+    }
+
     public function complianceCheck(Request $request)
     {
         $companyId = app('currentCompanyId');

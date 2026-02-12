@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h2 class="font-bold text-xl text-gray-800 leading-tight">Invoices</h2>
             <a href="/invoice/create" class="inline-flex items-center px-4 py-2 bg-emerald-600 border border-transparent rounded-lg font-semibold text-xs text-white uppercase tracking-widest hover:bg-emerald-700 transition">
                 + New Invoice
@@ -21,7 +21,7 @@
                 </a>
             </div>
             <div class="mb-6">
-                <form method="GET" action="/invoices" class="flex gap-3">
+                <form method="GET" action="/invoices" class="flex flex-col sm:flex-row gap-3">
                     <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by invoice #, FBR #, customer name, or NTN..." class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
                     <input type="hidden" name="tab" value="{{ $tab }}">
                     <button type="submit" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">Search</button>

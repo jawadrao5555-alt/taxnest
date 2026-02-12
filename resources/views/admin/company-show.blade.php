@@ -144,6 +144,7 @@
                     <div class="px-6 py-4 border-b border-gray-100">
                         <h4 class="text-sm font-bold text-gray-800">Users ({{ $stats['total_users'] }})</h4>
                     </div>
+                    <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
@@ -172,6 +173,7 @@
                             @endforelse
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </div>
 
@@ -208,6 +210,7 @@
                     <div class="px-6 py-4 border-b border-gray-100">
                         <h4 class="text-sm font-bold text-gray-800">Monthly Revenue (Last 6 Months)</h4>
                     </div>
+                    <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
@@ -226,6 +229,7 @@
                             @endforeach
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </div>
 
@@ -308,6 +312,7 @@
                         @endforelse
                     </tbody>
                 </table>
+                </div>
             </div>
 
             <div x-show="activeTab === 'settings'" class="space-y-6">

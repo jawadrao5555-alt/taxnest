@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h2 class="font-bold text-xl text-gray-800 leading-tight">Customer Profiles</h2>
             <a href="/customer-profiles/create" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">
                 + New Customer
@@ -17,7 +17,7 @@
             @endif
 
             <div class="mb-4">
-                <form method="GET" action="/customer-profiles" class="flex items-center space-x-2">
+                <form method="GET" action="/customer-profiles" class="flex flex-col sm:flex-row sm:items-center gap-2">
                     <input type="text" name="search" value="{{ $search }}" placeholder="Search by name, NTN, CNIC, or phone..."
                         class="w-full max-w-md rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                     <button type="submit" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">Search</button>
@@ -28,6 +28,7 @@
             </div>
 
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
@@ -80,6 +81,7 @@
                         @endforelse
                     </tbody>
                 </table>
+                </div>
             </div>
 
             <div class="mt-4">

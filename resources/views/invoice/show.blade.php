@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div class="flex items-center space-x-3">
                 <a href="/invoice" class="inline-flex items-center text-gray-500 hover:text-gray-700 transition">
                     <svg class="w-5 h-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
@@ -8,7 +8,7 @@
                 </a>
                 <h2 class="font-bold text-xl text-gray-800 leading-tight">Invoice {{ $invoice->display_invoice_number }}</h2>
             </div>
-            <div class="flex items-center space-x-3">
+            <div class="flex items-center flex-wrap gap-2">
                 @if($invoice->status === 'draft')
                 <a href="/invoice/{{ $invoice->id }}/edit" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">Edit</a>
                 <div x-data="{ showSubmitModal: false, submitEnv: '{{ $invoice->company->fbr_environment ?? 'sandbox' }}' }">
@@ -128,35 +128,56 @@
                 </form>
                 @endif
                 <a href="/invoice/{{ $invoice->id }}/preview" class="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition">Preview</a>
-                <div x-data="{ showWhtModal: false, pdfWhtRate: 0 }" class="inline-block">
+                <div x-data="{ showWhtModal: false, pdfWhtRate: {{ $invoice->wht_rate ?? 0 }} }" class="inline-flex items-center gap-2">
                     @if($invoice->status === 'locked')
-                    <button @click="showWhtModal = true" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Download PDF</button>
+                    <button @click="showWhtModal = true" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        WHT {{ ($invoice->wht_rate ?? 0) > 0 ? number_format($invoice->wht_rate, 1) . '%' : 'Set' }}
+                    </button>
                     <div x-show="showWhtModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background-color: rgba(0,0,0,0.4);">
-                        <div @click.away="showWhtModal = false" class="bg-white rounded-2xl shadow-2xl border border-gray-200 p-6 w-80 max-w-[90vw]">
+                        <div @click.away="showWhtModal = false" class="bg-white rounded-2xl shadow-2xl border border-gray-200 p-6 w-96 max-w-[90vw]">
                             <div class="flex items-center justify-between mb-4">
                                 <p class="text-base font-bold text-gray-800">Withholding Tax Rate</p>
                                 <button @click="showWhtModal = false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
                             </div>
-                            <div class="space-y-2 mb-4">
-                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                    :class="pdfWhtRate == 0 ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 hover:bg-gray-50'">
-                                    <input type="radio" value="0" x-model.number="pdfWhtRate" class="text-emerald-500">
-                                    <span class="text-sm font-semibold text-gray-800">No WHT (0%)</span>
-                                </label>
-                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                    :class="pdfWhtRate == 0.5 ? 'border-amber-400 bg-amber-50' : 'border-gray-200 hover:bg-gray-50'">
-                                    <input type="radio" value="0.5" x-model.number="pdfWhtRate" class="text-amber-500">
-                                    <span class="text-sm font-semibold text-gray-800">WHT 0.5%</span>
-                                </label>
-                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                    :class="pdfWhtRate == 2.5 ? 'border-red-400 bg-red-50' : 'border-gray-200 hover:bg-gray-50'">
-                                    <input type="radio" value="2.5" x-model.number="pdfWhtRate" class="text-red-500">
-                                    <span class="text-sm font-semibold text-gray-800">WHT 2.5%</span>
-                                </label>
-                            </div>
-                            <a :href="'/invoice/{{ $invoice->id }}/download?wht_rate=' + pdfWhtRate" target="_blank" class="block w-full text-center px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition">Download PDF</a>
+                            <p class="text-xs text-gray-500 mb-3">Select WHT rate - it will be saved to this invoice permanently and reflected in all PDF downloads.</p>
+                            <form method="POST" action="/invoice/{{ $invoice->id }}/update-wht">
+                                @csrf
+                                <div class="space-y-2 mb-4">
+                                    <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                        :class="pdfWhtRate == 0 ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 hover:bg-gray-50'">
+                                        <input type="radio" name="wht_rate" value="0" x-model.number="pdfWhtRate" class="text-emerald-500">
+                                        <span class="text-sm font-semibold text-gray-800">No WHT (0%)</span>
+                                    </label>
+                                    <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                        :class="pdfWhtRate == 0.5 ? 'border-amber-400 bg-amber-50' : 'border-gray-200 hover:bg-gray-50'">
+                                        <input type="radio" name="wht_rate" value="0.5" x-model.number="pdfWhtRate" class="text-amber-500">
+                                        <span class="text-sm font-semibold text-gray-800">WHT 0.5%</span>
+                                    </label>
+                                    <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                        :class="pdfWhtRate == 1 ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'">
+                                        <input type="radio" name="wht_rate" value="1" x-model.number="pdfWhtRate" class="text-blue-500">
+                                        <span class="text-sm font-semibold text-gray-800">WHT 1%</span>
+                                    </label>
+                                    <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                        :class="pdfWhtRate == 2 ? 'border-orange-400 bg-orange-50' : 'border-gray-200 hover:bg-gray-50'">
+                                        <input type="radio" name="wht_rate" value="2" x-model.number="pdfWhtRate" class="text-orange-500">
+                                        <span class="text-sm font-semibold text-gray-800">WHT 2%</span>
+                                    </label>
+                                    <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                        :class="pdfWhtRate == 2.5 ? 'border-red-400 bg-red-50' : 'border-gray-200 hover:bg-gray-50'">
+                                        <input type="radio" name="wht_rate" value="2.5" x-model.number="pdfWhtRate" class="text-red-500">
+                                        <span class="text-sm font-semibold text-gray-800">WHT 2.5%</span>
+                                    </label>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button type="submit" class="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition">Save WHT Rate</button>
+                                    <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="flex-1 text-center px-4 py-2.5 bg-gray-600 text-white rounded-lg text-sm font-bold hover:bg-gray-700 transition">Download PDF</a>
+                                </div>
+                            </form>
                         </div>
                     </div>
+                    <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Download PDF</a>
                     @else
                     <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Download PDF</a>
                     @endif

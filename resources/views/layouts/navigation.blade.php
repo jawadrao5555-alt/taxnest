@@ -11,7 +11,7 @@
                     </a>
                 </div>
 
-                <div class="hidden space-x-6 sm:-my-px sm:ms-8 sm:flex">
+                <div class="hidden space-x-6 lg:-my-px lg:ms-8 lg:flex overflow-x-auto whitespace-nowrap">
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         Dashboard
                     </x-nav-link>
@@ -33,6 +33,12 @@
                     </x-nav-link>
                     <x-nav-link href="/mis" :active="request()->is('mis*')">
                         MIS Reports
+                    </x-nav-link>
+                    <x-nav-link href="/reports/wht" :active="request()->is('reports/wht*')">
+                        WHT Report
+                    </x-nav-link>
+                    <x-nav-link href="/reports/tax-summary" :active="request()->is('reports/tax-summary*')">
+                        Tax Summary
                     </x-nav-link>
                     @if(auth()->user()->role === 'company_admin')
                     <x-nav-link href="/branches" :active="request()->is('branches*')">
@@ -69,7 +75,7 @@
                 </div>
             </div>
 
-            <div class="hidden sm:flex sm:items-center sm:ms-6">
+            <div class="hidden lg:flex lg:items-center lg:ms-6">
                 <div class="me-4">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
                         @if(auth()->user()->role === 'super_admin') bg-purple-100 text-purple-800
@@ -80,6 +86,10 @@
                         {{ ucfirst(str_replace('_', ' ', auth()->user()->role)) }}
                     </span>
                 </div>
+                <button id="pwa-install-btn" onclick="installPwa()" class="hidden inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs font-bold rounded-lg hover:from-emerald-600 hover:to-teal-700 shadow-sm transition-all mr-2">
+                    <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    Install App
+                </button>
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
                         <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150">
@@ -112,7 +122,7 @@
                 </x-dropdown>
             </div>
 
-            <div class="-me-2 flex items-center sm:hidden">
+            <div class="-me-2 flex items-center lg:hidden">
                 <button @click="open = ! open" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 focus:text-gray-500 transition duration-150 ease-in-out">
                     <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
                         <path :class="{'hidden': open, 'inline-flex': ! open }" class="inline-flex" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -123,7 +133,7 @@
         </div>
     </div>
 
-    <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
+    <div :class="{'block': open, 'hidden': ! open}" class="hidden lg:hidden">
         <div class="pt-2 pb-3 space-y-1">
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 Dashboard
@@ -146,6 +156,12 @@
             </x-responsive-nav-link>
             <x-responsive-nav-link href="/mis" :active="request()->is('mis*')">
                 MIS Reports
+            </x-responsive-nav-link>
+            <x-responsive-nav-link href="/reports/wht" :active="request()->is('reports/wht*')">
+                WHT Report
+            </x-responsive-nav-link>
+            <x-responsive-nav-link href="/reports/tax-summary" :active="request()->is('reports/tax-summary*')">
+                Tax Summary
             </x-responsive-nav-link>
             @endif
             @if(auth()->user()->role === 'super_admin')

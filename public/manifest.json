@@ -1,0 +1,27 @@
+{
+    "name": "TaxNest - FBR Tax Manager",
+    "short_name": "TaxNest",
+    "description": "Pakistan's Smart FBR-Compliant Tax & Invoice Management Platform",
+    "start_url": "/dashboard",
+    "display": "standalone",
+    "background_color": "#f9fafb",
+    "theme_color": "#059669",
+    "orientation": "any",
+    "icons": [
+        {
+            "src": "/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": ["business", "finance"],
+    "lang": "en",
+    "dir": "ltr"
+}

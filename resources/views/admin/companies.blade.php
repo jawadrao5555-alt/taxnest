@@ -14,6 +14,7 @@
             @endif
 
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
@@ -54,6 +55,7 @@
                         @endforelse
                     </tbody>
                 </table>
+                </div>
                 @if($companies->hasPages())
                 <div class="px-6 py-4 border-t border-gray-100">{{ $companies->links() }}</div>
                 @endif

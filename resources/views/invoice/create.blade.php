@@ -126,9 +126,8 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Destination Province *</label>
                             <select name="destination_province" x-model="destination_province" required class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                                <option value="">— Select Province —</option>
                                 @foreach($provinces as $prov)
-                                <option value="{{ $prov }}">{{ $prov }}</option>
+                                <option value="{{ $prov }}" {{ old('destination_province', 'Punjab') === $prov ? 'selected' : '' }}>{{ $prov }}</option>
                                 @endforeach
                             </select>
                             @error('destination_province') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
@@ -515,7 +514,7 @@
                 buyer_address: '{{ old("buyer_address", "") }}',
                 document_type: '{{ old("document_type", "Sale Invoice") }}',
                 reference_invoice_number: '{{ old("reference_invoice_number", "") }}',
-                destination_province: '{{ old("destination_province", "") }}',
+                destination_province: '{{ old("destination_province", "Punjab") }}',
                 items: [newItem()],
                 customerSearch: '',
                 customerResults: [],

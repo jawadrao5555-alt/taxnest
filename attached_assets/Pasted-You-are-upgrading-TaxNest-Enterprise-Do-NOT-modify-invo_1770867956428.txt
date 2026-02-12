@@ -1,0 +1,133 @@
+You are upgrading TaxNest Enterprise.
+
+Do NOT modify invoice engine.
+Do NOT modify FBR payload.
+Do NOT modify HS → PCT engine.
+This is Admin UI integration only.
+
+Implement Phase 2 — HS Master Admin Control Panel.
+
+========================================
+STEP 1 — ADMIN ROUTES
+========================================
+
+Create routes under super_admin middleware:
+
+GET  /admin/hs-master
+GET  /admin/hs-master/{id}/edit
+POST /admin/hs-master/{id}
+GET  /admin/hs-unmapped
+POST /admin/hs-unmapped/{id}/map
+
+Super Admin access only.
+
+========================================
+STEP 2 — CONTROLLER
+========================================
+
+Create:
+
+App\Http\Controllers\Admin\HsMasterController
+
+Methods:
+
+index()
+edit($id)
+update(Request $request, $id)
+unmapped()
+mapFromQueue(Request $request, $id)
+
+Ensure:
+
+- Validation rules:
+    hs_code required
+    schedule_type nullable
+    default_tax_rate nullable numeric
+    sro_required boolean
+    serial_required boolean
+    mrp_required boolean
+
+- Log audit entry on every update
+- Use SHA256 integrity logging
+
+========================================
+STEP 3 — ADMIN UI VIEWS
+========================================
+
+Create Blade views:
+
+admin/hs_master/index.blade.php
+admin/hs_master/edit.blade.php
+admin/hs_master/unmapped.blade.php
+
+Index Page:
+
+- Search bar (HS or description)
+- Filter by schedule_type
+- Filter by tax_rate
+- Show:
+    hs_code
+    schedule_type
+    tax_rate
+    confidence_score
+    is_active
+    Edit button
+
+Edit Page:
+
+Editable fields:
+
+- schedule_type
+- default_tax_rate
+- sro_required
+- default_sro_number
+- serial_required
+- default_serial_no
+- mrp_required
+- st_withheld_applicable
+- petroleum_levy_applicable
+- default_uom
+- confidence_score
+- is_active
+
+Unmapped Page:
+
+Show:
+
+- hs_code
+- company_id
+- usage_count
+- first_seen_at
+- Map button
+
+Map button:
+
+- Create new hs_master_global record
+- Remove from queue
+
+========================================
+STEP 4 — SAFETY RULES
+========================================
+
+- Editing mapping does NOT modify past invoices.
+- Only affects future lookups.
+- No invoice auto-update.
+- No FBR logic change.
+
+========================================
+STEP 5 — VALIDATION
+========================================
+
+Confirm:
+
+- Routes return 200
+- Only Super Admin can access
+- No invoice creation broken
+- Queue worker unaffected
+- System health clean
+
+Return summary with:
+
+- Total HS master records
+- Total unmapped records
+- System health status

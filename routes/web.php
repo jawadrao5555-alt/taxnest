@@ -12,6 +12,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\MISController;
 use App\Http\Controllers\HsMasterExportController;
 use App\Http\Controllers\GlobalHsMasterController;
+use App\Http\Controllers\Admin\HsMasterController;
 use App\Http\Controllers\ShareController;
 use App\Http\Controllers\CompanyUserController;
 use App\Http\Controllers\CompanySettingsController;
@@ -220,6 +221,12 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::put('/admin/hs-master/{id}', [GlobalHsMasterController::class, 'update'])->name('admin.hs-master.update');
         Route::post('/admin/hs-master/seed', [GlobalHsMasterController::class, 'seed'])->name('admin.hs-master.seed');
         Route::post('/admin/hs-master/map-unmapped', [GlobalHsMasterController::class, 'mapUnmapped'])->name('admin.hs-master.map-unmapped');
+
+        Route::get('/admin/hs-master-global', [HsMasterController::class, 'index'])->name('admin.hs-master-global.index');
+        Route::get('/admin/hs-master-global/{id}/edit', [HsMasterController::class, 'edit'])->name('admin.hs-master-global.edit');
+        Route::post('/admin/hs-master-global/{id}', [HsMasterController::class, 'update'])->name('admin.hs-master-global.update');
+        Route::get('/admin/hs-unmapped', [HsMasterController::class, 'unmapped'])->name('admin.hs-master-global.unmapped');
+        Route::post('/admin/hs-unmapped/{id}/map', [HsMasterController::class, 'mapFromQueue'])->name('admin.hs-master-global.map');
     });
 });
 

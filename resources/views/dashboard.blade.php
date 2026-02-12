@@ -153,25 +153,25 @@
             @if($planTier === 'retail')
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-6">
                 <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                    <h3 class="text-lg font-semibold text-gray-800">Recent Invoices</h3>
+                    <h3 class="text-base font-semibold text-gray-800">Recent Invoices</h3>
                     <a href="/invoices" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View All</a>
                 </div>
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice #</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Buyer</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Date</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Invoice #</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Buyer</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Date</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200">
                         @forelse($recentInvoices->take(5) as $inv)
                         <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 text-sm font-mono font-medium text-gray-900">{{ $inv->invoice_number ?? 'INV-'.$inv->id }}</td>
-                            <td class="px-6 py-4 text-sm text-gray-700">{{ $inv->buyer_name }}</td>
-                            <td class="px-6 py-4">
+                            <td class="px-4 py-3 text-sm font-mono font-medium text-gray-900">{{ $inv->invoice_number ?? 'INV-'.$inv->id }}</td>
+                            <td class="px-4 py-3 text-sm text-gray-700">{{ $inv->buyer_name }}</td>
+                            <td class="px-4 py-3">
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold
                                     @if($inv->status === 'locked') bg-green-100 text-green-800
                                     @elseif($inv->status === 'submitted') bg-blue-100 text-blue-800
@@ -179,8 +179,8 @@
                                     @else bg-red-100 text-red-800
                                     @endif">{{ ucfirst($inv->status) }}</span>
                             </td>
-                            <td class="px-6 py-4 text-sm font-semibold text-gray-900 text-right">Rs. {{ number_format($inv->total_amount, 2) }}</td>
-                            <td class="px-6 py-4 text-sm text-gray-500 text-right">{{ $inv->created_at->format('d M Y') }}</td>
+                            <td class="px-4 py-3 text-sm font-semibold text-gray-900 text-right">Rs. {{ number_format($inv->total_amount, 2) }}</td>
+                            <td class="px-4 py-3 text-sm text-gray-500 text-right">{{ $inv->created_at->format('d M Y') }}</td>
                         </tr>
                         @empty
                         <tr><td colspan="5" class="px-6 py-8 text-center text-gray-400">No invoices yet. Create your first invoice!</td></tr>
@@ -193,13 +193,13 @@
             @if($planTier !== 'retail')
             @if(count($smartInsights) > 0)
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center space-x-2">
+                <h3 class="text-base font-semibold text-gray-800 mb-4 flex items-center space-x-2">
                     <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
                     <span>Smart Insights</span>
                 </h3>
-                <div class="space-y-3">
+                <div class="space-y-2">
                     @foreach($smartInsights as $insight)
-                    <div class="flex items-start space-x-3 p-3 rounded-lg {{ $insight['type'] === 'danger' ? 'bg-red-50' : 'bg-yellow-50' }}">
+                    <div class="flex items-start space-x-3 p-2 rounded-lg {{ $insight['type'] === 'danger' ? 'bg-red-50' : 'bg-yellow-50' }}">
                         <div class="flex-shrink-0 mt-0.5">
                             @if($insight['icon'] === 'clock')
                             <svg class="w-5 h-5 {{ $insight['type'] === 'danger' ? 'text-red-600' : 'text-yellow-600' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -225,25 +225,25 @@
             @if($planTier !== 'retail')
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Draft Aging Breakdown</h3>
+                    <h3 class="text-base font-semibold text-gray-800 mb-4">Draft Aging Breakdown</h3>
                     <div class="grid grid-cols-3 gap-4">
-                        <div class="text-center p-4 bg-green-50 rounded-lg">
-                            <p class="text-2xl font-bold text-green-700">{{ $draftAging['1_day'] }}</p>
+                        <div class="text-center p-3 bg-green-50 rounded-lg">
+                            <p class="text-xl font-bold text-green-700">{{ $draftAging['1_day'] }}</p>
                             <p class="text-sm text-green-600 mt-1">Less than 1 day</p>
                         </div>
-                        <div class="text-center p-4 bg-yellow-50 rounded-lg">
-                            <p class="text-2xl font-bold text-yellow-700">{{ $draftAging['3_days'] }}</p>
+                        <div class="text-center p-3 bg-yellow-50 rounded-lg">
+                            <p class="text-xl font-bold text-yellow-700">{{ $draftAging['3_days'] }}</p>
                             <p class="text-sm text-yellow-600 mt-1">1 - 3 days</p>
                         </div>
-                        <div class="text-center p-4 bg-red-50 rounded-lg">
-                            <p class="text-2xl font-bold text-red-700">{{ $draftAging['7_plus'] }}</p>
+                        <div class="text-center p-3 bg-red-50 rounded-lg">
+                            <p class="text-xl font-bold text-red-700">{{ $draftAging['7_plus'] }}</p>
                             <p class="text-sm text-red-600 mt-1">7+ days old</p>
                         </div>
                     </div>
                 </div>
 
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Industry Benchmark</h3>
+                    <h3 class="text-base font-semibold text-gray-800 mb-4">Industry Benchmark</h3>
                     <div class="flex items-center justify-between mb-4">
                         <div class="text-center">
                             <p class="text-3xl font-bold {{ $industryBenchmark['above_average'] ? 'text-green-600' : 'text-red-600' }}">{{ $complianceScore }}</p>
@@ -282,15 +282,15 @@
             @if($planTier !== 'retail')
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
                 <div class="bg-white rounded-xl shadow-sm border {{ $riskBadge['border'] ?? 'border-gray-100' }} p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center space-x-2">
+                    <h3 class="text-base font-semibold text-gray-800 mb-4 flex items-center space-x-2">
                         <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
                         <span>Audit Probability Meter</span>
                     </h3>
                     <div class="flex items-center justify-center mb-4">
-                        <div class="relative w-40 h-40">
-                            <canvas id="auditGauge" width="160" height="160"></canvas>
+                        <div class="relative w-32 h-32">
+                            <canvas id="auditGauge" width="128" height="128"></canvas>
                             <div class="absolute inset-0 flex flex-col items-center justify-center">
-                                <span class="text-3xl font-bold {{ $auditProbability['level'] === 'LOW' ? 'text-green-600' : ($auditProbability['level'] === 'MODERATE' ? 'text-yellow-600' : ($auditProbability['level'] === 'HIGH' ? 'text-orange-600' : 'text-red-600')) }}">{{ $auditProbability['probability'] }}%</span>
+                                <span class="text-2xl font-bold {{ $auditProbability['level'] === 'LOW' ? 'text-green-600' : ($auditProbability['level'] === 'MODERATE' ? 'text-yellow-600' : ($auditProbability['level'] === 'HIGH' ? 'text-orange-600' : 'text-red-600')) }}">{{ $auditProbability['probability'] }}%</span>
                                 <span class="text-xs text-gray-500">Audit Risk</span>
                             </div>
                         </div>
@@ -332,7 +332,7 @@
 
                 @if($planTier === 'enterprise')
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center space-x-2">
+                    <h3 class="text-base font-semibold text-gray-800 mb-4 flex items-center space-x-2">
                         <svg class="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                         <span>Vendor Risk Panel</span>
                     </h3>
@@ -361,7 +361,7 @@
             @if($companyRiskSummary['total_active_risks'] > 0)
             <div class="bg-white rounded-xl shadow-sm border border-orange-200 overflow-hidden mb-6">
                 <div class="px-6 py-4 border-b border-orange-100 flex items-center justify-between">
-                    <h3 class="text-lg font-semibold text-gray-800 flex items-center space-x-2">
+                    <h3 class="text-base font-semibold text-gray-800 flex items-center space-x-2">
                         <svg class="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         <span>Intelligence Risk Summary</span>
                     </h3>
@@ -369,22 +369,22 @@
                         {{ $companyRiskSummary['total_active_risks'] }} Active Risk(s)
                     </span>
                 </div>
-                <div class="p-6">
+                <div class="p-4">
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div class="p-3 bg-red-50 rounded-lg text-center border border-red-100">
-                            <p class="text-2xl font-bold text-red-700">{{ $companyRiskSummary['severity_breakdown']['high'] }}</p>
+                        <div class="p-2 bg-red-50 rounded-lg text-center border border-red-100">
+                            <p class="text-lg font-bold text-red-700">{{ $companyRiskSummary['severity_breakdown']['high'] }}</p>
                             <p class="text-xs text-red-600">High Severity</p>
                         </div>
-                        <div class="p-3 bg-yellow-50 rounded-lg text-center border border-yellow-100">
-                            <p class="text-2xl font-bold text-yellow-700">{{ $companyRiskSummary['severity_breakdown']['medium'] }}</p>
+                        <div class="p-2 bg-yellow-50 rounded-lg text-center border border-yellow-100">
+                            <p class="text-lg font-bold text-yellow-700">{{ $companyRiskSummary['severity_breakdown']['medium'] }}</p>
                             <p class="text-xs text-yellow-600">Medium Severity</p>
                         </div>
-                        <div class="p-3 bg-blue-50 rounded-lg text-center border border-blue-100">
-                            <p class="text-2xl font-bold text-blue-700">{{ $companyRiskSummary['severity_breakdown']['low'] }}</p>
+                        <div class="p-2 bg-blue-50 rounded-lg text-center border border-blue-100">
+                            <p class="text-lg font-bold text-blue-700">{{ $companyRiskSummary['severity_breakdown']['low'] }}</p>
                             <p class="text-xs text-blue-600">Low Severity</p>
                         </div>
-                        <div class="p-3 bg-gray-50 rounded-lg text-center border border-gray-100">
-                            <p class="text-2xl font-bold text-gray-700">{{ count($companyRiskSummary['risks_by_type']) }}</p>
+                        <div class="p-2 bg-gray-50 rounded-lg text-center border border-gray-100">
+                            <p class="text-lg font-bold text-gray-700">{{ count($companyRiskSummary['risks_by_type']) }}</p>
                             <p class="text-xs text-gray-600">Risk Types</p>
                         </div>
                     </div>
@@ -405,24 +405,24 @@
             @if($planTier !== 'retail')
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Invoice Status</h3>
+                    <h3 class="text-base font-semibold text-gray-800 mb-4">Invoice Status</h3>
                     <canvas id="statusChart" height="150"></canvas>
                 </div>
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Monthly Invoices</h3>
+                    <h3 class="text-base font-semibold text-gray-800 mb-4">Monthly Invoices</h3>
                     <canvas id="monthlyChart" height="150"></canvas>
                 </div>
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Compliance Trend (6 Months)</h3>
+                    <h3 class="text-base font-semibold text-gray-800 mb-4">Compliance Trend (6 Months)</h3>
                     <canvas id="complianceChart" height="150"></canvas>
                 </div>
             </div>
             @endif
 
             @if($planTier === 'enterprise')
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-indigo-200 dark:border-indigo-800 p-5 mb-6">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-indigo-200 dark:border-indigo-800 p-4 mb-6">
                 <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
+                    <h3 class="text-base font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
                         <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
                         <span>Risk Heatmap</span>
                     </h3>
@@ -474,7 +474,7 @@
             </div>
 
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-6">
-                <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center space-x-2">
+                <h3 class="text-base font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center space-x-2">
                     <svg class="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
                     <span>AI Audit Probability Engine</span>
                 </h3>
@@ -500,18 +500,18 @@
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">MoM Growth (6 Months)</h3>
+                    <h3 class="text-base font-semibold text-gray-800 dark:text-gray-100 mb-4">MoM Growth (6 Months)</h3>
                     <canvas id="momGrowthChart" height="180"></canvas>
                 </div>
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Tax Variance: Actual vs Expected</h3>
+                    <h3 class="text-base font-semibold text-gray-800 dark:text-gray-100 mb-4">Tax Variance: Actual vs Expected</h3>
                     <canvas id="taxVarianceChart" height="180"></canvas>
                 </div>
             </div>
 
             @if($hsRiskData->count() > 0)
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-6">
-                <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Risk Heatmap by HS Code</h3>
+                <h3 class="text-base font-semibold text-gray-800 dark:text-gray-100 mb-4">Risk Heatmap by HS Code</h3>
                 <canvas id="hsRiskChart" height="200"></canvas>
             </div>
             @endif
@@ -519,13 +519,13 @@
 
             @if($recentAnomalies->count() > 0)
             <div class="bg-white rounded-xl shadow-sm border border-red-100 p-6 mb-6">
-                <h3 class="text-lg font-semibold text-red-800 mb-4 flex items-center space-x-2">
+                <h3 class="text-base font-semibold text-red-800 mb-4 flex items-center space-x-2">
                     <svg class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
                     <span>Active Anomalies</span>
                 </h3>
                 <div class="space-y-2">
                     @foreach($recentAnomalies as $anomaly)
-                    <div class="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                    <div class="flex items-center justify-between p-2 bg-red-50 rounded-lg">
                         <div class="flex items-center space-x-3">
                             <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $anomaly->type === 'invoice_spike' ? 'bg-orange-100 text-orange-800' : 'bg-red-100 text-red-800' }}">
                                 {{ str_replace('_', ' ', ucfirst($anomaly->type)) }}
@@ -541,11 +541,11 @@
 
             @if($planTier === 'enterprise')
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm font-medium text-gray-500">Compliance %</p>
-                            <p class="text-3xl font-bold mt-1 {{ $kpis['compliance_percent'] >= 70 ? 'text-emerald-600' : ($kpis['compliance_percent'] >= 40 ? 'text-orange-600' : 'text-red-600') }}">{{ $kpis['compliance_percent'] }}%</p>
+                            <p class="text-2xl font-bold mt-1 {{ $kpis['compliance_percent'] >= 70 ? 'text-emerald-600' : ($kpis['compliance_percent'] >= 40 ? 'text-orange-600' : 'text-red-600') }}">{{ $kpis['compliance_percent'] }}%</p>
                         </div>
                         <div class="p-3 bg-emerald-50 rounded-lg">
                             <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -553,11 +553,11 @@
                     </div>
                     <p class="text-xs text-gray-400 mt-2">Locked / Total Invoices</p>
                 </div>
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm font-medium text-gray-500">Avg Invoice Value</p>
-                            <p class="text-3xl font-bold text-gray-900 mt-1">Rs. {{ number_format($kpis['avg_invoice_value']) }}</p>
+                            <p class="text-2xl font-bold text-gray-900 mt-1">Rs. {{ number_format($kpis['avg_invoice_value']) }}</p>
                         </div>
                         <div class="p-3 bg-blue-50 rounded-lg">
                             <svg class="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -565,11 +565,11 @@
                     </div>
                     <p class="text-xs text-gray-400 mt-2">Average total_amount per invoice</p>
                 </div>
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm font-medium text-gray-500">Rejection Rate</p>
-                            <p class="text-3xl font-bold mt-1 {{ $kpis['rejection_rate'] <= 10 ? 'text-emerald-600' : ($kpis['rejection_rate'] <= 30 ? 'text-orange-600' : 'text-red-600') }}">{{ $kpis['rejection_rate'] }}%</p>
+                            <p class="text-2xl font-bold mt-1 {{ $kpis['rejection_rate'] <= 10 ? 'text-emerald-600' : ($kpis['rejection_rate'] <= 30 ? 'text-orange-600' : 'text-red-600') }}">{{ $kpis['rejection_rate'] }}%</p>
                         </div>
                         <div class="p-3 bg-red-50 rounded-lg">
                             <svg class="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
@@ -585,24 +585,24 @@
                 @if($topCustomers->count() > 0)
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100">
                     <div class="px-6 py-4 border-b border-gray-100">
-                        <h3 class="text-lg font-semibold text-gray-800">Top 5 Customers</h3>
+                        <h3 class="text-base font-semibold text-gray-800">Top 5 Customers</h3>
                     </div>
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">NTN</th>
-                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
-                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Invoices</th>
+                                <th class="px-3 py-1.5 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                                <th class="px-3 py-1.5 text-left text-xs font-medium text-gray-500 uppercase">NTN</th>
+                                <th class="px-3 py-1.5 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                                <th class="px-3 py-1.5 text-right text-xs font-medium text-gray-500 uppercase">Invoices</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200">
                             @foreach($topCustomers as $cust)
                             <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ $cust->buyer_name }}</td>
-                                <td class="px-4 py-2 text-sm font-mono text-gray-600">{{ $cust->buyer_ntn }}</td>
-                                <td class="px-4 py-2 text-sm font-semibold text-emerald-600 text-right">Rs. {{ number_format($cust->total_amount) }}</td>
-                                <td class="px-4 py-2 text-sm text-gray-700 text-right">{{ $cust->invoice_count }}</td>
+                                <td class="px-3 py-1.5 text-sm font-medium text-gray-900">{{ $cust->buyer_name }}</td>
+                                <td class="px-3 py-1.5 text-sm font-mono text-gray-600">{{ $cust->buyer_ntn }}</td>
+                                <td class="px-3 py-1.5 text-sm font-semibold text-emerald-600 text-right">Rs. {{ number_format($cust->total_amount) }}</td>
+                                <td class="px-3 py-1.5 text-sm text-gray-700 text-right">{{ $cust->invoice_count }}</td>
                             </tr>
                             @endforeach
                         </tbody>
@@ -613,22 +613,22 @@
                 @if($branchComparison->count() > 0)
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100">
                     <div class="px-6 py-4 border-b border-gray-100">
-                        <h3 class="text-lg font-semibold text-gray-800">Branch Comparison</h3>
+                        <h3 class="text-base font-semibold text-gray-800">Branch Comparison</h3>
                     </div>
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Branch</th>
-                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Invoices</th>
-                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Revenue</th>
+                                <th class="px-3 py-1.5 text-left text-xs font-medium text-gray-500 uppercase">Branch</th>
+                                <th class="px-3 py-1.5 text-right text-xs font-medium text-gray-500 uppercase">Invoices</th>
+                                <th class="px-3 py-1.5 text-right text-xs font-medium text-gray-500 uppercase">Revenue</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200">
                             @foreach($branchComparison as $branch)
                             <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ $branch->branch_name }}</td>
-                                <td class="px-4 py-2 text-sm text-gray-700 text-right">{{ $branch->invoice_count }}</td>
-                                <td class="px-4 py-2 text-sm font-semibold text-emerald-600 text-right">Rs. {{ number_format($branch->total_revenue) }}</td>
+                                <td class="px-3 py-1.5 text-sm font-medium text-gray-900">{{ $branch->branch_name }}</td>
+                                <td class="px-3 py-1.5 text-sm text-gray-700 text-right">{{ $branch->invoice_count }}</td>
+                                <td class="px-3 py-1.5 text-sm font-semibold text-emerald-600 text-right">Rs. {{ number_format($branch->total_revenue) }}</td>
                             </tr>
                             @endforeach
                         </tbody>
@@ -641,12 +641,12 @@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100">
                     <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                        <h3 class="text-lg font-semibold text-gray-800">Recent Invoices</h3>
+                        <h3 class="text-base font-semibold text-gray-800">Recent Invoices</h3>
                         <a href="/invoices" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View All</a>
                     </div>
                     <div class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                         @forelse($recentInvoices as $invoice)
-                        <a href="/invoice/{{ $invoice->id }}" class="block p-3 rounded-lg border border-gray-200 hover:border-emerald-300 hover:shadow-sm transition group">
+                        <a href="/invoice/{{ $invoice->id }}" class="block p-2.5 rounded-lg border border-gray-200 hover:border-emerald-300 hover:shadow-sm transition group">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-xs font-mono text-gray-500">{{ $invoice->invoice_number ?? 'INV-' . $invoice->id }}</span>
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold
@@ -681,11 +681,11 @@
 
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100">
                     <div class="px-6 py-4 border-b border-gray-100">
-                        <h3 class="text-lg font-semibold text-gray-800">Recent Activity</h3>
+                        <h3 class="text-base font-semibold text-gray-800">Recent Activity</h3>
                     </div>
                     <div class="p-4 max-h-96 overflow-y-auto">
                         @forelse($recentActivity as $activity)
-                        <div class="flex items-start space-x-3 py-3 {{ !$loop->last ? 'border-b border-gray-50' : '' }}">
+                        <div class="flex items-start space-x-3 py-2 {{ !$loop->last ? 'border-b border-gray-50' : '' }}">
                             <div class="flex-shrink-0 mt-1">
                                 @if($activity->action === 'created')
                                     <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100"><svg class="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></span>
@@ -918,7 +918,7 @@
             if (gaugeCanvas) {
                 const gCtx = gaugeCanvas.getContext('2d');
                 const prob = {{ $auditProbability['probability'] }};
-                const cx = 80, cy = 90, r = 60;
+                const cx = 64, cy = 72, r = 48;
                 const startAngle = Math.PI;
                 const endAngle = 2 * Math.PI;
                 const valueAngle = startAngle + (prob / 100) * Math.PI;

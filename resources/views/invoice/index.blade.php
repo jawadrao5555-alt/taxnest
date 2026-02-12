@@ -103,7 +103,30 @@
                                         </form>
                                         @endif
                                     @else
-                                        <a href="/invoice/{{ $invoice->id }}/download" class="text-gray-600 hover:text-gray-800 font-medium">Download</a>
+                                        <div x-data="{ showWhtModal: false, pdfWhtRate: 0 }" class="relative inline-block">
+                                            <button @click="showWhtModal = !showWhtModal" class="text-gray-600 hover:text-gray-800 font-medium">Download</button>
+                                            <div x-show="showWhtModal" x-cloak @click.away="showWhtModal = false" class="absolute left-0 mt-2 w-72 bg-white rounded-xl shadow-lg border border-gray-200 p-4 z-50">
+                                                <p class="text-sm font-semibold text-gray-800 mb-3">Select Withholding Tax Rate</p>
+                                                <div class="space-y-2 mb-3">
+                                                    <label class="flex items-center gap-2 p-2 rounded-lg border-2 cursor-pointer transition"
+                                                        :class="pdfWhtRate == 0 ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 hover:bg-gray-50'">
+                                                        <input type="radio" value="0" x-model.number="pdfWhtRate" class="text-emerald-500">
+                                                        <span class="text-sm font-medium">No WHT (0%)</span>
+                                                    </label>
+                                                    <label class="flex items-center gap-2 p-2 rounded-lg border-2 cursor-pointer transition"
+                                                        :class="pdfWhtRate == 0.5 ? 'border-amber-400 bg-amber-50' : 'border-gray-200 hover:bg-gray-50'">
+                                                        <input type="radio" value="0.5" x-model.number="pdfWhtRate" class="text-amber-500">
+                                                        <span class="text-sm font-medium">WHT 0.5%</span>
+                                                    </label>
+                                                    <label class="flex items-center gap-2 p-2 rounded-lg border-2 cursor-pointer transition"
+                                                        :class="pdfWhtRate == 2.5 ? 'border-red-400 bg-red-50' : 'border-gray-200 hover:bg-gray-50'">
+                                                        <input type="radio" value="2.5" x-model.number="pdfWhtRate" class="text-red-500">
+                                                        <span class="text-sm font-medium">WHT 2.5%</span>
+                                                    </label>
+                                                </div>
+                                                <a :href="'/invoice/{{ $invoice->id }}/download?wht_rate=' + pdfWhtRate" class="block w-full text-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">Download PDF</a>
+                                            </div>
+                                        </div>
                                     @endif
                                 </td>
                             </tr>

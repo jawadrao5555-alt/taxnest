@@ -200,7 +200,7 @@
                                 </div>
                             </div>
 
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3" x-show="item.requires_sro || item.requires_serial || item.requires_mrp || item.optional_sro" x-cloak>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3" x-show="item.requires_sro || item.requires_serial || item.optional_sro" x-cloak>
                                 <div x-show="item.requires_sro || item.optional_sro">
                                     <label class="block text-xs font-medium mb-1" :class="item.requires_sro ? 'text-amber-600' : 'text-gray-500'" x-text="item.requires_sro ? 'SRO Schedule No *' : 'SRO Schedule No (optional)'"></label>
                                     <input type="text" :name="'items[' + index + '][sro_schedule_no]'" x-model="item.sro_schedule_no" placeholder="e.g. SRO 1125(I)/2011"
@@ -218,11 +218,6 @@
                                     <input type="text" :name="'items[' + index + '][serial_no]'" x-model="item.serial_no" placeholder="e.g. 42"
                                         :class="item.requires_serial ? 'border-amber-300 bg-amber-50 focus:ring-amber-500 focus:border-amber-500' : 'border-gray-300 focus:ring-emerald-500 focus:border-emerald-500'"
                                         class="w-full rounded-lg shadow-sm text-sm">
-                                </div>
-                                <div x-show="item.requires_mrp">
-                                    <label class="block text-xs font-medium text-amber-600 mb-1" x-text="item.schedule_type === '3rd_schedule' && parseFloat(item.tax_rate) < companyStandardRate ? 'Fixed/Notified Value (Rs.) *' : 'MRP / Retail Price (Rs.) *'"></label>
-                                    <input type="number" step="0.01" min="0" :name="'items[' + index + '][mrp]'" x-model="item.mrp" placeholder="0.00"
-                                        class="w-full rounded-lg border-amber-300 shadow-sm text-sm focus:ring-amber-500 focus:border-amber-500 bg-amber-50">
                                 </div>
                             </div>
 
@@ -256,7 +251,7 @@
                                 </template>
                             </div>
 
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Description</label>
                                     <input type="text" :name="'items[' + index + '][description]'" x-model="item.description" required
@@ -286,6 +281,11 @@
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Unit Price (Rs.)</label>
                                     <input type="number" step="0.01" min="0" :name="'items[' + index + '][price]'" x-model="item.price" @input="calcTax(index)" required
+                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">MRP / Retail Price (Rs.)</label>
+                                    <input type="number" step="0.01" min="0" :name="'items[' + index + '][mrp]'" x-model="item.mrp" placeholder="0.00"
                                         class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 </div>
                             </div>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\HsMasterGlobal;
 use App\Models\HsUnmappedQueue;
 use App\Services\AuditLogService;
+use App\Services\HsIntelligenceService;
 use Illuminate\Http\Request;
 
 class HsMasterController extends Controller
@@ -103,7 +104,23 @@ class HsMasterController extends Controller
             ->orderByDesc('usage_count')
             ->paginate(25);
 
-        return view('admin.hs_master.unmapped', compact('records'));
+        $suggestions = [];
+        $rejections = [];
+        foreach ($records as $r) {
+            $suggestion = HsIntelligenceService::getLatestSuggestion($r->hs_code);
+            if (!$suggestion) {
+                $suggestion = HsIntelligenceService::generateSuggestion($r->hs_code);
+                if ($suggestion) {
+                    $suggestion = (object) $suggestion;
+                }
+            }
+            $suggestions[$r->id] = $suggestion;
+
+            $rejection = HsIntelligenceService::getRejectionHistory($r->hs_code);
+            $rejections[$r->id] = $rejection;
+        }
+
+        return view('admin.hs_master.unmapped', compact('records', 'suggestions', 'rejections'));
     }
 
     public function mapFromQueue(Request $request, $id)
@@ -117,7 +134,9 @@ class HsMasterController extends Controller
                 ->with('success', "HS Code {$unmapped->hs_code} already exists in master. Removed from queue.");
         }
 
-        $newRecord = HsMasterGlobal::create([
+        $decisionType = $request->input('decision_type', 'manual');
+
+        $finalData = [
             'hs_code' => $unmapped->hs_code,
             'description' => $request->input('description'),
             'schedule_type' => $request->input('schedule_type'),
@@ -129,21 +148,60 @@ class HsMasterController extends Controller
             'petroleum_levy_applicable' => $request->boolean('petroleum_levy_applicable'),
             'default_uom' => $request->input('default_uom'),
             'confidence_score' => $request->input('confidence_score', 50),
-            'last_source' => 'mapped_from_queue',
+            'last_source' => 'mapped_from_queue_' . $decisionType,
             'is_active' => true,
-        ]);
+        ];
+
+        $newRecord = HsMasterGlobal::create($finalData);
+
+        $integrityHash = hash('sha256', json_encode([
+            'hs_code' => $newRecord->hs_code,
+            'schedule_type' => $newRecord->schedule_type,
+            'default_tax_rate' => $newRecord->default_tax_rate,
+            'decision_type' => $decisionType,
+            'admin_id' => auth()->id(),
+            'timestamp' => now()->toIso8601String(),
+        ]));
 
         AuditLogService::log(
-            'hs_master_global_mapped',
+            'hs_master_intelligence_mapped',
             'hs_master_global',
             $newRecord->id,
-            ['source' => 'hs_unmapped_queue', 'queue_id' => $unmapped->id],
+            [
+                'source' => 'hs_unmapped_queue',
+                'queue_id' => $unmapped->id,
+                'decision_type' => $decisionType,
+                'integrity_hash' => $integrityHash,
+            ],
             $newRecord->toArray()
         );
 
         $unmapped->delete();
 
         return redirect()->route('admin.hs-master-global.unmapped')
-            ->with('success', "HS Code {$newRecord->hs_code} mapped successfully and added to master.");
+            ->with('success', "HS Code {$newRecord->hs_code} mapped successfully ({$decisionType}). Integrity hash: " . substr($integrityHash, 0, 12) . '...');
+    }
+
+    public function rejectSuggestion(Request $request, $id)
+    {
+        $unmapped = HsUnmappedQueue::findOrFail($id);
+        $reason = $request->input('rejection_reason', 'Admin rejected suggestion');
+
+        HsIntelligenceService::recordRejection($unmapped->hs_code, $reason);
+
+        HsIntelligenceService::generateSuggestion($unmapped->hs_code);
+
+        return redirect()->route('admin.hs-master-global.unmapped')
+            ->with('success', "Suggestion rejected for HS Code {$unmapped->hs_code}. Rejection recorded and new suggestion generated.");
+    }
+
+    public function regenerateSuggestion($id)
+    {
+        $unmapped = HsUnmappedQueue::findOrFail($id);
+
+        HsIntelligenceService::generateSuggestion($unmapped->hs_code);
+
+        return redirect()->route('admin.hs-master-global.unmapped')
+            ->with('success', "Suggestion regenerated for HS Code {$unmapped->hs_code}.");
     }
 }

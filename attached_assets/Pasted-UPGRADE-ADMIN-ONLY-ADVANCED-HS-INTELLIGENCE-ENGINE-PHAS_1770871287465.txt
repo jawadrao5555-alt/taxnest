@@ -1,0 +1,111 @@
+UPGRADE: ADMIN-ONLY ADVANCED HS INTELLIGENCE ENGINE (PHASE 4A)
+
+Do NOT modify:
+- FBR payload structure
+- Invoice creation logic
+- Existing validation engines
+- Multi-company isolation
+
+=================================================
+1️⃣ CREATE TABLE: hs_intelligence_logs
+=================================================
+
+Fields:
+- id
+- hs_code
+- suggested_schedule_type
+- suggested_tax_rate (decimal 5,2)
+- suggested_sro_required (boolean)
+- suggested_serial_required (boolean)
+- suggested_mrp_required (boolean)
+- confidence_score (integer)
+- weight_breakdown (json)
+- based_on_records_count (integer)
+- rejection_factor (integer)
+- industry_factor (integer)
+- created_at
+
+Index:
+- hs_code
+- confidence_score
+
+=================================================
+2️⃣ CREATE TABLE: hs_rejection_history
+=================================================
+
+Fields:
+- id
+- hs_code
+- rejection_count
+- last_rejection_reason
+- last_seen_at
+- updated_at
+
+Index:
+- hs_code
+
+=================================================
+3️⃣ BUILD WEIGHTED SUGGESTION ENGINE
+=================================================
+
+When HS is unmapped:
+
+Calculate suggestion using weighted model:
+
+Weights:
+- 4-digit HS match = 30%
+- 2-digit chapter match = 15%
+- historical tax frequency = 20%
+- historical schedule frequency = 15%
+- rejection history factor = 10%
+- industry usage factor = 10%
+
+Generate:
+- suggested schedule
+- suggested tax
+- required flags
+- confidence score (0-100)
+- weight breakdown JSON
+
+Log into hs_intelligence_logs.
+
+=================================================
+4️⃣ ADMIN PANEL UPGRADE
+=================================================
+
+On unmapped HS mapping screen:
+
+Display:
+- AI Suggestion box
+- Confidence %
+- Risk flag
+- Breakdown expandable
+- Rejection history
+
+Allow admin manual override.
+
+On save:
+- Store decision_type
+- Store final values
+- Log SHA256 integrity hash
+
+=================================================
+5️⃣ COMPANIES MUST NOT SEE:
+=================================================
+
+- Confidence %
+- Suggestion source
+- Weight breakdown
+- Risk level
+
+Companies only see final mapped values.
+
+=================================================
+6️⃣ SAFETY
+=================================================
+
+- Do not auto-apply suggestion.
+- Admin approval required.
+- No changes to past invoices.
+- No change to FBR payload keys.
+- No change to compliance engine.

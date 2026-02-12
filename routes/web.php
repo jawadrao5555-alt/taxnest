@@ -227,6 +227,8 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::post('/admin/hs-master-global/{id}', [HsMasterController::class, 'update'])->name('admin.hs-master-global.update');
         Route::get('/admin/hs-unmapped', [HsMasterController::class, 'unmapped'])->name('admin.hs-master-global.unmapped');
         Route::post('/admin/hs-unmapped/{id}/map', [HsMasterController::class, 'mapFromQueue'])->name('admin.hs-master-global.map');
+        Route::post('/admin/hs-unmapped/{id}/reject', [HsMasterController::class, 'rejectSuggestion'])->name('admin.hs-master-global.reject');
+        Route::post('/admin/hs-unmapped/{id}/regenerate', [HsMasterController::class, 'regenerateSuggestion'])->name('admin.hs-master-global.regenerate');
     });
 });
 

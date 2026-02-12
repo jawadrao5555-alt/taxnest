@@ -178,6 +178,21 @@ class GlobalHsMasterController extends Controller
         return redirect('/admin/hs-master?tab=unmapped')->with('success', "HS {$hsCode} mapped successfully and removed from unmapped log.");
     }
 
+    private static function stripIntelligenceFields(array $result): array
+    {
+        $user = auth()->user();
+        $isAdmin = $user && $user->isSuperAdmin();
+
+        if (!$isAdmin) {
+            unset($result['confidence_score']);
+            unset($result['source']);
+            unset($result['weight_breakdown']);
+            unset($result['sro_suggestion']);
+        }
+
+        return $result;
+    }
+
     public function apiLookup(Request $request)
     {
         $hsCode = $request->get('hs_code', '');
@@ -220,7 +235,7 @@ class GlobalHsMasterController extends Controller
                 $result['sro_suggestion'] = $sroSuggestion;
             }
 
-            return response()->json($result);
+            return response()->json(self::stripIntelligenceFields($result));
         }
 
         $result = GlobalHsService::resolveForInvoiceItem($hsCode, $standardTaxRate, $companyId);
@@ -239,7 +254,7 @@ class GlobalHsMasterController extends Controller
             $result['st_withheld_applicable'] = self::isStWithheldApplicable($hsCode, $result['schedule_type'] ?? 'standard');
             $result['petroleum_levy_applicable'] = self::isPetroleumLevyApplicable($hsCode);
             $result['hs_unmapped'] = false;
-            return response()->json($result);
+            return response()->json(self::stripIntelligenceFields($result));
         }
 
         $customerNtn = $request->get('customer_ntn');
@@ -253,7 +268,7 @@ class GlobalHsMasterController extends Controller
             $resolved['st_withheld_applicable'] = self::isStWithheldApplicable($hsCode, $resolved['schedule_type'] ?? 'standard');
             $resolved['petroleum_levy_applicable'] = self::isPetroleumLevyApplicable($hsCode);
             $resolved['hs_unmapped'] = false;
-            return response()->json($resolved);
+            return response()->json(self::stripIntelligenceFields($resolved));
         }
 
         $scheduleResult = ScheduleEngine::lookupByHsCode($hsCode, $standardTaxRate);
@@ -262,7 +277,7 @@ class GlobalHsMasterController extends Controller
             $scheduleResult['st_withheld_applicable'] = self::isStWithheldApplicable($hsCode, $scheduleResult['schedule_type'] ?? 'standard');
             $scheduleResult['petroleum_levy_applicable'] = self::isPetroleumLevyApplicable($hsCode);
             $scheduleResult['hs_unmapped'] = false;
-            return response()->json($scheduleResult);
+            return response()->json(self::stripIntelligenceFields($scheduleResult));
         }
 
         self::trackUnmappedHs($normalizedHs, $companyId);

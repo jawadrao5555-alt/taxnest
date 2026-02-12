@@ -90,14 +90,29 @@ class SendInvoiceToFbrJob implements ShouldQueue
 
             $this->captureHsRejections($invoice, $response);
 
-            InvoiceActivityService::log(
-                $invoice->id,
-                $invoice->company_id,
-                'retry',
-                ['attempt' => $this->attempts(), 'failure_type' => $response['failure_type'] ?? 'unknown']
-            );
+            if ($this->attempts() >= $this->tries) {
+                $invoice->status = 'failed';
+                $invoice->fbr_status = 'failed';
+                $invoice->save();
 
-            $this->release($this->backoff[$this->attempts() - 1] ?? 120);
+                InvoiceActivityService::log(
+                    $invoice->id,
+                    $invoice->company_id,
+                    'fbr_failed',
+                    ['attempt' => $this->attempts(), 'failure_type' => $response['failure_type'] ?? 'unknown', 'errors' => $response['errors'] ?? []]
+                );
+
+                ComplianceScoreService::recalculate($invoice->company_id);
+            } else {
+                InvoiceActivityService::log(
+                    $invoice->id,
+                    $invoice->company_id,
+                    'retry',
+                    ['attempt' => $this->attempts(), 'failure_type' => $response['failure_type'] ?? 'unknown']
+                );
+
+                $this->release($this->backoff[$this->attempts() - 1] ?? 120);
+            }
         }
     }
 
@@ -105,7 +120,8 @@ class SendInvoiceToFbrJob implements ShouldQueue
     {
         $invoice = Invoice::with(['company', 'items'])->find($this->invoiceId);
         if ($invoice) {
-            $invoice->status = 'draft';
+            $invoice->status = 'failed';
+            $invoice->fbr_status = 'failed';
             $invoice->save();
 
             $this->captureHsRejections($invoice, [

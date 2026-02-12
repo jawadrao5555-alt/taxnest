@@ -133,24 +133,11 @@ class DashboardController extends Controller
 
         $smartInsights = SmartInsightsService::getInsights($companyId);
 
-        $recentAnomalies = AnomalyLog::where('company_id', $companyId)
-            ->where('resolved', false)
-            ->orderBy('created_at', 'desc')
-            ->take(5)
-            ->get();
-
         $notifications = Notification::where('company_id', $companyId)
             ->where('read', false)
             ->orderBy('created_at', 'desc')
             ->take(5)
             ->get();
-
-        $avgComplianceAllCompanies = Company::whereNotNull('compliance_score')->avg('compliance_score');
-        $industryBenchmark = [
-            'average' => round($avgComplianceAllCompanies ?? 100),
-            'your_score' => $hybridScore,
-            'above_average' => $hybridScore >= ($avgComplianceAllCompanies ?? 100),
-        ];
 
         $trialInfo = null;
         if ($subscription && $subscription->trial_ends_at) {
@@ -161,67 +148,6 @@ class DashboardController extends Controller
                 'ends_at' => $subscription->trial_ends_at->format('M d, Y'),
             ];
         }
-
-        $vendorRisks = VendorRiskProfile::where('company_id', $companyId)
-            ->orderBy('vendor_score', 'asc')
-            ->take(5)
-            ->get();
-
-        $auditProbability = ComplianceScoreService::getAuditProbability($companyId);
-
-        $complianceDetails = ComplianceScoreService::calculateDetailed($companyId);
-
-        $companyRiskSummary = RiskIntelligenceEngine::getCompanyRiskSummary($companyId);
-
-        $recentReports = ComplianceReport::where('company_id', $companyId)
-            ->orderBy('created_at', 'desc')
-            ->take(5)
-            ->get();
-
-        $momGrowth = [];
-        for ($i = 5; $i >= 0; $i--) {
-            $month = now()->subMonths($i);
-            $count = Invoice::where('company_id', $companyId)
-                ->whereMonth('created_at', $month->month)
-                ->whereYear('created_at', $month->year)
-                ->count();
-            $revenue = Invoice::where('company_id', $companyId)
-                ->whereMonth('created_at', $month->month)
-                ->whereYear('created_at', $month->year)
-                ->sum('total_amount');
-            $momGrowth[] = ['month' => $month->format('M'), 'count' => $count, 'revenue' => $revenue];
-        }
-
-        $taxVariance = [];
-        for ($i = 5; $i >= 0; $i--) {
-            $month = now()->subMonths($i);
-            $invoiceIdsForTax = Invoice::where('company_id', $companyId)
-                ->whereMonth('created_at', $month->month)
-                ->whereYear('created_at', $month->year)
-                ->pluck('id');
-            $actualTax = InvoiceItem::whereIn('invoice_id', $invoiceIdsForTax)->sum('tax');
-            $subtotal = InvoiceItem::whereIn('invoice_id', $invoiceIdsForTax)
-                ->selectRaw('SUM(price * quantity) as s')->value('s') ?? 0;
-            $expectedTax = $subtotal * 0.18;
-            $taxVariance[] = [
-                'month' => $month->format('M'),
-                'actual' => round($actualTax),
-                'expected' => round($expectedTax),
-            ];
-        }
-
-        $hsRiskData = InvoiceItem::whereIn('invoice_id',
-                Invoice::where('company_id', $companyId)->pluck('id'))
-            ->select(
-                DB::raw("SUBSTRING(hs_code, 1, 2) as hs_prefix"),
-                DB::raw('COUNT(*) as count'),
-                DB::raw('SUM(tax) as total_tax'),
-                DB::raw('SUM(price * quantity) as total_value')
-            )
-            ->groupBy('hs_prefix')
-            ->orderByDesc('count')
-            ->take(10)
-            ->get();
 
         $topCustomers = Invoice::where('company_id', $companyId)
             ->select('buyer_ntn', 'buyer_name', DB::raw('SUM(total_amount) as total_amount'), DB::raw('COUNT(*) as invoice_count'))
@@ -252,22 +178,15 @@ class DashboardController extends Controller
             'rejection_rate' => $rejectionRate,
         ];
 
-        $riskHeatmapData = self::buildRiskHeatmap($companyId);
-        $auditEngine = AuditProbabilityEngine::calculate($companyId);
-
         return view('dashboard', compact(
             'company', 'totalInvoices', 'draftCount', 'submittedCount', 'lockedCount',
             'totalRevenue', 'subscription', 'invoiceLimit', 'invoicesUsed',
             'statusData', 'monthlyData', 'recentInvoices',
             'draftAging', 'fbrSuccessRate', 'complianceScore',
             'hybridScore', 'riskLevel', 'riskBadge',
-            'complianceTrend', 'recentActivity', 'smartInsights', 'recentAnomalies',
-            'notifications', 'industryBenchmark', 'trialInfo',
-            'vendorRisks', 'auditProbability', 'recentReports',
-            'momGrowth', 'taxVariance', 'hsRiskData',
-            'topCustomers', 'branchComparison', 'kpis', 'planTier',
-            'complianceDetails', 'companyRiskSummary',
-            'riskHeatmapData', 'auditEngine'
+            'complianceTrend', 'recentActivity', 'smartInsights',
+            'notifications', 'trialInfo',
+            'topCustomers', 'branchComparison', 'kpis', 'planTier'
         ));
     }
 

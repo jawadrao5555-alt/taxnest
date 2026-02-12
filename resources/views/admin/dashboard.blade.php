@@ -269,6 +269,87 @@
             </div>
             @endif
 
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-8">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2 mb-6">
+                    <svg class="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                    <span>Platform Risk Intelligence</span>
+                </h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                    <div class="rounded-xl p-4 {{ $platformAuditStats['total_anomalies'] > 0 ? 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800' : 'bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600' }}">
+                        <p class="text-sm font-medium {{ $platformAuditStats['total_anomalies'] > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400' }}">Active Anomalies</p>
+                        <p class="text-3xl font-bold mt-1 {{ $platformAuditStats['total_anomalies'] > 0 ? 'text-red-700 dark:text-red-300' : 'text-gray-900 dark:text-gray-100' }}">{{ $platformAuditStats['total_anomalies'] }}</p>
+                    </div>
+                    <div class="rounded-xl p-4 {{ $platformAuditStats['high_risk_companies'] > 0 ? 'bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800' : 'bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600' }}">
+                        <p class="text-sm font-medium {{ $platformAuditStats['high_risk_companies'] > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-gray-500 dark:text-gray-400' }}">High Risk Companies</p>
+                        <p class="text-3xl font-bold mt-1 {{ $platformAuditStats['high_risk_companies'] > 0 ? 'text-orange-700 dark:text-orange-300' : 'text-gray-900 dark:text-gray-100' }}">{{ $platformAuditStats['high_risk_companies'] }}</p>
+                    </div>
+                    <div class="rounded-xl p-4 {{ $platformAuditStats['avg_compliance'] >= 70 ? 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800' : ($platformAuditStats['avg_compliance'] >= 40 ? 'bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800' : 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800') }}">
+                        <p class="text-sm font-medium {{ $platformAuditStats['avg_compliance'] >= 70 ? 'text-green-600 dark:text-green-400' : ($platformAuditStats['avg_compliance'] >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') }}">Avg Compliance</p>
+                        <p class="text-3xl font-bold mt-1 {{ $platformAuditStats['avg_compliance'] >= 70 ? 'text-green-700 dark:text-green-300' : ($platformAuditStats['avg_compliance'] >= 40 ? 'text-amber-700 dark:text-amber-300' : 'text-red-700 dark:text-red-300') }}">{{ $platformAuditStats['avg_compliance'] }}%</p>
+                    </div>
+                    <div class="rounded-xl p-4 {{ $platformAuditStats['total_vendor_risks'] > 0 ? 'bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800' : 'bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600' }}">
+                        <p class="text-sm font-medium {{ $platformAuditStats['total_vendor_risks'] > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400' }}">Vendor Alerts</p>
+                        <p class="text-3xl font-bold mt-1 {{ $platformAuditStats['total_vendor_risks'] > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-gray-900 dark:text-gray-100' }}">{{ $platformAuditStats['total_vendor_risks'] }}</p>
+                    </div>
+                </div>
+
+                @if($atRiskCompanies->count() > 0)
+                <div class="mb-6">
+                    <h4 class="text-md font-semibold text-gray-700 dark:text-gray-300 mb-3">Companies at Risk</h4>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead class="bg-gray-50 dark:bg-gray-700">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Company Name</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">NTN</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Compliance Score</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Risk Level</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                @foreach($atRiskCompanies as $riskCompany)
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                    <td class="px-4 py-3 text-sm">
+                                        <a href="/admin/companies/{{ $riskCompany->id }}" class="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">{{ $riskCompany->name }}</a>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{{ $riskCompany->ntn }}</td>
+                                    <td class="px-4 py-3 text-sm font-bold text-gray-900 dark:text-gray-100">{{ $riskCompany->compliance_score }}</td>
+                                    <td class="px-4 py-3">
+                                        @if($riskCompany->compliance_score >= 70)
+                                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300">LOW</span>
+                                        @elseif($riskCompany->compliance_score >= 40)
+                                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">MODERATE</span>
+                                        @else
+                                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300">HIGH</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                @endif
+
+                @if($companyScores->count() > 0)
+                <div>
+                    <h4 class="text-md font-semibold text-gray-700 dark:text-gray-300 mb-3">Compliance Leaderboard</h4>
+                    <div class="space-y-2">
+                        @foreach($companyScores as $scored)
+                        <div class="flex items-center space-x-3">
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300 w-40 truncate">{{ $scored->name }}</span>
+                            <div class="flex-1 bg-gray-200 dark:bg-gray-600 rounded-full h-4 overflow-hidden">
+                                <div class="h-4 rounded-full {{ $scored->compliance_score >= 70 ? 'bg-green-500 dark:bg-green-400' : ($scored->compliance_score >= 40 ? 'bg-amber-500 dark:bg-amber-400' : 'bg-red-500 dark:bg-red-400') }}" style="width: {{ $scored->compliance_score }}%"></div>
+                            </div>
+                            <span class="text-sm font-bold text-gray-900 dark:text-gray-100 w-12 text-right">{{ $scored->compliance_score }}%</span>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
+            </div>
+
             <div class="flex flex-wrap gap-3">
                 <a href="/admin/companies" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 transition">Manage Companies</a>
                 <a href="/admin/users" class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg font-medium text-sm hover:bg-purple-700 transition">Manage Users</a>

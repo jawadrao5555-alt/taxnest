@@ -66,13 +66,32 @@ class AdminController extends Controller
         $totalHsMaster = \App\Models\HsMasterGlobal::count();
         $totalUnmapped = DB::table('hs_unmapped_queue')->count();
 
+        $atRiskCompanies = Company::whereNotNull('compliance_score')
+            ->orderBy('compliance_score', 'asc')
+            ->take(5)
+            ->get();
+
+        $platformAuditStats = [
+            'total_anomalies' => \App\Models\AnomalyLog::where('resolved', false)->count(),
+            'high_risk_companies' => Company::whereNotNull('compliance_score')->where('compliance_score', '<', 50)->count(),
+            'avg_compliance' => round(Company::whereNotNull('compliance_score')->avg('compliance_score') ?? 100),
+            'total_vendor_risks' => \App\Models\VendorRiskProfile::where('vendor_score', '<', 40)->count(),
+        ];
+
+        $companyScores = Company::whereNotNull('compliance_score')
+            ->select('name', 'compliance_score', 'ntn')
+            ->orderBy('compliance_score', 'desc')
+            ->take(10)
+            ->get();
+
         return view('admin.dashboard', compact(
             'totalCompanies', 'totalUsers', 'totalInvoices',
             'draftInvoices', 'submittedInvoices', 'lockedInvoices',
             'failedLogs', 'totalRevenue', 'activeSubscriptions',
             'recentInvoices', 'recentCompanies', 'recentAnomalies',
             'pendingCompanies', 'overrideStats',
-            'topRejectedHsCodes', 'totalHsMaster', 'totalUnmapped'
+            'topRejectedHsCodes', 'totalHsMaster', 'totalUnmapped',
+            'atRiskCompanies', 'platformAuditStats', 'companyScores'
         ));
     }
 

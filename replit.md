@@ -100,6 +100,7 @@ TaxNest is built on Laravel 12 with Breeze for authentication, using PHP 8.4. Th
 - **Invoice List Tabs:** Split into "Drafted" (draft/submitted) and "Completed" (locked/failed) tabs with counts and tab-preserving pagination.
 - **Products Page Upgrade:** Search functionality, schedule type color badges, HS code mapping sections in create/edit forms.
 - **Dashboard Compactness:** Reduced chart heights, compressed spacing (mb-8→mb-6, gap-6→gap-4, py-8→py-6).
+- **Dashboard Separation (Feb 2026):** Client dashboard simplified - removed admin-level panels (Audit Probability, Vendor Risk, Industry Benchmark, HS Risk, Risk Heatmap, Tax Intelligence, Compliance Formula, Anomalies). Added client-friendly sections: Quick Actions row (5 shortcuts), Simple Compliance Status badge, Payment Summary cards. Admin-level analytics moved to Super Admin Dashboard with "Platform Risk Intelligence" section (Platform Health cards, Companies at Risk table, Compliance Leaderboard). DashboardController optimized by removing unused queries.
 
 ## External Dependencies
 - **PostgreSQL:** Primary database.

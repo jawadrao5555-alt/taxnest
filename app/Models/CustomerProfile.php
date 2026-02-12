@@ -12,6 +12,7 @@ class CustomerProfile extends Model
         'ntn',
         'cnic',
         'address',
+        'province',
         'phone',
         'email',
         'registration_type',

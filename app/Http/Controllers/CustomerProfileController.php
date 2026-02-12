@@ -44,6 +44,7 @@ class CustomerProfileController extends Controller
             'ntn' => 'nullable|string|max:50',
             'cnic' => 'nullable|string|max:15',
             'address' => 'nullable|string|max:1000',
+            'province' => 'required|string|max:100',
             'phone' => 'nullable|string|max:50',
             'email' => 'nullable|email|max:255',
         ];
@@ -63,6 +64,7 @@ class CustomerProfileController extends Controller
             'ntn' => $request->ntn,
             'cnic' => $request->cnic,
             'address' => $request->address,
+            'province' => $request->province,
             'phone' => $request->phone,
             'email' => $request->email,
             'registration_type' => $registrationType,
@@ -92,6 +94,7 @@ class CustomerProfileController extends Controller
             'ntn' => 'nullable|string|max:50',
             'cnic' => 'nullable|string|max:15',
             'address' => 'nullable|string|max:1000',
+            'province' => 'required|string|max:100',
             'phone' => 'nullable|string|max:50',
             'email' => 'nullable|email|max:255',
         ];
@@ -108,6 +111,7 @@ class CustomerProfileController extends Controller
             'ntn' => $request->ntn,
             'cnic' => $request->cnic,
             'address' => $request->address,
+            'province' => $request->province,
             'phone' => $request->phone,
             'email' => $request->email,
             'registration_type' => $registrationType,
@@ -136,7 +140,7 @@ class CustomerProfileController extends Controller
                   ->orWhere('cnic', 'ilike', "%{$query}%");
             })
             ->take(20)
-            ->get(['id', 'name', 'ntn', 'cnic', 'address', 'phone', 'email', 'registration_type']);
+            ->get(['id', 'name', 'ntn', 'cnic', 'address', 'province', 'phone', 'email', 'registration_type']);
 
         return response()->json($customers);
     }

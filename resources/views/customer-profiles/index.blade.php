@@ -33,7 +33,7 @@
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NTN</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CNIC</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Province</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registration</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
@@ -45,7 +45,7 @@
                             <tr>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $customer->name }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-mono">{{ $customer->ntn ?? '-' }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-mono">{{ $customer->cnic ?? '-' }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $customer->province ?? '-' }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $customer->phone ?? '-' }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     @if($customer->registration_type === 'Registered')

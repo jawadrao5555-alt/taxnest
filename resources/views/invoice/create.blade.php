@@ -201,7 +201,13 @@
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3" x-show="item.requires_sro || item.requires_serial || item.optional_sro" x-cloak>
                                 <div x-show="item.requires_sro || item.optional_sro">
-                                    <label class="block text-xs font-medium mb-1" :class="item.requires_sro ? 'text-amber-600' : 'text-gray-500'" x-text="item.requires_sro ? 'SRO Schedule No *' : 'SRO Schedule No (optional)'"></label>
+                                    <div class="flex items-center justify-between mb-1">
+                                        <label class="block text-xs font-medium" :class="item.requires_sro ? 'text-amber-600' : 'text-gray-500'" x-text="item.requires_sro ? 'SRO Schedule No *' : 'SRO Schedule No (optional)'"></label>
+                                        <button type="button" @click="$dispatch('open-sro-modal', { itemIndex: index })" class="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 font-medium flex items-center gap-1">
+                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                            SRO Reference
+                                        </button>
+                                    </div>
                                     <input type="text" :name="'items[' + index + '][sro_schedule_no]'" x-model="item.sro_schedule_no" placeholder="e.g. SRO 1125(I)/2011"
                                         :class="item.requires_sro ? 'border-amber-300 bg-amber-50 focus:ring-amber-500 focus:border-amber-500' : 'border-gray-300 focus:ring-emerald-500 focus:border-emerald-500'"
                                         class="w-full rounded-lg shadow-sm text-sm">
@@ -508,6 +514,7 @@
             }
 
             return {
+                init() { window.invoiceFormInstance = this; },
                 buyer_name: '{{ old("buyer_name", "") }}',
                 buyer_ntn: '{{ old("buyer_ntn", "") }}',
                 buyer_cnic: '{{ old("buyer_cnic", "") }}',
@@ -799,4 +806,180 @@
             };
         }
     </script>
+
+    <div x-data="sroReferenceModal()" @open-sro-modal.window="openModal($event.detail.itemIndex)" x-cloak>
+        <div x-show="isOpen" class="fixed inset-0 z-50 overflow-hidden" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+            <div class="absolute inset-0 bg-black/50" @click="isOpen = false"></div>
+            <div class="absolute inset-y-0 right-0 max-w-xl w-full" x-show="isOpen" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full">
+                <div class="h-full bg-white dark:bg-gray-800 shadow-xl flex flex-col">
+                    <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-emerald-50 dark:bg-emerald-900/20">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100">SRO & Serial Reference</h3>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Search and select SRO numbers for your invoice items</p>
+                        </div>
+                        <button @click="isOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+
+                    <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-700">
+                        <div class="flex gap-2">
+                            <input type="text" x-model="searchQuery" @input.debounce.300ms="search()" placeholder="Search SRO, HS code, or description..."
+                                class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <select x-model="scheduleFilter" @change="search()" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                <option value="">All Types</option>
+                                <option value="exempt">Exempt</option>
+                                <option value="zero_rated">Zero Rated</option>
+                                <option value="3rd_schedule">3rd Schedule</option>
+                                <option value="reduced">Reduced</option>
+                                <option value="standard">Standard</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="flex border-b border-gray-200 dark:border-gray-700">
+                        <button @click="activeTab = 'sro'" :class="activeTab === 'sro' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500'" class="flex-1 px-4 py-2 text-sm font-medium border-b-2 transition">SRO Rules</button>
+                        <button @click="activeTab = 'hs'" :class="activeTab === 'hs' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500'" class="flex-1 px-4 py-2 text-sm font-medium border-b-2 transition">HS Requirements</button>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto px-5 py-3">
+                        <div x-show="loading" class="flex items-center justify-center py-12">
+                            <svg class="animate-spin h-6 w-6 text-emerald-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        </div>
+
+                        <div x-show="!loading && activeTab === 'sro'" class="space-y-2">
+                            <template x-for="rule in sroResults" :key="rule.id">
+                                <div @click="selectSro(rule)" class="p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 cursor-pointer transition group">
+                                    <div class="flex items-start justify-between">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2 mb-1">
+                                                <span class="font-mono text-sm font-bold text-emerald-700 dark:text-emerald-400" x-text="rule.sro_number"></span>
+                                                <span x-show="rule.serial_no" class="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-mono" x-text="'Serial: ' + rule.serial_no"></span>
+                                            </div>
+                                            <p class="text-xs text-gray-600 dark:text-gray-300" x-text="rule.description"></p>
+                                            <div class="flex items-center gap-2 mt-1.5">
+                                                <span class="text-xs font-mono text-blue-600 dark:text-blue-400" x-text="'HS: ' + rule.hs_code"></span>
+                                                <span class="px-1.5 py-0.5 rounded-full text-xs font-medium"
+                                                    :class="{
+                                                        'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400': rule.schedule_type === 'exempt',
+                                                        'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400': rule.schedule_type === 'zero_rated',
+                                                        'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400': rule.schedule_type === '3rd_schedule',
+                                                        'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400': rule.schedule_type === 'reduced',
+                                                        'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300': rule.schedule_type === 'standard',
+                                                    }" x-text="rule.schedule_type.replace('_', ' ')"></span>
+                                                <span x-show="rule.concessionary_rate !== null" class="text-xs text-gray-500" x-text="rule.concessionary_rate + '%'"></span>
+                                            </div>
+                                        </div>
+                                        <span class="text-xs text-emerald-600 dark:text-emerald-400 opacity-0 group-hover:opacity-100 transition font-medium">Use</span>
+                                    </div>
+                                </div>
+                            </template>
+                            <div x-show="sroResults.length === 0 && !loading" class="py-8 text-center text-gray-400 dark:text-gray-500">
+                                <svg class="mx-auto h-8 w-8 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                <p class="text-sm">Search for an SRO number, HS code, or product</p>
+                            </div>
+                        </div>
+
+                        <div x-show="!loading && activeTab === 'hs'" class="space-y-2">
+                            <template x-for="hs in hsResults" :key="hs.id">
+                                <div @click="selectHs(hs)" class="p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 cursor-pointer transition group">
+                                    <div class="flex items-start justify-between">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2 mb-1">
+                                                <span class="font-mono text-sm font-bold text-blue-600 dark:text-blue-400" x-text="hs.hs_code"></span>
+                                                <span x-show="hs.sro_required" class="px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-medium">SRO Required</span>
+                                                <span x-show="hs.serial_required" class="px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-medium">Serial Required</span>
+                                            </div>
+                                            <p class="text-xs text-gray-600 dark:text-gray-300" x-text="hs.description"></p>
+                                            <div class="flex items-center gap-2 mt-1.5">
+                                                <span x-show="hs.default_sro_number" class="font-mono text-xs text-emerald-700 dark:text-emerald-400" x-text="'SRO: ' + hs.default_sro_number"></span>
+                                                <span x-show="hs.default_serial_no" class="font-mono text-xs text-blue-600 dark:text-blue-400" x-text="'Serial: ' + hs.default_serial_no"></span>
+                                                <span x-show="hs.default_tax_rate !== null" class="text-xs text-gray-500" x-text="hs.default_tax_rate + '%'"></span>
+                                            </div>
+                                        </div>
+                                        <span class="text-xs text-emerald-600 dark:text-emerald-400 opacity-0 group-hover:opacity-100 transition font-medium">Use</span>
+                                    </div>
+                                </div>
+                            </template>
+                            <div x-show="hsResults.length === 0 && !loading" class="py-8 text-center text-gray-400 dark:text-gray-500">
+                                <svg class="mx-auto h-8 w-8 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                <p class="text-sm">Search for an HS code or product description</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="px-5 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex justify-between items-center">
+                        <a href="/sro-reference" target="_blank" class="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1">
+                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                            Full Reference Page
+                        </a>
+                        <button @click="isOpen = false" class="px-4 py-1.5 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm hover:bg-gray-300 dark:hover:bg-gray-500 transition">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function sroReferenceModal() {
+            return {
+                isOpen: false,
+                activeTab: 'sro',
+                searchQuery: '',
+                scheduleFilter: '',
+                sroResults: [],
+                hsResults: [],
+                loading: false,
+                targetItemIndex: null,
+
+                openModal(itemIndex) {
+                    this.targetItemIndex = itemIndex;
+                    this.isOpen = true;
+                    this.searchQuery = '';
+                    this.scheduleFilter = '';
+                    this.search();
+                },
+
+                async search() {
+                    this.loading = true;
+                    try {
+                        let params = new URLSearchParams();
+                        if (this.searchQuery) params.set('q', this.searchQuery);
+                        if (this.scheduleFilter) params.set('schedule_type', this.scheduleFilter);
+                        let res = await fetch('/api/sro-reference/search?' + params.toString());
+                        let data = await res.json();
+                        this.sroResults = data.sro_rules || [];
+                        this.hsResults = data.hs_items || [];
+                    } catch(e) {
+                        this.sroResults = [];
+                        this.hsResults = [];
+                    }
+                    this.loading = false;
+                },
+
+                selectSro(rule) {
+                    if (this.targetItemIndex !== null && window.invoiceFormInstance) {
+                        let item = window.invoiceFormInstance.items[this.targetItemIndex];
+                        if (item) {
+                            item.sro_schedule_no = rule.sro_number;
+                            if (rule.serial_no) item.serial_no = rule.serial_no;
+                        }
+                    }
+                    this.isOpen = false;
+                },
+
+                selectHs(hs) {
+                    if (this.targetItemIndex !== null && window.invoiceFormInstance) {
+                        let item = window.invoiceFormInstance.items[this.targetItemIndex];
+                        if (item) {
+                            if (hs.default_sro_number) item.sro_schedule_no = hs.default_sro_number;
+                            if (hs.default_serial_no) item.serial_no = hs.default_serial_no;
+                        }
+                    }
+                    this.isOpen = false;
+                }
+            };
+        }
+    </script>
 </x-app-layout>
+

@@ -12,6 +12,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\MISController;
 use App\Http\Controllers\HsMasterExportController;
 use App\Http\Controllers\GlobalHsMasterController;
+use App\Http\Controllers\SroReferenceController;
 use App\Http\Controllers\Admin\HsMasterController;
 use App\Http\Controllers\ShareController;
 use App\Http\Controllers\CompanyUserController;
@@ -59,6 +60,9 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::get('/customers/{ntn}/ledger', [CustomerLedgerController::class, 'show']);
         Route::post('/customers/payment', [CustomerLedgerController::class, 'addPayment']);
         Route::post('/customers/adjustment', [CustomerLedgerController::class, 'addAdjustment']);
+
+        Route::get('/sro-reference', [SroReferenceController::class, 'index'])->name('sro-reference');
+        Route::get('/api/sro-reference/search', [SroReferenceController::class, 'apiSearch'])->name('sro-reference.search');
 
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/products/create', [ProductController::class, 'create'])->name('products.create');

@@ -12,6 +12,7 @@ class GlobalHsMaster extends Model
         'hs_code', 'description', 'pct_code', 'schedule_type', 'tax_rate',
         'default_uom', 'sro_required', 'sro_number', 'sro_item_serial_no',
         'mrp_required', 'sector_tag', 'risk_weight', 'mapping_status',
+        'st_withheld_applicable', 'petroleum_levy_applicable',
         'created_by', 'updated_by',
     ];
 
@@ -20,6 +21,8 @@ class GlobalHsMaster extends Model
         'risk_weight' => 'float',
         'sro_required' => 'boolean',
         'mrp_required' => 'boolean',
+        'st_withheld_applicable' => 'boolean',
+        'petroleum_levy_applicable' => 'boolean',
     ];
 
     public function scopeSearch($query, ?string $search)

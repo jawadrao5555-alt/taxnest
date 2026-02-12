@@ -1,0 +1,120 @@
+You are fixing critical UI binding issues in the Invoice Create/Edit form.
+
+DO NOT modify backend logic.
+DO NOT change FBR payload.
+ONLY fix frontend reactive behavior.
+
+================================================
+1️⃣ FIX SRO / SERIAL VISIBILITY LOGIC
+================================================
+
+Current issue:
+SRO and Serial fields do not appear when required.
+
+Implement:
+
+- When scheduleType = "3rd Schedule" AND taxRate < 18:
+    show SRO field
+    show sroItemSerialNo field
+    show MRP field
+
+- When scheduleType = "3rd Schedule" AND taxRate = 18:
+    hide SRO
+    hide Serial
+    hide MRP
+
+- When scheduleType = "Exempt":
+    show SRO
+    hide Serial unless required by mapping
+
+- When scheduleType = "Zero Rated":
+    hide SRO
+    hide Serial
+    hide MRP
+
+Visibility must be reactive using Alpine.js computed watcher.
+
+Do NOT rely on initial load only.
+It must react on dropdown change instantly.
+
+================================================
+2️⃣ FIX DROPDOWN SELECTION ISSUE
+================================================
+
+Problem:
+Select dropdown opens but selection does not bind.
+
+Fix:
+
+- Ensure <select> uses x-model correctly
+- Remove duplicate name/id attributes
+- Remove any custom JS interfering
+- Ensure no disabled attribute present
+- Ensure wire:model / x-model not conflicting
+
+Province select must:
+- Save value
+- Reflect selection immediately
+- Show validation error if empty
+
+Document Type must:
+- Default to "Sale Invoice"
+- Be changeable to Credit / Debit
+- Persist correctly on submit
+
+================================================
+3️⃣ FIX DARK MODE TEXT ISSUE
+================================================
+
+Problem:
+Text appears black on dark background.
+
+Fix:
+
+- All input fields must use:
+
+class="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+
+- Remove any forced text-black
+- Remove hardcoded text-gray-900 only classes
+- Ensure select fields also use dark:text-gray-100
+
+================================================
+4️⃣ REMOVE HARD-CODED HS PREFIX LOGIC
+================================================
+
+Replace prefix-based detection for:
+- ST Withheld
+- Petroleum Levy
+
+With DB-driven flags:
+
+Use:
+st_withheld_applicable
+petroleum_levy_applicable
+
+Load from HS mapping table.
+
+================================================
+5️⃣ ENSURE CREATE + EDIT BOTH FIXED
+================================================
+
+Apply same fixes to:
+- Invoice create
+- Invoice edit
+
+================================================
+6️⃣ TEST AFTER FIX
+================================================
+
+Test cases:
+
+1) Select 3rd Schedule reduced → SRO appears
+2) Select 3rd Schedule 18% → SRO hidden
+3) Select Exempt → SRO visible
+4) Province dropdown selects correctly
+5) Document Type defaults to Sale Invoice
+6) Dark mode typing visible
+7) All fields reactive without page refresh
+
+Return PASS/FAIL summary.

@@ -271,8 +271,12 @@ class GlobalHsMasterController extends Controller
 
     private static function isStWithheldApplicable(string $hsCode, string $scheduleType): bool
     {
-        $stWithheldPrefixes = ['2523', '7213', '7214', '7216', '7228', '7308', '8544'];
         $normalized = preg_replace('/[^0-9]/', '', $hsCode);
+        $dbRecord = GlobalHsMaster::where('hs_code', $normalized)->first();
+        if ($dbRecord) {
+            return (bool) $dbRecord->st_withheld_applicable;
+        }
+        $stWithheldPrefixes = ['2523', '7213', '7214', '7216', '7228', '7308', '8544'];
         foreach ($stWithheldPrefixes as $prefix) {
             if (str_starts_with($normalized, $prefix)) return true;
         }
@@ -281,8 +285,12 @@ class GlobalHsMasterController extends Controller
 
     private static function isPetroleumLevyApplicable(string $hsCode): bool
     {
-        $petroleumPrefixes = ['2709', '2710', '2711', '2713'];
         $normalized = preg_replace('/[^0-9]/', '', $hsCode);
+        $dbRecord = GlobalHsMaster::where('hs_code', $normalized)->first();
+        if ($dbRecord) {
+            return (bool) $dbRecord->petroleum_levy_applicable;
+        }
+        $petroleumPrefixes = ['2709', '2710', '2711', '2713'];
         foreach ($petroleumPrefixes as $prefix) {
             if (str_starts_with($normalized, $prefix)) return true;
         }

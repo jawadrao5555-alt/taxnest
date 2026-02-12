@@ -1,8 +1,8 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h2 class="font-bold text-xl text-gray-800 leading-tight">Create Invoice</h2>
-            <a href="/invoices" class="text-sm text-gray-600 hover:text-gray-800">Back to Invoices</a>
+            <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Create Invoice</h2>
+            <a href="/invoices" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">Back to Invoices</a>
         </div>
     </x-slot>
 
@@ -12,14 +12,14 @@
                 @csrf
 
                 @if(session('error'))
-                <div class="bg-red-50 border border-red-200 rounded-2xl p-4">
-                    <p class="text-sm text-red-700">{{ session('error') }}</p>
+                <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-2xl p-4">
+                    <p class="text-sm text-red-700 dark:text-red-400">{{ session('error') }}</p>
                 </div>
                 @endif
 
                 @if($errors->any())
-                <div class="bg-red-50 border border-red-200 rounded-2xl p-4">
-                    <ul class="list-disc list-inside text-sm text-red-700">
+                <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-2xl p-4">
+                    <ul class="list-disc list-inside text-sm text-red-700 dark:text-red-400">
                         @foreach($errors->all() as $error)
                         <li>{{ $error }}</li>
                         @endforeach
@@ -28,11 +28,11 @@
                 @endif
 
                 @if(isset($branches) && $branches->count() > 0)
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Branch</h3>
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Branch</h3>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Select Branch (Optional)</label>
-                        <select name="branch_id" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Branch (Optional)</label>
+                        <select name="branch_id" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             <option value="">— Select Branch —</option>
                             @foreach($branches as $branch)
                             <option value="{{ $branch->id }}" {{ old('branch_id') == $branch->id ? 'selected' : '' }}>
@@ -45,12 +45,12 @@
                 </div>
                 @endif
 
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Document Information</h3>
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Document Information</h3>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Document Type</label>
-                            <select name="document_type" x-model="document_type" @change="onDocTypeChange()" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Document Type</label>
+                            <select name="document_type" x-model="document_type" @change="onDocTypeChange()" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 <option value="Sale Invoice">Sale Invoice</option>
                                 <option value="Credit Note">Credit Note</option>
                                 <option value="Debit Note">Debit Note</option>
@@ -59,38 +59,38 @@
                         <div x-show="document_type !== 'Sale Invoice'" x-cloak>
                             <label class="block text-sm font-medium text-amber-600 mb-1">Reference Invoice No *</label>
                             <input type="text" name="reference_invoice_number" x-model="reference_invoice_number" placeholder="Original invoice number"
-                                class="w-full rounded-lg border-amber-300 shadow-sm bg-amber-50 focus:ring-amber-500 focus:border-amber-500">
+                                class="w-full rounded-lg border-amber-300 shadow-sm bg-amber-50 dark:bg-amber-900/30 dark:border-amber-600 dark:text-gray-100 focus:ring-amber-500 focus:border-amber-500">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Next Invoice #</label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Next Invoice #</label>
                             <input type="text" value="{{ $nextInvoiceNumber ?? '' }}" disabled
-                                class="w-full rounded-lg border-gray-200 shadow-sm bg-gray-50 text-gray-500">
-                            <p class="text-xs text-gray-400 mt-1">Auto-generated on save</p>
+                                class="w-full rounded-lg border-gray-200 shadow-sm bg-gray-50 text-gray-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-400">
+                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Auto-generated on save</p>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Buyer Information</h3>
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Buyer Information</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Buyer Name</label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer Name</label>
                             <input type="text" name="buyer_name" x-model="buyer_name" value="{{ old('buyer_name') }}" required autofocus
                                 class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             @error('buyer_name') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Buyer NTN</label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer NTN</label>
                             <input type="text" name="buyer_ntn" x-model="buyer_ntn" value="{{ old('buyer_ntn') }}" required placeholder="1234567-8"
-                                class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             @error('buyer_ntn') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                             <p class="text-xs mt-1" :class="buyerRegType === 'Registered' ? 'text-green-600' : 'text-gray-400'" x-text="'Registration: ' + buyerRegType"></p>
                         </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Destination Province *</label>
-                            <select name="destination_province" x-model="destination_province" required class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Destination Province *</label>
+                            <select name="destination_province" x-model="destination_province" required class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 <option value="">— Select Province —</option>
                                 @foreach($provinces as $prov)
                                 <option value="{{ $prov }}">{{ $prov }}</option>
@@ -99,43 +99,43 @@
                             @error('destination_province') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">WHT Rate (%)</label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">WHT Rate (%)</label>
                             <input type="number" step="0.01" min="0" max="100" name="wht_rate" x-model="wht_rate" value="{{ old('wht_rate', 0) }}" placeholder="0"
-                                class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                            <p class="text-xs text-gray-400 mt-1">Withholding Tax deduction rate (manual selection)</p>
+                                class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Withholding Tax deduction rate (manual selection)</p>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-semibold text-gray-800">Invoice Items</h3>
+                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Invoice Items</h3>
                         <button type="button" @click="addItem()" class="inline-flex items-center px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-100 transition">
                             + Add Item
                         </button>
                     </div>
 
-                    <div x-show="scheduleError" x-cloak class="mb-4 bg-red-50 border border-red-200 rounded-lg p-3">
-                        <p class="text-sm text-red-700 font-medium" x-text="scheduleError"></p>
+                    <div x-show="scheduleError" x-cloak class="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-3">
+                        <p class="text-sm text-red-700 dark:text-red-400 font-medium" x-text="scheduleError"></p>
                     </div>
 
                     <template x-for="(item, index) in items" :key="index">
-                        <div class="border border-gray-200 rounded-xl p-4 mb-4">
+                        <div class="border border-gray-200 dark:border-gray-600 rounded-xl p-4 mb-4">
                             <div class="flex items-center justify-between mb-3">
-                                <span class="text-sm font-medium text-gray-600" x-text="'Item #' + (index + 1)"></span>
+                                <span class="text-sm font-medium text-gray-600 dark:text-gray-400" x-text="'Item #' + (index + 1)"></span>
                                 <button type="button" @click="removeItem(index)" x-show="items.length > 1" class="text-red-500 hover:text-red-700 text-sm">Remove</button>
                             </div>
 
                             <div class="mb-3">
-                                <label class="block text-xs font-medium text-gray-500 mb-1">Product (optional - auto-fills schedule info)</label>
+                                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Product (optional - auto-fills schedule info)</label>
                                 <div class="relative">
                                     <input type="text" x-model="item.productSearch" @input.debounce.300ms="searchProducts(index)" @focus="searchProducts(index)" @click.away="item.showDropdown = false" placeholder="Search products..."
-                                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
-                                    <div x-show="item.showDropdown && item.productResults.length > 0" class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                    <div x-show="item.showDropdown && item.productResults.length > 0" class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                                         <template x-for="product in item.productResults" :key="product.id">
-                                            <button type="button" @click="selectProduct(index, product)" class="w-full text-left px-4 py-2 hover:bg-emerald-50 text-sm border-b border-gray-100 last:border-0">
-                                                <span class="font-medium text-gray-800" x-text="product.name"></span>
-                                                <span class="text-gray-500 text-xs ml-2" x-text="'HS: ' + product.hs_code + ' | ' + (product.schedule_type || 'standard') + ' | Rs. ' + product.default_price"></span>
+                                            <button type="button" @click="selectProduct(index, product)" class="w-full text-left px-4 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-sm border-b border-gray-100 last:border-0">
+                                                <span class="font-medium text-gray-800 dark:text-gray-100" x-text="product.name"></span>
+                                                <span class="text-gray-500 dark:text-gray-400 text-xs ml-2" x-text="'HS: ' + product.hs_code + ' | ' + (product.schedule_type || 'standard') + ' | Rs. ' + product.default_price"></span>
                                             </button>
                                         </template>
                                     </div>
@@ -144,9 +144,9 @@
 
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-500 mb-1">Schedule Type</label>
+                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Schedule Type</label>
                                     <select :name="'items[' + index + '][schedule_type]'" x-model="item.schedule_type" @change="onScheduleChange(index)"
-                                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                         <option value="standard">Standard Rate</option>
                                         <option value="reduced">Reduced Rate</option>
                                         <option value="3rd_schedule">3rd Schedule</option>
@@ -155,19 +155,19 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-500 mb-1">HS Code</label>
+                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">HS Code</label>
                                     <input type="text" :name="'items[' + index + '][hs_code]'" x-model="item.hs_code" @blur="lookupHsCode(index); fetchTaxRecommendation(index)" required placeholder="8471.3010"
-                                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-500 mb-1">PCT Code</label>
+                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">PCT Code</label>
                                     <input type="text" :name="'items[' + index + '][pct_code]'" x-model="item.pct_code" placeholder="Auto from HS/Product"
-                                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm bg-gray-50 focus:ring-emerald-500 focus:border-emerald-500" readonly>
+                                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm bg-gray-50 dark:bg-gray-600 dark:text-gray-300 focus:ring-emerald-500 focus:border-emerald-500" readonly>
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-500 mb-1">Tax Rate (%)</label>
+                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tax Rate (%)</label>
                                     <input type="number" step="0.01" min="0" x-model="item.tax_rate" @input="calcTax(index)" :name="'items[' + index + '][tax_rate]'"
-                                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 </div>
                             </div>
 
@@ -197,8 +197,8 @@
                                 </div>
                             </div>
 
-                            <div x-show="item.schedule_hint" x-cloak class="mb-3 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg">
-                                <p class="text-xs text-indigo-700" x-text="item.schedule_hint"></p>
+                            <div x-show="item.schedule_hint" x-cloak class="mb-3 px-3 py-2 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700 rounded-lg">
+                                <p class="text-xs text-indigo-700 dark:text-indigo-300" x-text="item.schedule_hint"></p>
                             </div>
 
                             <div x-show="item.hsLookupInfo" x-cloak class="mb-3 px-3 py-2 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg">
@@ -224,14 +224,14 @@
 
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-500 mb-1">Description</label>
+                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Description</label>
                                     <input type="text" :name="'items[' + index + '][description]'" x-model="item.description" required
-                                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-500 mb-1">UOM</label>
+                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">UOM</label>
                                     <select :name="'items[' + index + '][default_uom]'" x-model="item.default_uom"
-                                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                         <option value="Numbers, pieces, units">Numbers, pieces, units</option>
                                         <option value="Kilograms">Kilograms</option>
                                         <option value="Liters">Liters</option>
@@ -245,52 +245,52 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-500 mb-1">Quantity</label>
+                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Quantity</label>
                                     <input type="number" step="0.01" min="0.01" :name="'items[' + index + '][quantity]'" x-model="item.quantity" @input="calcTax(index)" required
-                                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-500 mb-1">Unit Price (Rs.)</label>
+                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Unit Price (Rs.)</label>
                                     <input type="number" step="0.01" min="0" :name="'items[' + index + '][price]'" x-model="item.price" @input="calcTax(index)" required
-                                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 </div>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3" x-show="item.show_st_withheld || item.show_petroleum_levy" x-cloak>
                                 <div x-show="item.show_st_withheld">
-                                    <label class="flex items-center gap-2 text-xs text-gray-500">
+                                    <label class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                                         <input type="checkbox" :name="'items[' + index + '][st_withheld_at_source]'" x-model="item.st_withheld_at_source" value="1"
                                             class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
                                         ST Withheld at Source
                                     </label>
                                 </div>
                                 <div x-show="item.show_petroleum_levy">
-                                    <label class="block text-xs font-medium text-gray-500 mb-1">Petroleum Levy (Rs.)</label>
+                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Petroleum Levy (Rs.)</label>
                                     <input type="number" step="0.01" min="0" :name="'items[' + index + '][petroleum_levy]'" x-model="item.petroleum_levy" placeholder="0.00"
-                                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 </div>
                             </div>
                             <input type="hidden" :name="'items[' + index + '][tax]'" :value="item.tax">
-                            <div class="mt-2 flex justify-between text-sm text-gray-500">
-                                <span>Subtotal: <span class="font-medium text-gray-800" x-text="'Rs. ' + itemSubtotal(index)"></span></span>
-                                <span>Tax (<span x-text="item.tax_rate"></span>%): <span class="font-medium text-gray-800" x-text="'Rs. ' + parseFloat(item.tax || 0).toFixed(2)"></span></span>
-                                <span>Line Total: <span class="font-medium text-gray-800" x-text="'Rs. ' + itemTotal(index)"></span></span>
+                            <div class="mt-2 flex justify-between text-sm text-gray-500 dark:text-gray-400">
+                                <span>Subtotal: <span class="font-medium text-gray-800 dark:text-gray-100" x-text="'Rs. ' + itemSubtotal(index)"></span></span>
+                                <span>Tax (<span x-text="item.tax_rate"></span>%): <span class="font-medium text-gray-800 dark:text-gray-100" x-text="'Rs. ' + parseFloat(item.tax || 0).toFixed(2)"></span></span>
+                                <span>Line Total: <span class="font-medium text-gray-800 dark:text-gray-100" x-text="'Rs. ' + itemTotal(index)"></span></span>
                             </div>
-                            <div class="mt-1 text-xs text-gray-400">
+                            <div class="mt-1 text-xs text-gray-400 dark:text-gray-500">
                                 <span x-text="'FBR Value (qty × price): Rs. ' + itemSubtotal(index) + ' | FBR Tax (value × ' + item.tax_rate + '%): Rs. ' + parseFloat(item.tax || 0).toFixed(2)"></span>
                             </div>
                         </div>
                     </template>
 
-                    <div class="mt-4 p-4 bg-gray-50 rounded-lg space-y-2">
-                        <div class="flex justify-between items-center text-sm text-gray-600">
+                    <div class="mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg space-y-2">
+                        <div class="flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
                             <span>Value Excl. ST</span>
                             <span class="font-medium" x-text="'Rs. ' + totalExclST()"></span>
                         </div>
-                        <div class="flex justify-between items-center text-sm text-gray-600">
+                        <div class="flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
                             <span>Total Sales Tax</span>
                             <span class="font-medium" x-text="'Rs. ' + totalSalesTax()"></span>
                         </div>
-                        <div class="flex justify-between items-center text-sm font-semibold text-gray-700 border-t border-gray-200 pt-2">
+                        <div class="flex justify-between items-center text-sm font-semibold text-gray-700 dark:text-gray-300 border-t border-gray-200 dark:border-gray-600 pt-2">
                             <span>Grand Total</span>
                             <span class="text-lg text-emerald-600" x-text="'Rs. ' + grandTotal()"></span>
                         </div>
@@ -298,16 +298,16 @@
                             <span>WHT Deduction (<span x-text="wht_rate"></span>%)</span>
                             <span class="font-medium" x-text="'- Rs. ' + whtAmount()"></span>
                         </div>
-                        <div x-show="parseFloat(wht_rate) > 0" x-cloak class="flex justify-between items-center text-sm font-bold text-emerald-700 border-t border-gray-200 pt-2">
+                        <div x-show="parseFloat(wht_rate) > 0" x-cloak class="flex justify-between items-center text-sm font-bold text-emerald-700 border-t border-gray-200 dark:border-gray-600 pt-2">
                             <span>Net Receivable</span>
                             <span class="text-lg" x-text="'Rs. ' + netReceivable()"></span>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-semibold text-gray-800">Live Compliance Check</h3>
+                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Live Compliance Check</h3>
                         <button type="button" @click="checkCompliance()" :disabled="complianceLoading" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-50">
                             <svg x-show="complianceLoading" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                             Check Compliance
@@ -344,7 +344,7 @@
                         </template>
                     </div>
 
-                    <p x-show="!complianceResult && !complianceLoading" class="text-sm text-gray-400">Click "Check Compliance" to preview compliance status before submitting.</p>
+                    <p x-show="!complianceResult && !complianceLoading" class="text-sm text-gray-400 dark:text-gray-500">Click "Check Compliance" to preview compliance status before submitting.</p>
                 </div>
 
                 <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
@@ -622,9 +622,7 @@
                     let item = this.items[index];
                     let subtotal = parseFloat(item.price || 0) * parseFloat(item.quantity || 0);
                     item.tax = parseFloat(((parseFloat(item.tax_rate || 0) / 100) * subtotal).toFixed(2));
-                    if (item.schedule_type === '3rd_schedule') {
-                        this.applyScheduleRules(item);
-                    }
+                    this.applyScheduleRules(item);
                 },
                 itemSubtotal(index) {
                     let item = this.items[index];

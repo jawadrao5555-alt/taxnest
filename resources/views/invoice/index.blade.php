@@ -103,6 +103,13 @@
                                         </form>
                                         @endif
                                     @else
+                                        @if($invoice->status === 'failed')
+                                        <a href="/invoice/{{ $invoice->id }}/edit" class="text-amber-600 hover:text-amber-800 font-medium">Edit</a>
+                                        <form method="POST" action="/invoice/{{ $invoice->id }}/retry" class="inline">
+                                            @csrf
+                                            <button type="submit" class="text-emerald-600 hover:text-emerald-800 font-medium" onclick="return confirm('Retry FBR submission?')">Retry</button>
+                                        </form>
+                                        @endif
                                         <div x-data="{ showWhtModal: false, pdfWhtRate: 0 }" class="inline-block">
                                             <button @click="showWhtModal = true" class="text-gray-600 hover:text-gray-800 font-medium">Download</button>
                                             <div x-show="showWhtModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background-color: rgba(0,0,0,0.4);">

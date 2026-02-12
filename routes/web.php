@@ -53,6 +53,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::get('/invoice/{invoice}/edit', [InvoiceController::class, 'edit']);
         Route::put('/invoice/{invoice}', [InvoiceController::class, 'update']);
         Route::post('/invoice/{invoice}/submit', [InvoiceController::class, 'submit']);
+        Route::post('/invoice/{invoice}/retry', [InvoiceController::class, 'retry']);
         Route::post('/invoice/{invoice}/validate', [InvoiceController::class, 'validateInvoice']);
         Route::post('/invoice/{invoice}/validate-fbr', [InvoiceController::class, 'validateFbrPayload']);
 

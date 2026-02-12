@@ -673,6 +673,34 @@ class InvoiceController extends Controller
         return redirect('/invoices')->with('success', 'Invoice submitted to FBR (Compliance Score: ' . $scoreResult['final_score'] . ' - ' . $scoreResult['risk_level'] . ' risk).');
     }
 
+    public function retry(Request $request, Invoice $invoice)
+    {
+        $companyId = app('currentCompanyId');
+        if ($invoice->company_id !== $companyId) {
+            abort(403);
+        }
+
+        if ($invoice->status !== 'failed') {
+            return redirect('/invoice/' . $invoice->id)->with('error', 'Only failed invoices can be retried.');
+        }
+
+        $invoice->status = 'submitted';
+        $invoice->fbr_status = 'pending';
+        $invoice->save();
+
+        InvoiceActivityService::log($invoice->id, $invoice->company_id, 'retry_submitted', [
+            'retried_by' => auth()->user()->name,
+        ], request()->ip());
+
+        AuditLogService::log('invoice_retry', 'Invoice', $invoice->id, null, [
+            'retried_by' => auth()->user()->name,
+        ]);
+
+        SendInvoiceToFbrJob::dispatch($invoice->id);
+
+        return redirect('/invoice/' . $invoice->id)->with('success', 'Invoice resubmitted to FBR. You will be notified of the result.');
+    }
+
     public function verifyIntegrity(Invoice $invoice)
     {
         $companyId = app('currentCompanyId');

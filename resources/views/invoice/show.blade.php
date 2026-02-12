@@ -108,6 +108,19 @@
                     </button>
                 </form>
                 @endif
+                @if($invoice->status === 'failed')
+                <a href="/invoice/{{ $invoice->id }}/edit" class="inline-flex items-center px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    Edit & Fix
+                </a>
+                <form method="POST" action="/invoice/{{ $invoice->id }}/retry" class="inline">
+                    @csrf
+                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition" onclick="return confirm('Retry FBR submission for this invoice?')">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Retry Submit
+                    </button>
+                </form>
+                @endif
                 <a href="/invoice/{{ $invoice->id }}/preview" class="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition">Preview</a>
                 <div x-data="{ showWhtModal: false, pdfWhtRate: 0 }" class="inline-block">
                     @if($invoice->status === 'locked')
@@ -153,6 +166,44 @@
 
     <div class="py-8">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            @if($invoice->status === 'failed')
+            @php
+                $lastFbrLog = \App\Models\FbrLog::where('invoice_id', $invoice->id)->orderBy('created_at', 'desc')->first();
+                $failErrors = [];
+                if ($lastFbrLog && $lastFbrLog->response_payload) {
+                    $resp = json_decode($lastFbrLog->response_payload, true);
+                    if (!empty($resp['errors'])) {
+                        $failErrors = is_array($resp['errors']) ? $resp['errors'] : [$resp['errors']];
+                    } elseif (!empty($resp['error'])) {
+                        $failErrors = [$resp['error']];
+                    }
+                }
+            @endphp
+            <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+                <div class="flex items-start gap-3">
+                    <svg class="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                    <div class="flex-1">
+                        <p class="text-sm font-bold text-red-800">FBR Submission Failed</p>
+                        @if(count($failErrors) > 0)
+                        <ul class="mt-1 text-sm text-red-700 list-disc list-inside space-y-0.5">
+                            @foreach($failErrors as $err)
+                            <li>{{ $err }}</li>
+                            @endforeach
+                        </ul>
+                        @else
+                        <p class="mt-1 text-sm text-red-700">Invoice could not be submitted to FBR. Please fix the issues and retry.</p>
+                        @endif
+                        <div class="mt-3 flex gap-2">
+                            <a href="/invoice/{{ $invoice->id }}/edit" class="inline-flex items-center px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-semibold hover:bg-amber-600 transition">Edit & Fix</a>
+                            <form method="POST" action="/invoice/{{ $invoice->id }}/retry" class="inline">
+                                @csrf
+                                <button type="submit" class="inline-flex items-center px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition">Retry Submit</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-8">
                 <div class="p-6 border-b border-gray-100">
                     <div class="flex items-center justify-between mb-6">

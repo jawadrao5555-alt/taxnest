@@ -6,15 +6,52 @@
                 <div x-data="{ open: false }" class="relative">
                     <button @click="open = !open" class="inline-flex items-center px-3 py-2 bg-emerald-600 rounded-lg font-semibold text-xs text-white hover:bg-emerald-700 transition">
                         <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                        Monthly
+                        Production
                         <svg class="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <div x-show="open" @click.away="open = false" class="absolute right-0 mt-1 w-52 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
-                        <a href="{{ route('mis.export', ['type' => 'monthly', 'view' => 'whole']) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Whole CSV</a>
-                        <a href="{{ route('mis.export', ['type' => 'monthly', 'view' => 'partywise']) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Party-wise CSV</a>
+                        <div class="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
+                            <p class="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Production Invoices</p>
+                        </div>
+                        <a href="{{ route('mis.export', ['type' => 'monthly', 'view' => 'whole', 'status' => 'production']) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Whole CSV</a>
+                        <a href="{{ route('mis.export', ['type' => 'monthly', 'view' => 'partywise', 'status' => 'production']) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Party-wise CSV</a>
                         <div class="border-t border-gray-200 dark:border-gray-700"></div>
-                        <a href="{{ route('mis.pdf', ['type' => 'monthly', 'view' => 'whole']) }}" onclick="event.preventDefault(); downloadPdf(this.href);" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">Whole PDF</a>
-                        <a href="{{ route('mis.pdf', ['type' => 'monthly', 'view' => 'partywise']) }}" onclick="event.preventDefault(); downloadPdf(this.href);" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">Party-wise PDF</a>
+                        <a href="{{ route('mis.pdf', ['type' => 'monthly', 'view' => 'whole', 'status' => 'production']) }}" onclick="event.preventDefault(); downloadPdf(this.href);" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">Whole PDF</a>
+                        <a href="{{ route('mis.pdf', ['type' => 'monthly', 'view' => 'partywise', 'status' => 'production']) }}" onclick="event.preventDefault(); downloadPdf(this.href);" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">Party-wise PDF</a>
+                    </div>
+                </div>
+                <div x-data="{ open: false }" class="relative">
+                    <button @click="open = !open" class="inline-flex items-center px-3 py-2 bg-amber-600 rounded-lg font-semibold text-xs text-white hover:bg-amber-700 transition">
+                        <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        Draft
+                        <svg class="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open" @click.away="open = false" class="absolute right-0 mt-1 w-52 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                        <div class="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
+                            <p class="text-xs font-semibold text-amber-600 dark:text-amber-400">Draft Invoices</p>
+                        </div>
+                        <a href="{{ route('mis.export', ['type' => 'monthly', 'view' => 'whole', 'status' => 'draft']) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Whole CSV</a>
+                        <a href="{{ route('mis.export', ['type' => 'monthly', 'view' => 'partywise', 'status' => 'draft']) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Party-wise CSV</a>
+                        <div class="border-t border-gray-200 dark:border-gray-700"></div>
+                        <a href="{{ route('mis.pdf', ['type' => 'monthly', 'view' => 'whole', 'status' => 'draft']) }}" onclick="event.preventDefault(); downloadPdf(this.href);" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">Whole PDF</a>
+                        <a href="{{ route('mis.pdf', ['type' => 'monthly', 'view' => 'partywise', 'status' => 'draft']) }}" onclick="event.preventDefault(); downloadPdf(this.href);" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">Party-wise PDF</a>
+                    </div>
+                </div>
+                <div x-data="{ open: false }" class="relative">
+                    <button @click="open = !open" class="inline-flex items-center px-3 py-2 bg-red-600 rounded-lg font-semibold text-xs text-white hover:bg-red-700 transition">
+                        <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        Failed
+                        <svg class="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open" @click.away="open = false" class="absolute right-0 mt-1 w-52 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                        <div class="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
+                            <p class="text-xs font-semibold text-red-600 dark:text-red-400">Failed Invoices</p>
+                        </div>
+                        <a href="{{ route('mis.export', ['type' => 'monthly', 'view' => 'whole', 'status' => 'failed']) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Whole CSV</a>
+                        <a href="{{ route('mis.export', ['type' => 'monthly', 'view' => 'partywise', 'status' => 'failed']) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Party-wise CSV</a>
+                        <div class="border-t border-gray-200 dark:border-gray-700"></div>
+                        <a href="{{ route('mis.pdf', ['type' => 'monthly', 'view' => 'whole', 'status' => 'failed']) }}" onclick="event.preventDefault(); downloadPdf(this.href);" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">Whole PDF</a>
+                        <a href="{{ route('mis.pdf', ['type' => 'monthly', 'view' => 'partywise', 'status' => 'failed']) }}" onclick="event.preventDefault(); downloadPdf(this.href);" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">Party-wise PDF</a>
                     </div>
                 </div>
                 <div x-data="{ open: false }" class="relative">

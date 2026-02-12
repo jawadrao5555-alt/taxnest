@@ -11,10 +11,17 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class WhtReportController extends Controller
 {
-    private function getWhtQuery($companyId, $fromDate, $toDate, $partyFilter = null)
+    private function resolveDbStatus($status)
     {
+        $map = ['production' => 'locked', 'draft' => 'draft', 'failed' => 'submitted'];
+        return $map[$status] ?? 'locked';
+    }
+
+    private function getWhtQuery($companyId, $fromDate, $toDate, $partyFilter = null, $status = 'production')
+    {
+        $dbStatus = $this->resolveDbStatus($status);
         $query = Invoice::where('company_id', $companyId)
-            ->where('status', 'locked')
+            ->where('status', $dbStatus)
             ->where('wht_rate', '>', 0)
             ->whereBetween('invoice_date', [$fromDate, $toDate]);
 
@@ -78,12 +85,13 @@ class WhtReportController extends Controller
         $toDate = $request->get('to_date', Carbon::now()->toDateString());
         $partyFilter = $request->get('party');
         $period = $request->get('period', 'daily');
+        $status = $request->get('status', 'production');
 
-        $query = $this->getWhtQuery($companyId, $fromDate, $toDate, $partyFilter);
+        $query = $this->getWhtQuery($companyId, $fromDate, $toDate, $partyFilter, $status);
         $results = $this->getWhtResults(clone $query, $period);
         $totals = $this->getWhtTotals($results);
 
-        return view('reports.wht-report', compact('results', 'totals', 'fromDate', 'toDate', 'partyFilter', 'period'));
+        return view('reports.wht-report', compact('results', 'totals', 'fromDate', 'toDate', 'partyFilter', 'period', 'status'));
     }
 
     public function pdfWht(Request $request)
@@ -95,12 +103,14 @@ class WhtReportController extends Controller
         $partyFilter = $request->get('party');
         $period = $request->get('period', 'daily');
         $viewType = $request->get('view', 'whole');
+        $status = $request->get('status', 'production');
 
-        $query = $this->getWhtQuery($companyId, $fromDate, $toDate, $partyFilter);
+        $query = $this->getWhtQuery($companyId, $fromDate, $toDate, $partyFilter, $status);
         $results = $this->getWhtResults(clone $query, $period);
         $totals = $this->getWhtTotals($results);
 
-        $title = 'WHT Collection Report';
+        $statusLabel = ucfirst($status);
+        $title = 'WHT Collection Report (' . $statusLabel . ')';
         $partyGroups = null;
         $partyName = $partyFilter;
 
@@ -110,7 +120,7 @@ class WhtReportController extends Controller
 
         $pdf = Pdf::loadView('reports.wht-pdf', compact('results', 'totals', 'fromDate', 'toDate', 'partyFilter', 'period', 'company', 'title', 'viewType', 'partyGroups', 'partyName'));
         $pdf->setPaper('a4', 'landscape');
-        $filename = 'WHT_Report_' . $fromDate . '_to_' . $toDate . '_' . $viewType . '.pdf';
+        $filename = 'WHT_Report_' . $status . '_' . $fromDate . '_to_' . $toDate . '_' . $viewType . '.pdf';
         return $pdf->download($filename);
     }
 
@@ -119,9 +129,11 @@ class WhtReportController extends Controller
         $companyId = app('currentCompanyId');
         $year = $request->get('year', Carbon::now()->year);
         $partyFilter = $request->get('party');
+        $status = $request->get('status', 'production');
+        $dbStatus = $this->resolveDbStatus($status);
 
         $query = Invoice::where('company_id', $companyId)
-            ->where('status', 'locked')
+            ->where('status', $dbStatus)
             ->whereRaw("EXTRACT(YEAR FROM invoice_date::date) = ?", [$year]);
 
         if ($partyFilter) {
@@ -153,7 +165,7 @@ class WhtReportController extends Controller
         ];
 
         $availableYears = Invoice::where('company_id', $companyId)
-            ->where('status', 'locked')
+            ->where('status', $dbStatus)
             ->selectRaw("DISTINCT EXTRACT(YEAR FROM invoice_date::date) as yr")
             ->orderByDesc('yr')
             ->pluck('yr')
@@ -166,7 +178,7 @@ class WhtReportController extends Controller
             $availableYears = array_reverse($availableYears);
         }
 
-        return view('reports.tax-summary', compact('monthly', 'yearTotals', 'year', 'partyFilter', 'availableYears'));
+        return view('reports.tax-summary', compact('monthly', 'yearTotals', 'year', 'partyFilter', 'availableYears', 'status'));
     }
 
     public function pdfTaxSummary(Request $request)
@@ -176,12 +188,15 @@ class WhtReportController extends Controller
         $year = $request->get('year', Carbon::now()->year);
         $partyFilter = $request->get('party');
         $viewType = $request->get('view', 'whole');
+        $status = $request->get('status', 'production');
+        $dbStatus = $this->resolveDbStatus($status);
 
-        $title = 'Tax Collection Summary';
+        $statusLabel = ucfirst($status);
+        $title = 'Tax Collection Summary (' . $statusLabel . ')';
 
         if ($viewType === 'partywise') {
             $monthly = Invoice::where('company_id', $companyId)
-                ->where('status', 'locked')
+                ->where('status', $dbStatus)
                 ->whereRaw("EXTRACT(YEAR FROM invoice_date::date) = ?", [$year])
                 ->when($partyFilter, function ($q) use ($partyFilter) {
                     $q->where(function ($qq) use ($partyFilter) {
@@ -220,7 +235,7 @@ class WhtReportController extends Controller
         }
 
         $query = Invoice::where('company_id', $companyId)
-            ->where('status', 'locked')
+            ->where('status', $dbStatus)
             ->whereRaw("EXTRACT(YEAR FROM invoice_date::date) = ?", [$year]);
 
         if ($partyFilter) {
@@ -255,7 +270,7 @@ class WhtReportController extends Controller
 
         $pdf = Pdf::loadView('reports.tax-summary-pdf', compact('monthly', 'yearTotals', 'year', 'partyFilter', 'company', 'title', 'viewType', 'partyName'));
         $pdf->setPaper('a4', 'landscape');
-        return $pdf->download('Tax_Summary_' . $year . '_whole.pdf');
+        return $pdf->download('Tax_Summary_' . $status . '_' . $year . '_' . $viewType . '.pdf');
     }
 
     public function downloadWht(Request $request)
@@ -265,8 +280,9 @@ class WhtReportController extends Controller
         $toDate = $request->get('to_date', Carbon::now()->toDateString());
         $partyFilter = $request->get('party');
         $viewType = $request->get('view', 'whole');
+        $status = $request->get('status', 'production');
 
-        $query = $this->getWhtQuery($companyId, $fromDate, $toDate, $partyFilter);
+        $query = $this->getWhtQuery($companyId, $fromDate, $toDate, $partyFilter, $status);
 
         if ($viewType === 'partywise') {
             $results = $query->select([
@@ -326,7 +342,7 @@ class WhtReportController extends Controller
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="wht-report-' . $fromDate . '-to-' . $toDate . '.csv"',
+            'Content-Disposition' => 'attachment; filename="wht-report-' . $status . '-' . $fromDate . '-to-' . $toDate . '-' . $viewType . '.csv"',
         ]);
     }
 
@@ -336,9 +352,11 @@ class WhtReportController extends Controller
         $year = $request->get('year', Carbon::now()->year);
         $partyFilter = $request->get('party');
         $viewType = $request->get('view', 'whole');
+        $status = $request->get('status', 'production');
+        $dbStatus = $this->resolveDbStatus($status);
 
         $query = Invoice::where('company_id', $companyId)
-            ->where('status', 'locked')
+            ->where('status', $dbStatus)
             ->whereRaw("EXTRACT(YEAR FROM invoice_date::date) = ?", [$year]);
 
         if ($partyFilter) {
@@ -399,7 +417,7 @@ class WhtReportController extends Controller
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="tax-summary-' . $year . '.csv"',
+            'Content-Disposition' => 'attachment; filename="tax-summary-' . $status . '-' . $year . '-' . $viewType . '.csv"',
         ]);
     }
 }

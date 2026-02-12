@@ -27,11 +27,25 @@
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Party Filter (optional)</label>
                         <input type="text" name="party" value="{{ $partyFilter }}" placeholder="Filter by party name or NTN..." class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
                     </div>
+                    <div class="flex-1 w-full sm:w-auto">
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Status</label>
+                        <select name="status" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <option value="production" {{ $status === 'production' ? 'selected' : '' }}>Production</option>
+                            <option value="draft" {{ $status === 'draft' ? 'selected' : '' }}>Draft</option>
+                            <option value="failed" {{ $status === 'failed' ? 'selected' : '' }}>Failed</option>
+                        </select>
+                    </div>
                     <button type="submit" class="inline-flex items-center px-6 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition">
                         <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
                         Apply
                     </button>
                 </form>
+            </div>
+
+            <div class="mb-4">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold {{ $status === 'production' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' : ($status === 'draft' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400') }}">
+                    Showing: {{ ucfirst($status) }} Invoices
+                </span>
             </div>
 
             @if($yearTotals['total_sales_tax'] > 0)
@@ -40,7 +54,7 @@
                     <div>
                         <p class="text-sm font-medium text-emerald-100">Total Sales Tax to Pay FBR</p>
                         <p class="text-3xl font-bold mt-1">PKR {{ number_format($yearTotals['total_sales_tax'], 2) }}</p>
-                        <p class="text-xs text-emerald-200 mt-2">This is the total sales tax collected in {{ $year }} that needs to be deposited with FBR.</p>
+                        <p class="text-xs text-emerald-200 mt-2">This is the total sales tax collected from {{ ucfirst($status) }} invoices in {{ $year }} that needs to be deposited with FBR.</p>
                     </div>
                     <div class="text-right">
                         <svg class="w-16 h-16 text-white/20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
@@ -72,15 +86,21 @@
                 <div class="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700">
                     <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Monthly Breakdown</h3>
                     <div class="flex items-center flex-wrap gap-2">
+                        @php
+                            $baseParams = array_merge(request()->query(), ['status' => $status]);
+                        @endphp
                         <div x-data="{ open: false }" class="relative">
                             <button @click="open = !open" type="button" class="inline-flex items-center px-3 py-1.5 bg-gray-600 text-white rounded-lg text-xs font-semibold hover:bg-gray-700 transition">
                                 <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                 CSV
                                 <svg class="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                             </button>
-                            <div x-show="open" @click.away="open = false" class="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
-                                <a href="{{ route('reports.tax-summary.download', array_merge(request()->query(), ['view' => 'whole'])) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg">Whole Report CSV</a>
-                                <a href="{{ route('reports.tax-summary.download', array_merge(request()->query(), ['view' => 'partywise'])) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg">Party-wise CSV</a>
+                            <div x-show="open" @click.away="open = false" class="absolute right-0 mt-1 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                                <div class="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
+                                    <p class="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{{ ucfirst($status) }} Invoices</p>
+                                </div>
+                                <a href="{{ route('reports.tax-summary.download', array_merge($baseParams, ['view' => 'whole'])) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Whole Report CSV</a>
+                                <a href="{{ route('reports.tax-summary.download', array_merge($baseParams, ['view' => 'partywise'])) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Party-wise CSV</a>
                             </div>
                         </div>
                         <div x-data="{ open: false }" class="relative">
@@ -89,9 +109,12 @@
                                 PDF
                                 <svg class="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                             </button>
-                            <div x-show="open" @click.away="open = false" class="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
-                                <a href="{{ route('reports.tax-summary.pdf', array_merge(request()->query(), ['view' => 'whole'])) }}" onclick="event.preventDefault(); downloadPdf(this.href);" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg cursor-pointer">Whole Report PDF</a>
-                                <a href="{{ route('reports.tax-summary.pdf', array_merge(request()->query(), ['view' => 'partywise'])) }}" onclick="event.preventDefault(); downloadPdf(this.href);" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg cursor-pointer">Party-wise PDF</a>
+                            <div x-show="open" @click.away="open = false" class="absolute right-0 mt-1 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                                <div class="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
+                                    <p class="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{{ ucfirst($status) }} Invoices</p>
+                                </div>
+                                <a href="{{ route('reports.tax-summary.pdf', array_merge($baseParams, ['view' => 'whole'])) }}" onclick="event.preventDefault(); downloadPdf(this.href);" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">Whole Report PDF</a>
+                                <a href="{{ route('reports.tax-summary.pdf', array_merge($baseParams, ['view' => 'partywise'])) }}" onclick="event.preventDefault(); downloadPdf(this.href);" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">Party-wise PDF</a>
                             </div>
                         </div>
                         @php
@@ -131,7 +154,7 @@
                             <tr>
                                 <td colspan="6" class="px-6 py-12 text-center">
                                     <svg class="mx-auto h-12 w-12 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">No locked invoices found for {{ $year }}.</p>
+                                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">No {{ ucfirst($status) }} invoices found for {{ $year }}.</p>
                                 </td>
                             </tr>
                             @endforelse

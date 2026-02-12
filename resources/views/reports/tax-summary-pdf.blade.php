@@ -141,7 +141,7 @@
                     <td class="right bold">{{ number_format($row->total_net, 2) }}</td>
                 </tr>
                 @empty
-                <tr><td colspan="6" style="text-align:center; padding:20px; color:#9ca3af;">No locked invoices found for {{ $year }}.</td></tr>
+                <tr><td colspan="6" style="text-align:center; padding:20px; color:#9ca3af;">No production invoices found for {{ $year }}.</td></tr>
                 @endforelse
             </tbody>
             @if($monthly->count() > 0)

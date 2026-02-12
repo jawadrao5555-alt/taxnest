@@ -15,6 +15,18 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class MISController extends Controller
 {
+    private function resolveDbStatus($status)
+    {
+        $map = ['production' => 'locked', 'draft' => 'draft', 'failed' => 'submitted'];
+        return $map[$status] ?? 'locked';
+    }
+
+    private function displayStatus($dbStatus)
+    {
+        $map = ['locked' => 'production', 'submitted' => 'failed', 'draft' => 'draft'];
+        return $map[$dbStatus] ?? $dbStatus;
+    }
+
     public function index()
     {
         $companyId = app('currentCompanyId');
@@ -81,13 +93,19 @@ class MISController extends Controller
         $companyId = app('currentCompanyId');
         $type = $request->get('type', 'monthly');
         $viewType = $request->get('view', 'whole');
+        $status = $request->get('status', 'all');
 
         if ($type === 'monthly') {
-            $invoices = Invoice::where('company_id', $companyId)
+            $query = Invoice::where('company_id', $companyId)
                 ->whereMonth('created_at', now()->month)
-                ->whereYear('created_at', now()->year)
-                ->orderBy('created_at')
-                ->get();
+                ->whereYear('created_at', now()->year);
+
+            if ($status !== 'all') {
+                $dbStatus = $this->resolveDbStatus($status);
+                $query->where('status', $dbStatus);
+            }
+
+            $invoices = $query->orderBy('created_at')->get();
 
             if ($viewType === 'partywise') {
                 $csv = "Party Name,NTN,Invoice No,Date,Subtotal,Sales Tax,WHT,Total,Status\n";
@@ -102,7 +120,7 @@ class MISController extends Controller
                             . number_format($inv->total_sales_tax, 2, '.', '') . ','
                             . number_format($inv->wht_amount, 2, '.', '') . ','
                             . number_format($inv->total_amount, 2, '.', '') . ','
-                            . $inv->status . "\n";
+                            . $this->displayStatus($inv->status) . "\n";
                     }
                 }
             } else {
@@ -117,11 +135,12 @@ class MISController extends Controller
                         number_format($inv->total_sales_tax, 2, '.', ''),
                         number_format($inv->wht_amount, 2, '.', ''),
                         number_format($inv->total_amount, 2, '.', ''),
-                        $inv->status,
+                        $this->displayStatus($inv->status),
                     ]) . "\n";
                 }
             }
-            $filename = "mis_monthly_" . now()->format('Y_m') . ".csv";
+            $statusSuffix = $status !== 'all' ? '_' . $status : '';
+            $filename = "mis_monthly" . $statusSuffix . '_' . $viewType . '_' . now()->format('Y_m') . ".csv";
         } elseif ($type === 'tax') {
             $csv = "Month,Tax Collected,Subtotal,Effective Rate %\n";
             for ($i = 5; $i >= 0; $i--) {
@@ -193,24 +212,32 @@ class MISController extends Controller
         $company = Company::find($companyId);
         $type = $request->get('type', 'monthly');
         $viewType = $request->get('view', 'whole');
+        $status = $request->get('status', 'all');
         $title = 'MIS Report';
 
         if ($type === 'monthly') {
-            $reportTitle = 'Monthly Invoice Report - ' . now()->format('F Y');
-            $invoices = Invoice::where('company_id', $companyId)
+            $statusLabel = $status !== 'all' ? ' (' . ucfirst($status) . ')' : '';
+            $reportTitle = 'Monthly Invoice Report' . $statusLabel . ' - ' . now()->format('F Y');
+            $query = Invoice::where('company_id', $companyId)
                 ->whereMonth('created_at', now()->month)
-                ->whereYear('created_at', now()->year)
-                ->orderBy('created_at')
-                ->get();
+                ->whereYear('created_at', now()->year);
+
+            if ($status !== 'all') {
+                $dbStatus = $this->resolveDbStatus($status);
+                $query->where('status', $dbStatus);
+            }
+
+            $invoices = $query->orderBy('created_at')->get();
 
             $partyGroups = null;
             if ($viewType === 'partywise') {
                 $partyGroups = $invoices->groupBy('buyer_name');
             }
 
+            $statusSuffix = $status !== 'all' ? '_' . $status : '';
             $pdf = Pdf::loadView('reports.mis-pdf', compact('company', 'title', 'reportTitle', 'type', 'invoices', 'viewType', 'partyGroups'));
             $pdf->setPaper('a4', 'landscape');
-            return $pdf->download('MIS_Monthly_' . now()->format('Y-m') . '_' . $viewType . '.pdf');
+            return $pdf->download('MIS_Monthly' . $statusSuffix . '_' . now()->format('Y-m') . '_' . $viewType . '.pdf');
 
         } elseif ($type === 'tax') {
             $reportTitle = 'Tax Collection Summary (Last 6 Months)';

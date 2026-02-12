@@ -15,7 +15,7 @@
 
             <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-6">
                 <form method="GET" action="{{ route('reports.wht') }}" class="space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">From Date</label>
                             <input type="date" name="from_date" value="{{ $fromDate }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
@@ -36,6 +36,14 @@
                                 <option value="yearly" {{ $period === 'yearly' ? 'selected' : '' }}>Yearly</option>
                             </select>
                         </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Status</label>
+                            <select name="status" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                <option value="production" {{ $status === 'production' ? 'selected' : '' }}>Production</option>
+                                <option value="draft" {{ $status === 'draft' ? 'selected' : '' }}>Draft</option>
+                                <option value="failed" {{ $status === 'failed' ? 'selected' : '' }}>Failed</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="flex items-center justify-between">
                         <button type="submit" class="inline-flex items-center px-6 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition">
@@ -43,15 +51,21 @@
                             Apply Filters
                         </button>
                         <div class="flex items-center flex-wrap gap-2">
+                            @php
+                                $baseParams = array_merge(request()->query(), ['status' => $status]);
+                            @endphp
                             <div x-data="{ open: false }" class="relative">
                                 <button @click="open = !open" type="button" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-xs font-semibold hover:bg-gray-700 transition">
                                     <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                     CSV
                                     <svg class="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                 </button>
-                                <div x-show="open" @click.away="open = false" class="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
-                                    <a href="{{ route('reports.wht.download', array_merge(request()->query(), ['view' => 'whole'])) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg">Whole Report CSV</a>
-                                    <a href="{{ route('reports.wht.download', array_merge(request()->query(), ['view' => 'partywise'])) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg">Party-wise CSV</a>
+                                <div x-show="open" @click.away="open = false" class="absolute right-0 mt-1 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                                    <div class="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
+                                        <p class="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{{ ucfirst($status) }} Invoices</p>
+                                    </div>
+                                    <a href="{{ route('reports.wht.download', array_merge($baseParams, ['view' => 'whole'])) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Whole Report CSV</a>
+                                    <a href="{{ route('reports.wht.download', array_merge($baseParams, ['view' => 'partywise'])) }}" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Party-wise CSV</a>
                                 </div>
                             </div>
                             <div x-data="{ open: false }" class="relative">
@@ -60,9 +74,12 @@
                                     PDF
                                     <svg class="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                 </button>
-                                <div x-show="open" @click.away="open = false" class="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
-                                    <a href="{{ route('reports.wht.pdf', array_merge(request()->query(), ['view' => 'whole'])) }}" onclick="event.preventDefault(); downloadPdf(this.href);" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg cursor-pointer">Whole Report PDF</a>
-                                    <a href="{{ route('reports.wht.pdf', array_merge(request()->query(), ['view' => 'partywise'])) }}" onclick="event.preventDefault(); downloadPdf(this.href);" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg cursor-pointer">Party-wise PDF</a>
+                                <div x-show="open" @click.away="open = false" class="absolute right-0 mt-1 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                                    <div class="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
+                                        <p class="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{{ ucfirst($status) }} Invoices</p>
+                                    </div>
+                                    <a href="{{ route('reports.wht.pdf', array_merge($baseParams, ['view' => 'whole'])) }}" onclick="event.preventDefault(); downloadPdf(this.href);" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">Whole Report PDF</a>
+                                    <a href="{{ route('reports.wht.pdf', array_merge($baseParams, ['view' => 'partywise'])) }}" onclick="event.preventDefault(); downloadPdf(this.href);" class="block px-4 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">Party-wise PDF</a>
                                 </div>
                             </div>
                             @php
@@ -75,6 +92,12 @@
                         </div>
                     </div>
                 </form>
+            </div>
+
+            <div class="mb-4">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold {{ $status === 'production' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' : ($status === 'draft' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400') }}">
+                    Showing: {{ ucfirst($status) }} Invoices
+                </span>
             </div>
 
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -133,7 +156,7 @@
                             <tr>
                                 <td colspan="10" class="px-6 py-12 text-center">
                                     <svg class="mx-auto h-12 w-12 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">No WHT records found for the selected period.</p>
+                                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">No WHT records found for {{ ucfirst($status) }} invoices in the selected period.</p>
                                     <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Try adjusting your date range or filters.</p>
                                 </td>
                             </tr>

@@ -90,6 +90,24 @@
                                         {{ ucfirst($invoice->fbr_status) }}
                                     </span>
                                     @endif
+                                    @if($invoice->status === 'failed')
+                                    @php
+                                        $lastLog = $invoice->fbrLogs->first();
+                                        $failReason = '';
+                                        if ($lastLog && $lastLog->response_payload) {
+                                            $resp = json_decode($lastLog->response_payload, true);
+                                            if (!empty($resp['errors'])) {
+                                                $errs = is_array($resp['errors']) ? $resp['errors'] : [$resp['errors']];
+                                                $failReason = implode(', ', array_slice($errs, 0, 2));
+                                            } elseif (!empty($resp['error'])) {
+                                                $failReason = $resp['error'];
+                                            }
+                                        }
+                                    @endphp
+                                    @if($failReason)
+                                    <p class="text-xs text-red-600 mt-1 max-w-[200px] truncate" title="{{ $failReason }}">{{ $failReason }}</p>
+                                    @endif
+                                    @endif
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $invoice->created_at->format('d M Y') }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm space-x-2">

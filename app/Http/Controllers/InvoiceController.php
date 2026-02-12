@@ -32,7 +32,9 @@ class InvoiceController extends Controller
         $tab = $request->get('tab', 'draft');
         
         $baseQuery = Invoice::where('company_id', $companyId)
-            ->with('items', 'branch');
+            ->with(['items', 'branch', 'fbrLogs' => function ($q) {
+                $q->orderBy('created_at', 'desc')->limit(1);
+            }]);
 
         // Filter by tab
         if ($tab === 'completed') {

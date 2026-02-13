@@ -1,0 +1,87 @@
+You are required to perform a PRODUCTION SAFETY AUDIT on the FBR submission flow.
+
+Do NOT modify anything.
+Do NOT redesign anything.
+Only inspect and report with code proof.
+
+Answer ALL questions clearly with code references.
+
+========================================
+1️⃣ DATABASE TRANSACTION & ROW LOCKING
+========================================
+
+In the FBR submission controller/service:
+
+- Is DB::transaction() used?
+- Is lockForUpdate() applied on the invoice row before status check?
+- Show exact code block for:
+    - Status check
+    - Status update (draft → submitting)
+    - Commit
+
+We need proof that race condition is impossible.
+
+========================================
+2️⃣ IDEMPOTENCY / DUPLICATE PREVENTION
+========================================
+
+When submitting to FBR:
+
+- Is the same invoiceRefNo reused on retry?
+- Or is a new invoiceRefNo generated?
+
+Show:
+- How invoiceRefNo is generated
+- Whether it changes on retry
+- Any unique DB constraint on invoiceRefNo
+
+========================================
+3️⃣ QUEUE WORKER SAFETY
+========================================
+
+For SendInvoiceToFbrJob:
+
+- If job retries, does it check invoice status first?
+- If invoice is already locked, does it exit safely?
+- Show retry logic and max attempts configuration.
+
+========================================
+4️⃣ FBR 500 RESPONSE HANDLING
+========================================
+
+When FBR returns HTTP 500:
+
+- Does system check response body for invoice number?
+- Or treat 500 as automatic success?
+
+Show exact conditional logic.
+
+========================================
+5️⃣ UNKNOWN STATE HANDLING
+========================================
+
+Is there any "unknown" status for uncertain FBR responses?
+If not, confirm clearly.
+
+========================================
+6️⃣ UNIQUE DATABASE CONSTRAINTS
+========================================
+
+Confirm existence (or absence) of:
+
+- Unique constraint on invoiceRefNo
+- Unique constraint on fbr_invoice_number
+- Any protection at DB level
+
+Show migration definitions.
+
+========================================
+
+Return final safety rating:
+
+- SAFE
+- PARTIALLY SAFE
+- HIGH RISK
+
+Do not summarize without proof.
+Provide exact code references.

@@ -28,14 +28,15 @@
                                     <span class="font-medium">Production</span>
                                 </label>
                             </div>
-                            <div class="space-y-4">
-                                <form method="POST" action="/invoice/{{ $invoice->id }}/submit">
+                            <div class="space-y-4" x-data="{ smartSubmitting: false, directSubmitting: false }">
+                                <form method="POST" action="/invoice/{{ $invoice->id }}/submit" @submit="if(smartSubmitting) { $event.preventDefault(); return; } smartSubmitting = true;">
                                     @csrf
                                     <input type="hidden" name="mode" value="smart">
                                     <input type="hidden" name="fbr_environment" :value="submitEnv">
-                                    <button type="submit" class="w-full p-4 border-2 border-emerald-200 rounded-lg hover:bg-emerald-50 text-left">
-                                        <p class="font-semibold text-emerald-700">Smart Mode (Recommended)</p>
-                                        <p class="text-xs text-gray-500">Runs compliance scoring, blocks CRITICAL risk invoices</p>
+                                    <button type="submit" :disabled="smartSubmitting" class="w-full p-4 border-2 border-emerald-200 rounded-lg hover:bg-emerald-50 text-left disabled:opacity-50 disabled:cursor-not-allowed">
+                                        <p class="font-semibold text-emerald-700" x-text="smartSubmitting ? 'Submitting to FBR...' : 'Smart Mode (Recommended)'"></p>
+                                        <p class="text-xs text-gray-500" x-show="!smartSubmitting">Runs compliance scoring, blocks CRITICAL risk invoices</p>
+                                        <p class="text-xs text-emerald-600 animate-pulse" x-show="smartSubmitting" x-cloak>Please wait, sending to FBR...</p>
                                     </button>
                                 </form>
                                 <div x-data="{ showOverride: false }">
@@ -43,12 +44,12 @@
                                         <p class="font-semibold text-orange-700">Direct MIS Mode</p>
                                         <p class="text-xs text-gray-500">Skips compliance check - requires override reason</p>
                                     </button>
-                                    <form x-show="showOverride" method="POST" action="/invoice/{{ $invoice->id }}/submit" class="mt-3">
+                                    <form x-show="showOverride" method="POST" action="/invoice/{{ $invoice->id }}/submit" class="mt-3" @submit="if(directSubmitting) { $event.preventDefault(); return; } directSubmitting = true;">
                                         @csrf
                                         <input type="hidden" name="mode" value="direct_mis">
                                         <input type="hidden" name="fbr_environment" :value="submitEnv">
                                         <textarea name="override_reason" required minlength="10" placeholder="Enter override reason (min 10 characters)..." class="w-full rounded-lg border-gray-300 text-sm"></textarea>
-                                        <button type="submit" class="mt-2 w-full px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium">Submit with Override</button>
+                                        <button type="submit" :disabled="directSubmitting" class="mt-2 w-full px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed" x-text="directSubmitting ? 'Submitting...' : 'Submit with Override'"></button>
                                     </form>
                                 </div>
                             </div>
@@ -114,12 +115,13 @@
                     </button>
                 </form>
                 @endif
-                @if(in_array($invoice->status, ['locked', 'failed', 'submitted']) && in_array(auth()->user()->role, ['company_admin', 'super_admin']))
-                <form method="POST" action="/invoice/{{ $invoice->id }}/resubmit-fbr" class="inline">
+                @if(in_array($invoice->status, ['failed', 'submitted']) && in_array(auth()->user()->role, ['company_admin', 'super_admin']))
+                <form method="POST" action="/invoice/{{ $invoice->id }}/resubmit-fbr" class="inline" x-data="{ submitting: false }" @submit="if(submitting) { $event.preventDefault(); return; } submitting = true;">
                     @csrf
-                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition" onclick="return confirm('Resubmit this invoice to FBR? This will send it to FBR and update the FBR invoice number.')">
-                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                        Resubmit to FBR
+                    <button type="submit" :disabled="submitting" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed" onclick="return confirm('Resubmit this invoice to FBR? This will send it to FBR and update the FBR invoice number.')">
+                        <svg x-show="!submitting" class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        <svg x-show="submitting" x-cloak class="animate-spin w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <span x-text="submitting ? 'Submitting...' : 'Resubmit to FBR'"></span>
                     </button>
                 </form>
                 @endif
@@ -202,6 +204,32 @@
 
     <div class="py-8">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            @if($invoice->status === 'locked')
+            <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6">
+                <div class="flex items-start gap-3">
+                    <svg class="w-6 h-6 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <div class="flex-1">
+                        <p class="text-sm font-bold text-emerald-800">FBR Production - Invoice Locked</p>
+                        <p class="mt-1 text-sm text-emerald-700">FBR Invoice Number: <strong>{{ $invoice->fbr_invoice_number ?? 'Pending verification' }}</strong></p>
+                        @if($invoice->fbr_submission_date)
+                        <p class="text-xs text-emerald-600 mt-1">Submitted: {{ \Carbon\Carbon::parse($invoice->fbr_submission_date)->format('d-M-Y h:i A') }}</p>
+                        @endif
+                        <p class="text-xs text-gray-500 mt-2">This invoice is locked and cannot be edited. Verify actual FBR number on FBR portal if needed.</p>
+                    </div>
+                </div>
+            </div>
+            @endif
+            @if($invoice->status === 'submitted')
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+                <div class="flex items-start gap-3">
+                    <svg class="animate-spin w-6 h-6 text-blue-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <div class="flex-1">
+                        <p class="text-sm font-bold text-blue-800">Submitting to FBR...</p>
+                        <p class="mt-1 text-sm text-blue-700">This invoice is being processed by FBR. Please wait and refresh this page.</p>
+                    </div>
+                </div>
+            </div>
+            @endif
             @if($invoice->status === 'failed')
             @php
                 $lastFbrLog = \App\Models\FbrLog::where('invoice_id', $invoice->id)->orderBy('created_at', 'desc')->first();

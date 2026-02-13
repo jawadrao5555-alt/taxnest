@@ -18,8 +18,8 @@ class SendInvoiceToFbrJob implements ShouldQueue
 {
     use Queueable;
 
-    public $tries = 3;
-    public $backoff = [30, 60, 120];
+    public $tries = 2;
+    public $backoff = [30, 60];
 
     public function __construct(public int $invoiceId, public ?string $fbrEnvironment = null)
     {

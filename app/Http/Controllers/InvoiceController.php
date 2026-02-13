@@ -536,7 +536,11 @@ class InvoiceController extends Controller
     public function submit(Request $request, Invoice $invoice)
     {
         if ($invoice->isLocked()) {
-            return redirect('/invoices')->with('error', 'Invoice already locked.');
+            return redirect('/invoices')->with('error', 'Invoice already locked and submitted to FBR.');
+        }
+
+        if ($invoice->status === 'submitted') {
+            return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice is already being processed by FBR. Please wait.');
         }
 
         $companyId = $invoice->company_id;
@@ -725,7 +729,11 @@ class InvoiceController extends Controller
             }
         }
 
-        if (!in_array($invoice->status, ['draft', 'locked', 'failed', 'submitted'])) {
+        if ($invoice->status === 'locked') {
+            return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice already submitted to FBR' . (!empty($invoice->fbr_invoice_number) ? ' with number: ' . $invoice->fbr_invoice_number : '') . '. Cannot resubmit.');
+        }
+
+        if (!in_array($invoice->status, ['draft', 'failed'])) {
             return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice cannot be submitted in current status.');
         }
 

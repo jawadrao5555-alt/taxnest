@@ -1,0 +1,217 @@
+You are upgrading the existing TaxNest Enterprise System.
+
+DO NOT:
+- Break FBR payload structure
+- Modify compliance engine logic
+- Remove any production safety mechanisms
+- Remove unique constraints
+- Change invoice numbering
+
+All upgrades must be additive and production-safe.
+
+========================================
+PHASE 1 — QR CODE + PDF SECURITY FIX
+========================================
+
+1. Fix QR not showing in production PDFs:
+   - QR must render when:
+        invoice.status === 'locked'
+        AND fbr_invoice_number IS NOT NULL
+   - QR must encode:
+        sellerNTNCNIC
+        fbr_invoice_number
+        invoiceDate
+        totalValues
+   - Ensure QR is generated server-side (not JS-based)
+   - Ensure PDF engine supports embedded SVG/PNG QR.
+
+2. Remove:
+   - Any security token
+   - Any RS-255 reference
+   - Any bearer token
+   - Any internal API data
+
+PDF must NEVER show:
+   - Authorization token
+   - Raw payload
+   - System security keys
+
+Return confirmation of:
+   - QR rendering test PASS
+   - Security token removed
+
+========================================
+PHASE 2 — NAVIGATION & UX STRUCTURE FIX
+========================================
+
+1. Add universal "Back" system:
+   - Use breadcrumb navigation
+   - Add top-left back arrow on:
+        Invoice view
+        Edit page
+        Admin panels
+        Billing page
+   - Back must return to previous route (history based fallback)
+
+2. Dashboard layout improvement:
+   Replace top floating 3-button dashboard with:
+
+   - Permanent left sidebar (glassmorphism)
+   - Scrollable
+   - Collapsible on mobile
+   - Active route highlight
+   - Smooth transition
+
+Premium UI rules:
+   - No overlapping scroll buttons
+   - Sticky header
+   - Consistent padding
+   - Mobile-safe layout
+
+========================================
+PHASE 3 — SMART BILLING BUILDER
+========================================
+
+Keep existing plans.
+
+Add:
+Custom Plan Builder (Admin only)
+
+User selects:
+   - Invoice limit per month
+   - User count
+   - Branch count
+
+System calculates:
+   base_rate = dynamic formula:
+      invoice_factor * invoice_limit
+      + user_factor * user_count
+      + branch_factor * branch_count
+
+Then apply billing cycle discounts:
+   Monthly = 0%
+   Quarterly = 1%
+   Semi-Annual = 3%
+   Annual = 6%
+
+Must:
+   - Respect existing subscription engine
+   - Not break invoice limit enforcement
+   - Not allow internal companies to be billed
+
+========================================
+PHASE 4 — GLOBAL HS LEARNING MEMORY ENGINE
+(HYBRID MODEL – ADMIN CONTROLLED)
+========================================
+
+Create table:
+hs_usage_patterns
+
+Fields:
+   hs_code
+   schedule_type
+   tax_rate
+   sro_schedule_no
+   sro_item_serial_no
+   mrp_required
+   sale_type
+   success_count
+   rejection_count
+   confidence_score
+   last_used_at
+   integrity_hash
+
+Rules:
+
+1. Trigger only when:
+   invoice.status = 'locked'
+   AND FBR success
+
+2. Increment success_count.
+
+3. If FBR rejection:
+   increment rejection_count.
+
+4. Confidence formula:
+   base = success_count * 5
+   penalty = rejection_count * 10
+   confidence = max(0, base - penalty)
+   cap at 95%
+
+5. Suggestions:
+   - Only show if confidence >= 60%
+   - Label as:
+        "Community Pattern Suggestion"
+
+6. Admin control:
+   - Admin can mark pattern as:
+        Approved Global
+        Disabled
+   - Only approved patterns auto-suggest
+   - No auto-overwrite of manual input
+
+7. Companies NEVER see:
+   - confidence breakdown
+   - rejection counts
+   - company source
+
+========================================
+PHASE 5 — SMART INVOICE MEMORY SUGGESTION
+========================================
+
+On invoice create:
+
+When HS code entered:
+   1. Check hs_master_global
+   2. Then hs_usage_patterns (approved only)
+
+If match found:
+   show suggestion panel:
+      Schedule Type
+      Tax Rate
+      SRO
+      Serial
+      MRP flag
+
+Buttons:
+   [Apply]
+   [Ignore]
+
+Manual entry always allowed.
+
+========================================
+PHASE 6 — PRODUCTION SAFETY RE-VALIDATION
+========================================
+
+Confirm:
+
+- DB::transaction() exists in submit()
+- lockForUpdate() applied
+- Unique index on:
+     fbr_invoice_number
+     (company_id, internal_invoice_number)
+- pending_verification status active
+- No invoice-level environment toggle
+- Admin confirm workflow working
+
+Return PASS/FAIL report.
+
+========================================
+FINAL REQUIREMENT
+========================================
+
+After implementation:
+- Run full test on Demo Company
+- Confirm:
+     No duplicate submission
+     No double-click duplication
+     QR visible
+     SRO suggestion visible
+     Billing calculation correct
+     Back navigation working
+     Sidebar responsive
+     No FBR payload modification
+
+Return:
+   SYSTEM STATUS REPORT
+   with each phase PASS/FAIL

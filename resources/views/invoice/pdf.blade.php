@@ -99,25 +99,28 @@
         <p style="margin: 4px 0 0 0; font-size: 13px; color: #047857;">Federal Board of Revenue — Government of Pakistan</p>
         <p style="margin: 8px 0 0 0; font-size: 14px; font-weight: bold; color: #065f46;">FBR Invoice #: {{ $invoice->fbr_invoice_number }}</p>
     </div>
-    @endif
 
-    @if($invoice->qr_data)
-    @php $qrInfo = json_decode($invoice->qr_data, true); @endphp
     <div style="border: 2px solid #10b981; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
         <div style="text-align: center; margin-bottom: 10px;">
             <span style="background: #d1fae5; color: #065f46; padding: 4px 16px; border-radius: 20px; font-size: 13px; font-weight: bold;">FBR Verified</span>
         </div>
-        @if($invoice->qr_image_url)
         <div style="text-align: center; margin: 10px 0;">
-            <img src="{{ $invoice->qr_image_url }}" alt="QR Code" style="width: 150px; height: 150px; display: inline-block;">
+            @php
+                $qrData = json_encode([
+                    'ntn' => preg_replace('/[^0-9]/', '', $invoice->company->ntn ?? ''),
+                    'fbr_inv' => $invoice->fbr_invoice_number,
+                    'date' => $invoice->invoice_date,
+                    'total' => $invoice->total_amount
+                ]);
+            @endphp
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={{ urlencode($qrData) }}" alt="QR Code" style="width: 150px; height: 150px; display: inline-block;">
         </div>
-        @endif
         <table style="width: 100%; border: none; margin: 0;">
-            <tr><td style="border: none; padding: 4px 8px; font-size: 13px; color: #6b7280;">NTN</td><td style="border: none; padding: 4px 8px; font-size: 13px; font-weight: bold;">{{ $qrInfo['ntn'] ?? '' }}</td></tr>
-            <tr><td style="border: none; padding: 4px 8px; font-size: 13px; color: #6b7280;">Invoice #</td><td style="border: none; padding: 4px 8px; font-size: 13px; font-weight: bold;">{{ $qrInfo['invoice_number'] ?? '' }}</td></tr>
-            <tr><td style="border: none; padding: 4px 8px; font-size: 13px; color: #6b7280;">FBR ID</td><td style="border: none; padding: 4px 8px; font-size: 13px; font-weight: bold;">{{ $qrInfo['fbr_invoice_id'] ?? '' }}</td></tr>
-            <tr><td style="border: none; padding: 4px 8px; font-size: 13px; color: #6b7280;">Date</td><td style="border: none; padding: 4px 8px; font-size: 13px; font-weight: bold;">{{ $qrInfo['date'] ?? '' }}</td></tr>
-            <tr><td style="border: none; padding: 4px 8px; font-size: 13px; color: #6b7280;">Total</td><td style="border: none; padding: 4px 8px; font-size: 13px; font-weight: bold;">Rs. {{ number_format($qrInfo['total'] ?? 0, 2) }}</td></tr>
+            <tr><td style="border: none; padding: 4px 8px; font-size: 13px; color: #6b7280;">NTN</td><td style="border: none; padding: 4px 8px; font-size: 13px; font-weight: bold;">{{ $invoice->company->ntn ?? '' }}</td></tr>
+            <tr><td style="border: none; padding: 4px 8px; font-size: 13px; color: #6b7280;">Invoice #</td><td style="border: none; padding: 4px 8px; font-size: 13px; font-weight: bold;">{{ $invoice->internal_invoice_number }}</td></tr>
+            <tr><td style="border: none; padding: 4px 8px; font-size: 13px; color: #6b7280;">FBR ID</td><td style="border: none; padding: 4px 8px; font-size: 13px; font-weight: bold;">{{ $invoice->fbr_invoice_number }}</td></tr>
+            <tr><td style="border: none; padding: 4px 8px; font-size: 13px; color: #6b7280;">Date</td><td style="border: none; padding: 4px 8px; font-size: 13px; font-weight: bold;">{{ $invoice->invoice_date }}</td></tr>
+            <tr><td style="border: none; padding: 4px 8px; font-size: 13px; color: #6b7280;">Total</td><td style="border: none; padding: 4px 8px; font-size: 13px; font-weight: bold;">Rs. {{ number_format($invoice->total_amount, 2) }}</td></tr>
         </table>
         @if($invoice->integrity_hash)
         <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e5e7eb;">

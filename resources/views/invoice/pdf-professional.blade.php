@@ -75,13 +75,19 @@
                     <td style="vertical-align: middle; text-align: center;">
                         <div class="fbr-header-title">FBR VERIFIED INVOICE</div>
                         <div class="fbr-header-sub">Federal Board of Revenue &mdash; Government of Pakistan</div>
-                        <div class="fbr-number">FBR Invoice #: {{ $invoice->fbr_invoice_number ?? $invoice->fbr_invoice_id }}</div>
+                        <div class="fbr-number">FBR Invoice #: {{ $invoice->fbr_invoice_number }}</div>
                     </td>
-                    @if($invoice->qr_image_url)
                     <td style="width: 100px; vertical-align: middle; text-align: right;">
-                        <img src="{{ $invoice->qr_image_url }}" alt="QR Code" style="width: 80px; height: 80px;">
+                        @php
+                            $qrData = json_encode([
+                                'ntn' => preg_replace('/[^0-9]/', '', $invoice->company->ntn ?? ''),
+                                'fbr_inv' => $invoice->fbr_invoice_number,
+                                'date' => $invoice->invoice_date,
+                                'total' => $invoice->total_amount
+                            ]);
+                        @endphp
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data={{ urlencode($qrData) }}" alt="QR Code" style="width: 80px; height: 80px;">
                     </td>
-                    @endif
                 </tr>
             </table>
             @if($invoice->integrity_hash)

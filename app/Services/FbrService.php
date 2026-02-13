@@ -14,6 +14,59 @@ class FbrService
     private const SANDBOX_VALIDATE_URL = 'https://gw.fbr.gov.pk/di_data/v1/di/validateinvoicedata_sb';
     private const PRODUCTION_VALIDATE_URL = 'https://gw.fbr.gov.pk/di_data/v1/di/validateinvoicedata';
 
+    private function isProxyEnabled(): bool
+    {
+        return !empty(env('FBR_PROXY_URL'));
+    }
+
+    private function getProxyUrl(): string
+    {
+        return env('FBR_PROXY_URL', '');
+    }
+
+    private function getProxySecret(): string
+    {
+        return env('FBR_PROXY_SECRET', 'TaxNest_FBR_Proxy_2024_SecureKey');
+    }
+
+    private function sendViaProxy(string $fbrUrl, string $token, array $payload): array
+    {
+        $proxyUrl = $this->getProxyUrl();
+        $proxySecret = $this->getProxySecret();
+
+        $proxyPayload = [
+            'fbr_url' => $fbrUrl,
+            'fbr_token' => $token,
+            'fbr_payload' => $payload,
+        ];
+
+        $jsonBody = json_encode($proxyPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
+
+        $ch = curl_init($proxyUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $jsonBody,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 60,
+            CURLOPT_HTTPHEADER     => [
+                'Content-Type: application/json',
+                'X-Proxy-Secret: ' . $proxySecret,
+                'Accept: application/json',
+            ],
+        ]);
+
+        $responseBody = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        return [
+            'body' => $responseBody,
+            'http_code' => $httpCode,
+            'curl_error' => $curlError,
+        ];
+    }
+
     private function sanitizeForFbr(?string $text): string
     {
         if (empty($text)) return "";
@@ -544,25 +597,32 @@ class FbrService
         $startTime = microtime(true);
 
         try {
-            $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
+            if ($this->isProxyEnabled()) {
+                $proxyResult = $this->sendViaProxy($url, $token, $payload);
+                $responseBody = $proxyResult['body'];
+                $httpCode = $proxyResult['http_code'];
+                $curlError = $proxyResult['curl_error'];
+            } else {
+                $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
 
-            $ch = curl_init($url);
-            curl_setopt_array($ch, [
-                CURLOPT_POST           => true,
-                CURLOPT_POSTFIELDS     => $jsonBody,
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT        => 30,
-                CURLOPT_HTTPHEADER     => [
-                    'Content-Type: application/json',
-                    'Authorization: Bearer ' . $token,
-                    'Accept: application/json',
-                ],
-            ]);
+                $ch = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_POST           => true,
+                    CURLOPT_POSTFIELDS     => $jsonBody,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT        => 30,
+                    CURLOPT_HTTPHEADER     => [
+                        'Content-Type: application/json',
+                        'Authorization: Bearer ' . $token,
+                        'Accept: application/json',
+                    ],
+                ]);
 
-            $responseBody = curl_exec($ch);
-            $httpCode     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $curlError    = curl_error($ch);
-            curl_close($ch);
+                $responseBody = curl_exec($ch);
+                $httpCode     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $curlError    = curl_error($ch);
+                curl_close($ch);
+            }
 
             $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
             $log->response_time_ms = $responseTimeMs;
@@ -826,24 +886,30 @@ class FbrService
         $validateUrl = $this->getValidateUrl($company);
 
         try {
-            $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
+            if ($this->isProxyEnabled()) {
+                $proxyResult = $this->sendViaProxy($validateUrl, $token, $payload);
+                $responseBody = $proxyResult['body'];
+                $httpCode = $proxyResult['http_code'];
+            } else {
+                $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
 
-            $ch = curl_init($validateUrl);
-            curl_setopt_array($ch, [
-                CURLOPT_POST           => true,
-                CURLOPT_POSTFIELDS     => $jsonBody,
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT        => 30,
-                CURLOPT_HTTPHEADER     => [
-                    'Content-Type: application/json',
-                    'Authorization: Bearer ' . $token,
-                    'Accept: application/json',
-                ],
-            ]);
+                $ch = curl_init($validateUrl);
+                curl_setopt_array($ch, [
+                    CURLOPT_POST           => true,
+                    CURLOPT_POSTFIELDS     => $jsonBody,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT        => 30,
+                    CURLOPT_HTTPHEADER     => [
+                        'Content-Type: application/json',
+                        'Authorization: Bearer ' . $token,
+                        'Accept: application/json',
+                    ],
+                ]);
 
-            $responseBody = curl_exec($ch);
-            $httpCode     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
+                $responseBody = curl_exec($ch);
+                $httpCode     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+            }
 
             $response = new class($responseBody, $httpCode) {
                 private $body;

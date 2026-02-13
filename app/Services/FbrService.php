@@ -544,7 +544,7 @@ class FbrService
         $startTime = microtime(true);
 
         try {
-            $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
 
             $ch = curl_init($url);
             curl_setopt_array($ch, [
@@ -826,7 +826,7 @@ class FbrService
         $validateUrl = $this->getValidateUrl($company);
 
         try {
-            $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
 
             $ch = curl_init($validateUrl);
             curl_setopt_array($ch, [

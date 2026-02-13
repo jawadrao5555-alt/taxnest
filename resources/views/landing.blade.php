@@ -15,6 +15,7 @@
         .feature-gradient { background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%); }
         [x-cloak] { display: none !important; }
     </style>
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body class="antialiased text-gray-800">
@@ -31,6 +32,7 @@
                 <a href="#features" class="text-sm font-medium text-gray-600 hover:text-emerald-600 transition">Features</a>
                 <a href="#how-it-works" class="text-sm font-medium text-gray-600 hover:text-emerald-600 transition">How It Works</a>
                 <a href="#pricing" class="text-sm font-medium text-gray-600 hover:text-emerald-600 transition">Pricing</a>
+                <a href="#faq" class="text-sm font-medium text-gray-600 hover:text-emerald-600 transition">FAQ</a>
                 <a href="/login" class="inline-flex items-center px-4 py-2 border-2 border-emerald-600 text-emerald-700 rounded-lg text-sm font-semibold hover:bg-emerald-50 transition">Login</a>
                 <a href="/register" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition shadow-sm">Sign Up Free</a>
             </div>
@@ -308,6 +310,14 @@
                 </template>
             </div>
 
+            <div class="mt-8 text-center">
+                <p class="text-gray-600 mb-3">Need a custom configuration?</p>
+                <a href="/register" class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-bold hover:from-indigo-700 hover:to-purple-700 transition shadow-lg shadow-indigo-500/25">
+                    <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                    Build Custom Plan
+                </a>
+            </div>
+
             <div class="mt-12 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden max-w-6xl mx-auto">
                 <div class="p-6 border-b border-gray-100">
                     <h3 class="text-xl font-bold text-gray-900">Feature Comparison</h3>
@@ -409,6 +419,59 @@
                             <span class="text-sm font-semibold text-gray-600" x-text="'Rs. ' + calcMonthly(parseInt(selectedPlan)).toLocaleString() + '/mo'"></span>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="faq" class="py-20 bg-white">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <p class="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-2">FAQ</p>
+                <h2 class="text-3xl sm:text-4xl font-extrabold text-gray-900">Frequently Asked Questions</h2>
+            </div>
+            <div class="space-y-4" x-data="{ open: null }">
+                <div class="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+                    <button @click="open = open === 1 ? null : 1" class="w-full flex items-center justify-between p-6 text-left">
+                        <span class="text-base font-semibold text-gray-900">What is TaxNest?</span>
+                        <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 1 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 1" x-collapse class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">TaxNest is Pakistan's leading FBR-compliant tax and invoice management platform. It integrates directly with FBR's PRAL API for real-time invoice submission, compliance scoring, and QR code generation.</div>
+                </div>
+                <div class="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+                    <button @click="open = open === 2 ? null : 2" class="w-full flex items-center justify-between p-6 text-left">
+                        <span class="text-base font-semibold text-gray-900">Is TaxNest FBR approved?</span>
+                        <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 2 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 2" x-collapse class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Yes, TaxNest integrates directly with FBR's PRAL API v1.12 for production invoice submission. All invoices are validated against FBR's compliance rules before submission.</div>
+                </div>
+                <div class="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+                    <button @click="open = open === 3 ? null : 3" class="w-full flex items-center justify-between p-6 text-left">
+                        <span class="text-base font-semibold text-gray-900">How does the free trial work?</span>
+                        <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 3 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 3" x-collapse class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Sign up and get 14 days of full access with no credit card required. You can create invoices, submit to FBR, and explore all features. After the trial, choose a plan that fits your business.</div>
+                </div>
+                <div class="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+                    <button @click="open = open === 4 ? null : 4" class="w-full flex items-center justify-between p-6 text-left">
+                        <span class="text-base font-semibold text-gray-900">Can I manage multiple branches?</span>
+                        <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 4 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 4" x-collapse class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Yes! Business plans support up to 3 branches, Industrial plans offer unlimited branches, and Enterprise plans include unlimited branches with dedicated support.</div>
+                </div>
+                <div class="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+                    <button @click="open = open === 5 ? null : 5" class="w-full flex items-center justify-between p-6 text-left">
+                        <span class="text-base font-semibold text-gray-900">Is my data secure?</span>
+                        <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 5 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 5" x-collapse class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Absolutely. TaxNest uses SHA-256 encrypted audit logs, immutable transaction records, and encrypted FBR tokens. All data is stored securely with role-based access controls.</div>
+                </div>
+                <div class="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+                    <button @click="open = open === 6 ? null : 6" class="w-full flex items-center justify-between p-6 text-left">
+                        <span class="text-base font-semibold text-gray-900">Can I build a custom plan?</span>
+                        <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 6 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 6" x-collapse class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Yes! After signing up, use our Custom Plan Builder to configure exact invoice limits, user counts, and branch counts. Pricing is calculated dynamically with cycle-based discounts.</div>
                 </div>
             </div>
         </div>

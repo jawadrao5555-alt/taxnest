@@ -42,11 +42,11 @@
                 @endif
 
                 @if(isset($branches) && $branches->count() > 0)
-                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100/60 dark:border-gray-700/50 p-6 animate-fade-in">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Branch</h3>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Branch (Optional)</label>
-                        <select name="branch_id" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                        <select name="branch_id" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                             <option value="">— Select Branch —</option>
                             @foreach($branches as $branch)
                             <option value="{{ $branch->id }}" {{ old('branch_id') == $branch->id ? 'selected' : '' }}>
@@ -59,12 +59,12 @@
                 </div>
                 @endif
 
-                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100/60 dark:border-gray-700/50 p-6 animate-fade-in">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Document Information</h3>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Document Type</label>
-                            <select name="document_type" x-model="document_type" @change="onDocTypeChange()" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <select name="document_type" x-model="document_type" @change="onDocTypeChange()" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                 <option value="Sale Invoice">Sale Invoice</option>
                                 <option value="Credit Note">Credit Note</option>
                                 <option value="Debit Note">Debit Note</option>
@@ -84,7 +84,7 @@
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100/60 dark:border-gray-700/50 p-6 animate-fade-in">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Buyer Information</h3>
 
                     <div class="mb-4">
@@ -92,7 +92,7 @@
                         <div class="relative">
                             <div class="flex gap-2">
                                 <input type="text" x-model="customerSearch" @input.debounce.300ms="searchCustomers()" @focus="searchCustomers()" @click.away="showCustomerDropdown = false" placeholder="Search saved customers or enter manually"
-                                    class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                    class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                 <button type="button" x-show="selectedCustomerId" x-cloak @click="clearCustomer()" class="px-3 py-1.5 text-sm text-red-600 hover:text-red-800 border border-red-300 rounded-lg hover:bg-red-50 transition">Clear</button>
                             </div>
                             <div x-show="showCustomerDropdown && customerResults.length > 0" x-cloak class="absolute z-20 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
@@ -111,13 +111,13 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer Name *</label>
                             <input type="text" name="buyer_name" x-model="buyer_name" value="{{ old('buyer_name') }}" required autofocus
-                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                             @error('buyer_name') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer NTN</label>
                             <input type="text" name="buyer_ntn" x-model="buyer_ntn" value="{{ old('buyer_ntn') }}" placeholder="Optional for unregistered"
-                                class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                             @error('buyer_ntn') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                             <p class="text-xs mt-1" :class="buyerRegType === 'Registered' ? 'text-green-600' : 'text-gray-400'" x-text="'Registration: ' + buyerRegType"></p>
                         </div>
@@ -126,7 +126,7 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer CNIC</label>
                             <input type="text" name="buyer_cnic" x-model="buyer_cnic" value="{{ old('buyer_cnic') }}" maxlength="15" placeholder="xxxxx-xxxxxxx-x"
-                                class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                             @error('buyer_cnic') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                     </div>
@@ -134,12 +134,12 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer Address *</label>
                             <textarea name="buyer_address" x-model="buyer_address" required rows="2"
-                                class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">{{ old('buyer_address') }}</textarea>
+                                class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">{{ old('buyer_address') }}</textarea>
                             @error('buyer_address') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Destination Province *</label>
-                            <select name="destination_province" x-model="destination_province" required class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <select name="destination_province" x-model="destination_province" required class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                 @foreach($provinces as $prov)
                                 <option value="{{ $prov }}" {{ old('destination_province', 'Punjab') === $prov ? 'selected' : '' }}>{{ $prov }}</option>
                                 @endforeach
@@ -149,7 +149,7 @@
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100/60 dark:border-gray-700/50 p-6 animate-fade-in">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Invoice Items</h3>
                         <button type="button" @click="addItem()" class="inline-flex items-center px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-100 transition">
@@ -172,7 +172,7 @@
                                 <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Product (optional - auto-fills schedule info)</label>
                                 <div class="relative">
                                     <input type="text" x-model="item.productSearch" @input.debounce.300ms="searchProducts(index)" @focus="searchProducts(index)" @click.away="item.showDropdown = false" placeholder="Search products..."
-                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                     <div x-show="item.showDropdown && item.productResults.length > 0" class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                                         <template x-for="product in item.productResults" :key="product.id">
                                             <button type="button" @click="selectProduct(index, product)" class="w-full text-left px-4 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-sm border-b border-gray-100 last:border-0">
@@ -188,7 +188,7 @@
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Schedule Type</label>
                                     <select :name="'items[' + index + '][schedule_type]'" x-model="item.schedule_type" @change="onScheduleChange(index)"
-                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                         <option value="standard">Standard Rate</option>
                                         <option value="reduced">Reduced Rate</option>
                                         <option value="3rd_schedule">3rd Schedule</option>
@@ -199,7 +199,7 @@
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">HS Code</label>
                                     <input type="text" :name="'items[' + index + '][hs_code]'" x-model="item.hs_code" @blur="lookupHsCode(index); fetchTaxRecommendation(index); fetchHsSuggestion(index)" required placeholder="8471.3010"
-                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                     <div x-show="item.hsSuggestion" x-cloak class="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
                                         <div class="flex items-center justify-between mb-2">
                                             <span class="text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Community Pattern Suggestion</span>
@@ -219,12 +219,12 @@
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">PCT Code</label>
                                     <input type="text" :name="'items[' + index + '][pct_code]'" x-model="item.pct_code" placeholder="Auto from HS/Product"
-                                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm bg-gray-50 dark:bg-gray-600 dark:text-gray-300 focus:ring-emerald-500 focus:border-emerald-500" readonly>
+                                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm bg-gray-50 dark:bg-gray-600 dark:text-gray-300 focus:ring-emerald-500/50 focus:border-emerald-500" readonly>
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tax Rate (%)</label>
                                     <input type="number" step="1" min="0" x-model="item.tax_rate" @input="item.tax_rate = Math.round(item.tax_rate); calcTax(index)" :name="'items[' + index + '][tax_rate]'"
-                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                 </div>
                             </div>
 
@@ -238,7 +238,7 @@
                                         </button>
                                     </div>
                                     <input type="text" :name="'items[' + index + '][sro_schedule_no]'" x-model="item.sro_schedule_no" placeholder="e.g. SRO 1125(I)/2011"
-                                        :class="item.requires_sro ? 'border-amber-300 bg-amber-50 focus:ring-amber-500 focus:border-amber-500' : 'border-gray-300 focus:ring-emerald-500 focus:border-emerald-500'"
+                                        :class="item.requires_sro ? 'border-amber-300 bg-amber-50 focus:ring-amber-500 focus:border-amber-500' : 'border-gray-300 focus:ring-emerald-500/50 focus:border-emerald-500'"
                                         class="w-full rounded-lg shadow-sm text-sm">
                                     <template x-if="item.sroSuggestion">
                                         <div class="mt-1 p-1.5 rounded text-xs" :class="item.sroSuggestion.confidence === 'high' ? 'bg-green-50 text-green-700' : (item.sroSuggestion.confidence === 'medium' ? 'bg-yellow-50 text-yellow-700' : 'bg-gray-50 text-gray-600')">
@@ -250,7 +250,7 @@
                                 <div x-show="item.requires_serial || item.optional_serial">
                                     <label class="block text-xs font-medium mb-1" :class="item.requires_serial ? 'text-amber-600' : 'text-gray-500'" x-text="item.requires_serial ? 'SRO Item Serial No *' : 'SRO Item Serial No (optional)'"></label>
                                     <input type="text" :name="'items[' + index + '][serial_no]'" x-model="item.serial_no" placeholder="e.g. 42"
-                                        :class="item.requires_serial ? 'border-amber-300 bg-amber-50 focus:ring-amber-500 focus:border-amber-500' : 'border-gray-300 focus:ring-emerald-500 focus:border-emerald-500'"
+                                        :class="item.requires_serial ? 'border-amber-300 bg-amber-50 focus:ring-amber-500 focus:border-amber-500' : 'border-gray-300 focus:ring-emerald-500/50 focus:border-emerald-500'"
                                         class="w-full rounded-lg shadow-sm text-sm">
                                 </div>
                             </div>
@@ -289,12 +289,12 @@
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Description</label>
                                     <input type="text" :name="'items[' + index + '][description]'" x-model="item.description" required
-                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">UOM</label>
                                     <select :name="'items[' + index + '][default_uom]'" x-model="item.default_uom"
-                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                         <option value="Numbers, pieces, units">Numbers, pieces, units</option>
                                         <option value="Kilograms">Kilograms</option>
                                         <option value="Liters">Liters</option>
@@ -310,17 +310,17 @@
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Quantity</label>
                                     <input type="number" step="0.01" min="0.01" :name="'items[' + index + '][quantity]'" x-model="item.quantity" @input="calcTax(index)" required
-                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Unit Price (Rs.)</label>
                                     <input type="number" step="0.01" min="0" :name="'items[' + index + '][price]'" x-model="item.price" @input="calcTax(index)" required
-                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">MRP / Retail Price (Rs.)</label>
                                     <input type="number" step="0.01" min="0" :name="'items[' + index + '][mrp]'" x-model="item.mrp" placeholder="0.00"
-                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                 </div>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3" x-show="item.show_st_withheld || item.show_petroleum_levy" x-cloak>
@@ -334,7 +334,7 @@
                                 <div x-show="item.show_petroleum_levy">
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Petroleum Levy (Rs.)</label>
                                     <input type="number" step="0.01" min="0" :name="'items[' + index + '][petroleum_levy]'" x-model="item.petroleum_levy" placeholder="0.00"
-                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                 </div>
                             </div>
                             <input type="hidden" :name="'items[' + index + '][tax]'" :value="item.tax">
@@ -365,7 +365,7 @@
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100/60 dark:border-gray-700/50 p-6 animate-fade-in">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Live Compliance Check</h3>
                         <button type="button" @click="checkCompliance()" :disabled="complianceLoading" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-50">
@@ -456,6 +456,35 @@
                     <button type="submit" class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition">
                         Create Invoice
                     </button>
+                </div>
+
+                <div class="fixed bottom-0 left-0 right-0 lg:left-64 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border-t border-gray-200 dark:border-gray-700 z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+                    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-6 text-sm">
+                                <div>
+                                    <span class="text-gray-500 dark:text-gray-400">Subtotal</span>
+                                    <p class="font-bold text-gray-900 dark:text-white" x-text="'Rs. ' + Number(subtotal || 0).toLocaleString()"></p>
+                                </div>
+                                <div>
+                                    <span class="text-gray-500 dark:text-gray-400">Tax</span>
+                                    <p class="font-bold text-emerald-600 dark:text-emerald-400" x-text="'Rs. ' + Number(totalTax || 0).toLocaleString()"></p>
+                                </div>
+                                <div>
+                                    <span class="text-gray-500 dark:text-gray-400">WHT</span>
+                                    <p class="font-bold text-amber-600 dark:text-amber-400" x-text="'Rs. ' + Number(whtAmount || 0).toLocaleString()"></p>
+                                </div>
+                                <div class="pl-4 border-l border-gray-200 dark:border-gray-600">
+                                    <span class="text-gray-500 dark:text-gray-400">Grand Total</span>
+                                    <p class="text-lg font-extrabold text-gray-900 dark:text-white" x-text="'Rs. ' + Number(grandTotal || 0).toLocaleString()"></p>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-premium inline-flex items-center px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-500/25 transition">
+                                <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                Save Invoice
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </form>
         </div>
@@ -885,8 +914,8 @@
                     <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-700">
                         <div class="flex gap-2">
                             <input type="text" x-model="searchQuery" @input.debounce.300ms="search()" placeholder="Search SRO, HS code, or description..."
-                                class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 text-sm focus:ring-emerald-500 focus:border-emerald-500">
-                            <select x-model="scheduleFilter" @change="search()" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
+                            <select x-model="scheduleFilter" @change="search()" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                 <option value="">All Types</option>
                                 <option value="exempt">Exempt</option>
                                 <option value="zero_rated">Zero Rated</option>

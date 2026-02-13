@@ -47,6 +47,23 @@ TaxNest is built on Laravel 12 with PHP 8.4, using Breeze for authentication. Th
 - **Custom Billing Plan Builder:** Admin-only dynamic pricing calculator with sliders for invoice limit, user count, branch count. Pricing formula: invoiceFactor=2.5, userFactor=500, branchFactor=1000 per month. Cycle discounts: quarterly 1%, semi-annual 3%, annual 6%. Creates PricingPlan and Subscription records.
 - **HS Usage Patterns Learning Engine:** `hs_usage_patterns` table tracks HS code patterns with confidence scoring (success*5 - rejection*10, cap 95%). Auto-records on FBR success/rejection via SendInvoiceToFbrJob. Only surfaces suggestions with admin_status='approved' and confidence >= 60%.
 - **Smart Invoice Memory Suggestions:** Community Pattern Suggestion panel on invoice create page. Fetches suggestions via `/api/hs-usage-suggestions/{hsCode}` when HS code entered. One-click apply for schedule_type, tax_rate, SRO, serial_no. Never exposes internal confidence metrics.
+- **Premium Enterprise Visual Standard (10-Phase UI Overhaul):**
+  - Phase 1+2: Global Design System with CSS variables (--primary-gradient, --card-radius, --glass-bg), glass effects (backdrop-blur-xl), fadeIn/scaleIn animations, premium-hover utilities, sidebar active state with gradient background and 3px emerald left border
+  - Phase 3: Dashboard KPI cards with gradient top borders (blue, emerald, purple, indigo, orange), gradient icon containers with shadow, premium-hover on all interactive cards
+  - Phase 4: Invoice sticky bottom summary bar (backdrop-blur-xl, Subtotal/Tax/WHT/Grand Total), section cards with animate-fade-in, input focus ring opacity
+  - Phase 5: PDF tri-color gradient header line, zebra striped tables, gradient QR badge, "Powered by TaxNest" footer
+  - Phase 6: PWA with cache-first service worker, install popup (auto-appears after 2s), offline badge, update banner
+  - Phase 7: Landing Page FAQ accordion (6 items, Alpine.js x-collapse), Custom Plan CTA button, FAQ nav link
+  - Phase 8-10: Billing pages premium card styling with gradient top accents, rounded-2xl, animate-fade-in
+
+## UI Architecture Notes
+- **Layout**: Fixed sidebar (w-64, z-30, overflow-y-auto), sticky header (z-20), h-screen overflow-hidden body, flex h-full, ml-64 content
+- **Glass Effects**: bg-white/80 backdrop-blur-xl on sidebar/header, border opacity /60 and /50
+- **Design Tokens**: --primary-gradient (sky-indigo), --card-radius (16px), --card-shadow, --glass-bg, --hover-lift (translateY(-2px))
+- **Animations**: fadeIn (translateY 6px), scaleIn (scale 0.97), premium-hover (lift+shadow), btn-premium (scale hover/active)
+- **Sticky Summary**: Fixed bottom (lg:left-64), backdrop-blur-xl, financial summary + submit
+- **PDF Premium**: Gradient header (green-indigo-blue), zebra stripes, gradient QR badge
+- **PWA**: Install popup (bottom-right), offline badge (top-center amber), update banner (top-center indigo)
 
 ## External Dependencies
 - **PostgreSQL:** Primary database.

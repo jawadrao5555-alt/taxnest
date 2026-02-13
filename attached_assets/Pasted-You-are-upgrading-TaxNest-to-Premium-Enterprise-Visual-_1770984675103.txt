@@ -1,0 +1,214 @@
+You are upgrading TaxNest to Premium Enterprise Visual Standard.
+
+DO NOT change business logic.
+DO NOT modify FBR payload.
+DO NOT touch invoice engine.
+Only enhance UI/UX, branding, premium feel, and PWA experience.
+
+========================================
+PHASE 1 – GLOBAL DESIGN SYSTEM UPGRADE
+========================================
+
+1. Introduce Design Tokens:
+
+Create global CSS variables:
+
+--primary-gradient: linear-gradient(135deg, #0ea5e9, #6366f1);
+--card-radius: 16px;
+--card-shadow: 0 8px 30px rgba(0,0,0,0.06);
+--glass-bg: rgba(255,255,255,0.7);
+--glass-blur: blur(12px);
+
+Apply consistent radius + shadow everywhere.
+
+2. Upgrade Cards:
+- Rounded-2xl
+- Subtle shadow
+- Soft hover lift (translateY -2px)
+- Border opacity 10%
+
+3. Typography hierarchy:
+- Page Title: text-2xl font-semibold tracking-tight
+- Section Title: text-lg font-medium
+- Labels: text-sm text-gray-500
+- Values: text-xl font-bold
+
+4. Micro-animations:
+- Button hover smooth scale
+- Card fade-in animation
+- Page transition opacity
+
+========================================
+PHASE 2 – SIDEBAR PREMIUM REBUILD
+========================================
+
+1. Convert sidebar to glass + subtle gradient:
+bg-white/70 backdrop-blur-md border-r
+
+2. Active menu highlight:
+- Left colored indicator bar
+- Soft background tint
+
+3. Add icon consistency:
+Use Heroicons solid version everywhere.
+
+4. Add collapse toggle:
+Desktop:
+- Expand / collapse icon-only mode
+Mobile:
+- Slide-in overlay drawer
+
+========================================
+PHASE 3 – DASHBOARD PREMIUM LAYOUT
+========================================
+
+1. KPI Cards:
+- Add soft icon circles
+- Add mini trend indicator (↑ ↓)
+- Gradient top border accent
+
+2. Compliance score:
+- Replace static circle with animated progress ring
+- Show score with gradient fill
+
+3. Charts:
+- Smooth curves
+- Remove heavy grid lines
+- Softer color palette
+
+4. Add “Quick Actions” section:
+- New Invoice
+- Add Product
+- View Reports
+- Check Compliance
+
+========================================
+PHASE 4 – INVOICE UI REFINEMENT
+========================================
+
+1. Convert invoice form to 2-column grid on desktop.
+2. Add floating section headers.
+3. Sticky summary bar with:
+   - Subtotal
+   - Tax
+   - WHT
+   - Grand Total
+   - Submit button
+
+4. Add subtle info badges:
+   - Intelligence Suggestion
+   - Schedule type
+
+5. Improve input design:
+   - Focus ring color
+   - Rounded-md
+   - Soft transition
+
+========================================
+PHASE 5 – PDF PREMIUM TEMPLATE
+========================================
+
+1. Add premium header:
+   - Company logo
+   - Gradient top line
+   - Better spacing
+
+2. Improve table styling:
+   - Soft zebra stripes
+   - Border opacity 20%
+
+3. QR section boxed with label:
+   “FBR Verification QR”
+
+4. Footer:
+   - Integrity hash
+   - Generated timestamp
+   - Powered by TaxNest
+
+========================================
+PHASE 6 – PWA PREMIUM EXPERIENCE
+========================================
+
+1. Add Install App Popup:
+   - Detect beforeinstallprompt
+   - Show bottom floating install banner
+   - "Install TaxNest App"
+
+2. Add PWA splash screen:
+   - Gradient background
+   - Centered logo
+   - Loading animation
+
+3. Offline mode:
+   - Show "Offline Mode Active" badge when offline
+   - Service worker update notification
+
+4. Add App Icon Set:
+   - 192x192
+   - 512x512
+   - Maskable icon
+
+========================================
+PHASE 7 – LANDING PAGE ENTERPRISE REDESIGN
+========================================
+
+1. Hero Section:
+   - Large gradient background
+   - Animated compliance meter demo
+   - Trust badges row
+
+2. Feature grid:
+   - Icon + headline + short paragraph
+   - Glass cards
+
+3. Add Enterprise trust strip:
+   - “FBR Integrated”
+   - “SHA-256 Secured”
+   - “PRAL Connected”
+
+4. Pricing:
+   - Highlight recommended plan
+   - Add Custom Plan CTA
+   - Add savings badge for annual
+
+5. Add comparison table.
+
+6. Add FAQ section.
+
+========================================
+PHASE 8 – BILLING UI IMPROVEMENT
+========================================
+
+1. Upgrade billing calculator:
+   - Slider inputs
+   - Animated total update
+   - Highlight savings dynamically
+
+2. Add “Estimated Cost Breakdown” modal.
+
+========================================
+PHASE 9 – GLOBAL CONSISTENCY CHECK
+========================================
+
+1. Remove inconsistent paddings.
+2. Normalize spacing system (4px scale).
+3. Ensure dark mode parity.
+4. Ensure mobile responsiveness.
+
+========================================
+PHASE 10 – PERFORMANCE OPTIMIZATION
+========================================
+
+1. Lazy load heavy charts.
+2. Optimize Tailwind build.
+3. Compress images.
+4. Defer non-critical JS.
+
+========================================
+
+After completion:
+Return:
+- Screens updated list
+- PWA status
+- Performance score
+- Before/After summary

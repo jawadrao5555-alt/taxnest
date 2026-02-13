@@ -1,5 +1,5 @@
 <div class="flex flex-col h-full">
-    <div class="flex-shrink-0 px-5 pt-5 pb-4 border-b border-gray-100 dark:border-gray-700">
+    <div class="flex-shrink-0 px-5 pt-5 pb-4 border-b border-gray-200/50 dark:border-gray-700/50">
         <a href="{{ route('dashboard') }}" class="flex items-center space-x-2.5">
             <svg class="h-8 w-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
@@ -127,7 +127,7 @@
         @endif
     </nav>
 
-    <div class="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 p-3">
+    <div class="flex-shrink-0 border-t border-gray-200/50 dark:border-gray-700/50 p-3">
         <a href="{{ route('profile.edit') }}" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm text-gray-600 dark:text-gray-400">
             <span class="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400 text-xs font-bold flex-shrink-0">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</span>
             <div class="min-w-0 flex-1">

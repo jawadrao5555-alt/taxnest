@@ -19,7 +19,8 @@
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="lg:col-span-2 space-y-6">
-                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                    <div class="premium-hover bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100/60 dark:border-gray-700/50 p-6 animate-fade-in relative overflow-hidden">
+                        <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-600"></div>
                         <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-6">Configure Limits</h3>
 
                         <div class="space-y-8">
@@ -70,7 +71,7 @@
                         </div>
                     </div>
 
-                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                    <div class="premium-hover bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100/60 dark:border-gray-700/50 p-6 animate-fade-in">
                         <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Billing Cycle</h3>
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                             <button type="button" @click="billingCycle = 'monthly'; calculate()"
@@ -102,7 +103,8 @@
                 </div>
 
                 <div class="space-y-6">
-                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 sticky top-6">
+                    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100/60 dark:border-gray-700/50 p-6 sticky top-6 relative overflow-hidden animate-fade-in">
+                        <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-400 to-purple-600"></div>
                         <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Price Summary</h3>
 
                         <div x-show="loading" class="flex items-center justify-center py-8">
@@ -160,7 +162,7 @@
                                 <input type="hidden" name="user_count" :value="userCount">
                                 <input type="hidden" name="branch_count" :value="branchCount">
                                 <input type="hidden" name="billing_cycle" :value="billingCycle">
-                                <button type="submit" class="w-full mt-2 py-3 bg-emerald-600 text-white rounded-xl font-semibold text-sm hover:bg-emerald-700 transition shadow-sm">
+                                <button type="submit" class="btn-premium w-full mt-2 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl font-bold text-sm hover:from-emerald-700 hover:to-teal-700 transition shadow-lg shadow-emerald-500/25">
                                     Subscribe to Custom Plan
                                 </button>
                             </form>

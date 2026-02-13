@@ -43,7 +43,7 @@
                 </div>
                 @endif
 
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+                <div class="premium-hover bg-white rounded-2xl shadow-sm border border-gray-100/60 p-6 mb-8 animate-fade-in">
                     <div class="flex items-center justify-between mb-4">
                         <div>
                             <h3 class="text-lg font-semibold text-gray-800">Current Plan: {{ $currentSubscription->pricingPlan->name }}</h3>
@@ -119,7 +119,7 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     @foreach($plans as $index => $plan)
-                    <div class="bg-white rounded-xl shadow-sm border-2 transition hover:shadow-lg relative
+                    <div class="bg-white rounded-2xl shadow-sm border-2 transition premium-hover relative
                         {{ $plan->name === 'Business' ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-gray-100' }}
                         {{ $currentSubscription && $currentSubscription->pricing_plan_id === $plan->id ? 'border-emerald-500' : '' }}">
 
@@ -206,7 +206,7 @@
                 </div>
                 @endif
 
-                <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="mt-8 bg-white rounded-2xl shadow-sm border border-gray-100/60 overflow-hidden animate-fade-in">
                     <div class="p-6 border-b border-gray-100">
                         <h3 class="text-xl font-bold text-gray-900">Feature Comparison</h3>
                     </div>

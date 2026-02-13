@@ -29,6 +29,25 @@
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
         <script>if(document.documentElement.classList.contains('dark')){document.documentElement.style.colorScheme='dark';}</script>
         <style>
+            :root {
+                --primary-gradient: linear-gradient(135deg, #0ea5e9, #6366f1);
+                --card-radius: 16px;
+                --card-shadow: 0 8px 30px rgba(0,0,0,0.06);
+                --glass-bg: rgba(255,255,255,0.7);
+                --glass-blur: blur(12px);
+                --hover-lift: translateY(-2px);
+            }
+            .dark {
+                --glass-bg: rgba(31,41,55,0.7);
+            }
+            @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+            @keyframes scaleIn { from { transform: scale(0.97); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+            .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+            .premium-hover { transition: all 0.2s ease; }
+            .premium-hover:hover { transform: var(--hover-lift); box-shadow: var(--card-shadow); }
+            .btn-premium { transition: all 0.15s ease; }
+            .btn-premium:hover { transform: scale(1.02); }
+            .btn-premium:active { transform: scale(0.98); }
             .sidebar-scroll::-webkit-scrollbar { width: 4px; }
             .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(156,163,175,0.3); border-radius: 4px; }
             .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -38,14 +57,14 @@
             .sidebar-link { transition: all 0.15s ease; }
             .sidebar-link:hover { background-color: #f9fafb; }
             .dark .sidebar-link:hover { background-color: rgba(55,65,81,0.5); }
-            .sidebar-link.active { background-color: #f3f4f6; font-weight: 600; }
-            .dark .sidebar-link.active { background-color: rgba(55,65,81,0.7); }
+            .sidebar-link.active { background: linear-gradient(90deg, rgba(16,185,129,0.08) 0%, transparent 100%); font-weight: 600; border-left: 3px solid #10b981; padding-left: 13px; }
+            .dark .sidebar-link.active { background: linear-gradient(90deg, rgba(16,185,129,0.15) 0%, transparent 100%); border-left: 3px solid #10b981; padding-left: 13px; }
         </style>
     </head>
     <body class="font-sans antialiased h-screen overflow-hidden bg-gray-50 dark:bg-gray-900" x-data="{ sidebarOpen: false }">
         @auth
         <div class="flex h-full">
-            <aside class="hidden lg:flex lg:flex-col w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 fixed left-0 top-0 h-full overflow-y-auto sidebar-scroll z-30">
+            <aside class="hidden lg:flex lg:flex-col w-64 bg-white/80 dark:bg-gray-800/90 backdrop-blur-xl border-r border-gray-200/60 dark:border-gray-700/60 fixed left-0 top-0 h-full overflow-y-auto sidebar-scroll z-30">
                 @include('layouts.navigation')
             </aside>
 
@@ -70,7 +89,7 @@
             </div>
 
             <div class="flex-1 ml-64 flex flex-col h-full">
-                <header class="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 z-20 shadow-sm">
+                <header class="sticky top-0 bg-white/80 dark:bg-gray-800/90 backdrop-blur-xl border-b border-gray-200/60 dark:border-gray-700/60 z-20 shadow-sm">
                     <div class="flex items-center justify-between h-14 px-4 sm:px-6">
                         <div class="flex items-center gap-3">
                             <button @click="sidebarOpen = !sidebarOpen" class="lg:hidden p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
@@ -163,9 +182,48 @@
         @else
         {{ $slot }}
         @endauth
+
+        <div id="pwa-install-popup" class="hidden fixed bottom-6 right-6 z-50 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-5 max-w-sm animate-fade-in">
+            <div class="flex items-start space-x-4">
+                <div class="p-3 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg">
+                    <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                </div>
+                <div class="flex-1">
+                    <h4 class="text-sm font-bold text-gray-900 dark:text-white">Install TaxNest App</h4>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Get instant access from your home screen with offline support.</p>
+                    <div class="flex items-center space-x-2 mt-3">
+                        <button onclick="installPwa()" class="px-4 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition">Install</button>
+                        <button onclick="dismissInstallPopup()" class="px-3 py-1.5 text-gray-500 text-xs font-medium hover:text-gray-700 transition">Later</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="offline-badge" class="hidden fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-amber-500 text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg animate-fade-in">
+            <svg class="w-3.5 h-3.5 inline mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m-2.829-2.829a5 5 0 010-7.07m-2.828 2.829a1 1 0 010 1.414"/></svg>
+            Offline Mode Active
+        </div>
+
+        <div id="sw-update-banner" class="hidden fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-indigo-600 text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg animate-fade-in cursor-pointer" onclick="location.reload()">
+            <svg class="w-3.5 h-3.5 inline mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Update Available — Click to Refresh
+        </div>
+
         <script>
             if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/sw.js').catch(() => {});
+                navigator.serviceWorker.register('/sw.js').then(reg => {
+                    reg.addEventListener('updatefound', () => {
+                        const newWorker = reg.installing;
+                        if (newWorker) {
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'activated') {
+                                    const banner = document.getElementById('sw-update-banner');
+                                    if (banner) banner.classList.remove('hidden');
+                                }
+                            });
+                        }
+                    });
+                }).catch(() => {});
             }
             let deferredPrompt;
             window.addEventListener('beforeinstallprompt', (e) => {
@@ -173,13 +231,33 @@
                 deferredPrompt = e;
                 const btn = document.getElementById('pwa-install-btn');
                 if (btn) btn.classList.remove('hidden');
+                const popup = document.getElementById('pwa-install-popup');
+                if (popup) {
+                    setTimeout(() => popup.classList.remove('hidden'), 2000);
+                }
             });
             function installPwa() {
                 if (deferredPrompt) {
                     deferredPrompt.prompt();
-                    deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
+                    deferredPrompt.userChoice.then(() => { 
+                        deferredPrompt = null;
+                        const popup = document.getElementById('pwa-install-popup');
+                        if (popup) popup.classList.add('hidden');
+                    });
                 }
             }
+            function dismissInstallPopup() {
+                const popup = document.getElementById('pwa-install-popup');
+                if (popup) popup.classList.add('hidden');
+            }
+            window.addEventListener('online', () => {
+                const badge = document.getElementById('offline-badge');
+                if (badge) badge.classList.add('hidden');
+            });
+            window.addEventListener('offline', () => {
+                const badge = document.getElementById('offline-badge');
+                if (badge) badge.classList.remove('hidden');
+            });
         </script>
     </body>
 </html>

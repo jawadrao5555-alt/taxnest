@@ -22,12 +22,14 @@ class CompanySettingsController extends Controller
 
         $request->validate([
             'name' => 'required|string|max:255',
+            'owner_name' => 'nullable|string|max:255',
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:50',
+            'business_activity' => 'nullable|string|max:255',
             'address' => 'nullable|string|max:500',
         ]);
 
-        $company->update($request->only(['name', 'email', 'phone', 'address']));
+        $company->update($request->only(['name', 'owner_name', 'email', 'phone', 'business_activity', 'address']));
 
         SecurityLogService::log('company_profile_updated', auth()->id(), [
             'company_id' => $company->id,
@@ -39,19 +41,22 @@ class CompanySettingsController extends Controller
     public function fbrSettings()
     {
         $company = Company::find(auth()->user()->company_id);
+        if (!$company) {
+            return redirect('/dashboard')->with('error', 'Company not found.');
+        }
 
         $sandboxToken = null;
         $productionToken = null;
         try {
-            if ($company->fbr_sandbox_token) {
+            if (!empty($company->fbr_sandbox_token)) {
                 $sandboxToken = Crypt::decryptString($company->fbr_sandbox_token);
             }
-            if ($company->fbr_production_token) {
+            if (!empty($company->fbr_production_token)) {
                 $productionToken = Crypt::decryptString($company->fbr_production_token);
             }
         } catch (\Exception $e) {
-            $sandboxToken = $company->fbr_sandbox_token;
-            $productionToken = $company->fbr_production_token;
+            $sandboxToken = $company->fbr_sandbox_token ?? null;
+            $productionToken = $company->fbr_production_token ?? null;
         }
 
         return view('company.fbr-settings', compact('company', 'sandboxToken', 'productionToken'));

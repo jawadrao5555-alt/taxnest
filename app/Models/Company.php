@@ -8,10 +8,13 @@ class Company extends Model
 {
     protected $fillable = [
         'name',
+        'owner_name',
         'ntn',
+        'cnic',
         'email',
         'phone',
         'address',
+        'business_activity',
         'fbr_token',
         'token_expires_at',
         'compliance_score',

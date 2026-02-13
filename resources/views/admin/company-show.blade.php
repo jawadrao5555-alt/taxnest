@@ -43,10 +43,16 @@
                     <div>
                         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Company Name</p>
                         <p class="text-sm font-bold text-gray-900 mt-1">{{ $company->name }}</p>
+                        @if($company->owner_name)
+                        <p class="text-xs text-gray-500 mt-0.5">Owner: {{ $company->owner_name }}</p>
+                        @endif
                     </div>
                     <div>
-                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">NTN</p>
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">NTN / CNIC</p>
                         <p class="text-sm font-mono font-bold text-gray-900 mt-1">{{ $company->ntn }}</p>
+                        @if($company->cnic && $company->cnic !== $company->ntn)
+                        <p class="text-xs text-gray-500 mt-0.5">CNIC: {{ $company->cnic }}</p>
+                        @endif
                     </div>
                     <div>
                         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Status</p>

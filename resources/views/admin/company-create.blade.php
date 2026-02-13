@@ -14,14 +14,31 @@
                 <h3 class="text-lg font-semibold text-gray-800">Company Details</h3>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Business Name</label>
                     <input type="text" name="name" value="{{ old('name') }}" required class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                     @error('name') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">NTN (National Tax Number)</label>
-                    <input type="text" name="ntn" value="{{ old('ntn') }}" required placeholder="1234567-8" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                    @error('ntn') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Owner / Proprietor Name</label>
+                    <input type="text" name="owner_name" value="{{ old('owner_name') }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500" placeholder="e.g. ZIA UR REHMAN">
+                    @error('owner_name') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">NTN (National Tax Number)</label>
+                        <input type="text" name="ntn" value="{{ old('ntn') }}" required placeholder="1234567-8" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                        @error('ntn') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">CNIC</label>
+                        <input type="text" name="cnic" value="{{ old('cnic') }}" placeholder="3620291786117" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                        @error('cnic') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">FBR Registration No</label>
+                    <input type="text" name="fbr_registration_no" value="{{ old('fbr_registration_no') }}" placeholder="Same as CNIC for individuals" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                    @error('fbr_registration_no') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
@@ -29,9 +46,14 @@
                         <input type="email" name="email" value="{{ old('email') }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Phone / Cell</label>
                         <input type="text" name="phone" value="{{ old('phone') }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                     </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Business Activity</label>
+                    <input type="text" name="business_activity" value="{{ old('business_activity') }}" placeholder="e.g. Retailer, Manufacturer, Distributor" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                    @error('business_activity') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>

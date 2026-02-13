@@ -14,24 +14,45 @@
                 @csrf
                 @method('PUT')
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Business Name</label>
                     <input type="text" name="name" value="{{ old('name', $company->name) }}" required class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                     @error('name') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">NTN</label>
-                    <input type="text" value="{{ $company->ntn }}" disabled class="w-full rounded-lg bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed">
-                    <p class="text-xs text-gray-400 mt-1">NTN cannot be changed after registration</p>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Owner / Proprietor Name</label>
+                    <input type="text" name="owner_name" value="{{ old('owner_name', $company->owner_name) }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                 </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">NTN</label>
+                        <input type="text" value="{{ $company->ntn }}" disabled class="w-full rounded-lg bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed">
+                        <p class="text-xs text-gray-400 mt-1">NTN cannot be changed after registration</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">CNIC</label>
+                        <input type="text" value="{{ $company->cnic }}" disabled class="w-full rounded-lg bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed">
+                        <p class="text-xs text-gray-400 mt-1">CNIC cannot be changed after registration</p>
+                    </div>
+                </div>
+                @if($company->fbr_registration_no)
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">FBR Registration No</label>
+                    <input type="text" value="{{ $company->fbr_registration_no }}" disabled class="w-full rounded-lg bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed">
+                </div>
+                @endif
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
                         <input type="email" name="email" value="{{ old('email', $company->email) }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Phone / Cell</label>
                         <input type="text" name="phone" value="{{ old('phone', $company->phone) }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                     </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Business Activity</label>
+                    <input type="text" name="business_activity" value="{{ old('business_activity', $company->business_activity) }}" placeholder="e.g. Retailer, Manufacturer" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>

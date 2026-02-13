@@ -110,16 +110,23 @@ class AdminController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
+            'owner_name' => 'nullable|string|max:255',
             'ntn' => 'required|string|max:50|unique:companies,ntn',
+            'cnic' => 'nullable|string|max:20',
+            'fbr_registration_no' => 'nullable|string|max:50',
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:50',
+            'business_activity' => 'nullable|string|max:255',
             'address' => 'nullable|string|max:500',
             'admin_name' => 'nullable|string|max:255',
             'admin_email' => 'nullable|email|unique:users,email',
             'admin_password' => 'nullable|string|min:6',
         ]);
 
-        $company = Company::create(array_merge($request->only(['name', 'ntn', 'email', 'phone', 'address']), ['company_status' => 'active']));
+        $company = Company::create(array_merge(
+            $request->only(['name', 'owner_name', 'ntn', 'cnic', 'fbr_registration_no', 'email', 'phone', 'business_activity', 'address']),
+            ['company_status' => 'active']
+        ));
 
         $freePlan = PricingPlan::orderBy('price')->first();
         if ($freePlan) {

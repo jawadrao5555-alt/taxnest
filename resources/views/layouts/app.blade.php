@@ -59,125 +59,115 @@
             .dark .sidebar-link:hover { background-color: rgba(55,65,81,0.5); }
             .sidebar-link.active { background: linear-gradient(90deg, rgba(16,185,129,0.08) 0%, transparent 100%); font-weight: 600; border-left: 3px solid #10b981; padding-left: 13px; }
             .dark .sidebar-link.active { background: linear-gradient(90deg, rgba(16,185,129,0.15) 0%, transparent 100%); border-left: 3px solid #10b981; padding-left: 13px; }
+
+            .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 40; }
+            .sidebar-overlay.active { display: block; }
+            .sidebar-drawer { position: fixed; top: 0; left: 0; bottom: 0; width: 272px; background: white; z-index: 50; transform: translateX(-100%); transition: transform 0.25s ease; overflow-y: auto; box-shadow: 4px 0 25px rgba(0,0,0,0.1); }
+            .dark .sidebar-drawer { background: #1f2937; }
+            .sidebar-drawer.open { transform: translateX(0); }
         </style>
     </head>
-    <body class="font-sans antialiased h-screen overflow-hidden bg-gray-50 dark:bg-gray-900" x-data="{ sidebarOpen: false }">
+    <body class="font-sans antialiased bg-gray-50 dark:bg-gray-900">
         @auth
-        <div class="flex h-full">
-            <aside class="hidden lg:flex lg:flex-col w-64 bg-white/80 dark:bg-gray-800/90 backdrop-blur-xl border-r border-gray-200/60 dark:border-gray-700/60 fixed left-0 top-0 h-full overflow-y-auto sidebar-scroll z-30">
-                @include('layouts.navigation')
-            </aside>
-
-            <div x-show="sidebarOpen" x-cloak class="fixed inset-0 z-40 lg:hidden" @click="sidebarOpen = false">
-                <div class="fixed inset-0 bg-black/40" x-show="sidebarOpen" x-transition:enter="transition-opacity ease-out duration-200" x-transition:leave="transition-opacity ease-in duration-150"></div>
-                <aside class="fixed inset-y-0 left-0 w-72 bg-white dark:bg-gray-800 shadow-xl z-50 overflow-y-auto sidebar-scroll"
-                    x-show="sidebarOpen"
-                    x-transition:enter="transition transform ease-out duration-200"
-                    x-transition:enter-start="-translate-x-full"
-                    x-transition:enter-end="translate-x-0"
-                    x-transition:leave="transition transform ease-in duration-150"
-                    x-transition:leave-start="translate-x-0"
-                    x-transition:leave-end="-translate-x-full"
-                    @click.stop>
-                    <div class="absolute top-3 right-3">
-                        <button @click="sidebarOpen = false" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
-                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                        </button>
-                    </div>
-                    @include('layouts.navigation')
-                </aside>
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+        <nav class="sidebar-drawer sidebar-scroll" id="sidebarDrawer">
+            <div class="absolute top-3 right-3 z-10">
+                <button onclick="closeSidebar()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
             </div>
+            @include('layouts.navigation')
+        </nav>
 
-            <div class="flex-1 ml-0 lg:ml-64 flex flex-col h-full">
-                <header class="sticky top-0 bg-white/80 dark:bg-gray-800/90 backdrop-blur-xl border-b border-gray-200/60 dark:border-gray-700/60 z-20 shadow-sm">
-                    <div class="flex items-center justify-between h-14 px-4 sm:px-6">
-                        <div class="flex items-center gap-3">
-                            <button @click="sidebarOpen = !sidebarOpen" class="lg:hidden p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-                            </button>
-                            @if(url()->previous() !== url()->current() && url()->previous() !== '')
-                                <a href="{{ url()->previous() }}" class="hidden sm:inline-flex items-center text-sm text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition">
-                                    <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                                    Back
-                                </a>
-                            @endif
-                            @isset($header)
-                                <div class="text-sm">{{ $header }}</div>
-                            @endisset
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <span class="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                @if(auth()->user()->role === 'super_admin') bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300
-                                @elseif(auth()->user()->role === 'company_admin') bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300
-                                @elseif(auth()->user()->role === 'employee') bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300
-                                @else bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300
-                                @endif">
-                                {{ ucfirst(str_replace('_', ' ', auth()->user()->role)) }}
-                            </span>
-                            <button id="pwa-install-btn" onclick="installPwa()" class="hidden items-center px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 shadow-sm transition">
-                                <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                                Install
-                            </button>
-                            <x-dropdown align="right" width="48">
-                                <x-slot name="trigger">
-                                    <button class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
-                                        <span class="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400 text-xs font-bold">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</span>
-                                        <span class="hidden sm:inline">{{ Auth::user()->name }}</span>
-                                        <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" fill="currentColor"/></svg>
-                                    </button>
-                                </x-slot>
-                                <x-slot name="content">
-                                    <x-dropdown-link :href="route('profile.edit')">Profile</x-dropdown-link>
-                                    <form method="POST" action="{{ route('toggle.dark-mode') }}">
-                                        @csrf
-                                        <x-dropdown-link href="#" onclick="event.preventDefault(); this.closest('form').submit();">
-                                            {{ auth()->user()->dark_mode ? 'Light Mode' : 'Dark Mode' }}
-                                        </x-dropdown-link>
-                                    </form>
-                                    <form method="POST" action="{{ route('logout') }}">
-                                        @csrf
-                                        <x-dropdown-link :href="route('logout')" onclick="event.preventDefault(); this.closest('form').submit();">Log Out</x-dropdown-link>
-                                    </form>
-                                </x-slot>
-                            </x-dropdown>
-                        </div>
+        <div class="flex flex-col min-h-screen">
+            <header class="sticky top-0 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border-b border-gray-200/60 dark:border-gray-700/60 z-20 shadow-sm">
+                <div class="flex items-center justify-between h-14 px-4 sm:px-6">
+                    <div class="flex items-center gap-3">
+                        <button onclick="toggleSidebar()" class="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700 transition">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                        </button>
+                        @if(url()->previous() !== url()->current() && url()->previous() !== '')
+                            <a href="{{ url()->previous() }}" class="hidden sm:inline-flex items-center text-sm text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition">
+                                <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                                Back
+                            </a>
+                        @endif
+                        @isset($header)
+                            <div class="text-sm">{{ $header }}</div>
+                        @endisset
                     </div>
-                </header>
+                    <div class="flex items-center gap-3">
+                        <span class="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                            @if(auth()->user()->role === 'super_admin') bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300
+                            @elseif(auth()->user()->role === 'company_admin') bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300
+                            @elseif(auth()->user()->role === 'employee') bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300
+                            @else bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300
+                            @endif">
+                            {{ ucfirst(str_replace('_', ' ', auth()->user()->role)) }}
+                        </span>
+                        <button id="pwa-install-btn" onclick="installPwa()" class="hidden items-center px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 shadow-sm transition">
+                            <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                            Install
+                        </button>
+                        <x-dropdown align="right" width="48">
+                            <x-slot name="trigger">
+                                <button class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                                    <span class="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400 text-xs font-bold">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</span>
+                                    <span class="hidden sm:inline">{{ Auth::user()->name }}</span>
+                                    <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" fill="currentColor"/></svg>
+                                </button>
+                            </x-slot>
+                            <x-slot name="content">
+                                <x-dropdown-link :href="route('profile.edit')">Profile</x-dropdown-link>
+                                <form method="POST" action="{{ route('toggle.dark-mode') }}">
+                                    @csrf
+                                    <x-dropdown-link href="#" onclick="event.preventDefault(); this.closest('form').submit();">
+                                        {{ auth()->user()->dark_mode ? 'Light Mode' : 'Dark Mode' }}
+                                    </x-dropdown-link>
+                                </form>
+                                <form method="POST" action="{{ route('logout') }}">
+                                    @csrf
+                                    <x-dropdown-link :href="route('logout')" onclick="event.preventDefault(); this.closest('form').submit();">Log Out</x-dropdown-link>
+                                </form>
+                            </x-slot>
+                        </x-dropdown>
+                    </div>
+                </div>
+            </header>
 
-                @if(auth()->check() && auth()->user()->company_id)
-                    @php $currentCompany = \App\Models\Company::find(auth()->user()->company_id); @endphp
-                    @if($currentCompany && $currentCompany->company_status === 'pending')
-                    <div class="bg-amber-500 text-white text-center py-2 px-4 text-sm font-medium">
-                        Your company registration is pending approval. Some features may be limited.
+            @if(auth()->check() && auth()->user()->company_id)
+                @php $currentCompany = \App\Models\Company::find(auth()->user()->company_id); @endphp
+                @if($currentCompany && $currentCompany->company_status === 'pending')
+                <div class="bg-amber-500 text-white text-center py-2 px-4 text-sm font-medium">
+                    Your company registration is pending approval. Some features may be limited.
+                </div>
+                @endif
+                @if($currentCompany && $currentCompany->company_status === 'suspended')
+                <div class="bg-red-600 text-white text-center py-2 px-4 text-sm font-medium">
+                    Your company has been suspended. Please contact support.
+                </div>
+                @endif
+            @endif
+
+            <main class="flex-1 p-4 sm:p-6 overflow-y-auto">
+                @if(session('success'))
+                    <div class="max-w-7xl mx-auto mb-4">
+                        <div class="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg">
+                            {{ session('success') }}
+                        </div>
                     </div>
-                    @endif
-                    @if($currentCompany && $currentCompany->company_status === 'suspended')
-                    <div class="bg-red-600 text-white text-center py-2 px-4 text-sm font-medium">
-                        Your company has been suspended. Please contact support.
-                    </div>
-                    @endif
                 @endif
 
-                <main class="flex-1 p-6 overflow-y-auto main-scroll">
-                    @if(session('success'))
-                        <div class="max-w-7xl mx-auto mb-4">
-                            <div class="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg">
-                                {{ session('success') }}
-                            </div>
+                @if(session('error'))
+                    <div class="max-w-7xl mx-auto mb-4">
+                        <div class="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
+                            {{ session('error') }}
                         </div>
-                    @endif
+                    </div>
+                @endif
 
-                    @if(session('error'))
-                        <div class="max-w-7xl mx-auto mb-4">
-                            <div class="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
-                                {{ session('error') }}
-                            </div>
-                        </div>
-                    @endif
-
-                    {{ $slot }}
-                </main>
-            </div>
+                {{ $slot }}
+            </main>
         </div>
         @else
         {{ $slot }}
@@ -210,6 +200,15 @@
         </div>
 
         <script>
+            function toggleSidebar() {
+                document.getElementById('sidebarDrawer').classList.toggle('open');
+                document.getElementById('sidebarOverlay').classList.toggle('active');
+            }
+            function closeSidebar() {
+                document.getElementById('sidebarDrawer').classList.remove('open');
+                document.getElementById('sidebarOverlay').classList.remove('active');
+            }
+
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('/sw.js').then(reg => {
                     reg.addEventListener('updatefound', () => {
@@ -239,7 +238,7 @@
             function installPwa() {
                 if (deferredPrompt) {
                     deferredPrompt.prompt();
-                    deferredPrompt.userChoice.then(() => { 
+                    deferredPrompt.userChoice.then(() => {
                         deferredPrompt = null;
                         const popup = document.getElementById('pwa-install-popup');
                         if (popup) popup.classList.add('hidden');

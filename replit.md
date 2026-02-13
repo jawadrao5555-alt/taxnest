@@ -57,13 +57,15 @@ TaxNest is built on Laravel 12 with PHP 8.4, using Breeze for authentication. Th
   - Phase 8-10: Billing pages premium card styling with gradient top accents, rounded-2xl, animate-fade-in
 
 ## UI Architecture Notes
-- **Layout**: Fixed sidebar (w-64, z-30, overflow-y-auto), sticky header (z-20), h-screen overflow-hidden body, flex h-full, ml-64 content
-- **Glass Effects**: bg-white/80 backdrop-blur-xl on sidebar/header, border opacity /60 and /50
+- **Layout**: Universal slide-out drawer sidebar (NO CSS media queries for sidebar visibility). Sidebar uses CSS transform translateX(-100%)/translateX(0) controlled by JavaScript toggleSidebar()/closeSidebar(). Content always full width (no ml-64). Hamburger menu always visible in header.
+- **Sidebar Drawer**: `.sidebar-drawer` class with position fixed, z-50, w-272px, transform transition. `.sidebar-overlay` backdrop for click-to-close. No `lg:` breakpoint dependencies.
+- **Glass Effects**: bg-white/90 backdrop-blur-xl on header, border opacity /60 and /50
 - **Design Tokens**: --primary-gradient (sky-indigo), --card-radius (16px), --card-shadow, --glass-bg, --hover-lift (translateY(-2px))
 - **Animations**: fadeIn (translateY 6px), scaleIn (scale 0.97), premium-hover (lift+shadow), btn-premium (scale hover/active)
-- **Sticky Summary**: Fixed bottom (lg:left-64), backdrop-blur-xl, financial summary + submit
+- **Sticky Summary**: Fixed bottom (left-0), backdrop-blur-xl, financial summary + submit
 - **PDF Premium**: Gradient header (green-indigo-blue), zebra stripes, gradient QR badge
 - **PWA**: Install popup (bottom-right), offline badge (top-center amber), update banner (top-center indigo)
+- **IMPORTANT**: Never use `lg:ml-64`, `lg:left-64`, `hidden lg:flex` for sidebar. Sidebar is always a JavaScript-controlled drawer overlay.
 
 ## External Dependencies
 - **PostgreSQL:** Primary database.

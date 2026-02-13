@@ -989,6 +989,21 @@ class InvoiceController extends Controller
         $whtAmount = round($subtotal * ($whtRate / 100), 2);
         $netReceivable = round(($subtotal + $totalTax) + $whtAmount, 2);
 
+        $qrBase64 = '';
+        if ($invoice->fbr_invoice_number) {
+            $qrData = json_encode([
+                'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $invoice->company->ntn ?? ''),
+                'fbr_invoice_number' => $invoice->fbr_invoice_number,
+                'invoiceDate' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
+                'totalValues' => $invoice->total_amount,
+            ]);
+            $qrOptions = new \chillerlan\QRCode\QROptions([
+                'outputType' => \chillerlan\QRCode\Output\QROutputInterface::GDIMAGE_PNG,
+                'scale' => 10,
+            ]);
+            $qrBase64 = (new \chillerlan\QRCode\QRCode($qrOptions))->render($qrData);
+        }
+
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-professional', [
             'invoice' => $invoice,
             'showWatermark' => $showWatermark,
@@ -998,6 +1013,7 @@ class InvoiceController extends Controller
             'wht_rate' => $whtRate,
             'wht_amount' => $whtAmount,
             'net_receivable' => $netReceivable,
+            'qrBase64' => $qrBase64,
         ]);
 
         $filename = 'invoice-' . ($invoice->fbr_invoice_number ?? $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id) . '.pdf';

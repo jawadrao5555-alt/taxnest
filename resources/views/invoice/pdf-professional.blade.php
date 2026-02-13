@@ -8,11 +8,11 @@
         body { font-family: 'Helvetica', 'Arial', sans-serif; color: #1f2937; font-size: 13px; line-height: 1.5; }
         .page { padding: 30px 40px; position: relative; }
 
-        .top-stripe { height: 4px; background: #059669; margin-bottom: 20px; }
+        .doc-title { text-align: center; font-size: 22px; font-weight: bold; color: #059669; letter-spacing: 3px; border-bottom: 2px solid #059669; padding-bottom: 12px; margin-bottom: 20px; }
 
-        .header-bar { width: 100%; border-bottom: 2px solid #059669; padding-bottom: 16px; margin-bottom: 20px; }
+        .header-bar { width: 100%; padding-bottom: 16px; margin-bottom: 20px; border-bottom: 1px solid #e5e7eb; }
         .header-bar table { width: 100%; }
-        .company-name { font-size: 20px; font-weight: bold; color: #059669; }
+        .company-name { font-size: 18px; font-weight: bold; color: #1f2937; }
         .company-detail { font-size: 11px; color: #6b7280; margin-top: 2px; }
         .status-badge { display: inline-block; padding: 3px 14px; border-radius: 12px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
         .status-draft { background: #f3f4f6; color: #6b7280; }
@@ -43,9 +43,6 @@
         .totals-inner tr.grand-total td.value { font-size: 15px; font-weight: 800; color: #059669; }
         .totals-inner tr.net td { background: #f0fdf4; border-radius: 4px; }
 
-        .footer { margin-top: 30px; padding-top: 12px; border-top: 2px solid #059669; text-align: center; }
-        .footer-title { font-size: 16px; font-weight: bold; color: #059669; letter-spacing: 2px; }
-
         .watermark { position: fixed; top: 40%; left: 15%; font-size: 60px; color: rgba(156, 163, 175, 0.12); font-weight: bold; text-transform: uppercase; transform: rotate(-35deg); letter-spacing: 10px; z-index: 9999; pointer-events: none; white-space: nowrap; }
 
         .clearfix::after { content: ""; display: table; clear: both; }
@@ -54,7 +51,7 @@
 <body>
     <div class="page">
 
-        <div class="top-stripe"></div>
+        <div class="doc-title">{{ strtoupper($invoice->document_type ?? 'SALE INVOICE') }}</div>
 
         <div class="header-bar">
             <table>
@@ -73,16 +70,8 @@
                         @endif
                     </td>
                     <td style="width: 40%; vertical-align: top; text-align: right;">
-                        @if($invoice->fbr_invoice_number)
-                        @php
-                            $qrData = json_encode([
-                                'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $invoice->company->ntn ?? ''),
-                                'fbr_invoice_number' => $invoice->fbr_invoice_number,
-                                'invoiceDate' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
-                                'totalValues' => $invoice->total_amount
-                            ]);
-                        @endphp
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data={{ urlencode($qrData) }}" alt="QR Code" style="width: 90px; height: 90px; display: inline-block;">
+                        @if($invoice->fbr_invoice_number && !empty($qrBase64))
+                        <img src="{{ $qrBase64 }}" alt="QR Code" style="width: 100px; height: 100px; display: inline-block;">
                         <div style="font-size: 9px; color: #059669; font-weight: bold; margin-top: 3px;">FBR Verified</div>
                         @else
                         <div style="margin-top: 6px;">
@@ -200,10 +189,6 @@
                     @endif
                 </table>
             </div>
-        </div>
-
-        <div class="footer">
-            <div class="footer-title">{{ strtoupper($invoice->document_type ?? 'SALE INVOICE') }}</div>
         </div>
 
         @if(!empty($isDraft) && $isDraft)

@@ -5,9 +5,10 @@
     <title>Invoice {{ $invoice->invoice_number ?? $invoice->id }}</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 40px; color: #333; font-size: 13px; }
-        .header { border-bottom: 3px solid #10b981; padding-bottom: 16px; margin-bottom: 24px; }
+        .doc-title { text-align: center; font-size: 22px; font-weight: bold; color: #10b981; letter-spacing: 3px; border-bottom: 2px solid #10b981; padding-bottom: 12px; margin-bottom: 20px; }
+        .header { border-bottom: 1px solid #e5e7eb; padding-bottom: 16px; margin-bottom: 24px; }
         .header table { width: 100%; }
-        .company-name { font-size: 22px; font-weight: bold; color: #10b981; }
+        .company-name { font-size: 18px; font-weight: bold; color: #1f2937; }
         .info-grid { width: 100%; margin-bottom: 24px; }
         .info-grid td { width: 50%; vertical-align: top; }
         .info-box { background: #f9fafb; padding: 14px; border-radius: 8px; border: 1px solid #e5e7eb; }
@@ -23,11 +24,11 @@
         .status-draft { background: #fef3c7; color: #92400e; }
         .status-submitted { background: #dbeafe; color: #1e40af; }
         .status-locked { background: #d1fae5; color: #065f46; }
-        .footer { margin-top: 30px; padding-top: 12px; border-top: 2px solid #10b981; text-align: center; }
-        .footer-title { font-size: 16px; font-weight: bold; color: #10b981; letter-spacing: 2px; }
     </style>
 </head>
 <body>
+    <div class="doc-title">{{ strtoupper($invoice->document_type ?? 'SALE INVOICE') }}</div>
+
     <div class="header">
         <table>
             <tr>
@@ -123,10 +124,6 @@
             </tr>
         </tfoot>
     </table>
-
-    <div class="footer">
-        <div class="footer-title">{{ strtoupper($invoice->document_type ?? 'SALE INVOICE') }}</div>
-    </div>
 
     @if(!empty($showWatermark) && $showWatermark)
     <div style="position: fixed; top: 40%; left: 15%; font-size: 48px; color: rgba(239, 68, 68, 0.10); font-weight: bold; text-transform: uppercase; transform: rotate(-35deg); pointer-events: none; z-index: 9999; white-space: nowrap; letter-spacing: 6px;">

@@ -16,17 +16,14 @@ class InvoiceNumberingService
                 throw new \RuntimeException("Company not found: {$companyId}");
             }
 
-            $prefix = $company->invoice_number_prefix;
-            if (empty($prefix)) {
-                $prefix = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $company->name), 0, 5));
-                if (empty($prefix)) {
-                    $prefix = 'INV';
-                }
-                $company->invoice_number_prefix = $prefix;
+            $ntn = preg_replace('/[^0-9]/', '', $company->ntn ?? '');
+            if (empty($ntn)) {
+                $ntn = '0000000';
             }
 
             $nextNum = $company->next_invoice_number ?? 1;
-            $invoiceNumber = $prefix . '-' . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+
+            $invoiceNumber = $ntn . 'DI' . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
 
             $company->next_invoice_number = $nextNum + 1;
             $company->save();
@@ -39,18 +36,15 @@ class InvoiceNumberingService
     {
         $company = Company::find($companyId);
         if (!$company) {
-            return 'INV-000001';
+            return '0000000DI000001';
         }
 
-        $prefix = $company->invoice_number_prefix;
-        if (empty($prefix)) {
-            $prefix = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $company->name), 0, 5));
-            if (empty($prefix)) {
-                $prefix = 'INV';
-            }
+        $ntn = preg_replace('/[^0-9]/', '', $company->ntn ?? '');
+        if (empty($ntn)) {
+            $ntn = '0000000';
         }
 
         $nextNum = $company->next_invoice_number ?? 1;
-        return $prefix . '-' . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+        return $ntn . 'DI' . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
     }
 }

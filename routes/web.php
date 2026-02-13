@@ -23,6 +23,7 @@ use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\TaxOverrideController;
 use App\Http\Controllers\CustomerProfileController;
 use App\Http\Controllers\WhtReportController;
+use App\Http\Controllers\CsvImportController;
 
 Route::get('/share/invoice/{uuid}', [ShareController::class, 'show']);
 
@@ -61,6 +62,11 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::post('/invoice/{invoice}/validate', [InvoiceController::class, 'validateInvoice']);
         Route::post('/invoice/{invoice}/validate-fbr', [InvoiceController::class, 'validateFbrPayload']);
         Route::post('/invoice/{invoice}/confirm-fbr', [InvoiceController::class, 'confirmFbrStatus']);
+        Route::post('/invoice/{invoice}/duplicate', [InvoiceController::class, 'duplicate'])->name('invoice.duplicate');
+
+        Route::get('/invoices/csv-template', [CsvImportController::class, 'template'])->name('invoices.csv-template');
+        Route::post('/invoices/csv-upload', [CsvImportController::class, 'upload'])->name('invoices.csv-upload');
+        Route::post('/invoices/csv-process', [CsvImportController::class, 'process'])->name('invoices.csv-process');
 
         Route::get('/customers', [CustomerLedgerController::class, 'index'])->name('customers.index');
         Route::get('/customers/{ntn}/ledger', [CustomerLedgerController::class, 'show']);
@@ -109,6 +115,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
     });
 
     Route::get('/api/products/search', [ProductController::class, 'search']);
+    Route::post('/api/products/quick-create', [ProductController::class, 'quickCreate']);
     Route::get('/api/customer-profiles/search', [CustomerProfileController::class, 'search']);
     Route::get('/api/schedule/config', function () {
         return response()->json(\App\Services\ScheduleEngine::$scheduleTypes);

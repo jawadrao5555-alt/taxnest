@@ -136,4 +136,41 @@ class ProductController extends Controller
 
         return response()->json($products);
     }
+
+    public function quickCreate(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'hs_code' => 'required|string|max:50',
+            'default_price' => 'nullable|numeric|min:0',
+            'uom' => 'nullable|string|max:100',
+            'schedule_type' => 'nullable|string|max:100',
+            'default_tax_rate' => 'nullable|numeric|min:0|max:100',
+        ]);
+
+        $companyId = app('currentCompanyId');
+
+        $product = Product::create([
+            'company_id' => $companyId,
+            'name' => $request->name,
+            'hs_code' => $request->hs_code,
+            'default_price' => $request->default_price ?? 0,
+            'uom' => $request->uom ?? 'Numbers, pieces, units',
+            'schedule_type' => $request->schedule_type ?? 'standard',
+            'default_tax_rate' => $request->default_tax_rate ?? 18,
+            'is_active' => true,
+        ]);
+
+        return response()->json([
+            'id' => $product->id,
+            'name' => $product->name,
+            'hs_code' => $product->hs_code,
+            'pct_code' => $product->pct_code,
+            'default_price' => $product->default_price,
+            'uom' => $product->uom,
+            'schedule_type' => $product->schedule_type,
+            'default_tax_rate' => $product->default_tax_rate,
+            'sro_reference' => $product->sro_reference,
+        ]);
+    }
 }

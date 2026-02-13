@@ -17,7 +17,7 @@
             </div>
         </div>
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <form method="POST" action="/invoice/store" x-data="invoiceForm()" @keydown.enter.prevent="focusNext($event)" class="space-y-6">
+            <form method="POST" action="/invoice/store" x-data="invoiceForm()" @keydown.enter.prevent="focusNext($event)" @keydown.ctrl.s.prevent="saveDraft()" @keydown.meta.s.prevent="saveDraft()" @keydown.ctrl.enter.prevent="submitInvoice()" @keydown.meta.enter.prevent="submitInvoice()" @keydown.escape="closeModals()" class="space-y-6">
                 @csrf
 
                 @if(session('error'))
@@ -157,10 +157,13 @@
                     </div>
 
                     <template x-for="(item, index) in items" :key="index">
-                        <div class="border border-gray-200 dark:border-gray-600 rounded-xl p-4 mb-4">
+                        <div class="border border-gray-200 dark:border-gray-600 rounded-xl p-4 mb-4" :data-item-index="index">
                             <div class="flex items-center justify-between mb-3">
                                 <span class="text-sm font-medium text-gray-600 dark:text-gray-400" x-text="'Item #' + (index + 1)"></span>
-                                <button type="button" @click="removeItem(index)" x-show="items.length > 1" class="text-red-500 hover:text-red-700 text-sm">Remove</button>
+                                <div class="flex items-center space-x-2">
+                                    <button type="button" @click="openQuickProduct(index)" class="text-emerald-600 hover:text-emerald-700 text-xs font-medium">+ Quick Product</button>
+                                    <button type="button" @click="removeItem(index)" x-show="items.length > 1" class="text-red-500 hover:text-red-700 text-sm">Remove</button>
+                                </div>
                             </div>
 
                             <div class="mb-3">
@@ -304,12 +307,12 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Quantity</label>
-                                    <input type="number" step="0.01" min="0.01" :name="'items[' + index + '][quantity]'" x-model="item.quantity" @input="calcTax(index)" required
+                                    <input type="number" step="0.01" min="0.01" :name="'items[' + index + '][quantity]'" x-model="item.quantity" @input="calcTax(index)" required data-field="quantity"
                                         class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Unit Price (Rs.)</label>
-                                    <input type="number" step="0.01" min="0" :name="'items[' + index + '][price]'" x-model="item.price" @input="calcTax(index)" required
+                                    <input type="number" step="0.01" min="0" :name="'items[' + index + '][price]'" x-model="item.price" @input="calcTax(index)" required data-field="price"
                                         class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                 </div>
                                 <div>
@@ -486,22 +489,37 @@
     </div>
 
     <div x-data="{ get form() { return Alpine.$data(document.querySelector('form[x-data]')) } }"
-         class="fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-sm">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-            <div class="flex flex-wrap items-center justify-between gap-3 text-sm">
-                <div class="flex items-center space-x-6">
+         class="fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-lg">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5">
+            <div class="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <div class="flex items-center space-x-4">
                     <div>
-                        <span class="text-gray-500 dark:text-gray-400">Value Excl. ST:</span>
-                        <span class="font-semibold text-gray-800 dark:text-gray-100 ml-1" x-text="'Rs. ' + form.totalExclST()"></span>
+                        <span class="text-xs text-gray-400">Subtotal</span>
+                        <p class="font-semibold text-gray-800 dark:text-gray-100" x-text="'Rs. ' + form.totalExclST()"></p>
                     </div>
                     <div>
-                        <span class="text-gray-500 dark:text-gray-400">Tax:</span>
-                        <span class="font-semibold text-gray-800 dark:text-gray-100 ml-1" x-text="'Rs. ' + form.totalSalesTax()"></span>
+                        <span class="text-xs text-gray-400">Tax</span>
+                        <p class="font-semibold text-emerald-600 dark:text-emerald-400" x-text="'Rs. ' + form.totalSalesTax()"></p>
+                    </div>
+                    <div>
+                        <span class="text-xs text-gray-400">WHT</span>
+                        <p class="font-semibold text-amber-600 dark:text-amber-400" x-text="'Rs. ' + form.whtAmount()"></p>
+                    </div>
+                    <div class="pl-3 border-l border-gray-200 dark:border-gray-700">
+                        <span class="text-xs text-gray-400">Grand Total</span>
+                        <p class="font-bold text-base text-gray-900 dark:text-white" x-text="'Rs. ' + form.grandTotal()"></p>
                     </div>
                 </div>
-                <div class="flex items-center space-x-2">
-                    <span class="text-gray-500 dark:text-gray-400">Net Receivable:</span>
-                    <span class="font-bold text-lg text-emerald-600 dark:text-emerald-400" x-text="'Rs. ' + form.netReceivable()"></span>
+                <div class="flex items-center space-x-3">
+                    @php $fbrEnv = isset($company) ? ($company->fbr_environment ?? 'sandbox') : 'sandbox'; @endphp
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ $fbrEnv === 'production' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' }}">
+                        {{ ucfirst($fbrEnv) }}
+                    </span>
+                    <div class="text-xs text-gray-400">
+                        <kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-xs font-mono">Ctrl+S</kbd> Save
+                        <kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-xs font-mono ml-1">Ctrl+Enter</kbd> Save
+                        <kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-xs font-mono ml-1">Esc</kbd> Close
+                    </div>
                 </div>
             </div>
         </div>
@@ -568,7 +586,10 @@
             }
 
             return {
-                init() { window.invoiceFormInstance = this; },
+                init() { window.invoiceFormInstance = this; this.showQuickProduct = false; this.quickProductName = ''; this.quickProductHs = ''; this.quickProductPrice = ''; this.quickProductUom = 'Numbers, pieces, units'; this.quickProductSchedule = 'standard'; this.quickProductTaxRate = companyStandardRate; this.quickProductSaving = false; this.quickProductItemIndex = null; },
+                showQuickProduct: false,
+                quickProductName: '', quickProductHs: '', quickProductPrice: '', quickProductUom: 'Numbers, pieces, units',
+                quickProductSchedule: 'standard', quickProductTaxRate: companyStandardRate, quickProductSaving: false, quickProductItemIndex: null,
                 buyer_name: '{{ old("buyer_name", "") }}',
                 buyer_ntn: '{{ old("buyer_ntn", "") }}',
                 buyer_cnic: '{{ old("buyer_cnic", "") }}',
@@ -687,6 +708,7 @@
                             this.calcTax(index);
                             this.validateMixedSchedules();
                             this.fetchSroSuggestion(item);
+                            this.focusItemField(index, 'quantity');
                         } else {
                             item.hsLookupInfo = '';
                         }
@@ -807,6 +829,87 @@
                     this.validateMixedSchedules();
                 },
 
+                saveDraft() {
+                    let form = this.$el.closest('form');
+                    if (form) {
+                        let hiddenInput = form.querySelector('input[name="save_as_draft"]');
+                        if (!hiddenInput) {
+                            hiddenInput = document.createElement('input');
+                            hiddenInput.type = 'hidden';
+                            hiddenInput.name = 'save_as_draft';
+                            hiddenInput.value = '1';
+                            form.appendChild(hiddenInput);
+                        }
+                        form.submit();
+                    }
+                },
+
+                submitInvoice() {
+                    let form = this.$el.closest('form');
+                    if (form) {
+                        let hiddenInput = form.querySelector('input[name="save_as_draft"]');
+                        if (hiddenInput) hiddenInput.remove();
+                        form.submit();
+                    }
+                },
+
+                closeModals() {
+                    this.showQuickProduct = false;
+                    this.showCustomerDropdown = false;
+                    this.items.forEach(i => { i.showDropdown = false; });
+                },
+
+                openQuickProduct(index) {
+                    this.quickProductItemIndex = index;
+                    let item = this.items[index];
+                    this.quickProductHs = item.hs_code || '';
+                    this.quickProductName = item.description || '';
+                    this.quickProductPrice = item.price || '';
+                    this.quickProductUom = item.default_uom || 'Numbers, pieces, units';
+                    this.quickProductSchedule = item.schedule_type || 'standard';
+                    this.quickProductTaxRate = item.tax_rate || companyStandardRate;
+                    this.showQuickProduct = true;
+                    this.$nextTick(() => {
+                        let nameInput = document.getElementById('quickProductNameInput');
+                        if (nameInput) nameInput.focus();
+                    });
+                },
+
+                async saveQuickProduct() {
+                    if (!this.quickProductName || !this.quickProductHs) return;
+                    this.quickProductSaving = true;
+                    try {
+                        let res = await fetch('/api/products/quick-create', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' },
+                            body: JSON.stringify({
+                                name: this.quickProductName,
+                                hs_code: this.quickProductHs,
+                                default_price: this.quickProductPrice,
+                                uom: this.quickProductUom,
+                                schedule_type: this.quickProductSchedule,
+                                default_tax_rate: this.quickProductTaxRate
+                            })
+                        });
+                        if (res.ok) {
+                            let product = await res.json();
+                            if (this.quickProductItemIndex !== null) {
+                                this.selectProduct(this.quickProductItemIndex, product);
+                            }
+                            this.showQuickProduct = false;
+                        }
+                    } catch(e) { console.error(e); }
+                    this.quickProductSaving = false;
+                },
+
+                focusItemField(index, field) {
+                    this.$nextTick(() => {
+                        let selector = `[data-item-index="${index}"] [data-field="${field}"]`;
+                        let el = document.querySelector(selector);
+                        if (el) el.focus();
+                    });
+                },
+
                 async checkCompliance() {
                     this.complianceLoading = true;
                     this.complianceResult = null;
@@ -890,6 +993,58 @@
             };
         }
     </script>
+
+    <div x-data="{ get form() { return Alpine.$data(document.querySelector('form[x-data]')) } }" x-cloak>
+        <div x-show="form.showQuickProduct" class="fixed inset-0 z-50 flex items-center justify-center" x-transition>
+            <div class="absolute inset-0 bg-black/50" @click="form.showQuickProduct = false"></div>
+            <div class="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md mx-4 p-6" @keydown.escape="form.showQuickProduct = false">
+                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">Quick Product Create</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Product Name *</label>
+                        <input id="quickProductNameInput" type="text" x-model="form.quickProductName" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:ring-emerald-500/50 focus:border-emerald-500" placeholder="Product name">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">HS Code *</label>
+                            <input type="text" x-model="form.quickProductHs" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:ring-emerald-500/50 focus:border-emerald-500" placeholder="e.g. 12345678">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Default Price</label>
+                            <input type="number" step="0.01" x-model="form.quickProductPrice" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:ring-emerald-500/50 focus:border-emerald-500" placeholder="0.00">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Schedule Type</label>
+                            <select x-model="form.quickProductSchedule" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
+                                <option value="standard">Standard</option>
+                                <option value="reduced">Reduced</option>
+                                <option value="3rd_schedule">3rd Schedule</option>
+                                <option value="exempt">Exempt</option>
+                                <option value="zero_rated">Zero Rated</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Tax Rate (%)</label>
+                            <input type="number" step="0.01" x-model="form.quickProductTaxRate" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">UOM</label>
+                        <input type="text" x-model="form.quickProductUom" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
+                    </div>
+                </div>
+                <div class="flex items-center justify-end space-x-3 mt-5">
+                    <button type="button" @click="form.showQuickProduct = false" class="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition">Cancel</button>
+                    <button type="button" @click="form.saveQuickProduct()" :disabled="form.quickProductSaving || !form.quickProductName || !form.quickProductHs" class="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition">
+                        <span x-show="!form.quickProductSaving">Save & Use</span>
+                        <span x-show="form.quickProductSaving">Saving...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div x-data="sroReferenceModal()" @open-sro-modal.window="openModal($event.detail.itemIndex)" x-cloak>
         <div x-show="isOpen" class="fixed inset-0 z-50 overflow-hidden" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">

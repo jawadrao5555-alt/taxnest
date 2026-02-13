@@ -282,6 +282,37 @@ class AdminController extends Controller
             ->groupBy('failure_type')
             ->get();
 
+        $fbrMetrics30d = FbrLog::where('created_at', '>=', now()->subDays(30))
+            ->select(
+                DB::raw('COUNT(*) as total'),
+                DB::raw("SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success_count"),
+                DB::raw("SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_count"),
+                DB::raw("SUM(CASE WHEN retry_count > 0 THEN 1 ELSE 0 END) as retried_count"),
+                DB::raw('AVG(submission_latency_ms) as avg_latency'),
+                DB::raw('MAX(submission_latency_ms) as max_latency'),
+                DB::raw('MIN(CASE WHEN submission_latency_ms > 0 THEN submission_latency_ms END) as min_latency')
+            )
+            ->first();
+
+        $fbrObservability = [
+            'avg_submission_time' => $fbrMetrics30d->avg_latency ? round($fbrMetrics30d->avg_latency) : ($avgResponseTime ? round($avgResponseTime) : null),
+            'max_submission_time' => $fbrMetrics30d->max_latency ? round($fbrMetrics30d->max_latency) : null,
+            'min_submission_time' => $fbrMetrics30d->min_latency ? round($fbrMetrics30d->min_latency) : null,
+            'total_submissions' => $fbrMetrics30d->total,
+            'success_count' => $fbrMetrics30d->success_count,
+            'failure_count' => $fbrMetrics30d->failed_count,
+            'failure_ratio' => $fbrMetrics30d->total > 0 ? round(($fbrMetrics30d->failed_count / $fbrMetrics30d->total) * 100, 1) : 0,
+            'retry_ratio' => $fbrMetrics30d->total > 0 ? round(($fbrMetrics30d->retried_count / $fbrMetrics30d->total) * 100, 1) : 0,
+        ];
+
+        $failureCategoryBreakdown = FbrLog::where('status', 'failed')
+            ->whereNotNull('failure_category')
+            ->where('created_at', '>=', now()->subDays(30))
+            ->select('failure_category', DB::raw('count(*) as count'))
+            ->groupBy('failure_category')
+            ->orderByDesc('count')
+            ->get();
+
         $companiesAtRisk = Company::where('compliance_score', '<', 50)->count();
         $companiesModerate = Company::whereBetween('compliance_score', [50, 79])->count();
         $companiesSafe = Company::where('compliance_score', '>=', 80)->count();
@@ -309,7 +340,8 @@ class AdminController extends Controller
             'pendingJobs', 'failedJobs', 'avgResponseTime', 'totalRetries24h',
             'fbrLogsToday', 'fbrSuccessToday', 'failureBreakdown',
             'companiesAtRisk', 'companiesModerate', 'companiesSafe',
-            'recentSecurityLogs', 'healthScore', 'recentAnomalies'
+            'recentSecurityLogs', 'healthScore', 'recentAnomalies',
+            'fbrObservability', 'failureCategoryBreakdown'
         ));
     }
 

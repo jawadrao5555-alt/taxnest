@@ -10,9 +10,143 @@
                     </nav>
                     <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Invoices</h2>
                 </div>
-                <a href="/invoice/create" class="inline-flex items-center px-4 py-2 bg-emerald-600 border border-transparent rounded-lg font-semibold text-xs text-white uppercase tracking-widest hover:bg-emerald-700 transition">
-                    + New Invoice
-                </a>
+                <div class="flex gap-2">
+                    <div x-data="csvImport()" x-cloak>
+                        <button @click="openModal()" class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-lg font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 transition">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                            Import CSV
+                        </button>
+
+                        <div x-show="showModal" class="fixed inset-0 z-50 flex items-center justify-center" style="background-color: rgba(0,0,0,0.5);">
+                            <div @click.away="closeModal()" class="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800 w-full max-w-4xl max-h-[90vh] overflow-y-auto mx-4">
+                                <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+                                    <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100">Import Invoices from CSV</h3>
+                                    <button @click="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+                                </div>
+
+                                <div class="p-6">
+                                    <div x-show="step === 'upload'" class="space-y-4">
+                                        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                                            <p class="text-sm text-blue-700 dark:text-blue-300 mb-2">Download the CSV template, fill in your invoice data, then upload it here. Each row represents one invoice item. Items with the same buyer name + NTN will be grouped into a single invoice.</p>
+                                            <a href="/invoices/csv-template" class="inline-flex items-center text-sm font-semibold text-blue-600 hover:text-blue-800">
+                                                <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                                Download CSV Template
+                                            </a>
+                                        </div>
+
+                                        <div class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center">
+                                            <input type="file" accept=".csv,.txt" @change="handleFileUpload($event)" class="hidden" x-ref="csvInput">
+                                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                            <p class="mt-2 text-sm text-gray-500">Select a CSV file to upload</p>
+                                            <button @click="$refs.csvInput.click()" class="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition" :disabled="uploading">
+                                                <span x-show="!uploading">Choose File</span>
+                                                <span x-show="uploading">Uploading...</span>
+                                            </button>
+                                        </div>
+
+                                        <div x-show="uploadError" class="bg-red-50 border border-red-200 rounded-lg p-3">
+                                            <p class="text-sm text-red-700" x-text="uploadError"></p>
+                                        </div>
+                                    </div>
+
+                                    <div x-show="step === 'preview'" class="space-y-4">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex gap-3">
+                                                <span class="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700">Total: <span x-text="totalRows"></span></span>
+                                                <span class="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Valid: <span x-text="validCount"></span></span>
+                                                <span x-show="errorCount > 0" class="px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">Errors: <span x-text="errorCount"></span></span>
+                                            </div>
+                                            <div class="flex gap-2">
+                                                <button @click="resetUpload()" class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-300 transition">Upload Different File</button>
+                                                <button @click="processCsv()" :disabled="processing || validCount === 0" class="px-4 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                                    <span x-show="!processing">Create <span x-text="validCount"></span> Draft(s)</span>
+                                                    <span x-show="processing">Processing...</span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div x-show="errorCount > 0" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                                            <p class="text-sm font-semibold text-red-700 dark:text-red-300 mb-1">Rows with errors (will be skipped):</p>
+                                            <ul class="text-xs text-red-600 dark:text-red-400 space-y-0.5 max-h-32 overflow-y-auto">
+                                                <template x-for="row in rows.filter(r => !r.valid)" :key="row.row">
+                                                    <li>
+                                                        <span class="font-medium">Row <span x-text="row.row"></span>:</span>
+                                                        <span x-text="row.errors.join('; ')"></span>
+                                                    </li>
+                                                </template>
+                                            </ul>
+                                        </div>
+
+                                        <div class="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
+                                            <table class="min-w-full text-xs">
+                                                <thead class="bg-gray-50 dark:bg-gray-800">
+                                                    <tr>
+                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">Row</th>
+                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">Status</th>
+                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">Buyer</th>
+                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">NTN</th>
+                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">Province</th>
+                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">Doc Type</th>
+                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">HS Code</th>
+                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">Description</th>
+                                                        <th class="px-3 py-2 text-right font-medium text-gray-500">Qty</th>
+                                                        <th class="px-3 py-2 text-right font-medium text-gray-500">Price</th>
+                                                        <th class="px-3 py-2 text-right font-medium text-gray-500">Tax</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                                    <template x-for="row in rows" :key="row.row">
+                                                        <tr :class="row.valid ? 'bg-green-50/50 dark:bg-green-900/10' : 'bg-red-50/50 dark:bg-red-900/10'">
+                                                            <td class="px-3 py-2" x-text="row.row"></td>
+                                                            <td class="px-3 py-2">
+                                                                <span x-show="row.valid" class="inline-flex px-1.5 py-0.5 rounded text-xs font-bold bg-green-100 text-green-700">OK</span>
+                                                                <span x-show="!row.valid" class="inline-flex px-1.5 py-0.5 rounded text-xs font-bold bg-red-100 text-red-700" :title="row.errors.join('; ')">Error</span>
+                                                            </td>
+                                                            <td class="px-3 py-2" x-text="row.data.buyer_name || '—'"></td>
+                                                            <td class="px-3 py-2" x-text="row.data.buyer_ntn || '—'"></td>
+                                                            <td class="px-3 py-2" x-text="row.data.destination_province || '—'"></td>
+                                                            <td class="px-3 py-2" x-text="row.data.document_type || '—'"></td>
+                                                            <td class="px-3 py-2" x-text="row.data.hs_code || '—'"></td>
+                                                            <td class="px-3 py-2 max-w-[150px] truncate" x-text="row.data.description || '—'"></td>
+                                                            <td class="px-3 py-2 text-right" x-text="row.data.quantity || '—'"></td>
+                                                            <td class="px-3 py-2 text-right" x-text="row.data.price || '—'"></td>
+                                                            <td class="px-3 py-2 text-right" x-text="row.data.tax || '—'"></td>
+                                                        </tr>
+                                                    </template>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    <div x-show="step === 'done'" class="text-center py-8">
+                                        <svg class="mx-auto h-16 w-16 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        <p class="mt-3 text-lg font-bold text-gray-800 dark:text-gray-100" x-text="resultMessage"></p>
+                                        <div x-show="createdInvoices.length > 0" class="mt-4 max-h-48 overflow-y-auto">
+                                            <table class="mx-auto text-sm text-left">
+                                                <thead><tr><th class="px-3 py-1 text-gray-500">Invoice #</th><th class="px-3 py-1 text-gray-500">Buyer</th><th class="px-3 py-1 text-gray-500">Amount</th><th class="px-3 py-1 text-gray-500">Items</th></tr></thead>
+                                                <tbody>
+                                                    <template x-for="inv in createdInvoices" :key="inv.id">
+                                                        <tr>
+                                                            <td class="px-3 py-1 font-mono text-xs" x-text="inv.invoice_number"></td>
+                                                            <td class="px-3 py-1" x-text="inv.buyer_name"></td>
+                                                            <td class="px-3 py-1" x-text="'Rs. ' + Number(inv.total_amount).toLocaleString()"></td>
+                                                            <td class="px-3 py-1 text-center" x-text="inv.items_count"></td>
+                                                        </tr>
+                                                    </template>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <button @click="closeModal(); window.location.reload();" class="mt-6 px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition">Close & Refresh</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <a href="/invoice/create" class="inline-flex items-center px-4 py-2 bg-emerald-600 border border-transparent rounded-lg font-semibold text-xs text-white uppercase tracking-widest hover:bg-emerald-700 transition">
+                        + New Invoice
+                    </a>
+                </div>
             </div>
             <div class="flex gap-2 mb-6">
                 <a href="/invoices?tab=draft" class="px-4 py-2 rounded-lg text-sm font-medium transition {{ $tab === 'draft' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700' }}">
@@ -185,4 +319,115 @@
             </div>
         </div>
     </div>
+<script>
+function csvImport() {
+    return {
+        showModal: false,
+        step: 'upload',
+        uploading: false,
+        processing: false,
+        uploadError: '',
+        rows: [],
+        totalRows: 0,
+        validCount: 0,
+        errorCount: 0,
+        resultMessage: '',
+        createdInvoices: [],
+
+        openModal() {
+            this.showModal = true;
+            this.resetUpload();
+        },
+
+        closeModal() {
+            this.showModal = false;
+        },
+
+        resetUpload() {
+            this.step = 'upload';
+            this.uploading = false;
+            this.uploadError = '';
+            this.rows = [];
+            this.totalRows = 0;
+            this.validCount = 0;
+            this.errorCount = 0;
+        },
+
+        async handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            this.uploading = true;
+            this.uploadError = '';
+
+            const formData = new FormData();
+            formData.append('csv_file', file);
+
+            try {
+                const response = await fetch('/invoices/csv-upload', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: formData,
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    this.uploadError = data.error || data.message || 'Upload failed.';
+                    this.uploading = false;
+                    return;
+                }
+
+                this.rows = data.rows;
+                this.totalRows = data.total;
+                this.validCount = data.valid_count;
+                this.errorCount = data.error_count;
+                this.step = 'preview';
+            } catch (e) {
+                this.uploadError = 'Network error. Please try again.';
+            }
+
+            this.uploading = false;
+            event.target.value = '';
+        },
+
+        async processCsv() {
+            this.processing = true;
+
+            const validRows = this.rows.filter(r => r.valid).map(r => r.data);
+
+            try {
+                const response = await fetch('/invoices/csv-process', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ rows: validRows }),
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    this.uploadError = data.error || data.message || 'Processing failed.';
+                    this.processing = false;
+                    return;
+                }
+
+                this.resultMessage = data.message;
+                this.createdInvoices = data.invoices || [];
+                this.step = 'done';
+            } catch (e) {
+                this.uploadError = 'Network error. Please try again.';
+            }
+
+            this.processing = false;
+        }
+    };
+}
+</script>
 </x-app-layout>

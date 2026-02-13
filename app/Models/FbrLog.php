@@ -13,7 +13,10 @@ class FbrLog extends Model
         'status',
         'failure_type',
         'response_time_ms',
-        'retry_count'
+        'retry_count',
+        'environment_used',
+        'failure_category',
+        'submission_latency_ms',
     ];
 
     public function invoice()

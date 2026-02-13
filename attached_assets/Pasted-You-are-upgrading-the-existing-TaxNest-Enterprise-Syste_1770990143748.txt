@@ -1,0 +1,117 @@
+You are upgrading the existing TaxNest Enterprise System.
+
+STRICT RULES:
+- DO NOT modify FBR payload structure
+- DO NOT change invoice numbering logic
+- DO NOT modify compliance engine
+- DO NOT modify HS → PCT engine
+- DO NOT change WHT manual selection logic
+- DO NOT break multi-company isolation
+- All upgrades must be backward compatible
+
+========================================
+PHASE A — PRODUCTION STABILITY
+========================================
+
+1️⃣ Database Hardening
+- Enable slow query logging (>300ms)
+- Log SQL, bindings, execution time, route
+- Add indexes (if not exists):
+    invoices (company_id, status, invoice_date)
+    invoice_items (hs_code)
+    fbr_logs (invoice_id, status)
+    hs_usage_patterns (hs_code)
+
+2️⃣ Remove N+1 Queries
+- Apply eager loading in:
+    DashboardController
+    InvoiceController
+    AdminCompanyController
+- Disable lazy loading in production
+
+3️⃣ Queue Safety
+Enhance SendInvoiceToFbrJob:
+- Log execution time
+- Log retry count
+- Abort if status = locked OR pending_verification
+- Prevent duplicate dispatch
+
+4️⃣ FBR Observability
+Enhance fbr_logs table:
+- Add submission_latency_ms
+- Add retry_count
+- Add environment_used
+- Add failure_category
+
+Expose Admin-only metrics:
+- Avg submission time
+- Failure ratio
+- Retry ratio
+
+5️⃣ Safe Caching
+Use Cache::remember for:
+- Pricing plans
+- HS master lookups
+- Province list
+- Dashboard counters
+
+DO NOT cache invoice state.
+
+========================================
+PHASE B — UX & SPEED
+========================================
+
+1️⃣ Keyboard Invoice Mode
+- Enter → next field
+- Ctrl+S → Save Draft
+- Ctrl+Enter → Submit
+- ESC → Close modal
+
+2️⃣ Duplicate Invoice Button
+- Copy header + items
+- Reset status to draft
+- Generate new internal number
+- Do NOT copy fbr_invoice_number
+- Log audit entry
+
+3️⃣ CSV Bulk Invoice Import
+- Download template
+- Upload with preview
+- Row-level validation
+- Batch draft creation
+- Optional batch submit
+
+4️⃣ Quick Product Create (Inline)
+If product not found:
+- Modal with Name, HS, Tax Rate, Schedule Type
+- Save and auto-select
+
+5️⃣ Intelligent Autofocus
+Item entry flow:
+HS → Quantity → Rate → Next row HS auto-focus
+
+6️⃣ Sticky Bottom Summary Bar
+Must show:
+- Subtotal
+- Tax
+- WHT
+- Grand Total
+- Rejection probability
+- Environment badge (Sandbox/Production)
+
+========================================
+FINAL VALIDATION
+========================================
+
+After implementation confirm:
+- All routes return 200
+- Queue worker running
+- No production regression
+- No duplicate invoice submission possible
+- FBR payload unchanged
+- Invoice numbering intact
+
+Return summary of:
+- Indexes added
+- Performance improvements
+- UX upgrades completed

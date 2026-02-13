@@ -23,6 +23,7 @@ use App\Services\RiskIntelligenceEngine;
 use App\Services\VendorRiskEngine;
 use App\Services\AuditProbabilityEngine;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -38,22 +39,28 @@ class DashboardController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
-        $invoices = Invoice::where('company_id', $companyId)
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $invoiceCounts = Invoice::where('company_id', $companyId)
+            ->select(
+                DB::raw('COUNT(*) as total'),
+                DB::raw("SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) as draft_count"),
+                DB::raw("SUM(CASE WHEN status = 'submitted' THEN 1 ELSE 0 END) as submitted_count"),
+                DB::raw("SUM(CASE WHEN status = 'locked' THEN 1 ELSE 0 END) as locked_count"),
+                DB::raw('COALESCE(SUM(total_amount), 0) as total_revenue')
+            )
+            ->first();
 
-        $totalInvoices = $invoices->count();
-        $draftCount = $invoices->where('status', 'draft')->count();
-        $submittedCount = $invoices->where('status', 'submitted')->count();
-        $lockedCount = $invoices->where('status', 'locked')->count();
-        $totalRevenue = $invoices->sum('total_amount');
+        $totalInvoices = $invoiceCounts->total;
+        $draftCount = $invoiceCounts->draft_count;
+        $submittedCount = $invoiceCounts->submitted_count;
+        $lockedCount = $invoiceCounts->locked_count;
+        $totalRevenue = $invoiceCounts->total_revenue;
 
         $subscription = Subscription::where('company_id', $companyId)
             ->where('active', true)
             ->with('pricingPlan')
             ->first();
 
-        $invoiceLimit = $subscription ? $subscription->pricingPlan->invoice_limit : 0;
+        $invoiceLimit = $subscription && $subscription->pricingPlan ? $subscription->pricingPlan->invoice_limit : 0;
         $invoicesUsed = $totalInvoices;
 
         $planTier = 'retail';
@@ -82,18 +89,39 @@ class DashboardController extends Controller
             ->orderBy('month_num')
             ->get();
 
-        $recentInvoices = $invoices->take(10);
+        $recentInvoices = Invoice::where('company_id', $companyId)
+            ->with('items', 'branch')
+            ->orderBy('created_at', 'desc')
+            ->take(10)
+            ->get();
+
+        $draftAging = Invoice::where('company_id', $companyId)
+            ->where('status', 'draft')
+            ->select(
+                DB::raw("SUM(CASE WHEN created_at >= '" . now()->subDay()->toDateTimeString() . "' THEN 1 ELSE 0 END) as one_day"),
+                DB::raw("SUM(CASE WHEN created_at BETWEEN '" . now()->subDays(3)->toDateTimeString() . "' AND '" . now()->subDay()->toDateTimeString() . "' THEN 1 ELSE 0 END) as three_days"),
+                DB::raw("SUM(CASE WHEN created_at < '" . now()->subDays(7)->toDateTimeString() . "' THEN 1 ELSE 0 END) as seven_plus")
+            )
+            ->first();
 
         $draftAging = [
-            '1_day' => Invoice::where('company_id', $companyId)->where('status', 'draft')->where('created_at', '>=', now()->subDay())->count(),
-            '3_days' => Invoice::where('company_id', $companyId)->where('status', 'draft')->whereBetween('created_at', [now()->subDays(3), now()->subDay()])->count(),
-            '7_plus' => Invoice::where('company_id', $companyId)->where('status', 'draft')->where('created_at', '<', now()->subDays(7))->count(),
+            '1_day' => $draftAging->one_day ?? 0,
+            '3_days' => $draftAging->three_days ?? 0,
+            '7_plus' => $draftAging->seven_plus ?? 0,
         ];
 
-        $invoiceIds = Invoice::where('company_id', $companyId)->pluck('id');
-        $totalFbrLogs = FbrLog::whereIn('invoice_id', $invoiceIds)->count();
-        $successFbrLogs = FbrLog::whereIn('invoice_id', $invoiceIds)->where('status', 'success')->count();
-        $fbrSuccessRate = $totalFbrLogs > 0 ? round(($successFbrLogs / $totalFbrLogs) * 100, 1) : 100;
+        $fbrStats = FbrLog::whereIn('invoice_id', function ($q) use ($companyId) {
+                $q->select('id')->from('invoices')->where('company_id', $companyId);
+            })
+            ->select(
+                DB::raw('COUNT(*) as total'),
+                DB::raw("SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success_count"),
+                DB::raw("SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_count")
+            )
+            ->first();
+
+        $totalFbrLogs = $fbrStats->total;
+        $fbrSuccessRate = $totalFbrLogs > 0 ? round(($fbrStats->success_count / $totalFbrLogs) * 100, 1) : 100;
 
         $complianceScore = $company->compliance_score ?? 100;
 
@@ -169,8 +197,7 @@ class DashboardController extends Controller
 
         $compliancePercent = $totalInvoices > 0 ? round(($lockedCount / $totalInvoices) * 100, 1) : 0;
         $avgInvoiceValue = $totalInvoices > 0 ? round($totalRevenue / $totalInvoices, 2) : 0;
-        $failedFbrLogs = FbrLog::whereIn('invoice_id', $invoiceIds)->where('status', 'failed')->count();
-        $rejectionRate = $totalFbrLogs > 0 ? round(($failedFbrLogs / $totalFbrLogs) * 100, 1) : 0;
+        $rejectionRate = $totalFbrLogs > 0 ? round(($fbrStats->failed_count / $totalFbrLogs) * 100, 1) : 0;
 
         $kpis = [
             'compliance_percent' => $compliancePercent,
@@ -206,20 +233,19 @@ class DashboardController extends Controller
             $monthStart = $month->copy()->startOfMonth();
             $monthEnd = $month->copy()->endOfMonth();
 
-            $invoices = Invoice::where('company_id', $companyId)
-                ->whereBetween('created_at', [$monthStart, $monthEnd]);
-
-            $count = $invoices->count();
-            $revenue = Invoice::where('company_id', $companyId)
+            $monthStats = Invoice::where('company_id', $companyId)
                 ->whereBetween('created_at', [$monthStart, $monthEnd])
-                ->sum('total_amount');
-            $taxCollected = Invoice::where('company_id', $companyId)
-                ->whereBetween('created_at', [$monthStart, $monthEnd])
-                ->sum('total_sales_tax');
+                ->select(
+                    DB::raw('COUNT(*) as count'),
+                    DB::raw('COALESCE(SUM(total_amount), 0) as revenue'),
+                    DB::raw('COALESCE(SUM(total_sales_tax), 0) as tax_collected')
+                )
+                ->first();
 
             $invoiceIds = Invoice::where('company_id', $companyId)
                 ->whereBetween('created_at', [$monthStart, $monthEnd])
                 ->pluck('id');
+
             $totalLogs = FbrLog::whereIn('invoice_id', $invoiceIds)->count();
             $failedLogs = FbrLog::whereIn('invoice_id', $invoiceIds)->where('status', 'failed')->count();
             $failRate = $totalLogs > 0 ? round(($failedLogs / $totalLogs) * 100, 1) : 0;
@@ -228,9 +254,9 @@ class DashboardController extends Controller
                 ->whereBetween('created_at', [$monthStart, $monthEnd])
                 ->avg('final_score');
 
-            $monthlyVolume[] = ['month' => $month->format('M'), 'count' => $count, 'revenue' => round($revenue)];
+            $monthlyVolume[] = ['month' => $month->format('M'), 'count' => $monthStats->count, 'revenue' => round($monthStats->revenue)];
             $failureRateTrend[] = ['month' => $month->format('M'), 'rate' => $failRate];
-            $taxCollectedTrend[] = ['month' => $month->format('M'), 'amount' => round($taxCollected)];
+            $taxCollectedTrend[] = ['month' => $month->format('M'), 'amount' => round($monthStats->tax_collected)];
             $riskTrend[] = ['month' => $month->format('M'), 'score' => round($monthReport ?? 100)];
         }
 

@@ -14,6 +14,7 @@ use App\Services\HsUsagePatternService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class SendInvoiceToFbrJob implements ShouldQueue
 {
@@ -26,22 +27,33 @@ class SendInvoiceToFbrJob implements ShouldQueue
     {
     }
 
+    public static function safeDispatch(int $invoiceId, ?string $fbrEnvironment = null): bool
+    {
+        $lockKey = "fbr_dispatch_lock:{$invoiceId}";
+        if (!Cache::add($lockKey, true, 120)) {
+            Log::info("SendInvoiceToFbrJob: Duplicate dispatch prevented for invoice #{$invoiceId}");
+            return false;
+        }
+        static::dispatch($invoiceId, $fbrEnvironment);
+        return true;
+    }
+
     public function handle(): void
     {
+        $startTime = microtime(true);
         $invoice = Invoice::with(['company', 'items'])->findOrFail($this->invoiceId);
 
-        if ($invoice->status === 'locked') {
-            Log::info("SendInvoiceToFbrJob: Invoice #{$invoice->id} already locked, skipping.");
-            return;
-        }
+        Log::info("SendInvoiceToFbrJob: Starting invoice #{$invoice->id}, attempt {$this->attempts()}/{$this->tries}");
 
-        if ($invoice->status === 'pending_verification') {
-            Log::info("SendInvoiceToFbrJob: Invoice #{$invoice->id} pending verification, skipping.");
+        if (in_array($invoice->status, ['locked', 'pending_verification'])) {
+            Log::info("SendInvoiceToFbrJob: Invoice #{$invoice->id} status is '{$invoice->status}', skipping.");
+            $this->releaseLock();
             return;
         }
 
         if ($invoice->status !== 'submitted') {
             Log::warning("SendInvoiceToFbrJob: Invoice #{$invoice->id} status is '{$invoice->status}', expected 'submitted'. Skipping.");
+            $this->releaseLock();
             return;
         }
 
@@ -49,8 +61,16 @@ class SendInvoiceToFbrJob implements ShouldQueue
             $invoice->company->fbr_environment = $this->fbrEnvironment;
         }
 
+        $environment = $invoice->company->fbr_environment ?? 'sandbox';
         $fbrService = new FbrService();
         $response = $fbrService->submitInvoice($invoice, $this->attempts() - 1);
+
+        $executionMs = round((microtime(true) - $startTime) * 1000);
+        Log::info("SendInvoiceToFbrJob: Invoice #{$invoice->id} completed in {$executionMs}ms, result: {$response['status']}");
+
+        $failureCategory = $this->categorizeFailure($response);
+
+        $this->updateFbrLog($invoice, $response, $executionMs, $environment, $failureCategory);
 
         if ($response['status'] === 'success') {
             $invoice->status = 'locked';
@@ -103,6 +123,7 @@ class SendInvoiceToFbrJob implements ShouldQueue
             HsUsagePatternService::recordSuccess($invoice);
 
             ComplianceScoreService::recalculate($invoice->company_id);
+            $this->releaseLock();
             return;
         }
 
@@ -119,14 +140,16 @@ class SendInvoiceToFbrJob implements ShouldQueue
                     'reason' => 'FBR response ambiguous',
                     'attempt' => $this->attempts(),
                     'failure_type' => $response['failure_type'] ?? 'ambiguous_response',
+                    'execution_ms' => $executionMs,
                 ]
             );
 
             Log::warning("SendInvoiceToFbrJob: Invoice #{$invoice->id} marked pending_verification - FBR response ambiguous.");
+            $this->releaseLock();
             return;
         }
 
-        Log::warning("FBR submission failed for invoice #{$invoice->id}, attempt {$this->attempts()}, type: " . ($response['failure_type'] ?? 'unknown'));
+        Log::warning("FBR submission failed for invoice #{$invoice->id}, attempt {$this->attempts()}, type: " . ($response['failure_type'] ?? 'unknown') . ", execution: {$executionMs}ms");
 
         $this->captureHsRejections($invoice, $response);
 
@@ -139,16 +162,17 @@ class SendInvoiceToFbrJob implements ShouldQueue
                 $invoice->id,
                 $invoice->company_id,
                 'fbr_failed',
-                ['attempt' => $this->attempts(), 'failure_type' => $response['failure_type'] ?? 'unknown', 'errors' => $response['errors'] ?? []]
+                ['attempt' => $this->attempts(), 'failure_type' => $response['failure_type'] ?? 'unknown', 'errors' => $response['errors'] ?? [], 'execution_ms' => $executionMs]
             );
 
             ComplianceScoreService::recalculate($invoice->company_id);
+            $this->releaseLock();
         } else {
             InvoiceActivityService::log(
                 $invoice->id,
                 $invoice->company_id,
                 'retry',
-                ['attempt' => $this->attempts(), 'failure_type' => $response['failure_type'] ?? 'unknown']
+                ['attempt' => $this->attempts(), 'failure_type' => $response['failure_type'] ?? 'unknown', 'execution_ms' => $executionMs]
             );
 
             $this->release($this->backoff[$this->attempts() - 1] ?? 120);
@@ -178,7 +202,51 @@ class SendInvoiceToFbrJob implements ShouldQueue
             ComplianceScoreService::recalculate($invoice->company_id);
         }
 
+        $this->releaseLock();
         Log::error("FBR submission permanently failed for invoice #{$this->invoiceId}: " . $exception->getMessage());
+    }
+
+    private function releaseLock(): void
+    {
+        Cache::forget("fbr_dispatch_lock:{$this->invoiceId}");
+    }
+
+    private function categorizeFailure(array $response): ?string
+    {
+        if ($response['status'] === 'success') return null;
+
+        $failureType = $response['failure_type'] ?? '';
+
+        return match(true) {
+            str_contains($failureType, 'auth') || str_contains($failureType, 'token') => 'authentication',
+            str_contains($failureType, 'timeout') || str_contains($failureType, 'connection') => 'network',
+            str_contains($failureType, 'validation') || str_contains($failureType, 'payload') => 'validation',
+            str_contains($failureType, 'rate_limit') => 'rate_limit',
+            str_contains($failureType, 'server') || str_contains($failureType, '500') => 'server_error',
+            str_contains($failureType, 'duplicate') => 'duplicate',
+            $failureType === 'exception' => 'exception',
+            default => 'unknown',
+        };
+    }
+
+    private function updateFbrLog(Invoice $invoice, array $response, int $executionMs, string $environment, ?string $failureCategory): void
+    {
+        try {
+            $latestLog = FbrLog::where('invoice_id', $invoice->id)
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+            if ($latestLog) {
+                $latestLog->update([
+                    'submission_latency_ms' => $executionMs,
+                    'environment_used' => $environment,
+                    'failure_category' => $failureCategory,
+                    'retry_count' => $this->attempts() - 1,
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::warning("Failed to update FBR log metrics for invoice #{$invoice->id}: " . $e->getMessage());
+        }
     }
 
     private function captureHsRejections($invoice, array $response): void

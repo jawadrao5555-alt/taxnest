@@ -96,6 +96,44 @@
                 </div>
             </div>
 
+            @if(isset($fbrObservability))
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 mb-8">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">FBR Submission Metrics (30 Days)</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="p-3 bg-blue-50 rounded-lg text-center">
+                        <p class="text-xs text-gray-500 uppercase">Avg Submission Time</p>
+                        <p class="text-xl font-bold text-blue-700">{{ $fbrObservability['avg_submission_time'] ? number_format($fbrObservability['avg_submission_time']) . 'ms' : 'N/A' }}</p>
+                    </div>
+                    <div class="p-3 bg-green-50 rounded-lg text-center">
+                        <p class="text-xs text-gray-500 uppercase">Success Rate</p>
+                        <p class="text-xl font-bold text-green-700">{{ $fbrObservability['total_submissions'] > 0 ? round(($fbrObservability['success_count'] / $fbrObservability['total_submissions']) * 100, 1) : 0 }}%</p>
+                    </div>
+                    <div class="p-3 bg-red-50 rounded-lg text-center">
+                        <p class="text-xs text-gray-500 uppercase">Failure Ratio</p>
+                        <p class="text-xl font-bold text-red-700">{{ $fbrObservability['failure_ratio'] }}%</p>
+                    </div>
+                    <div class="p-3 bg-orange-50 rounded-lg text-center">
+                        <p class="text-xs text-gray-500 uppercase">Retry Ratio</p>
+                        <p class="text-xl font-bold text-orange-700">{{ $fbrObservability['retry_ratio'] }}%</p>
+                    </div>
+                </div>
+                <div class="mt-4 grid grid-cols-3 gap-4 text-sm">
+                    <div class="text-center">
+                        <p class="text-gray-500">Total Submissions</p>
+                        <p class="font-semibold text-gray-800">{{ $fbrObservability['total_submissions'] }}</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-gray-500">Min Latency</p>
+                        <p class="font-semibold text-gray-800">{{ $fbrObservability['min_submission_time'] ? number_format($fbrObservability['min_submission_time']) . 'ms' : 'N/A' }}</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-gray-500">Max Latency</p>
+                        <p class="font-semibold text-gray-800">{{ $fbrObservability['max_submission_time'] ? number_format($fbrObservability['max_submission_time']) . 'ms' : 'N/A' }}</p>
+                    </div>
+                </div>
+            </div>
+            @endif
+
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <h3 class="text-lg font-semibold text-gray-800 mb-4">FBR Failure Breakdown</h3>

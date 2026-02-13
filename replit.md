@@ -68,6 +68,24 @@ TaxNest is built on Laravel 12 with PHP 8.4, using Breeze for authentication. Th
 - **PWA**: Install popup (bottom-right, shows once via localStorage), offline badge (bottom-left small pill), update banner (full-width top bar).
 - **Mobile**: Hamburger opens sidebar drawer. Overlay click closes it. Tables have overflow-x-auto. Invoice sticky summary functional on all sizes.
 
+## Recent Changes (Feb 13, 2026)
+**Phase A - Production Stability:**
+- Database hardening: composite indexes on invoices (company_id+status+date), invoice_items (hs_code+invoice_id), fbr_logs (invoice_id+status)
+- N+1 query elimination: DashboardController and AdminController use aggregated SELECT with conditional sums
+- Queue safety: SendInvoiceToFbrJob with execution timing, cache-based duplicate dispatch prevention (fbr_dispatch_lock), failure categorization
+- FBR observability: admin system-health page shows avg/min/max submission latency, success/failure/retry ratios (30-day window), failure category breakdown
+- Safe caching: CacheService with TTL-based caching for pricing plans (5min), HS lookups (10min), provinces (1hr), dashboard counters (1min)
+- Slow query logging: >300ms threshold with route tracking in AppServiceProvider
+- fbr_logs extended: environment_used, failure_category, submission_latency_ms columns
+
+**Phase B - UX & Speed:**
+- B1: Keyboard mode on invoice create - Ctrl+S and Ctrl+Enter save, ESC closes modals, Enter advances fields
+- B2: Duplicate Invoice button on show page - copies header+items, resets FBR fields, new internal number, audit trail
+- B3: CSV Bulk Import - CsvImportController with template download, row validation preview, batch draft creation grouped by buyer
+- B4: Quick Product Create - inline modal on invoice create + API endpoint POST /api/products/quick-create
+- B5: Intelligent Autofocus - HS lookup completion auto-focuses quantity field via data-field attributes
+- B6: Sticky Bottom Summary - Subtotal, Tax, WHT, Grand Total, FBR environment badge (sandbox/production), keyboard shortcut hints
+
 ## External Dependencies
 - **PostgreSQL:** Primary database.
 - **FBR (Federal Board of Revenue) Pakistan:** Integration for tax and invoice submission compliance.

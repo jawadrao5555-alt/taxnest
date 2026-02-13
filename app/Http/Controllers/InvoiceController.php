@@ -82,7 +82,7 @@ class InvoiceController extends Controller
         $standardTaxRate = $company ? $company->getStandardTaxRateValue() : 18.0;
         $nextInvoiceNumber = InvoiceNumberingService::peekNextNumber($companyId);
         $provinces = self::getPakistanProvinces();
-        return view('invoice.create', compact('branches', 'standardTaxRate', 'nextInvoiceNumber', 'provinces'));
+        return view('invoice.create', compact('branches', 'standardTaxRate', 'nextInvoiceNumber', 'provinces', 'company'));
     }
 
     public static function getPakistanProvinces(): array
@@ -1194,6 +1194,95 @@ class InvoiceController extends Controller
             'locked_invoices' => $lockedInvoices,
             'latest_risk_level' => $latestReport ? $latestReport->risk_level : 'N/A',
         ]);
+    }
+
+    public function duplicate(Invoice $invoice)
+    {
+        $companyId = app('currentCompanyId');
+        if ($invoice->company_id !== $companyId) {
+            abort(403);
+        }
+
+        $invoice->load('items');
+
+        DB::beginTransaction();
+        try {
+            $newInvoiceNumber = InvoiceNumberingService::generateNextNumber($companyId);
+
+            $newInvoice = Invoice::create([
+                'company_id' => $invoice->company_id,
+                'invoice_number' => $newInvoiceNumber,
+                'internal_invoice_number' => $newInvoiceNumber,
+                'buyer_name' => $invoice->buyer_name,
+                'buyer_ntn' => $invoice->buyer_ntn,
+                'buyer_cnic' => $invoice->buyer_cnic,
+                'buyer_address' => $invoice->buyer_address,
+                'buyer_registration_type' => $invoice->buyer_registration_type,
+                'total_amount' => $invoice->total_amount,
+                'total_value_excluding_st' => $invoice->total_value_excluding_st,
+                'total_sales_tax' => $invoice->total_sales_tax,
+                'wht_rate' => $invoice->wht_rate,
+                'wht_amount' => $invoice->wht_amount,
+                'net_receivable' => $invoice->net_receivable,
+                'branch_id' => $invoice->branch_id,
+                'document_type' => $invoice->document_type,
+                'reference_invoice_number' => $invoice->reference_invoice_number,
+                'supplier_province' => $invoice->supplier_province,
+                'destination_province' => $invoice->destination_province,
+                'invoice_date' => now()->toDateString(),
+                'status' => 'draft',
+                'fbr_status' => null,
+                'fbr_invoice_number' => null,
+                'fbr_invoice_id' => null,
+                'fbr_submission_date' => null,
+                'qr_data' => null,
+                'integrity_hash' => null,
+                'submitted_at' => null,
+                'override_reason' => null,
+                'override_by' => null,
+                'submission_mode' => null,
+            ]);
+
+            foreach ($invoice->items as $item) {
+                InvoiceItem::create([
+                    'invoice_id' => $newInvoice->id,
+                    'hs_code' => $item->hs_code,
+                    'description' => $item->description,
+                    'quantity' => $item->quantity,
+                    'price' => $item->price,
+                    'tax' => $item->tax,
+                    'schedule_type' => $item->schedule_type,
+                    'pct_code' => $item->pct_code,
+                    'tax_rate' => $item->tax_rate,
+                    'sro_schedule_no' => $item->sro_schedule_no,
+                    'serial_no' => $item->serial_no,
+                    'mrp' => $item->mrp,
+                    'default_uom' => $item->default_uom,
+                    'sale_type' => $item->sale_type,
+                    'st_withheld_at_source' => $item->st_withheld_at_source,
+                    'petroleum_levy' => $item->petroleum_levy,
+                ]);
+            }
+
+            AuditLogService::log('invoice_duplicated', 'Invoice', $newInvoice->id, null, [
+                'source_invoice_id' => $invoice->id,
+                'source_invoice_number' => $invoice->internal_invoice_number,
+                'new_invoice_number' => $newInvoiceNumber,
+                'user' => auth()->user()->name,
+            ]);
+
+            InvoiceActivityService::log($newInvoice->id, $companyId, 'duplicated', [
+                'source_invoice_id' => $invoice->id,
+                'source_invoice_number' => $invoice->internal_invoice_number,
+                'items_count' => $invoice->items->count(),
+            ]);
+
+            DB::commit();
+            return redirect('/invoice/' . $newInvoice->id)->with('success', 'Invoice duplicated successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to duplicate invoice: ' . $e->getMessage());
+        }
     }
 
     private function extractTaxRate(array $item): float

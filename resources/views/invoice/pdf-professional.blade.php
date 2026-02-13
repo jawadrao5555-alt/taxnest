@@ -74,8 +74,10 @@
             <table>
                 <tr>
                     <td style="width: 50%; vertical-align: top;">
-                        @if(!$invoice->fbr_invoice_number)
-                        <span class="status-badge status-{{ $invoice->status }}">{{ strtoupper($invoice->status) }}</span>
+                        @if($invoice->fbr_invoice_number)
+                        <span class="status-badge status-locked" style="background: #d1fae5; color: #065f46;">FBR VERIFIED</span>
+                        @else
+                        <span class="status-badge status-{{ $invoice->status }}">{{ strtoupper($invoice->status === 'locked' ? 'PRODUCTION' : $invoice->status) }}</span>
                         @endif
                     </td>
                     <td style="width: 50%; vertical-align: top; text-align: right;">
@@ -149,7 +151,7 @@
                         </tr>
                         <tr>
                             <td style="padding: 2px 0;"><span class="inv-detail-label">Status</span></td>
-                            <td style="padding: 2px 0; text-align: right;"><span class="inv-detail-value">{{ ucfirst($invoice->status) }}</span></td>
+                            <td style="padding: 2px 0; text-align: right;"><span class="inv-detail-value">{{ $invoice->fbr_invoice_number ? 'FBR Verified' : ($invoice->status === 'locked' ? 'Production' : ucfirst($invoice->status)) }}</span></td>
                         </tr>
                         @if($invoice->document_type && $invoice->document_type !== 'Sale Invoice')
                         <tr>

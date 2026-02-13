@@ -1,4 +1,4 @@
-const CACHE_NAME = 'taxnest-v2';
+const CACHE_NAME = 'taxnest-v3';
 const OFFLINE_URL = '/offline';
 const ASSETS_TO_CACHE = [
     '/',
@@ -30,7 +30,16 @@ self.addEventListener('fetch', event => {
         );
         return;
     }
+
+    const url = new URL(event.request.url);
+    if (url.pathname.startsWith('/build/')) {
+        event.respondWith(fetch(event.request));
+        return;
+    }
+
     event.respondWith(
-        caches.match(event.request).then(cached => cached || fetch(event.request))
+        fetch(event.request)
+            .then(response => response)
+            .catch(() => caches.match(event.request))
     );
 });

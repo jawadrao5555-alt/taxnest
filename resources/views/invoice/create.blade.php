@@ -1079,6 +1079,10 @@
                     <div class="flex border-b border-gray-200 dark:border-gray-700">
                         <button @click="activeTab = 'sro'" :class="activeTab === 'sro' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500'" class="flex-1 px-4 py-2 text-sm font-medium border-b-2 transition">SRO Rules</button>
                         <button @click="activeTab = 'hs'" :class="activeTab === 'hs' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500'" class="flex-1 px-4 py-2 text-sm font-medium border-b-2 transition">HS Requirements</button>
+                        <button @click="activeTab = 'learned'" :class="activeTab === 'learned' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500'" class="flex-1 px-4 py-2 text-sm font-medium border-b-2 transition relative">
+                            FBR Verified
+                            <span x-show="learnedResults.length > 0" class="ml-1 inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-blue-600 rounded-full" x-text="learnedResults.length"></span>
+                        </button>
                     </div>
 
                     <div class="flex-1 overflow-y-auto px-5 py-3">
@@ -1145,6 +1149,46 @@
                                 <p class="text-sm">Search for an HS code or product description</p>
                             </div>
                         </div>
+
+                        <div x-show="!loading && activeTab === 'learned'" class="space-y-2">
+                            <div x-show="learnedResults.length > 0" class="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
+                                <p class="text-xs text-blue-700 dark:text-blue-300">These SRO/Serial patterns were auto-approved after 3+ successful FBR submissions across all companies.</p>
+                            </div>
+                            <template x-for="learned in learnedResults" :key="learned.id">
+                                <div @click="selectLearned(learned)" class="p-3 rounded-lg border border-blue-200 dark:border-blue-600 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition group">
+                                    <div class="flex items-start justify-between">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2 mb-1">
+                                                <span class="font-mono text-sm font-bold text-blue-600 dark:text-blue-400" x-text="learned.sro_number"></span>
+                                                <span x-show="learned.serial_no" class="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-mono" x-text="'Serial: ' + learned.serial_no"></span>
+                                                <span class="px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium flex items-center gap-1">
+                                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                                                    <span x-text="learned.success_count + 'x Verified'"></span>
+                                                </span>
+                                            </div>
+                                            <div class="flex items-center gap-2 mt-1.5">
+                                                <span class="font-mono text-xs text-gray-600 dark:text-gray-400" x-text="'HS: ' + learned.hs_code"></span>
+                                                <span class="px-1.5 py-0.5 rounded-full text-xs font-medium"
+                                                    :class="{
+                                                        'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400': learned.schedule_type === 'exempt',
+                                                        'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400': learned.schedule_type === 'zero_rated',
+                                                        'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400': learned.schedule_type === '3rd_schedule',
+                                                        'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400': learned.schedule_type === 'reduced',
+                                                        'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300': learned.schedule_type === 'standard',
+                                                    }" x-text="learned.schedule_type.replace('_', ' ')"></span>
+                                                <span x-show="learned.tax_rate" class="text-xs text-gray-500" x-text="learned.tax_rate + '%'"></span>
+                                            </div>
+                                        </div>
+                                        <span class="text-xs text-blue-600 dark:text-blue-400 opacity-0 group-hover:opacity-100 transition font-medium">Use</span>
+                                    </div>
+                                </div>
+                            </template>
+                            <div x-show="learnedResults.length === 0 && !loading" class="py-8 text-center text-gray-400 dark:text-gray-500">
+                                <svg class="mx-auto h-8 w-8 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                <p class="text-sm">No FBR verified patterns yet</p>
+                                <p class="text-xs text-gray-400 mt-1">Patterns auto-appear here after 3+ successful FBR submissions</p>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="px-5 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex justify-between items-center">
@@ -1168,6 +1212,7 @@
                 scheduleFilter: '',
                 sroResults: [],
                 hsResults: [],
+                learnedResults: [],
                 loading: false,
                 targetItemIndex: null,
 
@@ -1189,9 +1234,11 @@
                         let data = await res.json();
                         this.sroResults = data.sro_rules || [];
                         this.hsResults = data.hs_items || [];
+                        this.learnedResults = data.learned_patterns || [];
                     } catch(e) {
                         this.sroResults = [];
                         this.hsResults = [];
+                        this.learnedResults = [];
                     }
                     this.loading = false;
                 },
@@ -1213,6 +1260,19 @@
                         if (item) {
                             if (hs.default_sro_number) item.sro_schedule_no = hs.default_sro_number;
                             if (hs.default_serial_no) item.serial_no = hs.default_serial_no;
+                        }
+                    }
+                    this.isOpen = false;
+                },
+
+                selectLearned(learned) {
+                    if (this.targetItemIndex !== null && window.invoiceFormInstance) {
+                        let item = window.invoiceFormInstance.items[this.targetItemIndex];
+                        if (item) {
+                            if (learned.sro_number) item.sro_schedule_no = learned.sro_number;
+                            if (learned.serial_no) item.serial_no = learned.serial_no;
+                            if (learned.schedule_type) item.schedule_type = learned.schedule_type;
+                            if (learned.tax_rate) item.tax_rate = learned.tax_rate;
                         }
                     }
                     this.isOpen = false;

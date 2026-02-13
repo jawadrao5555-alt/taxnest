@@ -22,8 +22,8 @@
                     <div class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-1">HS Codes (Serial Required)</div>
                 </div>
                 <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4 text-center">
-                    <div class="text-2xl font-bold text-purple-600">{{ count($stats['schedule_breakdown']) }}</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-1">Schedule Types</div>
+                    <div class="text-2xl font-bold text-purple-600">{{ $stats['total_learned'] }}</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-1">FBR Verified Patterns</div>
                 </div>
             </div>
 
@@ -63,6 +63,11 @@
                             class="px-6 py-3 text-sm font-medium border-b-2 transition {{ $tab === 'hs' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300' }}">
                             HS Code Requirements
                             <span class="ml-1 px-2 py-0.5 rounded-full text-xs {{ $tab === 'hs' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400' }}">{{ $hsWithSro->total() }}</span>
+                        </a>
+                        <a href="/sro-reference?tab=learned&search={{ $search }}&schedule_type={{ $scheduleFilter }}"
+                            class="px-6 py-3 text-sm font-medium border-b-2 transition {{ $tab === 'learned' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300' }}">
+                            FBR Verified
+                            <span class="ml-1 px-2 py-0.5 rounded-full text-xs {{ $tab === 'learned' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400' }}">{{ $stats['total_learned'] }}</span>
                         </a>
                         <a href="/sro-reference?tab=guide"
                             class="px-6 py-3 text-sm font-medium border-b-2 transition {{ $tab === 'guide' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300' }}">
@@ -211,6 +216,83 @@
                     </table>
                 </div>
                 <div class="px-4 py-3 border-t border-gray-100 dark:border-gray-700">{{ $hsWithSro->links() }}</div>
+                @endif
+
+                @if($tab === 'learned')
+                <div class="p-4">
+                    <div class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
+                        <p class="text-sm text-blue-700 dark:text-blue-300">These SRO/Serial patterns were auto-approved after 3+ successful FBR submissions across all companies. Click any row to copy the values.</p>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead class="bg-gray-50 dark:bg-gray-900/50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">HS Code</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">SRO Number</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Serial No</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Schedule</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tax Rate</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">FBR Verified</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Confidence</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                            @forelse($learnedPatterns as $pattern)
+                            <tr class="hover:bg-blue-50 dark:hover:bg-blue-900/20 transition even:bg-gray-50/50 dark:even:bg-gray-800/50">
+                                <td class="px-4 py-3">
+                                    <span class="font-mono text-sm font-semibold text-blue-600 dark:text-blue-400">{{ $pattern->hs_code }}</span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span class="font-mono text-sm font-semibold text-emerald-700 dark:text-emerald-400">{{ $pattern->sro_schedule_no }}</span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span class="font-mono text-sm text-gray-800 dark:text-gray-200">{{ $pattern->sro_item_serial_no ?? '-' }}</span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    @php
+                                        $colors = [
+                                            'exempt' => 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+                                            'zero_rated' => 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+                                            '3rd_schedule' => 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+                                            'reduced' => 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+                                            'standard' => 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
+                                        ];
+                                    @endphp
+                                    <span class="px-2 py-1 rounded-full text-xs font-medium {{ $colors[$pattern->schedule_type] ?? 'bg-gray-100 text-gray-800' }}">{{ str_replace('_', ' ', $pattern->schedule_type) }}</span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span class="text-sm text-gray-700 dark:text-gray-300">{{ $pattern->tax_rate }}%</span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                                        {{ $pattern->success_count }}x Verified
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    @php $conf = round($pattern->confidence_score); @endphp
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-16 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                            <div class="h-full rounded-full {{ $conf >= 70 ? 'bg-green-500' : ($conf >= 40 ? 'bg-yellow-500' : 'bg-red-500') }}" style="width: {{ min(100, $conf) }}%"></div>
+                                        </div>
+                                        <span class="text-xs text-gray-500">{{ $conf }}%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            @empty
+                            <tr>
+                                <td colspan="7" class="px-4 py-12 text-center text-gray-400 dark:text-gray-500">
+                                    <svg class="mx-auto h-10 w-10 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    <p class="text-sm font-medium">No FBR verified patterns yet</p>
+                                    <p class="text-xs mt-1">Patterns will appear here automatically after 3+ successful FBR submissions</p>
+                                </td>
+                            </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-4 py-3 border-t border-gray-100 dark:border-gray-700">{{ $learnedPatterns->links() }}</div>
                 @endif
 
                 @if($tab === 'guide')

@@ -94,9 +94,11 @@ class SroReferenceController extends Controller
     {
         $search = $request->get('q', '');
         $scheduleType = $request->get('schedule_type', '');
+        $hsCode = $request->get('hs_code', '');
+
+        $learnedPatterns = $this->getLearnedPatterns($search, $scheduleType, $hsCode);
 
         if (strlen($search) < 2 && !$scheduleType) {
-            $learnedPatterns = $this->getLearnedPatterns('', '');
             return response()->json(['sro_rules' => [], 'hs_items' => [], 'learned_patterns' => $learnedPatterns]);
         }
 
@@ -134,8 +136,6 @@ class SroReferenceController extends Controller
             ->limit(20)
             ->get();
 
-        $learnedPatterns = $this->getLearnedPatterns($search, $scheduleType);
-
         return response()->json([
             'sro_rules' => $sroResults,
             'hs_items' => $hsResults,
@@ -143,7 +143,7 @@ class SroReferenceController extends Controller
         ]);
     }
 
-    private function getLearnedPatterns(string $search, string $scheduleType): array
+    private function getLearnedPatterns(string $search, string $scheduleType, string $hsCode = ''): array
     {
         return HsUsagePattern::whereNotNull('sro_schedule_no')
             ->where('sro_schedule_no', '!=', '')
@@ -152,7 +152,11 @@ class SroReferenceController extends Controller
                 $q->where('admin_status', 'approved')
                   ->orWhere('admin_status', 'auto');
             })
-            ->when($search, function ($q) use ($search) {
+            ->when($hsCode, function ($q) use ($hsCode) {
+                $cleanHs = preg_replace('/[^0-9.]/', '', $hsCode);
+                $q->where('hs_code', 'ilike', $cleanHs . '%');
+            })
+            ->when($search && !$hsCode, function ($q) use ($search) {
                 $q->where(function ($q2) use ($search) {
                     $q2->where('hs_code', 'ilike', "%{$search}%")
                         ->orWhere('sro_schedule_no', 'ilike', "%{$search}%")

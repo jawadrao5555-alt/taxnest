@@ -1230,6 +1230,12 @@
                         let params = new URLSearchParams();
                         if (this.searchQuery) params.set('q', this.searchQuery);
                         if (this.scheduleFilter) params.set('schedule_type', this.scheduleFilter);
+                        if (this.targetItemIndex !== null && window.invoiceFormInstance) {
+                            let currentItem = window.invoiceFormInstance.items[this.targetItemIndex];
+                            if (currentItem && currentItem.hs_code) {
+                                params.set('hs_code', currentItem.hs_code);
+                            }
+                        }
                         let res = await fetch('/api/sro-reference/search?' + params.toString());
                         let data = await res.json();
                         this.sroResults = data.sro_rules || [];

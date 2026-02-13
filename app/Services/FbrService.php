@@ -19,9 +19,92 @@ class FbrService
         $company = $invoice->company;
         $env = $company->fbr_environment ?? 'sandbox';
 
+        $docTypeMap = [
+            'Sale Invoice' => 1,
+            'Debit Note' => 4,
+            'Credit Note' => 3,
+        ];
+        $invoiceType = $invoice->document_type ?? "Sale Invoice";
+
+        $items = [];
+        foreach ($invoice->items as $item) {
+            $scheduleType = $item->schedule_type ?? 'standard';
+            $taxRate = floatval($item->tax_rate ?? 18);
+            $quantity = round(floatval($item->quantity), 4);
+            $unitPrice = floatval($item->price);
+            $valueSalesExcludingST = round($quantity * $unitPrice, 2);
+
+            $saleTypeNormalized = $this->normalizeSaleType($item->sale_type ?: ScheduleEngine::mapSaleType($scheduleType));
+            $is3rdSchedule = (stripos($saleTypeNormalized, '3rd Schedule') !== false);
+            $isExempt = (stripos($saleTypeNormalized, 'Exempt') !== false);
+            $isReduced = (stripos($saleTypeNormalized, 'Reduced') !== false);
+
+            if ($is3rdSchedule) {
+                $retailPrice = round(floatval($item->mrp ?? $unitPrice), 2);
+                $salesTaxApplicable = round($retailPrice * ($taxRate / 100), 2);
+            } else {
+                $retailPrice = round(floatval($item->mrp ?? 0), 2);
+                $salesTaxApplicable = round($valueSalesExcludingST * ($taxRate / 100), 2);
+            }
+
+            if ($isExempt) {
+                $salesTaxApplicable = 0.00;
+                $extraTaxVal = "";
+            } elseif ($isReduced) {
+                $extraTaxVal = "";
+            } else {
+                $extraTaxVal = round(floatval($item->extra_tax ?? 0), 2);
+            }
+
+            $furtherTax = round(floatval($item->further_tax ?? 0), 2);
+            $fedPayable = round(floatval($item->fed_payable ?? 0), 2);
+            $discount = round(floatval($item->discount ?? 0), 2);
+
+            $extraTaxNum = is_numeric($extraTaxVal) ? $extraTaxVal : 0;
+            $totalValues = round($valueSalesExcludingST + $salesTaxApplicable + $extraTaxNum + $furtherTax + $fedPayable - $discount, 2);
+
+            if ($isExempt) {
+                $rateStr = "Exempt";
+            } else {
+                $rateStr = ($taxRate == intval($taxRate)) ? intval($taxRate) . "%" : number_format($taxRate, 1) . "%";
+            }
+
+            $itemPayload = [
+                "hsCode" => $item->hs_code ?? "",
+                "productDescription" => $item->description ?? "",
+                "rate" => $rateStr,
+                "uoM" => $this->normalizeUom($item->default_uom),
+                "quantity" => $quantity,
+                "totalValues" => $totalValues,
+                "valueSalesExcludingST" => $valueSalesExcludingST,
+                "fixedNotifiedValueOrRetailPrice" => $is3rdSchedule ? $retailPrice : $retailPrice,
+                "salesTaxApplicable" => $salesTaxApplicable,
+                "salesTaxWithheldAtSource" => round($item->st_withheld_at_source ? floatval($item->st_withheld_at_source) : 0.00, 2),
+                "extraTax" => $extraTaxVal,
+                "furtherTax" => $furtherTax,
+                "fedPayable" => $fedPayable,
+                "discount" => $discount,
+                "saleType" => $saleTypeNormalized,
+            ];
+
+            $needsSro = ($is3rdSchedule && $taxRate < 18) || $isExempt || $isReduced;
+            if ($needsSro) {
+                $itemPayload["sroScheduleNo"] = $item->sro_schedule_no ?? "";
+                $itemPayload["sroItemSerialNo"] = $item->serial_no ?? "";
+            }
+
+            if ($item->petroleum_levy && $item->petroleum_levy > 0) {
+                $itemPayload["petroleumLevy"] = round(floatval($item->petroleum_levy), 2);
+            }
+
+            $items[] = $itemPayload;
+        }
+
         $payload = [
-            "invoiceType" => $invoice->document_type ?? "Sale Invoice",
+            "items" => $items,
+            "invoiceType" => $invoiceType,
             "invoiceDate" => $invoice->invoice_date ?? ($invoice->created_at ? $invoice->created_at->toDateString() : now()->toDateString()),
+            "documentTypeId" => $docTypeMap[$invoiceType] ?? 1,
             "sellerNTNCNIC" => $this->formatNtnCnic($company->ntn ?? ""),
             "sellerBusinessName" => $company->fbr_business_name ?: ($company->name ?? ""),
             "sellerProvince" => $this->normalizeProvince($invoice->supplier_province ?? $company->province ?? "Punjab"),
@@ -32,53 +115,10 @@ class FbrService
             "buyerAddress" => $invoice->buyer_address ?? "",
             "buyerRegistrationType" => $invoice->buyer_registration_type ?? $this->determineBuyerRegistrationType($invoice->buyer_ntn),
             "invoiceRefNo" => $this->resolveInvoiceRefNo($invoice),
-            "items" => []
         ];
 
         if ($env === 'sandbox') {
             $payload["scenarioId"] = "SN001";
-        }
-
-        foreach ($invoice->items as $item) {
-            $scheduleType = $item->schedule_type ?? 'standard';
-            $taxRate = floatval($item->tax_rate ?? 18);
-            $quantity = round(floatval($item->quantity), 4);
-            $unitPrice = floatval($item->price);
-            $valueSalesExcludingST = round($quantity * $unitPrice, 2);
-            $salesTaxApplicable = round($valueSalesExcludingST * ($taxRate / 100), 2);
-            $extraTax = round(floatval($item->extra_tax ?? 0), 2);
-            $furtherTax = round(floatval($item->further_tax ?? 0), 2);
-            $fedPayable = round(floatval($item->fed_payable ?? 0), 2);
-            $discount = round(floatval($item->discount ?? 0), 2);
-            $totalValues = round($valueSalesExcludingST + $salesTaxApplicable + $extraTax + $furtherTax + $fedPayable - $discount, 2);
-
-            $rateStr = ($taxRate == intval($taxRate)) ? intval($taxRate) . "%" : number_format($taxRate, 1) . "%";
-
-            $itemPayload = [
-                "hsCode" => $item->hs_code ?? "",
-                "productDescription" => $item->description ?? "",
-                "rate" => $rateStr,
-                "uoM" => $this->normalizeUom($item->default_uom),
-                "quantity" => $quantity,
-                "totalValues" => $totalValues,
-                "valueSalesExcludingST" => $valueSalesExcludingST,
-                "fixedNotifiedValueOrRetailPrice" => round(floatval($item->mrp ?? 0), 2),
-                "salesTaxApplicable" => $salesTaxApplicable,
-                "salesTaxWithheldAtSource" => round($item->st_withheld_at_source ? floatval($item->st_withheld_at_source) : 0.00, 2),
-                "extraTax" => $extraTax,
-                "furtherTax" => $furtherTax,
-                "sroScheduleNo" => $item->sro_schedule_no ?? "",
-                "fedPayable" => $fedPayable,
-                "discount" => $discount,
-                "saleType" => $this->normalizeSaleType($item->sale_type ?: ScheduleEngine::mapSaleType($scheduleType)),
-                "sroItemSerialNo" => $item->serial_no ?? ""
-            ];
-
-            if ($item->petroleum_levy && $item->petroleum_levy > 0) {
-                $itemPayload["petroleumLevy"] = round(floatval($item->petroleum_levy), 2);
-            }
-
-            $payload["items"][] = $itemPayload;
         }
 
         return $payload;

@@ -38,6 +38,7 @@ class Invoice extends Model
         'supplier_province',
         'destination_province',
         'invoice_date',
+        'submitted_at',
     ];
 
     protected $casts = [

@@ -57,6 +57,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::post('/invoice/{invoice}/resubmit-fbr', [InvoiceController::class, 'resubmitToFbr']);
         Route::post('/invoice/{invoice}/validate', [InvoiceController::class, 'validateInvoice']);
         Route::post('/invoice/{invoice}/validate-fbr', [InvoiceController::class, 'validateFbrPayload']);
+        Route::post('/invoice/{invoice}/confirm-fbr', [InvoiceController::class, 'confirmFbrStatus']);
 
         Route::get('/customers', [CustomerLedgerController::class, 'index'])->name('customers.index');
         Route::get('/customers/{ntn}/ledger', [CustomerLedgerController::class, 'show']);

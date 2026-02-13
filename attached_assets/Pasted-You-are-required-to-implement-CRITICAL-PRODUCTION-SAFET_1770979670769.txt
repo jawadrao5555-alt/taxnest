@@ -1,0 +1,122 @@
+You are required to implement CRITICAL PRODUCTION SAFETY FIXES.
+
+Do NOT redesign architecture.
+Do NOT modify FBR payload.
+Do NOT remove existing features.
+
+Fix the race condition and duplicate submission risks.
+
+========================================
+1️⃣ ATOMIC SUBMISSION LOCK
+========================================
+
+In InvoiceController@submit:
+
+Wrap status check + update inside DB::transaction().
+
+Inside transaction:
+
+- Fetch invoice using:
+  Invoice::where('id', $invoice->id)->lockForUpdate()->first();
+
+- If status != 'draft'
+    throw exception / return error
+
+- Immediately update:
+    $invoice->status = 'submitted';
+    $invoice->submitted_at = now();
+    $invoice->save();
+
+Only AFTER commit:
+    dispatch SendInvoiceToFbrJob
+
+This ensures:
+- No two parallel requests pass check
+- Race condition impossible
+
+========================================
+2️⃣ QUEUE SAFETY HARDENING
+========================================
+
+Inside SendInvoiceToFbrJob@handle:
+
+Immediately after loading invoice:
+
+if ($invoice->status !== 'submitted') {
+    return;
+}
+
+Also:
+
+if ($invoice->status === 'locked') {
+    return;
+}
+
+Prevent retry if already locked.
+
+========================================
+3️⃣ UNIQUE DATABASE CONSTRAINTS
+========================================
+
+Add migration:
+
+$table->string('fbr_invoice_number')->nullable()->unique();
+
+Also add:
+
+$table->unique(['company_id', 'internal_invoice_number']);
+
+Prevent duplicates at DB level.
+
+========================================
+4️⃣ ADD UNKNOWN STATE
+========================================
+
+Add new invoice status:
+
+pending_verification
+
+When FBR returns:
+- HTTP 200
+- But response ambiguous
+- Or errorCode 500 "went wrong"
+
+Then:
+
+$status = 'pending_verification';
+
+Do NOT mark locked.
+
+Admin must verify manually.
+
+========================================
+5️⃣ HARDEN 500 LOGIC
+========================================
+
+Remove automatic success on 500 assumption.
+
+Instead:
+
+If errorCode = 500
+AND no fbrInvoiceNumber present in response
+
+→ set pending_verification
+
+========================================
+6️⃣ ADD DB INDEX ON invoiceRefNo
+========================================
+
+Add unique constraint on:
+invoiceRefNo per company.
+
+========================================
+
+After implementation:
+
+- Confirm no route broken
+- Confirm queue worker operational
+- Confirm FBR production safe
+- Provide final safety rating
+
+Do not partially implement.
+Implement fully.

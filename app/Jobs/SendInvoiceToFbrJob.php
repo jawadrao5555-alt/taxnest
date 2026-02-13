@@ -29,8 +29,18 @@ class SendInvoiceToFbrJob implements ShouldQueue
     {
         $invoice = Invoice::with(['company', 'items'])->findOrFail($this->invoiceId);
 
-        if ($invoice->status === 'locked' && !empty($invoice->fbr_invoice_number)) {
-            Log::info("Invoice #{$invoice->id} already locked with FBR number {$invoice->fbr_invoice_number}, skipping retry.");
+        if ($invoice->status === 'locked') {
+            Log::info("SendInvoiceToFbrJob: Invoice #{$invoice->id} already locked, skipping.");
+            return;
+        }
+
+        if ($invoice->status === 'pending_verification') {
+            Log::info("SendInvoiceToFbrJob: Invoice #{$invoice->id} pending verification, skipping.");
+            return;
+        }
+
+        if ($invoice->status !== 'submitted') {
+            Log::warning("SendInvoiceToFbrJob: Invoice #{$invoice->id} status is '{$invoice->status}', expected 'submitted'. Skipping.");
             return;
         }
 
@@ -48,6 +58,7 @@ class SendInvoiceToFbrJob implements ShouldQueue
                 $invoice->fbr_invoice_number = $fbrNum;
                 $invoice->fbr_submission_date = now();
             }
+            $invoice->fbr_status = 'success';
             $invoice->integrity_hash = IntegrityHashService::generate($invoice);
 
             $qrData = json_encode([
@@ -90,34 +101,55 @@ class SendInvoiceToFbrJob implements ShouldQueue
             $invoice->company->update(['last_successful_submission' => now()]);
 
             ComplianceScoreService::recalculate($invoice->company_id);
+            return;
+        }
+
+        if ($response['status'] === 'pending_verification') {
+            $invoice->status = 'pending_verification';
+            $invoice->fbr_status = 'pending_verification';
+            $invoice->save();
+
+            InvoiceActivityService::log(
+                $invoice->id,
+                $invoice->company_id,
+                'pending_verification',
+                [
+                    'reason' => 'FBR response ambiguous',
+                    'attempt' => $this->attempts(),
+                    'failure_type' => $response['failure_type'] ?? 'ambiguous_response',
+                ]
+            );
+
+            Log::warning("SendInvoiceToFbrJob: Invoice #{$invoice->id} marked pending_verification - FBR response ambiguous.");
+            return;
+        }
+
+        Log::warning("FBR submission failed for invoice #{$invoice->id}, attempt {$this->attempts()}, type: " . ($response['failure_type'] ?? 'unknown'));
+
+        $this->captureHsRejections($invoice, $response);
+
+        if ($this->attempts() >= $this->tries) {
+            $invoice->status = 'failed';
+            $invoice->fbr_status = 'failed';
+            $invoice->save();
+
+            InvoiceActivityService::log(
+                $invoice->id,
+                $invoice->company_id,
+                'fbr_failed',
+                ['attempt' => $this->attempts(), 'failure_type' => $response['failure_type'] ?? 'unknown', 'errors' => $response['errors'] ?? []]
+            );
+
+            ComplianceScoreService::recalculate($invoice->company_id);
         } else {
-            Log::warning("FBR submission failed for invoice #{$invoice->id}, attempt {$this->attempts()}, type: " . ($response['failure_type'] ?? 'unknown'));
+            InvoiceActivityService::log(
+                $invoice->id,
+                $invoice->company_id,
+                'retry',
+                ['attempt' => $this->attempts(), 'failure_type' => $response['failure_type'] ?? 'unknown']
+            );
 
-            $this->captureHsRejections($invoice, $response);
-
-            if ($this->attempts() >= $this->tries) {
-                $invoice->status = 'failed';
-                $invoice->fbr_status = 'failed';
-                $invoice->save();
-
-                InvoiceActivityService::log(
-                    $invoice->id,
-                    $invoice->company_id,
-                    'fbr_failed',
-                    ['attempt' => $this->attempts(), 'failure_type' => $response['failure_type'] ?? 'unknown', 'errors' => $response['errors'] ?? []]
-                );
-
-                ComplianceScoreService::recalculate($invoice->company_id);
-            } else {
-                InvoiceActivityService::log(
-                    $invoice->id,
-                    $invoice->company_id,
-                    'retry',
-                    ['attempt' => $this->attempts(), 'failure_type' => $response['failure_type'] ?? 'unknown']
-                );
-
-                $this->release($this->backoff[$this->attempts() - 1] ?? 120);
-            }
+            $this->release($this->backoff[$this->attempts() - 1] ?? 120);
         }
     }
 

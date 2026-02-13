@@ -680,22 +680,19 @@ class FbrService
                 $bodyStr = $response->body();
 
                 if ($response->successful() && strlen(trim($bodyStr)) === 0) {
-                    $ntn = preg_replace('/[^0-9]/', '', $company->ntn ?? '');
-                    $generatedFbrNumber = $ntn . 'DI' . round(microtime(true) * 1000);
-
-                    $log->status = 'success';
-                    $log->failure_type = null;
+                    $log->status = 'pending_verification';
+                    $log->failure_type = 'ambiguous_response';
                     $log->response_payload = json_encode([
-                        'note' => 'FBR returned 200 OK with empty body - invoice accepted',
-                        'generated_fbr_number' => $generatedFbrNumber,
+                        'note' => 'FBR returned 200 OK with empty body - status unknown, needs manual verification',
+                        'http_code' => $httpCode,
                     ]);
                     $log->save();
 
                     return [
-                        "status" => "success",
-                        "fbr_invoice_number" => $generatedFbrNumber,
+                        "status" => "pending_verification",
+                        "failure_type" => "ambiguous_response",
+                        "errors" => ['FBR returned 200 OK but empty response. Invoice may have been accepted. Check FBR portal to verify.'],
                         "response_time_ms" => $responseTimeMs,
-                        "fbr_response" => ['note' => 'FBR accepted invoice (200 OK, empty body). Check FBR portal for exact invoice number.'],
                     ];
                 }
 
@@ -735,21 +732,18 @@ class FbrService
             }
 
             if ($isFbrServerError && $response->successful()) {
-                $ntn = preg_replace('/[^0-9]/', '', $company->ntn ?? '');
-                $generatedFbrNumber = $ntn . 'DI' . round(microtime(true) * 1000);
-
-                $log->status = 'success';
-                $log->failure_type = null;
+                $log->status = 'pending_verification';
+                $log->failure_type = 'ambiguous_response';
                 $log->response_payload = json_encode([
-                    'note' => 'FBR returned error 500 but invoice likely accepted (check FBR portal)',
-                    'generated_fbr_number' => $generatedFbrNumber,
+                    'note' => 'FBR returned error 500 "Something went wrong" - invoice may be accepted, needs manual verification',
                     'original_response' => $responseData,
                 ]);
                 $log->save();
 
                 return [
-                    "status" => "success",
-                    "fbr_invoice_number" => $generatedFbrNumber,
+                    "status" => "pending_verification",
+                    "failure_type" => "ambiguous_response",
+                    "errors" => ['FBR returned error 500 but invoice may have been accepted. Check FBR portal to verify.'],
                     "response_time_ms" => $responseTimeMs,
                     "fbr_response" => $responseData,
                 ];

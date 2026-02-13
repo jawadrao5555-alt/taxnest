@@ -36,20 +36,18 @@ class InvoiceController extends Controller
                 $q->orderBy('created_at', 'desc')->limit(1);
             }]);
 
-        // Filter by tab
         if ($tab === 'completed') {
-            $baseQuery->whereIn('status', ['locked', 'failed']);
+            $baseQuery->whereIn('status', ['locked', 'failed', 'pending_verification']);
         } else {
             $baseQuery->whereIn('status', ['draft', 'submitted']);
         }
 
-        // Get counts for both tabs
         $draftCount = Invoice::where('company_id', $companyId)
             ->whereIn('status', ['draft', 'submitted'])
             ->count();
         
         $completedCount = Invoice::where('company_id', $companyId)
-            ->whereIn('status', ['locked', 'failed'])
+            ->whereIn('status', ['locked', 'failed', 'pending_verification'])
             ->count();
 
         $query = $baseQuery;
@@ -535,12 +533,14 @@ class InvoiceController extends Controller
 
     public function submit(Request $request, Invoice $invoice)
     {
-        if ($invoice->isLocked()) {
-            return redirect('/invoices')->with('error', 'Invoice already locked and submitted to FBR.');
-        }
-
-        if ($invoice->status === 'submitted') {
-            return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice is already being processed by FBR. Please wait.');
+        if (in_array($invoice->status, ['locked', 'submitted', 'pending_verification'])) {
+            $msg = match($invoice->status) {
+                'locked' => 'Invoice already locked and submitted to FBR.',
+                'submitted' => 'Invoice is already being processed by FBR. Please wait.',
+                'pending_verification' => 'Invoice is pending FBR verification. Please wait.',
+                default => 'Invoice cannot be submitted.',
+            };
+            return redirect('/invoice/' . $invoice->id)->with('error', $msg);
         }
 
         $companyId = $invoice->company_id;
@@ -605,11 +605,23 @@ class InvoiceController extends Controller
 
             $request->validate(['override_reason' => 'required|string|min:10|max:500']);
 
-            $invoice->status = 'submitted';
-            $invoice->submission_mode = 'direct_mis';
-            $invoice->override_reason = $request->override_reason;
-            $invoice->override_by = auth()->id();
-            $invoice->save();
+            $locked = DB::transaction(function () use ($invoice, $request) {
+                $lockedInvoice = Invoice::where('id', $invoice->id)->lockForUpdate()->first();
+                if (!$lockedInvoice || !in_array($lockedInvoice->status, ['draft', 'failed'])) {
+                    return false;
+                }
+                $lockedInvoice->status = 'submitted';
+                $lockedInvoice->submitted_at = now();
+                $lockedInvoice->submission_mode = 'direct_mis';
+                $lockedInvoice->override_reason = $request->override_reason;
+                $lockedInvoice->override_by = auth()->id();
+                $lockedInvoice->save();
+                return true;
+            });
+
+            if (!$locked) {
+                return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice is no longer in a submittable state. It may have been submitted by another request.');
+            }
 
             \App\Models\OverrideLog::create([
                 'invoice_id' => $invoice->id,
@@ -661,9 +673,21 @@ class InvoiceController extends Controller
             return redirect('/invoice/' . $invoice->id)->with('error', $message);
         }
 
-        $invoice->status = 'submitted';
-        $invoice->submission_mode = 'smart';
-        $invoice->save();
+        $locked = DB::transaction(function () use ($invoice, $scoreResult) {
+            $lockedInvoice = Invoice::where('id', $invoice->id)->lockForUpdate()->first();
+            if (!$lockedInvoice || !in_array($lockedInvoice->status, ['draft', 'failed'])) {
+                return false;
+            }
+            $lockedInvoice->status = 'submitted';
+            $lockedInvoice->submitted_at = now();
+            $lockedInvoice->submission_mode = 'smart';
+            $lockedInvoice->save();
+            return true;
+        });
+
+        if (!$locked) {
+            return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice is no longer in a submittable state. It may have been submitted by another request.');
+        }
 
         InvoiceActivityService::log($invoice->id, $invoice->company_id, 'submitted', [
             'mode' => 'smart',
@@ -698,9 +722,23 @@ class InvoiceController extends Controller
             return redirect('/invoice/' . $invoice->id)->with('error', 'Only failed invoices can be retried.');
         }
 
-        $invoice->status = 'submitted';
-        $invoice->fbr_status = 'pending';
-        $invoice->save();
+        $dispatched = \DB::transaction(function () use ($invoice) {
+            $locked = Invoice::where('id', $invoice->id)->lockForUpdate()->first();
+            if ($locked->status !== 'failed') {
+                return false;
+            }
+            $locked->status = 'submitted';
+            $locked->fbr_status = 'pending';
+            $locked->submitted_at = now();
+            $locked->save();
+            return true;
+        });
+
+        if (!$dispatched) {
+            return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice status changed. Cannot retry.');
+        }
+
+        $invoice->refresh();
 
         InvoiceActivityService::log($invoice->id, $invoice->company_id, 'retry_submitted', [
             'retried_by' => auth()->user()->name,
@@ -729,14 +767,36 @@ class InvoiceController extends Controller
             }
         }
 
-        if ($invoice->status === 'locked') {
-            return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice already submitted to FBR' . (!empty($invoice->fbr_invoice_number) ? ' with number: ' . $invoice->fbr_invoice_number : '') . '. Cannot resubmit.');
+        if (in_array($invoice->status, ['locked', 'submitted', 'pending_verification'])) {
+            $msg = match($invoice->status) {
+                'locked' => 'Invoice already submitted to FBR' . (!empty($invoice->fbr_invoice_number) ? ' with number: ' . $invoice->fbr_invoice_number : '') . '. Cannot resubmit.',
+                'submitted' => 'Invoice is already being processed. Please wait.',
+                'pending_verification' => 'Invoice is pending FBR verification.',
+                default => 'Cannot resubmit.',
+            };
+            return redirect('/invoice/' . $invoice->id)->with('error', $msg);
         }
 
         if (!in_array($invoice->status, ['draft', 'failed'])) {
             return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice cannot be submitted in current status.');
         }
 
+        $locked = DB::transaction(function () use ($invoice) {
+            $lockedInvoice = Invoice::where('id', $invoice->id)->lockForUpdate()->first();
+            if (!$lockedInvoice || !in_array($lockedInvoice->status, ['draft', 'failed'])) {
+                return false;
+            }
+            $lockedInvoice->status = 'submitted';
+            $lockedInvoice->submitted_at = now();
+            $lockedInvoice->save();
+            return true;
+        });
+
+        if (!$locked) {
+            return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice is no longer in a submittable state.');
+        }
+
+        $invoice->refresh();
         $invoice->load('items', 'company');
         $company = $invoice->company;
 
@@ -780,6 +840,18 @@ class InvoiceController extends Controller
             return redirect('/invoice/' . $invoice->id)->with('success', 'FBR submission successful! Invoice Number: ' . $fbrNum);
         }
 
+        if ($response['status'] === 'pending_verification') {
+            $invoice->status = 'pending_verification';
+            $invoice->fbr_status = 'pending_verification';
+            $invoice->save();
+
+            return redirect('/invoice/' . $invoice->id)->with('warning', 'FBR response was ambiguous. Invoice marked for manual verification. Check FBR portal.');
+        }
+
+        $invoice->status = 'failed';
+        $invoice->fbr_status = 'failed';
+        $invoice->save();
+
         $errors = $response['errors'] ?? [];
         $failureType = $response['failure_type'] ?? 'unknown';
         $errorMsg = 'FBR submission failed (' . $failureType . ')';
@@ -794,6 +866,67 @@ class InvoiceController extends Controller
         ], request()->ip());
 
         return redirect('/invoice/' . $invoice->id)->with('error', $errorMsg);
+    }
+
+    public function confirmFbrStatus(Request $request, Invoice $invoice)
+    {
+        $user = auth()->user();
+        if (!in_array($user->role, ['company_admin', 'super_admin'])) {
+            abort(403);
+        }
+
+        if ($user->role !== 'super_admin') {
+            $companyId = app('currentCompanyId');
+            if ($invoice->company_id !== $companyId) {
+                abort(403);
+            }
+        }
+
+        if ($invoice->status !== 'pending_verification') {
+            return redirect('/invoice/' . $invoice->id)->with('error', 'This invoice is not pending verification.');
+        }
+
+        $action = $request->input('action');
+
+        if ($action === 'confirm') {
+            $invoice->status = 'locked';
+            $invoice->fbr_status = 'success';
+            $invoice->fbr_submission_date = $invoice->fbr_submission_date ?? now();
+            $invoice->integrity_hash = IntegrityHashService::generate($invoice);
+            $invoice->save();
+
+            InvoiceActivityService::log($invoice->id, $invoice->company_id, 'manually_confirmed', [
+                'confirmed_by' => $user->name,
+                'action' => 'confirmed_on_fbr_portal',
+            ], request()->ip());
+
+            AuditLogService::log('invoice_manually_confirmed', 'Invoice', $invoice->id, null, [
+                'confirmed_by' => $user->name,
+            ]);
+
+            return redirect('/invoice/' . $invoice->id)->with('success', 'Invoice confirmed as submitted to FBR. Status updated to Locked.');
+        }
+
+        if ($action === 'reject') {
+            $invoice->status = 'draft';
+            $invoice->fbr_status = null;
+            $invoice->fbr_invoice_number = null;
+            $invoice->submitted_at = null;
+            $invoice->save();
+
+            InvoiceActivityService::log($invoice->id, $invoice->company_id, 'verification_rejected', [
+                'rejected_by' => $user->name,
+                'action' => 'not_found_on_fbr_portal',
+            ], request()->ip());
+
+            AuditLogService::log('invoice_verification_rejected', 'Invoice', $invoice->id, null, [
+                'rejected_by' => $user->name,
+            ]);
+
+            return redirect('/invoice/' . $invoice->id)->with('success', 'Invoice reset to Draft. You can edit and resubmit.');
+        }
+
+        return redirect('/invoice/' . $invoice->id)->with('error', 'Invalid action.');
     }
 
     public function verifyIntegrity(Invoice $invoice)

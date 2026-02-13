@@ -230,6 +230,31 @@
                 </div>
             </div>
             @endif
+            @if($invoice->status === 'pending_verification')
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+                <div class="flex items-start gap-3">
+                    <svg class="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                    <div class="flex-1">
+                        <p class="text-sm font-bold text-amber-800">Pending FBR Verification</p>
+                        <p class="mt-1 text-sm text-amber-700">FBR returned an ambiguous response. The invoice may have been accepted. Please check the FBR portal to confirm and then update this invoice's status.</p>
+                        @if(in_array(auth()->user()->role, ['company_admin', 'super_admin']))
+                        <div class="mt-3 flex gap-2">
+                            <form method="POST" action="/invoice/{{ $invoice->id }}/confirm-fbr" class="inline">
+                                @csrf
+                                <input type="hidden" name="action" value="confirm">
+                                <button type="submit" class="inline-flex items-center px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition">Confirm (Verified on FBR Portal)</button>
+                            </form>
+                            <form method="POST" action="/invoice/{{ $invoice->id }}/confirm-fbr" class="inline">
+                                @csrf
+                                <input type="hidden" name="action" value="reject">
+                                <button type="submit" class="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition">Not on FBR Portal (Reset to Draft)</button>
+                            </form>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+            @endif
             @if($invoice->status === 'failed')
             @php
                 $lastFbrLog = \App\Models\FbrLog::where('invoice_id', $invoice->id)->orderBy('created_at', 'desc')->first();
@@ -281,8 +306,9 @@
                                 @elseif($invoice->status === 'submitted') bg-blue-100 text-blue-800
                                 @elseif($invoice->status === 'locked') bg-green-100 text-green-800
                                 @elseif($invoice->status === 'failed') bg-red-100 text-red-800
+                                @elseif($invoice->status === 'pending_verification') bg-amber-100 text-amber-800
                                 @endif">
-                                {{ ucfirst($invoice->status) }}
+                                {{ $invoice->status === 'pending_verification' ? 'Pending Verification' : ucfirst($invoice->status) }}
                             </span>
                             @if($invoice->fbr_status)
                             <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ml-2

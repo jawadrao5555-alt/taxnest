@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Crypt;
 use App\Models\FbrLog;
 
 class FbrService
@@ -27,13 +28,9 @@ class FbrService
             "buyerProvince" => $invoice->destination_province ?? "Punjab",
             "buyerAddress" => $invoice->buyer_address ?? "",
             "buyerRegistrationType" => $invoice->buyer_registration_type ?? $this->determineBuyerRegistrationType($invoice->buyer_ntn),
-            "invoiceRefNo" => $invoice->internal_invoice_number ?? $invoice->invoice_number ?? "",
+            "invoiceRefNo" => $this->resolveInvoiceRefNo($invoice),
             "items" => []
         ];
-
-        if (in_array($invoice->document_type, ['Credit Note', 'Debit Note']) && $invoice->reference_invoice_number) {
-            $payload["referenceInvoiceNo"] = $invoice->reference_invoice_number;
-        }
 
         foreach ($invoice->items as $item) {
             $scheduleType = $item->schedule_type ?? 'standard';
@@ -74,6 +71,31 @@ class FbrService
         return $payload;
     }
 
+    private function resolveInvoiceRefNo($invoice): string
+    {
+        if (!in_array($invoice->document_type, ['Credit Note', 'Debit Note'])) {
+            return "";
+        }
+
+        if (!empty($invoice->reference_invoice_number)) {
+            $refInvoice = \App\Models\Invoice::where('company_id', $invoice->company_id)
+                ->where(function ($q) use ($invoice) {
+                    $q->where('fbr_invoice_number', $invoice->reference_invoice_number)
+                      ->orWhere('internal_invoice_number', $invoice->reference_invoice_number)
+                      ->orWhere('invoice_number', $invoice->reference_invoice_number);
+                })
+                ->first();
+
+            if ($refInvoice && !empty($refInvoice->fbr_invoice_number)) {
+                return $refInvoice->fbr_invoice_number;
+            }
+
+            return $invoice->reference_invoice_number;
+        }
+
+        return "";
+    }
+
     private function determineBuyerRegistrationType(?string $buyerNtn): string
     {
         if (empty($buyerNtn)) return "Unregistered";
@@ -85,10 +107,22 @@ class FbrService
     private function getApiToken($company): string
     {
         $env = $company->fbr_environment ?? 'sandbox';
+        $encryptedToken = '';
         if ($env === 'production') {
-            return $company->fbr_production_token ?? '';
+            $encryptedToken = $company->fbr_production_token ?? '';
+        } else {
+            $encryptedToken = $company->fbr_sandbox_token ?? '';
         }
-        return $company->fbr_sandbox_token ?? '';
+
+        if (empty($encryptedToken)) {
+            return '';
+        }
+
+        try {
+            return Crypt::decryptString($encryptedToken);
+        } catch (\Exception $e) {
+            return $encryptedToken;
+        }
     }
 
     private function getApiUrl($company): string

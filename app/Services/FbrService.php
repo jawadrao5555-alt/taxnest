@@ -104,7 +104,6 @@ class FbrService
             "items" => $items,
             "invoiceType" => $invoiceType,
             "invoiceDate" => $invoice->invoice_date ?? ($invoice->created_at ? $invoice->created_at->toDateString() : now()->toDateString()),
-            "documentTypeId" => $docTypeMap[$invoiceType] ?? 1,
             "sellerNTNCNIC" => $this->formatNtnCnic($company->ntn ?? ""),
             "sellerBusinessName" => $company->fbr_business_name ?: ($company->name ?? ""),
             "sellerProvince" => $this->normalizeProvince($invoice->supplier_province ?? $company->province ?? "Punjab"),

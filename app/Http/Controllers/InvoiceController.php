@@ -990,6 +990,7 @@ class InvoiceController extends Controller
         $netReceivable = round(($subtotal + $totalTax) + $whtAmount, 2);
 
         $qrBase64 = '';
+        $fbrLogoBase64 = '';
         if ($invoice->fbr_invoice_number) {
             $qrData = json_encode([
                 'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $invoice->company->ntn ?? ''),
@@ -1002,6 +1003,11 @@ class InvoiceController extends Controller
                 'scale' => 10,
             ]);
             $qrBase64 = (new \chillerlan\QRCode\QRCode($qrOptions))->render($qrData);
+
+            $logoPath = public_path('images/fbr-digital-invoice-logo.png');
+            if (file_exists($logoPath)) {
+                $fbrLogoBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));
+            }
         }
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-professional', [
@@ -1014,6 +1020,7 @@ class InvoiceController extends Controller
             'wht_amount' => $whtAmount,
             'net_receivable' => $netReceivable,
             'qrBase64' => $qrBase64,
+            'fbrLogoBase64' => $fbrLogoBase64,
         ]);
 
         $filename = 'invoice-' . ($invoice->fbr_invoice_number ?? $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id) . '.pdf';

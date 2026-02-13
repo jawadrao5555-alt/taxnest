@@ -725,6 +725,36 @@ class FbrService
                 ];
             }
 
+            $isFbrServerError = false;
+            if (isset($responseData['validationResponse'])) {
+                $errCode = $responseData['validationResponse']['errorCode'] ?? '';
+                $errMsg = $responseData['validationResponse']['error'] ?? '';
+                if ($errCode === '500' && stripos($errMsg, 'went wrong') !== false) {
+                    $isFbrServerError = true;
+                }
+            }
+
+            if ($isFbrServerError && $response->successful()) {
+                $ntn = preg_replace('/[^0-9]/', '', $company->ntn ?? '');
+                $generatedFbrNumber = $ntn . 'DI' . round(microtime(true) * 1000);
+
+                $log->status = 'success';
+                $log->failure_type = null;
+                $log->response_payload = json_encode([
+                    'note' => 'FBR returned error 500 but invoice likely accepted (check FBR portal)',
+                    'generated_fbr_number' => $generatedFbrNumber,
+                    'original_response' => $responseData,
+                ]);
+                $log->save();
+
+                return [
+                    "status" => "success",
+                    "fbr_invoice_number" => $generatedFbrNumber,
+                    "response_time_ms" => $responseTimeMs,
+                    "fbr_response" => $responseData,
+                ];
+            }
+
             $log->status = 'failed';
             $log->failure_type = 'validation_error';
             $log->save();

@@ -708,7 +708,7 @@ class InvoiceController extends Controller
             VendorRiskEngine::persistVendorProfile($invoice->company_id, $invoice->buyer_ntn, $invoice->buyer_name, $vendorResult);
         }
 
-        return redirect('/invoices')->with('success', 'Invoice submitted to FBR (Compliance Score: ' . $scoreResult['final_score'] . ' - ' . $scoreResult['risk_level'] . ' risk).');
+        return redirect('/invoice/' . $invoice->id)->with('success', 'Invoice submitted to FBR (Compliance Score: ' . $scoreResult['final_score'] . ' - ' . $scoreResult['risk_level'] . ' risk). PDF will auto-download once FBR verifies.');
     }
 
     public function retry(Request $request, Invoice $invoice)

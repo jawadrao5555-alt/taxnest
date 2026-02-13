@@ -52,8 +52,8 @@
         .totals-inner td { padding: 4px 10px; font-size: 12px; }
         .totals-inner td.label { text-align: right; color: #6b7280; font-weight: 600; }
         .totals-inner td.value { text-align: right; color: #1f2937; font-weight: 600; }
-        .totals-inner tr.grand-total td { border-top: 2px solid #059669; padding-top: 8px; }
-        .totals-inner tr.grand-total td.value { font-size: 14px; font-weight: 800; color: #059669; }
+        .totals-inner tr.grand-total td { border-top: 2px solid #1f2937; padding-top: 8px; }
+        .totals-inner tr.grand-total td.value { font-size: 14px; font-weight: 800; color: #1f2937; }
         .totals-inner tr.net td { background: #f0fdf4; border-radius: 4px; }
 
         .status-badge { display: inline-block; padding: 3px 14px; border-radius: 12px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }

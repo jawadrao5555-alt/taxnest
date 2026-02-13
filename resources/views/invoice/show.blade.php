@@ -673,4 +673,13 @@
             @endif
         </div>
     </div>
+@if($invoice->fbr_invoice_number && session('success') && str_contains(session('success'), 'FBR'))
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+            window.open('/invoice/{{ $invoice->id }}/pdf', '_blank');
+        }, 1500);
+    });
+</script>
+@endif
 </x-app-layout>

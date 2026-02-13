@@ -1,10 +1,14 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h2 class="font-bold text-xl text-gray-800 leading-tight">Risk Explanation Report - {{ $report['period'] }}</h2>
-            <div class="flex space-x-2">
+            <div class="flex items-center gap-3">
+                <a href="/dashboard" class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-emerald-100 hover:text-emerald-700 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-400 transition" title="Back to Dashboard">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                </a>
+                <h2 class="font-bold text-xl text-gray-800 leading-tight">Risk Explanation Report - {{ $report['period'] }}</h2>
+            </div>
+            <div class="flex items-center space-x-2">
                 <button onclick="window.print()" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-xs font-semibold hover:bg-gray-700 transition">Print PDF</button>
-                <a href="/dashboard" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition">Back</a>
             </div>
         </div>
     </x-slot>

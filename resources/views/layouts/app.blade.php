@@ -42,10 +42,10 @@
             .dark .sidebar-link.active { background-color: rgba(55,65,81,0.7); }
         </style>
     </head>
-    <body class="font-sans antialiased bg-gray-50 dark:bg-gray-900" x-data="{ sidebarOpen: false }">
+    <body class="font-sans antialiased h-screen overflow-hidden bg-gray-50 dark:bg-gray-900" x-data="{ sidebarOpen: false }">
         @auth
-        <div class="flex min-h-screen">
-            <aside class="hidden lg:flex lg:flex-col w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 fixed h-screen overflow-y-auto sidebar-scroll z-30">
+        <div class="flex h-full">
+            <aside class="hidden lg:flex lg:flex-col w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 fixed left-0 top-0 h-full overflow-y-auto sidebar-scroll z-30">
                 @include('layouts.navigation')
             </aside>
 
@@ -69,8 +69,8 @@
                 </aside>
             </div>
 
-            <div class="flex-1 lg:ml-64 flex flex-col min-h-screen">
-                <header class="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 z-20">
+            <div class="flex-1 ml-64 flex flex-col h-full">
+                <header class="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 z-20 shadow-sm">
                     <div class="flex items-center justify-between h-14 px-4 sm:px-6">
                         <div class="flex items-center gap-3">
                             <button @click="sidebarOpen = !sidebarOpen" class="lg:hidden p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition">

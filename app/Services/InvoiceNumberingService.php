@@ -21,11 +21,11 @@ class InvoiceNumberingService
                 $ntn = '0000000';
             }
 
-            $nextNum = $company->next_invoice_number ?? 1;
+            $timestampMs = (int)(microtime(true) * 1000);
 
-            $invoiceNumber = $ntn . 'DI' . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+            $invoiceNumber = $ntn . 'DI' . $timestampMs;
 
-            $company->next_invoice_number = $nextNum + 1;
+            $company->next_invoice_number = ($company->next_invoice_number ?? 1) + 1;
             $company->save();
 
             return $invoiceNumber;
@@ -36,7 +36,7 @@ class InvoiceNumberingService
     {
         $company = Company::find($companyId);
         if (!$company) {
-            return '0000000DI000001';
+            return '0000000DI' . (int)(microtime(true) * 1000);
         }
 
         $ntn = preg_replace('/[^0-9]/', '', $company->ntn ?? '');
@@ -44,7 +44,7 @@ class InvoiceNumberingService
             $ntn = '0000000';
         }
 
-        $nextNum = $company->next_invoice_number ?? 1;
-        return $ntn . 'DI' . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+        $timestampMs = (int)(microtime(true) * 1000);
+        return $ntn . 'DI' . $timestampMs;
     }
 }

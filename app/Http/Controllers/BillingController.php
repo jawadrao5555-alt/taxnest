@@ -141,4 +141,118 @@ class BillingController extends Controller
 
         return response()->json($pricing);
     }
+
+    public function customPlanBuilder()
+    {
+        if (!in_array(auth()->user()->role, ['super_admin', 'company_admin'])) {
+            abort(403);
+        }
+        return view('billing.custom-plan');
+    }
+
+    public function calculateCustomPlan(Request $request)
+    {
+        $request->validate([
+            'invoice_limit' => 'required|integer|min:50|max:100000',
+            'user_count' => 'required|integer|min:1|max:500',
+            'branch_count' => 'required|integer|min:1|max:100',
+            'billing_cycle' => 'required|in:monthly,quarterly,semi_annual,annual',
+        ]);
+
+        $invoiceFactor = 2.5;
+        $userFactor = 500;
+        $branchFactor = 1000;
+
+        $baseRate = ($invoiceFactor * $request->invoice_limit)
+                  + ($userFactor * $request->user_count)
+                  + ($branchFactor * $request->branch_count);
+
+        $cycle = $request->billing_cycle;
+        $discounts = ['monthly' => 0, 'quarterly' => 1, 'semi_annual' => 3, 'annual' => 6];
+        $discount = $discounts[$cycle] ?? 0;
+        $months = Subscription::getMonthsForCycle($cycle);
+
+        $totalBeforeDiscount = $baseRate * $months;
+        $discountAmount = $totalBeforeDiscount * ($discount / 100);
+        $finalPrice = $totalBeforeDiscount - $discountAmount;
+
+        return response()->json([
+            'base_rate_monthly' => round($baseRate, 2),
+            'months' => $months,
+            'discount_percent' => $discount,
+            'total_before_discount' => round($totalBeforeDiscount, 2),
+            'discount_amount' => round($discountAmount, 2),
+            'final_price' => round($finalPrice, 2),
+            'monthly_effective' => round($finalPrice / $months, 2),
+            'breakdown' => [
+                'invoices' => round($invoiceFactor * $request->invoice_limit, 2),
+                'users' => round($userFactor * $request->user_count, 2),
+                'branches' => round($branchFactor * $request->branch_count, 2),
+            ],
+        ]);
+    }
+
+    public function subscribeCustomPlan(Request $request)
+    {
+        $request->validate([
+            'invoice_limit' => 'required|integer|min:50|max:100000',
+            'user_count' => 'required|integer|min:1|max:500',
+            'branch_count' => 'required|integer|min:1|max:100',
+            'billing_cycle' => 'required|in:monthly,quarterly,semi_annual,annual',
+        ]);
+
+        $companyId = app('currentCompanyId');
+        $company = \App\Models\Company::find($companyId);
+
+        if ($company && $company->is_internal_account) {
+            return back()->with('error', 'Internal accounts cannot be billed.');
+        }
+
+        $invoiceFactor = 2.5;
+        $userFactor = 500;
+        $branchFactor = 1000;
+        $baseRate = ($invoiceFactor * $request->invoice_limit) + ($userFactor * $request->user_count) + ($branchFactor * $request->branch_count);
+
+        $cycle = $request->billing_cycle;
+        $discounts = ['monthly' => 0, 'quarterly' => 1, 'semi_annual' => 3, 'annual' => 6];
+        $discount = $discounts[$cycle] ?? 0;
+        $months = Subscription::getMonthsForCycle($cycle);
+        $totalBeforeDiscount = $baseRate * $months;
+        $discountAmount = $totalBeforeDiscount * ($discount / 100);
+        $finalPrice = $totalBeforeDiscount - $discountAmount;
+
+        $customPlan = PricingPlan::create([
+            'name' => 'Custom Plan',
+            'invoice_limit' => $request->invoice_limit,
+            'user_limit' => $request->user_count,
+            'branch_limit' => $request->branch_count,
+            'is_trial' => false,
+            'price' => round($baseRate, 2),
+            'features' => ['custom' => true, 'invoice_limit' => $request->invoice_limit, 'user_count' => $request->user_count, 'branch_count' => $request->branch_count],
+        ]);
+
+        Subscription::where('company_id', $companyId)->update(['active' => false]);
+
+        Subscription::create([
+            'company_id' => $companyId,
+            'pricing_plan_id' => $customPlan->id,
+            'billing_cycle' => $cycle,
+            'discount_percent' => $discount,
+            'final_price' => round($finalPrice, 2),
+            'start_date' => now(),
+            'end_date' => now()->addMonths($months),
+            'active' => true,
+        ]);
+
+        SecurityLogService::log('custom_subscription', auth()->id(), [
+            'plan' => 'Custom Plan',
+            'invoice_limit' => $request->invoice_limit,
+            'user_count' => $request->user_count,
+            'branch_count' => $request->branch_count,
+            'cycle' => $cycle,
+            'final_price' => round($finalPrice, 2),
+        ]);
+
+        return redirect('/billing/plans')->with('success', 'Custom plan activated! Rs. ' . number_format($finalPrice) . ' for ' . $months . ' months.');
+    }
 }

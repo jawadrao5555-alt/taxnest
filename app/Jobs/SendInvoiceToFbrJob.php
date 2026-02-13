@@ -10,6 +10,7 @@ use App\Services\InvoiceActivityService;
 use App\Services\IntegrityHashService;
 use App\Services\ComplianceScoreService;
 use App\Services\HsIntelligenceService;
+use App\Services\HsUsagePatternService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -62,10 +63,12 @@ class SendInvoiceToFbrJob implements ShouldQueue
             $invoice->integrity_hash = IntegrityHashService::generate($invoice);
 
             $qrData = json_encode([
+                'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $invoice->company->ntn ?? ''),
                 'ntn' => $invoice->company->ntn ?? '',
                 'invoice_number' => $invoice->internal_invoice_number ?? $invoice->invoice_number,
+                'fbr_invoice_number' => $fbrNum ?? $invoice->invoice_number,
                 'fbr_invoice_id' => $fbrNum ?? $invoice->invoice_number,
-                'date' => $invoice->created_at->format('Y-m-d'),
+                'date' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
                 'total' => $invoice->total_amount,
             ]);
             $invoice->qr_data = $qrData;
@@ -99,6 +102,8 @@ class SendInvoiceToFbrJob implements ShouldQueue
             ]);
 
             $invoice->company->update(['last_successful_submission' => now()]);
+
+            HsUsagePatternService::recordSuccess($invoice);
 
             ComplianceScoreService::recalculate($invoice->company_id);
             return;
@@ -200,6 +205,12 @@ class SendInvoiceToFbrJob implements ShouldQueue
                         $item->tax_rate ?? 18,
                         $item->sro_schedule_no ?? null,
                         $environment
+                    );
+
+                    HsUsagePatternService::recordRejection(
+                        $item->hs_code,
+                        $item->schedule_type ?? 'standard',
+                        $item->tax_rate ?? 18
                     );
                 }
             }

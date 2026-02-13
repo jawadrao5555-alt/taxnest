@@ -44,6 +44,9 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
     Route::get('/billing/plans', [BillingController::class, 'plans'])->name('billing.plans');
     Route::post('/billing/subscribe', [BillingController::class, 'subscribe']);
     Route::post('/api/billing/calculate', [BillingController::class, 'calculatePrice']);
+    Route::get('/billing/custom-plan', [BillingController::class, 'customPlanBuilder']);
+    Route::post('/billing/calculate-custom', [BillingController::class, 'calculateCustomPlan']);
+    Route::post('/billing/subscribe-custom', [BillingController::class, 'subscribeCustomPlan']);
 
     Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
 
@@ -134,6 +137,17 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         }
         return response()->json(\App\Services\RiskIntelligenceEngine::analyzeInvoice($invoice));
     });
+    Route::get('/api/hs-usage-suggestions/{hsCode}', function (string $hsCode) {
+        $suggestions = \App\Services\HsUsagePatternService::getSuggestions($hsCode);
+        if ($suggestions && count($suggestions) > 0) {
+            $best = $suggestions[0];
+            $best['hs_code'] = $hsCode;
+            $best['all_suggestions'] = $suggestions;
+            return response()->json($best);
+        }
+        return response()->json(['hs_code' => $hsCode]);
+    });
+
     Route::get('/api/smart-tax-recommend', function (\Illuminate\Http\Request $request) {
         $companyId = app('currentCompanyId');
         $hsCode = $request->get('hs_code', '');

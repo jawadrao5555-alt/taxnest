@@ -187,6 +187,25 @@
                     @endforeach
                 </div>
 
+                @if(in_array(auth()->user()->role, ['super_admin', 'company_admin']))
+                <div class="mt-8">
+                    <a href="/billing/custom-plan" class="block bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-xl shadow-sm border-2 border-dashed border-emerald-300 dark:border-emerald-700 p-6 hover:border-emerald-500 dark:hover:border-emerald-500 transition group">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-4">
+                                <div class="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/40 rounded-xl flex items-center justify-center group-hover:bg-emerald-200 dark:group-hover:bg-emerald-800/40 transition">
+                                    <svg class="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">Build Custom Plan</h3>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">Need specific limits? Configure invoices, users, and branches to get instant pricing.</p>
+                                </div>
+                            </div>
+                            <svg class="w-5 h-5 text-emerald-500 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                        </div>
+                    </a>
+                </div>
+                @endif
+
                 <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                     <div class="p-6 border-b border-gray-100">
                         <h3 class="text-xl font-bold text-gray-900">Feature Comparison</h3>

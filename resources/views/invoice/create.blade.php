@@ -198,8 +198,23 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">HS Code</label>
-                                    <input type="text" :name="'items[' + index + '][hs_code]'" x-model="item.hs_code" @blur="lookupHsCode(index); fetchTaxRecommendation(index)" required placeholder="8471.3010"
+                                    <input type="text" :name="'items[' + index + '][hs_code]'" x-model="item.hs_code" @blur="lookupHsCode(index); fetchTaxRecommendation(index); fetchHsSuggestion(index)" required placeholder="8471.3010"
                                         class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                    <div x-show="item.hsSuggestion" x-cloak class="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <span class="text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Community Pattern Suggestion</span>
+                                            <div class="flex gap-2">
+                                                <button type="button" @click="applySuggestion(index)" class="px-3 py-1 text-xs font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">Apply</button>
+                                                <button type="button" @click="item.hsSuggestion = null" class="px-3 py-1 text-xs font-medium text-gray-500 border border-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition">Ignore</button>
+                                            </div>
+                                        </div>
+                                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                                            <div><span class="text-gray-500">Schedule:</span> <span class="font-medium text-gray-800 dark:text-gray-200" x-text="item.hsSuggestion?.schedule_type"></span></div>
+                                            <div><span class="text-gray-500">Tax Rate:</span> <span class="font-medium text-gray-800 dark:text-gray-200" x-text="(item.hsSuggestion?.tax_rate ?? '') + '%'"></span></div>
+                                            <div x-show="item.hsSuggestion?.sro_schedule_no"><span class="text-gray-500">SRO:</span> <span class="font-medium text-gray-800 dark:text-gray-200" x-text="item.hsSuggestion?.sro_schedule_no"></span></div>
+                                            <div x-show="item.hsSuggestion?.mrp_required"><span class="text-gray-500">MRP:</span> <span class="font-medium text-emerald-600">Required</span></div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">PCT Code</label>
@@ -517,7 +532,8 @@
                     productSearch: '', showDropdown: false, productResults: [],
                     hsLookupInfo: '',
                     hsUnmapped: false,
-                    taxRecommendation: null
+                    taxRecommendation: null,
+                    hsSuggestion: null
                 };
             }
 
@@ -801,6 +817,36 @@
                         this.rejectionResult = await res.json();
                     } catch(e) { console.error(e); }
                     this.rejectionLoading = false;
+                },
+
+                async fetchHsSuggestion(index) {
+                    let item = this.items[index];
+                    if (!item.hs_code || item.hs_code.length < 4) { item.hsSuggestion = null; return; }
+                    try {
+                        let res = await fetch('/api/hs-usage-suggestions/' + encodeURIComponent(item.hs_code));
+                        if (res.ok) {
+                            let data = await res.json();
+                            if (data && data.schedule_type) {
+                                item.hsSuggestion = data;
+                            } else {
+                                item.hsSuggestion = null;
+                            }
+                        }
+                    } catch(e) { item.hsSuggestion = null; }
+                },
+
+                applySuggestion(index) {
+                    let item = this.items[index];
+                    let s = item.hsSuggestion;
+                    if (!s) return;
+                    if (s.schedule_type) item.schedule_type = s.schedule_type;
+                    if (s.tax_rate !== null && s.tax_rate !== undefined) item.tax_rate = s.tax_rate;
+                    if (s.sro_schedule_no) item.sro_schedule_no = s.sro_schedule_no;
+                    if (s.sro_item_serial_no) item.serial_no = s.sro_item_serial_no;
+                    if (s.mrp_required !== undefined) item.show_mrp = s.mrp_required;
+                    this.calcTax(index);
+                    this.applyScheduleRules(item);
+                    item.hsSuggestion = null;
                 },
 
                 async fetchTaxRecommendation(index) {

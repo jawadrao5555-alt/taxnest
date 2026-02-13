@@ -71,6 +71,18 @@ class Invoice extends Model
     public function getQrImageUrlAttribute()
     {
         if (!$this->qr_data) return null;
+
+        $decoded = json_decode($this->qr_data, true);
+        if (is_array($decoded)) {
+            $qrPayload = json_encode([
+                'sellerNTNCNIC' => $decoded['sellerNTNCNIC'] ?? preg_replace('/[^0-9]/', '', $decoded['ntn'] ?? ''),
+                'fbr_invoice_number' => $decoded['fbr_invoice_number'] ?? $decoded['fbr_invoice_id'] ?? '',
+                'invoiceDate' => $decoded['date'] ?? '',
+                'totalValues' => $decoded['total'] ?? 0,
+            ]);
+            return 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' . urlencode($qrPayload);
+        }
+
         return 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' . urlencode($this->qr_data);
     }
 

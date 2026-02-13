@@ -37,6 +37,9 @@ class Company extends Model
         'province',
         'invoice_number_prefix',
         'next_invoice_number',
+        'invoice_limit_override',
+        'user_limit_override',
+        'branch_limit_override',
     ];
 
     protected $casts = [

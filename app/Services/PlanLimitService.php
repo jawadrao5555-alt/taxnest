@@ -24,6 +24,18 @@ class PlanLimitService
             return ['allowed' => true, 'internal' => true];
         }
 
+        if ($company && $company->invoice_limit_override !== null) {
+            if ($company->invoice_limit_override === -1) {
+                return ['allowed' => true, 'unlimited' => true];
+            }
+            $count = Invoice::where('company_id', $companyId)->count();
+            $limit = $company->invoice_limit_override;
+            if ($count >= $limit) {
+                return ['allowed' => false, 'reason' => "Invoice limit reached ({$count}/{$limit}). Please contact admin."];
+            }
+            return ['allowed' => true, 'remaining' => $limit - $count];
+        }
+
         $sub = self::getActiveSubscription($companyId);
 
         if (!$sub) {
@@ -58,6 +70,18 @@ class PlanLimitService
             return ['allowed' => true, 'internal' => true];
         }
 
+        if ($company && $company->user_limit_override !== null) {
+            if ($company->user_limit_override === -1) {
+                return ['allowed' => true, 'unlimited' => true];
+            }
+            $count = User::where('company_id', $companyId)->where('is_active', true)->count();
+            $limit = $company->user_limit_override;
+            if ($count >= $limit) {
+                return ['allowed' => false, 'reason' => "User limit reached ({$count}/{$limit}). Please contact admin."];
+            }
+            return ['allowed' => true, 'remaining' => $limit - $count];
+        }
+
         $sub = self::getActiveSubscription($companyId);
 
         if (!$sub) {
@@ -84,6 +108,18 @@ class PlanLimitService
             return ['allowed' => true, 'internal' => true];
         }
 
+        if ($company && $company->branch_limit_override !== null) {
+            if ($company->branch_limit_override === -1) {
+                return ['allowed' => true, 'unlimited' => true];
+            }
+            $count = Branch::where('company_id', $companyId)->count();
+            $limit = $company->branch_limit_override;
+            if ($count >= $limit) {
+                return ['allowed' => false, 'reason' => "Branch limit reached ({$count}/{$limit}). Please contact admin."];
+            }
+            return ['allowed' => true, 'remaining' => $limit - $count];
+        }
+
         $sub = self::getActiveSubscription($companyId);
 
         if (!$sub) {
@@ -101,5 +137,41 @@ class PlanLimitService
         }
 
         return ['allowed' => true, 'remaining' => $limit - $count];
+    }
+
+    public static function getEffectiveLimits(int $companyId): array
+    {
+        $company = \App\Models\Company::find($companyId);
+        $sub = self::getActiveSubscription($companyId);
+        $plan = $sub?->pricingPlan;
+
+        $invoiceLimit = $company?->invoice_limit_override ?? $plan?->invoice_limit ?? 0;
+        $userLimit = $company?->user_limit_override ?? $plan?->user_limit ?? 0;
+        $branchLimit = $company?->branch_limit_override ?? $plan?->branch_limit ?? 0;
+
+        $invoiceCount = Invoice::where('company_id', $companyId)->count();
+        $userCount = User::where('company_id', $companyId)->where('is_active', true)->count();
+        $branchCount = Branch::where('company_id', $companyId)->count();
+
+        return [
+            'invoice' => [
+                'limit' => $invoiceLimit,
+                'used' => $invoiceCount,
+                'source' => $company?->invoice_limit_override !== null ? 'admin_override' : 'plan',
+                'display' => $invoiceLimit === -1 ? 'Unlimited' : $invoiceLimit,
+            ],
+            'user' => [
+                'limit' => $userLimit,
+                'used' => $userCount,
+                'source' => $company?->user_limit_override !== null ? 'admin_override' : 'plan',
+                'display' => $userLimit === -1 ? 'Unlimited' : $userLimit,
+            ],
+            'branch' => [
+                'limit' => $branchLimit,
+                'used' => $branchCount,
+                'source' => $company?->branch_limit_override !== null ? 'admin_override' : 'plan',
+                'display' => $branchLimit === -1 ? 'Unlimited' : $branchLimit,
+            ],
+        ];
     }
 }

@@ -542,6 +542,44 @@ class AdminController extends Controller
         return redirect('/admin/company/' . $company->id)->with('success', 'Internal account status updated.');
     }
 
+    public function updateCompanyLimits(Request $request, Company $company)
+    {
+        $request->validate([
+            'invoice_limit_override' => 'nullable|integer|min:-1',
+            'user_limit_override' => 'nullable|integer|min:-1',
+            'branch_limit_override' => 'nullable|integer|min:-1',
+        ]);
+
+        $data = [];
+        $data['invoice_limit_override'] = $request->input('invoice_limit_override') !== null && $request->input('invoice_limit_override') !== '' ? (int) $request->input('invoice_limit_override') : null;
+        $data['user_limit_override'] = $request->input('user_limit_override') !== null && $request->input('user_limit_override') !== '' ? (int) $request->input('user_limit_override') : null;
+        $data['branch_limit_override'] = $request->input('branch_limit_override') !== null && $request->input('branch_limit_override') !== '' ? (int) $request->input('branch_limit_override') : null;
+
+        $company->update($data);
+
+        AuditLogService::log('company_limits_updated', 'Company', $company->id, null, $data);
+        SecurityLogService::log('company_limits_updated', auth()->id(), [
+            'company_id' => $company->id,
+            'limits' => $data,
+        ]);
+
+        return redirect('/admin/company/' . $company->id)->with('success', 'Company limits updated successfully.');
+    }
+
+    public function resetCompanyLimits(Request $request, Company $company)
+    {
+        $company->update([
+            'invoice_limit_override' => null,
+            'user_limit_override' => null,
+            'branch_limit_override' => null,
+        ]);
+
+        AuditLogService::log('company_limits_reset', 'Company', $company->id, null, []);
+        SecurityLogService::log('company_limits_reset', auth()->id(), ['company_id' => $company->id]);
+
+        return redirect('/admin/company/' . $company->id)->with('success', 'Company limits reset to plan defaults.');
+    }
+
     private function calcAuditProbability(Company $company)
     {
         $score = $company->compliance_score ?? 75;

@@ -323,6 +323,64 @@
 
             <div x-show="activeTab === 'settings'" class="space-y-6">
                 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <h4 class="text-sm font-bold text-gray-800 mb-4">Limit Overrides</h4>
+                    <p class="text-sm text-gray-600 mb-4">Override the subscription plan limits for this company. Leave empty to use the plan default. Set to <strong>-1</strong> for unlimited.</p>
+
+                    <form method="POST" action="/admin/company/{{ $company->id }}/update-limits" class="space-y-4">
+                        @csrf
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Invoice Limit</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" name="invoice_limit_override" value="{{ $company->invoice_limit_override }}" placeholder="Plan default" min="-1" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500 text-sm">
+                                    @if($company->invoice_limit_override === -1)
+                                    <span class="px-2 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full whitespace-nowrap">Unlimited</span>
+                                    @elseif($company->invoice_limit_override !== null)
+                                    <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full whitespace-nowrap">Override</span>
+                                    @else
+                                    <span class="px-2 py-1 bg-gray-100 text-gray-500 text-xs font-bold rounded-full whitespace-nowrap">Plan</span>
+                                    @endif
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">User Limit</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" name="user_limit_override" value="{{ $company->user_limit_override }}" placeholder="Plan default" min="-1" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500 text-sm">
+                                    @if($company->user_limit_override === -1)
+                                    <span class="px-2 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full whitespace-nowrap">Unlimited</span>
+                                    @elseif($company->user_limit_override !== null)
+                                    <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full whitespace-nowrap">Override</span>
+                                    @else
+                                    <span class="px-2 py-1 bg-gray-100 text-gray-500 text-xs font-bold rounded-full whitespace-nowrap">Plan</span>
+                                    @endif
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Branch Limit</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" name="branch_limit_override" value="{{ $company->branch_limit_override }}" placeholder="Plan default" min="-1" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500 text-sm">
+                                    @if($company->branch_limit_override === -1)
+                                    <span class="px-2 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full whitespace-nowrap">Unlimited</span>
+                                    @elseif($company->branch_limit_override !== null)
+                                    <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full whitespace-nowrap">Override</span>
+                                    @else
+                                    <span class="px-2 py-1 bg-gray-100 text-gray-500 text-xs font-bold rounded-full whitespace-nowrap">Plan</span>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                            <p class="text-xs text-amber-700"><strong>Note:</strong> Empty = use plan default | <strong>-1</strong> = unlimited | Any positive number = custom limit</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button type="submit" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg font-medium hover:bg-emerald-700 transition">Save Limits</button>
+                            <button type="button" onclick="if(confirm('Reset all limits to plan defaults?')){document.getElementById('resetLimitsForm').submit()}" class="px-4 py-2 bg-gray-200 text-gray-700 text-sm rounded-lg font-medium hover:bg-gray-300 transition">Reset to Plan Defaults</button>
+                        </div>
+                    </form>
+                    <form id="resetLimitsForm" method="POST" action="/admin/company/{{ $company->id }}/reset-limits" class="hidden">@csrf</form>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                     <h4 class="text-sm font-bold text-gray-800 mb-4">Internal Account</h4>
                     <p class="text-sm text-gray-600 mb-4">Internal accounts bypass invoice limits, subscription enforcement, and payment requirements. Audit logs and compliance engine remain active.</p>
                     <div class="flex items-center justify-between p-4 rounded-lg {{ $company->is_internal_account ? 'bg-emerald-50 border border-emerald-200' : 'bg-gray-50 border border-gray-200' }}">

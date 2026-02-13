@@ -236,6 +236,8 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::get('/admin/companies/pending', [AdminController::class, 'pendingCompanies']);
         Route::post('/admin/company/{company}/change-plan', [AdminController::class, 'changePlan']);
         Route::post('/admin/company/{company}/toggle-internal', [AdminController::class, 'toggleInternalAccount']);
+        Route::post('/admin/company/{company}/update-limits', [AdminController::class, 'updateCompanyLimits']);
+        Route::post('/admin/company/{company}/reset-limits', [AdminController::class, 'resetCompanyLimits']);
         Route::get('/admin/hs-master-export', [HsMasterExportController::class, 'index'])->name('admin.hs-master-export');
 
         Route::get('/admin/hs-master', [GlobalHsMasterController::class, 'index'])->name('admin.hs-master');

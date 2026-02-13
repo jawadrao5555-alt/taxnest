@@ -29,7 +29,6 @@
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
         <script>if(document.documentElement.classList.contains('dark')){document.documentElement.style.colorScheme='dark';}</script>
         <style>
-            html, body { height: 100%; overflow: hidden; }
             .sidebar-scroll::-webkit-scrollbar { width: 4px; }
             .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(156,163,175,0.3); border-radius: 4px; }
             .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -37,21 +36,22 @@
             .main-scroll::-webkit-scrollbar-thumb { background: rgba(156,163,175,0.3); border-radius: 4px; }
             .main-scroll::-webkit-scrollbar-track { background: transparent; }
             .sidebar-link { transition: all 0.15s ease; }
-            .sidebar-link:hover { transform: translateX(2px); }
-            .sidebar-link.active { background: linear-gradient(135deg, rgba(5,150,105,0.12) 0%, rgba(16,185,129,0.08) 100%); border-left: 3px solid #059669; }
-            .dark .sidebar-link.active { background: linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(5,150,105,0.1) 100%); }
+            .sidebar-link:hover { background-color: #f9fafb; }
+            .dark .sidebar-link:hover { background-color: rgba(55,65,81,0.5); }
+            .sidebar-link.active { background-color: #f3f4f6; font-weight: 600; }
+            .dark .sidebar-link.active { background-color: rgba(55,65,81,0.7); }
         </style>
     </head>
-    <body class="font-sans antialiased" x-data="{ sidebarOpen: false }">
-        <div class="h-screen flex bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-            @auth
-            <aside class="hidden lg:flex lg:flex-col lg:w-[260px] lg:flex-shrink-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border-r border-gray-200/60 dark:border-gray-700/60 z-30">
+    <body class="font-sans antialiased bg-gray-50 dark:bg-gray-900" x-data="{ sidebarOpen: false }">
+        @auth
+        <div class="flex min-h-screen">
+            <aside class="hidden lg:flex lg:flex-col w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 fixed h-screen overflow-y-auto sidebar-scroll z-30">
                 @include('layouts.navigation')
             </aside>
 
             <div x-show="sidebarOpen" x-cloak class="fixed inset-0 z-40 lg:hidden" @click="sidebarOpen = false">
-                <div class="fixed inset-0 bg-black/40 backdrop-blur-sm" x-show="sidebarOpen" x-transition:enter="transition-opacity ease-out duration-200" x-transition:leave="transition-opacity ease-in duration-150"></div>
-                <aside class="fixed inset-y-0 left-0 w-[280px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl shadow-2xl z-50 overflow-hidden"
+                <div class="fixed inset-0 bg-black/40" x-show="sidebarOpen" x-transition:enter="transition-opacity ease-out duration-200" x-transition:leave="transition-opacity ease-in duration-150"></div>
+                <aside class="fixed inset-y-0 left-0 w-72 bg-white dark:bg-gray-800 shadow-xl z-50 overflow-y-auto sidebar-scroll"
                     x-show="sidebarOpen"
                     x-transition:enter="transition transform ease-out duration-200"
                     x-transition:enter-start="-translate-x-full"
@@ -61,23 +61,27 @@
                     x-transition:leave-end="-translate-x-full"
                     @click.stop>
                     <div class="absolute top-3 right-3">
-                        <button @click="sidebarOpen = false" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                        <button @click="sidebarOpen = false" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                         </button>
                     </div>
                     @include('layouts.navigation')
                 </aside>
             </div>
-            @endauth
 
-            <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
-                @auth
-                <header class="flex-shrink-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg border-b border-gray-200/60 dark:border-gray-700/60 z-20">
+            <div class="flex-1 lg:ml-64 flex flex-col min-h-screen">
+                <header class="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 z-20">
                     <div class="flex items-center justify-between h-14 px-4 sm:px-6">
                         <div class="flex items-center gap-3">
-                            <button @click="sidebarOpen = !sidebarOpen" class="lg:hidden p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                            <button @click="sidebarOpen = !sidebarOpen" class="lg:hidden p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                             </button>
+                            @if(url()->previous() !== url()->current() && url()->previous() !== '')
+                                <a href="{{ url()->previous() }}" class="hidden sm:inline-flex items-center text-sm text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition">
+                                    <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                                    Back
+                                </a>
+                            @endif
                             @isset($header)
                                 <div class="text-sm">{{ $header }}</div>
                             @endisset
@@ -91,13 +95,13 @@
                                 @endif">
                                 {{ ucfirst(str_replace('_', ' ', auth()->user()->role)) }}
                             </span>
-                            <button id="pwa-install-btn" onclick="installPwa()" class="hidden items-center px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs font-bold rounded-lg hover:from-emerald-600 hover:to-teal-700 shadow-sm transition-all">
+                            <button id="pwa-install-btn" onclick="installPwa()" class="hidden items-center px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 shadow-sm transition">
                                 <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                 Install
                             </button>
                             <x-dropdown align="right" width="48">
                                 <x-slot name="trigger">
-                                    <button class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                                    <button class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
                                         <span class="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400 text-xs font-bold">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</span>
                                         <span class="hidden sm:inline">{{ Auth::user()->name }}</span>
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" fill="currentColor"/></svg>
@@ -120,25 +124,24 @@
                         </div>
                     </div>
                 </header>
-                @endauth
 
                 @if(auth()->check() && auth()->user()->company_id)
                     @php $currentCompany = \App\Models\Company::find(auth()->user()->company_id); @endphp
                     @if($currentCompany && $currentCompany->company_status === 'pending')
-                    <div class="flex-shrink-0 bg-amber-500 text-white text-center py-2 px-4 text-sm font-medium">
+                    <div class="bg-amber-500 text-white text-center py-2 px-4 text-sm font-medium">
                         Your company registration is pending approval. Some features may be limited.
                     </div>
                     @endif
                     @if($currentCompany && $currentCompany->company_status === 'suspended')
-                    <div class="flex-shrink-0 bg-red-600 text-white text-center py-2 px-4 text-sm font-medium">
+                    <div class="bg-red-600 text-white text-center py-2 px-4 text-sm font-medium">
                         Your company has been suspended. Please contact support.
                     </div>
                     @endif
                 @endif
 
-                <main class="flex-1 overflow-y-auto main-scroll">
+                <main class="flex-1 p-6 overflow-y-auto main-scroll">
                     @if(session('success'))
-                        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+                        <div class="max-w-7xl mx-auto mb-4">
                             <div class="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg">
                                 {{ session('success') }}
                             </div>
@@ -146,7 +149,7 @@
                     @endif
 
                     @if(session('error'))
-                        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+                        <div class="max-w-7xl mx-auto mb-4">
                             <div class="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
                                 {{ session('error') }}
                             </div>
@@ -157,6 +160,9 @@
                 </main>
             </div>
         </div>
+        @else
+        {{ $slot }}
+        @endauth
         <script>
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('/sw.js').catch(() => {});

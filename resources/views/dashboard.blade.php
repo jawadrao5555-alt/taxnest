@@ -14,11 +14,11 @@
                 </span>
             </div>
             <div class="flex items-center space-x-2">
-                <a href="/compliance/certificate" target="_blank" class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl text-xs font-bold text-white hover:from-indigo-700 hover:to-purple-700 shadow-lg shadow-indigo-500/25 transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/30 hover:-translate-y-0.5">
+                <a href="/compliance/certificate" target="_blank" class="inline-flex items-center px-4 py-2 bg-indigo-600 rounded-lg text-xs font-bold text-white hover:bg-indigo-700 shadow-sm transition">
                     <svg class="w-3.5 h-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
                     Certificate
                 </a>
-                <a href="/invoice/create" class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl text-xs font-bold text-white hover:from-emerald-700 hover:to-teal-700 shadow-lg shadow-emerald-500/25 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/30 hover:-translate-y-0.5">
+                <a href="/invoice/create" class="inline-flex items-center px-4 py-2 bg-emerald-600 rounded-lg text-xs font-bold text-white hover:bg-emerald-700 shadow-sm transition">
                     <svg class="w-3.5 h-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     New Invoice
                 </a>
@@ -27,20 +27,16 @@
     </x-slot>
 
     <style>
-        @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes countUp { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes progressFill { from { width: 0; } }
-        .animate-slide-up { animation: slideUp 0.5s ease-out forwards; }
+        .animate-slide-up { animation: slideUp 0.4s ease-out forwards; }
         .animate-slide-up-1 { animation-delay: 0.05s; opacity: 0; }
         .animate-slide-up-2 { animation-delay: 0.1s; opacity: 0; }
         .animate-slide-up-3 { animation-delay: 0.15s; opacity: 0; }
         .animate-slide-up-4 { animation-delay: 0.2s; opacity: 0; }
         .animate-slide-up-5 { animation-delay: 0.25s; opacity: 0; }
-        .premium-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .premium-card:hover { transform: translateY(-2px); box-shadow: 0 12px 40px -12px rgba(0,0,0,0.12); }
-        .glass-card { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
-        .shimmer-border { background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent); background-size: 200% 100%; animation: shimmer 3s infinite; }
+        .premium-card { transition: box-shadow 0.2s ease; }
+        .premium-card:hover { box-shadow: 0 4px 12px -4px rgba(0,0,0,0.1); }
         .progress-animate { animation: progressFill 1.5s ease-out; }
     </style>
 
@@ -48,9 +44,9 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
             @if(!empty($trialInfo) && $trialInfo['is_trial'])
-            <div class="mb-4 bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-500/10 dark:from-blue-500/20 dark:via-indigo-500/20 dark:to-purple-500/20 border border-blue-200/60 dark:border-blue-700/40 rounded-2xl p-4 flex items-center justify-between backdrop-blur-sm">
+            <div class="mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 flex items-center justify-between">
                 <div class="flex items-center space-x-3">
-                    <div class="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg shadow-blue-500/30">
+                    <div class="p-2.5 bg-blue-600 rounded-lg">
                         <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     </div>
                     <div>
@@ -58,14 +54,14 @@
                         <p class="text-xs text-blue-600 dark:text-blue-400">Upgrade anytime to unlock full features</p>
                     </div>
                 </div>
-                <a href="/billing/plans" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold rounded-xl hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-500/25 transition-all duration-300 hover:-translate-y-0.5">Upgrade Now</a>
+                <a href="/billing/plans" class="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 shadow-sm transition">Upgrade Now</a>
             </div>
             @endif
 
             @if(!empty($trialInfo) && !empty($trialInfo['is_expired']) && $trialInfo['is_expired'])
-            <div class="mb-4 bg-gradient-to-r from-red-500/10 via-rose-500/10 to-pink-500/10 dark:from-red-500/20 dark:via-rose-500/20 dark:to-pink-500/20 border border-red-200/60 dark:border-red-700/40 rounded-2xl p-4 flex items-center justify-between backdrop-blur-sm">
+            <div class="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 flex items-center justify-between">
                 <div class="flex items-center space-x-3">
-                    <div class="p-2.5 bg-gradient-to-br from-red-500 to-rose-600 rounded-xl shadow-lg shadow-red-500/30">
+                    <div class="p-2.5 bg-red-600 rounded-lg">
                         <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
                     </div>
                     <div>
@@ -73,7 +69,7 @@
                         <p class="text-xs text-red-600 dark:text-red-400">Subscribe to continue using all features</p>
                     </div>
                 </div>
-                <a href="/billing/plans" class="px-4 py-2 bg-gradient-to-r from-red-600 to-rose-600 text-white text-xs font-bold rounded-xl hover:from-red-700 hover:to-rose-700 shadow-lg shadow-red-500/25 transition-all duration-300 hover:-translate-y-0.5">Subscribe</a>
+                <a href="/billing/plans" class="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700 shadow-sm transition">Subscribe</a>
             </div>
             @endif
 
@@ -92,9 +88,9 @@
 
             @php $usagePercent = $invoiceLimit > 0 ? min(100, ($invoicesUsed / $invoiceLimit) * 100) : 0; @endphp
             @if($usagePercent >= 80)
-            <div class="mb-4 bg-gradient-to-r from-orange-500/10 to-red-500/10 dark:from-orange-500/20 dark:to-red-500/20 border border-orange-200/60 dark:border-orange-700/40 rounded-2xl p-4 flex items-center justify-between backdrop-blur-sm">
+            <div class="mb-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl p-4 flex items-center justify-between">
                 <div class="flex items-center space-x-3">
-                    <div class="p-2.5 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl shadow-lg shadow-orange-500/30">
+                    <div class="p-2.5 bg-orange-600 rounded-lg">
                         <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                     </div>
                     <div>
@@ -102,85 +98,71 @@
                         <p class="text-xs text-orange-600 dark:text-orange-400">{{ $invoicesUsed }} of {{ $invoiceLimit }} invoices used this period</p>
                     </div>
                 </div>
-                <a href="/billing/plans" class="px-4 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white text-xs font-bold rounded-xl hover:from-orange-700 hover:to-red-700 shadow-lg shadow-orange-500/25 transition-all duration-300 hover:-translate-y-0.5">Upgrade</a>
+                <a href="/billing/plans" class="px-4 py-2 bg-orange-600 text-white text-xs font-bold rounded-lg hover:bg-orange-700 shadow-sm transition">Upgrade</a>
             </div>
             @endif
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
-                <div class="premium-card animate-slide-up animate-slide-up-1 relative overflow-hidden bg-white dark:bg-gray-800/80 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-700/50 p-5 group">
-                    <div class="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-blue-500/10 to-transparent rounded-bl-full"></div>
-                    <div class="relative">
-                        <div class="flex items-center justify-between mb-3">
-                            <div class="p-2.5 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg shadow-blue-500/30 group-hover:shadow-xl group-hover:shadow-blue-500/40 transition-all duration-300">
-                                <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+                <div class="premium-card animate-slide-up animate-slide-up-1 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="p-2.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                            <svg class="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                         </div>
-                        <p class="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight" x-data="{ count: 0 }" x-init="let target = {{ $totalInvoices }}; let interval = setInterval(() => { if(count < target) count++; else clearInterval(interval); }, 30)" x-text="count">0</p>
-                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider">Total Invoices</p>
-                        <div class="mt-3 flex items-center space-x-2 text-xs">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-100/80 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-semibold">{{ $draftCount }} draft</span>
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-100/80 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-semibold">{{ $submittedCount }} sent</span>
-                        </div>
+                    </div>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ $totalInvoices }}</p>
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider">Total Invoices</p>
+                    <div class="mt-3 flex items-center space-x-2 text-xs">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">{{ $draftCount }} draft</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium">{{ $submittedCount }} sent</span>
                     </div>
                 </div>
 
-                <div class="premium-card animate-slide-up animate-slide-up-2 relative overflow-hidden bg-white dark:bg-gray-800/80 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-700/50 p-5 group">
-                    <div class="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-emerald-500/10 to-transparent rounded-bl-full"></div>
-                    <div class="relative">
-                        <div class="flex items-center justify-between mb-3">
-                            <div class="p-2.5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg shadow-emerald-500/30 group-hover:shadow-xl group-hover:shadow-emerald-500/40 transition-all duration-300">
-                                <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            </div>
+                <div class="premium-card animate-slide-up animate-slide-up-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="p-2.5 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
+                            <svg class="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         </div>
-                        <p class="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Rs. {{ number_format($totalRevenue) }}</p>
-                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider">Total Revenue</p>
                     </div>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white">Rs. {{ number_format($totalRevenue) }}</p>
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider">Total Revenue</p>
                 </div>
 
-                <div class="premium-card animate-slide-up animate-slide-up-3 relative overflow-hidden bg-white dark:bg-gray-800/80 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-700/50 p-5 group">
-                    <div class="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-purple-500/10 to-transparent rounded-bl-full"></div>
-                    <div class="relative">
-                        <div class="flex items-center justify-between mb-3">
-                            <div class="p-2.5 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl shadow-lg shadow-purple-500/30 group-hover:shadow-xl group-hover:shadow-purple-500/40 transition-all duration-300">
-                                <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                            </div>
+                <div class="premium-card animate-slide-up animate-slide-up-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="p-2.5 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                            <svg class="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                         </div>
-                        <p class="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight" x-data="{ count: 0 }" x-init="let target = {{ $lockedCount }}; let interval = setInterval(() => { if(count < target) count++; else clearInterval(interval); }, 30)" x-text="count">0</p>
-                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider">FBR Locked</p>
                     </div>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ $lockedCount }}</p>
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider">FBR Locked</p>
                 </div>
 
-                <div class="premium-card animate-slide-up animate-slide-up-4 relative overflow-hidden bg-white dark:bg-gray-800/80 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-700/50 p-5 group">
-                    <div class="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-indigo-500/10 to-transparent rounded-bl-full"></div>
-                    <div class="relative">
-                        <div class="flex items-center justify-between mb-3">
-                            <div class="p-2.5 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl shadow-lg shadow-indigo-500/30 group-hover:shadow-xl group-hover:shadow-indigo-500/40 transition-all duration-300">
-                                <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            </div>
+                <div class="premium-card animate-slide-up animate-slide-up-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="p-2.5 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
+                            <svg class="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         </div>
-                        <p class="text-3xl font-extrabold tracking-tight {{ $fbrSuccessRate >= 80 ? 'text-emerald-600 dark:text-emerald-400' : ($fbrSuccessRate >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') }}">{{ $fbrSuccessRate }}%</p>
-                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider">FBR Success</p>
                     </div>
+                    <p class="text-2xl font-bold {{ $fbrSuccessRate >= 80 ? 'text-emerald-600 dark:text-emerald-400' : ($fbrSuccessRate >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') }}">{{ $fbrSuccessRate }}%</p>
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider">FBR Success</p>
                 </div>
 
-                <div class="premium-card animate-slide-up animate-slide-up-5 relative overflow-hidden bg-white dark:bg-gray-800/80 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-700/50 p-5 group">
-                    <div class="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-orange-500/10 to-transparent rounded-bl-full"></div>
-                    <div class="relative">
-                        <div class="flex items-center justify-between mb-3">
-                            <div class="p-2.5 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl shadow-lg shadow-orange-500/30 group-hover:shadow-xl group-hover:shadow-orange-500/40 transition-all duration-300">
-                                <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                            </div>
+                <div class="premium-card animate-slide-up animate-slide-up-5 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="p-2.5 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+                            <svg class="w-4 h-4 text-orange-600 dark:text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                         </div>
-                        <p class="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">{{ $invoicesUsed }}<span class="text-lg text-gray-400 dark:text-gray-500 font-medium">/{{ $invoiceLimit }}</span></p>
-                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider">Plan Usage</p>
-                        @if($subscription)
-                        <div class="mt-3">
-                            <div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
-                                <div class="h-2 rounded-full progress-animate {{ $usagePercent > 80 ? 'bg-gradient-to-r from-red-500 to-rose-500' : 'bg-gradient-to-r from-emerald-500 to-teal-500' }}" style="width: {{ $usagePercent }}%"></div>
-                            </div>
-                            <p class="text-xs text-gray-400 mt-1.5 font-medium">{{ $subscription->pricingPlan->name }}</p>
+                    </div>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ $invoicesUsed }}<span class="text-base text-gray-400 dark:text-gray-500 font-normal">/{{ $invoiceLimit }}</span></p>
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider">Plan Usage</p>
+                    @if($subscription)
+                    <div class="mt-3">
+                        <div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                            <div class="h-1.5 rounded-full progress-animate {{ $usagePercent > 80 ? 'bg-red-500' : 'bg-emerald-500' }}" style="width: {{ $usagePercent }}%"></div>
                         </div>
-                        @endif
+                        <p class="text-xs text-gray-400 mt-1.5 font-medium">{{ $subscription->pricingPlan->name }}</p>
+                    </div>
+                    @endif
                     </div>
                 </div>
             </div>

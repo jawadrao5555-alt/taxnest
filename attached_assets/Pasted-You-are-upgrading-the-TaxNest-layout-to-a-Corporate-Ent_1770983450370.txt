@@ -1,0 +1,145 @@
+You are upgrading the TaxNest layout to a Corporate Enterprise Standard UI.
+
+DO NOT modify:
+- Business logic
+- Controllers
+- Routes
+- FBR integration
+- Database structure
+
+Only update layout + UI structure.
+
+========================================
+PHASE 1 — FIX CORE LAYOUT STRUCTURE
+========================================
+
+1️⃣ Update main layout blade (layouts/app.blade.php):
+
+Replace wrapper with:
+
+<div class="flex min-h-screen bg-gray-50">
+    <aside class="w-64 bg-white border-r border-gray-200 fixed h-screen overflow-y-auto">
+        @include('partials.sidebar')
+    </aside>
+
+    <div class="flex-1 ml-64 flex flex-col">
+        @include('partials.topbar')
+
+        <main class="flex-1 p-6 overflow-y-auto">
+            @yield('content')
+        </main>
+    </div>
+</div>
+
+Ensure:
+- Sidebar is fixed
+- Content uses ml-64
+- No nested min-h-screen inside pages
+- Remove any conflicting flex wrappers
+
+========================================
+PHASE 2 — SIDEBAR CLEAN STRUCTURE
+========================================
+
+Sidebar styling:
+
+- Remove floating 3-button corner controls
+- No transparency
+- Background: bg-white
+- Active item: bg-gray-100 font-semibold
+- Hover: bg-gray-50
+- Add proper padding: py-3 px-4
+- Icons aligned with flex items-center gap-3
+
+Make sidebar scrollable independently:
+overflow-y-auto
+
+========================================
+PHASE 3 — ADD GLOBAL BACK BUTTON
+========================================
+
+Inside topbar, add:
+
+@if(url()->previous() !== url()->current())
+    <a href="{{ url()->previous() }}"
+       class="text-sm text-gray-600 hover:text-black">
+       ← Back
+    </a>
+@endif
+
+Position left side before page title.
+
+========================================
+PHASE 4 — DASHBOARD POLISH
+========================================
+
+Cards:
+
+- Add class: shadow-sm
+- Rounded: rounded-xl
+- Padding: p-6
+- Background: bg-white
+- Border: border border-gray-100
+
+Add consistent grid:
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+Compliance circle:
+- Reduce size slightly
+- Align vertically centered
+
+Remove excessive blur/gradient effects.
+
+========================================
+PHASE 5 — FIX SCROLL BEHAVIOR
+========================================
+
+Ensure:
+
+- Only main content scrolls
+- Sidebar remains fixed
+- No double scrollbars
+- Remove overflow-hidden from body
+
+========================================
+PHASE 6 — BILLING PAGE POLISH
+========================================
+
+Dropdown:
+
+- Remove browser default styling
+- Add custom class:
+  class="w-full border border-gray-300 rounded-md px-4 py-2 bg-white focus:ring-2 focus:ring-gray-300"
+
+Pricing summary box:
+- bg-gray-50
+- rounded-lg
+- p-4
+- text-right
+
+========================================
+PHASE 7 — REMOVE UI CLUTTER
+========================================
+
+- Remove duplicate header shadows
+- Remove floating hidden dashboard elements
+- Remove unnecessary fixed-position elements
+- Remove absolute positioning from layout wrappers
+
+========================================
+FINAL VALIDATION
+========================================
+
+Confirm:
+
+✔ Sidebar fixed
+✔ Content aligned
+✔ No overlapping
+✔ No dashboard hidden
+✔ No layout jumping
+✔ Back button visible
+✔ All routes still return 200
+
+Do not change business logic.
+Return summary of layout changes.

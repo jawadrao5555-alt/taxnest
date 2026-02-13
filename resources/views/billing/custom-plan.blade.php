@@ -19,7 +19,7 @@
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="lg:col-span-2 space-y-6">
-                    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
                         <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-6">Configure Limits</h3>
 
                         <div class="space-y-8">
@@ -70,7 +70,7 @@
                         </div>
                     </div>
 
-                    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
                         <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Billing Cycle</h3>
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                             <button type="button" @click="billingCycle = 'monthly'; calculate()"
@@ -102,7 +102,7 @@
                 </div>
 
                 <div class="space-y-6">
-                    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 sticky top-6">
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 sticky top-6">
                         <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Price Summary</h3>
 
                         <div x-show="loading" class="flex items-center justify-center py-8">

@@ -88,7 +88,7 @@
                 </aside>
             </div>
 
-            <div class="flex-1 ml-64 flex flex-col h-full">
+            <div class="flex-1 ml-0 lg:ml-64 flex flex-col h-full">
                 <header class="sticky top-0 bg-white/80 dark:bg-gray-800/90 backdrop-blur-xl border-b border-gray-200/60 dark:border-gray-700/60 z-20 shadow-sm">
                     <div class="flex items-center justify-between h-14 px-4 sm:px-6">
                         <div class="flex items-center gap-3">

@@ -1,10 +1,16 @@
 <x-guest-layout>
+    <div class="mb-6 text-center">
+        <div class="flex justify-center mb-3">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            </div>
+        </div>
+        <h2 class="text-xl font-bold" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Create Your Account</h2>
+        <p class="text-sm text-gray-500 mt-1">Register your company and become its admin</p>
+    </div>
+
     <form method="POST" action="{{ route('register') }}">
         @csrf
-
-        <div class="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-            <p class="text-sm text-emerald-700 font-medium">Register your company and become its admin</p>
-        </div>
 
         <div class="mt-4">
             <x-input-label for="company_name" value="Company Name" />
@@ -18,7 +24,7 @@
             <x-input-error :messages="$errors->get('company_ntn')" class="mt-2" />
         </div>
 
-        <hr class="my-4 border-gray-200">
+        <hr class="my-4 border-gray-200/60">
 
         <div>
             <x-input-label for="name" :value="__('Your Name')" />
@@ -58,14 +64,17 @@
             <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
         </div>
 
-        <div class="flex items-center justify-end mt-4">
-            <a class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500" href="{{ route('login') }}">
-                {{ __('Already registered?') }}
-            </a>
-
-            <x-primary-button class="ms-4">
+        <div class="mt-6">
+            <button type="submit" class="w-full flex justify-center py-2.5 px-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 hover:from-emerald-600 hover:to-teal-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-all duration-200">
                 {{ __('Register') }}
-            </x-primary-button>
+            </button>
+        </div>
+
+        <div class="mt-5 text-center">
+            <p class="text-sm text-gray-500">
+                Already have an account?
+                <a href="{{ route('login') }}" class="font-semibold text-emerald-600 hover:text-emerald-700 transition">Log In</a>
+            </p>
         </div>
     </form>
 </x-guest-layout>

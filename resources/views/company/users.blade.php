@@ -1,13 +1,10 @@
 <x-app-layout>
-    <x-slot name="header">
-        <div class="flex items-center justify-between">
-            <h2 class="font-bold text-xl text-gray-800 leading-tight">Team Members</h2>
-            <button onclick="document.getElementById('addUserModal').classList.toggle('hidden')" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">+ Add User</button>
-        </div>
-    </x-slot>
-
     <div class="py-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Team Members</h2>
+                <button onclick="document.getElementById('addUserModal').classList.toggle('hidden')" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/20">+ Add User</button>
+            </div>
 
             @if(session('success'))
             <div class="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700">{{ session('success') }}</div>
@@ -17,38 +14,38 @@
             @endif
 
             <div id="addUserModal" class="hidden mb-6">
-                <form method="POST" action="/company/users" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <form method="POST" action="/company/users" class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-6">
                     @csrf
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Add New Team Member</h3>
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Add New Team Member</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Name <span class="text-red-500">*</span></label>
-                            <input type="text" name="name" required class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name <span class="text-red-500">*</span></label>
+                            <input type="text" name="name" required class="w-full rounded-lg bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm border-gray-200/50 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             @error('name') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Email <span class="text-red-500">*</span></label>
-                            <input type="email" name="email" required class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email <span class="text-red-500">*</span></label>
+                            <input type="email" name="email" required class="w-full rounded-lg bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm border-gray-200/50 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             @error('email') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                            <input type="text" name="username" placeholder="e.g. ahmed_user" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
+                            <input type="text" name="username" placeholder="e.g. ahmed_user" class="w-full rounded-lg bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm border-gray-200/50 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             @error('username') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                            <input type="text" name="phone" placeholder="e.g. 03001234567" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone</label>
+                            <input type="text" name="phone" placeholder="e.g. 03001234567" class="w-full rounded-lg bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm border-gray-200/50 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             @error('phone') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Password <span class="text-red-500">*</span></label>
-                            <input type="password" name="password" required minlength="6" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password <span class="text-red-500">*</span></label>
+                            <input type="password" name="password" required minlength="6" class="w-full rounded-lg bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm border-gray-200/50 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             @error('password') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Role <span class="text-red-500">*</span></label>
-                            <select name="role" required class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role <span class="text-red-500">*</span></label>
+                            <select name="role" required class="w-full rounded-lg bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm border-gray-200/50 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 <option value="employee">Employee</option>
                                 <option value="company_admin">Company Admin</option>
                                 <option value="viewer">Viewer</option>
@@ -56,15 +53,15 @@
                         </div>
                     </div>
                     <div class="mt-4 flex justify-end">
-                        <button type="submit" class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition">Add User</button>
+                        <button type="submit" class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/20">Add User</button>
                     </div>
                 </form>
             </div>
 
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 overflow-hidden">
                 <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50/50 dark:bg-gray-900/30">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
@@ -75,9 +72,9 @@
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200">
+                    <tbody class="bg-transparent divide-y divide-gray-200 dark:divide-gray-700">
                         @forelse($users as $user)
-                        <tr class="hover:bg-gray-50">
+                        <tr class="hover:bg-white/50 dark:hover:bg-gray-700/30 transition">
                             <td class="px-6 py-4 text-sm font-medium text-gray-900">
                                 {{ $user->name }}
                                 @if($user->id === auth()->id())

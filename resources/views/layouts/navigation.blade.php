@@ -1,11 +1,14 @@
 <div class="flex flex-col h-full">
-    <div class="flex-shrink-0 px-5 pt-5 pb-4 border-b border-gray-200/50 dark:border-gray-700/50">
+    <div class="flex-shrink-0 px-5 pt-5 pb-4">
         <a href="{{ route('dashboard') }}" class="flex items-center space-x-2.5">
-            <svg class="h-8 w-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
-            </svg>
+            <div class="h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                </svg>
+            </div>
             <span class="text-lg font-bold text-gray-800 dark:text-white tracking-tight">TaxNest</span>
         </a>
+        <div class="mt-4 h-px bg-gradient-to-r from-emerald-500/40 via-teal-500/20 to-transparent"></div>
     </div>
 
     <nav class="flex-1 overflow-y-auto sidebar-scroll px-3 py-3 space-y-0.5">
@@ -16,7 +19,7 @@
 
         @if(auth()->user()->role !== 'super_admin' || auth()->user()->company_id)
         <div class="pt-4 pb-1 px-4">
-            <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Business</p>
+            <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500"></span>Business</p>
         </div>
 
         <a href="/invoices" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->is('invoices*') || request()->is('invoice*') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
@@ -45,7 +48,7 @@
         </a>
 
         <div class="pt-4 pb-1 px-4">
-            <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Reports</p>
+            <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-sky-400 to-indigo-500"></span>Reports</p>
         </div>
 
         <a href="/mis" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->is('mis*') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
@@ -65,7 +68,7 @@
 
         @if(auth()->user()->role === 'company_admin')
         <div class="pt-4 pb-1 px-4">
-            <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Management</p>
+            <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-500"></span>Management</p>
         </div>
 
         <a href="/branches" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->is('branches*') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
@@ -92,7 +95,7 @@
 
         @if(auth()->user()->role === 'super_admin')
         <div class="pt-4 pb-1 px-4">
-            <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Admin</p>
+            <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-purple-400 to-pink-500"></span>Admin</p>
         </div>
 
         <a href="/admin/dashboard" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->is('admin/dashboard*') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
@@ -127,13 +130,15 @@
         @endif
     </nav>
 
-    <div class="flex-shrink-0 border-t border-gray-200/50 dark:border-gray-700/50 p-3">
-        <a href="{{ route('profile.edit') }}" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm text-gray-600 dark:text-gray-400">
-            <span class="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400 text-xs font-bold flex-shrink-0">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</span>
-            <div class="min-w-0 flex-1">
-                <p class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{{ Auth::user()->name }}</p>
-                <p class="text-xs text-gray-400 truncate">{{ Auth::user()->email }}</p>
-            </div>
-        </a>
+    <div class="flex-shrink-0 p-3">
+        <div class="rounded-xl bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm border border-gray-200/30 dark:border-gray-700/30 p-1" style="background-image: linear-gradient(135deg, rgba(16,185,129,0.03), rgba(20,184,166,0.03));">
+            <a href="{{ route('profile.edit') }}" class="sidebar-link flex items-center gap-3 py-2.5 px-3 rounded-lg text-sm text-gray-600 dark:text-gray-400">
+                <span class="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 shadow-sm shadow-emerald-500/20">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</span>
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{{ Auth::user()->name }}</p>
+                    <p class="text-xs text-gray-400 truncate">{{ Auth::user()->email }}</p>
+                </div>
+            </a>
+        </div>
     </div>
 </div>

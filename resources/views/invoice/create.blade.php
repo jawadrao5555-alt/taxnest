@@ -1,26 +1,21 @@
 <x-app-layout>
-    <x-slot name="header">
-        <div class="flex items-center justify-between">
-            <div>
-                <nav class="flex items-center text-xs text-gray-400 mb-1">
-                    <a href="{{ route('dashboard') }}" class="hover:text-emerald-600 transition">Dashboard</a>
-                    <svg class="w-3.5 h-3.5 mx-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                    <a href="/invoices" class="hover:text-emerald-600 transition">Invoices</a>
-                    <svg class="w-3.5 h-3.5 mx-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                    <span class="text-gray-600 dark:text-gray-300 font-medium">Create</span>
-                </nav>
-                <div class="flex items-center space-x-3">
-                    <a href="/invoices" class="inline-flex items-center text-gray-500 hover:text-emerald-600 transition text-sm">
-                        <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                        Back to Invoices
-                    </a>
-                    <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Create Invoice</h2>
-                </div>
+    <div class="py-8 pb-36">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
+            <nav class="flex items-center text-xs text-gray-400 mb-1">
+                <a href="{{ route('dashboard') }}" class="hover:text-emerald-600 transition">Dashboard</a>
+                <svg class="w-3.5 h-3.5 mx-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                <a href="/invoices" class="hover:text-emerald-600 transition">Invoices</a>
+                <svg class="w-3.5 h-3.5 mx-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                <span class="text-gray-600 dark:text-gray-300 font-medium">Create</span>
+            </nav>
+            <div class="flex items-center space-x-3">
+                <a href="/invoices" class="inline-flex items-center text-gray-500 hover:text-emerald-600 transition text-sm">
+                    <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    Back to Invoices
+                </a>
+                <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Create Invoice</h2>
             </div>
         </div>
-    </x-slot>
-
-    <div class="py-8 pb-36">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <form method="POST" action="/invoice/store" x-data="invoiceForm()" @keydown.enter.prevent="focusNext($event)" class="space-y-6">
                 @csrf
@@ -42,11 +37,11 @@
                 @endif
 
                 @if(isset($branches) && $branches->count() > 0)
-                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100/60 dark:border-gray-700/50 p-6 animate-fade-in">
+                <div class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-6 animate-fade-in">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Branch</h3>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Branch (Optional)</label>
-                        <select name="branch_id" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
+                        <select name="branch_id" class="w-full rounded-lg bg-white/50 dark:bg-gray-700/50 border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                             <option value="">— Select Branch —</option>
                             @foreach($branches as $branch)
                             <option value="{{ $branch->id }}" {{ old('branch_id') == $branch->id ? 'selected' : '' }}>
@@ -59,12 +54,12 @@
                 </div>
                 @endif
 
-                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100/60 dark:border-gray-700/50 p-6 animate-fade-in">
+                <div class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-6 animate-fade-in">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Document Information</h3>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Document Type</label>
-                            <select name="document_type" x-model="document_type" @change="onDocTypeChange()" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
+                            <select name="document_type" x-model="document_type" @change="onDocTypeChange()" class="w-full rounded-lg bg-white/50 dark:bg-gray-700/50 border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                 <option value="Sale Invoice">Sale Invoice</option>
                                 <option value="Credit Note">Credit Note</option>
                                 <option value="Debit Note">Debit Note</option>
@@ -84,7 +79,7 @@
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100/60 dark:border-gray-700/50 p-6 animate-fade-in">
+                <div class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-6 animate-fade-in">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Buyer Information</h3>
 
                     <div class="mb-4">
@@ -111,13 +106,13 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer Name *</label>
                             <input type="text" name="buyer_name" x-model="buyer_name" value="{{ old('buyer_name') }}" required autofocus
-                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
+                                class="w-full rounded-lg bg-white/50 dark:bg-gray-700/50 border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                             @error('buyer_name') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer NTN</label>
                             <input type="text" name="buyer_ntn" x-model="buyer_ntn" value="{{ old('buyer_ntn') }}" placeholder="Optional for unregistered"
-                                class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
+                                class="w-full rounded-lg bg-white/50 dark:bg-gray-700/50 border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                             @error('buyer_ntn') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                             <p class="text-xs mt-1" :class="buyerRegType === 'Registered' ? 'text-green-600' : 'text-gray-400'" x-text="'Registration: ' + buyerRegType"></p>
                         </div>
@@ -126,7 +121,7 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer CNIC</label>
                             <input type="text" name="buyer_cnic" x-model="buyer_cnic" value="{{ old('buyer_cnic') }}" maxlength="15" placeholder="xxxxx-xxxxxxx-x"
-                                class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
+                                class="w-full rounded-lg bg-white/50 dark:bg-gray-700/50 border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                             @error('buyer_cnic') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                     </div>
@@ -134,12 +129,12 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer Address *</label>
                             <textarea name="buyer_address" x-model="buyer_address" required rows="2"
-                                class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">{{ old('buyer_address') }}</textarea>
+                                class="w-full rounded-lg bg-white/50 dark:bg-gray-700/50 border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">{{ old('buyer_address') }}</textarea>
                             @error('buyer_address') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Destination Province *</label>
-                            <select name="destination_province" x-model="destination_province" required class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
+                            <select name="destination_province" x-model="destination_province" required class="w-full rounded-lg bg-white/50 dark:bg-gray-700/50 border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                 @foreach($provinces as $prov)
                                 <option value="{{ $prov }}" {{ old('destination_province', 'Punjab') === $prov ? 'selected' : '' }}>{{ $prov }}</option>
                                 @endforeach
@@ -149,7 +144,7 @@
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100/60 dark:border-gray-700/50 p-6 animate-fade-in">
+                <div class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-6 animate-fade-in">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Invoice Items</h3>
                         <button type="button" @click="addItem()" class="inline-flex items-center px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-100 transition">
@@ -365,7 +360,7 @@
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100/60 dark:border-gray-700/50 p-6 animate-fade-in">
+                <div class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-6 animate-fade-in">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Live Compliance Check</h3>
                         <button type="button" @click="checkCompliance()" :disabled="complianceLoading" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-50">
@@ -407,7 +402,7 @@
                     <p x-show="!complianceResult && !complianceLoading" class="text-sm text-gray-400 dark:text-gray-500">Click "Check Compliance" to preview compliance status before submitting.</p>
                 </div>
 
-                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                <div class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-6">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Rejection Probability</h3>
                         <button type="button" @click="checkRejectionProbability()" :disabled="rejectionLoading" class="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 transition disabled:opacity-50">
@@ -900,7 +895,7 @@
         <div x-show="isOpen" class="fixed inset-0 z-50 overflow-hidden" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
             <div class="absolute inset-0 bg-black/50" @click="isOpen = false"></div>
             <div class="absolute inset-y-0 right-0 max-w-xl w-full" x-show="isOpen" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full">
-                <div class="h-full bg-white dark:bg-gray-800 shadow-xl flex flex-col">
+                <div class="h-full bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl shadow-xl flex flex-col">
                     <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-emerald-50 dark:bg-emerald-900/20">
                         <div>
                             <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100">SRO & Serial Reference</h3>

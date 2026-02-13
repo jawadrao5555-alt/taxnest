@@ -10,7 +10,8 @@
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700,800&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Figtree', sans-serif; }
-        .glass-card { background: rgba(255,255,255,0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.3); }
+        .glass-card { background: rgba(255,255,255,0.15); backdrop-filter: blur(16px) saturate(180%); border: 1px solid rgba(255,255,255,0.25); transition: all 0.3s ease; }
+        .glass-card:hover { background: rgba(255,255,255,0.25); transform: translateY(-2px); }
         .hero-gradient { background: linear-gradient(135deg, #064e3b 0%, #059669 40%, #10b981 70%, #34d399 100%); }
         .feature-gradient { background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%); }
         [x-cloak] { display: none !important; }
@@ -20,10 +21,10 @@
 </head>
 <body class="antialiased text-gray-800">
 
-    <nav class="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-lg border-b border-gray-100">
+    <nav class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-2xl border-b border-white/30 shadow-sm">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
             <div class="flex items-center space-x-2">
-                <div class="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
                     <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                 </div>
                 <span class="text-xl font-bold text-gray-900">TaxNest</span>
@@ -75,19 +76,19 @@
             </div>
 
             <div class="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-4xl mx-auto">
-                <div class="glass-card rounded-xl p-4 text-center">
+                <div class="glass-card rounded-xl p-4 text-center hover:scale-105 transition-all duration-300">
                     <p class="text-3xl font-extrabold text-white">99.9%</p>
                     <p class="text-sm text-emerald-100 mt-1">Uptime SLA</p>
                 </div>
-                <div class="glass-card rounded-xl p-4 text-center">
+                <div class="glass-card rounded-xl p-4 text-center hover:scale-105 transition-all duration-300">
                     <p class="text-3xl font-extrabold text-white">50k+</p>
                     <p class="text-sm text-emerald-100 mt-1">Invoices Processed</p>
                 </div>
-                <div class="glass-card rounded-xl p-4 text-center">
+                <div class="glass-card rounded-xl p-4 text-center hover:scale-105 transition-all duration-300">
                     <p class="text-3xl font-extrabold text-white">500+</p>
                     <p class="text-sm text-emerald-100 mt-1">Companies Trust Us</p>
                 </div>
-                <div class="glass-card rounded-xl p-4 text-center">
+                <div class="glass-card rounded-xl p-4 text-center hover:scale-105 transition-all duration-300">
                     <p class="text-3xl font-extrabold text-white">Rs. 999</p>
                     <p class="text-sm text-emerald-100 mt-1">Starting Price</p>
                 </div>
@@ -131,7 +132,7 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <div class="glass-card rounded-2xl p-8 hover:shadow-lg transition group">
+                <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 hover:-translate-y-1 transition-all duration-300 rounded-2xl p-8 group">
                     <div class="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mb-5 group-hover:bg-emerald-200 transition">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     </div>
@@ -139,7 +140,7 @@
                     <p class="text-gray-500 text-sm leading-relaxed">Direct PRAL API integration with real-time submission, QR code generation, and invoice locking for complete FBR compliance.</p>
                 </div>
 
-                <div class="glass-card rounded-2xl p-8 hover:shadow-lg transition group">
+                <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 hover:-translate-y-1 transition-all duration-300 rounded-2xl p-8 group">
                     <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-5 group-hover:bg-blue-200 transition">
                         <svg class="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                     </div>
@@ -147,7 +148,7 @@
                     <p class="text-gray-500 text-sm leading-relaxed">AI-powered hybrid scoring that validates tax rates, buyer NTN, banking rules, and structural compliance before submission.</p>
                 </div>
 
-                <div class="glass-card rounded-2xl p-8 hover:shadow-lg transition group">
+                <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 hover:-translate-y-1 transition-all duration-300 rounded-2xl p-8 group">
                     <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-5 group-hover:bg-purple-200 transition">
                         <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                     </div>
@@ -155,7 +156,7 @@
                     <p class="text-gray-500 text-sm leading-relaxed">Manage multiple branches with branch-level invoicing, reporting, and analytics. Scale your operations seamlessly.</p>
                 </div>
 
-                <div class="glass-card rounded-2xl p-8 hover:shadow-lg transition group">
+                <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 hover:-translate-y-1 transition-all duration-300 rounded-2xl p-8 group">
                     <div class="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-5 group-hover:bg-orange-200 transition">
                         <svg class="w-6 h-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
@@ -163,7 +164,7 @@
                     <p class="text-gray-500 text-sm leading-relaxed">Track customer balances with auto-debit on invoice lock, manual payments, adjustments, and running balance per customer.</p>
                 </div>
 
-                <div class="glass-card rounded-2xl p-8 hover:shadow-lg transition group">
+                <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 hover:-translate-y-1 transition-all duration-300 rounded-2xl p-8 group">
                     <div class="w-12 h-12 bg-rose-100 rounded-xl flex items-center justify-center mb-5 group-hover:bg-rose-200 transition">
                         <svg class="w-6 h-6 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                     </div>
@@ -171,7 +172,7 @@
                     <p class="text-gray-500 text-sm leading-relaxed">MIS reporting with monthly trends, HS concentration analysis, tax variance tracking, and executive compliance dashboards.</p>
                 </div>
 
-                <div class="glass-card rounded-2xl p-8 hover:shadow-lg transition group">
+                <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 hover:-translate-y-1 transition-all duration-300 rounded-2xl p-8 group">
                     <div class="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center mb-5 group-hover:bg-teal-200 transition">
                         <svg class="w-6 h-6 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                     </div>
@@ -190,7 +191,7 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
-                <div class="text-center">
+                <div class="text-center bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 rounded-2xl p-8 hover:-translate-y-1 transition-all duration-300">
                     <div class="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
                         <span class="text-2xl font-extrabold text-emerald-600">1</span>
                     </div>
@@ -198,7 +199,7 @@
                     <p class="text-gray-500 leading-relaxed">Select products from your master catalog. HS codes, tax rates, and prices auto-fill instantly.</p>
                 </div>
 
-                <div class="text-center relative">
+                <div class="text-center relative bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 rounded-2xl p-8 hover:-translate-y-1 transition-all duration-300">
                     <div class="hidden md:block absolute top-8 -left-6 w-12 border-t-2 border-dashed border-emerald-300"></div>
                     <div class="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
                         <span class="text-2xl font-extrabold text-emerald-600">2</span>
@@ -208,7 +209,7 @@
                     <div class="hidden md:block absolute top-8 -right-6 w-12 border-t-2 border-dashed border-emerald-300"></div>
                 </div>
 
-                <div class="text-center">
+                <div class="text-center bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 rounded-2xl p-8 hover:-translate-y-1 transition-all duration-300">
                     <div class="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
                         <span class="text-2xl font-extrabold text-emerald-600">3</span>
                     </div>
@@ -261,8 +262,8 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
                 <template x-for="plan in plans" :key="plan.name">
-                    <div class="bg-white rounded-2xl shadow-sm border-2 transition hover:shadow-lg relative"
-                         :class="plan.name === 'Business' ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-gray-100'">
+                    <div class="bg-white/70 backdrop-blur-xl border-2 shadow-lg shadow-black/5 hover:-translate-y-1 transition-all duration-300 rounded-2xl relative"
+                         :class="plan.name === 'Business' ? 'border-emerald-500 ring-2 ring-emerald-500/50 shadow-xl shadow-emerald-500/10' : 'border-white/30'">
 
                         <div x-show="plan.tag" class="absolute -top-3 left-1/2 transform -translate-x-1/2">
                             <span class="bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full" x-text="plan.tag"></span>
@@ -318,7 +319,7 @@
                 </a>
             </div>
 
-            <div class="mt-12 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden max-w-6xl mx-auto">
+            <div class="mt-12 bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 overflow-hidden max-w-6xl mx-auto">
                 <div class="p-6 border-b border-gray-100">
                     <h3 class="text-xl font-bold text-gray-900">Feature Comparison</h3>
                 </div>
@@ -380,7 +381,7 @@
                 </div>
             </div>
 
-            <div class="mt-12 max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+            <div class="mt-12 max-w-2xl mx-auto bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 p-8">
                 <h3 class="text-xl font-bold text-gray-900 mb-6 text-center">Billing Calculator</h3>
                 <div class="space-y-4">
                     <div>
@@ -431,42 +432,42 @@
                 <h2 class="text-3xl sm:text-4xl font-extrabold text-gray-900">Frequently Asked Questions</h2>
             </div>
             <div class="space-y-4" x-data="{ open: null }">
-                <div class="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+                <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 rounded-2xl overflow-hidden">
                     <button @click="open = open === 1 ? null : 1" class="w-full flex items-center justify-between p-6 text-left">
                         <span class="text-base font-semibold text-gray-900">What is TaxNest?</span>
                         <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 1 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <div x-show="open === 1" x-collapse class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">TaxNest is Pakistan's leading FBR-compliant tax and invoice management platform. It integrates directly with FBR's PRAL API for real-time invoice submission, compliance scoring, and QR code generation.</div>
                 </div>
-                <div class="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+                <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 rounded-2xl overflow-hidden">
                     <button @click="open = open === 2 ? null : 2" class="w-full flex items-center justify-between p-6 text-left">
                         <span class="text-base font-semibold text-gray-900">Is TaxNest FBR approved?</span>
                         <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 2 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <div x-show="open === 2" x-collapse class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Yes, TaxNest integrates directly with FBR's PRAL API v1.12 for production invoice submission. All invoices are validated against FBR's compliance rules before submission.</div>
                 </div>
-                <div class="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+                <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 rounded-2xl overflow-hidden">
                     <button @click="open = open === 3 ? null : 3" class="w-full flex items-center justify-between p-6 text-left">
                         <span class="text-base font-semibold text-gray-900">How does the free trial work?</span>
                         <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 3 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <div x-show="open === 3" x-collapse class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Sign up and get 14 days of full access with no credit card required. You can create invoices, submit to FBR, and explore all features. After the trial, choose a plan that fits your business.</div>
                 </div>
-                <div class="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+                <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 rounded-2xl overflow-hidden">
                     <button @click="open = open === 4 ? null : 4" class="w-full flex items-center justify-between p-6 text-left">
                         <span class="text-base font-semibold text-gray-900">Can I manage multiple branches?</span>
                         <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 4 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <div x-show="open === 4" x-collapse class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Yes! Business plans support up to 3 branches, Industrial plans offer unlimited branches, and Enterprise plans include unlimited branches with dedicated support.</div>
                 </div>
-                <div class="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+                <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 rounded-2xl overflow-hidden">
                     <button @click="open = open === 5 ? null : 5" class="w-full flex items-center justify-between p-6 text-left">
                         <span class="text-base font-semibold text-gray-900">Is my data secure?</span>
                         <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 5 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <div x-show="open === 5" x-collapse class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Absolutely. TaxNest uses SHA-256 encrypted audit logs, immutable transaction records, and encrypted FBR tokens. All data is stored securely with role-based access controls.</div>
                 </div>
-                <div class="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+                <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 rounded-2xl overflow-hidden">
                     <button @click="open = open === 6 ? null : 6" class="w-full flex items-center justify-between p-6 text-left">
                         <span class="text-base font-semibold text-gray-900">Can I build a custom plan?</span>
                         <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 6 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -477,7 +478,9 @@
         </div>
     </section>
 
-    <section class="py-16 bg-emerald-700">
+    <section class="py-16 bg-emerald-700 relative overflow-hidden">
+        <div class="absolute inset-0 bg-white/5 backdrop-blur-sm"></div>
+        <div class="relative">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h2 class="text-3xl font-extrabold text-white mb-4">Ready to Streamline Your FBR Compliance?</h2>
             <p class="text-lg text-emerald-200 mb-8">Join 500+ businesses already using TaxNest. Start your 14-day free trial today.</p>
@@ -492,14 +495,15 @@
                 </a>
             </div>
         </div>
+        </div>
     </section>
 
-    <footer class="bg-gray-900 text-gray-400 py-16">
+    <footer class="bg-gradient-to-b from-gray-900 to-gray-950 text-gray-400 py-16">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
                 <div>
                     <div class="flex items-center space-x-2 mb-4">
-                        <div class="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
                             <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                         </div>
                         <span class="text-lg font-bold text-white">TaxNest</span>

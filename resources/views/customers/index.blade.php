@@ -1,19 +1,18 @@
 <x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-bold text-xl text-gray-800 leading-tight">Customer Ledger</h2>
-    </x-slot>
-
     <div class="py-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="mb-6">
+                <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Customer Ledger</h2>
+            </div>
 
             @if(session('success'))
             <div class="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700">{{ session('success') }}</div>
             @endif
 
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 overflow-hidden">
                 <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50/50 dark:bg-gray-900/30">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer Name</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">NTN</th>
@@ -22,9 +21,9 @@
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Outstanding</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200">
+                    <tbody class="bg-transparent divide-y divide-gray-200 dark:divide-gray-700">
                         @forelse($customers as $customer)
-                        <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/customers/{{ $customer->customer_ntn }}/ledger'">
+                        <tr class="hover:bg-white/50 dark:hover:bg-gray-700/30 cursor-pointer transition" onclick="window.location='/customers/{{ $customer->customer_ntn }}/ledger'">
                             <td class="px-6 py-4 text-sm font-medium text-emerald-700 hover:text-emerald-900">
                                 <a href="/customers/{{ $customer->customer_ntn }}/ledger">{{ $customer->customer_name }}</a>
                             </td>

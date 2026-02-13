@@ -47,7 +47,7 @@
             </div>
 
             @if(!empty($trialInfo) && $trialInfo['is_trial'])
-            <div class="mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+            <div class="mb-4 bg-blue-50/80 dark:bg-blue-900/20 backdrop-blur-sm border border-blue-200 dark:border-blue-800 rounded-xl p-4">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div class="flex items-center space-x-3">
                         <div class="p-2.5 bg-blue-600 rounded-lg flex-shrink-0">
@@ -108,7 +108,7 @@
             @endif
 
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-                <div class="premium-card premium-hover animate-slide-up animate-slide-up-1 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100/60 dark:border-gray-700/50 p-6 relative overflow-hidden">
+                <div class="premium-card premium-hover animate-slide-up animate-slide-up-1 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-sm border border-white/30 dark:border-gray-700/30 p-6 relative overflow-hidden">
                     <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 to-indigo-600"></div>
                     <div class="flex items-center justify-between mb-3">
                         <div class="p-2.5 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg shadow-blue-500/25">
@@ -123,7 +123,7 @@
                     </div>
                 </div>
 
-                <div class="premium-card premium-hover animate-slide-up animate-slide-up-2 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100/60 dark:border-gray-700/50 p-6 relative overflow-hidden">
+                <div class="premium-card premium-hover animate-slide-up animate-slide-up-2 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-sm border border-white/30 dark:border-gray-700/30 p-6 relative overflow-hidden">
                     <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-600"></div>
                     <div class="flex items-center justify-between mb-3">
                         <div class="p-2.5 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl shadow-lg shadow-emerald-500/25">
@@ -134,7 +134,7 @@
                     <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider">Total Revenue</p>
                 </div>
 
-                <div class="premium-card premium-hover animate-slide-up animate-slide-up-3 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100/60 dark:border-gray-700/50 p-6 relative overflow-hidden">
+                <div class="premium-card premium-hover animate-slide-up animate-slide-up-3 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-sm border border-white/30 dark:border-gray-700/30 p-6 relative overflow-hidden">
                     <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-400 to-violet-600"></div>
                     <div class="flex items-center justify-between mb-3">
                         <div class="p-2.5 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg shadow-purple-500/25">
@@ -145,7 +145,7 @@
                     <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider">FBR Locked</p>
                 </div>
 
-                <div class="premium-card premium-hover animate-slide-up animate-slide-up-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100/60 dark:border-gray-700/50 p-6 relative overflow-hidden">
+                <div class="premium-card premium-hover animate-slide-up animate-slide-up-4 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-sm border border-white/30 dark:border-gray-700/30 p-6 relative overflow-hidden">
                     <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-400 to-blue-600"></div>
                     <div class="flex items-center justify-between mb-3">
                         <div class="p-2.5 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl shadow-lg shadow-indigo-500/25">
@@ -156,7 +156,7 @@
                     <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider">FBR Success</p>
                 </div>
 
-                <div class="premium-card premium-hover animate-slide-up animate-slide-up-5 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100/60 dark:border-gray-700/50 p-6 relative overflow-hidden">
+                <div class="premium-card premium-hover animate-slide-up animate-slide-up-5 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-sm border border-white/30 dark:border-gray-700/30 p-6 relative overflow-hidden">
                     <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-400 to-amber-600"></div>
                     <div class="flex items-center justify-between mb-3">
                         <div class="p-2.5 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg shadow-orange-500/25">
@@ -178,31 +178,31 @@
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 mb-5">
-                <a href="/invoice/create" class="premium-card premium-hover group flex items-center space-x-3 p-3.5 bg-white dark:bg-gray-800/80 border border-gray-100/80 dark:border-gray-700/50 rounded-2xl hover:border-emerald-300 dark:hover:border-emerald-700 transition-all duration-300">
+                <a href="/invoice/create" class="premium-card premium-hover group flex items-center space-x-3 p-3.5 bg-white/60 dark:bg-gray-800/60 backdrop-blur-lg border border-white/40 dark:border-gray-700/30 rounded-2xl hover:border-emerald-300 dark:hover:border-emerald-700 transition-all duration-300">
                     <div class="p-2.5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-md shadow-emerald-500/20 group-hover:shadow-lg group-hover:shadow-emerald-500/30 transition-all duration-300">
                         <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     </div>
                     <span class="text-xs font-bold text-gray-700 dark:text-gray-200 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition">Create Invoice</span>
                 </a>
-                <a href="/customer-profiles" class="premium-card premium-hover group flex items-center space-x-3 p-3.5 bg-white dark:bg-gray-800/80 border border-gray-100/80 dark:border-gray-700/50 rounded-2xl hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-300">
+                <a href="/customer-profiles" class="premium-card premium-hover group flex items-center space-x-3 p-3.5 bg-white/60 dark:bg-gray-800/60 backdrop-blur-lg border border-white/40 dark:border-gray-700/30 rounded-2xl hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-300">
                     <div class="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-md shadow-blue-500/20 group-hover:shadow-lg group-hover:shadow-blue-500/30 transition-all duration-300">
                         <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     </div>
                     <span class="text-xs font-bold text-gray-700 dark:text-gray-200 group-hover:text-blue-700 dark:group-hover:text-blue-400 transition">Customers</span>
                 </a>
-                <a href="/reports/wht" class="premium-card premium-hover group flex items-center space-x-3 p-3.5 bg-white dark:bg-gray-800/80 border border-gray-100/80 dark:border-gray-700/50 rounded-2xl hover:border-purple-300 dark:hover:border-purple-700 transition-all duration-300">
+                <a href="/reports/wht" class="premium-card premium-hover group flex items-center space-x-3 p-3.5 bg-white/60 dark:bg-gray-800/60 backdrop-blur-lg border border-white/40 dark:border-gray-700/30 rounded-2xl hover:border-purple-300 dark:hover:border-purple-700 transition-all duration-300">
                     <div class="p-2.5 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl shadow-md shadow-purple-500/20 group-hover:shadow-lg group-hover:shadow-purple-500/30 transition-all duration-300">
                         <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                     </div>
                     <span class="text-xs font-bold text-gray-700 dark:text-gray-200 group-hover:text-purple-700 dark:group-hover:text-purple-400 transition">Reports</span>
                 </a>
-                <a href="/customers" class="premium-card premium-hover group flex items-center space-x-3 p-3.5 bg-white dark:bg-gray-800/80 border border-gray-100/80 dark:border-gray-700/50 rounded-2xl hover:border-amber-300 dark:hover:border-amber-700 transition-all duration-300">
+                <a href="/customers" class="premium-card premium-hover group flex items-center space-x-3 p-3.5 bg-white/60 dark:bg-gray-800/60 backdrop-blur-lg border border-white/40 dark:border-gray-700/30 rounded-2xl hover:border-amber-300 dark:hover:border-amber-700 transition-all duration-300">
                     <div class="p-2.5 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl shadow-md shadow-amber-500/20 group-hover:shadow-lg group-hover:shadow-amber-500/30 transition-all duration-300">
                         <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
                     </div>
                     <span class="text-xs font-bold text-gray-700 dark:text-gray-200 group-hover:text-amber-700 dark:group-hover:text-amber-400 transition">Ledger</span>
                 </a>
-                <a href="/company/fbr-settings" class="premium-card premium-hover group flex items-center space-x-3 p-3.5 bg-white dark:bg-gray-800/80 border border-gray-100/80 dark:border-gray-700/50 rounded-2xl hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-300">
+                <a href="/company/fbr-settings" class="premium-card premium-hover group flex items-center space-x-3 p-3.5 bg-white/60 dark:bg-gray-800/60 backdrop-blur-lg border border-white/40 dark:border-gray-700/30 rounded-2xl hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-300">
                     <div class="p-2.5 bg-gradient-to-br from-gray-500 to-gray-700 rounded-xl shadow-md shadow-gray-500/20 group-hover:shadow-lg group-hover:shadow-gray-500/30 transition-all duration-300">
                         <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     </div>
@@ -211,7 +211,7 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
-                <div class="premium-card bg-white dark:bg-gray-800/80 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-700/50 p-5 relative overflow-hidden">
+                <div class="premium-card bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-5 relative overflow-hidden">
                     <div class="absolute -top-8 -right-8 w-24 h-24 bg-gradient-to-bl {{ $hybridScore >= 80 ? 'from-emerald-500/15' : ($hybridScore >= 50 ? 'from-amber-500/15' : 'from-red-500/15') }} to-transparent rounded-full"></div>
                     <div class="relative">
                         <div class="flex items-center justify-between mb-4">
@@ -257,7 +257,7 @@
                     </div>
                 </div>
 
-                <div class="premium-card bg-white dark:bg-gray-800/80 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-700/50 p-5 relative overflow-hidden">
+                <div class="premium-card bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-5 relative overflow-hidden">
                     <div class="absolute -top-8 -right-8 w-24 h-24 bg-gradient-to-bl from-blue-500/15 to-transparent rounded-full"></div>
                     <div class="relative">
                         <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center space-x-2 uppercase tracking-wider">
@@ -284,7 +284,7 @@
 
             @if($planTier !== 'retail')
             @if(count($smartInsights) > 0)
-            <div class="premium-card premium-hover bg-white dark:bg-gray-800/80 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-700/50 p-5 mb-5">
+            <div class="premium-card premium-hover bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-5 mb-5">
                 <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3 flex items-center space-x-2 uppercase tracking-wider">
                     <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
                     <span>Smart Insights</span>
@@ -312,7 +312,7 @@
             @endif
             @endif
 
-            <div class="premium-card premium-hover bg-white dark:bg-gray-800/80 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-700/50 p-5 mb-5">
+            <div class="premium-card premium-hover bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-5 mb-5">
                 <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3 uppercase tracking-wider">Draft Aging</h3>
                 <div class="grid grid-cols-3 gap-3">
                     <div class="text-center p-3 bg-gradient-to-br from-emerald-50 to-green-50/50 dark:from-emerald-900/20 dark:to-green-900/10 rounded-xl border border-emerald-100/50 dark:border-emerald-800/30">
@@ -331,22 +331,22 @@
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
-                <div class="premium-card premium-hover bg-white dark:bg-gray-800/80 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-700/50 p-5">
+                <div class="premium-card premium-hover bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-5">
                     <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3 uppercase tracking-wider">Invoice Status</h3>
                     <div style="height: 150px;"><canvas id="statusChart"></canvas></div>
                 </div>
-                <div class="premium-card premium-hover bg-white dark:bg-gray-800/80 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-700/50 p-5">
+                <div class="premium-card premium-hover bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-5">
                     <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3 uppercase tracking-wider">Monthly Invoices</h3>
                     <div style="height: 150px;"><canvas id="monthlyChart"></canvas></div>
                 </div>
-                <div class="premium-card premium-hover bg-white dark:bg-gray-800/80 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-700/50 p-5">
+                <div class="premium-card premium-hover bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-5">
                     <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3 uppercase tracking-wider">Compliance Trend</h3>
                     <div style="height: 150px;"><canvas id="complianceChart"></canvas></div>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
-                <div class="premium-card premium-hover relative overflow-hidden bg-white dark:bg-gray-800/80 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-700/50 p-5 group">
+                <div class="premium-card premium-hover relative overflow-hidden bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-5 group">
                     <div class="absolute -top-6 -right-6 w-16 h-16 bg-gradient-to-bl from-emerald-500/10 to-transparent rounded-full"></div>
                     <div class="relative flex items-center justify-between">
                         <div>
@@ -359,7 +359,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="premium-card premium-hover relative overflow-hidden bg-white dark:bg-gray-800/80 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-700/50 p-5 group">
+                <div class="premium-card premium-hover relative overflow-hidden bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-5 group">
                     <div class="absolute -top-6 -right-6 w-16 h-16 bg-gradient-to-bl from-blue-500/10 to-transparent rounded-full"></div>
                     <div class="relative flex items-center justify-between">
                         <div>
@@ -372,7 +372,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="premium-card premium-hover relative overflow-hidden bg-white dark:bg-gray-800/80 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-700/50 p-5 group">
+                <div class="premium-card premium-hover relative overflow-hidden bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-5 group">
                     <div class="absolute -top-6 -right-6 w-16 h-16 bg-gradient-to-bl from-red-500/10 to-transparent rounded-full"></div>
                     <div class="relative flex items-center justify-between">
                         <div>
@@ -388,7 +388,7 @@
             </div>
 
             @if(in_array($planTier, ['business', 'enterprise']) && $topCustomers->count() > 0)
-            <div class="premium-card bg-white dark:bg-gray-800/80 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-700/50 overflow-hidden mb-5">
+            <div class="premium-card bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 overflow-hidden mb-5">
                 <div class="px-5 py-4 border-b border-gray-100/80 dark:border-gray-700/50 flex items-center justify-between">
                     <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wider">Top 5 Customers</h3>
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100/80 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">{{ $topCustomers->count() }} customers</span>
@@ -415,7 +415,7 @@
             @endif
 
             @if($planTier === 'enterprise' && $branchComparison->count() > 0)
-            <div class="premium-card bg-white dark:bg-gray-800/80 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-700/50 overflow-hidden mb-5">
+            <div class="premium-card bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 overflow-hidden mb-5">
                 <div class="px-5 py-4 border-b border-gray-100/80 dark:border-gray-700/50">
                     <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wider">Branch Comparison</h3>
                 </div>
@@ -441,14 +441,14 @@
             @endif
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
-                <div class="premium-card premium-hover bg-white dark:bg-gray-800/80 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-700/50 overflow-hidden">
+                <div class="premium-card premium-hover bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 overflow-hidden">
                     <div class="px-5 py-4 border-b border-gray-100/80 dark:border-gray-700/50 flex items-center justify-between">
                         <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wider">Recent Invoices</h3>
                         <a href="/invoices" class="text-xs font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 transition">View All &rarr;</a>
                     </div>
                     <div class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         @forelse($recentInvoices as $invoice)
-                        <a href="/invoice/{{ $invoice->id }}" class="block p-3 rounded-xl border border-gray-100/80 dark:border-gray-700/50 hover:border-emerald-200 dark:hover:border-emerald-800 hover:shadow-md transition-all duration-300 group bg-white dark:bg-gray-800/50">
+                        <a href="/invoice/{{ $invoice->id }}" class="block p-3 rounded-xl border border-gray-100/80 dark:border-gray-700/50 hover:border-emerald-200 dark:hover:border-emerald-800 hover:shadow-md transition-all duration-300 group bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-xs font-mono text-gray-400 dark:text-gray-500 font-medium">{{ $invoice->invoice_number ?? 'INV-' . $invoice->id }}</span>
                                 <span class="inline-flex px-2 py-0.5 rounded-lg text-xs font-bold
@@ -473,7 +473,7 @@
                     </div>
                 </div>
 
-                <div class="premium-card premium-hover bg-white dark:bg-gray-800/80 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-700/50 overflow-hidden">
+                <div class="premium-card premium-hover bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 overflow-hidden">
                     <div class="px-5 py-4 border-b border-gray-100/80 dark:border-gray-700/50">
                         <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wider">Recent Activity</h3>
                     </div>

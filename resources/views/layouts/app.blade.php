@@ -40,8 +40,36 @@
             .dark {
                 --glass-bg: rgba(31,41,55,0.7);
             }
+            .glass-card {
+                background: rgba(255,255,255,0.7);
+                backdrop-filter: blur(16px);
+                -webkit-backdrop-filter: blur(16px);
+                border: 1px solid rgba(255,255,255,0.2);
+                border-radius: 1rem;
+                box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+            }
+            .dark .glass-card {
+                background: rgba(31,41,55,0.7);
+                border-color: rgba(55,65,81,0.3);
+            }
+            .glass-input {
+                background: rgba(255,255,255,0.5);
+                backdrop-filter: blur(4px);
+                -webkit-backdrop-filter: blur(4px);
+                border-color: rgba(209,213,219,0.5);
+            }
+            .dark .glass-input {
+                background: rgba(55,65,81,0.5);
+            }
+            .gradient-text {
+                background: var(--primary-gradient);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+            }
             @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
             @keyframes scaleIn { from { transform: scale(0.97); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+            @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
             .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
             .premium-hover { transition: all 0.2s ease; }
             .premium-hover:hover { transform: var(--hover-lift); box-shadow: var(--card-shadow); }
@@ -55,24 +83,24 @@
             .main-scroll::-webkit-scrollbar-thumb { background: rgba(156,163,175,0.3); border-radius: 4px; }
             .main-scroll::-webkit-scrollbar-track { background: transparent; }
             .sidebar-link { transition: all 0.15s ease; }
-            .sidebar-link:hover { background-color: #f9fafb; }
+            .sidebar-link:hover { background-color: rgba(249,250,251,0.8); }
             .dark .sidebar-link:hover { background-color: rgba(55,65,81,0.5); }
             .sidebar-link.active { background: linear-gradient(90deg, rgba(16,185,129,0.08) 0%, transparent 100%); font-weight: 600; border-left: 3px solid #10b981; padding-left: 13px; }
             .dark .sidebar-link.active { background: linear-gradient(90deg, rgba(16,185,129,0.15) 0%, transparent 100%); border-left: 3px solid #10b981; padding-left: 13px; }
 
             .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 40; }
             .sidebar-overlay.active { display: block; }
-            .sidebar-drawer { position: fixed; top: 0; left: 0; bottom: 0; width: 272px; background: white; z-index: 50; transform: translateX(-100%); transition: transform 0.25s ease; overflow-y: auto; box-shadow: 4px 0 25px rgba(0,0,0,0.1); }
-            .dark .sidebar-drawer { background: #1f2937; }
+            .sidebar-drawer { position: fixed; top: 0; left: 0; bottom: 0; width: 272px; background: rgba(255,255,255,0.85); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); z-index: 50; transform: translateX(-100%); transition: transform 0.25s ease; overflow-y: auto; box-shadow: 4px 0 25px rgba(0,0,0,0.1); border-right: 1px solid rgba(229,231,235,0.5); }
+            .dark .sidebar-drawer { background: rgba(17,24,39,0.9); border-right-color: rgba(55,65,81,0.5); }
             .sidebar-drawer.open { transform: translateX(0); }
         </style>
     </head>
-    <body class="font-sans antialiased bg-gray-50 dark:bg-gray-900">
+    <body class="font-sans antialiased bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
         @auth
         <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
         <nav class="sidebar-drawer sidebar-scroll" id="sidebarDrawer">
             <div class="absolute top-3 right-3 z-10">
-                <button onclick="closeSidebar()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                <button onclick="closeSidebar()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100/80 dark:hover:bg-gray-700/80 transition">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
@@ -80,7 +108,7 @@
         </nav>
 
         <div class="flex flex-col min-h-screen">
-            <header class="sticky top-0 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border-b border-gray-200/60 dark:border-gray-700/60 z-20 shadow-sm">
+            <header class="sticky top-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-2xl border-b border-gray-200/40 dark:border-gray-700/40 z-20 shadow-sm shadow-gray-900/5">
                 <div class="flex items-center justify-between h-14 px-4 sm:px-6">
                     <div class="flex items-center gap-3">
                         <button onclick="toggleSidebar()" class="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700 transition">

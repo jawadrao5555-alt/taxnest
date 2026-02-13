@@ -1,0 +1,238 @@
+1. SYSTEM OVERVIEW
+NestPay Pakistan ke FBR (Federal Board of Revenue) ke PRAL DI API v1.12 ke mutabiq digital invoices banata aur submit karta hai. Yeh SRO 709(I)/2025 compliant hai.
+
+Dual Mode Operation:
+
+Sandbox Mode → Testing ke liye (FBR test server pe submit hota hai)
+Production Mode → Real FBR submission (final, immutable, locked)
+Multi-Company Support:
+
+Har company ke apne FBR tokens hain (Sandbox + Production alag)
+Data isolation: Ek company doosri ka data nahi dekh sakti
+Tax logic GLOBAL hai — ek formula sab companies ke liye
+2. INVOICE LIFECYCLE (Step by Step)
+User Invoice Banata Hai (Draft)
+        ↓
+  [DRAFT STATUS] — Edit/Delete Allowed
+        ↓
+  User "Send to Sandbox" Click Karta Hai
+        ↓
+  [SANDBOX STATUS] — FBR Test Server pe Submit
+        ↓
+  User "Send to Production" Click Karta Hai
+        ↓
+  [PRODUCTION STATUS] — FBR Real Server pe Submit
+        ↓
+  ❌ LOCKED — Edit/Delete Impossible
+  ✅ PDF Download with QR Code + FBR Invoice Number
+  ✅ Credit Note = ONLY allowed modification path
+3. FBR API ENDPOINTS
+SANDBOX:
+  POST Invoice:     https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata_sb
+  Validate Invoice: https://gw.fbr.gov.pk/di_data/v1/di/validateinvoicedata_sb
+PRODUCTION:
+  POST Invoice:     https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata
+  Validate Invoice: https://gw.fbr.gov.pk/di_data/v1/di/validateinvoicedata
+HTTP Request:
+
+Method: POST
+Content-Type: application/json
+Authorization: Bearer <FBR_API_TOKEN>
+Accept: application/json
+Timeout: 30 seconds
+4. EXACT FBR PAYLOAD STRUCTURE (Production-Ready)
+Yeh woh JSON hai jo FBR ko bheji jati hai:
+
+{
+  "items": [
+    {
+      "uoM": "U",
+      "rate": "18%",
+      "hsCode": "2202.1010",
+      "discount": 0.00,
+      "extraTax": 0.00,
+      "quantity": 10.0000,
+      "saleType": "Goods at standard rate (default)",
+      "fedPayable": 0.00,
+      "furtherTax": 0.00,
+      "totalValues": 11800.00,
+      "productDescription": "COLD DRINKS",
+      "salesTaxApplicable": 1800.00,
+      "valueSalesExcludingST": 10000.00,
+      "salesTaxWithheldAtSource": 0.00,
+      "fixedNotifiedValueOrRetailPrice": 10000.00
+    }
+  ],
+  "invoiceDate": "2026-02-13",
+  "invoiceType": "Sale Invoice",
+  "documentTypeId": 1,
+  "buyerAddress": "LAHORE PUNJAB",
+  "invoiceRefNo": "INV-2026-001",
+  "buyerProvince": "Punjab",
+  "sellerAddress": "OLD GHALLA MANDI LODHRAN",
+  "sellerNTNCNIC": "7962754",
+  "sellerProvince": "Punjab",
+  "buyerBusinessName": "CUSTOMER NAME",
+  "sellerBusinessName": "RAO BROTHERS",
+  "buyerRegistrationType": "Unregistered",
+  "buyerNTNCNIC": ""
+}
+5. ITEM-LEVEL FIELDS EXPLAINED
+Field	Type	Description
+uoM	string	Unit of Measure — "U" (Units), "KG", "Liter", "M", "SQM"
+rate	string	Tax rate as percentage — "18%", "5%", "0%", "Exempt"
+hsCode	string	HS Code in XXXX.XXXX format — e.g., "2202.1010"
+discount	number	Discount amount (default 0.00)
+extraTax	number	Extra tax (0.00 for standard, "" for reduced/exempt)
+quantity	number	Quantity (4 decimal places)
+saleType	string	Sale category (see mapping below)
+fedPayable	number	Federal Excise Duty (default 0.00)
+furtherTax	number	Further tax amount (default 0.00)
+totalValues	number	valueSalesExcludingST + salesTaxApplicable
+productDescription	string	Item description
+salesTaxApplicable	number	Calculated tax amount
+valueSalesExcludingST	number	Amount before tax
+salesTaxWithheldAtSource	number	WHT at source (default 0.00)
+fixedNotifiedValueOrRetailPrice	number	MRP/Retail price (3rd Schedule tax base)
+Conditional SRO Fields (only when applicable):
+
+Field	When Required
+sroScheduleNo	3rd Schedule (rate < 18%), Exempt, Reduced Rate
+sroItemSerialNo	Same as above — serial number in the schedule
+scenarioId	ONLY in Sandbox mode (SN001-SN028)
+6. SALE TYPE MAPPING (Sandbox vs Production)
+FBR Sandbox aur Production alag values expect karta hai:
+
+Internal Value	Sandbox Value	Production Value
+Goods at standard rate	Goods at standard rate	Goods at standard rate (default)
+Goods at standard rate (FMCG)	Goods at standard rate (FMCG)	Goods at standard rate (default)
+Goods at standard rate (CNG)	Goods at standard rate (CNG)	Goods at standard rate (default)
+Goods at standard rate (retail)	Goods at standard rate (retail)	Goods at standard rate (default)
+3rd Schedule Goods	3rd Schedule Goods	3rd Schedule Goods
+Exempt	Exempt	Exempt goods
+Goods at Reduced Rate	Goods at Reduced Rate	Goods at Reduced Rate
+Zero Rated	Zero Rated	Goods at zero rate
+Export	Export	Export of goods
+Services	Services	Services at standard rate
+Cement/Concrete Block	Cement /Concrete Block	Cement/Concrete Block
+7. TAX CALCULATION ENGINE (4 Formulas)
+┌─────────────────────────────────────────────────────────────┐
+│ STANDARD RATE (18%)                                          │
+│ valueSalesExcludingST = quantity × unitPrice                 │
+│ salesTax = valueSalesExcludingST × rate%                     │
+│ Example: 10 × 1000 = 10000 → Tax = 10000 × 18% = 1800      │
+├─────────────────────────────────────────────────────────────┤
+│ 3RD SCHEDULE GOODS (5%, 10%, 12%, 18%)                       │
+│ Tax Base = fixedNotifiedValueOrRetailPrice (MRP)             │
+│ salesTax = retailPrice × rate%                               │
+│ Example: MRP = 5000 → Tax = 5000 × 5% = 250                 │
+│ SRO RULE: rate < 18 → sroScheduleNo = "3rd Schedule goods"  │
+│           rate = 18 → NO SRO fields sent                     │
+├─────────────────────────────────────────────────────────────┤
+│ REDUCED RATE (8th Schedule)                                  │
+│ salesTax = valueSalesExcludingST × reducedRate%              │
+│ extraTax = "" (empty string, NOT 0)                          │
+│ sroScheduleNo = "EIGHTH SCHEDULE Table 1"                    │
+├─────────────────────────────────────────────────────────────┤
+│ EXEMPT GOODS (6th Schedule)                                  │
+│ salesTax = 0                                                 │
+│ rate = "Exempt" (NOT "0%")                                   │
+│ extraTax = "" (empty string, NOT 0)                          │
+│ sroScheduleNo = "6th Schd Table I"                           │
+└─────────────────────────────────────────────────────────────┘
+8. INVOICE-LEVEL FIELDS EXPLAINED
+Field	Type	Required	Description
+items	array	YES	MUST be first field in JSON
+invoiceDate	string	YES	Format: "YYYY-MM-DD"
+invoiceType	string	YES	"Sale Invoice", "Credit Note", "Debit Note"
+documentTypeId	number	YES	1=Sale, 2=Purchase, 3=Credit, 4=Debit
+buyerAddress	string	YES	Buyer's address
+invoiceRefNo	string	YES	Internal invoice reference number
+buyerProvince	string	YES	Province name (Punjab, Sindh, etc.)
+sellerAddress	string	YES	Seller's address
+sellerNTNCNIC	string	YES	Seller's NTN (7 digits) or CNIC (13 digits, no dashes)
+sellerProvince	string	YES	Seller's province
+buyerBusinessName	string	YES	Buyer's name
+sellerBusinessName	string	YES	Company business name
+buyerRegistrationType	string	YES	"Registered" or "Unregistered"
+buyerNTNCNIC	string	YES	Buyer's NTN/CNIC (empty string if unregistered)
+Credit/Debit Note Extra Fields:
+
+Field	When
+originalInvoiceRef	FBR-issued invoice ID of original invoice
+originalInvoiceDate	Date of original invoice (YYYY-MM-DD)
+reason	Reason for credit/debit note (default: "Return of goods")
+9. FBR RESPONSE STRUCTURE
+Success Response:
+
+{
+  "invoiceNumber": "3620291786117DIACCSNP430611",
+  "dated": "2026-02-13",
+  "validationResponse": {
+    "statusCode": "00",
+    "status": "Valid"
+  }
+}
+Error Response:
+
+{
+  "validationResponse": {
+    "statusCode": "01",
+    "status": "Invalid",
+    "invoiceStatuses": [
+      {
+        "itemSNo": "1",
+        "statusCode": "01",
+        "status": "Invalid",
+        "invoiceNo": "",
+        "errorCode": "0002",
+        "error": "Invalid Buyer Registration No or NTN"
+      }
+    ]
+  }
+}
+Status Code "00" = SUCCESS, "01" = REJECTED
+
+10. IMPORTANT BUSINESS RULES
+Rule	Detail
+CNIC/NTN Format	Remove ALL dashes/spaces — CNIC = 13 digits, NTN = 7 or 9 digits
+Buyer Unregistered	buyerNTNCNIC = "" (empty string, field MUST exist)
+Credit Notes	NEVER sent to FBR (internal-only). Debit Notes are used for FBR returns
+Production Lock	Once submitted to Production, invoice is PERMANENT — no edit, no delete
+HS Code Format	XXXX.XXXX format (e.g., "2202.1010") — add dot between 4th and 5th digit
+UoM for Beverages	Chapter 22 HS Codes → UoM = "Liter" (full word)
+Sanitization	Remove newlines, tabs, extra spaces from all text fields
+items FIRST	In the JSON payload, "items" array must be the FIRST key
+11. FBR ERROR CODES
+Code	Meaning
+0001	Seller not registered for sales tax
+0002	Invalid Buyer NTN/CNIC format
+0003	Invalid invoice type
+0005	Date format wrong (need YYYY-MM-DD)
+0009	Buyer registration number missing
+0010	Buyer name empty
+0013	Sale type invalid
+0019	HS Code missing
+0020	Rate field empty
+0021	Value of Sales / Quantity empty
+0401	Seller unauthorized (invalid token)
+0402	Buyer unauthorized
+12. AUTHENTICATION / CREDENTIALS
+Token Source Priority:
+1. Company-level tokens (fbrSandboxToken / fbrProductionToken)
+2. User Settings tokens (legacy)
+3. Environment variables (FBR_SANDBOX_TOKEN / FBR_PRODUCTION_TOKEN)
+HTTP Header:
+Authorization: Bearer <token>
+13. COMPLETE SUBMISSION FLOW (Code Level)
+Step 1: User clicks "Submit to Production"
+Step 2: Frontend calls → POST /api/invoices/:id/submit-to-fbr
+Step 3: Backend loads invoice + items + company data
+Step 4: Checks: Credit Note? → BLOCK | Already Production? → BLOCK
+Step 5: transformToFbrJson() → Builds exact FBR payload
+Step 6: validateFbrJson() → Checks all required fields
+Step 7: axios.post(FBR_URL, payload, { Authorization: Bearer token })
+Step 8: FBR Response → statusCode "00"? 
+         ↳ YES → Update invoice status = "production", save FBR invoice number
+         ↳ NO  → Return error message to user, invoice stays draft
+Step 9: If FBR down → Queue for auto-retry

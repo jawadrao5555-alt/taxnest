@@ -43,6 +43,10 @@ TaxNest is built on Laravel 12 with PHP 8.4, using Breeze for authentication. Th
 - **Advanced HS Intelligence Engine:** `hs_intelligence_logs` for weighted suggestions, `hs_rejection_history` for tracking admin rejections, `HsIntelligenceService` with a 6-factor model for suggestions, and an upgraded admin panel for managing unmapped HS codes.
 - **Live Rejection Learning Engine:** Captures FBR rejection data for HS codes, feeds into intelligence for confidence deduction, and provides admin alerts for top rejected HS codes.
 - **UI/UX Improvements:** FBR settings redesign with sandbox/production selection, customer profile management, invoice customer/product autocomplete, invoice list tabs, products page upgrade with search and HS mapping, dashboard compactness, separated client and super admin dashboards, premium dashboard UI overhaul, and an SRO & Serial Number Reference System with seeded rules and search functionality.
+- **QR Code FBR Compliance:** Server-side QR data encoding with 4 FBR-required fields (sellerNTNCNIC, fbr_invoice_number, invoiceDate, totalValues). QR displayed in both PDF templates when fbr_invoice_number exists.
+- **Custom Billing Plan Builder:** Admin-only dynamic pricing calculator with sliders for invoice limit, user count, branch count. Pricing formula: invoiceFactor=2.5, userFactor=500, branchFactor=1000 per month. Cycle discounts: quarterly 1%, semi-annual 3%, annual 6%. Creates PricingPlan and Subscription records.
+- **HS Usage Patterns Learning Engine:** `hs_usage_patterns` table tracks HS code patterns with confidence scoring (success*5 - rejection*10, cap 95%). Auto-records on FBR success/rejection via SendInvoiceToFbrJob. Only surfaces suggestions with admin_status='approved' and confidence >= 60%.
+- **Smart Invoice Memory Suggestions:** Community Pattern Suggestion panel on invoice create page. Fetches suggestions via `/api/hs-usage-suggestions/{hsCode}` when HS code entered. One-click apply for schedule_type, tax_rate, SRO, serial_no. Never exposes internal confidence metrics.
 
 ## External Dependencies
 - **PostgreSQL:** Primary database.

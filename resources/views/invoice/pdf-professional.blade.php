@@ -90,9 +90,6 @@
                     </td>
                 </tr>
             </table>
-            @if($invoice->integrity_hash)
-            <div style="margin-top: 6px; font-size: 8px; color: #6b7280; font-family: 'Courier New', monospace; word-break: break-all;">SHA256: {{ $invoice->integrity_hash }}</div>
-            @endif
         </div>
         @endif
 
@@ -246,9 +243,6 @@
                 <tr><td class="qlabel">Date</td><td class="qvalue">{{ $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d') }}</td></tr>
                 <tr><td class="qlabel">Total</td><td class="qvalue">Rs. {{ number_format($invoice->total_amount, 2) }}</td></tr>
             </table>
-            @if($invoice->integrity_hash)
-            <div class="hash-bar">SHA256: {{ $invoice->integrity_hash }}</div>
-            @endif
         </div>
         @endif
 

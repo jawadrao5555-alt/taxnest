@@ -75,10 +75,10 @@ class Invoice extends Model
         $decoded = json_decode($this->qr_data, true);
         if (is_array($decoded)) {
             $qrPayload = json_encode([
-                'sellerNTNCNIC' => $decoded['sellerNTNCNIC'] ?? preg_replace('/[^0-9]/', '', $decoded['ntn'] ?? ''),
-                'fbr_invoice_number' => $decoded['fbr_invoice_number'] ?? $decoded['fbr_invoice_id'] ?? '',
-                'invoiceDate' => $decoded['date'] ?? '',
-                'totalValues' => $decoded['total'] ?? 0,
+                'sellerNTNCNIC' => $decoded['sellerNTNCNIC'] ?? '',
+                'fbr_invoice_number' => $decoded['fbr_invoice_number'] ?? '',
+                'invoiceDate' => $decoded['invoiceDate'] ?? '',
+                'totalValues' => $decoded['totalValues'] ?? 0,
             ]);
             return 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' . urlencode($qrPayload);
         }

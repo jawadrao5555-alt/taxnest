@@ -64,12 +64,9 @@ class SendInvoiceToFbrJob implements ShouldQueue
 
             $qrData = json_encode([
                 'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $invoice->company->ntn ?? ''),
-                'ntn' => $invoice->company->ntn ?? '',
-                'invoice_number' => $invoice->internal_invoice_number ?? $invoice->invoice_number,
                 'fbr_invoice_number' => $fbrNum ?? $invoice->invoice_number,
-                'fbr_invoice_id' => $fbrNum ?? $invoice->invoice_number,
-                'date' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
-                'total' => $invoice->total_amount,
+                'invoiceDate' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
+                'totalValues' => $invoice->total_amount,
             ]);
             $invoice->qr_data = $qrData;
             $invoice->fbr_invoice_id = $fbrNum;

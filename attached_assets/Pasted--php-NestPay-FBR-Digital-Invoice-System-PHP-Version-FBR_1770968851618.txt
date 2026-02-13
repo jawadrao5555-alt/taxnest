@@ -1,0 +1,423 @@
+<?php
+
+/**
+ * NestPay FBR Digital Invoice System - PHP Version
+ * FBR PRAL DI API v1.12 Compliant
+ * SRO 709(I)/2025
+ */
+
+// ============================================================
+// FBR API ENDPOINTS
+// ============================================================
+define('FBR_SANDBOX_URL', 'https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata_sb');
+define('FBR_PRODUCTION_URL', 'https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata');
+define('FBR_SANDBOX_VALIDATE', 'https://gw.fbr.gov.pk/di_data/v1/di/validateinvoicedata_sb');
+define('FBR_PRODUCTION_VALIDATE', 'https://gw.fbr.gov.pk/di_data/v1/di/validateinvoicedata');
+
+// ============================================================
+// SALE TYPE MAPPING (Sandbox vs Production)
+// ============================================================
+$SANDBOX_SALE_TYPE_MAP = [
+    "Goods at standard rate"            => "Goods at standard rate",
+    "Goods at standard rate (default)"  => "Goods at standard rate (default)",
+    "Goods at standard rate (FMCG)"    => "Goods at standard rate (FMCG)",
+    "Goods at standard rate (CNG)"     => "Goods at standard rate (CNG)",
+    "Goods at standard rate (wholesale)"=> "Goods at standard rate (wholesale)",
+    "Goods at standard rate (retail)"  => "Goods at standard rate (retail)",
+    "Cement /Concrete Block"           => "Cement /Concrete Block",
+    "Cement/Concrete Block"            => "Cement /Concrete Block",
+    "3rd Schedule (Taxable)"           => "3rd Schedule Goods",
+    "3rd Schedule Goods"               => "3rd Schedule Goods",
+    "Goods at zero rate"               => "Zero Rated",
+    "Zero Rated"                       => "Zero Rated",
+    "Goods exempt"                     => "Exempt",
+    "Exempt"                           => "Exempt",
+    "Exempt goods"                     => "Exempt goods",
+    "Goods at reduced rate"            => "Goods at Reduced Rate",
+    "Goods at Reduced Rate"            => "Goods at Reduced Rate",
+    "Export of goods"                  => "Export",
+    "Export"                           => "Export",
+    "Services at standard rate"        => "Services",
+    "Services"                         => "Services",
+    "Steel melting and re-rolling"     => "Steel melting and re-rolling",
+    "Ship breaking"                    => "Ship breaking",
+];
+
+$PRODUCTION_SALE_TYPE_MAP = [
+    "Goods at standard rate"            => "Goods at standard rate (default)",
+    "Goods at standard rate (default)"  => "Goods at standard rate (default)",
+    "Goods at standard rate (FMCG)"    => "Goods at standard rate (default)",
+    "Goods at standard rate (CNG)"     => "Goods at standard rate (default)",
+    "Goods at standard rate (wholesale)"=> "Goods at standard rate (default)",
+    "Goods at standard rate (retail)"  => "Goods at standard rate (default)",
+    "Cement /Concrete Block"           => "Cement/Concrete Block",
+    "Cement/Concrete Block"            => "Cement/Concrete Block",
+    "3rd Schedule (Taxable)"           => "3rd Schedule Goods",
+    "3rd Schedule Goods"               => "3rd Schedule Goods",
+    "Goods at zero rate"               => "Goods at zero rate",
+    "Zero Rated"                       => "Goods at zero rate",
+    "Goods exempt"                     => "Exempt goods",
+    "Exempt"                           => "Exempt goods",
+    "Exempt goods"                     => "Exempt goods",
+    "Goods at reduced rate"            => "Goods at Reduced Rate",
+    "Goods at Reduced Rate"            => "Goods at Reduced Rate",
+    "Export of goods"                  => "Export of goods",
+    "Export"                           => "Export of goods",
+    "Services at standard rate"        => "Services at standard rate",
+    "Services"                         => "Services at standard rate",
+    "Steel melting and re-rolling"     => "Steel melting and re-rolling",
+    "Ship breaking"                    => "Ship breaking",
+];
+
+// ============================================================
+// UOM MAPPING
+// ============================================================
+$UOM_FBR_FORMAT = [
+    'u'    => 'U',
+    'pcs'  => 'U',
+    'nos'  => 'U',
+    'kg'   => 'KG',
+    'l'    => 'l',
+    'ltr'  => 'l',
+    'm'    => 'M',
+    'mtr'  => 'MTR',
+    'sqm'  => 'SQM',
+    'ths'  => 'THS',
+];
+
+// ============================================================
+// HELPER: CNIC/NTN se dashes aur spaces remove karo
+// ============================================================
+function cleanCnicNtn($value) {
+    if (empty($value)) return "";
+    return preg_replace('/[-\s]/', '', $value);
+}
+
+// ============================================================
+// HELPER: Text sanitize for FBR (newlines, tabs remove)
+// ============================================================
+function sanitizeForFbr($text) {
+    if (empty($text)) return "";
+    $text = preg_replace('/[\n\r\t]/', ' ', $text);
+    $text = preg_replace('/\s+/', ' ', $text);
+    return trim($text);
+}
+
+// ============================================================
+// HELPER: HS Code format karo XXXX.XXXX mein
+// ============================================================
+function formatHsCode($hsCode) {
+    if (empty($hsCode)) return "22021010";
+    $clean = str_replace('.', '', $hsCode);
+    if (strlen($clean) === 8 && strpos($hsCode, '.') === false) {
+        return substr($clean, 0, 4) . '.' . substr($clean, 4);
+    }
+    return $hsCode;
+}
+
+// ============================================================
+// HELPER: HS Code se UoM determine karo
+// ============================================================
+function getUomByHsCode($hsCode, $defaultUom = 'U') {
+    $clean = str_replace('.', '', $hsCode);
+    $chapter = intval(substr($clean, 0, 2));
+
+    // Chapter 22: Beverages → Liter
+    if ($chapter === 22) return "Liter";
+    // Chapter 27: Petroleum → Liter
+    if ($chapter === 27) return "Liter";
+    // Chapter 31: Fertilizers (DAP, Urea) → KG
+    if ($chapter === 31) return "KG";
+
+    return $defaultUom;
+}
+
+// ============================================================
+// HELPER: Document Type ID
+// ============================================================
+function getDocumentTypeId($invoiceType) {
+    $map = [
+        "Sale Invoice"     => 1,
+        "Sales Invoice"    => 1,
+        "Purchase Invoice" => 2,
+        "Credit Note"      => 3,
+        "Debit Note"       => 4,
+    ];
+    return $map[$invoiceType] ?? 1;
+}
+
+// ============================================================
+// MAIN: FBR PAYLOAD BANAO
+// ============================================================
+function buildFbrPayload($invoice, $items, $environment = 'production') {
+    global $SANDBOX_SALE_TYPE_MAP, $PRODUCTION_SALE_TYPE_MAP;
+
+    $isProduction = ($environment === 'production');
+    $saleTypeMap = $isProduction ? $PRODUCTION_SALE_TYPE_MAP : $SANDBOX_SALE_TYPE_MAP;
+
+    // ---- ITEMS BUILD KARO ----
+    $fbrItems = [];
+    foreach ($items as $index => $item) {
+        $quantity  = floatval($item['quantity']);
+        $unitPrice = floatval($item['rate']);
+        $taxRate   = floatval($item['tax_rate']);
+        $rawSaleType = $item['sale_type'] ?? 'Goods at standard rate';
+
+        // Schedule detection
+        $is3rdSchedule = (strpos($rawSaleType, '3rd Schedule') !== false);
+        $isReducedRate = (stripos($rawSaleType, 'reduced rate') !== false);
+        $isExempt      = (stripos($rawSaleType, 'exempt') !== false);
+
+        // ========== TAX CALCULATION ==========
+        if ($is3rdSchedule) {
+            // 3RD SCHEDULE: Tax Base = MRP (fixedNotifiedValueOrRetailPrice)
+            $retailPrice = floatval($item['fixed_notified_value'] ?? 0);
+            if ($retailPrice <= 0) {
+                $retailPrice = $unitPrice * $quantity;
+            }
+            $valueSalesExcludingST = $retailPrice;
+            $salesTax = ($retailPrice * $taxRate) / 100;
+
+        } elseif ($isExempt) {
+            // EXEMPT: No tax
+            $valueSalesExcludingST = $quantity * $unitPrice;
+            $salesTax = 0;
+            $retailPrice = $valueSalesExcludingST;
+
+        } elseif ($isReducedRate) {
+            // REDUCED RATE: Tax on value
+            $valueSalesExcludingST = $quantity * $unitPrice;
+            $salesTax = ($valueSalesExcludingST * $taxRate) / 100;
+            $retailPrice = $valueSalesExcludingST;
+
+        } else {
+            // STANDARD RATE (18%): Tax on value
+            $valueSalesExcludingST = $quantity * $unitPrice;
+            $salesTax = ($valueSalesExcludingST * $taxRate) / 100;
+            $retailPrice = $valueSalesExcludingST;
+        }
+
+        // ========== UOM ==========
+        $hsCode = $item['hs_code'] ?? '22021010';
+        $uomCode = getUomByHsCode($hsCode, $item['uom'] ?? 'U');
+
+        // ========== SALE TYPE MAP ==========
+        $fbrSaleType = $saleTypeMap[$rawSaleType] ?? $rawSaleType;
+
+        // ========== RATE STRING ==========
+        $fbrRate = $isExempt ? "Exempt" : "{$taxRate}%";
+
+        // ========== BUILD ITEM ==========
+        $fbrItem = [
+            "uoM"                            => $uomCode,
+            "rate"                           => $fbrRate,
+            "hsCode"                         => formatHsCode($hsCode),
+            "discount"                       => 0.00,
+            "extraTax"                       => ($isReducedRate || $isExempt) ? "" : 0.00,
+            "quantity"                       => round($quantity, 4),
+            "saleType"                       => $fbrSaleType,
+            "fedPayable"                     => 0.00,
+            "furtherTax"                     => 0.00,
+            "totalValues"                    => round($valueSalesExcludingST + $salesTax, 2),
+            "productDescription"             => $item['description'] ?? 'PRODUCT',
+            "salesTaxApplicable"             => round($salesTax, 2),
+            "valueSalesExcludingST"           => round($valueSalesExcludingST, 2),
+            "salesTaxWithheldAtSource"        => 0.00,
+            "fixedNotifiedValueOrRetailPrice" => round($retailPrice, 2),
+        ];
+
+        // ========== SRO FIELDS (Conditional) ==========
+        if ($is3rdSchedule && $taxRate < 18) {
+            $fbrItem['sroScheduleNo']    = $item['sro_schedule_no'] ?? "3rd Schedule goods";
+            $fbrItem['sroItemSerialNo']  = $item['sro_item_serial'] ?? "51";
+        } elseif ($isExempt) {
+            $fbrItem['sroScheduleNo']    = $item['sro_schedule_no'] ?? "6th Schd Table I";
+            $fbrItem['sroItemSerialNo']  = $item['sro_item_serial'] ?? "100";
+        } elseif ($isReducedRate) {
+            $fbrItem['sroScheduleNo']    = $item['sro_schedule_no'] ?? "EIGHTH SCHEDULE Table 1";
+            if (!empty($item['sro_item_serial'])) {
+                $fbrItem['sroItemSerialNo'] = $item['sro_item_serial'];
+            }
+        }
+        // 3rd Schedule @ 18% → NO SRO fields
+
+        $fbrItems[] = $fbrItem;
+    }
+
+    // ---- BUYER REGISTRATION TYPE ----
+    $buyerRegType = $invoice['buyer_registration_type'] ?? 'Unregistered';
+    $buyerCnicNtn = cleanCnicNtn($invoice['buyer_ntn_cnic'] ?? '');
+
+    if ($buyerRegType !== 'Registered') {
+        $buyerCnicNtn = $buyerCnicNtn ?: "";
+    }
+
+    // ---- INVOICE TYPE ----
+    $invoiceType = $invoice['invoice_type'] ?? 'Sale Invoice';
+    $invoiceTypeMap = [
+        "sales" => "Sale Invoice",
+        "sale"  => "Sale Invoice",
+        "Sale Invoice" => "Sale Invoice",
+        "Credit Note"  => "Credit Note",
+        "Debit Note"   => "Debit Note",
+    ];
+    $fbrInvoiceType = $invoiceTypeMap[$invoiceType] ?? "Sale Invoice";
+
+    // ---- BUILD MAIN PAYLOAD ----
+    // CRITICAL: "items" MUST be first key
+    $payload = [
+        "items"                 => $fbrItems,
+        "invoiceDate"           => date('Y-m-d', strtotime($invoice['invoice_date'])),
+        "invoiceType"           => $fbrInvoiceType,
+        "documentTypeId"        => getDocumentTypeId($fbrInvoiceType),
+        "buyerAddress"          => sanitizeForFbr($invoice['buyer_address'] ?? 'CUSTOMER ADDRESS'),
+        "invoiceRefNo"          => $invoice['invoice_ref_no'],
+        "buyerProvince"         => $invoice['buyer_province'] ?? 'Punjab',
+        "sellerAddress"         => sanitizeForFbr($invoice['seller_address']),
+        "sellerNTNCNIC"         => cleanCnicNtn($invoice['seller_ntn_cnic']),
+        "sellerProvince"        => $invoice['seller_province'] ?? 'Punjab',
+        "buyerBusinessName"     => sanitizeForFbr($invoice['buyer_name'] ?? 'CUSTOMER'),
+        "sellerBusinessName"    => sanitizeForFbr($invoice['seller_business_name']),
+        "buyerRegistrationType" => $buyerRegType,
+        "buyerNTNCNIC"          => $buyerCnicNtn,
+    ];
+
+    // ---- CREDIT/DEBIT NOTE EXTRA FIELDS ----
+    if (in_array($fbrInvoiceType, ['Credit Note', 'Debit Note']) && !empty($invoice['original_invoice_ref'])) {
+        $payload['originalInvoiceRef']  = $invoice['original_invoice_ref'];
+        $payload['originalInvoiceDate'] = date('Y-m-d', strtotime($invoice['original_invoice_date']));
+        $payload['reason']              = $invoice['reason'] ?? 'Return of goods';
+    }
+
+    // ---- SCENARIO ID (SANDBOX ONLY) ----
+    if ($environment === 'sandbox') {
+        $payload['scenarioId'] = $invoice['scenario_id'] ?? 'SN001';
+    }
+
+    return $payload;
+}
+
+// ============================================================
+// MAIN: FBR KO SUBMIT KARO
+// ============================================================
+function submitToFbr($invoice, $items, $fbrToken, $environment = 'production') {
+
+    // Credit Notes BLOCK
+    if (($invoice['invoice_type'] ?? '') === 'Credit Note') {
+        return [
+            'success' => false,
+            'error'   => 'Credit Notes cannot be submitted to FBR. Use Debit Notes for returns.',
+        ];
+    }
+
+    // Build payload
+    $payload = buildFbrPayload($invoice, $items, $environment);
+
+    // Select endpoint
+    $url = ($environment === 'production') ? FBR_PRODUCTION_URL : FBR_SANDBOX_URL;
+
+    // Send to FBR
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 30,
+        CURLOPT_HTTPHEADER     => [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $fbrToken,
+            'Accept: application/json',
+        ],
+    ]);
+
+    $responseBody = curl_exec($ch);
+    $httpCode     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError    = curl_error($ch);
+    curl_close($ch);
+
+    // Handle curl errors
+    if ($curlError) {
+        return [
+            'success'  => false,
+            'error'    => 'FBR connection failed: ' . $curlError,
+            'request'  => $payload,
+        ];
+    }
+
+    $response = json_decode($responseBody, true);
+
+    // Check FBR response
+    $statusCode = $response['validationResponse']['statusCode'] ?? '99';
+
+    if ($statusCode === '00') {
+        // SUCCESS
+        return [
+            'success'        => true,
+            'fbr_invoice_id' => $response['invoiceNumber'] ?? null,
+            'dated'          => $response['dated'] ?? null,
+            'request'        => $payload,
+            'response'       => $response,
+        ];
+    } else {
+        // FAILED
+        $errorMsg = $response['validationResponse']['error'] ?? '';
+        if (empty($errorMsg) && !empty($response['validationResponse']['invoiceStatuses'])) {
+            $errorMsg = $response['validationResponse']['invoiceStatuses'][0]['error'] ?? 'Unknown error';
+        }
+        return [
+            'success'   => false,
+            'error'     => $errorMsg,
+            'errorCode' => $response['validationResponse']['invoiceStatuses'][0]['errorCode'] ?? '',
+            'request'   => $payload,
+            'response'  => $response,
+        ];
+    }
+}
+
+// ============================================================
+// USAGE EXAMPLE
+// ============================================================
+
+$invoice = [
+    'invoice_date'             => '2026-02-13',
+    'invoice_type'             => 'Sale Invoice',
+    'invoice_ref_no'           => 'INV-2026-001',
+    'seller_ntn_cnic'          => '3620291786117',
+    'seller_business_name'     => 'ZIA CORPORATION',
+    'seller_address'           => 'KHAIR PUR ROAD PULL FAREED ABAD KAHROR PAKKA, Lodhran',
+    'seller_province'          => 'Punjab',
+    'buyer_name'               => 'Walk-in Customer',
+    'buyer_address'            => 'LAHORE PUNJAB',
+    'buyer_province'           => 'Punjab',
+    'buyer_registration_type'  => 'Unregistered',
+    'buyer_ntn_cnic'           => '',
+];
+
+$items = [
+    [
+        'hs_code'              => '3105.3000',
+        'description'          => 'DAP',
+        'quantity'             => 1,
+        'rate'                 => 260.21,
+        'tax_rate'             => 5,
+        'sale_type'            => '3rd Schedule Goods',
+        'uom'                  => 'KG',
+        'fixed_notified_value' => 260.21,
+        'sro_schedule_no'      => '3rd Schedule goods',
+        'sro_item_serial'      => '51',
+    ],
+];
+
+$fbrToken = 'YOUR_FBR_API_TOKEN_HERE';
+
+// Submit to Production
+$result = submitToFbr($invoice, $items, $fbrToken, 'production');
+
+if ($result['success']) {
+    echo "✅ FBR Invoice Submitted Successfully!\n";
+    echo "FBR Invoice Number: " . $result['fbr_invoice_id'] . "\n";
+    echo "Date: " . $result['dated'] . "\n";
+} else {
+    echo "❌ FBR Submission Failed!\n";
+    echo "Error: " . $result['error'] . "\n";
+}

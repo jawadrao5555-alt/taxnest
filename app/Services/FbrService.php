@@ -14,6 +14,27 @@ class FbrService
     private const SANDBOX_VALIDATE_URL = 'https://gw.fbr.gov.pk/di_data/v1/di/validateinvoicedata_sb';
     private const PRODUCTION_VALIDATE_URL = 'https://gw.fbr.gov.pk/di_data/v1/di/validateinvoicedata';
 
+    private function sanitizeForFbr(?string $text): string
+    {
+        if (empty($text)) return "";
+        $text = preg_replace('/[\n\r\t]/', ' ', $text);
+        $text = preg_replace('/\s+/', ' ', $text);
+        return trim($text);
+    }
+
+    private function getUomByHsCode(?string $hsCode, ?string $defaultUom = 'U'): string
+    {
+        if (empty($hsCode)) return $this->normalizeUom($defaultUom);
+        $clean = str_replace('.', '', $hsCode);
+        $chapter = intval(substr($clean, 0, 2));
+
+        if ($chapter === 22) return "Liter";
+        if ($chapter === 27) return "Liter";
+        if ($chapter === 31) return "KG";
+
+        return $this->normalizeUom($defaultUom);
+    }
+
     public function buildPayload($invoice): array
     {
         $company = $invoice->company;
@@ -29,17 +50,28 @@ class FbrService
             $unitPrice = floatval($item->price);
             $valueSalesExcludingST = round($quantity * $unitPrice, 2);
 
-            $saleTypeNormalized = $this->normalizeSaleType($item->sale_type ?: ScheduleEngine::mapSaleType($scheduleType));
-            $is3rdSchedule = (stripos($saleTypeNormalized, '3rd Schedule') !== false);
-            $isExempt = (stripos($saleTypeNormalized, 'Exempt') !== false);
-            $isReduced = (stripos($saleTypeNormalized, 'Reduced') !== false);
+            $rawSaleType = $item->sale_type ?: ScheduleEngine::mapSaleType($scheduleType);
+            $is3rdSchedule = (stripos($rawSaleType, '3rd Schedule') !== false);
+            $isExempt = (stripos($rawSaleType, 'Exempt') !== false || stripos($rawSaleType, 'exempt') !== false);
+            $isReduced = (stripos($rawSaleType, 'Reduced') !== false || stripos($rawSaleType, 'reduced') !== false);
+            $saleTypeNormalized = $this->normalizeSaleType($rawSaleType, $env);
 
             if ($is3rdSchedule) {
-                $retailPrice = round(floatval($item->mrp ?? $unitPrice), 2);
-                $salesTaxApplicable = round($retailPrice * ($taxRate / 100), 2);
-            } else {
                 $retailPrice = round(floatval($item->mrp ?? 0), 2);
-                $salesTaxApplicable = round($valueSalesExcludingST * ($taxRate / 100), 2);
+                if ($retailPrice <= 0) {
+                    $retailPrice = $valueSalesExcludingST;
+                }
+                $valueSalesExcludingST = $retailPrice;
+                $salesTaxApplicable = round(($retailPrice * $taxRate) / 100, 2);
+            } elseif ($isExempt) {
+                $retailPrice = $valueSalesExcludingST;
+                $salesTaxApplicable = 0.00;
+            } elseif ($isReduced) {
+                $retailPrice = $valueSalesExcludingST;
+                $salesTaxApplicable = round(($valueSalesExcludingST * $taxRate) / 100, 2);
+            } else {
+                $retailPrice = $valueSalesExcludingST;
+                $salesTaxApplicable = round(($valueSalesExcludingST * $taxRate) / 100, 2);
             }
 
             if ($isExempt) {
@@ -64,10 +96,13 @@ class FbrService
                 $rateStr = ($taxRate == intval($taxRate)) ? intval($taxRate) . "%" : number_format($taxRate, 1) . "%";
             }
 
+            $hsCode = $item->hs_code ?? "";
+            $uomCode = $this->getUomByHsCode($hsCode, $item->default_uom ?? 'U');
+
             $itemPayload = [
-                "uoM" => $this->normalizeUom($item->default_uom),
+                "uoM" => $uomCode,
                 "rate" => $rateStr,
-                "hsCode" => $item->hs_code ?? "",
+                "hsCode" => $hsCode,
                 "discount" => round($discount, 2),
                 "extraTax" => $extraTaxVal,
                 "quantity" => round($quantity, 4),
@@ -106,14 +141,14 @@ class FbrService
             "invoiceDate" => $invoice->invoice_date ?? ($invoice->created_at ? $invoice->created_at->toDateString() : now()->toDateString()),
             "invoiceType" => $invoiceType,
             "documentTypeId" => $docTypeMap[$invoiceType] ?? 1,
-            "buyerAddress" => $invoice->buyer_address ?? "",
+            "buyerAddress" => $this->sanitizeForFbr($invoice->buyer_address ?? 'CUSTOMER ADDRESS'),
             "invoiceRefNo" => $this->resolveInvoiceRefNo($invoice),
             "buyerProvince" => $this->normalizeProvince($invoice->destination_province ?? "Punjab"),
-            "sellerAddress" => $company->address ?? "",
+            "sellerAddress" => $this->sanitizeForFbr($company->address ?? ""),
             "sellerNTNCNIC" => $this->formatNtnCnic($company->ntn ?? ""),
             "sellerProvince" => $this->normalizeProvince($invoice->supplier_province ?? $company->province ?? "Punjab"),
-            "buyerBusinessName" => $invoice->buyer_name ?? "",
-            "sellerBusinessName" => $company->fbr_business_name ?: ($company->name ?? ""),
+            "buyerBusinessName" => $this->sanitizeForFbr($invoice->buyer_name ?? 'CUSTOMER'),
+            "sellerBusinessName" => $this->sanitizeForFbr($company->fbr_business_name ?: ($company->name ?? "")),
             "buyerRegistrationType" => $invoice->buyer_registration_type ?? $this->determineBuyerRegistrationType($invoice->buyer_ntn),
             "buyerNTNCNIC" => $this->formatNtnCnic($invoice->buyer_ntn ?? ""),
         ];
@@ -260,18 +295,31 @@ class FbrService
         return $uom;
     }
 
-    private function normalizeSaleType(string $saleType): string
+    private function normalizeSaleType(string $saleType, string $env = 'production'): string
     {
-        $map = [
+        $sandboxMap = [
+            'goods at standard rate' => 'Goods at standard rate',
+            'goods at standard rate (default)' => 'Goods at standard rate (default)',
+            'goods at standard rate (fmcg)' => 'Goods at standard rate (FMCG)',
+            'goods at standard rate (cng)' => 'Goods at standard rate (CNG)',
+            'goods at standard rate (wholesale)' => 'Goods at standard rate (wholesale)',
+            'goods at standard rate (retail)' => 'Goods at standard rate (retail)',
+            'cement /concrete block' => 'Cement /Concrete Block',
+            'cement/concrete block' => 'Cement /Concrete Block',
+            '3rd schedule (taxable)' => '3rd Schedule Goods',
+            '3rd schedule goods' => '3rd Schedule Goods',
             'goods under 3rd schedule' => '3rd Schedule Goods',
-            'goods at standard rate (default)' => 'Goods at Standard Rate (default)',
-            'goods at standard rate' => 'Goods at Standard Rate (default)',
+            'goods at zero rate' => 'Zero Rated',
+            'zero rated' => 'Zero Rated',
+            'goods exempt' => 'Exempt',
+            'exempt' => 'Exempt',
+            'exempt goods' => 'Exempt goods',
             'goods at reduced rate' => 'Goods at Reduced Rate',
-            'exempt goods' => 'Exempt Goods',
-            'zero rated goods' => 'Goods at zero-rate',
-            'goods at zero-rate' => 'Goods at zero-rate',
-            'goods at zero rate' => 'Goods at zero-rate',
-            'steel melting and re-rolling' => 'Steel Melting and re-rolling',
+            'export of goods' => 'Export',
+            'export' => 'Export',
+            'services at standard rate' => 'Services',
+            'services' => 'Services',
+            'steel melting and re-rolling' => 'Steel melting and re-rolling',
             'ship breaking' => 'Ship breaking',
             'cotton ginners' => 'Cotton Ginners',
             'telecommunication services' => 'Telecommunication services',
@@ -284,17 +332,56 @@ class FbrService
             'processing/conversion of goods' => 'Processing/ Conversion of Goods',
             'goods (fed in st mode)' => 'Goods (FED in ST Mode)',
             'services (fed in st mode)' => 'Services (FED in ST Mode)',
-            'services' => 'Services',
             'electric vehicle' => 'Electric Vehicle',
-            'cement /concrete block' => 'Cement /Concrete Block',
-            'cement/concrete block' => 'Cement /Concrete Block',
             'potassium chlorate' => 'Potassium Chlorate',
             'cng sales' => 'CNG Sales',
             'goods as per sro.297(|)/2023' => 'Goods as per SRO.297(|)/2023',
             'non-adjustable supplies' => 'Non-Adjustable Supplies',
-            '3rd schedule goods' => '3rd Schedule Goods',
         ];
 
+        $productionMap = [
+            'goods at standard rate' => 'Goods at standard rate (default)',
+            'goods at standard rate (default)' => 'Goods at standard rate (default)',
+            'goods at standard rate (fmcg)' => 'Goods at standard rate (default)',
+            'goods at standard rate (cng)' => 'Goods at standard rate (default)',
+            'goods at standard rate (wholesale)' => 'Goods at standard rate (default)',
+            'goods at standard rate (retail)' => 'Goods at standard rate (default)',
+            'cement /concrete block' => 'Cement/Concrete Block',
+            'cement/concrete block' => 'Cement/Concrete Block',
+            '3rd schedule (taxable)' => '3rd Schedule Goods',
+            '3rd schedule goods' => '3rd Schedule Goods',
+            'goods under 3rd schedule' => '3rd Schedule Goods',
+            'goods at zero rate' => 'Goods at zero rate',
+            'zero rated' => 'Goods at zero rate',
+            'goods exempt' => 'Exempt goods',
+            'exempt' => 'Exempt goods',
+            'exempt goods' => 'Exempt goods',
+            'goods at reduced rate' => 'Goods at Reduced Rate',
+            'export of goods' => 'Export of goods',
+            'export' => 'Export of goods',
+            'services at standard rate' => 'Services at standard rate',
+            'services' => 'Services at standard rate',
+            'steel melting and re-rolling' => 'Steel melting and re-rolling',
+            'ship breaking' => 'Ship breaking',
+            'cotton ginners' => 'Cotton Ginners',
+            'telecommunication services' => 'Telecommunication services',
+            'toll manufacturing' => 'Toll Manufacturing',
+            'petroleum products' => 'Petroleum Products',
+            'electricity supply to retailers' => 'Electricity Supply to Retailers',
+            'gas to cng stations' => 'Gas to CNG stations',
+            'mobile phones' => 'Mobile Phones',
+            'processing/ conversion of goods' => 'Processing/ Conversion of Goods',
+            'processing/conversion of goods' => 'Processing/ Conversion of Goods',
+            'goods (fed in st mode)' => 'Goods (FED in ST Mode)',
+            'services (fed in st mode)' => 'Services (FED in ST Mode)',
+            'electric vehicle' => 'Electric Vehicle',
+            'potassium chlorate' => 'Potassium Chlorate',
+            'cng sales' => 'CNG Sales',
+            'goods as per sro.297(|)/2023' => 'Goods as per SRO.297(|)/2023',
+            'non-adjustable supplies' => 'Non-Adjustable Supplies',
+        ];
+
+        $map = ($env === 'production') ? $productionMap : $sandboxMap;
         $normalized = $map[strtolower(trim($saleType))] ?? null;
         if ($normalized) {
             return $normalized;
@@ -457,13 +544,51 @@ class FbrService
         $startTime = microtime(true);
 
         try {
-            $response = Http::timeout(30)
-                ->withToken($token)
-                ->post($url, $payload);
+            $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => $jsonBody,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 30,
+                CURLOPT_HTTPHEADER     => [
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . $token,
+                    'Accept: application/json',
+                ],
+            ]);
+
+            $responseBody = curl_exec($ch);
+            $httpCode     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError    = curl_error($ch);
+            curl_close($ch);
 
             $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
             $log->response_time_ms = $responseTimeMs;
-            $log->response_payload = $response->body();
+            $log->response_payload = $responseBody ?: '';
+
+            if ($curlError) {
+                $log->status = 'failed';
+                $log->failure_type = 'connection_error';
+                $log->save();
+                return [
+                    "status" => "failed",
+                    "failure_type" => "connection_error",
+                    "errors" => ["FBR connection failed: " . $curlError],
+                    "response_time_ms" => $responseTimeMs,
+                ];
+            }
+
+            $response = new class($responseBody, $httpCode) {
+                private $body;
+                private $status;
+                public function __construct($body, $status) { $this->body = $body; $this->status = $status; }
+                public function body() { return $this->body; }
+                public function json() { return json_decode($this->body, true); }
+                public function status() { return $this->status; }
+                public function successful() { return $this->status >= 200 && $this->status < 300; }
+            };
 
             $responseData = $response->json();
 
@@ -701,9 +826,34 @@ class FbrService
         $validateUrl = $this->getValidateUrl($company);
 
         try {
-            $response = Http::timeout(30)
-                ->withToken($token)
-                ->post($validateUrl, $payload);
+            $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+            $ch = curl_init($validateUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => $jsonBody,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 30,
+                CURLOPT_HTTPHEADER     => [
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . $token,
+                    'Accept: application/json',
+                ],
+            ]);
+
+            $responseBody = curl_exec($ch);
+            $httpCode     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            $response = new class($responseBody, $httpCode) {
+                private $body;
+                private $status;
+                public function __construct($body, $status) { $this->body = $body; $this->status = $status; }
+                public function body() { return $this->body; }
+                public function json() { return json_decode($this->body, true); }
+                public function status() { return $this->status; }
+                public function successful() { return $this->status >= 200 && $this->status < 300; }
+            };
 
             if ($response->successful()) {
                 $responseData = $response->json();

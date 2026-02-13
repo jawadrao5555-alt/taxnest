@@ -8,14 +8,12 @@
         body { font-family: 'Helvetica', 'Arial', sans-serif; color: #1f2937; font-size: 13px; line-height: 1.5; }
         .page { padding: 30px 40px; position: relative; }
 
-        .top-stripe { height: 4px; background: linear-gradient(90deg, #059669, #6366f1, #0ea5e9); margin-bottom: 20px; }
+        .top-stripe { height: 4px; background: #059669; margin-bottom: 20px; }
 
         .header-bar { width: 100%; border-bottom: 2px solid #059669; padding-bottom: 16px; margin-bottom: 20px; }
         .header-bar table { width: 100%; }
         .company-name { font-size: 20px; font-weight: bold; color: #059669; }
         .company-detail { font-size: 11px; color: #6b7280; margin-top: 2px; }
-        .invoice-title { font-size: 24px; font-weight: bold; color: #1f2937; text-align: right; letter-spacing: 2px; }
-        .invoice-meta { font-size: 12px; color: #6b7280; text-align: right; margin-top: 2px; }
         .status-badge { display: inline-block; padding: 3px 14px; border-radius: 12px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
         .status-draft { background: #f3f4f6; color: #6b7280; }
         .status-submitted { background: #dbeafe; color: #1e40af; }
@@ -36,7 +34,6 @@
         .items-table tbody td.text-right { text-align: right; }
         .items-table tbody td.mono { font-family: 'Courier New', monospace; font-size: 11px; }
 
-        .totals-table { width: 100%; margin-bottom: 20px; }
         .totals-inner { width: 300px; float: right; }
         .totals-inner table { width: 100%; border-collapse: collapse; }
         .totals-inner td { padding: 5px 12px; font-size: 12px; }
@@ -46,16 +43,8 @@
         .totals-inner tr.grand-total td.value { font-size: 15px; font-weight: 800; color: #059669; }
         .totals-inner tr.net td { background: #f0fdf4; border-radius: 4px; }
 
-        .fbr-verification { border: 2px solid #059669; border-radius: 6px; padding: 16px; margin-bottom: 20px; page-break-inside: avoid; }
-        .fbr-verification table { width: 100%; }
-        .fbr-title { font-size: 14px; font-weight: bold; color: #065f46; letter-spacing: 1px; text-align: center; }
-        .fbr-subtitle { font-size: 10px; color: #047857; text-align: center; margin-top: 2px; }
-        .fbr-detail-row td { padding: 3px 8px; font-size: 11px; border: none; }
-        .fbr-detail-row td.fl { color: #6b7280; width: 35%; }
-        .fbr-detail-row td.fv { color: #1f2937; font-weight: bold; }
-
-        .footer { margin-top: 25px; padding-top: 12px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 10px; color: #9ca3af; }
-        .footer p { margin-bottom: 2px; }
+        .footer { margin-top: 30px; padding-top: 12px; border-top: 2px solid #059669; text-align: center; }
+        .footer-title { font-size: 16px; font-weight: bold; color: #059669; letter-spacing: 2px; }
 
         .watermark { position: fixed; top: 40%; left: 15%; font-size: 60px; color: rgba(156, 163, 175, 0.12); font-weight: bold; text-transform: uppercase; transform: rotate(-35deg); letter-spacing: 10px; z-index: 9999; pointer-events: none; white-space: nowrap; }
 
@@ -84,12 +73,22 @@
                         @endif
                     </td>
                     <td style="width: 40%; vertical-align: top; text-align: right;">
-                        <div class="invoice-title">{{ strtoupper($invoice->document_type ?? 'SALE INVOICE') }}</div>
-                        <div class="invoice-meta">#{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</div>
-                        <div class="invoice-meta">{{ $invoice->created_at->format('d M Y') }}</div>
+                        @if($invoice->fbr_invoice_number)
+                        @php
+                            $qrData = json_encode([
+                                'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $invoice->company->ntn ?? ''),
+                                'fbr_invoice_number' => $invoice->fbr_invoice_number,
+                                'invoiceDate' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
+                                'totalValues' => $invoice->total_amount
+                            ]);
+                        @endphp
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data={{ urlencode($qrData) }}" alt="QR Code" style="width: 90px; height: 90px; display: inline-block;">
+                        <div style="font-size: 9px; color: #059669; font-weight: bold; margin-top: 3px;">FBR Verified</div>
+                        @else
                         <div style="margin-top: 6px;">
                             <span class="status-badge status-{{ $invoice->status }}">{{ strtoupper($invoice->status) }}</span>
                         </div>
+                        @endif
                     </td>
                 </tr>
             </table>
@@ -120,9 +119,13 @@
                 </td>
                 <td style="padding-left: 8px;">
                     <div class="info-box">
-                        <div class="info-label">Invoice Info</div>
+                        <div class="info-label">Invoice Details</div>
                         <div class="info-value">Internal #: <strong>{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</strong></div>
+                        @if($invoice->fbr_invoice_number)
+                        <div class="info-value">FBR #: <strong style="color: #059669;">{{ $invoice->fbr_invoice_number }}</strong></div>
+                        @endif
                         <div class="info-value">Date: <strong>{{ $invoice->created_at->format('d M Y') }}</strong></div>
+                        <div class="info-value">Status: <strong>{{ ucfirst($invoice->status) }}</strong></div>
                         @if($invoice->document_type && $invoice->document_type !== 'Sale Invoice')
                         <div class="info-value">Type: <strong>{{ $invoice->document_type }}</strong></div>
                         @endif
@@ -199,46 +202,9 @@
             </div>
         </div>
 
-        @if($invoice->fbr_invoice_number)
-        <div class="fbr-verification">
-            <table>
-                <tr>
-                    <td style="vertical-align: top; text-align: center; width: 100%;" colspan="2">
-                        <div class="fbr-title">FBR VERIFIED INVOICE</div>
-                        <div class="fbr-subtitle">Federal Board of Revenue &mdash; Government of Pakistan</div>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="vertical-align: top; width: 55%; padding-top: 12px;">
-                        <table style="width: 100%; border: none;">
-                            <tr class="fbr-detail-row"><td class="fl">Seller NTN</td><td class="fv">{{ $invoice->company->ntn ?? '' }}</td></tr>
-                            <tr class="fbr-detail-row"><td class="fl">FBR Invoice #</td><td class="fv">{{ $invoice->fbr_invoice_number }}</td></tr>
-                            <tr class="fbr-detail-row"><td class="fl">Invoice Date</td><td class="fv">{{ $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d') }}</td></tr>
-                            <tr class="fbr-detail-row"><td class="fl">Total Amount</td><td class="fv">Rs. {{ number_format($invoice->total_amount, 2) }}</td></tr>
-                        </table>
-                    </td>
-                    <td style="vertical-align: top; width: 45%; text-align: center; padding-top: 12px;">
-                        @php
-                            $qrData = json_encode([
-                                'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $invoice->company->ntn ?? ''),
-                                'fbr_invoice_number' => $invoice->fbr_invoice_number,
-                                'invoiceDate' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
-                                'totalValues' => $invoice->total_amount
-                            ]);
-                        @endphp
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data={{ urlencode($qrData) }}" alt="QR Code" style="width: 120px; height: 120px;">
-                        <div style="font-size: 9px; color: #6b7280; margin-top: 4px;">Scan to verify</div>
-                    </td>
-                </tr>
-            </table>
-            @if($invoice->integrity_hash)
-            <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e5e7eb; font-size: 9px; color: #9ca3af; word-break: break-all; font-family: 'Courier New', monospace;">
-                Hash: {{ $invoice->integrity_hash }}
-            </div>
-            @endif
+        <div class="footer">
+            <div class="footer-title">{{ strtoupper($invoice->document_type ?? 'SALE INVOICE') }}</div>
         </div>
-        @endif
-
 
         @if(!empty($isDraft) && $isDraft)
         <div class="watermark">DRAFT</div>

@@ -1,0 +1,97 @@
+<?php
+/**
+ * FBR Proxy - TaxNest
+ * FBR DI API V1.12 Proxy for Pakistani Server
+ * Server: 182.181.125.191
+ */
+
+header('Content-Type: application/json; charset=utf-8');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['error' => 'Only POST method allowed']);
+    exit;
+}
+
+$rawInput = file_get_contents('php://input');
+$request = json_decode($rawInput, true);
+
+if (!$request) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Invalid JSON input']);
+    exit;
+}
+
+$token = $request['token'] ?? null;
+$payload = $request['payload'] ?? null;
+$action = $request['action'] ?? 'submit';
+
+if (!$token || !$payload) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Missing required fields: token, payload']);
+    exit;
+}
+
+if ($action === 'validate') {
+    $fbrUrl = 'https://gw.fbr.gov.pk/di_data/v1/di/validateinvoicedata';
+} else {
+    $fbrUrl = 'https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata';
+}
+
+$jsonPayload = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
+
+$ch = curl_init();
+curl_setopt_array($ch, [
+    CURLOPT_URL            => $fbrUrl,
+    CURLOPT_POST           => true,
+    CURLOPT_POSTFIELDS     => $jsonPayload,
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_TIMEOUT        => 30,
+    CURLOPT_CONNECTTIMEOUT => 10,
+    CURLOPT_HTTPHEADER     => [
+        'Content-Type: application/json',
+        'Authorization: Bearer ' . $token,
+    ],
+    CURLOPT_SSL_VERIFYPEER => true,
+    CURLOPT_SSL_VERIFYHOST => 2,
+]);
+
+$response = curl_exec($ch);
+$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$curlError = curl_error($ch);
+curl_close($ch);
+
+if ($curlError) {
+    http_response_code(502);
+    echo json_encode([
+        'success'   => false,
+        'error'     => 'FBR connection failed: ' . $curlError,
+        'http_code' => $httpCode,
+    ]);
+    exit;
+}
+
+$fbrResponse = json_decode($response, true);
+
+$result = [
+    'success'      => ($httpCode === 200 && isset($fbrResponse['validationResponse']['statusCode']) && $fbrResponse['validationResponse']['statusCode'] === '00'),
+    'http_code'    => $httpCode,
+    'fbr_response' => $fbrResponse,
+    'action'       => $action,
+    'timestamp'    => date('Y-m-d H:i:s'),
+];
+
+if (isset($fbrResponse['invoiceNumber'])) {
+    $result['invoice_number'] = $fbrResponse['invoiceNumber'];
+}
+
+http_response_code(200);
+echo json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);

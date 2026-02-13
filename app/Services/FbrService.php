@@ -24,20 +24,19 @@ class FbrService
         return env('FBR_PROXY_URL', '');
     }
 
-    private function getProxySecret(): string
-    {
-        return env('FBR_PROXY_SECRET', 'TaxNest_FBR_Proxy_2024_SecureKey');
-    }
-
     private function sendViaProxy(string $fbrUrl, string $token, array $payload): array
     {
         $proxyUrl = $this->getProxyUrl();
-        $proxySecret = $this->getProxySecret();
+
+        $action = 'submit';
+        if (strpos($fbrUrl, 'validate') !== false) {
+            $action = 'validate';
+        }
 
         $proxyPayload = [
-            'fbr_url' => $fbrUrl,
-            'fbr_token' => $token,
-            'fbr_payload' => $payload,
+            'token' => $token,
+            'payload' => $payload,
+            'action' => $action,
         ];
 
         $jsonBody = json_encode($proxyPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
@@ -50,7 +49,6 @@ class FbrService
             CURLOPT_TIMEOUT        => 60,
             CURLOPT_HTTPHEADER     => [
                 'Content-Type: application/json',
-                'X-Proxy-Secret: ' . $proxySecret,
                 'Accept: application/json',
             ],
         ]);
@@ -59,6 +57,15 @@ class FbrService
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlError = curl_error($ch);
         curl_close($ch);
+
+        $proxyResponse = json_decode($responseBody, true);
+        if ($proxyResponse && isset($proxyResponse['fbr_response'])) {
+            return [
+                'body' => json_encode($proxyResponse['fbr_response']),
+                'http_code' => $proxyResponse['http_code'] ?? $httpCode,
+                'curl_error' => $curlError,
+            ];
+        }
 
         return [
             'body' => $responseBody,

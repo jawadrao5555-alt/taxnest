@@ -33,6 +33,10 @@ args = "Laravel Server"
 task = "workflow.run"
 args = "Queue Worker"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "FBR Retry"
+
 [[workflows.workflow]]
 name = "Laravel Server"
 author = "agent"
@@ -55,6 +59,17 @@ outputType = "console"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "php artisan queue:work"
+
+[[workflows.workflow]]
+name = "FBR Retry"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan fbr:retry 9 --attempts=4 --interval=30"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [[ports]]
 localPort = 5000

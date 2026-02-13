@@ -1,30 +1,4 @@
 <x-app-layout>
-    <x-slot name="header">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-                <div>
-                    <h2 class="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-                        Welcome back<span class="text-emerald-600">,</span> {{ Auth::user()->name }}
-                    </h2>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{{ $company->name ?? 'My Company' }} &middot; {{ now()->format('l, d M Y') }}</p>
-                </div>
-                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold tracking-wide {{ $riskBadge['bg'] }} {{ $riskBadge['text'] }} shadow-sm">
-                    <span class="w-2 h-2 rounded-full mr-1.5 {{ $hybridScore >= 80 ? 'bg-emerald-500' : ($hybridScore >= 50 ? 'bg-amber-500' : 'bg-red-500') }} animate-pulse"></span>
-                    {{ $hybridScore }} - {{ $riskBadge['label'] }}
-                </span>
-            </div>
-            <div class="flex items-center space-x-2">
-                <a href="/compliance/certificate" target="_blank" class="inline-flex items-center px-4 py-2 bg-indigo-600 rounded-lg text-xs font-bold text-white hover:bg-indigo-700 shadow-sm transition">
-                    <svg class="w-3.5 h-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
-                    Certificate
-                </a>
-                <a href="/invoice/create" class="inline-flex items-center px-4 py-2 bg-emerald-600 rounded-lg text-xs font-bold text-white hover:bg-emerald-700 shadow-sm transition">
-                    <svg class="w-3.5 h-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                    New Invoice
-                </a>
-            </div>
-        </div>
-    </x-slot>
 
     <style>
         @keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -45,18 +19,47 @@
     <div class="py-4">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-            @if(!empty($trialInfo) && $trialInfo['is_trial'])
-            <div class="mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 flex items-center justify-between">
-                <div class="flex items-center space-x-3">
-                    <div class="p-2.5 bg-blue-600 rounded-lg">
-                        <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    </div>
-                    <div>
-                        <p class="text-sm font-bold text-blue-900 dark:text-blue-100">Free Trial &middot; {{ $trialInfo['days_left'] }} days remaining</p>
-                        <p class="text-xs text-blue-600 dark:text-blue-400">Upgrade anytime to unlock full features</p>
+            <div class="mb-5">
+                <div class="flex flex-col gap-3">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                            <h2 class="text-xl sm:text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                                Welcome back<span class="text-emerald-600">,</span> {{ Auth::user()->name }}
+                            </h2>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{{ $company->name ?? 'My Company' }} &middot; {{ now()->format('l, d M Y') }}</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold tracking-wide {{ $riskBadge['bg'] }} {{ $riskBadge['text'] }} shadow-sm">
+                                <span class="w-2 h-2 rounded-full mr-1.5 {{ $hybridScore >= 80 ? 'bg-emerald-500' : ($hybridScore >= 50 ? 'bg-amber-500' : 'bg-red-500') }} animate-pulse"></span>
+                                {{ $hybridScore }} - {{ $riskBadge['label'] }}
+                            </span>
+                            <a href="/compliance/certificate" target="_blank" class="inline-flex items-center px-3 py-1.5 bg-indigo-600 rounded-lg text-xs font-bold text-white hover:bg-indigo-700 shadow-sm transition">
+                                <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+                                Certificate
+                            </a>
+                            <a href="/invoice/create" class="inline-flex items-center px-3 py-1.5 bg-emerald-600 rounded-lg text-xs font-bold text-white hover:bg-emerald-700 shadow-sm transition">
+                                <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                New Invoice
+                            </a>
+                        </div>
                     </div>
                 </div>
-                <a href="/billing/plans" class="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 shadow-sm transition">Upgrade Now</a>
+            </div>
+
+            @if(!empty($trialInfo) && $trialInfo['is_trial'])
+            <div class="mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2.5 bg-blue-600 rounded-lg flex-shrink-0">
+                            <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-blue-900 dark:text-blue-100">Free Trial &middot; {{ round($trialInfo['days_left']) }} days remaining</p>
+                            <p class="text-xs text-blue-600 dark:text-blue-400">Upgrade anytime to unlock full features</p>
+                        </div>
+                    </div>
+                    <a href="/billing/plans" class="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 shadow-sm transition text-center flex-shrink-0">Upgrade Now</a>
+                </div>
             </div>
             @endif
 

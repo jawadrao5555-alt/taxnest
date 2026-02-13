@@ -725,8 +725,8 @@ class InvoiceController extends Controller
             }
         }
 
-        if (!in_array($invoice->status, ['locked', 'failed', 'submitted'])) {
-            return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice must be locked, submitted, or failed to resubmit.');
+        if (!in_array($invoice->status, ['draft', 'locked', 'failed', 'submitted'])) {
+            return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice cannot be submitted in current status.');
         }
 
         $invoice->load('items', 'company');

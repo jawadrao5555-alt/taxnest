@@ -235,14 +235,13 @@
     </div>
 <script>
 function downloadPdf(url) {
-    var iframe = document.getElementById('pdf-download-frame');
-    if (!iframe) {
-        iframe = document.createElement('iframe');
-        iframe.id = 'pdf-download-frame';
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
-    }
-    iframe.src = url;
+    var a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ document.body.removeChild(a); }, 100);
 }
 </script>
 </x-app-layout>

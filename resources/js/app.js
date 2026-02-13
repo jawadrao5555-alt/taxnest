@@ -2,6 +2,8 @@ import './bootstrap';
 
 import Alpine from 'alpinejs';
 
-window.Alpine = Alpine;
-
-Alpine.start();
+if (!window.__alpineStarted) {
+    window.Alpine = Alpine;
+    window.__alpineStarted = true;
+    Alpine.start();
+}

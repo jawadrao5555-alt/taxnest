@@ -26,6 +26,16 @@
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700&display=swap" rel="stylesheet" />
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
+        <script>
+            setTimeout(function(){
+                if(!window.__alpineStarted){
+                    window.__alpineStarted=true;
+                    var s=document.createElement('script');
+                    s.src='https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js';
+                    document.head.appendChild(s);
+                }
+            }, 2000);
+        </script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
         <script>if(document.documentElement.classList.contains('dark')){document.documentElement.style.colorScheme='dark';}</script>
         <style>

@@ -271,6 +271,8 @@ class InvoiceController extends Controller
 
             ComplianceScoringJob::dispatch($invoice->id);
 
+            \App\Services\HsUsagePatternService::recordFromInvoiceCreation($request->items);
+
             DB::commit();
             return redirect('/invoices')->with('success', 'Invoice created successfully.');
         } catch (\Exception $e) {

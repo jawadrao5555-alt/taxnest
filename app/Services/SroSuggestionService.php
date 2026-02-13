@@ -38,7 +38,34 @@ class SroSuggestionService
     public static function suggest(string $scheduleType, ?float $taxRate = null, ?string $hsCode = null, float $standardTaxRate = 18.0): ?array
     {
         if ($scheduleType === 'standard') {
+            if ($hsCode) {
+                $learned = HsUsagePatternService::getSroSuggestionForHs($hsCode, 'standard');
+                if ($learned) {
+                    return [
+                        'sro' => $learned['sro_schedule_no'],
+                        'serial' => $learned['serial_no'],
+                        'description' => 'Learned from previous successful invoices',
+                        'confidence' => 'learned',
+                        'auto_fill' => true,
+                        'source' => 'learned',
+                    ];
+                }
+            }
             return null;
+        }
+
+        if ($hsCode) {
+            $learned = HsUsagePatternService::getSroSuggestionForHs($hsCode, $scheduleType);
+            if ($learned) {
+                return [
+                    'sro' => $learned['sro_schedule_no'],
+                    'serial' => $learned['serial_no'],
+                    'description' => 'Learned from previous successful invoices',
+                    'confidence' => 'high',
+                    'auto_fill' => true,
+                    'source' => 'learned',
+                ];
+            }
         }
 
         $scheduleData = self::$sroDatabase[$scheduleType] ?? null;
@@ -110,6 +137,7 @@ class SroSuggestionService
             'description' => $suggestion['description'],
             'confidence' => $suggestion['confidence'],
             'auto_fill' => $suggestion['auto_fill'],
+            'source' => $suggestion['source'] ?? 'rules',
             'note' => 'This is a suggestion only. Please verify the SRO reference before submission.',
         ];
     }

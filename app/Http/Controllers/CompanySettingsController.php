@@ -65,6 +65,9 @@ class CompanySettingsController extends Controller
     public function updateFbrSettings(Request $request)
     {
         $company = Company::find(auth()->user()->company_id);
+        if (!$company) {
+            return redirect('/dashboard')->with('error', 'Company not found.');
+        }
 
         $request->validate([
             'fbr_environment' => 'required|in:sandbox,production',

@@ -52,6 +52,24 @@ class LoginRequest extends FormRequest
             $user = User::where('username', $login)->first();
         }
 
+        if (!$user) {
+            $normalizedId = preg_replace('/[^0-9\-]/', '', $login);
+            if (strlen($normalizedId) >= 7) {
+                $company = \App\Models\Company::where(function ($q) use ($login, $normalizedId) {
+                    $q->where('ntn', $login)
+                      ->orWhere('ntn', $normalizedId)
+                      ->orWhere('cnic', $login)
+                      ->orWhere('cnic', $normalizedId);
+                })->first();
+                if ($company) {
+                    $user = User::where('company_id', $company->id)
+                        ->where('role', 'company_admin')
+                        ->oldest()
+                        ->first();
+                }
+            }
+        }
+
         if (!$user || !Auth::attempt(['email' => $user->email, 'password' => $password], $remember)) {
             RateLimiter::hit($this->throttleKey());
 

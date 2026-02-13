@@ -4,7 +4,9 @@
 TaxNest is a multi-company SaaS tax and invoice management system for Pakistan, designed to ensure compliance with FBR (Federal Board of Revenue) regulations. It offers robust features including Smart Invoicing, configurable governance, enterprise API endpoints, PDF generation, and a demo mode. The "Heavy Enterprise" version extends these capabilities with a Company Approval System, Customer Ledger, Multi-Branch support, FBR Token Health Monitor, Advanced Admin View, Immutable Audit Logs, Enterprise Analytics, and enhanced Security Hardening. The project aims to capture a high-volume market with aggressive pricing tiers and a 14-day free trial.
 
 ## User Preferences
-N/A
+- ZIA CORPORATION is a REAL production account (not demo/internal) - NTN: 3620291786117, Owner: ZIA UR REHMAN
+- Login supports: Email, Phone, Username, CNIC, NTN
+- CNIC/NTN login maps to company_admin user of matching company
 
 ## System Architecture
 TaxNest is built on Laravel 12 with PHP 8.4, using Breeze for authentication. The frontend utilizes Tailwind CSS, Alpine.js, and Chart.js for a modern UI/UX. PostgreSQL serves as the database.

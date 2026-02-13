@@ -3,15 +3,15 @@
 
     <div class="mb-6 text-center">
         <h2 class="text-xl font-bold text-gray-800">Welcome Back</h2>
-        <p class="text-sm text-gray-500 mt-1">Login with your email, phone number, or username</p>
+        <p class="text-sm text-gray-500 mt-1">Login with your email, phone, username, CNIC or NTN</p>
     </div>
 
     <form method="POST" action="{{ route('login') }}" id="loginForm">
         @csrf
 
         <div>
-            <x-input-label for="login" value="Email / Phone / Username" />
-            <x-text-input id="login" class="block mt-1 w-full" type="text" name="login" :value="old('login')" required autofocus autocomplete="username" placeholder="Enter email, phone or username" />
+            <x-input-label for="login" value="Email / Phone / Username / CNIC / NTN" />
+            <x-text-input id="login" class="block mt-1 w-full" type="text" name="login" :value="old('login')" required autofocus autocomplete="username" placeholder="Enter email, phone, username, CNIC or NTN" />
             <x-input-error :messages="$errors->get('login')" class="mt-2" />
         </div>
 
@@ -57,6 +57,10 @@
                 <span class="inline-flex items-center gap-1 text-xs text-gray-500">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                     Username
+                </span>
+                <span class="inline-flex items-center gap-1 text-xs text-gray-500">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0"/></svg>
+                    CNIC / NTN
                 </span>
             </div>
         </div>

@@ -15,7 +15,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm font-medium text-gray-500">Pending Jobs</p>
@@ -28,7 +28,7 @@
                     <p class="mt-2 text-sm text-gray-500">In queue</p>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm font-medium text-gray-500">Failed Jobs</p>
@@ -41,7 +41,7 @@
                     <p class="mt-2 text-sm {{ $failedJobs > 0 ? 'text-red-500 font-medium' : 'text-gray-500' }}">{{ $failedJobs > 0 ? 'Needs attention' : 'All clear' }}</p>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm font-medium text-gray-500">Avg FBR Response</p>
@@ -54,7 +54,7 @@
                     <p class="mt-2 text-sm text-gray-500">milliseconds (30d avg)</p>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm font-medium text-gray-500">Retries (24h)</p>
@@ -68,7 +68,7 @@
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 mb-8">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4">System Health Indicator</h3>
                 <div class="flex items-center space-x-4">
                     <div class="flex-1">
@@ -97,7 +97,7 @@
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <h3 class="text-lg font-semibold text-gray-800 mb-4">FBR Failure Breakdown</h3>
                     @if($failureBreakdown->count() > 0)
                     <div class="space-y-3">
@@ -122,7 +122,7 @@
                     @endif
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <h3 class="text-lg font-semibold text-gray-800 mb-4">Company Risk Distribution</h3>
                     <div class="space-y-3">
                         <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
@@ -141,8 +141,8 @@
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
+                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
                     <h3 class="text-lg font-semibold text-gray-800">Recent Security Events</h3>
                     <a href="/admin/security-logs" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View All</a>
                 </div>

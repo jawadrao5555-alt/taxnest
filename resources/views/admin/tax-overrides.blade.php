@@ -66,8 +66,8 @@
             {{-- Sector Rules Tab --}}
             @if($isSuperAdmin)
             <div x-show="activeTab === 'sector'" x-cloak>
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-                    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
+                    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
                         <h3 class="text-lg font-semibold text-gray-800">Sector Tax Rules</h3>
                         <button @click="openAdd('sector')" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium text-sm hover:bg-emerald-700 transition">Add New</button>
                     </div>
@@ -87,7 +87,7 @@
                             </thead>
                             <tbody class="divide-y divide-gray-200">
                                 @forelse($sectorRules as $rule)
-                                <tr class="hover:bg-gray-50 {{ $loop->even ? 'bg-gray-50/50' : '' }}">
+                                <tr class="hover:bg-gray-50 {{ $loop->even ? 'bg-gray-50 dark:bg-gray-800' : '' }}">
                                     <td class="px-4 py-3 text-sm text-gray-900">{{ $rule->sector_type }}</td>
                                     <td class="px-4 py-3 text-sm font-mono text-gray-700">{{ $rule->hs_code }}</td>
                                     <td class="px-4 py-3 text-sm text-gray-700">{{ $rule->override_tax_rate !== null ? $rule->override_tax_rate . '%' : '-' }}</td>
@@ -119,8 +119,8 @@
             {{-- Province Rules Tab --}}
             @if($isSuperAdmin)
             <div x-show="activeTab === 'province'" x-cloak>
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-                    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
+                    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
                         <h3 class="text-lg font-semibold text-gray-800">Province Tax Rules</h3>
                         <button @click="openAdd('province')" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium text-sm hover:bg-emerald-700 transition">Add New</button>
                     </div>
@@ -140,7 +140,7 @@
                             </thead>
                             <tbody class="divide-y divide-gray-200">
                                 @forelse($provinceRules as $rule)
-                                <tr class="hover:bg-gray-50 {{ $loop->even ? 'bg-gray-50/50' : '' }}">
+                                <tr class="hover:bg-gray-50 {{ $loop->even ? 'bg-gray-50 dark:bg-gray-800' : '' }}">
                                     <td class="px-4 py-3 text-sm text-gray-900">{{ $rule->province }}</td>
                                     <td class="px-4 py-3 text-sm font-mono text-gray-700">{{ $rule->hs_code }}</td>
                                     <td class="px-4 py-3 text-sm text-gray-700">{{ $rule->override_tax_rate !== null ? $rule->override_tax_rate . '%' : '-' }}</td>
@@ -171,8 +171,8 @@
 
             {{-- Customer Rules Tab --}}
             <div x-show="activeTab === 'customer'" x-cloak>
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-                    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
+                    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
                         <h3 class="text-lg font-semibold text-gray-800">Customer Tax Rules</h3>
                         <button @click="openAdd('customer')" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium text-sm hover:bg-emerald-700 transition">Add New</button>
                     </div>
@@ -192,7 +192,7 @@
                             </thead>
                             <tbody class="divide-y divide-gray-200">
                                 @forelse($customerRules as $rule)
-                                <tr class="hover:bg-gray-50 {{ $loop->even ? 'bg-gray-50/50' : '' }}">
+                                <tr class="hover:bg-gray-50 {{ $loop->even ? 'bg-gray-50 dark:bg-gray-800' : '' }}">
                                     <td class="px-4 py-3 text-sm font-mono text-gray-900">{{ $rule->customer_ntn }}</td>
                                     <td class="px-4 py-3 text-sm font-mono text-gray-700">{{ $rule->hs_code }}</td>
                                     <td class="px-4 py-3 text-sm text-gray-700">{{ $rule->override_tax_rate !== null ? $rule->override_tax_rate . '%' : '-' }}</td>
@@ -223,8 +223,8 @@
             {{-- SRO Rules Tab --}}
             @if($isSuperAdmin)
             <div x-show="activeTab === 'sro'" x-cloak>
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-                    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
+                    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
                         <h3 class="text-lg font-semibold text-gray-800">Special SRO Rules</h3>
                         <button @click="openAdd('sro')" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium text-sm hover:bg-emerald-700 transition">Add New</button>
                     </div>
@@ -246,7 +246,7 @@
                             </thead>
                             <tbody class="divide-y divide-gray-200">
                                 @forelse($sroRules as $rule)
-                                <tr class="hover:bg-gray-50 {{ $loop->even ? 'bg-gray-50/50' : '' }}">
+                                <tr class="hover:bg-gray-50 {{ $loop->even ? 'bg-gray-50 dark:bg-gray-800' : '' }}">
                                     <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ $rule->sro_number }}</td>
                                     <td class="px-4 py-3 text-sm font-mono text-gray-700">{{ $rule->hs_code }}</td>
                                     <td class="px-4 py-3 text-sm text-gray-700">{{ $rule->schedule_type }}</td>
@@ -284,8 +284,8 @@
 
             {{-- Usage Logs Tab --}}
             <div x-show="activeTab === 'logs'" x-cloak>
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-                    <div class="px-6 py-4 border-b border-gray-100">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
+                    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
                         <h3 class="text-lg font-semibold text-gray-800">Override Usage Logs</h3>
                     </div>
                     <div class="overflow-x-auto">
@@ -303,7 +303,7 @@
                             </thead>
                             <tbody class="divide-y divide-gray-200">
                                 @forelse($usageLogs as $log)
-                                <tr class="hover:bg-gray-50 {{ $loop->even ? 'bg-gray-50/50' : '' }}">
+                                <tr class="hover:bg-gray-50 {{ $loop->even ? 'bg-gray-50 dark:bg-gray-800' : '' }}">
                                     <td class="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{{ $log->created_at->format('M d, Y H:i') }}</td>
                                     <td class="px-4 py-3 text-sm text-gray-900">{{ $log->company->name ?? 'N/A' }}</td>
                                     <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ $log->invoice->invoice_number ?? 'N/A' }}</td>

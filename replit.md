@@ -47,25 +47,26 @@ TaxNest is built on Laravel 12 with PHP 8.4, using Breeze for authentication. Th
 - **Custom Billing Plan Builder:** Admin-only dynamic pricing calculator with sliders for invoice limit, user count, branch count. Pricing formula: invoiceFactor=2.5, userFactor=500, branchFactor=1000 per month. Cycle discounts: quarterly 1%, semi-annual 3%, annual 6%. Creates PricingPlan and Subscription records.
 - **HS Usage Patterns Learning Engine:** `hs_usage_patterns` table tracks HS code patterns with confidence scoring (success*5 - rejection*10, cap 95%). Auto-records on FBR success/rejection via SendInvoiceToFbrJob. Only surfaces suggestions with admin_status='approved' and confidence >= 60%.
 - **Smart Invoice Memory Suggestions:** Community Pattern Suggestion panel on invoice create page. Fetches suggestions via `/api/hs-usage-suggestions/{hsCode}` when HS code entered. One-click apply for schedule_type, tax_rate, SRO, serial_no. Never exposes internal confidence metrics.
-- **Premium Enterprise Visual Standard (10-Phase UI Overhaul):**
-  - Phase 1+2: Global Design System with CSS variables (--primary-gradient, --card-radius, --glass-bg), glass effects (backdrop-blur-xl), fadeIn/scaleIn animations, premium-hover utilities, sidebar active state with gradient background and 3px emerald left border
-  - Phase 3: Dashboard KPI cards with gradient top borders (blue, emerald, purple, indigo, orange), gradient icon containers with shadow, premium-hover on all interactive cards
-  - Phase 4: Invoice sticky bottom summary bar (backdrop-blur-xl, Subtotal/Tax/WHT/Grand Total), section cards with animate-fade-in, input focus ring opacity
-  - Phase 5: PDF tri-color gradient header line, zebra striped tables, gradient QR badge, "Powered by TaxNest" footer
-  - Phase 6: PWA with cache-first service worker, install popup (auto-appears after 2s), offline badge, update banner
-  - Phase 7: Landing Page FAQ accordion (6 items, Alpine.js x-collapse), Custom Plan CTA button, FAQ nav link
-  - Phase 8-10: Billing pages premium card styling with gradient top accents, rounded-2xl, animate-fade-in
+- **Enterprise Simplified Premium Mode (9-Phase UI Overhaul):**
+  - Clean solid backgrounds on all internal pages (no glass on tables/forms/settings)
+  - Glass effects retained ONLY for: sidebar, landing page, login/register pages
+  - KPI cards with simple border-t-2 color accents, gray icon containers
+  - Zebra-striped tables, clean white cards with shadow-sm
+  - PWA install popup shows once per user (localStorage check)
+  - PDF: tri-color gradient header, zebra tables, gradient QR badge
 
 ## UI Architecture Notes
-- **Layout**: Universal slide-out drawer sidebar (NO CSS media queries for sidebar visibility). Sidebar uses CSS transform translateX(-100%)/translateX(0) controlled by JavaScript toggleSidebar()/closeSidebar(). Content always full width (no ml-64). Hamburger menu always visible in header.
-- **Sidebar Drawer**: `.sidebar-drawer` class with position fixed, z-50, w-272px, transform transition. `.sidebar-overlay` backdrop for click-to-close. No `lg:` breakpoint dependencies.
-- **Glass Effects**: bg-white/90 backdrop-blur-xl on header, border opacity /60 and /50
-- **Design Tokens**: --primary-gradient (sky-indigo), --card-radius (16px), --card-shadow, --glass-bg, --hover-lift (translateY(-2px))
-- **Animations**: fadeIn (translateY 6px), scaleIn (scale 0.97), premium-hover (lift+shadow), btn-premium (scale hover/active)
-- **Sticky Summary**: Fixed bottom (left-0), backdrop-blur-xl, financial summary + submit
-- **PDF Premium**: Gradient header (green-indigo-blue), zebra stripes, gradient QR badge
-- **PWA**: Install popup (bottom-right), offline badge (top-center amber), update banner (top-center indigo)
-- **IMPORTANT**: Never use `lg:ml-64`, `lg:left-64`, `hidden lg:flex` for sidebar. Sidebar is always a JavaScript-controlled drawer overlay.
+- **Layout**: Responsive sidebar — fixed visible on desktop (lg+), slide-in drawer on mobile (<lg). Body uses `h-screen overflow-hidden` for single scroll container.
+- **Sidebar**: `fixed left-0 top-0 w-64 h-full`, uses `-translate-x-full lg:translate-x-0` for responsive behavior. Close button has `lg:hidden`. Solid `bg-white dark:bg-gray-900`.
+- **Content Wrapper**: `lg:ml-64 flex flex-col h-full w-full` — offset on desktop, full width on mobile.
+- **Header**: `sticky top-0 z-30 bg-white dark:bg-gray-900 border-b`. Solid background, no backdrop-blur. Hamburger button has `lg:hidden`.
+- **Main Content**: `flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50 dark:bg-gray-950` — only scrollable area.
+- **Standard Card Pattern**: `bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800`
+- **Standard Table**: `bg-gray-50 dark:bg-gray-800` header, `even:bg-gray-50/50` zebra rows, `hover:bg-gray-100` hover
+- **Design Tokens**: `--card-radius: 12px`, `--card-shadow: subtle`. Minimal animations (fadeIn 4px, premium-hover translateY -1px).
+- **Colors**: Primary emerald-600, Accent indigo-500, Danger red-500, Warning amber-500. No multi-gradient headers.
+- **PWA**: Install popup (bottom-right, shows once via localStorage), offline badge (bottom-left small pill), update banner (full-width top bar).
+- **Mobile**: Hamburger opens sidebar drawer. Overlay click closes it. Tables have overflow-x-auto. Invoice sticky summary functional on all sizes.
 
 ## External Dependencies
 - **PostgreSQL:** Primary database.

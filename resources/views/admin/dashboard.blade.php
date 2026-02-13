@@ -24,7 +24,7 @@
             @endif
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm font-medium text-gray-500">Companies</p>
@@ -37,7 +37,7 @@
                     <p class="mt-2 text-sm text-gray-500">{{ $activeSubscriptions }} active subscriptions</p>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm font-medium text-gray-500">Users</p>
@@ -49,7 +49,7 @@
                     </div>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm font-medium text-gray-500">Total Invoices</p>
@@ -68,7 +68,7 @@
                     </div>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm font-medium text-gray-500">Total Revenue</p>
@@ -85,14 +85,14 @@
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-                    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
+                    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
                         <h3 class="text-lg font-semibold text-gray-800">Recent Companies</h3>
                         <a href="/admin/companies" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View All</a>
                     </div>
                     <div class="p-6">
                         @forelse($recentCompanies as $company)
-                        <div class="flex items-center justify-between py-3 {{ !$loop->last ? 'border-b border-gray-100' : '' }}">
+                        <div class="flex items-center justify-between py-3 {{ !$loop->last ? 'border-b border-gray-200 dark:border-gray-800' : '' }}">
                             <div>
                                 <p class="font-medium text-gray-900">{{ $company->name }}</p>
                                 <p class="text-sm text-gray-500">NTN: {{ $company->ntn }}</p>
@@ -108,8 +108,8 @@
                     </div>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-                    <div class="px-6 py-4 border-b border-gray-100">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
+                    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
                         <h3 class="text-lg font-semibold text-gray-800">Recent Invoices (All Companies)</h3>
                     </div>
                     <div class="overflow-x-auto">
@@ -269,18 +269,18 @@
             </div>
             @endif
 
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-8">
+            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 mb-8">
                 <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2 mb-6">
                     <svg class="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                     <span>Platform Risk Intelligence</span>
                 </h3>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                    <div class="rounded-xl p-4 {{ $platformAuditStats['total_anomalies'] > 0 ? 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800' : 'bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600' }}">
+                    <div class="rounded-xl p-4 {{ $platformAuditStats['total_anomalies'] > 0 ? 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800' : 'bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600' }}">
                         <p class="text-sm font-medium {{ $platformAuditStats['total_anomalies'] > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400' }}">Active Anomalies</p>
                         <p class="text-3xl font-bold mt-1 {{ $platformAuditStats['total_anomalies'] > 0 ? 'text-red-700 dark:text-red-300' : 'text-gray-900 dark:text-gray-100' }}">{{ $platformAuditStats['total_anomalies'] }}</p>
                     </div>
-                    <div class="rounded-xl p-4 {{ $platformAuditStats['high_risk_companies'] > 0 ? 'bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800' : 'bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600' }}">
+                    <div class="rounded-xl p-4 {{ $platformAuditStats['high_risk_companies'] > 0 ? 'bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800' : 'bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600' }}">
                         <p class="text-sm font-medium {{ $platformAuditStats['high_risk_companies'] > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-gray-500 dark:text-gray-400' }}">High Risk Companies</p>
                         <p class="text-3xl font-bold mt-1 {{ $platformAuditStats['high_risk_companies'] > 0 ? 'text-orange-700 dark:text-orange-300' : 'text-gray-900 dark:text-gray-100' }}">{{ $platformAuditStats['high_risk_companies'] }}</p>
                     </div>
@@ -288,7 +288,7 @@
                         <p class="text-sm font-medium {{ $platformAuditStats['avg_compliance'] >= 70 ? 'text-green-600 dark:text-green-400' : ($platformAuditStats['avg_compliance'] >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') }}">Avg Compliance</p>
                         <p class="text-3xl font-bold mt-1 {{ $platformAuditStats['avg_compliance'] >= 70 ? 'text-green-700 dark:text-green-300' : ($platformAuditStats['avg_compliance'] >= 40 ? 'text-amber-700 dark:text-amber-300' : 'text-red-700 dark:text-red-300') }}">{{ $platformAuditStats['avg_compliance'] }}%</p>
                     </div>
-                    <div class="rounded-xl p-4 {{ $platformAuditStats['total_vendor_risks'] > 0 ? 'bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800' : 'bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600' }}">
+                    <div class="rounded-xl p-4 {{ $platformAuditStats['total_vendor_risks'] > 0 ? 'bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800' : 'bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600' }}">
                         <p class="text-sm font-medium {{ $platformAuditStats['total_vendor_risks'] > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400' }}">Vendor Alerts</p>
                         <p class="text-3xl font-bold mt-1 {{ $platformAuditStats['total_vendor_risks'] > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-gray-900 dark:text-gray-100' }}">{{ $platformAuditStats['total_vendor_risks'] }}</p>
                     </div>
@@ -298,8 +298,8 @@
                 <div class="mb-6">
                     <h4 class="text-md font-semibold text-gray-700 dark:text-gray-300 mb-3">Companies at Risk</h4>
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead class="bg-gray-50 dark:bg-gray-700">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                            <thead class="bg-gray-50 dark:bg-gray-800">
                                 <tr>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Company Name</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">NTN</th>
@@ -307,9 +307,9 @@
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Risk Level</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                            <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
                                 @foreach($atRiskCompanies as $riskCompany)
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800">
                                     <td class="px-4 py-3 text-sm">
                                         <a href="/admin/companies/{{ $riskCompany->id }}" class="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">{{ $riskCompany->name }}</a>
                                     </td>

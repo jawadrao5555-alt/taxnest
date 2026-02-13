@@ -1,0 +1,165 @@
+You are upgrading the UI to Enterprise Simplified Premium Mode.
+
+Do NOT modify business logic.
+Do NOT modify controllers.
+Do NOT modify routes.
+CSS + Layout + Blade structure only.
+
+========================================
+PHASE 1 – REMOVE OVER-GLASS EFFECT
+========================================
+
+1. Keep glass effect ONLY for:
+   - Sidebar
+   - Top header
+   - KPI cards
+   - Charts container
+
+2. Remove glass from:
+   - Tables
+   - Form sections
+   - Billing page
+   - Customers/products pages
+   - Settings pages
+
+Replace with:
+   bg-white dark:bg-gray-900
+   rounded-xl
+   shadow-sm
+
+No heavy backdrop blur on tables.
+
+========================================
+PHASE 2 – ENTERPRISE DASHBOARD SIMPLIFICATION
+========================================
+
+Company Dashboard:
+
+- 4 KPI cards only (no extra gradients)
+- Clean icon container (soft gray bg)
+- Charts in simple white card
+- Remove excessive glow/shadow
+
+Admin Dashboard:
+
+- Keep heatmap
+- Keep risk intelligence
+- Remove animation-heavy effects
+- Structured grid layout (2 column)
+
+========================================
+PHASE 3 – LAYOUT STABILITY FIX
+========================================
+
+Ensure final layout structure:
+
+<body class="h-screen overflow-hidden">
+<div class="flex h-full">
+
+Sidebar:
+fixed left-0 top-0 w-64 h-full overflow-y-auto z-40
+
+Content wrapper:
+ml-64 flex flex-col h-full w-full
+
+Header:
+sticky top-0 z-30 bg-white dark:bg-gray-900 border-b
+
+Main content:
+flex-1 overflow-y-auto p-6
+
+Ensure:
+- No nested scroll containers
+- No double scrollbars
+- No overlap with sidebar
+- Mobile responsive collapse
+
+========================================
+PHASE 4 – MOBILE OPTIMIZATION
+========================================
+
+1. Sidebar becomes slide-in drawer below lg breakpoint
+2. Add hamburger toggle
+3. Sticky invoice summary:
+   - Only visible on desktop
+   - On mobile move above submit button
+
+4. Tables:
+   - overflow-x-auto
+   - Sticky header removed on mobile
+
+========================================
+PHASE 5 – PREMIUM BUT CLEAN DESIGN TOKENS
+========================================
+
+Use only:
+
+Primary color: Emerald-600
+Accent: Indigo-500
+Danger: Red-500
+Warning: Amber-500
+
+Remove multi-gradient headers.
+Keep minimal top border accent only.
+
+========================================
+PHASE 6 – PWA IMPROVEMENT
+========================================
+
+1. Install popup:
+   - Show only once per user
+   - Do not auto-show every login
+   - Small bottom card style
+
+2. Offline badge:
+   - Small corner indicator
+   - Not blocking content
+
+3. Update banner:
+   - Fixed top slim bar
+   - With refresh button
+
+========================================
+PHASE 7 – PROFESSIONAL INVOICE UI
+========================================
+
+Invoice Create:
+- White clean cards
+- Clear section headings
+- Minimal focus ring
+- Remove glow effects
+
+Invoice Table:
+- Zebra striping only
+- No blur
+
+========================================
+PHASE 8 – PERFORMANCE HARDENING
+========================================
+
+1. Remove unnecessary animation classes
+2. Remove heavy shadow-lg usage
+3. Reduce backdrop-blur usage
+4. Ensure Tailwind purge removes unused classes
+
+========================================
+PHASE 9 – FINAL QA CHECKLIST
+========================================
+
+Confirm:
+
+- No layout shift
+- No hidden dashboard
+- Sidebar fixed
+- Header sticky
+- Only main scroll
+- Mobile fully functional
+- All pages consistent spacing
+- No glass overuse
+- No performance lag
+
+Return summary with:
+- Screens updated
+- Classes modified
+- Mobile behavior confirmed
+- Performance improvement notes

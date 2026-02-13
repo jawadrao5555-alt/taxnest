@@ -8,7 +8,7 @@
             </div>
             <span class="text-lg font-bold text-gray-800 dark:text-white tracking-tight">TaxNest</span>
         </a>
-        <div class="mt-4 h-px bg-gradient-to-r from-emerald-500/40 via-teal-500/20 to-transparent"></div>
+        <div class="mt-4 h-px bg-gray-200 dark:bg-gray-700"></div>
     </div>
 
     <nav class="flex-1 overflow-y-auto sidebar-scroll px-3 py-3 space-y-0.5">
@@ -131,7 +131,7 @@
     </nav>
 
     <div class="flex-shrink-0 p-3">
-        <div class="rounded-xl bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm border border-gray-200/30 dark:border-gray-700/30 p-1" style="background-image: linear-gradient(135deg, rgba(16,185,129,0.03), rgba(20,184,166,0.03));">
+        <div class="rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-1">
             <a href="{{ route('profile.edit') }}" class="sidebar-link flex items-center gap-3 py-2.5 px-3 rounded-lg text-sm text-gray-600 dark:text-gray-400">
                 <span class="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 shadow-sm shadow-emerald-500/20">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</span>
                 <div class="min-w-0 flex-1">

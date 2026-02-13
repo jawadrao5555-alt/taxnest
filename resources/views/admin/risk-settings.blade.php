@@ -22,7 +22,7 @@
             </div>
             @endif
 
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                 <div class="mb-6">
                     <h3 class="text-lg font-semibold text-gray-800">Anomaly & Compliance Thresholds</h3>
                     <p class="text-sm text-gray-500 mt-1">Configure the risk detection parameters used by the compliance engine.</p>

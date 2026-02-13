@@ -15,18 +15,18 @@
                 </a>
             </div>
             <div class="flex gap-2 mb-6">
-                <a href="/invoices?tab=draft" class="px-4 py-2 rounded-lg text-sm font-medium transition {{ $tab === 'draft' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/25' : 'bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm text-gray-700 dark:text-gray-300 border border-white/30 dark:border-gray-700/30 hover:bg-white/80 dark:hover:bg-gray-800/80' }}">
+                <a href="/invoices?tab=draft" class="px-4 py-2 rounded-lg text-sm font-medium transition {{ $tab === 'draft' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700' }}">
                     Drafted Invoices
                     <span class="ml-1 px-2 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-800">{{ $draftCount }}</span>
                 </a>
-                <a href="/invoices?tab=completed" class="px-4 py-2 rounded-lg text-sm font-medium transition {{ $tab === 'completed' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/25' : 'bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm text-gray-700 dark:text-gray-300 border border-white/30 dark:border-gray-700/30 hover:bg-white/80 dark:hover:bg-gray-800/80' }}">
+                <a href="/invoices?tab=completed" class="px-4 py-2 rounded-lg text-sm font-medium transition {{ $tab === 'completed' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700' }}">
                     Completed Invoices
                     <span class="ml-1 px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-800">{{ $completedCount }}</span>
                 </a>
             </div>
             <div class="mb-6">
                 <form method="GET" action="/invoices" class="flex flex-col sm:flex-row gap-3">
-                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by invoice #, FBR #, customer name, or NTN..." class="flex-1 rounded-lg bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm border-gray-200/50 dark:border-gray-700/50 focus:border-emerald-400 focus:ring-emerald-400/20 text-sm">
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by invoice #, FBR #, customer name, or NTN..." class="flex-1 rounded-lg bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 focus:border-emerald-400 focus:ring-emerald-400 text-sm">
                     <input type="hidden" name="tab" value="{{ $tab }}">
                     <button type="submit" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">Search</button>
                     @if(request('search'))
@@ -34,10 +34,10 @@
                     @endif
                 </form>
             </div>
-            <div class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 overflow-hidden">
+            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead class="bg-gray-50/50 dark:bg-gray-900/30 backdrop-blur-sm sticky top-0 z-10">
+                        <thead class="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Invoice #</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
@@ -51,9 +51,9 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
-                        <tbody class="bg-transparent divide-y divide-gray-200">
+                        <tbody class="divide-y divide-gray-200">
                             @forelse($invoices as $invoice)
-                            <tr class="hover:bg-white/50 dark:hover:bg-gray-700/30 transition">
+                            <tr class="even:bg-gray-50/50 dark:even:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
                                 <td class="px-6 py-4 whitespace-nowrap">
     @if($invoice->fbr_invoice_number)
         <div class="text-sm font-semibold text-emerald-700">{{ $invoice->fbr_invoice_number }}</div>
@@ -136,7 +136,7 @@
                                         <div x-data="{ showWhtModal: false, pdfWhtRate: 0 }" class="inline-block">
                                             <button @click="showWhtModal = true" class="text-gray-600 hover:text-gray-800 font-medium">Download</button>
                                             <div x-show="showWhtModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background-color: rgba(0,0,0,0.4);">
-                                                <div @click.away="showWhtModal = false" class="bg-white/90 dark:bg-gray-800/90 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/40 dark:border-gray-700/30 p-6 w-80 max-w-[90vw]">
+                                                <div @click.away="showWhtModal = false" class="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800 p-6 w-80 max-w-[90vw]">
                                                     <div class="flex items-center justify-between mb-4">
                                                         <p class="text-base font-bold text-gray-800">Withholding Tax Rate</p>
                                                         <button @click="showWhtModal = false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>

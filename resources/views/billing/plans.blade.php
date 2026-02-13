@@ -7,7 +7,7 @@
 
             @if($currentSubscription && $usageData)
                 @if($usageData['trial'] && $usageData['trial']['is_trial'])
-                <div class="bg-blue-50/80 dark:bg-blue-900/20 backdrop-blur-sm border border-blue-200/60 dark:border-blue-700/40 rounded-xl p-6 mb-6">
+                <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl p-6 mb-6">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-3">
                             <svg class="w-8 h-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -19,7 +19,7 @@
                     </div>
                 </div>
                 @elseif($usageData['is_expired'])
-                <div class="bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border border-red-200/60 dark:border-red-700/40 rounded-xl p-6 mb-6">
+                <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-xl p-6 mb-6">
                     <div class="flex items-center space-x-3">
                         <svg class="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.268 16c-.77 1.333.192 3 1.732 3z"/></svg>
                         <div>
@@ -29,7 +29,7 @@
                     </div>
                 </div>
                 @elseif($usageData['is_expiring_soon'])
-                <div class="bg-yellow-50/80 dark:bg-yellow-900/20 backdrop-blur-sm border border-yellow-200/60 dark:border-yellow-700/40 rounded-xl p-6 mb-6">
+                <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-xl p-6 mb-6">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-3">
                             <svg class="w-8 h-8 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -42,7 +42,7 @@
                 </div>
                 @endif
 
-                <div class="premium-hover bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-6 mb-8 animate-fade-in">
+                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 mb-8">
                     <div class="flex items-center justify-between mb-4">
                         <div>
                             <h3 class="text-lg font-semibold text-gray-800">Current Plan: {{ $currentSubscription->pricingPlan->name }}</h3>
@@ -102,7 +102,7 @@
                 }
             }">
                 <div class="flex justify-center mb-8">
-                    <div class="inline-flex bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl p-1 border border-white/30 dark:border-gray-700/30">
+                    <div class="inline-flex bg-gray-100 dark:bg-gray-800 rounded-xl p-1 border border-gray-200 dark:border-gray-700">
                         @foreach($billingCycles as $key => $info)
                         <button @click="cycle = '{{ $key }}'"
                             :class="cycle === '{{ $key }}' ? 'bg-white dark:bg-gray-700 shadow-sm text-emerald-700 dark:text-emerald-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:text-gray-800'"
@@ -118,13 +118,13 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     @foreach($plans as $index => $plan)
-                    <div class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border-2 transition premium-hover relative
-                        {{ $plan->name === 'Business' ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-white/30 dark:border-gray-700/30' }}
+                    <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border-2 transition relative
+                        {{ $plan->name === 'Business' ? 'border-emerald-500 ring-2 ring-emerald-500' : 'border-gray-200 dark:border-gray-800' }}
                         {{ $currentSubscription && $currentSubscription->pricing_plan_id === $plan->id ? 'border-emerald-500' : '' }}">
 
                         @if($plan->name === 'Business')
                         <div class="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                            <span class="bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg shadow-emerald-500/20">MOST POPULAR</span>
+                            <span class="bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-sm">MOST POPULAR</span>
                         </div>
                         @endif
 
@@ -171,8 +171,8 @@
                                 @csrf
                                 <input type="hidden" name="plan_id" value="{{ $plan->id }}">
                                 <input type="hidden" name="billing_cycle" :value="cycle">
-                                <button type="submit" class="w-full py-2.5 rounded-lg font-semibold text-sm transition shadow-lg
-                                    {{ $plan->name === 'Business' ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-500/20' : 'bg-gray-900 text-white hover:bg-gray-800 shadow-black/10' }}">
+                                <button type="submit" class="w-full py-2.5 rounded-lg font-semibold text-sm transition shadow-sm
+                                    {{ $plan->name === 'Business' ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-900 text-white hover:bg-gray-800' }}">
                                     Subscribe
                                 </button>
                             </form>
@@ -188,7 +188,7 @@
 
                 @if(in_array(auth()->user()->role, ['super_admin', 'company_admin']))
                 <div class="mt-8">
-                    <a href="/billing/custom-plan" class="block bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-xl shadow-lg shadow-black/5 border-2 border-dashed border-emerald-300 dark:border-emerald-700 p-6 hover:border-emerald-500 dark:hover:border-emerald-500 transition group">
+                    <a href="/billing/custom-plan" class="block bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-xl shadow-sm border-2 border-dashed border-emerald-300 dark:border-emerald-700 p-6 hover:border-emerald-500 dark:hover:border-emerald-500 transition group">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center space-x-4">
                                 <div class="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/40 rounded-xl flex items-center justify-center group-hover:bg-emerald-200 dark:group-hover:bg-emerald-800/40 transition">
@@ -205,40 +205,40 @@
                 </div>
                 @endif
 
-                <div class="mt-8 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 overflow-hidden animate-fade-in">
-                    <div class="p-6 border-b border-white/30 dark:border-gray-700/30">
+                <div class="mt-8 bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+                    <div class="p-6 border-b border-gray-200 dark:border-gray-800">
                         <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">Feature Comparison</h3>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full">
                             <thead>
-                                <tr class="border-b border-gray-200/50 dark:border-gray-700/30 bg-gray-50/50 dark:bg-gray-900/30">
+                                <tr class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
                                     <th class="text-left py-3 px-4 text-sm font-medium text-gray-500 w-1/5">Feature</th>
                                     @foreach($plans as $plan)
                                     <th class="text-center py-3 px-4 text-sm font-bold text-gray-900 dark:text-gray-100">{{ $plan->name }}</th>
                                     @endforeach
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-gray-100/50 dark:divide-gray-700/30">
-                                <tr class="hover:bg-white/50 dark:hover:bg-gray-700/30 transition">
+                            <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
                                     <td class="py-3 px-4 text-sm text-gray-600">Monthly Price</td>
                                     @foreach($plans as $plan)
                                     <td class="py-3 px-4 text-center text-sm font-semibold">Rs. {{ number_format($plan->price) }}</td>
                                     @endforeach
                                 </tr>
-                                <tr class="bg-gray-50/30 dark:bg-gray-900/10 hover:bg-white/50 dark:hover:bg-gray-700/30 transition">
+                                <tr class="bg-gray-50 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
                                     <td class="py-3 px-4 text-sm text-gray-600">Invoices</td>
                                     @foreach($plans as $plan)
                                     <td class="py-3 px-4 text-center text-sm font-semibold">{{ $plan->getInvoiceLimitDisplay() }}</td>
                                     @endforeach
                                 </tr>
-                                <tr class="hover:bg-white/50 dark:hover:bg-gray-700/30 transition">
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
                                     <td class="py-3 px-4 text-sm text-gray-600">Users</td>
                                     @foreach($plans as $plan)
                                     <td class="py-3 px-4 text-center text-sm font-semibold">{{ $plan->getUserLimitDisplay() }}</td>
                                     @endforeach
                                 </tr>
-                                <tr class="bg-gray-50/30 dark:bg-gray-900/10 hover:bg-white/50 dark:hover:bg-gray-700/30 transition">
+                                <tr class="bg-gray-50 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
                                     <td class="py-3 px-4 text-sm text-gray-600">Branches</td>
                                     @foreach($plans as $plan)
                                     <td class="py-3 px-4 text-center text-sm font-semibold">{{ $plan->getBranchLimitDisplay() }}</td>
@@ -257,7 +257,7 @@
                                 ];
                                 @endphp
                                 @foreach($features as $feature => $availability)
-                                <tr class="{{ $loop->even ? 'bg-gray-50/30 dark:bg-gray-900/10' : '' }} hover:bg-white/50 dark:hover:bg-gray-700/30 transition">
+                                <tr class="{{ $loop->even ? 'bg-gray-50 dark:bg-gray-800' : '' }} hover:bg-gray-50 dark:hover:bg-gray-800 transition">
                                     <td class="py-3 px-4 text-sm text-gray-600">{{ $feature }}</td>
                                     @foreach($availability as $avail)
                                     <td class="py-3 px-4 text-center">

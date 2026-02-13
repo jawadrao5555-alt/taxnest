@@ -155,7 +155,7 @@
                         WHT {{ ($invoice->wht_rate ?? 0) > 0 ? number_format($invoice->wht_rate, 1) . '%' : 'Set' }}
                     </button>
                     <div x-show="showWhtModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background-color: rgba(0,0,0,0.4);">
-                        <div @click.away="showWhtModal = false" class="bg-white rounded-2xl shadow-2xl border border-gray-200 p-6 w-96 max-w-[90vw]">
+                        <div @click.away="showWhtModal = false" class="bg-white rounded-xl shadow-2xl border border-gray-200 p-6 w-96 max-w-[90vw]">
                             <div class="flex items-center justify-between mb-4">
                                 <p class="text-base font-bold text-gray-800">Withholding Tax Rate</p>
                                 <button @click="showWhtModal = false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
@@ -301,7 +301,7 @@
                 </div>
             </div>
             @endif
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-8">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-8">
                 <div class="p-6 border-b border-gray-100">
                     <div class="flex items-center justify-between mb-6">
                         <div>

@@ -21,13 +21,13 @@
                 @csrf
 
                 @if(session('error'))
-                <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-2xl p-4">
+                <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-xl p-4">
                     <p class="text-sm text-red-700 dark:text-red-400">{{ session('error') }}</p>
                 </div>
                 @endif
 
                 @if($errors->any())
-                <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-2xl p-4">
+                <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-xl p-4">
                     <ul class="list-disc list-inside text-sm text-red-700 dark:text-red-400">
                         @foreach($errors->all() as $error)
                         <li>{{ $error }}</li>
@@ -37,11 +37,11 @@
                 @endif
 
                 @if(isset($branches) && $branches->count() > 0)
-                <div class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-6 animate-fade-in">
+                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Branch</h3>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Branch (Optional)</label>
-                        <select name="branch_id" class="w-full rounded-lg bg-white/50 dark:bg-gray-700/50 border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
+                        <select name="branch_id" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             <option value="">— Select Branch —</option>
                             @foreach($branches as $branch)
                             <option value="{{ $branch->id }}" {{ old('branch_id') == $branch->id ? 'selected' : '' }}>
@@ -54,12 +54,12 @@
                 </div>
                 @endif
 
-                <div class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-6 animate-fade-in">
+                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Document Information</h3>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Document Type</label>
-                            <select name="document_type" x-model="document_type" @change="onDocTypeChange()" class="w-full rounded-lg bg-white/50 dark:bg-gray-700/50 border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
+                            <select name="document_type" x-model="document_type" @change="onDocTypeChange()" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 <option value="Sale Invoice">Sale Invoice</option>
                                 <option value="Credit Note">Credit Note</option>
                                 <option value="Debit Note">Debit Note</option>
@@ -79,7 +79,7 @@
                     </div>
                 </div>
 
-                <div class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-6 animate-fade-in">
+                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Buyer Information</h3>
 
                     <div class="mb-4">
@@ -106,13 +106,13 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer Name *</label>
                             <input type="text" name="buyer_name" x-model="buyer_name" value="{{ old('buyer_name') }}" required autofocus
-                                class="w-full rounded-lg bg-white/50 dark:bg-gray-700/50 border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             @error('buyer_name') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer NTN</label>
                             <input type="text" name="buyer_ntn" x-model="buyer_ntn" value="{{ old('buyer_ntn') }}" placeholder="Optional for unregistered"
-                                class="w-full rounded-lg bg-white/50 dark:bg-gray-700/50 border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             @error('buyer_ntn') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                             <p class="text-xs mt-1" :class="buyerRegType === 'Registered' ? 'text-green-600' : 'text-gray-400'" x-text="'Registration: ' + buyerRegType"></p>
                         </div>
@@ -121,7 +121,7 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer CNIC</label>
                             <input type="text" name="buyer_cnic" x-model="buyer_cnic" value="{{ old('buyer_cnic') }}" maxlength="15" placeholder="xxxxx-xxxxxxx-x"
-                                class="w-full rounded-lg bg-white/50 dark:bg-gray-700/50 border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             @error('buyer_cnic') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                     </div>
@@ -129,12 +129,12 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer Address *</label>
                             <textarea name="buyer_address" x-model="buyer_address" required rows="2"
-                                class="w-full rounded-lg bg-white/50 dark:bg-gray-700/50 border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">{{ old('buyer_address') }}</textarea>
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">{{ old('buyer_address') }}</textarea>
                             @error('buyer_address') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Destination Province *</label>
-                            <select name="destination_province" x-model="destination_province" required class="w-full rounded-lg bg-white/50 dark:bg-gray-700/50 border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500/50 focus:border-emerald-500">
+                            <select name="destination_province" x-model="destination_province" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 @foreach($provinces as $prov)
                                 <option value="{{ $prov }}" {{ old('destination_province', 'Punjab') === $prov ? 'selected' : '' }}>{{ $prov }}</option>
                                 @endforeach
@@ -144,7 +144,7 @@
                     </div>
                 </div>
 
-                <div class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-6 animate-fade-in">
+                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Invoice Items</h3>
                         <button type="button" @click="addItem()" class="inline-flex items-center px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-100 transition">
@@ -344,7 +344,7 @@
                         </div>
                     </template>
 
-                    <div class="mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg space-y-2">
+                    <div class="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-2">
                         <div class="flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
                             <span>Value Excl. ST</span>
                             <span class="font-medium" x-text="'Rs. ' + totalExclST()"></span>
@@ -360,7 +360,7 @@
                     </div>
                 </div>
 
-                <div class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-6 animate-fade-in">
+                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Live Compliance Check</h3>
                         <button type="button" @click="checkCompliance()" :disabled="complianceLoading" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-50">
@@ -402,7 +402,7 @@
                     <p x-show="!complianceResult && !complianceLoading" class="text-sm text-gray-400 dark:text-gray-500">Click "Check Compliance" to preview compliance status before submitting.</p>
                 </div>
 
-                <div class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg shadow-black/5 border border-white/30 dark:border-gray-700/30 p-6">
+                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Rejection Probability</h3>
                         <button type="button" @click="checkRejectionProbability()" :disabled="rejectionLoading" class="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 transition disabled:opacity-50">
@@ -453,7 +453,7 @@
                     </button>
                 </div>
 
-                <div class="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border-t border-gray-200 dark:border-gray-700 z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+                <div class="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 z-30 shadow-sm">
                     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center space-x-6 text-sm">
@@ -474,7 +474,7 @@
                                     <p class="text-lg font-extrabold text-gray-900 dark:text-white" x-text="'Rs. ' + Number(grandTotal || 0).toLocaleString()"></p>
                                 </div>
                             </div>
-                            <button type="submit" class="btn-premium inline-flex items-center px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-500/25 transition">
+                            <button type="submit" class="inline-flex items-center px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 shadow-sm transition">
                                 <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                 Save Invoice
                             </button>
@@ -486,7 +486,7 @@
     </div>
 
     <div x-data="{ get form() { return Alpine.$data(document.querySelector('form[x-data]')) } }"
-         class="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700 shadow-lg">
+         class="fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-sm">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
             <div class="flex flex-wrap items-center justify-between gap-3 text-sm">
                 <div class="flex items-center space-x-6">
@@ -895,7 +895,7 @@
         <div x-show="isOpen" class="fixed inset-0 z-50 overflow-hidden" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
             <div class="absolute inset-0 bg-black/50" @click="isOpen = false"></div>
             <div class="absolute inset-y-0 right-0 max-w-xl w-full" x-show="isOpen" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full">
-                <div class="h-full bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl shadow-xl flex flex-col">
+                <div class="h-full bg-white dark:bg-gray-900 shadow-xl flex flex-col">
                     <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-emerald-50 dark:bg-emerald-900/20">
                         <div>
                             <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100">SRO & Serial Reference</h3>

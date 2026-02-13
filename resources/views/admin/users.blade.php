@@ -10,7 +10,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
             <div id="addUserModal" class="hidden mb-6">
-                <form method="POST" action="/admin/users" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <form method="POST" action="/admin/users" class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     @csrf
                     <h3 class="text-lg font-semibold text-gray-800 mb-4">Add New User</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -51,7 +51,7 @@
                 </form>
             </div>
 
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
                 <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
@@ -86,7 +86,7 @@
                 </table>
                 </div>
                 @if($users->hasPages())
-                <div class="px-6 py-4 border-t border-gray-100">{{ $users->links() }}</div>
+                <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-800">{{ $users->links() }}</div>
                 @endif
             </div>
         </div>

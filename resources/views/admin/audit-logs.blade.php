@@ -9,7 +9,7 @@
     <div class="py-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-4 mb-6">
                 <form method="GET" action="{{ route('admin.audit-logs') }}" class="flex items-center gap-4">
                     <div>
                         <label class="text-xs font-medium text-gray-500 uppercase tracking-wider">Filter by Action</label>
@@ -29,7 +29,7 @@
                 </form>
             </div>
 
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
                 <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
@@ -69,7 +69,7 @@
                 </div>
 
                 @if($logs->hasPages())
-                <div class="px-6 py-4 border-t border-gray-100">
+                <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-800">
                     {{ $logs->links() }}
                 </div>
                 @endif

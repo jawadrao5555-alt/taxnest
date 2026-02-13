@@ -1,8 +1,24 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Edit Invoice {{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? '#' . $invoice->id }}</h2>
-            <a href="/invoice/{{ $invoice->id }}" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">Back to Invoice</a>
+            <div>
+                <nav class="flex items-center text-xs text-gray-400 mb-1">
+                    <a href="{{ route('dashboard') }}" class="hover:text-emerald-600 transition">Dashboard</a>
+                    <svg class="w-3.5 h-3.5 mx-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <a href="/invoices" class="hover:text-emerald-600 transition">Invoices</a>
+                    <svg class="w-3.5 h-3.5 mx-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <a href="/invoice/{{ $invoice->id }}" class="hover:text-emerald-600 transition">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? '#' . $invoice->id }}</a>
+                    <svg class="w-3.5 h-3.5 mx-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <span class="text-gray-600 dark:text-gray-300 font-medium">Edit</span>
+                </nav>
+                <div class="flex items-center space-x-3">
+                    <a href="/invoice/{{ $invoice->id }}" class="inline-flex items-center text-gray-500 hover:text-emerald-600 transition text-sm">
+                        <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                        Back to Invoice
+                    </a>
+                    <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Edit Invoice {{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? '#' . $invoice->id }}</h2>
+                </div>
+            </div>
         </div>
     </x-slot>
 

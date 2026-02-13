@@ -1,12 +1,21 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div class="flex items-center space-x-3">
-                <a href="/invoice" class="inline-flex items-center text-gray-500 hover:text-gray-700 transition">
-                    <svg class="w-5 h-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                    Back
-                </a>
-                <h2 class="font-bold text-xl text-gray-800 leading-tight">Invoice {{ $invoice->display_invoice_number }}</h2>
+            <div>
+                <nav class="flex items-center text-xs text-gray-400 mb-1">
+                    <a href="{{ route('dashboard') }}" class="hover:text-emerald-600 transition">Dashboard</a>
+                    <svg class="w-3.5 h-3.5 mx-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <a href="/invoices?tab={{ $invoice->status === 'draft' || $invoice->status === 'submitted' ? 'draft' : 'completed' }}" class="hover:text-emerald-600 transition">Invoices</a>
+                    <svg class="w-3.5 h-3.5 mx-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <span class="text-gray-600 dark:text-gray-300 font-medium">{{ $invoice->display_invoice_number }}</span>
+                </nav>
+                <div class="flex items-center space-x-3">
+                    <a href="/invoices?tab={{ $invoice->status === 'draft' || $invoice->status === 'submitted' ? 'draft' : 'completed' }}" class="inline-flex items-center text-gray-500 hover:text-emerald-600 transition text-sm">
+                        <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                        Back to Invoices
+                    </a>
+                    <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Invoice {{ $invoice->display_invoice_number }}</h2>
+                </div>
             </div>
             <div class="flex items-center flex-wrap gap-2">
                 @if($invoice->status === 'draft')
@@ -197,7 +206,6 @@
                 <a href="https://wa.me/?text={{ urlencode('Invoice ' . $invoice->display_invoice_number . ': ' . url('/share/invoice/' . $invoice->share_uuid)) }}" target="_blank" class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition">WhatsApp</a>
                 <button onclick="navigator.clipboard.writeText('{{ url('/share/invoice/' . $invoice->share_uuid) }}').then(() => { this.textContent = 'Copied!'; setTimeout(() => { this.textContent = 'Copy Link'; }, 2000); })" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">Copy Link</button>
                 @endif
-                <a href="/invoices" class="text-sm text-gray-600 hover:text-gray-800">Back</a>
             </div>
         </div>
     </x-slot>

@@ -93,13 +93,11 @@
         </tfoot>
     </table>
 
-    @if($invoice->status === 'locked')
+    @if($invoice->fbr_invoice_number)
     <div style="text-align: center; margin-bottom: 15px; padding: 10px; background: #f0fdf4; border: 2px solid #10b981; border-radius: 8px;">
         <div style="font-size: 20px; font-weight: bold; color: #065f46; letter-spacing: 2px;">FBR VERIFIED INVOICE</div>
         <p style="margin: 4px 0 0 0; font-size: 13px; color: #047857;">Federal Board of Revenue — Government of Pakistan</p>
-        @if($invoice->fbr_invoice_id)
-        <p style="margin: 8px 0 0 0; font-size: 14px; font-weight: bold; color: #065f46;">FBR Invoice #: {{ $invoice->fbr_invoice_id }}</p>
-        @endif
+        <p style="margin: 8px 0 0 0; font-size: 14px; font-weight: bold; color: #065f46;">FBR Invoice #: {{ $invoice->fbr_invoice_number }}</p>
     </div>
     @endif
 

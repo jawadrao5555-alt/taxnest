@@ -68,7 +68,7 @@
 <body>
     <div class="page">
 
-        @if($invoice->status === 'locked' && $invoice->fbr_invoice_id)
+        @if($invoice->fbr_invoice_number)
         <div class="fbr-header">
             <table style="width: 100%;">
                 <tr>

@@ -93,7 +93,10 @@
         <div class="fbr-section">
             <table style="width: auto; margin: 0 auto; border-collapse: collapse;">
                 <tr>
-                    <td style="text-align: center; vertical-align: middle; padding: 0 20px 0 0;">
+                    <td style="text-align: center; vertical-align: middle; padding: 0 16px 0 0;">
+                        @if(!empty($fbrLogoBase64))
+                        <img src="{{ $fbrLogoBase64 }}" alt="FBR Digital Invoicing System" style="width: 85px; height: auto;">
+                        @else
                         <div class="fbr-logo-box">
                             <div class="fbr-shield">FBR</div>
                             <div class="fbr-label">
@@ -101,9 +104,10 @@
                                 <div class="fbr-label-invoicing">INVOICING SYSTEM</div>
                             </div>
                         </div>
+                        @endif
                     </td>
-                    <td style="text-align: center; vertical-align: middle; padding: 0 0 0 20px;">
-                        <img src="{{ $qrBase64 }}" alt="QR Code" style="width: 80px; height: 80px;">
+                    <td style="text-align: center; vertical-align: middle; padding: 0 0 0 16px;">
+                        <img src="{{ $qrBase64 }}" alt="QR Code" style="width: 85px; height: 85px;">
                     </td>
                 </tr>
             </table>

@@ -711,6 +711,83 @@ class InvoiceController extends Controller
         return redirect('/invoice/' . $invoice->id)->with('success', 'Invoice resubmitted to FBR. You will be notified of the result.');
     }
 
+    public function resubmitToFbr(Request $request, Invoice $invoice)
+    {
+        $user = auth()->user();
+        if (!in_array($user->role, ['company_admin', 'super_admin'])) {
+            abort(403);
+        }
+
+        if ($user->role !== 'super_admin') {
+            $companyId = app('currentCompanyId');
+            if ($invoice->company_id !== $companyId) {
+                abort(403);
+            }
+        }
+
+        if (!in_array($invoice->status, ['locked', 'failed', 'submitted'])) {
+            return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice must be locked, submitted, or failed to resubmit.');
+        }
+
+        $invoice->load('items', 'company');
+        $company = $invoice->company;
+
+        $fbrService = new \App\Services\FbrService();
+        $response = $fbrService->submitInvoice($invoice, 0);
+
+        if ($response['status'] === 'success') {
+            $fbrNum = $response['fbr_invoice_number'] ?? null;
+            if ($fbrNum) {
+                $invoice->fbr_invoice_number = $fbrNum;
+                $invoice->fbr_invoice_id = $fbrNum;
+                $invoice->fbr_submission_date = now();
+            }
+            $invoice->status = 'locked';
+            $invoice->fbr_status = 'success';
+            $invoice->integrity_hash = \App\Services\IntegrityHashService::generate($invoice);
+            $invoice->qr_data = json_encode([
+                'ntn' => $company->ntn ?? '',
+                'invoice_number' => $invoice->internal_invoice_number ?? $invoice->invoice_number,
+                'fbr_invoice_id' => $fbrNum ?? $invoice->invoice_number,
+                'date' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
+                'total' => $invoice->total_amount,
+            ]);
+            $invoice->save();
+
+            $company->update(['last_successful_submission' => now()]);
+
+            InvoiceActivityService::log($invoice->id, $invoice->company_id, 'resubmitted_success', [
+                'fbr_invoice_number' => $fbrNum,
+                'environment' => $company->fbr_environment,
+                'resubmitted_by' => $user->name,
+            ], request()->ip());
+
+            AuditLogService::log('invoice_resubmitted', 'Invoice', $invoice->id, null, [
+                'fbr_invoice_number' => $fbrNum,
+                'environment' => $company->fbr_environment,
+            ]);
+
+            \App\Services\ComplianceScoreService::recalculate($invoice->company_id);
+
+            return redirect('/invoice/' . $invoice->id)->with('success', 'FBR submission successful! Invoice Number: ' . $fbrNum);
+        }
+
+        $errors = $response['errors'] ?? [];
+        $failureType = $response['failure_type'] ?? 'unknown';
+        $errorMsg = 'FBR submission failed (' . $failureType . ')';
+        if (!empty($errors)) {
+            $errorMsg .= ': ' . implode(' | ', array_slice($errors, 0, 5));
+        }
+
+        InvoiceActivityService::log($invoice->id, $invoice->company_id, 'resubmit_failed', [
+            'failure_type' => $failureType,
+            'errors' => $errors,
+            'environment' => $company->fbr_environment,
+        ], request()->ip());
+
+        return redirect('/invoice/' . $invoice->id)->with('error', $errorMsg);
+    }
+
     public function verifyIntegrity(Invoice $invoice)
     {
         $companyId = app('currentCompanyId');

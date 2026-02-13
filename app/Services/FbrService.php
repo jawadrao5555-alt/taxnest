@@ -19,11 +19,6 @@ class FbrService
         $company = $invoice->company;
         $env = $company->fbr_environment ?? 'sandbox';
 
-        $docTypeMap = [
-            'Sale Invoice' => 1,
-            'Debit Note' => 4,
-            'Credit Note' => 3,
-        ];
         $invoiceType = $invoice->document_type ?? "Sale Invoice";
 
         $items = [];
@@ -70,21 +65,21 @@ class FbrService
             }
 
             $itemPayload = [
-                "hsCode" => $item->hs_code ?? "",
-                "productDescription" => $item->description ?? "",
-                "rate" => $rateStr,
                 "uoM" => $this->normalizeUom($item->default_uom),
-                "quantity" => $quantity,
-                "totalValues" => $totalValues,
-                "valueSalesExcludingST" => $valueSalesExcludingST,
-                "fixedNotifiedValueOrRetailPrice" => $is3rdSchedule ? $retailPrice : $retailPrice,
-                "salesTaxApplicable" => $salesTaxApplicable,
-                "salesTaxWithheldAtSource" => round($item->st_withheld_at_source ? floatval($item->st_withheld_at_source) : 0.00, 2),
+                "rate" => $rateStr,
+                "hsCode" => $item->hs_code ?? "",
+                "discount" => round($discount, 2),
                 "extraTax" => $extraTaxVal,
-                "furtherTax" => $furtherTax,
-                "fedPayable" => $fedPayable,
-                "discount" => $discount,
+                "quantity" => round($quantity, 4),
                 "saleType" => $saleTypeNormalized,
+                "fedPayable" => round($fedPayable, 2),
+                "furtherTax" => round($furtherTax, 2),
+                "totalValues" => round($totalValues, 2),
+                "productDescription" => $item->description ?? "",
+                "salesTaxApplicable" => round($salesTaxApplicable, 2),
+                "valueSalesExcludingST" => round($valueSalesExcludingST, 2),
+                "salesTaxWithheldAtSource" => round($item->st_withheld_at_source ? floatval($item->st_withheld_at_source) : 0.00, 2),
+                "fixedNotifiedValueOrRetailPrice" => round($is3rdSchedule ? $retailPrice : $retailPrice, 2),
             ];
 
             $needsSro = ($is3rdSchedule && $taxRate < 18) || $isExempt || $isReduced;
@@ -100,20 +95,27 @@ class FbrService
             $items[] = $itemPayload;
         }
 
+        $docTypeMap = [
+            'Sale Invoice' => 1,
+            'Debit Note' => 4,
+            'Credit Note' => 3,
+        ];
+
         $payload = [
             "items" => $items,
-            "invoiceType" => $invoiceType,
             "invoiceDate" => $invoice->invoice_date ?? ($invoice->created_at ? $invoice->created_at->toDateString() : now()->toDateString()),
-            "sellerNTNCNIC" => $this->formatNtnCnic($company->ntn ?? ""),
-            "sellerBusinessName" => $company->fbr_business_name ?: ($company->name ?? ""),
-            "sellerProvince" => $this->normalizeProvince($invoice->supplier_province ?? $company->province ?? "Punjab"),
-            "sellerAddress" => $company->address ?? "",
-            "buyerNTNCNIC" => $this->formatNtnCnic($invoice->buyer_ntn ?? ""),
-            "buyerBusinessName" => $invoice->buyer_name ?? "",
-            "buyerProvince" => $this->normalizeProvince($invoice->destination_province ?? "Punjab"),
+            "invoiceType" => $invoiceType,
+            "documentTypeId" => $docTypeMap[$invoiceType] ?? 1,
             "buyerAddress" => $invoice->buyer_address ?? "",
-            "buyerRegistrationType" => $invoice->buyer_registration_type ?? $this->determineBuyerRegistrationType($invoice->buyer_ntn),
             "invoiceRefNo" => $this->resolveInvoiceRefNo($invoice),
+            "buyerProvince" => $this->normalizeProvince($invoice->destination_province ?? "Punjab"),
+            "sellerAddress" => $company->address ?? "",
+            "sellerNTNCNIC" => $this->formatNtnCnic($company->ntn ?? ""),
+            "sellerProvince" => $this->normalizeProvince($invoice->supplier_province ?? $company->province ?? "Punjab"),
+            "buyerBusinessName" => $invoice->buyer_name ?? "",
+            "sellerBusinessName" => $company->fbr_business_name ?: ($company->name ?? ""),
+            "buyerRegistrationType" => $invoice->buyer_registration_type ?? $this->determineBuyerRegistrationType($invoice->buyer_ntn),
+            "buyerNTNCNIC" => $this->formatNtnCnic($invoice->buyer_ntn ?? ""),
         ];
 
         if ($env === 'sandbox') {
@@ -125,31 +127,31 @@ class FbrService
 
     private function normalizeProvince(?string $province): string
     {
-        if (empty($province)) return "PUNJAB";
+        if (empty($province)) return "Punjab";
 
         $map = [
-            'punjab' => 'PUNJAB',
-            'sindh' => 'SINDH',
-            'balochistan' => 'BALOCHISTAN',
-            'khyber pakhtunkhwa' => 'KHYBER PAKHTUNKHWA',
-            'kpk' => 'KHYBER PAKHTUNKHWA',
-            'kp' => 'KHYBER PAKHTUNKHWA',
-            'islamabad' => 'CAPITAL TERRITORY',
-            'capital territory' => 'CAPITAL TERRITORY',
-            'ict' => 'CAPITAL TERRITORY',
-            'islamabad capital territory' => 'CAPITAL TERRITORY',
-            'azad kashmir' => 'AZAD JAMMU AND KASHMIR',
-            'azad jammu and kashmir' => 'AZAD JAMMU AND KASHMIR',
-            'ajk' => 'AZAD JAMMU AND KASHMIR',
-            'gilgit baltistan' => 'GILGIT BALTISTAN',
-            'gilgit-baltistan' => 'GILGIT BALTISTAN',
-            'gb' => 'GILGIT BALTISTAN',
+            'punjab' => 'Punjab',
+            'sindh' => 'Sindh',
+            'balochistan' => 'Balochistan',
+            'khyber pakhtunkhwa' => 'Khyber Pakhtunkhwa',
+            'kpk' => 'Khyber Pakhtunkhwa',
+            'kp' => 'Khyber Pakhtunkhwa',
+            'islamabad' => 'Islamabad Capital Territory',
+            'capital territory' => 'Islamabad Capital Territory',
+            'ict' => 'Islamabad Capital Territory',
+            'islamabad capital territory' => 'Islamabad Capital Territory',
+            'azad kashmir' => 'Azad Jammu and Kashmir',
+            'azad jammu and kashmir' => 'Azad Jammu and Kashmir',
+            'ajk' => 'Azad Jammu and Kashmir',
+            'gilgit baltistan' => 'Gilgit Baltistan',
+            'gilgit-baltistan' => 'Gilgit Baltistan',
+            'gb' => 'Gilgit Baltistan',
         ];
 
         $normalized = $map[strtolower(trim($province))] ?? null;
         if ($normalized) return $normalized;
 
-        return strtoupper(trim($province));
+        return ucwords(strtolower(trim($province)));
     }
 
     private function normalizeUom(?string $uom): string
@@ -303,11 +305,7 @@ class FbrService
 
     private function resolveInvoiceRefNo($invoice): string
     {
-        if ($invoice->document_type !== 'Debit Note') {
-            return "";
-        }
-
-        if (!empty($invoice->reference_invoice_number)) {
+        if ($invoice->document_type === 'Debit Note' && !empty($invoice->reference_invoice_number)) {
             $refInvoice = \App\Models\Invoice::where('company_id', $invoice->company_id)
                 ->where(function ($q) use ($invoice) {
                     $q->where('fbr_invoice_number', $invoice->reference_invoice_number)
@@ -323,7 +321,7 @@ class FbrService
             return $invoice->reference_invoice_number;
         }
 
-        return "";
+        return $invoice->internal_invoice_number ?? $invoice->invoice_number ?? ('INV-' . $invoice->id);
     }
 
     private function formatNtnCnic(?string $value): string

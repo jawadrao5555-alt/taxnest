@@ -24,11 +24,11 @@ class FbrService
             "invoiceDate" => $invoice->invoice_date ?? ($invoice->created_at ? $invoice->created_at->toDateString() : now()->toDateString()),
             "sellerNTNCNIC" => $this->formatNtnCnic($company->ntn ?? ""),
             "sellerBusinessName" => $company->fbr_business_name ?: ($company->name ?? ""),
-            "sellerProvince" => $invoice->supplier_province ?? $company->province ?? "Punjab",
+            "sellerProvince" => $this->normalizeProvince($invoice->supplier_province ?? $company->province ?? "Punjab"),
             "sellerAddress" => $company->address ?? "",
             "buyerNTNCNIC" => $this->formatNtnCnic($invoice->buyer_ntn ?? ""),
             "buyerBusinessName" => $invoice->buyer_name ?? "",
-            "buyerProvince" => $invoice->destination_province ?? "Punjab",
+            "buyerProvince" => $this->normalizeProvince($invoice->destination_province ?? "Punjab"),
             "buyerAddress" => $invoice->buyer_address ?? "",
             "buyerRegistrationType" => $invoice->buyer_registration_type ?? $this->determineBuyerRegistrationType($invoice->buyer_ntn),
             "invoiceRefNo" => $this->resolveInvoiceRefNo($invoice),
@@ -58,7 +58,7 @@ class FbrService
                 "hsCode" => $item->hs_code ?? "",
                 "productDescription" => $item->description ?? "",
                 "rate" => $rateStr,
-                "uoM" => $item->default_uom ?: "Numbers, pieces, units",
+                "uoM" => $this->normalizeUom($item->default_uom),
                 "quantity" => $quantity,
                 "totalValues" => $totalValues,
                 "valueSalesExcludingST" => $valueSalesExcludingST,
@@ -70,7 +70,7 @@ class FbrService
                 "sroScheduleNo" => $item->sro_schedule_no ?? "",
                 "fedPayable" => $fedPayable,
                 "discount" => $discount,
-                "saleType" => $item->sale_type ?: ScheduleEngine::mapSaleType($scheduleType),
+                "saleType" => $this->normalizeSaleType($item->sale_type ?: ScheduleEngine::mapSaleType($scheduleType)),
                 "sroItemSerialNo" => $item->serial_no ?? ""
             ];
 
@@ -82,6 +82,184 @@ class FbrService
         }
 
         return $payload;
+    }
+
+    private function normalizeProvince(?string $province): string
+    {
+        if (empty($province)) return "PUNJAB";
+
+        $map = [
+            'punjab' => 'PUNJAB',
+            'sindh' => 'SINDH',
+            'balochistan' => 'BALOCHISTAN',
+            'khyber pakhtunkhwa' => 'KHYBER PAKHTUNKHWA',
+            'kpk' => 'KHYBER PAKHTUNKHWA',
+            'kp' => 'KHYBER PAKHTUNKHWA',
+            'islamabad' => 'CAPITAL TERRITORY',
+            'capital territory' => 'CAPITAL TERRITORY',
+            'ict' => 'CAPITAL TERRITORY',
+            'islamabad capital territory' => 'CAPITAL TERRITORY',
+            'azad kashmir' => 'AZAD JAMMU AND KASHMIR',
+            'azad jammu and kashmir' => 'AZAD JAMMU AND KASHMIR',
+            'ajk' => 'AZAD JAMMU AND KASHMIR',
+            'gilgit baltistan' => 'GILGIT BALTISTAN',
+            'gilgit-baltistan' => 'GILGIT BALTISTAN',
+            'gb' => 'GILGIT BALTISTAN',
+        ];
+
+        $normalized = $map[strtolower(trim($province))] ?? null;
+        if ($normalized) return $normalized;
+
+        return strtoupper(trim($province));
+    }
+
+    private function normalizeUom(?string $uom): string
+    {
+        if (empty($uom)) return "Numbers, pieces, units";
+
+        $map = [
+            'kilograms' => 'KG',
+            'kilogram' => 'KG',
+            'kgs' => 'KG',
+            'kg' => 'KG',
+            'liters' => 'Liter',
+            'liter' => 'Liter',
+            'litres' => 'Liter',
+            'litre' => 'Liter',
+            'ltr' => 'Liter',
+            'ltrs' => 'Liter',
+            'l' => 'Liter',
+            'pieces' => 'Numbers, pieces, units',
+            'piece' => 'Numbers, pieces, units',
+            'pcs' => 'Pcs',
+            'units' => 'Numbers, pieces, units',
+            'unit' => 'Numbers, pieces, units',
+            'nos' => 'Numbers, pieces, units',
+            'numbers' => 'Numbers, pieces, units',
+            'number' => 'Numbers, pieces, units',
+            'each' => 'Numbers, pieces, units',
+            'ea' => 'Numbers, pieces, units',
+            'meters' => 'Meter',
+            'meter' => 'Meter',
+            'metre' => 'Meter',
+            'metres' => 'Meter',
+            'mtr' => 'Meter',
+            'mt' => 'MT',
+            'metric ton' => 'MT',
+            'metric tons' => 'MT',
+            'ton' => 'MT',
+            'tons' => 'MT',
+            'set' => 'SET',
+            'sets' => 'SET',
+            'bags' => 'Bag',
+            'bag' => 'Bag',
+            'dozen' => 'Dozen',
+            'dzn' => 'Dozen',
+            'dz' => 'Dozen',
+            'pair' => 'Pair',
+            'pairs' => 'Pair',
+            'packs' => 'Packs',
+            'pack' => 'Packs',
+            'packet' => 'Packs',
+            'packets' => 'Packs',
+            'gallon' => 'Gallon',
+            'gallons' => 'Gallon',
+            'gal' => 'Gallon',
+            'gram' => 'Gram',
+            'grams' => 'Gram',
+            'gm' => 'Gram',
+            'gms' => 'Gram',
+            'g' => 'Gram',
+            'pound' => 'Pound',
+            'pounds' => 'Pound',
+            'lb' => 'Pound',
+            'lbs' => 'Pound',
+            'carat' => 'Carat',
+            'carats' => 'Carat',
+            'sqft' => 'Square Foot',
+            'sq ft' => 'Square Foot',
+            'square foot' => 'Square Foot',
+            'square feet' => 'Square Foot',
+            'sqm' => 'Square Metre',
+            'sq m' => 'Square Metre',
+            'square meter' => 'Square Metre',
+            'square metre' => 'Square Metre',
+            'sqy' => 'SqY',
+            'sq y' => 'SqY',
+            'square yard' => 'SqY',
+            'square yards' => 'SqY',
+            'kwh' => 'KWH',
+            'kilowatt hour' => 'KWH',
+            'foot' => 'Foot',
+            'feet' => 'Foot',
+            'ft' => 'Foot',
+            'barrels' => 'Barrels',
+            'barrel' => 'Barrels',
+            'bbl' => 'Barrels',
+            'mmbtu' => 'MMBTU',
+            'cubic metre' => 'Cubic Metre',
+            'cubic meter' => 'Cubic Metre',
+            'cbm' => 'Cubic Metre',
+            'others' => 'Others',
+            'other' => 'Others',
+            '40kg' => '40KG',
+            'bill of lading' => 'Bill of lading',
+            'bol' => 'Bill of lading',
+            'no' => 'NO',
+            'timber logs' => 'Timber Logs',
+            'mega watt' => 'Mega Watt',
+            'mw' => 'Mega Watt',
+            'thousand unit' => 'Thousand Unit',
+            'thousand units' => 'Thousand Unit',
+        ];
+
+        $normalized = $map[strtolower(trim($uom))] ?? null;
+        if ($normalized) return $normalized;
+
+        return $uom;
+    }
+
+    private function normalizeSaleType(string $saleType): string
+    {
+        $map = [
+            'goods under 3rd schedule' => '3rd Schedule Goods',
+            'goods at standard rate (default)' => 'Goods at Standard Rate (default)',
+            'goods at standard rate' => 'Goods at Standard Rate (default)',
+            'goods at reduced rate' => 'Goods at Reduced Rate',
+            'exempt goods' => 'Exempt Goods',
+            'zero rated goods' => 'Goods at zero-rate',
+            'goods at zero-rate' => 'Goods at zero-rate',
+            'goods at zero rate' => 'Goods at zero-rate',
+            'steel melting and re-rolling' => 'Steel Melting and re-rolling',
+            'ship breaking' => 'Ship breaking',
+            'cotton ginners' => 'Cotton Ginners',
+            'telecommunication services' => 'Telecommunication services',
+            'toll manufacturing' => 'Toll Manufacturing',
+            'petroleum products' => 'Petroleum Products',
+            'electricity supply to retailers' => 'Electricity Supply to Retailers',
+            'gas to cng stations' => 'Gas to CNG stations',
+            'mobile phones' => 'Mobile Phones',
+            'processing/ conversion of goods' => 'Processing/ Conversion of Goods',
+            'processing/conversion of goods' => 'Processing/ Conversion of Goods',
+            'goods (fed in st mode)' => 'Goods (FED in ST Mode)',
+            'services (fed in st mode)' => 'Services (FED in ST Mode)',
+            'services' => 'Services',
+            'electric vehicle' => 'Electric Vehicle',
+            'cement /concrete block' => 'Cement /Concrete Block',
+            'cement/concrete block' => 'Cement /Concrete Block',
+            'potassium chlorate' => 'Potassium Chlorate',
+            'cng sales' => 'CNG Sales',
+            'goods as per sro.297(|)/2023' => 'Goods as per SRO.297(|)/2023',
+            'non-adjustable supplies' => 'Non-Adjustable Supplies',
+            '3rd schedule goods' => '3rd Schedule Goods',
+        ];
+
+        $normalized = $map[strtolower(trim($saleType))] ?? null;
+        if ($normalized) {
+            return $normalized;
+        }
+
+        return $saleType;
     }
 
     private function resolveInvoiceRefNo($invoice): string
@@ -250,47 +428,65 @@ class FbrService
             $log->response_time_ms = $responseTimeMs;
             $log->response_payload = $response->body();
 
-            if ($response->successful()) {
-                $responseData = $response->json();
-                $fbrResult = $this->parseFbrResponse($responseData);
+            $responseData = $response->json();
 
-                if ($fbrResult['valid']) {
-                    $log->status = 'success';
-                    $log->save();
+            if (!$response->successful()) {
+                $failureType = $this->classifyFailure($response->status(), $response->body());
+                $log->status = 'failed';
+                $log->failure_type = $failureType;
+                $log->save();
 
-                    return [
-                        "status" => "success",
-                        "fbr_invoice_number" => $fbrResult['invoiceNumber'],
-                        "response_time_ms" => $responseTimeMs,
-                        "fbr_response" => $responseData,
-                    ];
-                } else {
-                    $log->status = 'failed';
-                    $log->failure_type = 'validation_error';
-                    $log->save();
+                $errors = $this->extractErrorsFromResponse($response->body());
 
-                    return [
-                        "status" => "failed",
-                        "failure_type" => "validation_error",
-                        "errors" => $fbrResult['errors'],
-                        "response_time_ms" => $responseTimeMs,
-                        "fbr_response" => $responseData,
-                    ];
-                }
+                return [
+                    "status" => "failed",
+                    "failure_type" => $failureType,
+                    "errors" => $errors,
+                    "response_time_ms" => $responseTimeMs,
+                    "http_status" => $response->status(),
+                ];
             }
 
-            $failureType = $this->classifyFailure($response->status(), $response->body());
-            $log->status = 'failed';
-            $log->failure_type = $failureType;
-            $log->save();
+            if (!is_array($responseData)) {
+                $bodyStr = $response->body();
+                $log->status = 'failed';
+                $log->failure_type = strlen($bodyStr) === 0 ? 'rate_limited' : 'invalid_response';
+                $log->save();
+                $errorMsg = strlen($bodyStr) === 0
+                    ? 'FBR returned empty response (possible rate limiting). Please wait 2-3 minutes and try again.'
+                    : 'FBR returned unexpected response: ' . substr($bodyStr, 0, 500);
+                return [
+                    "status" => "failed",
+                    "failure_type" => $log->failure_type,
+                    "errors" => [$errorMsg],
+                    "response_time_ms" => $responseTimeMs,
+                ];
+            }
 
-            $errors = $this->extractErrorsFromResponse($response->body());
+            $fbrResult = $this->parseFbrResponse($responseData);
+
+            if ($fbrResult['valid']) {
+                $log->status = 'success';
+                $log->save();
+
+                return [
+                    "status" => "success",
+                    "fbr_invoice_number" => $fbrResult['invoiceNumber'],
+                    "response_time_ms" => $responseTimeMs,
+                    "fbr_response" => $responseData,
+                ];
+            }
+
+            $log->status = 'failed';
+            $log->failure_type = 'validation_error';
+            $log->save();
 
             return [
                 "status" => "failed",
-                "failure_type" => $failureType,
-                "errors" => $errors,
+                "failure_type" => "validation_error",
+                "errors" => $fbrResult['errors'],
                 "response_time_ms" => $responseTimeMs,
+                "fbr_response" => $responseData,
             ];
 
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
@@ -340,8 +536,9 @@ class FbrService
 
             if (!empty($validation['invoiceStatuses']) && is_array($validation['invoiceStatuses'])) {
                 foreach ($validation['invoiceStatuses'] as $itemStatus) {
-                    if (isset($itemStatus['invoiceNo']) && $itemStatus['invoiceNo'] !== null) {
-                        $itemInvoiceNumbers[] = $itemStatus['invoiceNo'];
+                    $itemInvNo = $itemStatus['invoiceNumber'] ?? $itemStatus['invoiceNo'] ?? null;
+                    if ($itemInvNo !== null) {
+                        $itemInvoiceNumbers[] = $itemInvNo;
                     }
                     if (($itemStatus['statusCode'] ?? '') === '01') {
                         $allItemsValid = false;
@@ -473,6 +670,14 @@ class FbrService
 
             if ($response->successful()) {
                 $responseData = $response->json();
+                if (!is_array($responseData)) {
+                    return [
+                        'status' => 'invalid',
+                        'message' => "FBR {$env} returned non-JSON response",
+                        'errors' => [substr($response->body(), 0, 500)],
+                        'payload' => $payload,
+                    ];
+                }
                 $fbrResult = $this->parseFbrResponse($responseData);
 
                 if ($fbrResult['valid']) {

@@ -187,12 +187,31 @@ class ScheduleEngine
     public static function mapSaleType(string $scheduleType): string
     {
         return match ($scheduleType) {
-            'standard' => 'Goods at standard rate (default)',
-            'reduced' => 'Goods at reduced rate',
-            '3rd_schedule' => 'Goods under 3rd Schedule',
-            'exempt' => 'Exempt goods',
-            'zero_rated' => 'Zero rated goods',
-            default => 'Goods at standard rate (default)',
+            'standard' => 'Goods at Standard Rate (default)',
+            'reduced' => 'Goods at Reduced Rate',
+            '3rd_schedule' => '3rd Schedule Goods',
+            'exempt' => 'Exempt Goods',
+            'zero_rated' => 'Goods at zero-rate',
+            'steel' => 'Steel Melting and re-rolling',
+            'ship_breaking' => 'Ship breaking',
+            'cotton_ginners' => 'Cotton Ginners',
+            'telecom' => 'Telecommunication services',
+            'toll_manufacturing' => 'Toll Manufacturing',
+            'petroleum' => 'Petroleum Products',
+            'electricity' => 'Electricity Supply to Retailers',
+            'gas_cng' => 'Gas to CNG stations',
+            'mobile_phones' => 'Mobile Phones',
+            'processing' => 'Processing/ Conversion of Goods',
+            'fed_goods' => 'Goods (FED in ST Mode)',
+            'fed_services' => 'Services (FED in ST Mode)',
+            'services' => 'Services',
+            'electric_vehicle' => 'Electric Vehicle',
+            'cement' => 'Cement /Concrete Block',
+            'potassium_chlorate' => 'Potassium Chlorate',
+            'cng_sales' => 'CNG Sales',
+            'sro_297' => 'Goods as per SRO.297(|)/2023',
+            'non_adjustable' => 'Non-Adjustable Supplies',
+            default => 'Goods at Standard Rate (default)',
         };
     }
 

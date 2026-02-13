@@ -46,12 +46,18 @@ class FbrService
             $unitPrice = floatval($item->price);
             $valueSalesExcludingST = round($quantity * $unitPrice, 2);
             $salesTaxApplicable = round($valueSalesExcludingST * ($taxRate / 100), 2);
-            $totalValues = round($valueSalesExcludingST + $salesTaxApplicable, 2);
+            $extraTax = round(floatval($item->extra_tax ?? 0), 2);
+            $furtherTax = round(floatval($item->further_tax ?? 0), 2);
+            $fedPayable = round(floatval($item->fed_payable ?? 0), 2);
+            $discount = round(floatval($item->discount ?? 0), 2);
+            $totalValues = round($valueSalesExcludingST + $salesTaxApplicable + $extraTax + $furtherTax + $fedPayable - $discount, 2);
+
+            $rateStr = ($taxRate == intval($taxRate)) ? intval($taxRate) . "%" : number_format($taxRate, 1) . "%";
 
             $itemPayload = [
                 "hsCode" => $item->hs_code ?? "",
                 "productDescription" => $item->description ?? "",
-                "rate" => intval($taxRate) . "%",
+                "rate" => $rateStr,
                 "uoM" => $item->default_uom ?: "Numbers, pieces, units",
                 "quantity" => $quantity,
                 "totalValues" => $totalValues,
@@ -59,11 +65,11 @@ class FbrService
                 "fixedNotifiedValueOrRetailPrice" => round(floatval($item->mrp ?? 0), 2),
                 "salesTaxApplicable" => $salesTaxApplicable,
                 "salesTaxWithheldAtSource" => round($item->st_withheld_at_source ? floatval($item->st_withheld_at_source) : 0.00, 2),
-                "extraTax" => round(floatval($item->extra_tax ?? 0), 2),
-                "furtherTax" => round(floatval($item->further_tax ?? 0), 2),
+                "extraTax" => $extraTax,
+                "furtherTax" => $furtherTax,
                 "sroScheduleNo" => $item->sro_schedule_no ?? "",
-                "fedPayable" => round(floatval($item->fed_payable ?? 0), 2),
-                "discount" => round(floatval($item->discount ?? 0), 2),
+                "fedPayable" => $fedPayable,
+                "discount" => $discount,
                 "saleType" => $item->sale_type ?: ScheduleEngine::mapSaleType($scheduleType),
                 "sroItemSerialNo" => $item->serial_no ?? ""
             ];
@@ -328,42 +334,47 @@ class FbrService
             $statusCode = $validation['statusCode'] ?? '01';
             $status = strtolower($validation['status'] ?? 'invalid');
 
-            if ($statusCode === '00' && $status === 'valid') {
-                $itemInvoiceNumbers = [];
-                if (!empty($validation['invoiceStatuses'])) {
-                    foreach ($validation['invoiceStatuses'] as $itemStatus) {
-                        if (isset($itemStatus['invoiceNo'])) {
-                            $itemInvoiceNumbers[] = $itemStatus['invoiceNo'];
+            $itemInvoiceNumbers = [];
+            $itemErrors = [];
+            $allItemsValid = true;
+
+            if (!empty($validation['invoiceStatuses']) && is_array($validation['invoiceStatuses'])) {
+                foreach ($validation['invoiceStatuses'] as $itemStatus) {
+                    if (isset($itemStatus['invoiceNo']) && $itemStatus['invoiceNo'] !== null) {
+                        $itemInvoiceNumbers[] = $itemStatus['invoiceNo'];
+                    }
+                    if (($itemStatus['statusCode'] ?? '') === '01') {
+                        $allItemsValid = false;
+                        if (!empty($itemStatus['error'])) {
+                            $errorCode = $itemStatus['errorCode'] ?? '';
+                            $itemErrors[] = "Item {$itemStatus['itemSNo']}: [{$errorCode}] {$itemStatus['error']}";
                         }
                     }
                 }
+            }
 
+            if ($statusCode === '00' && $status === 'valid' && $allItemsValid) {
                 return [
                     'valid' => true,
-                    'invoiceNumber' => $invoiceNumber ?? ($itemInvoiceNumbers[0] ?? ((string) time())),
+                    'invoiceNumber' => $invoiceNumber ?? ($itemInvoiceNumbers[0] ?? null),
                     'itemInvoiceNumbers' => $itemInvoiceNumbers,
                     'errors' => [],
                 ];
             }
 
             $errors = [];
+            $headerErrorCode = $validation['errorCode'] ?? '';
             if (!empty($validation['error'])) {
-                $errors[] = $validation['error'];
+                $prefix = $headerErrorCode ? "[{$headerErrorCode}] " : '';
+                $errors[] = $prefix . $validation['error'];
             }
-            if (!empty($validation['invoiceStatuses'])) {
-                foreach ($validation['invoiceStatuses'] as $itemStatus) {
-                    if (($itemStatus['statusCode'] ?? '') === '01' && !empty($itemStatus['error'])) {
-                        $errorMsg = "Item {$itemStatus['itemSNo']}: [{$itemStatus['errorCode']}] {$itemStatus['error']}";
-                        $errors[] = $errorMsg;
-                    }
-                }
-            }
+            $errors = array_merge($errors, $itemErrors);
 
             return [
                 'valid' => false,
                 'invoiceNumber' => null,
                 'itemInvoiceNumbers' => [],
-                'errors' => $errors ?: ['FBR validation failed'],
+                'errors' => $errors ?: ['FBR validation failed (statusCode: ' . $statusCode . ', status: ' . $status . ')'],
             ];
         }
 
@@ -376,11 +387,21 @@ class FbrService
             ];
         }
 
+        if (isset($responseData['fault'])) {
+            $faultMsg = ($responseData['fault']['message'] ?? 'Unknown') . ': ' . ($responseData['fault']['description'] ?? '');
+            return [
+                'valid' => false,
+                'invoiceNumber' => null,
+                'itemInvoiceNumbers' => [],
+                'errors' => [$faultMsg],
+            ];
+        }
+
         return [
             'valid' => false,
             'invoiceNumber' => null,
             'itemInvoiceNumbers' => [],
-            'errors' => ['Unexpected FBR response format'],
+            'errors' => ['Unexpected FBR response format: ' . json_encode($responseData)],
         ];
     }
 
@@ -490,7 +511,7 @@ class FbrService
 
     private function classifyFailure(int $statusCode, string $body): string
     {
-        if ($statusCode === 401 || $statusCode === 403) {
+        if ($statusCode === 401 || $statusCode === 402 || $statusCode === 403) {
             return 'token_error';
         }
 
@@ -500,6 +521,14 @@ class FbrService
 
         if ($statusCode >= 500) {
             return 'server_error';
+        }
+
+        $decoded = json_decode($body, true);
+        if ($decoded && isset($decoded['fault'])) {
+            $code = $decoded['fault']['code'] ?? '';
+            if (in_array($code, ['900901', '900902', '900900'])) {
+                return 'token_error';
+            }
         }
 
         return 'payload_error';

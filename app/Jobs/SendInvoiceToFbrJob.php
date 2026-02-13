@@ -29,6 +29,11 @@ class SendInvoiceToFbrJob implements ShouldQueue
     {
         $invoice = Invoice::with(['company', 'items'])->findOrFail($this->invoiceId);
 
+        if ($invoice->status === 'locked' && !empty($invoice->fbr_invoice_number)) {
+            Log::info("Invoice #{$invoice->id} already locked with FBR number {$invoice->fbr_invoice_number}, skipping retry.");
+            return;
+        }
+
         if ($this->fbrEnvironment && in_array($this->fbrEnvironment, ['sandbox', 'production'])) {
             $invoice->company->fbr_environment = $this->fbrEnvironment;
         }

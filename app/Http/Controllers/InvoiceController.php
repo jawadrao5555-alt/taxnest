@@ -845,7 +845,7 @@ class InvoiceController extends Controller
                 $invoice->fbr_submission_date = now();
             }
             $invoice->status = 'locked';
-            $invoice->fbr_status = 'success';
+            $invoice->fbr_status = 'production';
             $invoice->integrity_hash = \App\Services\IntegrityHashService::generate($invoice);
             $invoice->qr_data = json_encode([
                 'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $company->ntn ?? ''),
@@ -925,7 +925,7 @@ class InvoiceController extends Controller
             $fbrInvoiceNumber = $request->input('fbr_invoice_number');
 
             $invoice->status = 'locked';
-            $invoice->fbr_status = 'success';
+            $invoice->fbr_status = 'production';
             $invoice->fbr_submission_date = $invoice->fbr_submission_date ?? now();
 
             if ($fbrInvoiceNumber) {
@@ -1016,7 +1016,7 @@ class InvoiceController extends Controller
             'totalValues' => $invoice->total_amount,
         ]);
 
-        $invoice->status = 'submitted';
+        $invoice->status = 'locked';
         $invoice->fbr_status = 'production';
         $invoice->fbr_submission_date = $invoice->fbr_submission_date ?? now();
 
@@ -1512,7 +1512,7 @@ class InvoiceController extends Controller
                 $invoice->fbr_submission_date = now();
             }
             $invoice->status = 'locked';
-            $invoice->fbr_status = 'success';
+            $invoice->fbr_status = 'production';
             $invoice->integrity_hash = IntegrityHashService::generate($invoice);
             $invoice->qr_data = json_encode([
                 'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $company->ntn ?? ''),

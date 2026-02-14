@@ -128,10 +128,24 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Unit of Measure <span class="text-red-500">*</span></label>
+                            @php
+                                $uomOptions = [
+                                    'Numbers, pieces, units' => 'Numbers, pieces, units',
+                                    'Kilograms' => 'Kilograms',
+                                    'Liters' => 'Liters',
+                                    'Meters' => 'Meters',
+                                    'Square meters' => 'Square meters',
+                                    'Cubic meters' => 'Cubic meters',
+                                    'Packs' => 'Packs',
+                                    'Dozens' => 'Dozens',
+                                    'Tons' => 'Tons',
+                                    'Others' => 'Others',
+                                ];
+                            @endphp
                             <select name="uom" required class="w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 <option value="">Select UOM</option>
-                                @foreach(['PCS', 'KG', 'LTR', 'MTR', 'SQM', 'CBM', 'DOZ', 'SET', 'PKT'] as $unit)
-                                    <option value="{{ $unit }}" {{ old('uom', 'PCS') === $unit ? 'selected' : '' }}>{{ $unit }}</option>
+                                @foreach($uomOptions as $val => $label)
+                                    <option value="{{ $val }}" {{ old('uom', 'Numbers, pieces, units') === $val ? 'selected' : '' }}>{{ $label }}</option>
                                 @endforeach
                             </select>
                         </div>

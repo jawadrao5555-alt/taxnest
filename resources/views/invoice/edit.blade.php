@@ -689,7 +689,7 @@
                 },
 
                 mapUom(productUom) {
-                    const map = {
+                    const shortMap = {
                         'PCS': 'Numbers, pieces, units',
                         'KG': 'Kilograms',
                         'LTR': 'Liters',
@@ -700,7 +700,9 @@
                         'DOZ': 'Dozens',
                         'SET': 'Others',
                     };
-                    return map[productUom] || 'Numbers, pieces, units';
+                    const validFull = ['Numbers, pieces, units','Kilograms','Liters','Meters','Square meters','Cubic meters','Packs','Dozens','Tons','Others'];
+                    if (validFull.includes(productUom)) return productUom;
+                    return shortMap[productUom] || 'Numbers, pieces, units';
                 },
 
                 async checkCompliance() {

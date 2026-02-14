@@ -221,18 +221,7 @@
 
     <script>
     function fbrSettingsPage() {
-        var initData = @json([
-            'environment' => $company->fbr_environment ?? 'sandbox',
-            'registration_no' => $company->fbr_registration_no ?? '',
-            'business_name' => $company->fbr_business_name ?? '',
-            'sandbox_url' => $company->fbr_sandbox_url ?? 'https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata_sb',
-            'production_url' => $company->fbr_production_url ?? 'https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata',
-            'sandbox_token' => $sandboxToken ?? '',
-            'production_token' => $productionToken ?? '',
-            'connection_status' => $company->fbr_connection_status ?? 'unknown',
-            'has_sandbox' => !empty($sandboxToken),
-            'has_production' => !empty($productionToken),
-        ]);
+        var initData = @json($initData);
         return {
             form: {
                 fbr_environment: initData.environment,

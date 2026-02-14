@@ -342,6 +342,18 @@
                         <div>
                             <h3 class="text-2xl font-bold text-gray-900">{{ $invoice->company->name ?? 'Company' }}</h3>
                             <p class="text-sm text-gray-500 mt-1">NTN: {{ $invoice->company->ntn ?? 'N/A' }}</p>
+                            @if($invoice->company->registration_no)
+                            <p class="text-xs text-gray-400">Reg #: {{ $invoice->company->registration_no }}</p>
+                            @endif
+                            @if($invoice->company->address)
+                            <p class="text-xs text-gray-400">{{ $invoice->company->address }}@if($invoice->company->city), {{ $invoice->company->city }}@endif</p>
+                            @endif
+                            @if($invoice->company->phone || $invoice->company->mobile)
+                            <p class="text-xs text-gray-400">{{ $invoice->company->mobile ?? $invoice->company->phone }}</p>
+                            @endif
+                            @if($invoice->company->email)
+                            <p class="text-xs text-gray-400">{{ $invoice->company->email }}</p>
+                            @endif
                         </div>
                         <div class="text-right">
                             <span class="inline-flex px-3 py-1 rounded-full text-sm font-bold

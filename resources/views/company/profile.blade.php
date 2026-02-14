@@ -25,11 +25,33 @@
                         @if($company->cnic)
                         <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700">CNIC: {{ $company->cnic }}</span>
                         @endif
+                        @if($company->registration_no)
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700">Reg #: {{ $company->registration_no }}</span>
+                        @endif
                         @if($company->company_status)
                         <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold {{ $company->company_status === 'approved' ? 'bg-green-50 dark:bg-green-900/40 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700' : 'bg-amber-50 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700' }}">{{ ucfirst($company->company_status) }}</span>
                         @endif
                     </div>
                 </div>
+                @if($company->address || $company->phone || $company->mobile || $company->email || $company->city || $company->website)
+                <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
+                    @if($company->address)
+                    <p class="text-sm text-gray-500 dark:text-gray-400"><span class="font-medium text-gray-600 dark:text-gray-300">Address:</span> {{ $company->address }}@if($company->city), {{ $company->city }}@endif</p>
+                    @endif
+                    @if($company->phone)
+                    <p class="text-sm text-gray-500 dark:text-gray-400"><span class="font-medium text-gray-600 dark:text-gray-300">Phone:</span> {{ $company->phone }}</p>
+                    @endif
+                    @if($company->mobile)
+                    <p class="text-sm text-gray-500 dark:text-gray-400"><span class="font-medium text-gray-600 dark:text-gray-300">Mobile:</span> {{ $company->mobile }}</p>
+                    @endif
+                    @if($company->email)
+                    <p class="text-sm text-gray-500 dark:text-gray-400"><span class="font-medium text-gray-600 dark:text-gray-300">Email:</span> {{ $company->email }}</p>
+                    @endif
+                    @if($company->website)
+                    <p class="text-sm text-gray-500 dark:text-gray-400"><span class="font-medium text-gray-600 dark:text-gray-300">Website:</span> {{ $company->website }}</p>
+                    @endif
+                </div>
+                @endif
             </div>
 
             <form method="POST" action="/company/profile" class="space-y-6">
@@ -129,8 +151,12 @@
                         <p class="text-sm text-gray-600 dark:text-gray-300"><strong>{{ $company->name }}</strong></p>
                         @if($company->ntn)<p class="text-xs text-gray-500">NTN: {{ $company->ntn }}</p>@endif
                         @if($company->cnic)<p class="text-xs text-gray-500">CNIC: {{ $company->cnic }}</p>@endif
+                        @if($company->registration_no)<p class="text-xs text-gray-500">Reg #: {{ $company->registration_no }}</p>@endif
                         @if($company->address)<p class="text-xs text-gray-500 mt-1">{{ $company->address }}@if($company->city), {{ $company->city }}@endif</p>@endif
-                        @if($company->mobile)<p class="text-xs text-gray-500">Mobile: {{ $company->mobile }}</p>@elseif($company->phone)<p class="text-xs text-gray-500">Phone: {{ $company->phone }}</p>@endif
+                        @if($company->phone)<p class="text-xs text-gray-500">Phone: {{ $company->phone }}</p>@endif
+                        @if($company->mobile)<p class="text-xs text-gray-500">Mobile: {{ $company->mobile }}</p>@endif
+                        @if($company->email)<p class="text-xs text-gray-500">Email: {{ $company->email }}</p>@endif
+                        @if($company->website)<p class="text-xs text-gray-500">Website: {{ $company->website }}</p>@endif
                     </div>
                 </div>
 

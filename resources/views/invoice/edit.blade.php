@@ -109,6 +109,7 @@
                         </div>
                     </div>
 
+                    <input type="hidden" name="buyer_registration_type" :value="buyerRegType">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer Name *</label>
@@ -119,7 +120,9 @@
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer NTN</label>
                             <input type="text" name="buyer_ntn" x-model="buyer_ntn" placeholder="Optional for unregistered"
                                 class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                            <p class="text-xs mt-1" :class="buyerRegType === 'Registered' ? 'text-green-600' : 'text-gray-400'" x-text="'Registration: ' + buyerRegType"></p>
+                            <p class="text-xs mt-1 font-medium" :class="buyerRegType === 'Registered' ? 'text-emerald-600' : 'text-amber-600'">
+                                <span x-text="buyerRegType === 'Registered' ? '&#9989; FBR Registered' : '&#9888; Unregistered Buyer'"></span>
+                            </p>
                         </div>
                     </div>
                     <div x-show="buyerRegType === 'Registered'" x-cloak class="grid grid-cols-1 gap-4 mt-4">
@@ -442,6 +445,7 @@
                 buyer_name: @js($invoice->buyer_name),
                 buyer_ntn: @js($invoice->buyer_ntn),
                 buyer_cnic: @js($invoice->buyer_cnic ?? ''),
+                buyer_reg_type: @js($invoice->buyer_registration_type ?? ''),
                 buyer_address: @js($invoice->buyer_address ?? ''),
                 document_type: @js($invoice->document_type ?? 'Sale Invoice'),
                 reference_invoice_number: @js($invoice->reference_invoice_number ?? ''),
@@ -491,6 +495,7 @@
                 scheduleError: '',
 
                 get buyerRegType() {
+                    if (this.buyer_reg_type) return this.buyer_reg_type;
                     return detectRegType(this.buyer_ntn);
                 },
 
@@ -632,6 +637,7 @@
                     this.buyer_ntn = customer.ntn || '';
                     this.buyer_cnic = customer.cnic || '';
                     this.buyer_address = customer.address || '';
+                    this.buyer_reg_type = customer.registration_type || '';
                     this.customerSearch = customer.name;
                     this.showCustomerDropdown = false;
                 },

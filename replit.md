@@ -69,6 +69,17 @@ TaxNest is built on Laravel 12 with PHP 8.4, using Breeze for authentication. Th
 - **Mobile**: Hamburger opens sidebar drawer. Overlay click closes it. Tables have overflow-x-auto. Invoice sticky summary functional on all sizes.
 
 ## Recent Changes (Feb 14, 2026)
+**Customer Registered/Unregistered Toggle:**
+- Customer create/edit forms now have explicit Registered/Unregistered card-style toggle
+- Registered: NTN, CNIC required + phone, email, address shown
+- Unregistered: Only name & address needed, other fields hidden
+- registration_type stored directly from user selection (not auto-detected from NTN digits)
+- Invoice create/edit: buyer_registration_type passed via hidden field, customer selection auto-sets registration type
+- Customer search dropdown shows registration type badge (green/amber)
+- Customer index badges updated to emerald (FBR Registered) and amber (Unregistered)
+- InvoiceController uses explicit buyer_registration_type from form, falls back to NTN auto-detect for manual entries
+- Profile page consolidated with business profile, FBR Settings remains separate
+
 **FBR Real-Time & Profile Session:**
 - FBR submission changed from async queue to synchronous real-time response (submitToFbrSync helper)
 - Submit, Retry both now return immediate FBR result with execution time

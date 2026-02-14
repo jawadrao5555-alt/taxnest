@@ -93,8 +93,11 @@
                             <div x-show="showCustomerDropdown && customerResults.length > 0" x-cloak class="absolute z-20 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                                 <template x-for="customer in customerResults" :key="customer.id">
                                     <button type="button" @click="selectCustomer(customer)" class="w-full text-left px-4 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-sm border-b border-gray-100 dark:border-gray-600 last:border-0">
-                                        <span class="font-medium text-gray-800 dark:text-gray-100" x-text="customer.name"></span>
-                                        <span class="text-gray-500 dark:text-gray-400 text-xs ml-2" x-text="(customer.ntn ? 'NTN: ' + customer.ntn : '') + (customer.phone ? ' | ' + customer.phone : '')"></span>
+                                        <div class="flex items-center justify-between">
+                                            <span class="font-medium text-gray-800 dark:text-gray-100" x-text="customer.name"></span>
+                                            <span class="text-xs px-1.5 py-0.5 rounded-full font-medium" :class="customer.registration_type === 'Registered' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'" x-text="customer.registration_type === 'Registered' ? 'Registered' : 'Unregistered'"></span>
+                                        </div>
+                                        <span class="text-gray-500 dark:text-gray-400 text-xs" x-text="(customer.ntn ? 'NTN: ' + customer.ntn : '') + (customer.phone ? ' | ' + customer.phone : '')"></span>
                                     </button>
                                 </template>
                             </div>
@@ -102,6 +105,7 @@
                         </div>
                     </div>
 
+                    <input type="hidden" name="buyer_registration_type" :value="buyerRegType">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer Name *</label>
@@ -114,7 +118,9 @@
                             <input type="text" name="buyer_ntn" x-model="buyer_ntn" value="{{ old('buyer_ntn') }}" placeholder="Optional for unregistered"
                                 class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             @error('buyer_ntn') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-                            <p class="text-xs mt-1" :class="buyerRegType === 'Registered' ? 'text-green-600' : 'text-gray-400'" x-text="'Registration: ' + buyerRegType"></p>
+                            <p class="text-xs mt-1 font-medium" :class="buyerRegType === 'Registered' ? 'text-emerald-600' : 'text-amber-600'">
+                                <span x-text="buyerRegType === 'Registered' ? '&#9989; FBR Registered' : '&#9888; Unregistered Buyer'"></span>
+                            </p>
                         </div>
                     </div>
                     <div x-show="buyerRegType === 'Registered'" x-cloak class="grid grid-cols-1 gap-4 mt-4">
@@ -594,6 +600,7 @@
                 buyer_ntn: '{{ old("buyer_ntn", "") }}',
                 buyer_cnic: '{{ old("buyer_cnic", "") }}',
                 buyer_address: '{{ old("buyer_address", "") }}',
+                buyer_reg_type: '{{ old("buyer_registration_type", "") }}',
                 document_type: '{{ old("document_type", "Sale Invoice") }}',
                 reference_invoice_number: '{{ old("reference_invoice_number", "") }}',
                 destination_province: '{{ old("destination_province", "Punjab") }}',
@@ -609,6 +616,7 @@
                 scheduleError: '',
 
                 get buyerRegType() {
+                    if (this.buyer_reg_type) return this.buyer_reg_type;
                     return detectRegType(this.buyer_ntn);
                 },
 
@@ -785,6 +793,7 @@
                     this.buyer_ntn = customer.ntn || '';
                     this.buyer_cnic = customer.cnic || '';
                     this.buyer_address = customer.address || '';
+                    this.buyer_reg_type = customer.registration_type || '';
                     this.customerSearch = customer.name;
                     this.showCustomerDropdown = false;
                 },
@@ -796,6 +805,7 @@
                     this.buyer_ntn = '';
                     this.buyer_cnic = '';
                     this.buyer_address = '';
+                    this.buyer_reg_type = '';
                     this.customerResults = [];
                 },
 

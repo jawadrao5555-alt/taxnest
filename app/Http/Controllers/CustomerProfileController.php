@@ -35,23 +35,25 @@ class CustomerProfileController extends Controller
 
     public function store(Request $request)
     {
-        $ntn = $request->ntn;
-        $ntnDigits = preg_replace('/[^0-9]/', '', $ntn ?? '');
-        $registrationType = (strlen($ntnDigits) >= 7) ? 'Registered' : 'Unregistered';
+        $registrationType = $request->input('registration_type', 'Unregistered');
 
         $rules = [
             'name' => 'required|string|max:255',
-            'ntn' => 'nullable|string|max:50',
-            'cnic' => 'nullable|string|max:15',
+            'registration_type' => 'required|in:Registered,Unregistered',
             'address' => 'nullable|string|max:1000',
             'province' => 'required|string|max:100',
-            'phone' => 'nullable|string|max:50',
-            'email' => 'nullable|email|max:255',
         ];
 
         if ($registrationType === 'Registered') {
             $rules['ntn'] = 'required|string|max:50';
             $rules['cnic'] = 'required|string|max:15';
+            $rules['phone'] = 'nullable|string|max:50';
+            $rules['email'] = 'nullable|email|max:255';
+        } else {
+            $rules['ntn'] = 'nullable|string|max:50';
+            $rules['cnic'] = 'nullable|string|max:15';
+            $rules['phone'] = 'nullable|string|max:50';
+            $rules['email'] = 'nullable|email|max:255';
         }
 
         $request->validate($rules);
@@ -85,23 +87,25 @@ class CustomerProfileController extends Controller
         $companyId = app('currentCompanyId');
         if ($customerProfile->company_id !== $companyId) abort(403);
 
-        $ntn = $request->ntn;
-        $ntnDigits = preg_replace('/[^0-9]/', '', $ntn ?? '');
-        $registrationType = (strlen($ntnDigits) >= 7) ? 'Registered' : 'Unregistered';
+        $registrationType = $request->input('registration_type', 'Unregistered');
 
         $rules = [
             'name' => 'required|string|max:255',
-            'ntn' => 'nullable|string|max:50',
-            'cnic' => 'nullable|string|max:15',
+            'registration_type' => 'required|in:Registered,Unregistered',
             'address' => 'nullable|string|max:1000',
             'province' => 'required|string|max:100',
-            'phone' => 'nullable|string|max:50',
-            'email' => 'nullable|email|max:255',
         ];
 
         if ($registrationType === 'Registered') {
             $rules['ntn'] = 'required|string|max:50';
             $rules['cnic'] = 'required|string|max:15';
+            $rules['phone'] = 'nullable|string|max:50';
+            $rules['email'] = 'nullable|email|max:255';
+        } else {
+            $rules['ntn'] = 'nullable|string|max:50';
+            $rules['cnic'] = 'nullable|string|max:15';
+            $rules['phone'] = 'nullable|string|max:50';
+            $rules['email'] = 'nullable|email|max:255';
         }
 
         $request->validate($rules);

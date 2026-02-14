@@ -107,7 +107,11 @@ class InvoiceController extends Controller
             return back()->with('error', $limitCheck['reason']);
         }
 
-        $isRegistered = self::detectBuyerRegistrationType($request->buyer_ntn) === 'Registered';
+        $buyerRegTypeInput = $request->input('buyer_registration_type');
+        if (!$buyerRegTypeInput || !in_array($buyerRegTypeInput, ['Registered', 'Unregistered'])) {
+            $buyerRegTypeInput = self::detectBuyerRegistrationType($request->buyer_ntn);
+        }
+        $isRegistered = $buyerRegTypeInput === 'Registered';
 
         $request->validate([
             'buyer_name' => 'required|string|max:255',
@@ -187,7 +191,6 @@ class InvoiceController extends Controller
 
             $supplierProvince = $selectedBranch?->province ?? $company->province ?? null;
             $buyerNtn = $request->buyer_ntn;
-            $buyerRegType = self::detectBuyerRegistrationType($buyerNtn);
 
             $invoice = Invoice::create([
                 'company_id' => $companyId,
@@ -197,7 +200,7 @@ class InvoiceController extends Controller
                 'buyer_ntn' => $buyerNtn,
                 'buyer_cnic' => $request->buyer_cnic,
                 'buyer_address' => $request->buyer_address,
-                'buyer_registration_type' => $buyerRegType,
+                'buyer_registration_type' => $buyerRegTypeInput,
                 'total_amount' => $totalAmount,
                 'total_value_excluding_st' => round($totalValueExcludingST, 2),
                 'total_sales_tax' => round($totalSalesTax, 2),
@@ -356,7 +359,11 @@ class InvoiceController extends Controller
             return redirect('/invoices')->with('error', 'Locked invoices cannot be edited.');
         }
 
-        $isRegistered = self::detectBuyerRegistrationType($request->buyer_ntn) === 'Registered';
+        $buyerRegTypeInput = $request->input('buyer_registration_type');
+        if (!$buyerRegTypeInput || !in_array($buyerRegTypeInput, ['Registered', 'Unregistered'])) {
+            $buyerRegTypeInput = self::detectBuyerRegistrationType($request->buyer_ntn);
+        }
+        $isRegistered = $buyerRegTypeInput === 'Registered';
 
         $request->validate([
             'buyer_name' => 'required|string|max:255',
@@ -438,14 +445,13 @@ class InvoiceController extends Controller
             $netReceivable = $totalAmount;
 
             $supplierProvince = $selectedBranch?->province ?? $company->province ?? $invoice->supplier_province;
-            $buyerRegType = self::detectBuyerRegistrationType($request->buyer_ntn);
 
             $updateData = [
                 'buyer_name' => $request->buyer_name,
                 'buyer_ntn' => $request->buyer_ntn,
                 'buyer_cnic' => $request->buyer_cnic,
                 'buyer_address' => $request->buyer_address,
-                'buyer_registration_type' => $buyerRegType,
+                'buyer_registration_type' => $buyerRegTypeInput,
                 'total_amount' => $totalAmount,
                 'total_value_excluding_st' => round($totalValueExcludingST, 2),
                 'total_sales_tax' => round($totalSalesTax, 2),

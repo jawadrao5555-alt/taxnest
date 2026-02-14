@@ -88,7 +88,7 @@
                         @if($invoice->company->ntn)
                         <div class="company-detail">NTN: {{ $invoice->company->ntn }}</div>
                         @endif
-                        @if($invoice->company->cnic)
+                        @if($invoice->company->cnic && $invoice->company->cnic !== $invoice->company->ntn)
                         <div class="company-detail">CNIC: {{ $invoice->company->cnic }}</div>
                         @endif
                         @if($invoice->company->registration_no)
@@ -97,7 +97,7 @@
                         @if($invoice->company->phone)
                         <div class="company-detail">Phone: {{ $invoice->company->phone }}</div>
                         @endif
-                        @if($invoice->company->mobile)
+                        @if($invoice->company->mobile && $invoice->company->mobile !== $invoice->company->phone)
                         <div class="company-detail">Mobile: {{ $invoice->company->mobile }}</div>
                         @endif
                         @if($invoice->company->email)

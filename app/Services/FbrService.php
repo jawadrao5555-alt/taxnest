@@ -475,6 +475,8 @@ class FbrService
     {
         if (empty($value)) return "";
         $clean = preg_replace('/[^0-9]/', '', $value);
+        if (strlen($clean) === 13) return $clean;
+        if (strlen($clean) >= 7) return substr($clean, 0, 7);
         return $clean;
     }
 

@@ -56,7 +56,7 @@
                     @if($invoice->fbr_invoice_number)
                     @php
                         $qrData = json_encode([
-                            'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $invoice->company->ntn ?? ''),
+                            'sellerNTNCNIC' => substr(preg_replace('/[^0-9]/', '', $invoice->company->ntn ?? ''), 0, strlen(preg_replace('/[^0-9]/', '', $invoice->company->ntn ?? '')) === 13 ? 13 : 7),
                             'fbr_invoice_number' => $invoice->fbr_invoice_number,
                             'invoiceDate' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
                             'totalValues' => $invoice->total_amount

@@ -30,6 +30,10 @@ Route::get('/share/invoice/{uuid}', [ShareController::class, 'show']);
 Route::get('/demo-login/{role}', [\App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'demoLogin'])
     ->where('role', 'super_admin|company_admin|demo');
 
+Route::get('/health', function () {
+    return response('OK', 200);
+});
+
 Route::get('/', function () {
     return view('landing', ['showLogin' => false]);
 });

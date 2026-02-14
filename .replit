@@ -18,6 +18,11 @@ SESSION_DOMAIN = ""
 SESSION_PARTITIONED_COOKIE = "true"
 FBR_PROXY_URL = "https://nestpay.replit.app/api/fbr-proxy/submit"
 
+[userenv.production]
+APP_KEY = "base64:41WY2e9C1jMkW21wJQsxMC1NUk5mge9Rn7sx5oNo4x0="
+APP_ENV = "production"
+APP_DEBUG = "false"
+
 [workflows]
 runButton = "Project"
 
@@ -66,5 +71,6 @@ channel = "stable-25_05"
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["bash", "-c", "php artisan config:clear && php artisan serve --host=0.0.0.0 --port=5000"]
+run = ["php", "artisan", "serve", "--host=0.0.0.0", "--port=5000"]
 publicDir = "dist/public"
+build = ["bash", "-c", "php artisan config:clear && php artisan optimize"]

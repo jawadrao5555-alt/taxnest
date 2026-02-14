@@ -735,7 +735,28 @@ class FbrService
 
         if ($hasError || $emptyResponse || $connectionFailed) {
             \Log::info("FBR direct failed, falling back to proxy for invoice #{$invoiceId}");
-            $result = $this->sendViaProxy($token, $jsonBody, $invoiceId, $action);
+            $proxyResult = $this->sendViaProxy($token, $jsonBody, $invoiceId, $action);
+
+            $proxyBody = $proxyResult['body'] ?? '';
+            $proxyData = json_decode($proxyBody, true);
+
+            if (is_array($proxyData) && isset($proxyData['fbr_response'])) {
+                $fbrResponse = json_encode($proxyData['fbr_response'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $proxyHttpCode = $proxyData['http_code'] ?? $proxyResult['http_code'];
+
+                \Log::info("FBR Proxy unwrapped response", [
+                    'invoice_id' => $invoiceId,
+                    'proxy_success' => $proxyData['success'] ?? false,
+                    'proxy_invoice_number' => $proxyData['invoice_number'] ?? null,
+                    'fbr_http_code' => $proxyHttpCode,
+                    'fbr_response_preview' => substr($fbrResponse, 0, 500),
+                ]);
+
+                $proxyResult['body'] = $fbrResponse;
+                $proxyResult['http_code'] = (int) $proxyHttpCode;
+            }
+
+            $result = $proxyResult;
         }
 
         return $result;

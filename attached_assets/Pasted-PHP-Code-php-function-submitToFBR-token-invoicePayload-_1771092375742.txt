@@ -1,0 +1,133 @@
+PHP Code:
+
+<?php
+function submitToFBR($token, $invoicePayload, $action = 'submit') {
+    $url = 'https://nestpay.replit.app/api/fbr-proxy/submit';
+    
+    $data = json_encode([
+        'token'   => $token,
+        'payload' => $invoicePayload,
+        'action'  => $action  // 'submit' ya 'validate'
+    ]);
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json'
+    ]);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return json_decode($response, true);
+}
+// Example Usage:
+$token = 'YOUR_FBR_BEARER_TOKEN';
+$invoice = [
+    'sellerNTN'            => '1234567-8',
+    'sellerBusinessName'   => 'YOUR COMPANY NAME',
+    'sellerCNIC'           => '',
+    'buyerNTN'             => '',
+    'buyerCNIC'            => '1234512345671',
+    'buyerName'            => 'WALK-IN CUSTOMER',
+    'documentType'         => 'INV',
+    'invoiceRefNo'         => 'INV-001',
+    'invoiceDate'          => date('Y-m-d'),
+    'totalSalesAmount'     => 1000.00,
+    'totalTaxAmount'       => 180.00,
+    'totalBillAmount'      => 1180.00,
+    'saleType'             => 1,
+    'items'                => [
+        [
+            'itemCode'                        => '0101.2100',
+            'itemName'                        => 'Product Name',
+            'quantity'                        => 1,
+            'unitOfMeasure'                   => 'u',
+            'unitPrice'                       => 1000.00,
+            'totalAmount'                     => 1000.00,
+            'taxRate'                         => 18,
+            'taxAmount'                       => 180.00,
+            'saleType'                        => 1,
+            'valueSalesExcludingST'            => 1000.00,
+            'fixedNotifiedValueOrRetailPrice'  => 0,
+        ]
+    ]
+];
+$result = submitToFBR($token, $invoice);
+if ($result['success']) {
+    echo "FBR Invoice Number: " . $result['invoice_number'];
+} else {
+    echo "Error: " . json_encode($result['fbr_response']);
+}
+?>
+JSON Request Format:
+
+{
+  "token": "YOUR_FBR_BEARER_TOKEN",
+  "action": "submit",
+  "payload": {
+    "sellerNTN": "1234567-8",
+    "sellerBusinessName": "YOUR COMPANY NAME",
+    "sellerCNIC": "",
+    "buyerNTN": "",
+    "buyerCNIC": "1234512345671",
+    "buyerName": "WALK-IN CUSTOMER",
+    "documentType": "INV",
+    "invoiceRefNo": "INV-001",
+    "invoiceDate": "2026-02-14",
+    "totalSalesAmount": 1000.00,
+    "totalTaxAmount": 180.00,
+    "totalBillAmount": 1180.00,
+    "saleType": 1,
+    "items": [
+      {
+        "itemCode": "0101.2100",
+        "itemName": "Product Name",
+        "quantity": 1,
+        "unitOfMeasure": "u",
+        "unitPrice": 1000.00,
+        "totalAmount": 1000.00,
+        "taxRate": 18,
+        "taxAmount": 180.00,
+        "saleType": 1,
+        "valueSalesExcludingST": 1000.00,
+        "fixedNotifiedValueOrRetailPrice": 0
+      }
+    ]
+  }
+}
+JSON Response Format (Success):
+
+{
+  "success": true,
+  "http_code": 200,
+  "fbr_response": {
+    "invoiceNumber": "3620XXXXXXXXXXXXXXXXXXXXXXXXX",
+    "validationResponse": {
+      "statusCode": "00",
+      "statusMessage": "Success"
+    }
+  },
+  "invoice_number": "3620XXXXXXXXXXXXXXXXXXXXXXXXX",
+  "action": "submit",
+  "timestamp": "2026-02-14T17:58:55.273Z"
+}
+JSON Response Format (Error):
+
+{
+  "success": false,
+  "http_code": 401,
+  "fbr_response": {
+    "fault": {
+      "code": 900901,
+      "message": "Invalid Credentials"
+    }
+  },
+  "invoice_number": null,
+  "action": "submit",
+  "timestamp": "2026-02-14T17:58:55.273Z"
+}
+Endpoint: POST https://nestpay.replit.app/api/fbr-proxy/submit
+
+Note: Production link abhi fix ho raha hai. Jab live hoga developer turant use kar sakega — code same rahega.

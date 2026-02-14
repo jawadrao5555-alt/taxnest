@@ -586,6 +586,86 @@ class FbrService
         return self::SANDBOX_VALIDATE_URL;
     }
 
+    private function sendDirectToFbr(string $url, string $token, string $jsonBody, int $invoiceId): array
+    {
+        $cookieFile = storage_path('app/fbr_cookies_' . md5($token) . '.txt');
+
+        $attempt = 0;
+        $maxAttempts = 2;
+        $responseBody = '';
+        $httpCode = 0;
+        $curlError = '';
+        $curlInfo = [];
+        $responseHeaders = [];
+
+        while ($attempt < $maxAttempts) {
+            $attempt++;
+            $responseHeaders = [];
+
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => $jsonBody,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 30,
+                CURLOPT_HTTPHEADER     => [
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . $token,
+                    'Accept: application/json',
+                ],
+                CURLOPT_HEADERFUNCTION => function($curl, $header) use (&$responseHeaders) {
+                    $len = strlen($header);
+                    $parts = explode(':', $header, 2);
+                    if (count($parts) === 2) {
+                        $responseHeaders[strtolower(trim($parts[0]))] = trim($parts[1]);
+                    }
+                    return $len;
+                },
+                CURLOPT_COOKIEFILE     => $cookieFile,
+                CURLOPT_COOKIEJAR      => $cookieFile,
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_VERBOSE        => false,
+                CURLOPT_USERAGENT      => 'TaxNest/1.0 FBR-DI-Client',
+            ]);
+
+            $responseBody = curl_exec($ch);
+            $httpCode     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError    = curl_error($ch);
+            $curlInfo     = curl_getinfo($ch);
+            curl_close($ch);
+
+            \Log::info("FBR Direct Attempt {$attempt}", [
+                'invoice_id' => $invoiceId,
+                'http_code' => $httpCode,
+                'body_length' => strlen($responseBody ?: ''),
+                'response_preview' => substr($responseBody ?: '(empty)', 0, 500),
+                'time_sec' => $curlInfo['total_time'] ?? null,
+                'has_cookie' => file_exists($cookieFile),
+            ]);
+
+            if ($httpCode === 200 && strlen(trim($responseBody ?: '')) > 0) {
+                break;
+            }
+
+            if ($httpCode === 200 && strlen(trim($responseBody ?: '')) === 0 && $attempt < $maxAttempts) {
+                \Log::info("FBR WAF cookie challenge detected, retrying with cookie for invoice #{$invoiceId}");
+                usleep(500000);
+                continue;
+            }
+
+            break;
+        }
+
+        return [
+            'body' => $responseBody,
+            'http_code' => $httpCode,
+            'curl_error' => $curlError,
+            'response_headers' => $responseHeaders,
+            'curl_info' => $curlInfo,
+            'attempts' => $attempt,
+        ];
+    }
+
     public function submitInvoice($invoice, int $retryCount = 0)
     {
         $payload = $this->buildPayload($invoice);
@@ -666,42 +746,12 @@ class FbrService
 
         try {
             $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
-            $responseHeaders = [];
-
-            $ch = curl_init($url);
-            curl_setopt_array($ch, [
-                CURLOPT_POST           => true,
-                CURLOPT_POSTFIELDS     => $jsonBody,
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT        => 30,
-                CURLOPT_HTTPHEADER     => [
-                    'Content-Type: application/json',
-                    'Authorization: Bearer ' . $token,
-                    'Accept: application/json',
-                ],
-                CURLOPT_HEADERFUNCTION => function($curl, $header) use (&$responseHeaders) {
-                    $len = strlen($header);
-                    $header = explode(':', $header, 2);
-                    if (count($header) < 2) return $len;
-                    $responseHeaders[strtolower(trim($header[0]))] = trim($header[1]);
-                    return $len;
-                },
-                CURLOPT_SSL_VERIFYPEER => true,
-                CURLOPT_VERBOSE        => false,
-            ]);
-
-            $responseBody = curl_exec($ch);
-            $httpCode     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $curlError    = curl_error($ch);
-            $curlInfo     = curl_getinfo($ch);
-            curl_close($ch);
-
-            \Log::info('FBR Submit Response', [
-                'invoice_id' => $invoice->id,
-                'http_code' => $httpCode,
-                'response_preview' => substr($responseBody ?: '(empty)', 0, 500),
-                'time_sec' => $curlInfo['total_time'] ?? null,
-            ]);
+            $result = $this->sendDirectToFbr($url, $token, $jsonBody, $invoice->id);
+            $responseBody = $result['body'];
+            $httpCode = $result['http_code'];
+            $curlError = $result['curl_error'];
+            $responseHeaders = $result['response_headers'];
+            $curlInfo = $result['curl_info'];
 
             $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
             $log->response_time_ms = $responseTimeMs;
@@ -1012,24 +1062,9 @@ class FbrService
 
         try {
             $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
-
-            $ch = curl_init($validateUrl);
-            curl_setopt_array($ch, [
-                CURLOPT_POST           => true,
-                CURLOPT_POSTFIELDS     => $jsonBody,
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT        => 30,
-                CURLOPT_HTTPHEADER     => [
-                    'Content-Type: application/json',
-                    'Authorization: Bearer ' . $token,
-                    'Accept: application/json',
-                ],
-                CURLOPT_SSL_VERIFYPEER => true,
-            ]);
-
-            $responseBody = curl_exec($ch);
-            $httpCode     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
+            $result = $this->sendDirectToFbr($validateUrl, $token, $jsonBody, 0);
+            $responseBody = $result['body'];
+            $httpCode = $result['http_code'];
 
             $response = new class($responseBody, $httpCode) {
                 private $body;

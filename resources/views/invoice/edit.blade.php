@@ -585,10 +585,12 @@
 
                 calcTax(index) {
                     let item = this.items[index];
-                    let subtotal = parseFloat(item.price || 0) * parseFloat(item.quantity || 0);
+                    let unitPrice = parseFloat(item.price || 0);
+                    let qty = parseFloat(item.quantity || 0);
+                    let subtotal = unitPrice * qty;
                     item.tax = parseFloat(((parseFloat(item.tax_rate || 0) / 100) * subtotal).toFixed(2));
-                    if (!item.mrpManual && parseFloat(item.price || 0) > 0) {
-                        item.mrp = item.price;
+                    if (!item.mrpManual && unitPrice > 0) {
+                        item.mrp = unitPrice.toFixed(2);
                     }
                     this.applyScheduleRules(item);
                 },

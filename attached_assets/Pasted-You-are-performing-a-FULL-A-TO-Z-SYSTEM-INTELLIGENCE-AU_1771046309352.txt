@@ -1,0 +1,193 @@
+You are performing a FULL A-TO-Z SYSTEM INTELLIGENCE AUDIT of TaxNest.
+
+DO NOT modify anything.
+DO NOT refactor.
+DO NOT optimize.
+DO NOT migrate.
+DO NOT change database.
+DO NOT change UI.
+DO NOT change FBR payload.
+
+Only ANALYZE and RETURN structured report.
+
+========================================
+PHASE 1 — BUSINESS MODEL ANALYSIS
+========================================
+
+1. Identify system type:
+   - Pure FBR invoicing?
+   - SME ERP + FBR?
+   - Enterprise tax intelligence?
+   - Hybrid SaaS?
+
+2. Identify target market from features:
+   - Retail
+   - Distributor
+   - Manufacturer
+   - Corporate
+   - CA firms
+
+3. Identify revenue model:
+   - Subscription only?
+   - Tiered pricing?
+   - Custom plan builder?
+   - Transaction-based?
+
+Return summary.
+
+========================================
+PHASE 2 — INVOICE ENGINE AUDIT
+========================================
+
+Check and confirm:
+
+- Invoice types supported
+- Invoice lifecycle states
+- Dual numbering logic
+- FBR number storage logic
+- Retry protection
+- DB transactions + lockForUpdate usage
+- Unique DB constraints
+- Pending verification handling
+- Duplicate prevention
+- Idempotency safety
+
+Return safety rating.
+
+========================================
+PHASE 3 — TAX & HS SYSTEM AUDIT
+========================================
+
+Analyze:
+
+- Global HS master structure
+- HS intelligence layers
+- Schedule engine logic
+- SRO requirements logic
+- Reduced rate handling
+- 3rd Schedule validation
+- Exempt & Zero Rated validation
+- Tax override priority system (5-layer)
+- Province/Sector override logic
+- Learning engine integration
+- Auto suggestion system
+- Admin control boundaries
+
+Return architecture diagram summary.
+
+========================================
+PHASE 4 — FBR INTEGRATION AUDIT
+========================================
+
+Verify:
+
+- Token storage (encrypted?)
+- Static bearer usage
+- Production/Sandbox isolation
+- Environment switching safety
+- IP whitelist assumption
+- FBR 500 logic handling
+- Response validation parsing
+- Unknown state handling
+- Audit logging on submission
+- Retry backoff logic
+
+Return risk classification:
+LOW / MODERATE / HIGH
+
+========================================
+PHASE 5 — INTELLIGENCE LAYER AUDIT
+========================================
+
+Check existence of:
+
+- Compliance scoring engine
+- Rejection probability engine
+- Audit probability engine
+- Vendor risk engine
+- HS intelligence suggestion engine
+- Rejection learning loop
+- Confidence scoring logic
+- Cross-company isolation of intelligence data
+
+Return maturity level:
+Basic / Advanced / Enterprise AI
+
+========================================
+PHASE 6 — BILLING & LIMIT SYSTEM
+========================================
+
+Verify:
+
+- Fixed plans
+- Custom plan builder
+- Limit enforcement
+- Internal bypass flag
+- Trial expiry logic
+- Subscription expiry lock
+- Discount engine
+
+Return billing robustness rating.
+
+========================================
+PHASE 7 — SECURITY & DATA ISOLATION
+========================================
+
+Check:
+
+- Multi-tenant isolation
+- Company scoping enforcement
+- Role middleware coverage
+- Audit log immutability
+- SHA256 hash usage
+- Rate limiting
+- HTTPS enforcement
+- Queue isolation
+
+Return security grade:
+A / B / C
+
+========================================
+PHASE 8 — UI / PRODUCT STRATEGY
+========================================
+
+Evaluate:
+
+- Dashboard complexity vs target market
+- Mobile responsiveness
+- Scroll container correctness
+- Sidebar structure
+- PWA readiness
+- Install prompt logic
+- Premium consistency
+
+Return UI grade:
+Over-engineered / Balanced / Enterprise-ready
+
+========================================
+FINAL OUTPUT FORMAT
+========================================
+
+Return:
+
+1. System Identity (1 paragraph)
+2. Strengths (bullet list)
+3. Weaknesses (bullet list)
+4. Over-engineered areas (if any)
+5. Missing critical features (if any)
+6. Production safety level
+7. Intelligence maturity level
+8. Billing model maturity
+9. Security rating
+10. Final Verdict:
+   - Ready for Market
+   - Needs Hardening
+   - Overbuilt
+   - Underbuilt
+
+IMPORTANT:
+No code changes.
+No suggestions.
+Only analysis.
+
+Begin audit.

@@ -209,11 +209,21 @@
                     </div>
                 </div>
 
-                <div class="flex justify-end gap-3">
-                    <button type="submit" :disabled="saving" class="inline-flex items-center px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition shadow-sm disabled:opacity-50">
-                        <svg x-show="saving" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        <span x-text="saving ? 'Saving...' : 'Save FBR Settings'"></span>
-                    </button>
+                <div x-ref="saveArea">
+                    <div x-show="saveMessage" x-cloak x-transition class="mb-3 p-4 rounded-lg text-sm font-medium"
+                        :class="saveSuccess ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-red-50 border border-red-200 text-red-700'"
+                        x-text="saveMessage"></div>
+                    <div x-show="testMessage" x-cloak x-transition class="mb-3 p-3 rounded-lg text-sm"
+                        :class="connStatus === 'green' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'">
+                        <span class="font-medium" x-text="connStatus === 'green' ? 'Connection Healthy' : 'Connection Issue'"></span>
+                        <span class="ml-1" x-text="testMessage"></span>
+                    </div>
+                    <div class="flex justify-end gap-3">
+                        <button type="submit" :disabled="saving" class="inline-flex items-center px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition shadow-sm disabled:opacity-50">
+                            <svg x-show="saving" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            <span x-text="saving ? 'Saving...' : 'Save FBR Settings'"></span>
+                        </button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -274,17 +284,17 @@
                         this.confirmText = '';
                         this.hasSandboxToken = !!this.form.fbr_sandbox_token;
                         this.hasProductionToken = !!this.form.fbr_production_token;
-                        window.scrollTo({top: 0, behavior: 'smooth'});
+                        this.$nextTick(() => { this.$refs.saveArea?.scrollIntoView({behavior: 'smooth', block: 'center'}); });
                         await this.testConn();
                     } else {
-                        this.saveMessage = data.message || data.errors ? Object.values(data.errors || {}).flat().join(', ') : 'Failed to save settings.';
+                        this.saveMessage = data.message || (data.errors ? Object.values(data.errors).flat().join(', ') : 'Failed to save settings.');
                         this.saveSuccess = false;
-                        window.scrollTo({top: 0, behavior: 'smooth'});
+                        this.$nextTick(() => { this.$refs.saveArea?.scrollIntoView({behavior: 'smooth', block: 'center'}); });
                     }
                 } catch(e) {
                     this.saveMessage = 'Error saving settings. Please try again.';
                     this.saveSuccess = false;
-                    window.scrollTo({top: 0, behavior: 'smooth'});
+                    this.$nextTick(() => { this.$refs.saveArea?.scrollIntoView({behavior: 'smooth', block: 'center'}); });
                 }
                 this.saving = false;
             },

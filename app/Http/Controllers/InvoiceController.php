@@ -1473,7 +1473,7 @@ class InvoiceController extends Controller
             $executionMs = round((microtime(true) - $startTime) * 1000);
             Log::error("FBR Sync Submit: Invoice #{$invoice->id} exception: " . $e->getMessage());
 
-            $invoice->status = 'failed';
+            $invoice->status = 'draft';
             $invoice->fbr_status = 'failed';
             $invoice->save();
 
@@ -1580,7 +1580,7 @@ class InvoiceController extends Controller
         }
 
         if ($response['status'] === 'pending_verification') {
-            $invoice->status = 'pending_verification';
+            $invoice->status = 'draft';
             $invoice->fbr_status = 'pending_verification';
             $invoice->save();
 
@@ -1593,7 +1593,7 @@ class InvoiceController extends Controller
             return ['status' => 'pending_verification', 'execution_ms' => $executionMs];
         }
 
-        $invoice->status = 'failed';
+        $invoice->status = 'draft';
         $invoice->fbr_status = 'failed';
         $invoice->save();
 

@@ -64,6 +64,7 @@
             .dark .sidebar-link:hover { background-color: rgba(55,65,81,0.5); }
             .sidebar-link.active { background: linear-gradient(90deg, rgba(16,185,129,0.08) 0%, transparent 100%); font-weight: 600; border-left: 3px solid #10b981; padding-left: 13px; }
             .dark .sidebar-link.active { background: linear-gradient(90deg, rgba(16,185,129,0.15) 0%, transparent 100%); border-left: 3px solid #10b981; padding-left: 13px; }
+            [x-cloak] { display: none !important; }
         </style>
     </head>
     <body class="h-screen overflow-hidden font-sans antialiased">

@@ -194,48 +194,29 @@
             init() {
                 this.updateRules();
                 this.calcTax();
+                this.$watch('scheduleType', () => this.updateRules());
+                this.$watch('taxRate', () => { this.updateRules(); this.calcTax(); });
+                this.$watch('price', () => this.calcTax());
             },
 
             updateRules() {
                 const st = this.scheduleType;
                 const rate = parseFloat(this.taxRate) || 0;
 
-                switch(st) {
-                    case '3rd_schedule':
-                        if (rate >= 18) {
-                            this.requiresSro = false;
-                            this.requiresSerial = false;
-                            this.requiresMrp = true;
-                        } else {
-                            this.requiresSro = true;
-                            this.requiresSerial = true;
-                            this.requiresMrp = true;
-                        }
-                        break;
-                    case 'reduced':
+                this.requiresSro = false;
+                this.requiresSerial = false;
+                this.requiresMrp = false;
+
+                if (st === '3rd_schedule') {
+                    this.requiresMrp = true;
+                    if (rate < 18) {
                         this.requiresSro = true;
                         this.requiresSerial = true;
-                        this.requiresMrp = false;
-                        break;
-                    case 'exempt':
-                        this.requiresSro = true;
-                        this.requiresSerial = false;
-                        this.requiresMrp = false;
-                        break;
-                    case 'zero_rated':
-                        this.requiresSro = false;
-                        this.requiresSerial = false;
-                        this.requiresMrp = false;
-                        break;
-                    case 'standard':
-                    default:
-                        this.requiresSro = false;
-                        this.requiresSerial = false;
-                        this.requiresMrp = false;
-                        break;
-                }
-
-                if (!this.requiresSro && rate < 18 && st && st !== 'zero_rated' && st !== 'standard') {
+                    }
+                } else if (st === 'reduced') {
+                    this.requiresSro = true;
+                    this.requiresSerial = true;
+                } else if (st === 'exempt') {
                     this.requiresSro = true;
                 }
                 this.calcTax();

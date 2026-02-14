@@ -205,7 +205,7 @@ class FbrService
             "invoiceRefNo" => $this->resolveInvoiceRefNo($invoice),
             "buyerProvince" => $this->normalizeProvince($invoice->destination_province ?? "Punjab"),
             "sellerAddress" => $this->sanitizeForFbr($company->address ?? ""),
-            "sellerNTNCNIC" => $this->formatNtnCnic($company->ntn ?? ""),
+            "sellerNTNCNIC" => $this->formatNtnCnic($company->fbr_registration_no ?: ($company->ntn ?? "")),
             "sellerProvince" => $this->normalizeProvince($invoice->supplier_province ?? $company->province ?? "Punjab"),
             "buyerBusinessName" => $this->sanitizeForFbr($invoice->buyer_name ?? 'CUSTOMER'),
             "sellerBusinessName" => $this->sanitizeForFbr($company->fbr_business_name ?: ($company->name ?? "")),

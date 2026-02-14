@@ -854,7 +854,7 @@ class InvoiceController extends Controller
             $invoice->fbr_status = 'production';
             $invoice->integrity_hash = \App\Services\IntegrityHashService::generate($invoice);
             $invoice->qr_data = json_encode([
-                'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $company->ntn ?? ''),
+                'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $company->fbr_registration_no ?: ($company->ntn ?? '')),
                 'fbr_invoice_number' => $fbrNum ?? $invoice->invoice_number,
                 'invoiceDate' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
                 'totalValues' => $invoice->total_amount,
@@ -938,7 +938,7 @@ class InvoiceController extends Controller
                 $invoice->fbr_invoice_number = $fbrInvoiceNumber;
                 $invoice->fbr_invoice_id = $fbrInvoiceNumber;
                 $invoice->qr_data = json_encode([
-                    'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $invoice->company->ntn ?? ''),
+                    'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $invoice->company->fbr_registration_no ?: ($invoice->company->ntn ?? '')),
                     'fbr_invoice_number' => $fbrInvoiceNumber,
                     'invoiceDate' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
                     'totalValues' => $invoice->total_amount,
@@ -1012,11 +1012,20 @@ class InvoiceController extends Controller
         $oldStatus = $invoice->status;
         $newNumber = $request->input('fbr_invoice_number');
 
+        $existingInvoice = Invoice::where('fbr_invoice_number', $newNumber)
+            ->where('id', '!=', $invoice->id)
+            ->first();
+
+        if ($existingInvoice) {
+            return redirect('/invoice/' . $invoice->id)->with('error', 'This FBR Invoice Number is already assigned to Invoice #' . $existingInvoice->internal_invoice_number . '. Each invoice must have a unique FBR number.');
+        }
+
         $invoice->fbr_invoice_number = $newNumber;
         $invoice->fbr_invoice_id = $newNumber;
 
+        $company = $invoice->company;
         $invoice->qr_data = json_encode([
-            'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $invoice->company->ntn ?? ''),
+            'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $company->fbr_registration_no ?: ($company->ntn ?? '')),
             'fbr_invoice_number' => $newNumber,
             'invoiceDate' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
             'totalValues' => $invoice->total_amount,
@@ -1109,7 +1118,7 @@ class InvoiceController extends Controller
         $fbrLogoBase64 = '';
         if ($invoice->fbr_invoice_number) {
             $qrData = json_encode([
-                'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $invoice->company->ntn ?? ''),
+                'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $invoice->company->fbr_registration_no ?: ($invoice->company->ntn ?? '')),
                 'fbr_invoice_number' => $invoice->fbr_invoice_number,
                 'invoiceDate' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
                 'totalValues' => $invoice->total_amount,
@@ -1521,7 +1530,7 @@ class InvoiceController extends Controller
             $invoice->fbr_status = 'production';
             $invoice->integrity_hash = IntegrityHashService::generate($invoice);
             $invoice->qr_data = json_encode([
-                'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $company->ntn ?? ''),
+                'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $company->fbr_registration_no ?: ($company->ntn ?? '')),
                 'fbr_invoice_number' => $fbrNum ?? $invoice->invoice_number,
                 'invoiceDate' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
                 'totalValues' => $invoice->total_amount,

@@ -1016,11 +1016,9 @@ class InvoiceController extends Controller
             'totalValues' => $invoice->total_amount,
         ]);
 
-        if (in_array($invoice->status, ['pending_verification', 'submitted', 'failed'])) {
-            $invoice->status = 'locked';
-            $invoice->fbr_status = 'success';
-            $invoice->fbr_submission_date = $invoice->fbr_submission_date ?? now();
-        }
+        $invoice->status = 'locked';
+        $invoice->fbr_status = 'success';
+        $invoice->fbr_submission_date = $invoice->fbr_submission_date ?? now();
 
         $invoice->integrity_hash = IntegrityHashService::generate($invoice);
         $invoice->save();

@@ -35,7 +35,7 @@
                 <td style="width: 60%; vertical-align: top;">
                     <div class="company-name">{{ $invoice->company->name ?? 'TaxNest' }}</div>
                     <p style="margin: 3px 0; font-size: 12px; color: #6b7280;">NTN: {{ $invoice->company->ntn ?? 'N/A' }}</p>
-                    @if($invoice->company->cnic && $invoice->company->cnic !== $invoice->company->ntn)
+                    @if($invoice->company->cnic && $invoice->company->cnic !== $invoice->company->ntn && $invoice->company->cnic !== $invoice->company->registration_no)
                     <p style="margin: 3px 0; font-size: 12px; color: #6b7280;">CNIC: {{ $invoice->company->cnic }}</p>
                     @endif
                     @if($invoice->company->registration_no)

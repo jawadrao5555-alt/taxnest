@@ -667,6 +667,76 @@ class FbrService
         ];
     }
 
+    private function sendViaProxy(string $url, string $token, string $jsonBody, int $invoiceId): array
+    {
+        $proxyUrl = 'https://corsproxy.io/?' . urlencode($url);
+
+        $responseHeaders = [];
+        $ch = curl_init($proxyUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $jsonBody,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 45,
+            CURLOPT_HTTPHEADER     => [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $token,
+                'Accept: application/json',
+            ],
+            CURLOPT_HEADERFUNCTION => function($curl, $header) use (&$responseHeaders) {
+                $len = strlen($header);
+                $parts = explode(':', $header, 2);
+                if (count($parts) === 2) {
+                    $responseHeaders[strtolower(trim($parts[0]))] = trim($parts[1]);
+                }
+                return $len;
+            },
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_VERBOSE        => false,
+            CURLOPT_USERAGENT      => 'TaxNest/1.0 FBR-DI-Client',
+        ]);
+
+        $responseBody = curl_exec($ch);
+        $httpCode     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError    = curl_error($ch);
+        $curlInfo     = curl_getinfo($ch);
+        curl_close($ch);
+
+        \Log::info("FBR Proxy Attempt", [
+            'invoice_id' => $invoiceId,
+            'http_code' => $httpCode,
+            'body_length' => strlen($responseBody ?: ''),
+            'response_preview' => substr($responseBody ?: '(empty)', 0, 500),
+            'time_sec' => $curlInfo['total_time'] ?? null,
+        ]);
+
+        return [
+            'body' => $responseBody,
+            'http_code' => $httpCode,
+            'curl_error' => $curlError,
+            'response_headers' => $responseHeaders,
+            'curl_info' => $curlInfo,
+            'attempts' => 1,
+        ];
+    }
+
+    private function sendToFbr(string $url, string $token, string $jsonBody, int $invoiceId): array
+    {
+        $result = $this->sendDirectToFbr($url, $token, $jsonBody, $invoiceId);
+
+        $body = trim($result['body'] ?? '');
+        $hasError = !empty($result['curl_error']);
+        $emptyResponse = ($result['http_code'] === 200 && strlen($body) === 0);
+        $connectionFailed = ($result['http_code'] === 0);
+
+        if ($hasError || $emptyResponse || $connectionFailed) {
+            \Log::info("FBR direct failed, falling back to proxy for invoice #{$invoiceId}");
+            $result = $this->sendViaProxy($url, $token, $jsonBody, $invoiceId);
+        }
+
+        return $result;
+    }
+
     public function submitInvoice($invoice, int $retryCount = 0)
     {
         $payload = $this->buildPayload($invoice);
@@ -747,7 +817,7 @@ class FbrService
 
         try {
             $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
-            $result = $this->sendDirectToFbr($url, $token, $jsonBody, $invoice->id);
+            $result = $this->sendToFbr($url, $token, $jsonBody, $invoice->id);
             $responseBody = $result['body'];
             $httpCode = $result['http_code'];
             $curlError = $result['curl_error'];
@@ -1063,7 +1133,7 @@ class FbrService
 
         try {
             $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
-            $result = $this->sendDirectToFbr($validateUrl, $token, $jsonBody, 0);
+            $result = $this->sendToFbr($validateUrl, $token, $jsonBody, 0);
             $responseBody = $result['body'];
             $httpCode = $result['http_code'];
 

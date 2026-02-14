@@ -1036,7 +1036,15 @@ class InvoiceController extends Controller
         $invoice->fbr_submission_date = $invoice->fbr_submission_date ?? now();
 
         $invoice->integrity_hash = IntegrityHashService::generate($invoice);
-        $invoice->save();
+
+        try {
+            $invoice->save();
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            return redirect('/invoice/' . $invoice->id)->with('error', 'This FBR Invoice Number is already in use. Please enter a unique number.');
+        } catch (\Exception $e) {
+            \Log::error('FBR number update failed', ['invoice_id' => $invoice->id, 'error' => $e->getMessage()]);
+            return redirect('/invoice/' . $invoice->id)->with('error', 'Failed to update FBR number. Please try again.');
+        }
 
         InvoiceActivityService::log($invoice->id, $invoice->company_id, 'fbr_number_updated', [
             'old_number' => $oldNumber,

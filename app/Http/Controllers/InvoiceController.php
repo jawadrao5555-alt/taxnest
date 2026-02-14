@@ -807,23 +807,18 @@ class InvoiceController extends Controller
             }
         }
 
-        if (in_array($invoice->status, ['locked', 'submitted', 'pending_verification'])) {
-            $msg = match($invoice->status) {
-                'locked' => 'Invoice already submitted to FBR' . (!empty($invoice->fbr_invoice_number) ? ' with number: ' . $invoice->fbr_invoice_number : '') . '. Cannot resubmit.',
-                'submitted' => 'Invoice is already being processed. Please wait.',
-                'pending_verification' => 'Invoice is pending FBR verification.',
-                default => 'Cannot resubmit.',
-            };
+        if ($invoice->status === 'locked') {
+            $msg = 'Invoice already submitted to FBR' . (!empty($invoice->fbr_invoice_number) ? ' with number: ' . $invoice->fbr_invoice_number : '') . '. Cannot resubmit.';
             return redirect('/invoice/' . $invoice->id)->with('error', $msg);
         }
 
-        if (!in_array($invoice->status, ['draft', 'failed'])) {
+        if (!in_array($invoice->status, ['draft', 'failed', 'submitted', 'pending_verification'])) {
             return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice cannot be submitted in current status.');
         }
 
         $locked = DB::transaction(function () use ($invoice) {
             $lockedInvoice = Invoice::where('id', $invoice->id)->lockForUpdate()->first();
-            if (!$lockedInvoice || !in_array($lockedInvoice->status, ['draft', 'failed'])) {
+            if (!$lockedInvoice || !in_array($lockedInvoice->status, ['draft', 'failed', 'submitted', 'pending_verification'])) {
                 return false;
             }
             $lockedInvoice->status = 'submitted';

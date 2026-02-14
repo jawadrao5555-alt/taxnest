@@ -1017,7 +1017,7 @@ class InvoiceController extends Controller
         ]);
 
         $invoice->status = 'submitted';
-        $invoice->fbr_status = 'submitted';
+        $invoice->fbr_status = 'production';
         $invoice->fbr_submission_date = $invoice->fbr_submission_date ?? now();
 
         $invoice->integrity_hash = IntegrityHashService::generate($invoice);

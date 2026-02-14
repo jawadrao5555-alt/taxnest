@@ -99,6 +99,9 @@
                         @elseif($invoice->company->phone)
                         <div class="company-detail">Phone: {{ $invoice->company->phone }}</div>
                         @endif
+                        @if($invoice->company->email)
+                        <div class="company-detail">Email: {{ $invoice->company->email }}</div>
+                        @endif
                     </td>
                 </tr>
             </table>

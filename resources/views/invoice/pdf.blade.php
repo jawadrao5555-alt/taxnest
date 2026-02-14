@@ -51,6 +51,9 @@
                     @elseif($invoice->company->phone)
                     <p style="margin: 3px 0; font-size: 12px; color: #6b7280;">Phone: {{ $invoice->company->phone }}</p>
                     @endif
+                    @if($invoice->company->email)
+                    <p style="margin: 3px 0; font-size: 12px; color: #6b7280;">Email: {{ $invoice->company->email }}</p>
+                    @endif
                 </td>
                 <td style="width: 40%; vertical-align: top; text-align: right;">
                     @if($invoice->fbr_invoice_number)

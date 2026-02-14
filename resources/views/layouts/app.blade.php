@@ -214,7 +214,7 @@
             document.addEventListener('DOMContentLoaded', function() {
                 var firstErr = document.querySelector('.text-red-700, .text-red-600, .border-red-200, [class*="bg-red-"]');
                 if (firstErr && firstErr.closest('.max-w-7xl')) { firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-                document.querySelectorAll('form').forEach(function(form) {
+                document.querySelectorAll('form:not(.no-auto-loading)').forEach(function(form) {
                     form.addEventListener('submit', function() {
                         var btn = form.querySelector('button[type="submit"]');
                         if (btn && !btn.classList.contains('btn-loading')) { btn.classList.add('btn-loading'); }

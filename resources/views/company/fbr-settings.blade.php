@@ -9,7 +9,7 @@
                 :class="saveSuccess ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-red-50 border border-red-200 text-red-700'"
                 x-text="saveMessage"></div>
 
-            <form @submit.prevent="saveSettings()" class="space-y-6">
+            <form @submit.prevent="saveSettings()" class="space-y-6 no-auto-loading">
 
                 <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Company FBR Details</h3>

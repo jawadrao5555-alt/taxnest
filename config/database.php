@@ -1,7 +1,9 @@
 <?php
 use Illuminate\Support\Str;
-$dbUrl = getenv('DATABASE_URL');
+
+$dbUrl = env('DATABASE_URL', getenv('DATABASE_URL'));
 $parsedUrl = $dbUrl ? parse_url($dbUrl) : [];
+
 return [
     'default' => env('DB_CONNECTION', 'pgsql'),
     'connections' => [
@@ -30,7 +32,7 @@ return [
         ],
         'pgsql' => [
             'driver' => 'pgsql',
-            'url' => env('DATABASE_URL'),
+            'url' => $dbUrl,
             'host' => $parsedUrl['host'] ?? env('DB_HOST', '127.0.0.1'),
             'port' => $parsedUrl['port'] ?? env('DB_PORT', '5432'),
             'database' => ltrim($parsedUrl['path'] ?? env('DB_DATABASE', 'laravel'), '/'),

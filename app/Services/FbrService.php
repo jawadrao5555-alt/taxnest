@@ -669,7 +669,7 @@ class FbrService
 
     private function sendViaProxy(string $token, string $jsonBody, int $invoiceId, string $action = 'submit'): array
     {
-        $proxyUrl = 'https://nestpay.replit.app/api/fbr-proxy/submit';
+        $proxyUrl = env('FBR_PROXY_URL', 'https://nestpay.replit.app/api/fbr-proxy/submit');
         $payload = json_decode($jsonBody, true);
 
         $proxyData = json_encode([

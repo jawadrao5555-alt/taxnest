@@ -219,9 +219,15 @@
                         <span class="ml-1" x-text="testMessage"></span>
                     </div>
                     <div class="flex justify-end gap-3">
-                        <button type="submit" :disabled="saving" class="inline-flex items-center px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition shadow-sm disabled:opacity-50">
-                            <svg x-show="saving" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                            <span x-text="saving ? 'Saving...' : 'Save FBR Settings'"></span>
+                        <button type="submit" :disabled="saving || saveDone" class="inline-flex items-center px-6 py-2.5 rounded-lg font-medium transition shadow-sm disabled:opacity-70"
+                            :class="saveDone ? 'bg-green-500 text-white' : 'bg-emerald-600 text-white hover:bg-emerald-700'">
+                            <template x-if="saving">
+                                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            </template>
+                            <template x-if="saveDone">
+                                <svg class="-ml-1 mr-2 h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                            </template>
+                            <span x-text="saving ? 'Saving...' : (saveDone ? 'Saved!' : 'Save FBR Settings')"></span>
                         </button>
                     </div>
                 </div>
@@ -254,18 +260,21 @@
             sandboxResult: null,
             hasSandboxToken: initData.has_sandbox,
             hasProductionToken: initData.has_production,
+            saveDone: false,
 
             async saveSettings() {
                 if (this.form.fbr_environment === 'production' && this.originalEnv !== 'production') {
                     if (this.confirmText !== 'CONFIRM') {
                         this.saveMessage = 'Production switch requires confirmation. Please type CONFIRM.';
                         this.saveSuccess = false;
-                        window.scrollTo({top: 0, behavior: 'smooth'});
+                        this.$nextTick(() => { this.$refs.saveArea?.scrollIntoView({behavior: 'smooth', block: 'center'}); });
                         return;
                     }
                 }
                 this.saving = true;
+                this.saveDone = false;
                 this.saveMessage = '';
+                this.testMessage = '';
                 try {
                     let res = await fetch('/company/fbr-settings-ajax', {
                         method: 'POST',
@@ -276,8 +285,10 @@
                         },
                         body: JSON.stringify(this.form)
                     });
+                    this.saving = false;
                     let data = await res.json();
                     if (data.success) {
+                        this.saveDone = true;
                         this.saveMessage = data.message || 'FBR settings saved successfully!';
                         this.saveSuccess = true;
                         this.originalEnv = this.form.fbr_environment;
@@ -286,17 +297,18 @@
                         this.hasProductionToken = !!this.form.fbr_production_token;
                         this.$nextTick(() => { this.$refs.saveArea?.scrollIntoView({behavior: 'smooth', block: 'center'}); });
                         await this.testConn();
+                        setTimeout(() => { this.saveDone = false; }, 3000);
                     } else {
                         this.saveMessage = data.message || (data.errors ? Object.values(data.errors).flat().join(', ') : 'Failed to save settings.');
                         this.saveSuccess = false;
                         this.$nextTick(() => { this.$refs.saveArea?.scrollIntoView({behavior: 'smooth', block: 'center'}); });
                     }
                 } catch(e) {
+                    this.saving = false;
                     this.saveMessage = 'Error saving settings. Please try again.';
                     this.saveSuccess = false;
                     this.$nextTick(() => { this.$refs.saveArea?.scrollIntoView({behavior: 'smooth', block: 'center'}); });
                 }
-                this.saving = false;
             },
 
             async testConn() {

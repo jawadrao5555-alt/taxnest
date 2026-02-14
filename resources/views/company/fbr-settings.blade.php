@@ -276,6 +276,8 @@
                 this.saveMessage = '';
                 this.testMessage = '';
                 try {
+                    this.saveMessage = 'Saving settings...';
+                    this.saveSuccess = true;
                     let res = await fetch('/company/fbr-settings-ajax', {
                         method: 'POST',
                         headers: {
@@ -285,24 +287,42 @@
                         },
                         body: JSON.stringify(this.form)
                     });
-                    this.saving = false;
                     let data = await res.json();
-                    if (data.success) {
-                        this.saveDone = true;
-                        this.saveMessage = data.message || 'FBR settings saved successfully!';
-                        this.saveSuccess = true;
-                        this.originalEnv = this.form.fbr_environment;
-                        this.confirmText = '';
-                        this.hasSandboxToken = !!this.form.fbr_sandbox_token;
-                        this.hasProductionToken = !!this.form.fbr_production_token;
-                        this.$nextTick(() => { this.$refs.saveArea?.scrollIntoView({behavior: 'smooth', block: 'center'}); });
-                        await this.testConn();
-                        setTimeout(() => { this.saveDone = false; }, 3000);
-                    } else {
+                    if (!data.success) {
+                        this.saving = false;
                         this.saveMessage = data.message || (data.errors ? Object.values(data.errors).flat().join(', ') : 'Failed to save settings.');
                         this.saveSuccess = false;
                         this.$nextTick(() => { this.$refs.saveArea?.scrollIntoView({behavior: 'smooth', block: 'center'}); });
+                        return;
                     }
+                    this.originalEnv = this.form.fbr_environment;
+                    this.confirmText = '';
+                    this.hasSandboxToken = !!this.form.fbr_sandbox_token;
+                    this.hasProductionToken = !!this.form.fbr_production_token;
+                    this.saveMessage = 'Settings saved! Testing connection...';
+                    this.$nextTick(() => { this.$refs.saveArea?.scrollIntoView({behavior: 'smooth', block: 'center'}); });
+                    let connRes = await fetch('/company/test-connection', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json'
+                        }
+                    });
+                    let connData = await connRes.json();
+                    this.connStatus = connData.status;
+                    this.saving = false;
+                    this.saveDone = true;
+                    if (connData.status === 'green') {
+                        this.saveMessage = 'Settings saved & connection healthy! (' + this.form.fbr_environment + ')';
+                        this.saveSuccess = true;
+                    } else {
+                        this.saveMessage = 'Settings saved but connection issue: ' + (connData.message || 'Unknown error');
+                        this.saveSuccess = false;
+                    }
+                    this.testMessage = connData.message;
+                    this.$nextTick(() => { this.$refs.saveArea?.scrollIntoView({behavior: 'smooth', block: 'center'}); });
+                    setTimeout(() => { this.saveDone = false; }, 4000);
                 } catch(e) {
                     this.saving = false;
                     this.saveMessage = 'Error saving settings. Please try again.';

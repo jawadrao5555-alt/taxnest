@@ -280,7 +280,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">MRP / Retail Price (Rs.)</label>
-                                    <input type="number" step="0.01" min="0" :name="'items[' + index + '][mrp]'" x-model="item.mrp" placeholder="0.00"
+                                    <input type="number" step="0.01" min="0" :name="'items[' + index + '][mrp]'" x-model="item.mrp" @input="item.mrpManual = true" placeholder="0.00"
                                         class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 </div>
                             </div>
@@ -468,6 +468,7 @@
                         'sro_schedule_no' => $i->sro_schedule_no ?? '',
                         'serial_no' => $i->serial_no ?? '',
                         'mrp' => $i->mrp ?? '',
+                        'mrpManual' => true,
                         'default_uom' => $i->default_uom ?? 'Numbers, pieces, units',
                         'st_withheld_at_source' => (bool)($i->st_withheld_at_source ?? false),
                         'petroleum_levy' => $i->petroleum_levy ?? '',
@@ -513,7 +514,7 @@
                     let item = {
                         product_id: '', hs_code: '', pct_code: '', description: '',
                         quantity: 1, price: 0, tax_rate: companyStandardRate, tax: 0,
-                        schedule_type: 'standard', sro_schedule_no: '', serial_no: '', mrp: '',
+                        schedule_type: 'standard', sro_schedule_no: '', serial_no: '', mrp: '', mrpManual: false,
                         default_uom: 'Numbers, pieces, units',
                         st_withheld_at_source: false, petroleum_levy: '',
                         show_st_withheld: false, show_petroleum_levy: false,
@@ -586,6 +587,9 @@
                     let item = this.items[index];
                     let subtotal = parseFloat(item.price || 0) * parseFloat(item.quantity || 0);
                     item.tax = parseFloat(((parseFloat(item.tax_rate || 0) / 100) * subtotal).toFixed(2));
+                    if (!item.mrpManual && parseFloat(item.price || 0) > 0) {
+                        item.mrp = item.price;
+                    }
                     this.applyScheduleRules(item);
                 },
                 itemSubtotal(index) {
@@ -672,7 +676,10 @@
                     this.applyScheduleRules(item);
                     if (product.sro_reference) item.sro_schedule_no = product.sro_reference;
                     if (product.serial_number) item.serial_no = product.serial_number;
-                    if (product.mrp) item.mrp = product.mrp;
+                    if (product.mrp) {
+                        item.mrp = product.mrp;
+                        item.mrpManual = (parseFloat(product.mrp) !== parseFloat(product.default_price));
+                    }
                     item.productSearch = product.name;
                     item.showDropdown = false;
                     item.hsLookupInfo = 'From product: ' + product.name + ' | Schedule: ' + item.schedule_type;

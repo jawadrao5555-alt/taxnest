@@ -75,9 +75,10 @@
                                 <span x-show="requiresMrp" class="text-red-500">*</span>
                                 <span x-show="!requiresMrp" class="text-gray-400 text-xs">(Optional)</span>
                             </label>
-                            <input type="number" step="0.01" min="0" name="mrp" x-model="mrp"
+                            <input type="number" step="0.01" min="0" name="mrp" x-model="mrp" @input="mrpManual = true"
                                 class="w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
                                 placeholder="0.00">
+                            <p x-show="!mrpManual && parseFloat(mrp) > 0" class="text-xs text-gray-400 mt-1">Auto-filled from price</p>
                             <p x-show="requiresMrp" class="text-xs text-purple-600 mt-1">Required for 3rd Schedule</p>
                             @error('mrp') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
@@ -188,6 +189,7 @@
             taxRate: '{{ old("default_tax_rate", "18") }}',
             price: '{{ old("default_price", "0") }}',
             mrp: '{{ old("mrp", "") }}',
+            mrpManual: {{ old("mrp") ? 'true' : 'false' }},
             sroReference: '{{ old("sro_reference", "") }}',
             serialNumber: '{{ old("serial_number", "") }}',
             requiresSro: false,
@@ -204,7 +206,12 @@
                 this.calcTax();
                 this.$watch('scheduleType', () => this.updateRules());
                 this.$watch('taxRate', () => { this.updateRules(); this.calcTax(); });
-                this.$watch('price', () => this.calcTax());
+                this.$watch('price', (val) => {
+                    this.calcTax();
+                    if (!this.mrpManual) {
+                        this.mrp = val;
+                    }
+                });
             },
 
             updateRules() {

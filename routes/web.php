@@ -104,6 +104,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::put('/company/profile', [CompanySettingsController::class, 'updateProfile']);
         Route::get('/company/fbr-settings', [CompanySettingsController::class, 'fbrSettings']);
         Route::put('/company/fbr-settings', [CompanySettingsController::class, 'updateFbrSettings']);
+        Route::post('/company/fbr-settings-ajax', [CompanySettingsController::class, 'updateFbrSettingsAjax']);
         Route::post('/company/test-connection', [CompanySettingsController::class, 'testConnection']);
         Route::post('/company/sandbox-test/{type}', [CompanySettingsController::class, 'sandboxTest']);
 

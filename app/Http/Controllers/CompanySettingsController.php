@@ -121,6 +121,57 @@ class CompanySettingsController extends Controller
         return redirect('/company/fbr-settings')->with('success', 'FBR settings updated.');
     }
 
+    public function updateFbrSettingsAjax(Request $request)
+    {
+        $company = Company::find(auth()->user()->company_id);
+        if (!$company) {
+            return response()->json(['success' => false, 'message' => 'Company not found.']);
+        }
+
+        $request->validate([
+            'fbr_environment' => 'required|in:sandbox,production',
+            'fbr_sandbox_token' => 'nullable|string|max:500',
+            'fbr_production_token' => 'nullable|string|max:500',
+            'fbr_registration_no' => 'nullable|string|max:100',
+            'fbr_business_name' => 'nullable|string|max:255',
+            'fbr_sandbox_url' => 'nullable|url|max:500',
+            'fbr_production_url' => 'nullable|url|max:500',
+        ]);
+
+        $data = [
+            'fbr_environment' => $request->fbr_environment,
+            'fbr_registration_no' => $request->fbr_registration_no,
+            'fbr_business_name' => $request->fbr_business_name,
+            'fbr_sandbox_url' => $request->fbr_sandbox_url,
+            'fbr_production_url' => $request->fbr_production_url,
+        ];
+
+        if ($request->filled('fbr_sandbox_token')) {
+            $data['fbr_sandbox_token'] = Crypt::encryptString($request->fbr_sandbox_token);
+        }
+
+        if ($request->filled('fbr_production_token')) {
+            $data['fbr_production_token'] = Crypt::encryptString($request->fbr_production_token);
+        }
+
+        $company->update($data);
+
+        SecurityLogService::log('fbr_settings_updated', auth()->id(), [
+            'company_id' => $company->id,
+            'environment' => $request->fbr_environment,
+        ]);
+
+        AuditLogService::log('fbr_settings_changed', 'Company', $company->id, null, [
+            'environment' => $request->fbr_environment,
+            'registration_no' => $request->fbr_registration_no,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'FBR settings saved! Environment: ' . ucfirst($request->fbr_environment),
+        ]);
+    }
+
     public function testConnection()
     {
         $company = Company::find(auth()->user()->company_id);

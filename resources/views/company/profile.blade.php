@@ -1,10 +1,16 @@
 <x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-bold text-xl text-gray-800 dark:text-gray-200 leading-tight">Business Profile</h2>
-    </x-slot>
+    <div class="py-8">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="mb-6">
+                <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Settings</h2>
+            </div>
 
-    <div class="py-6">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+            <div class="flex gap-1 mb-6 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                <a href="/company/profile" class="flex-1 text-center px-4 py-2.5 rounded-md text-sm font-semibold transition bg-white dark:bg-gray-900 text-emerald-700 dark:text-emerald-400 shadow-sm">Business Profile</a>
+                <a href="/company/fbr-settings" class="flex-1 text-center px-4 py-2.5 rounded-md text-sm font-semibold transition text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">FBR Settings</a>
+            </div>
+
+        <div class="space-y-6">
 
             @if(session('success'))
             <div class="p-4 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700 rounded-xl text-emerald-700 dark:text-emerald-300 font-medium">{{ session('success') }}</div>
@@ -164,6 +170,7 @@
                     <button type="submit" class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition shadow-sm">Save Changes</button>
                 </div>
             </form>
+        </div>
         </div>
     </div>
 </x-app-layout>

@@ -2,7 +2,12 @@
     <div class="py-8">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="mb-6">
-                <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">FBR Integration Settings</h2>
+                <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Settings</h2>
+            </div>
+
+            <div class="flex gap-1 mb-6 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                <a href="/company/profile" class="flex-1 text-center px-4 py-2.5 rounded-md text-sm font-semibold transition text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">Business Profile</a>
+                <a href="/company/fbr-settings" class="flex-1 text-center px-4 py-2.5 rounded-md text-sm font-semibold transition bg-white dark:bg-gray-900 text-emerald-700 dark:text-emerald-400 shadow-sm">FBR Settings</a>
             </div>
 
             @if(session('success'))

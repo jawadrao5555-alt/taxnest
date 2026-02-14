@@ -821,6 +821,12 @@ class FbrService
 
         try {
             $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
+
+            \Log::info("FBR Payload for Invoice #{$invoice->id}", [
+                'payload_json' => $jsonBody,
+                'url' => $url,
+            ]);
+
             $result = $this->sendToFbr($url, $token, $jsonBody, $invoice->id);
             $responseBody = $result['body'];
             $httpCode = $result['http_code'];

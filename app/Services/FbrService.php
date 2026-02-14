@@ -163,9 +163,9 @@ class FbrService
 
             if ($isExempt) {
                 $salesTaxApplicable = 0.00;
-                $extraTaxVal = "";
+                $extraTaxVal = 0.00;
             } elseif ($isReduced) {
-                $extraTaxVal = "";
+                $extraTaxVal = 0.00;
             } else {
                 $extraTaxVal = round(floatval($item->extra_tax ?? 0), 2);
             }
@@ -174,8 +174,7 @@ class FbrService
             $fedPayable = round(floatval($item->fed_payable ?? 0), 2);
             $discount = round(floatval($item->discount ?? 0), 2);
 
-            $extraTaxNum = is_numeric($extraTaxVal) ? $extraTaxVal : 0;
-            $totalValues = round($valueSalesExcludingST + $salesTaxApplicable + $extraTaxNum + $furtherTax + $fedPayable - $discount, 2);
+            $totalValues = round($valueSalesExcludingST + $salesTaxApplicable + floatval($extraTaxVal) + $furtherTax + $fedPayable - $discount, 2);
 
             if ($isExempt) {
                 $rateStr = "Exempt";
@@ -191,7 +190,7 @@ class FbrService
                 "rate" => $rateStr,
                 "hsCode" => $hsCode,
                 "discount" => (float) round($discount, 2),
-                "extraTax" => is_numeric($extraTaxVal) ? (float) round($extraTaxVal, 2) : $extraTaxVal,
+                "extraTax" => (float) round(floatval($extraTaxVal), 2),
                 "quantity" => (float) round($quantity, 4),
                 "saleType" => $saleTypeNormalized,
                 "fedPayable" => (float) round($fedPayable, 2),
@@ -201,7 +200,7 @@ class FbrService
                 "salesTaxApplicable" => (float) round($salesTaxApplicable, 2),
                 "valueSalesExcludingST" => (float) round($valueSalesExcludingST, 2),
                 "salesTaxWithheldAtSource" => (float) round($item->st_withheld_at_source ? floatval($item->st_withheld_at_source) : 0.00, 2),
-                "fixedNotifiedValueOrRetailPrice" => (float) round($is3rdSchedule ? $retailPrice : $retailPrice, 2),
+                "fixedNotifiedValueOrRetailPrice" => (float) round($retailPrice, 2),
             ];
 
             $needsSro = ($is3rdSchedule && $taxRate < 18) || $isExempt || $isReduced;
@@ -249,6 +248,97 @@ class FbrService
         }
 
         return $payload;
+    }
+
+    public function validatePayloadPreSubmission(array $payload): array
+    {
+        $errors = [];
+
+        if (empty($payload['sellerNTNCNIC'])) {
+            $errors[] = ['code' => '0001', 'message' => 'Seller NTN/CNIC is missing. Please configure FBR Registration Number.'];
+        }
+
+        if (empty($payload['invoiceType'])) {
+            $errors[] = ['code' => '0011', 'message' => 'Invoice type is missing.'];
+        }
+
+        if (empty($payload['invoiceDate'])) {
+            $errors[] = ['code' => '0042', 'message' => 'Invoice date is missing.'];
+        }
+
+        if (empty($payload['buyerBusinessName'])) {
+            $errors[] = ['code' => '0010', 'message' => 'Buyer name is missing.'];
+        }
+
+        if (empty($payload['buyerRegistrationType'])) {
+            $errors[] = ['code' => '0012', 'message' => 'Buyer registration type is missing.'];
+        }
+
+        if (empty($payload['sellerProvince'])) {
+            $errors[] = ['code' => '0073', 'message' => 'Seller province (Sale Origination) is missing.'];
+        }
+
+        if (empty($payload['buyerProvince'])) {
+            $errors[] = ['code' => '0074', 'message' => 'Buyer province (Destination of Supply) is missing.'];
+        }
+
+        $invoiceType = $payload['invoiceType'] ?? '';
+        if (in_array($invoiceType, ['Debit Note', 'Credit Note'])) {
+            if (empty($payload['invoiceRefNo'])) {
+                $errors[] = ['code' => '0026', 'message' => 'Invoice Reference No. is required for ' . $invoiceType . '.'];
+            }
+        }
+
+        if (empty($payload['items']) || !is_array($payload['items'])) {
+            $errors[] = ['code' => 'ITEM', 'message' => 'No items found in payload.'];
+            return $errors;
+        }
+
+        foreach ($payload['items'] as $idx => $item) {
+            $sn = $idx + 1;
+
+            if (empty($item['hsCode'])) {
+                $errors[] = ['code' => '0044', 'message' => "Item #{$sn}: HS Code is missing."];
+            }
+
+            if (empty($item['rate'])) {
+                $errors[] = ['code' => '0046', 'message' => "Item #{$sn}: Rate is missing."];
+            }
+
+            if (empty($item['saleType'])) {
+                $errors[] = ['code' => '0013', 'message' => "Item #{$sn}: Sale type is missing."];
+            }
+
+            $rate = str_replace('%', '', $item['rate'] ?? '0');
+            $valueExclST = floatval($item['valueSalesExcludingST'] ?? 0);
+            if (is_numeric($rate) && floatval($rate) == 5 && $valueExclST > 20000) {
+                $errors[] = ['code' => '0079', 'message' => "Item #{$sn}: Value exceeds Rs. 20,000 - 5% rate is not allowed for values above this threshold."];
+            }
+
+            $saleType = strtolower($item['saleType'] ?? '');
+            if (strpos($saleType, '3rd schedule') !== false) {
+                $retailPrice = floatval($item['fixedNotifiedValueOrRetailPrice'] ?? 0);
+                if ($retailPrice <= 0) {
+                    $errors[] = ['code' => '0090', 'message' => "Item #{$sn}: Retail/MRP price is required for 3rd Schedule goods."];
+                }
+
+                if ($valueExclST > 0 && is_numeric($rate)) {
+                    $expectedTax = round(($valueExclST * floatval($rate)) / 100, 2);
+                    $actualTax = floatval($item['salesTaxApplicable'] ?? 0);
+                    if (abs($expectedTax - $actualTax) > 0.02) {
+                        $errors[] = ['code' => '0102', 'message' => "Item #{$sn}: Calculated tax ({$actualTax}) doesn't match expected ({$expectedTax}) for 3rd Schedule."];
+                    }
+                }
+            }
+
+            if ($saleType === 'exempt goods' || $saleType === 'exempt') {
+                if (floatval($item['salesTaxApplicable'] ?? 0) != 0) {
+                    $errors[] = ['code' => '0018', 'message' => "Item #{$sn}: Exempt goods should have zero sales tax."];
+                }
+            }
+        }
+
+        return $errors;
     }
 
     private function normalizeProvince(?string $province): string

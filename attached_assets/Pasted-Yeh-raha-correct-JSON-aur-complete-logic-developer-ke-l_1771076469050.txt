@@ -1,0 +1,77 @@
+Yeh raha correct JSON aur complete logic developer ke liye:
+
+Correct JSON (3 KG DAP):
+{
+  "token": "FBR_TOKEN_YAHAN_DAALEIN",
+  "action": "submit",
+  "payload": {
+    "items": [
+      {
+        "uoM": "KG",
+        "rate": "5%",
+        "hsCode": "3105.3000",
+        "discount": 0.0,
+        "extraTax": 0.0,
+        "quantity": 3,
+        "saleType": "3rd Schedule Goods",
+        "fedPayable": 0.0,
+        "furtherTax": 0.0,
+        "totalValues": 819.66,
+        "productDescription": "Dap",
+        "salesTaxApplicable": 39.03,
+        "valueSalesExcludingST": 780.63,
+        "salesTaxWithheldAtSource": 0.0,
+        "fixedNotifiedValueOrRetailPrice": 260.21,
+        "sroScheduleNo": "3rd Schedule goods",
+        "sroItemSerialNo": "51"
+      }
+    ],
+    "invoiceDate": "2026-02-14",
+    "invoiceType": "Sale Invoice",
+    "documentTypeId": 1,
+    "buyerAddress": "lodhran",
+    "invoiceRefNo": "3638114-4DI1771076067886",
+    "buyerProvince": "Punjab",
+    "sellerAddress": "KHAIR PUR ROAD PULL FAREED ABAD KAHROR PAKKA, Lodhran Kahror Pakka",
+    "sellerNTNCNIC": "3620291786117",
+    "sellerProvince": "Punjab",
+    "buyerBusinessName": "Abrar Ahmad",
+    "sellerBusinessName": "ZIA CORPORATION",
+    "buyerRegistrationType": "Unregistered",
+    "buyerNTNCNIC": ""
+  }
+}
+Logic / Formulas (3rd Schedule Goods):
+STEP 1: fixedNotifiedValueOrRetailPrice = Per unit MRP (FBR notified price)
+         = 260.21 (yeh fix hai, FBR ne decide kiya hai)
+STEP 2: valueSalesExcludingST = quantity × fixedNotifiedValueOrRetailPrice
+         = 3 × 260.21
+         = 780.63
+STEP 3: salesTaxApplicable = valueSalesExcludingST × rate%
+         = 780.63 × 5%
+         = 39.03 (round to 2 decimals)
+STEP 4: totalValues = valueSalesExcludingST + salesTaxApplicable
+         = 780.63 + 39.03
+         = 819.66
+Field-by-field explanation:
+Field	Value	Kya hai
+fixedNotifiedValueOrRetailPrice	260.21	Per unit price (FBR notified MRP) — yeh HAMESHA per unit rehta hai, quantity se multiply NAHI hota
+quantity	3	Kitne KG bech rahe hain
+valueSalesExcludingST	780.63	Total sale value WITHOUT tax = qty × MRP
+rate	"5%"	Tax rate (string mein "%" ke saath)
+salesTaxApplicable	39.03	Tax amount = valueSalesExcludingST × 5%
+totalValues	819.66	Grand total = value + tax
+saleType	"3rd Schedule Goods"	Capital G — yeh FBR ka exact format hai
+sroScheduleNo	"3rd Schedule goods"	Small g — yeh bhi FBR ka exact format hai
+discount, extraTax, fedPayable, furtherTax, salesTaxWithheldAtSource	0.0	Sab zero (agar koi applicable nahi)
+Common Galti:
+Galti	Galat	Sahi
+Values 1 unit ki rakhna jab quantity zyada ho	valueSalesExcludingST: 260.21 (1 KG)	valueSalesExcludingST: 780.63 (3 KG)
+saleType mein small g	"3rd Schedule goods"	"3rd Schedule Goods" (capital G)
+sroScheduleNo mein capital G	"3rd Schedule Goods"	"3rd Schedule goods" (small g)
+fixedNotifiedValueOrRetailPrice multiply karna	780.63 (galat)	260.21 (per unit hi rehta hai)
+Yaad rakhein:
+fixedNotifiedValueOrRetailPrice = HAMESHA per unit (kabhi multiply NAHI)
+valueSalesExcludingST = quantity × per unit price (yeh multiply HOTA HAI)
+saleType = Capital Goods
+sroScheduleNo = Small goods

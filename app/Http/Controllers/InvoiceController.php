@@ -1468,6 +1468,21 @@ class InvoiceController extends Controller
 
         try {
             $fbrService = new FbrService();
+
+            $payload = $fbrService->buildPayload($invoice);
+            $preErrors = $fbrService->validatePayloadPreSubmission($payload);
+            if (!empty($preErrors)) {
+                $executionMs = round((microtime(true) - $startTime) * 1000);
+                $errorMessages = array_map(fn($e) => "[{$e['code']}] {$e['message']}", $preErrors);
+                Log::warning("FBR Pre-Validation Failed: Invoice #{$invoice->id}", $preErrors);
+
+                $invoice->status = 'draft';
+                $invoice->fbr_status = 'validation_failed';
+                $invoice->save();
+
+                return ['status' => 'failed', 'errors' => $errorMessages, 'execution_ms' => $executionMs, 'failure_type' => 'pre_validation'];
+            }
+
             $response = $fbrService->submitInvoice($invoice, 0);
         } catch (\Exception $e) {
             $executionMs = round((microtime(true) - $startTime) * 1000);

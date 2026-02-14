@@ -221,34 +221,47 @@
 
     <script>
     function fbrSettingsPage() {
+        var initData = @json([
+            'environment' => $company->fbr_environment ?? 'sandbox',
+            'registration_no' => $company->fbr_registration_no ?? '',
+            'business_name' => $company->fbr_business_name ?? '',
+            'sandbox_url' => $company->fbr_sandbox_url ?? 'https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata_sb',
+            'production_url' => $company->fbr_production_url ?? 'https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata',
+            'sandbox_token' => $sandboxToken ?? '',
+            'production_token' => $productionToken ?? '',
+            'connection_status' => $company->fbr_connection_status ?? 'unknown',
+            'has_sandbox' => !empty($sandboxToken),
+            'has_production' => !empty($productionToken),
+        ]);
         return {
             form: {
-                fbr_environment: '{{ $company->fbr_environment ?? "sandbox" }}',
-                fbr_registration_no: '{{ $company->fbr_registration_no ?? "" }}',
-                fbr_business_name: @json($company->fbr_business_name ?? ''),
-                fbr_sandbox_url: '{{ $company->fbr_sandbox_url ?? "https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata_sb" }}',
-                fbr_production_url: '{{ $company->fbr_production_url ?? "https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata" }}',
-                fbr_sandbox_token: '{{ $sandboxToken ?? "" }}',
-                fbr_production_token: '{{ $productionToken ?? "" }}',
+                fbr_environment: initData.environment,
+                fbr_registration_no: initData.registration_no,
+                fbr_business_name: initData.business_name,
+                fbr_sandbox_url: initData.sandbox_url,
+                fbr_production_url: initData.production_url,
+                fbr_sandbox_token: initData.sandbox_token,
+                fbr_production_token: initData.production_token,
             },
-            originalEnv: '{{ $company->fbr_environment ?? "sandbox" }}',
+            originalEnv: initData.environment,
             confirmText: '',
             saving: false,
             saveMessage: '',
             saveSuccess: false,
-            connStatus: '{{ $company->fbr_connection_status ?? "unknown" }}',
+            connStatus: initData.connection_status,
             testing: false,
             testMessage: '',
             sandboxRunning: false,
             sandboxResult: null,
-            hasSandboxToken: {{ $sandboxToken ? 'true' : 'false' }},
-            hasProductionToken: {{ $productionToken ? 'true' : 'false' }},
+            hasSandboxToken: initData.has_sandbox,
+            hasProductionToken: initData.has_production,
 
             async saveSettings() {
                 if (this.form.fbr_environment === 'production' && this.originalEnv !== 'production') {
                     if (this.confirmText !== 'CONFIRM') {
                         this.saveMessage = 'Production switch requires confirmation. Please type CONFIRM.';
                         this.saveSuccess = false;
+                        window.scrollTo({top: 0, behavior: 'smooth'});
                         return;
                     }
                 }
@@ -272,14 +285,17 @@
                         this.confirmText = '';
                         this.hasSandboxToken = !!this.form.fbr_sandbox_token;
                         this.hasProductionToken = !!this.form.fbr_production_token;
+                        window.scrollTo({top: 0, behavior: 'smooth'});
                         await this.testConn();
                     } else {
-                        this.saveMessage = data.message || 'Failed to save settings.';
+                        this.saveMessage = data.message || data.errors ? Object.values(data.errors || {}).flat().join(', ') : 'Failed to save settings.';
                         this.saveSuccess = false;
+                        window.scrollTo({top: 0, behavior: 'smooth'});
                     }
                 } catch(e) {
                     this.saveMessage = 'Error saving settings. Please try again.';
                     this.saveSuccess = false;
+                    window.scrollTo({top: 0, behavior: 'smooth'});
                 }
                 this.saving = false;
             },

@@ -68,7 +68,13 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Price (Rs.) <span class="text-red-500">*</span></label>
+                            <input type="number" step="0.01" min="0" name="default_price" x-model="price" @input="calcTax()" required
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
+                                placeholder="0.00">
+                        </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 MRP / Retail Price (Rs.)
@@ -79,7 +85,6 @@
                                 class="w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
                                 placeholder="0.00">
                             <p x-show="!mrpManual && parseFloat(mrp) > 0" class="text-xs text-gray-400 mt-1">Auto-filled from price</p>
-                            <p x-show="requiresMrp" class="text-xs text-purple-600 mt-1">Required for 3rd Schedule</p>
                             @error('mrp') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
@@ -134,15 +139,7 @@
                 </div>
 
                 <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">Pricing & Tax Calculation</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Price (Rs.) <span class="text-red-500">*</span></label>
-                            <input type="number" step="0.01" min="0" name="default_price" x-model="price" @input="calcTax()" required
-                                class="w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                        </div>
-                    </div>
-
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">Tax Calculation Preview</h3>
                     <div class="p-4 rounded-lg border" :class="taxAmount > 0 ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-700' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'">
                         <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Tax Calculation Preview (per unit)</h4>
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">

@@ -10,63 +10,20 @@
                 <a href="/company/fbr-settings" class="flex-1 text-center px-4 py-2.5 rounded-md text-sm font-semibold transition text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">FBR Settings</a>
             </div>
 
-        <div class="space-y-6">
-
             @if(session('success'))
-            <div class="p-4 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700 rounded-xl text-emerald-700 dark:text-emerald-300 font-medium">{{ session('success') }}</div>
+            <div class="mb-4 p-4 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700 rounded-lg text-emerald-700 dark:text-emerald-300 font-medium">{{ session('success') }}</div>
             @endif
-
-            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
-                    <div>
-                        <h3 class="text-2xl font-bold text-gray-900 dark:text-white">{{ $company->name }}</h3>
-                        @if($company->owner_name)
-                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Owner: {{ $company->owner_name }}</p>
-                        @endif
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        @if($company->ntn)
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700">NTN: {{ $company->ntn }}</span>
-                        @endif
-                        @if($company->cnic)
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700">CNIC: {{ $company->cnic }}</span>
-                        @endif
-                        @if($company->registration_no)
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700">Reg #: {{ $company->registration_no }}</span>
-                        @endif
-                        @if($company->company_status)
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold {{ $company->company_status === 'approved' ? 'bg-green-50 dark:bg-green-900/40 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700' : 'bg-amber-50 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700' }}">{{ ucfirst($company->company_status) }}</span>
-                        @endif
-                    </div>
-                </div>
-                @if($company->address || $company->phone || $company->mobile || $company->email || $company->city || $company->website)
-                <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
-                    @if($company->address)
-                    <p class="text-sm text-gray-500 dark:text-gray-400"><span class="font-medium text-gray-600 dark:text-gray-300">Address:</span> {{ $company->address }}@if($company->city), {{ $company->city }}@endif</p>
-                    @endif
-                    @if($company->phone)
-                    <p class="text-sm text-gray-500 dark:text-gray-400"><span class="font-medium text-gray-600 dark:text-gray-300">Phone:</span> {{ $company->phone }}</p>
-                    @endif
-                    @if($company->mobile)
-                    <p class="text-sm text-gray-500 dark:text-gray-400"><span class="font-medium text-gray-600 dark:text-gray-300">Mobile:</span> {{ $company->mobile }}</p>
-                    @endif
-                    @if($company->email)
-                    <p class="text-sm text-gray-500 dark:text-gray-400"><span class="font-medium text-gray-600 dark:text-gray-300">Email:</span> {{ $company->email }}</p>
-                    @endif
-                    @if($company->website)
-                    <p class="text-sm text-gray-500 dark:text-gray-400"><span class="font-medium text-gray-600 dark:text-gray-300">Website:</span> {{ $company->website }}</p>
-                    @endif
-                </div>
-                @endif
-            </div>
+            @if(session('error'))
+            <div class="mb-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg text-red-700 dark:text-red-300 font-medium">{{ session('error') }}</div>
+            @endif
 
             <form method="POST" action="/company/profile" class="space-y-6">
                 @csrf
                 @method('PUT')
 
                 <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
-                    <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 pb-3 border-b border-gray-100 dark:border-gray-800">Business Information</h4>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Business Information</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Business Name <span class="text-red-500">*</span></label>
                             <input type="text" name="name" value="{{ old('name', $company->name) }}" required class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
@@ -88,24 +45,16 @@
                 </div>
 
                 <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
-                    <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 pb-3 border-b border-gray-100 dark:border-gray-800">Tax Registration (Read Only)</h4>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Tax Registration</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">NTN (National Tax Number)</label>
-                            <input type="text" value="{{ $company->ntn }}" disabled class="w-full rounded-lg bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed">
-                            <p class="text-xs text-gray-400 mt-1">Cannot be changed after registration</p>
+                            <input type="text" name="ntn" value="{{ old('ntn', $company->ntn) }}" placeholder="e.g. 1234567890123" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">CNIC</label>
-                            <input type="text" value="{{ $company->cnic }}" disabled class="w-full rounded-lg bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed">
-                            <p class="text-xs text-gray-400 mt-1">Cannot be changed after registration</p>
+                            <input type="text" name="cnic" value="{{ old('cnic', $company->cnic) }}" placeholder="e.g. 12345-1234567-1" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                         </div>
-                        @if($company->fbr_registration_no)
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">FBR Registration No</label>
-                            <input type="text" value="{{ $company->fbr_registration_no }}" disabled class="w-full rounded-lg bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed">
-                        </div>
-                        @endif
                         @if($company->province)
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Province</label>
@@ -116,8 +65,8 @@
                 </div>
 
                 <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
-                    <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 pb-3 border-b border-gray-100 dark:border-gray-800">Contact Details</h4>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Contact Details</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
                             <input type="email" name="email" value="{{ old('email', $company->email) }}" placeholder="company@example.com" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
@@ -138,9 +87,9 @@
                 </div>
 
                 <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
-                    <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 pb-3 border-b border-gray-100 dark:border-gray-800">Address</h4>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div class="sm:col-span-2">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Address</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Address</label>
                             <textarea name="address" rows="2" placeholder="Street address, area, etc." class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">{{ old('address', $company->address) }}</textarea>
                         </div>
@@ -152,7 +101,7 @@
                 </div>
 
                 <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
-                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">These details will appear on your invoices</h4>
+                    <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">These details will appear on your invoices</h3>
                     <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
                         <p class="text-sm text-gray-600 dark:text-gray-300"><strong>{{ $company->name }}</strong></p>
                         @if($company->ntn)<p class="text-xs text-gray-500">NTN: {{ $company->ntn }}</p>@endif
@@ -170,7 +119,6 @@
                     <button type="submit" class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition shadow-sm">Save Changes</button>
                 </div>
             </form>
-        </div>
         </div>
     </div>
 </x-app-layout>

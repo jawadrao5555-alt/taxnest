@@ -255,10 +255,14 @@
                         <p class="text-sm font-bold text-amber-800">Pending FBR Verification</p>
                         <p class="mt-1 text-sm text-amber-700">FBR returned an ambiguous response. The invoice may have been accepted. Please check the FBR portal to confirm and then update this invoice's status.</p>
                         @if(in_array(auth()->user()->role, ['company_admin', 'super_admin']))
-                        <div class="mt-3 flex gap-2">
-                            <form method="POST" action="/invoice/{{ $invoice->id }}/confirm-fbr" class="inline">
+                        <div class="mt-3 space-y-3">
+                            <form method="POST" action="/invoice/{{ $invoice->id }}/confirm-fbr" class="flex flex-wrap items-end gap-2" x-data="{ fbrNum: '' }">
                                 @csrf
                                 <input type="hidden" name="action" value="confirm">
+                                <div>
+                                    <label class="block text-xs font-medium text-amber-800 mb-1">FBR Invoice Number (from portal)</label>
+                                    <input type="text" name="fbr_invoice_number" x-model="fbrNum" placeholder="e.g. 3620291786117DIA..." class="px-3 py-1.5 text-xs border border-amber-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 w-64">
+                                </div>
                                 <button type="submit" class="inline-flex items-center px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition">Confirm (Verified on FBR Portal)</button>
                             </form>
                             <form method="POST" action="/invoice/{{ $invoice->id }}/confirm-fbr" class="inline">

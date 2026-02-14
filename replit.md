@@ -69,6 +69,17 @@ TaxNest is built on Laravel 12 with PHP 8.4, using Breeze for authentication. Th
 - **Mobile**: Hamburger opens sidebar drawer. Overlay click closes it. Tables have overflow-x-auto. Invoice sticky summary functional on all sizes.
 
 ## Recent Changes (Feb 14, 2026)
+**FBR Real-Time & Profile Session:**
+- FBR submission changed from async queue to synchronous real-time response (submitToFbrSync helper)
+- Submit, Retry both now return immediate FBR result with execution time
+- submitToFbrSync includes full post-processing: activity logging, audit logs, ledger entries, HS patterns, compliance recalculation, error handling with try/catch
+- SendInvoiceToFbrJob retained as fallback but no longer called from main submit/retry flow
+- Manual confirm (pending_verification) now accepts FBR invoice number input, saves it with QR data
+- Confirmation dialogs removed from Submit to FBR, Retry, Resubmit buttons (production flow)
+- Company Profile: registration_no, mobile, city, website fields added
+- Invoice PDF: Email added to both templates, all fields conditional (show only when filled)
+- Original PDF fields (Name, NTN, Address, Phone) always displayed as before
+
 **Enterprise Upgrade Session:**
 - Phase 1: Production Safety - exponential backoff (tries=3, backoff=[30,90,180]), lockForUpdate on FBR submission
 - Phase 3: Security Hardening - SecurityHeaders middleware (CSP, X-Frame-Options, X-Content-Type-Options)

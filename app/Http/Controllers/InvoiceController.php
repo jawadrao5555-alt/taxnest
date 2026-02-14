@@ -18,11 +18,17 @@ use App\Services\RiskIntelligenceEngine;
 use App\Services\SroSuggestionService;
 use App\Services\ScheduleEngine;
 use App\Services\GlobalHsService;
+use App\Services\FbrService;
+use App\Services\ComplianceScoreService;
+use App\Services\HsUsagePatternService;
+use App\Models\FbrLog;
+use App\Models\CustomerLedger;
 use Illuminate\Http\Request;
 use App\Services\AuditLogService;
 use App\Services\InvoiceNumberingService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class InvoiceController extends Controller
 {
@@ -703,14 +709,27 @@ class InvoiceController extends Controller
             'risk_level' => $scoreResult['risk_level'],
         ]);
 
-        SendInvoiceToFbrJob::safeDispatch($invoice->id, $fbrEnvironment);
-
         if ($invoice->buyer_ntn) {
             $vendorResult = VendorRiskEngine::calculateVendorScore($invoice->company_id, $invoice->buyer_ntn);
             VendorRiskEngine::persistVendorProfile($invoice->company_id, $invoice->buyer_ntn, $invoice->buyer_name, $vendorResult);
         }
 
-        return redirect('/invoice/' . $invoice->id)->with('success', 'Invoice submitted to FBR (Compliance Score: ' . $scoreResult['final_score'] . ' - ' . $scoreResult['risk_level'] . ' risk). PDF will auto-download once FBR verifies.');
+        $result = $this->submitToFbrSync($invoice, $fbrEnvironment);
+
+        if ($result['status'] === 'success') {
+            $fbrNum = $result['fbr_invoice_number'] ?? '';
+            return redirect('/invoice/' . $invoice->id)->with('success', 'FBR submission successful! Invoice Number: ' . $fbrNum . ' (Score: ' . $scoreResult['final_score'] . ', ' . $result['execution_ms'] . 'ms)');
+        }
+
+        if ($result['status'] === 'pending_verification') {
+            return redirect('/invoice/' . $invoice->id)->with('warning', 'FBR returned an ambiguous response (' . $result['execution_ms'] . 'ms). Please verify on FBR portal and confirm.');
+        }
+
+        $errorMsg = 'FBR submission failed';
+        if (!empty($result['errors'])) {
+            $errorMsg .= ': ' . implode(' | ', array_slice($result['errors'], 0, 3));
+        }
+        return redirect('/invoice/' . $invoice->id)->with('error', $errorMsg . ' (' . $result['execution_ms'] . 'ms)');
     }
 
     public function retry(Request $request, Invoice $invoice)
@@ -750,9 +769,22 @@ class InvoiceController extends Controller
             'retried_by' => auth()->user()->name,
         ]);
 
-        SendInvoiceToFbrJob::safeDispatch($invoice->id);
+        $result = $this->submitToFbrSync($invoice);
 
-        return redirect('/invoice/' . $invoice->id)->with('success', 'Invoice resubmitted to FBR. You will be notified of the result.');
+        if ($result['status'] === 'success') {
+            $fbrNum = $result['fbr_invoice_number'] ?? '';
+            return redirect('/invoice/' . $invoice->id)->with('success', 'FBR retry successful! Invoice Number: ' . $fbrNum . ' (' . $result['execution_ms'] . 'ms)');
+        }
+
+        if ($result['status'] === 'pending_verification') {
+            return redirect('/invoice/' . $invoice->id)->with('warning', 'FBR returned an ambiguous response. Please verify on FBR portal.');
+        }
+
+        $errorMsg = 'FBR retry failed';
+        if (!empty($result['errors'])) {
+            $errorMsg .= ': ' . implode(' | ', array_slice($result['errors'], 0, 3));
+        }
+        return redirect('/invoice/' . $invoice->id)->with('error', $errorMsg);
     }
 
     public function resubmitToFbr(Request $request, Invoice $invoice)
@@ -890,22 +922,42 @@ class InvoiceController extends Controller
         $action = $request->input('action');
 
         if ($action === 'confirm') {
+            $fbrInvoiceNumber = $request->input('fbr_invoice_number');
+
             $invoice->status = 'locked';
             $invoice->fbr_status = 'success';
             $invoice->fbr_submission_date = $invoice->fbr_submission_date ?? now();
+
+            if ($fbrInvoiceNumber) {
+                $invoice->fbr_invoice_number = $fbrInvoiceNumber;
+                $invoice->fbr_invoice_id = $fbrInvoiceNumber;
+                $invoice->qr_data = json_encode([
+                    'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $invoice->company->ntn ?? ''),
+                    'fbr_invoice_number' => $fbrInvoiceNumber,
+                    'invoiceDate' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
+                    'totalValues' => $invoice->total_amount,
+                ]);
+            }
+
             $invoice->integrity_hash = IntegrityHashService::generate($invoice);
             $invoice->save();
 
             InvoiceActivityService::log($invoice->id, $invoice->company_id, 'manually_confirmed', [
                 'confirmed_by' => $user->name,
                 'action' => 'confirmed_on_fbr_portal',
+                'fbr_invoice_number' => $fbrInvoiceNumber,
             ], request()->ip());
 
             AuditLogService::log('invoice_manually_confirmed', 'Invoice', $invoice->id, null, [
                 'confirmed_by' => $user->name,
+                'fbr_invoice_number' => $fbrInvoiceNumber,
             ]);
 
-            return redirect('/invoice/' . $invoice->id)->with('success', 'Invoice confirmed as submitted to FBR. Status updated to Locked.');
+            $msg = 'Invoice confirmed as submitted to FBR. Status updated to Locked.';
+            if ($fbrInvoiceNumber) {
+                $msg .= ' FBR Invoice #: ' . $fbrInvoiceNumber;
+            }
+            return redirect('/invoice/' . $invoice->id)->with('success', $msg);
         }
 
         if ($action === 'reject') {
@@ -1322,6 +1374,191 @@ class InvoiceController extends Controller
             }
         }
         return ScheduleEngine::getTaxRate($item['schedule_type'] ?? 'standard');
+    }
+
+    private function submitToFbrSync(Invoice $invoice, ?string $fbrEnvironment = null): array
+    {
+        $invoice->load(['company', 'items']);
+        $company = $invoice->company;
+
+        if (!in_array($invoice->status, ['submitted'])) {
+            return ['status' => 'failed', 'errors' => ['Invoice is not in submittable state (current: ' . $invoice->status . ')'], 'execution_ms' => 0];
+        }
+
+        if ($fbrEnvironment && in_array($fbrEnvironment, ['sandbox', 'production'])) {
+            $company->fbr_environment = $fbrEnvironment;
+        }
+
+        $environment = $company->fbr_environment ?? 'sandbox';
+        $startTime = microtime(true);
+
+        try {
+            $fbrService = new FbrService();
+            $response = $fbrService->submitInvoice($invoice, 0);
+        } catch (\Exception $e) {
+            $executionMs = round((microtime(true) - $startTime) * 1000);
+            Log::error("FBR Sync Submit: Invoice #{$invoice->id} exception: " . $e->getMessage());
+
+            $invoice->status = 'failed';
+            $invoice->fbr_status = 'failed';
+            $invoice->save();
+
+            InvoiceActivityService::log($invoice->id, $invoice->company_id, 'fbr_failed', [
+                'error' => $e->getMessage(),
+                'execution_ms' => $executionMs,
+                'mode' => 'sync',
+            ]);
+
+            AuditLogService::log('invoice_fbr_failed', 'Invoice', $invoice->id, null, [
+                'error' => $e->getMessage(),
+                'mode' => 'sync',
+            ]);
+
+            ComplianceScoreService::recalculate($invoice->company_id);
+
+            return ['status' => 'failed', 'errors' => [$e->getMessage()], 'execution_ms' => $executionMs];
+        }
+
+        $executionMs = round((microtime(true) - $startTime) * 1000);
+        Log::info("FBR Sync Submit: Invoice #{$invoice->id} completed in {$executionMs}ms, result: {$response['status']}");
+
+        try {
+            $latestLog = FbrLog::where('invoice_id', $invoice->id)->orderBy('created_at', 'desc')->first();
+            if ($latestLog) {
+                $failureCategory = null;
+                if ($response['status'] !== 'success') {
+                    $ft = $response['failure_type'] ?? '';
+                    $failureCategory = match(true) {
+                        str_contains($ft, 'auth') || str_contains($ft, 'token') => 'authentication',
+                        str_contains($ft, 'timeout') || str_contains($ft, 'connection') => 'network',
+                        str_contains($ft, 'validation') || str_contains($ft, 'payload') => 'validation',
+                        str_contains($ft, 'rate_limit') => 'rate_limit',
+                        str_contains($ft, 'server') || str_contains($ft, '500') => 'server_error',
+                        str_contains($ft, 'duplicate') => 'duplicate',
+                        default => 'unknown',
+                    };
+                }
+                $latestLog->update([
+                    'submission_latency_ms' => $executionMs,
+                    'environment_used' => $environment,
+                    'failure_category' => $failureCategory,
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::warning("Failed to update FBR log for invoice #{$invoice->id}: " . $e->getMessage());
+        }
+
+        if ($response['status'] === 'success') {
+            $fbrNum = $response['fbr_invoice_number'] ?? null;
+            if ($fbrNum) {
+                $invoice->fbr_invoice_number = $fbrNum;
+                $invoice->fbr_invoice_id = $fbrNum;
+                $invoice->fbr_submission_date = now();
+            }
+            $invoice->status = 'locked';
+            $invoice->fbr_status = 'success';
+            $invoice->integrity_hash = IntegrityHashService::generate($invoice);
+            $invoice->qr_data = json_encode([
+                'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $company->ntn ?? ''),
+                'fbr_invoice_number' => $fbrNum ?? $invoice->invoice_number,
+                'invoiceDate' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
+                'totalValues' => $invoice->total_amount,
+            ]);
+            $invoice->save();
+
+            InvoiceActivityService::log($invoice->id, $invoice->company_id, 'locked', [
+                'fbr_invoice_number' => $fbrNum,
+                'execution_ms' => $executionMs,
+                'mode' => 'sync',
+            ]);
+
+            AuditLogService::log('invoice_fbr_success', 'Invoice', $invoice->id, null, [
+                'fbr_invoice_number' => $fbrNum,
+                'environment' => $environment,
+                'mode' => 'sync',
+            ]);
+
+            try {
+                $lastEntry = CustomerLedger::where('company_id', $invoice->company_id)
+                    ->where('customer_ntn', $invoice->buyer_ntn)
+                    ->orderBy('id', 'desc')->first();
+                $lastBalance = $lastEntry ? $lastEntry->balance_after : 0;
+                CustomerLedger::create([
+                    'company_id' => $invoice->company_id,
+                    'customer_name' => $invoice->buyer_name,
+                    'customer_ntn' => $invoice->buyer_ntn ?? '',
+                    'invoice_id' => $invoice->id,
+                    'debit' => $invoice->total_amount,
+                    'credit' => 0,
+                    'balance_after' => $lastBalance + $invoice->total_amount,
+                    'type' => 'invoice',
+                    'notes' => 'Invoice ' . $invoice->invoice_number . ' locked',
+                ]);
+            } catch (\Exception $e) {
+                Log::warning("Ledger entry failed for invoice #{$invoice->id}: " . $e->getMessage());
+            }
+
+            $company->update(['last_successful_submission' => now()]);
+            HsUsagePatternService::recordSuccess($invoice);
+            ComplianceScoreService::recalculate($invoice->company_id);
+
+            return ['status' => 'success', 'fbr_invoice_number' => $fbrNum, 'execution_ms' => $executionMs];
+        }
+
+        if ($response['status'] === 'pending_verification') {
+            $invoice->status = 'pending_verification';
+            $invoice->fbr_status = 'pending_verification';
+            $invoice->save();
+
+            InvoiceActivityService::log($invoice->id, $invoice->company_id, 'pending_verification', [
+                'reason' => 'FBR response ambiguous',
+                'execution_ms' => $executionMs,
+                'mode' => 'sync',
+            ]);
+
+            return ['status' => 'pending_verification', 'execution_ms' => $executionMs];
+        }
+
+        $invoice->status = 'failed';
+        $invoice->fbr_status = 'failed';
+        $invoice->save();
+
+        InvoiceActivityService::log($invoice->id, $invoice->company_id, 'fbr_failed', [
+            'failure_type' => $response['failure_type'] ?? 'unknown',
+            'errors' => $response['errors'] ?? [],
+            'execution_ms' => $executionMs,
+            'mode' => 'sync',
+        ]);
+
+        AuditLogService::log('invoice_fbr_failed', 'Invoice', $invoice->id, null, [
+            'failure_type' => $response['failure_type'] ?? 'unknown',
+            'mode' => 'sync',
+        ]);
+
+        try {
+            foreach ($invoice->items as $item) {
+                if (!empty($item->hs_code)) {
+                    \App\Services\HsIntelligenceService::recordFbrRejection(
+                        $item->hs_code, $response['failure_type'] ?? null,
+                        is_array($response['errors'] ?? null) ? implode('; ', array_slice($response['errors'], 0, 3)) : ($response['failure_type'] ?? 'FBR submission failed'),
+                        $item->schedule_type ?? 'standard', $item->tax_rate ?? 18,
+                        $item->sro_schedule_no ?? null, $environment
+                    );
+                    HsUsagePatternService::recordRejection($item->hs_code, $item->schedule_type ?? 'standard', $item->tax_rate ?? 18);
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning("HS rejection capture failed for invoice #{$invoice->id}: " . $e->getMessage());
+        }
+
+        ComplianceScoreService::recalculate($invoice->company_id);
+
+        return [
+            'status' => 'failed',
+            'errors' => $response['errors'] ?? [],
+            'failure_type' => $response['failure_type'] ?? 'unknown',
+            'execution_ms' => $executionMs,
+        ];
     }
 
 }

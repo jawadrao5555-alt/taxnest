@@ -1,0 +1,71 @@
+eh rahi complete details developer ke liye:
+
+Proxy URL:
+
+POST https://nestpay.replit.app/api/fbr-proxy/submit
+Headers:
+
+Content-Type: application/json
+Body (JSON):
+
+{
+  "token": "APNA_FBR_TOKEN_YAHAN",
+  "action": "submit",
+  "payload": {
+    // apni invoice ka sara data yahan
+  }
+}
+PHP Example:
+
+<?php
+$url = "https://nestpay.replit.app/api/fbr-proxy/submit";
+$data = [
+    "token" => "APNA_FBR_TOKEN",
+    "action" => "submit",
+    "payload" => [
+        "items" => [
+            [
+                "uoM" => "KG",
+                "rate" => "5%",
+                "hsCode" => "3105.3000",
+                "discount" => 0.0,
+                "extraTax" => 0.0,
+                "quantity" => 3,
+                "saleType" => "3rd Schedule Goods",
+                "fedPayable" => 0.0,
+                "furtherTax" => 0.0,
+                "totalValues" => 819.66,
+                "productDescription" => "Dap",
+                "salesTaxApplicable" => 39.03,
+                "valueSalesExcludingST" => 780.63,
+                "salesTaxWithheldAtSource" => 0.0,
+                "fixedNotifiedValueOrRetailPrice" => 260.21,
+                "sroScheduleNo" => "3rd Schedule goods",
+                "sroItemSerialNo" => "51"
+            ]
+        ],
+        "invoiceDate" => "2026-02-14",
+        "invoiceType" => "Sale Invoice",
+        "documentTypeId" => 1,
+        "buyerAddress" => "lodhran",
+        "invoiceRefNo" => "3638114-4DI" . round(microtime(true) * 1000),
+        "buyerProvince" => "Punjab",
+        "sellerAddress" => "YOUR ADDRESS",
+        "sellerNTNCNIC" => "YOUR_NTN",
+        "sellerProvince" => "Punjab",
+        "buyerBusinessName" => "Customer Name",
+        "sellerBusinessName" => "YOUR BUSINESS NAME",
+        "buyerRegistrationType" => "Unregistered",
+        "buyerNTNCNIC" => ""
+    ]
+];
+$ch = curl_init($url);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+$response = curl_exec($ch);
+curl_close($ch);
+echo $response;
+?>
+Developer ko yeh proxy URL aur PHP code de dein — apna FBR token daalein aur invoice submit karein!

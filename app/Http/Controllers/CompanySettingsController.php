@@ -12,8 +12,7 @@ class CompanySettingsController extends Controller
 {
     public function profile()
     {
-        $company = Company::find(auth()->user()->company_id);
-        return view('company.profile', compact('company'));
+        return redirect('/profile');
     }
 
     public function updateProfile(Request $request)

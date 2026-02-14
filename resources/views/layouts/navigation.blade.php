@@ -132,11 +132,11 @@
 
     <div class="flex-shrink-0 p-3">
         <div class="rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-1 space-y-1">
-            <a href="/company/profile" class="sidebar-link flex items-center gap-3 py-2.5 px-3 rounded-lg text-sm {{ request()->is('company/profile*') ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
+            <a href="/profile" class="sidebar-link flex items-center gap-3 py-2.5 px-3 rounded-lg text-sm {{ request()->is('profile*') ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
                 <span class="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 shadow-sm shadow-emerald-500/20">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</span>
                 <div class="min-w-0 flex-1">
                     <p class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{{ Auth::user()->name }}</p>
-                    <p class="text-xs text-gray-400 truncate">Business Profile</p>
+                    <p class="text-xs text-gray-400 truncate">Profile</p>
                 </div>
             </a>
             <form method="POST" action="{{ route('logout') }}">

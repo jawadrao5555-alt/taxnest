@@ -703,6 +703,8 @@ class InvoiceController extends Controller
             return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice is no longer in a submittable state. It may have been submitted by another request.');
         }
 
+        $invoice->refresh();
+
         InvoiceActivityService::log($invoice->id, $invoice->company_id, 'submitted', [
             'mode' => 'smart',
             'compliance_score' => $scoreResult['final_score'],

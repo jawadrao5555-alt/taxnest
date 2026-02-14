@@ -618,6 +618,7 @@ class FbrService
                 $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
 
                 $ch = curl_init($url);
+                $responseHeaders = [];
                 curl_setopt_array($ch, [
                     CURLOPT_POST           => true,
                     CURLOPT_POSTFIELDS     => $jsonBody,
@@ -628,12 +629,34 @@ class FbrService
                         'Authorization: Bearer ' . $token,
                         'Accept: application/json',
                     ],
+                    CURLOPT_HEADERFUNCTION => function($curl, $header) use (&$responseHeaders) {
+                        $len = strlen($header);
+                        $header = explode(':', $header, 2);
+                        if (count($header) < 2) return $len;
+                        $responseHeaders[strtolower(trim($header[0]))] = trim($header[1]);
+                        return $len;
+                    },
+                    CURLOPT_SSL_VERIFYPEER => true,
+                    CURLOPT_VERBOSE        => false,
                 ]);
 
                 $responseBody = curl_exec($ch);
                 $httpCode     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 $curlError    = curl_error($ch);
+                $curlInfo     = curl_getinfo($ch);
                 curl_close($ch);
+
+                \Log::info('FBR API Debug', [
+                    'url' => $url,
+                    'http_code' => $httpCode,
+                    'response_length' => strlen($responseBody ?: ''),
+                    'response_body_raw' => substr($responseBody ?: '(empty)', 0, 1000),
+                    'response_headers' => $responseHeaders,
+                    'total_time' => $curlInfo['total_time'] ?? null,
+                    'connect_time' => $curlInfo['connect_time'] ?? null,
+                    'primary_ip' => $curlInfo['primary_ip'] ?? null,
+                    'ssl_verify_result' => $curlInfo['ssl_verify_result'] ?? null,
+                ]);
             }
 
             $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
@@ -690,6 +713,9 @@ class FbrService
                     $log->response_payload = json_encode([
                         'note' => 'FBR returned 200 OK with empty body - status unknown, needs manual verification',
                         'http_code' => $httpCode,
+                        'response_headers' => $responseHeaders ?? [],
+                        'server_ip' => $curlInfo['primary_ip'] ?? 'unknown',
+                        'total_time_sec' => $curlInfo['total_time'] ?? null,
                     ]);
                     $log->save();
 

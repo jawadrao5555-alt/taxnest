@@ -1,0 +1,136 @@
+Illuminate\Database\QueryException
+vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+SQLSTATE[08006] [7] could not translate host name "helium" to address: Temporary failure in name resolution (Connection: pgsql, Host: helium, Port: 5432, Database: heliumdb, SQL: select * from "users" where "phone" = 3620291786117 limit 1)
+
+LARAVEL
+12.51.0
+PHP
+8.4.16
+UNHANDLED
+CODE 7
+500
+POST
+https://laravel-setup.replit.app/login
+
+Exception trace
+12 vendor frames
+
+App\Http\Requests\Auth\LoginRequest->authenticate()
+app/Http/Requests/Auth/LoginRequest.php:45
+
+40        if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
+41            $user = User::where('email', $login)->first();
+42        }
+43
+44        if (!$user && strlen($normalizedPhone) >= 10 && strlen($normalizedPhone) <= 15) {
+45            $user = User::where('phone', $normalizedPhone)->first();
+46            if (!$user) {
+47                $user = User::where('phone', $login)->first();
+48            }
+49        }
+50
+51        if (!$user) {
+52            $user = User::where('username', $login)->first();
+53        }
+54
+55        if (!$user) {
+56            $normalizedId = preg_replace('/[^0-9\-]/', '', $login);
+57
+App\Http\Controllers\Auth\AuthenticatedSessionController->store(object(App\Http\Requests\Auth\LoginRequest))
+app/Http/Controllers/Auth/AuthenticatedSessionController.php:27
+
+27 vendor frames
+
+App\Http\Middleware\SecurityHeaders->handle(object(Illuminate\Http\Request), object(Closure))
+app/Http/Middleware/SecurityHeaders.php:13
+
+19 vendor frames
+
+App\Http\Middleware\ForceHttps->handle(object(Illuminate\Http\Request), object(Closure))
+app/Http/Middleware/ForceHttps.php:16
+
+5 vendor frames
+
+public/index.php
+public/index.php:20
+
+1 vendor frame
+
+Queries
+// No queries executed
+Headers
+host
+laravel-setup.replit.app
+user-agent
+Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36
+content-length
+97
+accept
+text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+accept-encoding
+gzip, deflate, br, zstd
+accept-language
+en-US,en;q=0.9
+cache-control
+max-age=0
+content-type
+application/x-www-form-urlencoded
+cookie
+GAESA=CpwBMDA1ZWI2OTc0Y2ZjZGRjZTA0OWM0MTk2ZDY0ZDk4MzZmMGZkNGFiOWZjZWMzNDFmNmQ4MDM4ODQ3ZDNhZGU2ZWRhM2UxMDc1ZTU0ODEyYmM5ODA2ODNmMWQzODliZDY0MWJkNDM1NWMyOGE1M2IyNDIxZWYyMjY0MjU2ZGE4MGMyYTU5ZWE3YTI2YjcwODIxNGI4ZTM5ZWQ2MzEwEIbLweTFMw; XSRF-TOKEN=eyJpdiI6IjVxcTRyZzNBcXYvdDJvVm5JZkJDeGc9PSIsInZhbHVlIjoiUzJiVnQrajY4cER4TDJGRDF1QUdQVFpMNTBQUXNjcDVOcEpaTlJWSEd3WWJkak1ESC9Oc0g2ZncrOFZsdnlIUDd0YXZ3aThKYWN0NHVUaWluSGlPUU5teExyVnhiR3ltSVZZYTNWUVFwZHhERmp4QlorZWFuOTk4UW8rbmtSajIiLCJtYWMiOiI5ZTVkMTM0NWExOTRkMTA3NDNjZDMwOTNlNTFhYzUwNmM3ODFjOWIwODEzMGJkMTI4MjU4MzhmYTljY2MzNWFjIiwidGFnIjoiIn0%3D; taxnest-session=eyJpdiI6IjlhOFJMeHhUbHVjalZlbWNlS3IyT3c9PSIsInZhbHVlIjoiaWFVeVdLejZ3UHJCN05zb3N3elJtZzJZdHVwNXdia2RiR2JYQXlTWHljYTBDbklMMG5wSHpldk5IUm9MQ2FGZUQvRWF1U3R6eEJucldlOTdBVEdFelpHM3UzbkE3WU9ZNk9QMlpRNTREazlaaFdpRTVGUGhoSGNubXZDczFqeFIiLCJtYWMiOiI1OWUzZjZhYzg1NDM1ZWEwYmY2YTdhNzc4ZDFlNTY2ZWRkMWE5MjQ1NDlkZjMxY2I2MDQ4NDc2MWQzNDZlZGVkIiwidGFnIjoiIn0%3D
+origin
+https://laravel-setup.replit.app
+priority
+u=0, i
+referer
+https://laravel-setup.replit.app/login
+sec-ch-ua
+"Not:A-Brand";v="99", "Google Chrome";v="145", "Chromium";v="145"
+sec-ch-ua-mobile
+?0
+sec-ch-ua-platform
+"Windows"
+sec-fetch-dest
+document
+sec-fetch-mode
+navigate
+sec-fetch-site
+same-origin
+sec-fetch-user
+?1
+server-timing
+depproxy;dur=1771079504108, pid1req;dur=1771079504132
+traceparent
+00-e34136dcee1d5bc422cc67290f4fefbc-3387eb646084a30b-01
+upgrade-insecure-requests
+1
+via
+1.1 google
+x-cloud-trace-context
+e34136dcee1d5bc422cc67290f4fefbc/3713195234138825483;o=1
+x-forwarded-for
+182.181.110.10, 34.117.33.233, 35.191.113.117,34.23.29.100
+x-forwarded-host
+laravel-setup.replit.app
+x-forwarded-proto
+https
+x-replit-user-bio
+x-replit-user-id
+x-replit-user-name
+x-replit-user-profile-image
+x-replit-user-roles
+x-replit-user-teams
+x-replit-user-url
+Body
+{
+    "_token": "YtiesexOoXWOzQFPtXVRRugvhaY5RgKcXYSx3P4a",
+    "login": "3620291786117",
+    "password": "admin123",
+    "remember": "on"
+}
+Routing
+controller
+App\Http\Controllers\Auth\AuthenticatedSessionController@store
+middleware
+web, guest
+Routing parameters
+// No routing parameters

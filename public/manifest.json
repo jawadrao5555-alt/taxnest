@@ -23,5 +23,26 @@
     ],
     "categories": ["business", "finance"],
     "lang": "en",
-    "dir": "ltr"
+    "dir": "ltr",
+    "shortcuts": [
+        {
+            "name": "Create Invoice",
+            "short_name": "New Invoice",
+            "url": "/invoice/create",
+            "icons": [{"src": "/icons/icon-192.png", "sizes": "192x192"}]
+        },
+        {
+            "name": "View Dashboard",
+            "short_name": "Dashboard",
+            "url": "/dashboard",
+            "icons": [{"src": "/icons/icon-192.png", "sizes": "192x192"}]
+        },
+        {
+            "name": "Customers",
+            "short_name": "Customers",
+            "url": "/customer-profiles",
+            "icons": [{"src": "/icons/icon-192.png", "sizes": "192x192"}]
+        }
+    ],
+    "prefer_related_applications": false
 }

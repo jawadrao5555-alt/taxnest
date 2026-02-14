@@ -68,7 +68,18 @@ TaxNest is built on Laravel 12 with PHP 8.4, using Breeze for authentication. Th
 - **PWA**: Install popup (bottom-right, shows once via localStorage), offline badge (bottom-left small pill), update banner (full-width top bar).
 - **Mobile**: Hamburger opens sidebar drawer. Overlay click closes it. Tables have overflow-x-auto. Invoice sticky summary functional on all sizes.
 
-## Recent Changes (Feb 13, 2026)
+## Recent Changes (Feb 14, 2026)
+**Enterprise Upgrade Session:**
+- Phase 1: Production Safety - exponential backoff (tries=3, backoff=[30,90,180]), lockForUpdate on FBR submission
+- Phase 3: Security Hardening - SecurityHeaders middleware (CSP, X-Frame-Options, X-Content-Type-Options)
+- Phase 4: Simplified Dashboard - Alpine.js "Advanced Insights" toggle, essential KPIs always visible
+- Phase 5+6: UX Engine - toast notifications (Alpine.js, XSS-safe), btn-loading spinner, page-fade (150ms), auto-scroll to errors, auto-loading on form submit
+- Phase 7: Performance - Tailwind CDN removed from landing/share pages, Vite-compiled assets
+- Phase 8: PWA Enhancement - manifest shortcuts (Create Invoice, Dashboard, Customers), offline splash page (sw.js v5)
+- Phase 10: Landing Page - "Why TaxNest" competitive comparison section (6 cards + comparison table), x-collapse replaced with x-transition, pricing x-data fix
+- Stripe/payment gateway integration DEFERRED by user for later
+
+## Changes (Feb 13, 2026)
 **Phase A - Production Stability:**
 - Database hardening: composite indexes on invoices (company_id+status+date), invoice_items (hs_code+invoice_id), fbr_logs (invoice_id+status)
 - N+1 query elimination: DashboardController and AdminController use aggregated SELECT with conditional sums

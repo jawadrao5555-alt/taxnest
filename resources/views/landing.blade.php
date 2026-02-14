@@ -218,6 +218,112 @@
         </div>
     </section>
 
+    <section class="py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <p class="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-2">Why TaxNest</p>
+                <h2 class="text-3xl sm:text-4xl font-extrabold text-gray-900">Built Different From Day One</h2>
+                <p class="mt-4 text-lg text-gray-500 max-w-2xl mx-auto">No generic accounting software. TaxNest is purpose-built for Pakistan's FBR ecosystem.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
+                <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:-translate-y-1 transition-all duration-300">
+                    <div class="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mb-5">
+                        <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Real-Time FBR Submission</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Not just PDF generation. Direct PRAL API integration with live QR codes, invoice locking, and instant FBR response.</p>
+                </div>
+                <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:-translate-y-1 transition-all duration-300">
+                    <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-5">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">HS Intelligence Engine</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">6-factor AI model learns from every submission. Auto-suggests HS codes, SRO numbers, and tax rates with confidence scoring.</p>
+                </div>
+                <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:-translate-y-1 transition-all duration-300">
+                    <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-5">
+                        <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Pre-Submission Validation</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Compliance scoring catches errors before FBR sees them. Risk detection blocks problematic invoices automatically.</p>
+                </div>
+                <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:-translate-y-1 transition-all duration-300">
+                    <div class="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-5">
+                        <svg class="w-6 h-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Multi-Company & Branch</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Enterprise-grade tenant isolation. Manage multiple companies and branches from a single admin dashboard.</p>
+                </div>
+                <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:-translate-y-1 transition-all duration-300">
+                    <div class="w-12 h-12 bg-rose-100 rounded-xl flex items-center justify-center mb-5">
+                        <svg class="w-6 h-6 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Tamper-Proof Audit Trail</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">SHA-256 hashed audit logs with integrity verification. Every action tracked, timestamped, and immutable.</p>
+                </div>
+                <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:-translate-y-1 transition-all duration-300">
+                    <div class="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center mb-5">
+                        <svg class="w-6 h-6 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Works Offline (PWA)</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Install on any device. Create drafts offline, sync when connected. Keyboard shortcuts for power users.</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden max-w-4xl mx-auto">
+                <div class="p-6 border-b border-gray-100 bg-gray-50">
+                    <h3 class="text-lg font-bold text-gray-900 text-center">TaxNest vs Traditional Software</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b border-gray-200">
+                                <th class="text-left py-3 px-6 text-sm font-medium text-gray-500">Capability</th>
+                                <th class="text-center py-3 px-6 text-sm font-bold text-emerald-700">TaxNest</th>
+                                <th class="text-center py-3 px-6 text-sm font-bold text-gray-500">Others</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @php
+                            $comparisons = [
+                                ['Direct FBR/PRAL API', true, false],
+                                ['Real-time QR Codes', true, false],
+                                ['HS Code Intelligence', true, false],
+                                ['Compliance Scoring', true, false],
+                                ['Multi-Branch Support', true, 'partial'],
+                                ['Immutable Audit Logs', true, false],
+                                ['Offline PWA Support', true, false],
+                                ['Customer Ledger', true, 'partial'],
+                                ['Starts at Rs. 999/mo', true, false],
+                            ];
+                            @endphp
+                            @foreach($comparisons as $comp)
+                            <tr class="{{ $loop->even ? 'bg-gray-50/50' : '' }}">
+                                <td class="py-3 px-6 text-sm font-medium text-gray-700">{{ $comp[0] }}</td>
+                                <td class="py-3 px-6 text-center">
+                                    @if($comp[1] === true)
+                                    <svg class="w-5 h-5 text-emerald-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    @endif
+                                </td>
+                                <td class="py-3 px-6 text-center">
+                                    @if($comp[2] === true)
+                                    <svg class="w-5 h-5 text-emerald-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    @elseif($comp[2] === 'partial')
+                                    <span class="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded">Limited</span>
+                                    @else
+                                    <svg class="w-5 h-5 text-red-400 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                    @endif
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <section id="pricing" class="py-20 bg-gray-50" x-data="{
         cycle: 'monthly',
         discounts: { monthly: 0, quarterly: 1, semi_annual: 3, annual: 6 },

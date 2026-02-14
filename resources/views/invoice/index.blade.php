@@ -247,6 +247,18 @@
                                     <p class="text-xs text-red-600 mt-1 max-w-[200px] truncate" title="{{ $failReason }}">{{ $failReason }}</p>
                                     @endif
                                     @endif
+                                    @if($invoice->status === 'locked' && $invoice->fbr_invoice_number)
+                                    <p class="text-xs text-emerald-600 mt-1 max-w-[200px] truncate" title="{{ $invoice->fbr_invoice_number }}">FBR: {{ $invoice->fbr_invoice_number }}</p>
+                                    @elseif(in_array($invoice->status, ['locked', 'pending_verification']) && !$invoice->fbr_invoice_number && in_array(auth()->user()->role, ['company_admin', 'super_admin']))
+                                    <div x-data="{ showInput: false }" class="mt-1">
+                                        <button x-show="!showInput" @click="showInput = true" class="text-xs text-blue-600 hover:text-blue-800 underline">+ FBR #</button>
+                                        <form x-show="showInput" x-cloak method="POST" action="/invoice/{{ $invoice->id }}/update-fbr-number" class="flex items-center gap-1 mt-1">
+                                            @csrf
+                                            <input type="text" name="fbr_invoice_number" placeholder="FBR #" class="px-1.5 py-0.5 text-xs border border-gray-300 rounded w-36">
+                                            <button type="submit" class="px-1.5 py-0.5 bg-emerald-600 text-white rounded text-xs">Save</button>
+                                        </form>
+                                    </div>
+                                    @endif
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $invoice->created_at->format('d M Y') }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm space-x-2">

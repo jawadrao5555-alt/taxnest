@@ -982,6 +982,67 @@ class InvoiceController extends Controller
         return redirect('/invoice/' . $invoice->id)->with('error', 'Invalid action.');
     }
 
+    public function updateFbrNumber(Request $request, Invoice $invoice)
+    {
+        $user = auth()->user();
+        if (!in_array($user->role, ['company_admin', 'super_admin'])) {
+            abort(403);
+        }
+
+        if ($user->role !== 'super_admin') {
+            $companyId = app('currentCompanyId');
+            if ($invoice->company_id !== $companyId) {
+                abort(403);
+            }
+        }
+
+        if (!in_array($invoice->status, ['locked', 'pending_verification'])) {
+            return redirect('/invoice/' . $invoice->id)->with('error', 'FBR number can only be updated on locked or pending invoices.');
+        }
+
+        if ($invoice->fbr_status === 'success' && $invoice->fbr_invoice_number && !$request->input('override')) {
+            $request->validate(['fbr_invoice_number' => 'required|string|min:5|max:100']);
+        } else {
+            $request->validate(['fbr_invoice_number' => 'required|string|min:5|max:100']);
+        }
+
+        $oldNumber = $invoice->fbr_invoice_number;
+        $newNumber = $request->input('fbr_invoice_number');
+
+        $invoice->fbr_invoice_number = $newNumber;
+        $invoice->fbr_invoice_id = $newNumber;
+
+        $invoice->qr_data = json_encode([
+            'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $invoice->company->ntn ?? ''),
+            'fbr_invoice_number' => $newNumber,
+            'invoiceDate' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
+            'totalValues' => $invoice->total_amount,
+        ]);
+
+        if ($invoice->status === 'pending_verification') {
+            $invoice->status = 'locked';
+            $invoice->fbr_status = 'success';
+            $invoice->fbr_submission_date = $invoice->fbr_submission_date ?? now();
+        }
+
+        $invoice->integrity_hash = IntegrityHashService::generate($invoice);
+        $invoice->save();
+
+        InvoiceActivityService::log($invoice->id, $invoice->company_id, 'fbr_number_updated', [
+            'old_number' => $oldNumber,
+            'new_number' => $newNumber,
+            'updated_by' => $user->name,
+        ], request()->ip());
+
+        AuditLogService::log('fbr_number_updated', 'Invoice', $invoice->id, null, [
+            'old_number' => $oldNumber,
+            'new_number' => $newNumber,
+            'updated_by' => $user->name,
+        ]);
+
+        return redirect('/invoice/' . $invoice->id)->with('success', 'FBR Invoice Number updated: ' . $newNumber);
+    }
+
     public function verifyIntegrity(Invoice $invoice)
     {
         $companyId = app('currentCompanyId');

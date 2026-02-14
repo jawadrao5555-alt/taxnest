@@ -222,16 +222,32 @@
     <div class="py-8">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             @if($invoice->status === 'locked')
-            <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6">
+            <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6" x-data="{ editingFbr: false, fbrNum: '{{ $invoice->fbr_invoice_number ?? '' }}' }">
                 <div class="flex items-start gap-3">
                     <svg class="w-6 h-6 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <div class="flex-1">
                         <p class="text-sm font-bold text-emerald-800">FBR Production - Invoice Locked</p>
-                        <p class="mt-1 text-sm text-emerald-700">FBR Invoice Number: <strong>{{ $invoice->fbr_invoice_number ?? 'Pending verification' }}</strong></p>
+                        <div class="mt-1">
+                            <template x-if="!editingFbr">
+                                <div class="flex items-center gap-2">
+                                    <p class="text-sm text-emerald-700">FBR Invoice Number: <strong>{{ $invoice->fbr_invoice_number ?? 'Not set' }}</strong></p>
+                                    @if(in_array(auth()->user()->role, ['company_admin', 'super_admin']))
+                                    <button @click="editingFbr = true" class="text-xs text-blue-600 hover:text-blue-800 font-medium underline">{{ $invoice->fbr_invoice_number ? 'Edit' : 'Add FBR #' }}</button>
+                                    @endif
+                                </div>
+                            </template>
+                            <template x-if="editingFbr">
+                                <form method="POST" action="/invoice/{{ $invoice->id }}/update-fbr-number" class="flex items-center gap-2 mt-1">
+                                    @csrf
+                                    <input type="text" name="fbr_invoice_number" x-model="fbrNum" placeholder="Enter FBR Invoice Number" class="px-3 py-1.5 text-sm border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 w-72">
+                                    <button type="submit" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition">Save</button>
+                                    <button type="button" @click="editingFbr = false" class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-300 transition">Cancel</button>
+                                </form>
+                            </template>
+                        </div>
                         @if($invoice->fbr_submission_date)
                         <p class="text-xs text-emerald-600 mt-1">Submitted: {{ \Carbon\Carbon::parse($invoice->fbr_submission_date)->format('d-M-Y h:i A') }}</p>
                         @endif
-                        <p class="text-xs text-gray-500 mt-2">This invoice is locked and cannot be edited. Verify actual FBR number on FBR portal if needed.</p>
                     </div>
                 </div>
             </div>
@@ -256,20 +272,26 @@
                         <p class="mt-1 text-sm text-amber-700">FBR returned an ambiguous response. The invoice may have been accepted. Please check the FBR portal to confirm and then update this invoice's status.</p>
                         @if(in_array(auth()->user()->role, ['company_admin', 'super_admin']))
                         <div class="mt-3 space-y-3">
-                            <form method="POST" action="/invoice/{{ $invoice->id }}/confirm-fbr" class="flex flex-wrap items-end gap-2" x-data="{ fbrNum: '' }">
+                            <form method="POST" action="/invoice/{{ $invoice->id }}/update-fbr-number" class="flex flex-wrap items-end gap-2">
                                 @csrf
-                                <input type="hidden" name="action" value="confirm">
                                 <div>
                                     <label class="block text-xs font-medium text-amber-800 mb-1">FBR Invoice Number (from portal)</label>
-                                    <input type="text" name="fbr_invoice_number" x-model="fbrNum" placeholder="e.g. 3620291786117DIA..." class="px-3 py-1.5 text-xs border border-amber-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 w-64">
+                                    <input type="text" name="fbr_invoice_number" placeholder="e.g. 3620291786117DIA..." class="px-3 py-1.5 text-xs border border-amber-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 w-64">
                                 </div>
-                                <button type="submit" class="inline-flex items-center px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition">Confirm (Verified on FBR Portal)</button>
+                                <button type="submit" class="inline-flex items-center px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition">Confirm & Save FBR #</button>
                             </form>
-                            <form method="POST" action="/invoice/{{ $invoice->id }}/confirm-fbr" class="inline">
-                                @csrf
-                                <input type="hidden" name="action" value="reject">
-                                <button type="submit" class="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition">Not on FBR Portal (Reset to Draft)</button>
-                            </form>
+                            <div class="flex gap-2">
+                                <form method="POST" action="/invoice/{{ $invoice->id }}/confirm-fbr" class="inline">
+                                    @csrf
+                                    <input type="hidden" name="action" value="confirm">
+                                    <button type="submit" class="inline-flex items-center px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700 transition">Confirm Without Number</button>
+                                </form>
+                                <form method="POST" action="/invoice/{{ $invoice->id }}/confirm-fbr" class="inline">
+                                    @csrf
+                                    <input type="hidden" name="action" value="reject">
+                                    <button type="submit" class="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition">Not on FBR Portal (Reset to Draft)</button>
+                                </form>
+                            </div>
                         </div>
                         @endif
                     </div>
@@ -365,6 +387,19 @@
                             <p class="text-sm text-gray-600">Internal #: <span class="font-semibold text-gray-900">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</span></p>
 @if($invoice->fbr_invoice_number)
 <p class="text-sm text-gray-600">FBR #: <span class="font-semibold text-emerald-700">{{ $invoice->fbr_invoice_number }}</span></p>
+@elseif(in_array($invoice->status, ['locked', 'pending_verification']) && in_array(auth()->user()->role, ['company_admin', 'super_admin']))
+<div x-data="{ showFbrInput: false, fbrVal: '' }" class="mt-1">
+    <template x-if="!showFbrInput">
+        <button @click="showFbrInput = true" class="text-xs text-blue-600 hover:text-blue-800 font-medium underline">+ Add FBR Invoice Number</button>
+    </template>
+    <template x-if="showFbrInput">
+        <form method="POST" action="/invoice/{{ $invoice->id }}/update-fbr-number" class="flex items-center gap-1 mt-1">
+            @csrf
+            <input type="text" name="fbr_invoice_number" x-model="fbrVal" placeholder="FBR Invoice #" class="px-2 py-1 text-xs border border-gray-300 rounded focus:ring-emerald-500 w-48">
+            <button type="submit" class="px-2 py-1 bg-emerald-600 text-white rounded text-xs font-semibold">Save</button>
+        </form>
+    </template>
+</div>
 @endif
 @if($invoice->fbr_submission_date)
 <p class="text-sm text-gray-600">FBR Date: <span class="font-semibold text-gray-900">{{ $invoice->fbr_submission_date->format('d M Y H:i') }}</span></p>

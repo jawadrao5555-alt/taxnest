@@ -249,7 +249,7 @@
                                     @endif
                                     @if($invoice->status === 'locked' && $invoice->fbr_invoice_number)
                                     <p class="text-xs text-emerald-600 mt-1 max-w-[200px] truncate" title="{{ $invoice->fbr_invoice_number }}">FBR: {{ $invoice->fbr_invoice_number }}</p>
-                                    @elseif(in_array($invoice->status, ['locked', 'pending_verification']) && !$invoice->fbr_invoice_number && in_array(auth()->user()->role, ['company_admin', 'super_admin']))
+                                    @elseif(in_array($invoice->status, ['locked', 'pending_verification', 'submitted', 'failed']) && !$invoice->fbr_invoice_number && in_array(auth()->user()->role, ['company_admin', 'super_admin']))
                                     <div x-data="{ showInput: false }" class="mt-1">
                                         <button x-show="!showInput" @click="showInput = true" class="text-xs text-blue-600 hover:text-blue-800 underline">+ FBR #</button>
                                         <form x-show="showInput" x-cloak method="POST" action="/invoice/{{ $invoice->id }}/update-fbr-number" class="flex items-center gap-1 mt-1">

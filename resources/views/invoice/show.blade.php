@@ -399,7 +399,7 @@
                             <p class="text-sm text-gray-600">Internal #: <span class="font-semibold text-gray-900">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</span></p>
 @if($invoice->fbr_invoice_number)
 <p class="text-sm text-gray-600">FBR #: <span class="font-semibold text-emerald-700">{{ $invoice->fbr_invoice_number }}</span></p>
-@elseif(in_array($invoice->status, ['locked', 'pending_verification']) && in_array(auth()->user()->role, ['company_admin', 'super_admin']))
+@elseif(in_array($invoice->status, ['locked', 'pending_verification', 'submitted', 'failed']) && in_array(auth()->user()->role, ['company_admin', 'super_admin']))
 <div x-data="{ showFbrInput: false, fbrVal: '' }" class="mt-1">
     <template x-if="!showFbrInput">
         <button @click="showFbrInput = true" class="text-xs text-blue-600 hover:text-blue-800 font-medium underline">+ Add FBR Invoice Number</button>

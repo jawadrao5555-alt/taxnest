@@ -996,17 +996,14 @@ class InvoiceController extends Controller
             }
         }
 
-        if (!in_array($invoice->status, ['locked', 'pending_verification'])) {
-            return redirect('/invoice/' . $invoice->id)->with('error', 'FBR number can only be updated on locked or pending invoices.');
+        if (!in_array($invoice->status, ['locked', 'pending_verification', 'submitted', 'failed'])) {
+            return redirect('/invoice/' . $invoice->id)->with('error', 'FBR number can only be updated on submitted, locked, failed or pending invoices.');
         }
 
-        if ($invoice->fbr_status === 'success' && $invoice->fbr_invoice_number && !$request->input('override')) {
-            $request->validate(['fbr_invoice_number' => 'required|string|min:5|max:100']);
-        } else {
-            $request->validate(['fbr_invoice_number' => 'required|string|min:5|max:100']);
-        }
+        $request->validate(['fbr_invoice_number' => 'required|string|min:5|max:100']);
 
         $oldNumber = $invoice->fbr_invoice_number;
+        $oldStatus = $invoice->status;
         $newNumber = $request->input('fbr_invoice_number');
 
         $invoice->fbr_invoice_number = $newNumber;
@@ -1019,7 +1016,7 @@ class InvoiceController extends Controller
             'totalValues' => $invoice->total_amount,
         ]);
 
-        if ($invoice->status === 'pending_verification') {
+        if (in_array($invoice->status, ['pending_verification', 'submitted', 'failed'])) {
             $invoice->status = 'locked';
             $invoice->fbr_status = 'success';
             $invoice->fbr_submission_date = $invoice->fbr_submission_date ?? now();

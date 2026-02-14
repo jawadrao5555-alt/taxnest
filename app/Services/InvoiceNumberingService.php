@@ -16,13 +16,7 @@ class InvoiceNumberingService
                 throw new \RuntimeException("Company not found: {$companyId}");
             }
 
-            $identifier = trim($company->ntn ?? '');
-            if (empty($identifier)) {
-                $identifier = preg_replace('/[^0-9]/', '', $company->fbr_registration_no ?? '');
-            }
-            if (empty($identifier)) {
-                $identifier = '0000000';
-            }
+            $identifier = self::resolveRegistrationIdentifier($company);
 
             $timestampMs = (int)(microtime(true) * 1000);
 
@@ -42,15 +36,39 @@ class InvoiceNumberingService
             return '0000000DI' . (int)(microtime(true) * 1000);
         }
 
-        $identifier = trim($company->ntn ?? '');
-        if (empty($identifier)) {
-            $identifier = preg_replace('/[^0-9]/', '', $company->fbr_registration_no ?? '');
-        }
-        if (empty($identifier)) {
-            $identifier = '0000000';
-        }
+        $identifier = self::resolveRegistrationIdentifier($company);
 
         $timestampMs = (int)(microtime(true) * 1000);
         return $identifier . 'DI' . $timestampMs;
+    }
+
+    private static function resolveRegistrationIdentifier(Company $company): string
+    {
+        $regNo = $company->fbr_registration_no ?? '';
+        $cleanRegNo = preg_replace('/[^0-9]/', '', $regNo);
+
+        if (strlen($cleanRegNo) === 13) {
+            return $cleanRegNo;
+        }
+
+        if (strlen($cleanRegNo) >= 7) {
+            return substr($cleanRegNo, 0, 7);
+        }
+
+        $ntn = $company->ntn ?? '';
+        $cleanNtn = preg_replace('/[^0-9]/', '', $ntn);
+
+        if (strlen($cleanNtn) >= 7) {
+            return substr($cleanNtn, 0, 7);
+        }
+
+        if (!empty($cleanRegNo)) {
+            return str_pad($cleanRegNo, 7, '0', STR_PAD_LEFT);
+        }
+        if (!empty($cleanNtn)) {
+            return str_pad($cleanNtn, 7, '0', STR_PAD_LEFT);
+        }
+
+        return '0000000';
     }
 }

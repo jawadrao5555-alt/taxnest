@@ -573,6 +573,8 @@ class FbrService
 
     private function resolveInvoiceRefNo($invoice): string
     {
+        $company = $invoice->company;
+
         if ($invoice->document_type === 'Debit Note' && !empty($invoice->reference_invoice_number)) {
             $refInvoice = \App\Models\Invoice::where('company_id', $invoice->company_id)
                 ->where(function ($q) use ($invoice) {
@@ -589,7 +591,31 @@ class FbrService
             return $invoice->reference_invoice_number;
         }
 
-        return $invoice->internal_invoice_number ?? $invoice->invoice_number ?? ('INV-' . $invoice->id);
+        return $this->buildFbrFormatInvoiceRef($company, $invoice);
+    }
+
+    private function buildFbrFormatInvoiceRef($company, $invoice): string
+    {
+        $regNo = $company->fbr_registration_no ?? $company->ntn ?? '';
+        $cleanRegNo = preg_replace('/[^0-9]/', '', $regNo);
+
+        if (strlen($cleanRegNo) === 13) {
+            $identifier = $cleanRegNo;
+        } elseif (strlen($cleanRegNo) >= 7) {
+            $identifier = substr($cleanRegNo, 0, 7);
+        } else {
+            $identifier = str_pad($cleanRegNo, 7, '0', STR_PAD_LEFT);
+        }
+
+        $existingRef = $invoice->internal_invoice_number ?? '';
+        if (preg_match('/DI(\d{13})$/', $existingRef, $matches)) {
+            $timestamp = $matches[1];
+        } else {
+            $timestamp = (string)(int)(microtime(true) * 1000);
+            $timestamp = substr($timestamp, 0, 13);
+        }
+
+        return $identifier . 'DI' . $timestamp;
     }
 
     private function formatNtnCnic(?string $value): string

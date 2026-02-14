@@ -119,10 +119,9 @@ class FbrService
             if ($is3rdSchedule) {
                 $retailPrice = round(floatval($item->mrp ?? 0), 2);
                 if ($retailPrice <= 0) {
-                    $retailPrice = $valueSalesExcludingST;
+                    $retailPrice = round($unitPrice, 2);
                 }
-                $valueSalesExcludingST = $retailPrice;
-                $salesTaxApplicable = round(($retailPrice * $taxRate) / 100, 2);
+                $salesTaxApplicable = round(($valueSalesExcludingST * $taxRate) / 100, 2);
             } elseif ($isExempt) {
                 $retailPrice = $valueSalesExcludingST;
                 $salesTaxApplicable = 0.00;
@@ -181,7 +180,7 @@ class FbrService
             if ($needsSro) {
                 $sroValue = $item->sro_schedule_no ?? "";
                 if (stripos($sroValue, '3rd schedule') !== false) {
-                    $sroValue = '3rd Schedule goods';
+                    $sroValue = '3rd Schedule Goods';
                 }
                 $itemPayload["sroScheduleNo"] = $sroValue;
                 $itemPayload["sroItemSerialNo"] = $item->serial_no ?? "";
@@ -370,9 +369,9 @@ class FbrService
             'goods at standard rate (retail)' => 'Goods at standard rate (retail)',
             'cement /concrete block' => 'Cement /Concrete Block',
             'cement/concrete block' => 'Cement /Concrete Block',
-            '3rd schedule (taxable)' => '3rd Schedule goods',
-            '3rd schedule goods' => '3rd Schedule goods',
-            'goods under 3rd schedule' => '3rd Schedule goods',
+            '3rd schedule (taxable)' => '3rd Schedule Goods',
+            '3rd schedule goods' => '3rd Schedule Goods',
+            'goods under 3rd schedule' => '3rd Schedule Goods',
             'goods at zero rate' => 'Zero Rated',
             'zero rated' => 'Zero Rated',
             'goods exempt' => 'Exempt',
@@ -412,9 +411,9 @@ class FbrService
             'goods at standard rate (retail)' => 'Goods at standard rate (default)',
             'cement /concrete block' => 'Cement/Concrete Block',
             'cement/concrete block' => 'Cement/Concrete Block',
-            '3rd schedule (taxable)' => '3rd Schedule goods',
-            '3rd schedule goods' => '3rd Schedule goods',
-            'goods under 3rd schedule' => '3rd Schedule goods',
+            '3rd schedule (taxable)' => '3rd Schedule Goods',
+            '3rd schedule goods' => '3rd Schedule Goods',
+            'goods under 3rd schedule' => '3rd Schedule Goods',
             'goods at zero rate' => 'Goods at zero rate',
             'zero rated' => 'Goods at zero rate',
             'goods exempt' => 'Exempt goods',

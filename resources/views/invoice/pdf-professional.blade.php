@@ -82,15 +82,21 @@
                     </td>
                     <td style="width: 50%; vertical-align: top; text-align: right;">
                         <div class="company-name">{{ $invoice->company->name ?? 'TaxNest' }}</div>
-                        <div class="company-detail">NTN: {{ $invoice->company->ntn ?? 'N/A' }}</div>
+                        @if($invoice->company->address)
+                        <div class="company-detail">{{ $invoice->company->address }}@if($invoice->company->city), {{ $invoice->company->city }}@endif</div>
+                        @endif
+                        @if($invoice->company->ntn)
+                        <div class="company-detail">NTN: {{ $invoice->company->ntn }}</div>
+                        @endif
                         @if($invoice->company->cnic)
                         <div class="company-detail">CNIC: {{ $invoice->company->cnic }}</div>
                         @endif
                         @if($invoice->company->registration_no)
                         <div class="company-detail">Reg #: {{ $invoice->company->registration_no }}</div>
                         @endif
-                        <div class="company-detail">{{ $invoice->company->address ?? '' }}@if($invoice->company->city), {{ $invoice->company->city }}@endif</div>
-                        <div class="company-detail">{{ $invoice->company->phone ?? '' }}</div>
+                        @if($invoice->company->phone)
+                        <div class="company-detail">Phone: {{ $invoice->company->phone }}</div>
+                        @endif
                         @if($invoice->company->mobile)
                         <div class="company-detail">Mobile: {{ $invoice->company->mobile }}</div>
                         @endif

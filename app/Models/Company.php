@@ -40,6 +40,10 @@ class Company extends Model
         'invoice_limit_override',
         'user_limit_override',
         'branch_limit_override',
+        'registration_no',
+        'mobile',
+        'city',
+        'website',
     ];
 
     protected $casts = [

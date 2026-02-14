@@ -23,13 +23,17 @@ class CompanySettingsController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'owner_name' => 'nullable|string|max:255',
+            'registration_no' => 'nullable|string|max:100',
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:50',
+            'mobile' => 'nullable|string|max:50',
             'business_activity' => 'nullable|string|max:255',
             'address' => 'nullable|string|max:500',
+            'city' => 'nullable|string|max:100',
+            'website' => 'nullable|string|max:255',
         ]);
 
-        $company->update($request->only(['name', 'owner_name', 'email', 'phone', 'business_activity', 'address']));
+        $company->update($request->only(['name', 'owner_name', 'registration_no', 'email', 'phone', 'mobile', 'business_activity', 'address', 'city', 'website']));
 
         SecurityLogService::log('company_profile_updated', auth()->id(), [
             'company_id' => $company->id,

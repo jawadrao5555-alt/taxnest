@@ -34,9 +34,23 @@
             <tr>
                 <td style="width: 60%; vertical-align: top;">
                     <div class="company-name">{{ $invoice->company->name ?? 'TaxNest' }}</div>
-                    <p style="margin: 3px 0; font-size: 12px; color: #6b7280;">NTN: {{ $invoice->company->ntn ?? 'N/A' }}</p>
-                    <p style="margin: 3px 0; font-size: 12px; color: #6b7280;">{{ $invoice->company->address ?? '' }}</p>
-                    <p style="margin: 3px 0; font-size: 12px; color: #6b7280;">{{ $invoice->company->phone ?? '' }}</p>
+                    @if($invoice->company->ntn)
+                    <p style="margin: 3px 0; font-size: 12px; color: #6b7280;">NTN: {{ $invoice->company->ntn }}</p>
+                    @endif
+                    @if($invoice->company->cnic)
+                    <p style="margin: 3px 0; font-size: 12px; color: #6b7280;">CNIC: {{ $invoice->company->cnic }}</p>
+                    @endif
+                    @if($invoice->company->registration_no)
+                    <p style="margin: 3px 0; font-size: 12px; color: #6b7280;">Reg #: {{ $invoice->company->registration_no }}</p>
+                    @endif
+                    @if($invoice->company->address)
+                    <p style="margin: 3px 0; font-size: 12px; color: #6b7280;">{{ $invoice->company->address }}@if($invoice->company->city), {{ $invoice->company->city }}@endif</p>
+                    @endif
+                    @if($invoice->company->mobile)
+                    <p style="margin: 3px 0; font-size: 12px; color: #6b7280;">Mobile: {{ $invoice->company->mobile }}</p>
+                    @elseif($invoice->company->phone)
+                    <p style="margin: 3px 0; font-size: 12px; color: #6b7280;">Phone: {{ $invoice->company->phone }}</p>
+                    @endif
                 </td>
                 <td style="width: 40%; vertical-align: top; text-align: right;">
                     @if($invoice->fbr_invoice_number)

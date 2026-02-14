@@ -14,94 +14,6 @@ class FbrService
     private const SANDBOX_VALIDATE_URL = 'https://gw.fbr.gov.pk/di_data/v1/di/validateinvoicedata_sb';
     private const PRODUCTION_VALIDATE_URL = 'https://gw.fbr.gov.pk/di_data/v1/di/validateinvoicedata';
 
-    private function isProxyEnabled(): bool
-    {
-        return !empty(env('FBR_PROXY_URL'));
-    }
-
-    private function getProxyUrl(): string
-    {
-        return env('FBR_PROXY_URL', '');
-    }
-
-    private function sendViaProxy(string $fbrUrl, string $token, array $payload): array
-    {
-        $proxyUrl = $this->getProxyUrl();
-
-        $action = 'submit';
-        if (strpos($fbrUrl, 'validate') !== false) {
-            $action = 'validate';
-        }
-
-        $proxyPayload = [
-            'token' => $token,
-            'payload' => $payload,
-            'action' => $action,
-        ];
-
-        $jsonBody = json_encode($proxyPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
-
-        $ch = curl_init($proxyUrl);
-        curl_setopt_array($ch, [
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $jsonBody,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 60,
-            CURLOPT_HTTPHEADER     => [
-                'Content-Type: application/json',
-                'Accept: application/json',
-            ],
-        ]);
-
-        $responseBody = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        curl_close($ch);
-
-        \Log::info('FBR Proxy Debug', [
-            'proxy_url' => $proxyUrl,
-            'proxy_http_code' => $httpCode,
-            'proxy_response_length' => strlen($responseBody ?: ''),
-            'proxy_response_raw' => substr($responseBody ?: '(empty)', 0, 2000),
-            'curl_error' => $curlError,
-        ]);
-
-        $proxyResponse = json_decode($responseBody, true);
-
-        if ($proxyResponse && isset($proxyResponse['success']) && $proxyResponse['success'] === true) {
-            $fbrResponse = $proxyResponse['fbr_response'] ?? [];
-            if (empty($fbrResponse) && !empty($proxyResponse['invoice_number'])) {
-                $fbrResponse = [
-                    'invoiceNumber' => $proxyResponse['invoice_number'],
-                    'validationResponse' => [
-                        'statusCode' => '00',
-                        'status' => 'Valid',
-                        'error' => '',
-                    ],
-                ];
-            }
-            return [
-                'body' => json_encode($fbrResponse),
-                'http_code' => $proxyResponse['http_code'] ?? 200,
-                'curl_error' => '',
-            ];
-        }
-
-        if ($proxyResponse && isset($proxyResponse['fbr_response'])) {
-            return [
-                'body' => json_encode($proxyResponse['fbr_response']),
-                'http_code' => $proxyResponse['http_code'] ?? $httpCode,
-                'curl_error' => $curlError,
-            ];
-        }
-
-        return [
-            'body' => $responseBody,
-            'http_code' => $httpCode,
-            'curl_error' => $curlError,
-        ];
-    }
-
     private function sanitizeForFbr(?string $text): string
     {
         if (empty($text)) return "";
@@ -753,55 +665,43 @@ class FbrService
         $startTime = microtime(true);
 
         try {
-            if ($this->isProxyEnabled()) {
-                $proxyResult = $this->sendViaProxy($url, $token, $payload);
-                $responseBody = $proxyResult['body'];
-                $httpCode = $proxyResult['http_code'];
-                $curlError = $proxyResult['curl_error'];
-            } else {
-                $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
+            $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
+            $responseHeaders = [];
 
-                $ch = curl_init($url);
-                $responseHeaders = [];
-                curl_setopt_array($ch, [
-                    CURLOPT_POST           => true,
-                    CURLOPT_POSTFIELDS     => $jsonBody,
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT        => 30,
-                    CURLOPT_HTTPHEADER     => [
-                        'Content-Type: application/json',
-                        'Authorization: Bearer ' . $token,
-                        'Accept: application/json',
-                    ],
-                    CURLOPT_HEADERFUNCTION => function($curl, $header) use (&$responseHeaders) {
-                        $len = strlen($header);
-                        $header = explode(':', $header, 2);
-                        if (count($header) < 2) return $len;
-                        $responseHeaders[strtolower(trim($header[0]))] = trim($header[1]);
-                        return $len;
-                    },
-                    CURLOPT_SSL_VERIFYPEER => true,
-                    CURLOPT_VERBOSE        => false,
-                ]);
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => $jsonBody,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 30,
+                CURLOPT_HTTPHEADER     => [
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . $token,
+                    'Accept: application/json',
+                ],
+                CURLOPT_HEADERFUNCTION => function($curl, $header) use (&$responseHeaders) {
+                    $len = strlen($header);
+                    $header = explode(':', $header, 2);
+                    if (count($header) < 2) return $len;
+                    $responseHeaders[strtolower(trim($header[0]))] = trim($header[1]);
+                    return $len;
+                },
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_VERBOSE        => false,
+            ]);
 
-                $responseBody = curl_exec($ch);
-                $httpCode     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                $curlError    = curl_error($ch);
-                $curlInfo     = curl_getinfo($ch);
-                curl_close($ch);
+            $responseBody = curl_exec($ch);
+            $httpCode     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError    = curl_error($ch);
+            $curlInfo     = curl_getinfo($ch);
+            curl_close($ch);
 
-                \Log::info('FBR API Debug', [
-                    'url' => $url,
-                    'http_code' => $httpCode,
-                    'response_length' => strlen($responseBody ?: ''),
-                    'response_body_raw' => substr($responseBody ?: '(empty)', 0, 1000),
-                    'response_headers' => $responseHeaders,
-                    'total_time' => $curlInfo['total_time'] ?? null,
-                    'connect_time' => $curlInfo['connect_time'] ?? null,
-                    'primary_ip' => $curlInfo['primary_ip'] ?? null,
-                    'ssl_verify_result' => $curlInfo['ssl_verify_result'] ?? null,
-                ]);
-            }
+            \Log::info('FBR Submit Response', [
+                'invoice_id' => $invoice->id,
+                'http_code' => $httpCode,
+                'response_preview' => substr($responseBody ?: '(empty)', 0, 500),
+                'time_sec' => $curlInfo['total_time'] ?? null,
+            ]);
 
             $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
             $log->response_time_ms = $responseTimeMs;
@@ -1111,30 +1011,25 @@ class FbrService
         $validateUrl = $this->getValidateUrl($company);
 
         try {
-            if ($this->isProxyEnabled()) {
-                $proxyResult = $this->sendViaProxy($validateUrl, $token, $payload);
-                $responseBody = $proxyResult['body'];
-                $httpCode = $proxyResult['http_code'];
-            } else {
-                $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
+            $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
 
-                $ch = curl_init($validateUrl);
-                curl_setopt_array($ch, [
-                    CURLOPT_POST           => true,
-                    CURLOPT_POSTFIELDS     => $jsonBody,
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT        => 30,
-                    CURLOPT_HTTPHEADER     => [
-                        'Content-Type: application/json',
-                        'Authorization: Bearer ' . $token,
-                        'Accept: application/json',
-                    ],
-                ]);
+            $ch = curl_init($validateUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => $jsonBody,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 30,
+                CURLOPT_HTTPHEADER     => [
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . $token,
+                    'Accept: application/json',
+                ],
+                CURLOPT_SSL_VERIFYPEER => true,
+            ]);
 
-                $responseBody = curl_exec($ch);
-                $httpCode     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
-            }
+            $responseBody = curl_exec($ch);
+            $httpCode     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
 
             $response = new class($responseBody, $httpCode) {
                 private $body;

@@ -219,11 +219,16 @@
                         <span class="ml-1" x-text="testMessage"></span>
                     </div>
                     <div class="flex justify-end gap-3">
-                        <button type="submit" :disabled="saving || saveDone" class="inline-flex items-center px-6 py-2.5 rounded-lg font-medium transition-colors duration-200 shadow-sm disabled:opacity-70"
-                            :class="saveDone ? 'bg-green-500 text-white' : 'bg-emerald-600 text-white hover:bg-emerald-700'">
-                            <svg x-show="saving" x-cloak class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                            <svg x-show="saveDone" x-cloak class="-ml-1 mr-2 h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
-                            <span x-text="saving ? 'Saving...' : (saveDone ? 'Saved!' : 'Save FBR Settings')"></span>
+                        <button x-show="saving" type="button" disabled class="inline-flex items-center px-6 py-2.5 rounded-lg font-medium bg-emerald-600 text-white shadow-sm opacity-70 cursor-wait">
+                            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            Saving...
+                        </button>
+                        <button x-show="saveDone && !saving" x-cloak type="button" disabled class="inline-flex items-center px-6 py-2.5 rounded-lg font-medium bg-green-500 text-white shadow-sm">
+                            <svg class="-ml-1 mr-2 h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                            Saved!
+                        </button>
+                        <button x-show="!saving && !saveDone" type="submit" class="inline-flex items-center px-6 py-2.5 rounded-lg font-medium bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">
+                            Save FBR Settings
                         </button>
                     </div>
                 </div>

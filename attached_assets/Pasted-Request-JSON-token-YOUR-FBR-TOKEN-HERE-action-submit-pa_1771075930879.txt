@@ -1,0 +1,75 @@
+Request JSON:
+{
+  "token": "YOUR_FBR_TOKEN_HERE",
+  "action": "submit",
+  "payload": {
+    "items": [
+      {
+        "uoM": "KG",
+        "rate": "5%",
+        "hsCode": "3105.3000",
+        "discount": 0.0,
+        "extraTax": 0.0,
+        "quantity": 3,
+        "saleType": "3rd Schedule Goods",
+        "fedPayable": 0.0,
+        "furtherTax": 0.0,
+        "totalValues": 819.66,
+        "productDescription": "Dap",
+        "salesTaxApplicable": 39.03,
+        "valueSalesExcludingST": 780.63,
+        "salesTaxWithheldAtSource": 0.0,
+        "fixedNotifiedValueOrRetailPrice": 260.21,
+        "sroScheduleNo": "3rd Schedule goods",
+        "sroItemSerialNo": "51"
+      }
+    ],
+    "invoiceDate": "2026-02-14",
+    "invoiceType": "Sale Invoice",
+    "documentTypeId": 1,
+    "buyerAddress": "lodhran",
+    "invoiceRefNo": "3638114-4DI1771075522417",
+    "buyerProvince": "Punjab",
+    "sellerAddress": "KHAIR PUR ROAD...",
+    "sellerNTNCNIC": "3620291786117",
+    "sellerProvince": "Punjab",
+    "buyerBusinessName": "Abrar Ahmad",
+    "sellerBusinessName": "ZIA CORPORATION",
+    "buyerRegistrationType": "Unregistered",
+    "buyerNTNCNIC": ""
+  }
+}
+PHP mein kaise call karega:
+$proxyUrl = "https://YOUR-NESTPAY-URL/api/fbr-proxy/submit";
+$data = [
+    'token'   => 'FBR_TOKEN_HERE',
+    'action'  => 'submit',
+    'payload' => $invoicePayload
+];
+$ch = curl_init($proxyUrl);
+curl_setopt_array($ch, [
+    CURLOPT_POST           => true,
+    CURLOPT_POSTFIELDS     => json_encode($data),
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_TIMEOUT        => 30,
+    CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+]);
+$response = curl_exec($ch);
+curl_close($ch);
+$result = json_decode($response, true);
+if ($result['success']) {
+    $fbrInvoiceNumber = $result['invoice_number'];
+    echo "FBR Invoice: " . $fbrInvoiceNumber;
+} else {
+    echo "Error: " . json_encode($result['fbr_response']);
+}
+Response format:
+{
+  "success": true,
+  "http_code": 200,
+  "invoice_number": "3620291786117DIACXXXXX",
+  "fbr_response": { ... },
+  "action": "submit",
+  "timestamp": "2026-02-14T..."
+}
+Developer ko proxy URL dein aur test karwayein — NestPay ki IP se FBR ko jayegi request!

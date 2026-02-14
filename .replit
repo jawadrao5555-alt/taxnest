@@ -16,6 +16,7 @@ SESSION_SECURE_COOKIE = "true"
 SESSION_SAME_SITE = "none"
 SESSION_DOMAIN = ""
 SESSION_PARTITIONED_COOKIE = "true"
+FBR_PROXY_URL = "https://nestpay.replit.app/api/fbr-proxy/submit"
 
 [workflows]
 runButton = "Project"

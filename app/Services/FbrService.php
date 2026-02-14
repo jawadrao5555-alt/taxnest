@@ -48,7 +48,7 @@ class FbrService
             $taxRate = floatval($item->tax_rate ?? 18);
             $quantity = round(floatval($item->quantity), 4);
             $unitPrice = floatval($item->price);
-            $valueSalesExcludingST = round($unitPrice, 2);
+            $valueSalesExcludingST = round($unitPrice * $quantity, 2);
 
             $rawSaleType = $item->sale_type ?: ScheduleEngine::mapSaleType($scheduleType);
             $is3rdSchedule = (stripos($rawSaleType, '3rd Schedule') !== false);
@@ -57,10 +57,11 @@ class FbrService
             $saleTypeNormalized = $this->normalizeSaleType($rawSaleType, $env);
 
             if ($is3rdSchedule) {
-                $retailPrice = round(floatval($item->mrp ?? 0), 2);
-                if ($retailPrice <= 0) {
-                    $retailPrice = round($unitPrice, 2);
+                $mrpPerUnit = floatval($item->mrp ?? 0);
+                if ($mrpPerUnit <= 0) {
+                    $mrpPerUnit = $unitPrice;
                 }
+                $retailPrice = round($mrpPerUnit * $quantity, 2);
                 $salesTaxApplicable = round(($valueSalesExcludingST * $taxRate) / 100, 2);
             } elseif ($isExempt) {
                 $retailPrice = $valueSalesExcludingST;
@@ -79,12 +80,12 @@ class FbrService
             } elseif ($isReduced) {
                 $extraTaxVal = 0.00;
             } else {
-                $extraTaxVal = round(floatval($item->extra_tax ?? 0), 2);
+                $extraTaxVal = round(floatval($item->extra_tax ?? 0) * $quantity, 2);
             }
 
-            $furtherTax = round(floatval($item->further_tax ?? 0), 2);
-            $fedPayable = round(floatval($item->fed_payable ?? 0), 2);
-            $discount = round(floatval($item->discount ?? 0), 2);
+            $furtherTax = round(floatval($item->further_tax ?? 0) * $quantity, 2);
+            $fedPayable = round(floatval($item->fed_payable ?? 0) * $quantity, 2);
+            $discount = round(floatval($item->discount ?? 0) * $quantity, 2);
 
             $totalValues = round($valueSalesExcludingST + $salesTaxApplicable + floatval($extraTaxVal) + $furtherTax + $fedPayable - $discount, 2);
 

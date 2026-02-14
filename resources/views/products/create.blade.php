@@ -68,17 +68,17 @@
                         </div>
                     </div>
 
-                    <div x-show="requiresMrp" x-cloak class="mb-6">
+                    <div x-show="requiresMrp" x-transition class="mb-6" style="display:none">
                         <div class="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg">
                             <label class="block text-sm font-medium text-purple-700 dark:text-purple-300 mb-1">MRP / Retail Price (Rs.) <span class="text-red-500">*</span></label>
                             <p class="text-xs text-purple-600 dark:text-purple-400 mb-2">Required for 3rd Schedule items</p>
-                            <input type="number" step="0.01" min="0" name="mrp" x-model="mrp" @input="calcTax()"
+                            <input type="number" step="0.01" min="0" name="mrp" x-model="mrp"
                                 class="w-full rounded-lg border-purple-300 dark:border-purple-600 bg-white dark:bg-gray-800 shadow-sm focus:ring-purple-500 focus:border-purple-500">
                             @error('mrp') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                     </div>
 
-                    <div x-show="requiresSro" x-cloak class="mb-6">
+                    <div x-show="requiresSro" x-transition class="mb-6" style="display:none">
                         <div class="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
                             <div class="flex items-center justify-between mb-2">
                                 <label class="block text-sm font-medium text-amber-700 dark:text-amber-300">SRO Reference <span class="text-red-500">*</span></label>
@@ -91,7 +91,7 @@
                                 class="w-full rounded-lg border-amber-300 dark:border-amber-600 bg-white dark:bg-gray-800 shadow-sm focus:ring-amber-500 focus:border-amber-500">
                             @error('sro_reference') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
 
-                            <div x-show="sroLookupOpen" x-cloak class="mt-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 p-3">
+                            <div x-show="sroLookupOpen" x-transition class="mt-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 p-3" style="display:none">
                                 <div class="flex gap-2 mb-2">
                                     <input type="text" x-model="sroSearch" @keydown.enter.prevent="searchSro()" placeholder="Search SRO rules..." class="flex-1 rounded-lg border-gray-300 dark:border-gray-700 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                     <button type="button" @click="searchSro()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700">Search</button>
@@ -101,7 +101,7 @@
                         </div>
                     </div>
 
-                    <div x-show="requiresSerial" x-cloak class="mb-6">
+                    <div x-show="requiresSerial" x-transition class="mb-6" style="display:none">
                         <div class="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
                             <label class="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">SRO Item Serial Number <span class="text-red-500">*</span></label>
                             <p class="text-xs text-blue-600 dark:text-blue-400 mb-2">Required for this schedule type</p>
@@ -154,7 +154,7 @@
                                 <p class="text-sm font-bold text-emerald-700 dark:text-emerald-400">Rs. <span x-text="formatNum(totalWithTax)">0.00</span></p>
                             </div>
                         </div>
-                        <div x-show="requiresMrp && parseFloat(mrp) > 0" x-cloak class="mt-3 p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
+                        <div x-show="requiresMrp && parseFloat(mrp) > 0" x-transition class="mt-3 p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700" style="display:none">
                             <div class="flex justify-between items-center">
                                 <span class="text-xs text-purple-600 dark:text-purple-400">MRP / Retail Price</span>
                                 <span class="text-sm font-bold text-purple-700 dark:text-purple-300">Rs. <span x-text="formatNum(mrp)">0.00</span></span>

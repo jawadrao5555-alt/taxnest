@@ -20,8 +20,8 @@ class SendInvoiceToFbrJob implements ShouldQueue
 {
     use Queueable;
 
-    public $tries = 2;
-    public $backoff = [30, 60];
+    public $tries = 3;
+    public $backoff = [30, 90, 180];
 
     public function __construct(public int $invoiceId, public ?string $fbrEnvironment = null)
     {
@@ -41,7 +41,22 @@ class SendInvoiceToFbrJob implements ShouldQueue
     public function handle(): void
     {
         $startTime = microtime(true);
-        $invoice = Invoice::with(['company', 'items'])->findOrFail($this->invoiceId);
+
+        $invoice = \Illuminate\Support\Facades\DB::transaction(function () {
+            $inv = Invoice::where('id', $this->invoiceId)->lockForUpdate()->first();
+            if (!$inv) {
+                return null;
+            }
+            return $inv;
+        });
+
+        if (!$invoice) {
+            Log::error("SendInvoiceToFbrJob: Invoice #{$this->invoiceId} not found.");
+            $this->releaseLock();
+            return;
+        }
+
+        $invoice->load(['company', 'items']);
 
         Log::info("SendInvoiceToFbrJob: Starting invoice #{$invoice->id}, attempt {$this->attempts()}/{$this->tries}");
 

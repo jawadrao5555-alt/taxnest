@@ -1,0 +1,203 @@
+You are performing the FINAL Enterprise Upgrade on TaxNest.
+
+DO NOT break:
+- FBR payload structure
+- HS Intelligence engine
+- Compliance scoring
+- Multi-tenant isolation
+- Invoice numbering system
+- Audit log integrity
+- Existing business logic
+
+This upgrade includes:
+UI polish + Smooth UX + Security hardening + Billing automation + Performance optimization + Production readiness.
+
+========================================================
+PHASE 1 — PRODUCTION SAFETY HARDENING (CRITICAL)
+========================================================
+
+1. Add UNIQUE database constraint:
+   - fbr_invoice_number must be UNIQUE (nullable allowed but unique when not null)
+
+2. Ensure invoice submission wrapped in:
+   DB::transaction() + lockForUpdate()
+
+3. Ensure queue job exits if:
+   status in (locked, pending_verification)
+
+4. Add exponential backoff:
+   tries = 3
+   backoff = [30, 90, 180]
+
+5. Ensure idempotency:
+   Prevent duplicate dispatch using:
+   Cache::add("fbr_dispatch_lock:{invoiceId}", true, 120)
+
+========================================================
+PHASE 2 — PAYMENT GATEWAY INTEGRATION (SELF-SERVICE SAAS)
+========================================================
+
+1. Integrate Stripe OR local equivalent (JazzCash/Easypaisa simulation mode allowed)
+2. Subscription creation must:
+   - Auto-activate after successful payment
+   - Set billing_cycle (monthly, quarterly, semi, annual)
+   - Apply discount logic dynamically
+3. Add webhook route for payment confirmation.
+4. Add "Upgrade Plan" self-service page.
+5. Trial auto-converts if payment added before expiry.
+
+========================================================
+PHASE 3 — SECURITY HARDENING
+========================================================
+
+1. Add 2FA (OTP via email or authenticator app)
+2. Add email verification on registration.
+3. Add login attempt limiter (5 attempts → cooldown 5 mins)
+4. Add Content Security Policy headers.
+5. Ensure CSRF tokens verified on all POST routes.
+6. Hide all sensitive tokens in logs.
+7. Add IP log for FBR submission attempts.
+
+========================================================
+PHASE 4 — ENTERPRISE SIMPLIFIED DASHBOARD
+========================================================
+
+Company Dashboard shows ONLY:
+- Total Invoices (Month)
+- Accepted
+- Rejected
+- Pending Verification
+- Tax Collected
+
+Add button:
+"Advanced Insights"
+Loads:
+- Compliance score
+- Audit probability
+- Risk trends
+- HS intelligence alerts
+
+Admin dashboard remains full enterprise.
+
+========================================================
+PHASE 5 — ULTRA SMOOTH UX ENGINE
+========================================================
+
+1. Add 150ms smooth fade transitions.
+2. Replace full page reloads with AJAX where safe.
+3. Add loading spinner to:
+   - Save draft
+   - Submit
+   - Retry
+4. Add optimistic UI:
+   Immediately change status to "Processing..."
+5. Sticky invoice summary bar:
+   Subtotal, Tax, WHT, Grand Total.
+6. Keyboard shortcuts:
+   Enter → next field
+   Ctrl+S → save draft
+   Esc → close modal
+7. Auto-scroll to first validation error.
+8. Soft toast notifications (top-right).
+
+========================================================
+PHASE 6 — UI CONSISTENCY PREMIUM STANDARD
+========================================================
+
+1. Remove all glass effects from internal app.
+2. Use solid background + shadow-sm + rounded-xl.
+3. KPI cards → border-top accent only.
+4. Tables:
+   zebra stripe + sticky header.
+5. Sidebar:
+   Desktop fixed.
+   Mobile slide drawer.
+   No double scroll.
+6. Add universal Back button.
+7. Add breadcrumb navigation.
+
+========================================================
+PHASE 7 — PERFORMANCE OPTIMIZATION
+========================================================
+
+1. Remove Tailwind CDN.
+2. Compile assets via Vite.
+3. Enable:
+   - route:cache
+   - config:cache
+   - view:cache
+4. Minify CSS & JS.
+5. Lazy load charts.
+6. Optimize N+1 queries.
+7. Ensure 60fps smooth scroll.
+
+========================================================
+PHASE 8 — PWA PREMIUM EXPERIENCE
+========================================================
+
+1. Install popup once per user (localStorage).
+2. Add subtle install icon in header.
+3. Offline badge when no network.
+4. Add splash screen.
+5. Service worker update banner.
+
+========================================================
+PHASE 9 — BILLING AUTOMATION UPGRADE
+========================================================
+
+1. Custom Plan Builder must:
+   Auto-calculate:
+   (invoice_limit × 2.5)
+ + (users × 500)
+ + (branches × 1000)
+
+2. Apply discount automatically:
+   Monthly: 0%
+   Quarterly: 1%
+   Semi-Annual: 3%
+   Annual: 6%
+
+3. Show savings indicator:
+   "You save Rs X with Annual billing"
+
+4. Prevent downgrade below active usage.
+
+========================================================
+PHASE 10 — LANDING PAGE REPOSITIONING
+========================================================
+
+Update hero section:
+
+"Smart FBR Invoicing — Without SRO Confusion"
+
+Add trust blocks:
+- FBR Integrated
+- SHA256 Secured
+- Multi-Branch Ready
+- Intelligent Tax Engine
+
+Add:
+- Comparison vs traditional invoicing
+- Clear CTA: Start 14-Day Free Trial
+
+========================================================
+FINAL VALIDATION CHECK
+========================================================
+
+After implementation:
+
+- All routes return 200.
+- Queue worker operational.
+- No FBR payload modified.
+- No compliance engine altered.
+- No HS intelligence broken.
+- No invoice numbering reset.
+- No security regression.
+- Full test on:
+   Draft → Submit → Pending → Confirm → Locked.
+
+Return:
+- Security score
+- Performance improvement summary
+- UX improvement summary
+- Production readiness status

@@ -646,7 +646,7 @@ class InvoiceController extends Controller
                 'override_reason' => $request->override_reason,
             ]);
 
-            SendInvoiceToFbrJob::dispatch($invoice->id, $fbrEnvironment);
+            SendInvoiceToFbrJob::safeDispatch($invoice->id, $fbrEnvironment);
 
             if ($invoice->buyer_ntn) {
                 $vendorResult = VendorRiskEngine::calculateVendorScore($invoice->company_id, $invoice->buyer_ntn);
@@ -703,7 +703,7 @@ class InvoiceController extends Controller
             'risk_level' => $scoreResult['risk_level'],
         ]);
 
-        SendInvoiceToFbrJob::dispatch($invoice->id, $fbrEnvironment);
+        SendInvoiceToFbrJob::safeDispatch($invoice->id, $fbrEnvironment);
 
         if ($invoice->buyer_ntn) {
             $vendorResult = VendorRiskEngine::calculateVendorScore($invoice->company_id, $invoice->buyer_ntn);
@@ -750,7 +750,7 @@ class InvoiceController extends Controller
             'retried_by' => auth()->user()->name,
         ]);
 
-        SendInvoiceToFbrJob::dispatch($invoice->id);
+        SendInvoiceToFbrJob::safeDispatch($invoice->id);
 
         return redirect('/invoice/' . $invoice->id)->with('success', 'Invoice resubmitted to FBR. You will be notified of the result.');
     }

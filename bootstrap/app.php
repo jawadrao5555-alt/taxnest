@@ -13,11 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
         $middleware->prepend(\App\Http\Middleware\ForceHttps::class);
-        $middleware->validateCsrfTokens(except: [
-            'login',
-            'register',
-            'logout',
-        ]);
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
         $middleware->alias([
             'company' => \App\Http\Middleware\CompanyIsolation::class,
             'role' => \App\Http\Middleware\RoleMiddleware::class,

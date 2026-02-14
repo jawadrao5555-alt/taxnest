@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <title>TaxNest — Pakistan's Smart FBR Compliance Platform</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700,800&display=swap" rel="stylesheet">
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
         body { font-family: 'Figtree', sans-serif; }
         .glass-card { background: rgba(255,255,255,0.15); backdrop-filter: blur(16px) saturate(180%); border: 1px solid rgba(255,255,255,0.25); transition: all 0.3s ease; }
@@ -16,8 +16,6 @@
         .feature-gradient { background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%); }
         [x-cloak] { display: none !important; }
     </style>
-    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body class="antialiased text-gray-800">
 
@@ -437,42 +435,42 @@
                         <span class="text-base font-semibold text-gray-900">What is TaxNest?</span>
                         <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 1 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 1" x-collapse class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">TaxNest is Pakistan's leading FBR-compliant tax and invoice management platform. It integrates directly with FBR's PRAL API for real-time invoice submission, compliance scoring, and QR code generation.</div>
+                    <div x-show="open === 1" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">TaxNest is Pakistan's leading FBR-compliant tax and invoice management platform. It integrates directly with FBR's PRAL API for real-time invoice submission, compliance scoring, and QR code generation.</div>
                 </div>
                 <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 rounded-2xl overflow-hidden">
                     <button @click="open = open === 2 ? null : 2" class="w-full flex items-center justify-between p-6 text-left">
                         <span class="text-base font-semibold text-gray-900">Is TaxNest FBR approved?</span>
                         <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 2 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 2" x-collapse class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Yes, TaxNest integrates directly with FBR's PRAL API v1.12 for production invoice submission. All invoices are validated against FBR's compliance rules before submission.</div>
+                    <div x-show="open === 2" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Yes, TaxNest integrates directly with FBR's PRAL API v1.12 for production invoice submission. All invoices are validated against FBR's compliance rules before submission.</div>
                 </div>
                 <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 rounded-2xl overflow-hidden">
                     <button @click="open = open === 3 ? null : 3" class="w-full flex items-center justify-between p-6 text-left">
                         <span class="text-base font-semibold text-gray-900">How does the free trial work?</span>
                         <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 3 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 3" x-collapse class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Sign up and get 14 days of full access with no credit card required. You can create invoices, submit to FBR, and explore all features. After the trial, choose a plan that fits your business.</div>
+                    <div x-show="open === 3" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Sign up and get 14 days of full access with no credit card required. You can create invoices, submit to FBR, and explore all features. After the trial, choose a plan that fits your business.</div>
                 </div>
                 <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 rounded-2xl overflow-hidden">
                     <button @click="open = open === 4 ? null : 4" class="w-full flex items-center justify-between p-6 text-left">
                         <span class="text-base font-semibold text-gray-900">Can I manage multiple branches?</span>
                         <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 4 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 4" x-collapse class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Yes! Business plans support up to 3 branches, Industrial plans offer unlimited branches, and Enterprise plans include unlimited branches with dedicated support.</div>
+                    <div x-show="open === 4" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Yes! Business plans support up to 3 branches, Industrial plans offer unlimited branches, and Enterprise plans include unlimited branches with dedicated support.</div>
                 </div>
                 <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 rounded-2xl overflow-hidden">
                     <button @click="open = open === 5 ? null : 5" class="w-full flex items-center justify-between p-6 text-left">
                         <span class="text-base font-semibold text-gray-900">Is my data secure?</span>
                         <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 5 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 5" x-collapse class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Absolutely. TaxNest uses SHA-256 encrypted audit logs, immutable transaction records, and encrypted FBR tokens. All data is stored securely with role-based access controls.</div>
+                    <div x-show="open === 5" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Absolutely. TaxNest uses SHA-256 encrypted audit logs, immutable transaction records, and encrypted FBR tokens. All data is stored securely with role-based access controls.</div>
                 </div>
                 <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 rounded-2xl overflow-hidden">
                     <button @click="open = open === 6 ? null : 6" class="w-full flex items-center justify-between p-6 text-left">
                         <span class="text-base font-semibold text-gray-900">Can I build a custom plan?</span>
                         <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 6 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 6" x-collapse class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Yes! After signing up, use our Custom Plan Builder to configure exact invoice limits, user counts, and branch counts. Pricing is calculated dynamically with cycle-based discounts.</div>
+                    <div x-show="open === 6" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Yes! After signing up, use our Custom Plan Builder to configure exact invoice limits, user counts, and branch counts. Pricing is calculated dynamically with cycle-based discounts.</div>
                 </div>
             </div>
         </div>

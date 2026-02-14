@@ -256,7 +256,7 @@
                                         <a href="/invoice/{{ $invoice->id }}/edit" class="text-blue-600 hover:text-blue-800 font-medium">Edit</a>
                                         <form method="POST" action="/invoice/{{ $invoice->id }}/submit" class="inline">
                                             @csrf
-                                            <button type="submit" class="text-purple-600 hover:text-purple-800 font-medium" onclick="return confirm('Submit this invoice to FBR?')">Submit to FBR</button>
+                                            <button type="submit" class="text-purple-600 hover:text-purple-800 font-medium">Submit to FBR</button>
                                         </form>
                                         @endif
                                     @else
@@ -264,7 +264,7 @@
                                         <a href="/invoice/{{ $invoice->id }}/edit" class="text-amber-600 hover:text-amber-800 font-medium">Edit</a>
                                         <form method="POST" action="/invoice/{{ $invoice->id }}/retry" class="inline">
                                             @csrf
-                                            <button type="submit" class="text-emerald-600 hover:text-emerald-800 font-medium" onclick="return confirm('Retry FBR submission?')">Retry</button>
+                                            <button type="submit" class="text-emerald-600 hover:text-emerald-800 font-medium">Retry</button>
                                         </form>
                                         @endif
                                         <div x-data="{ showWhtModal: false, pdfWhtRate: 0 }" class="inline-block">

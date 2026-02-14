@@ -29,55 +29,74 @@
                 <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead class="bg-gray-50 dark:bg-gray-800">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">HS Code</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PCT Code</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Schedule Type</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tax Rate</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SRO Reference</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">UOM</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">HS Code</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Schedule</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tax</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tax Amt</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MRP</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SRO</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                         @forelse($products as $product)
+                            @php
+                                $taxAmt = $product->default_price * $product->default_tax_rate / 100;
+                                $totalWithTax = $product->default_price + $taxAmt;
+                                $badges = [
+                                    'standard' => 'bg-gray-100 text-gray-800',
+                                    'reduced' => 'bg-blue-100 text-blue-800',
+                                    '3rd_schedule' => 'bg-amber-100 text-amber-800',
+                                    'exempt' => 'bg-green-100 text-green-800',
+                                    'zero_rated' => 'bg-purple-100 text-purple-800',
+                                ];
+                                $badgeClass = $badges[$product->schedule_type] ?? 'bg-gray-100 text-gray-800';
+                            @endphp
                             <tr class="even:bg-gray-50/50 dark:even:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $product->name }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $product->hs_code }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $product->pct_code ?? '-' }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap">
+                                <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{{ $product->name }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400 font-mono">{{ $product->hs_code }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap">
                                     @if($product->schedule_type)
-                                        @php
-                                            $badges = [
-                                                'standard' => ['bg-gray-100', 'text-gray-800'],
-                                                'reduced' => ['bg-blue-100', 'text-blue-800'],
-                                                '3rd_schedule' => ['bg-amber-100', 'text-amber-800'],
-                                                'exempt' => ['bg-green-100', 'text-green-800'],
-                                                'zero_rated' => ['bg-purple-100', 'text-purple-800'],
-                                            ];
-                                            $badgeClass = $badges[$product->schedule_type] ?? ['bg-gray-100', 'text-gray-800'];
-                                        @endphp
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $badgeClass[0] }} {{ $badgeClass[1] }}">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ $badgeClass }}">
                                             {{ str_replace('_', ' ', ucfirst($product->schedule_type)) }}
                                         </span>
                                     @else
                                         <span class="text-gray-400 text-sm">-</span>
                                     @endif
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $product->default_tax_rate }}%</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $product->sro_reference ?? '-' }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $product->uom }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">Rs. {{ number_format($product->default_price, 2) }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    @if($product->is_active)
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Active</span>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm font-medium {{ $product->default_tax_rate > 0 ? 'text-amber-600' : 'text-gray-600' }}">{{ intval($product->default_tax_rate) }}%</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">Rs. {{ number_format($product->default_price, 2) }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-red-600 font-medium">Rs. {{ number_format($taxAmt, 2) }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-emerald-700 dark:text-emerald-400 font-bold">Rs. {{ number_format($totalWithTax, 2) }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                                    @if($product->mrp)
+                                        <span class="text-purple-700 font-medium">Rs. {{ number_format($product->mrp, 2) }}</span>
                                     @else
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Inactive</span>
+                                        <span class="text-gray-400">-</span>
                                     @endif
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm space-x-2">
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                                    @if($product->sro_reference)
+                                        <span class="text-xs" title="{{ $product->sro_reference }}">{{ Str::limit($product->sro_reference, 15) }}</span>
+                                        @if($product->serial_number)
+                                            <span class="text-xs text-blue-600 ml-1">#{{ $product->serial_number }}</span>
+                                        @endif
+                                    @else
+                                        <span class="text-gray-400">-</span>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    @if($product->is_active)
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Active</span>
+                                    @else
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Inactive</span>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap text-right text-sm space-x-2">
                                     <a href="/products/{{ $product->id }}/edit" class="text-emerald-600 hover:text-emerald-800 font-medium">Edit</a>
                                     <form method="POST" action="/products/{{ $product->id }}/toggle" class="inline">
                                         @csrf
@@ -89,7 +108,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="10" class="px-6 py-12 text-center text-gray-500">
+                                <td colspan="11" class="px-6 py-12 text-center text-gray-500">
                                     No products found. <a href="/products/create" class="text-emerald-600 hover:text-emerald-800 font-medium">Create your first product</a>.
                                 </td>
                             </tr>

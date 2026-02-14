@@ -7,7 +7,7 @@ class ScheduleEngine
     public static array $scheduleTypes = [
         'standard' => ['label' => 'Standard Rate', 'tax_rate' => null, 'requires_sro' => false, 'requires_serial' => false, 'requires_mrp' => false],
         'reduced' => ['label' => 'Reduced Rate', 'tax_rate' => 10, 'requires_sro' => true, 'requires_serial' => true, 'requires_mrp' => false],
-        '3rd_schedule' => ['label' => '3rd Schedule', 'tax_rate' => 17, 'requires_sro' => false, 'requires_serial' => false, 'requires_mrp' => false],
+        '3rd_schedule' => ['label' => '3rd Schedule', 'tax_rate' => 17, 'requires_sro' => false, 'requires_serial' => false, 'requires_mrp' => true],
         'exempt' => ['label' => 'Exempt', 'tax_rate' => 0, 'requires_sro' => true, 'requires_serial' => false, 'requires_mrp' => false],
         'zero_rated' => ['label' => 'Zero Rated', 'tax_rate' => 0, 'requires_sro' => false, 'requires_serial' => false, 'requires_mrp' => false],
     ];

@@ -34,7 +34,11 @@ class ProductController extends Controller
 
     public function store(Request $request)
     {
-        $rules = [
+        $scheduleType = $request->schedule_type ?? 'standard';
+        $taxRate = (float) ($request->default_tax_rate ?? 18);
+        $rules = \App\Services\ScheduleEngine::resolveValidationRules($scheduleType, $taxRate);
+
+        $validationRules = [
             'name' => 'required|string|max:255',
             'hs_code' => 'required|string|max:50',
             'pct_code' => 'nullable|string|max:50',
@@ -42,14 +46,22 @@ class ProductController extends Controller
             'uom' => 'required|string|max:20',
             'schedule_type' => 'nullable|string|max:100',
             'sro_reference' => 'nullable|string|max:100',
+            'serial_number' => 'nullable|string|max:100',
+            'mrp' => 'nullable|numeric|min:0',
             'default_price' => 'required|numeric|min:0',
         ];
 
-        if ((int) $request->default_tax_rate < 18) {
-            $rules['sro_reference'] = 'required|string|max:100';
+        if ($rules['requires_sro']) {
+            $validationRules['sro_reference'] = 'required|string|max:100';
+        }
+        if ($rules['requires_serial']) {
+            $validationRules['serial_number'] = 'required|string|max:100';
+        }
+        if ($rules['requires_mrp']) {
+            $validationRules['mrp'] = 'required|numeric|min:0.01';
         }
 
-        $request->validate($rules);
+        $request->validate($validationRules);
 
         $companyId = app('currentCompanyId');
 
@@ -62,6 +74,8 @@ class ProductController extends Controller
             'uom' => $request->uom,
             'schedule_type' => $request->schedule_type,
             'sro_reference' => $request->sro_reference,
+            'serial_number' => $request->serial_number,
+            'mrp' => $request->mrp,
             'default_price' => $request->default_price,
         ]);
 
@@ -80,7 +94,11 @@ class ProductController extends Controller
         $companyId = app('currentCompanyId');
         if ($product->company_id !== $companyId) abort(403);
 
-        $rules = [
+        $scheduleType = $request->schedule_type ?? 'standard';
+        $taxRate = (float) ($request->default_tax_rate ?? 18);
+        $engineRules = \App\Services\ScheduleEngine::resolveValidationRules($scheduleType, $taxRate);
+
+        $validationRules = [
             'name' => 'required|string|max:255',
             'hs_code' => 'required|string|max:50',
             'pct_code' => 'nullable|string|max:50',
@@ -88,18 +106,26 @@ class ProductController extends Controller
             'uom' => 'required|string|max:20',
             'schedule_type' => 'nullable|string|max:100',
             'sro_reference' => 'nullable|string|max:100',
+            'serial_number' => 'nullable|string|max:100',
+            'mrp' => 'nullable|numeric|min:0',
             'default_price' => 'required|numeric|min:0',
         ];
 
-        if ((int) $request->default_tax_rate < 18) {
-            $rules['sro_reference'] = 'required|string|max:100';
+        if ($engineRules['requires_sro']) {
+            $validationRules['sro_reference'] = 'required|string|max:100';
+        }
+        if ($engineRules['requires_serial']) {
+            $validationRules['serial_number'] = 'required|string|max:100';
+        }
+        if ($engineRules['requires_mrp']) {
+            $validationRules['mrp'] = 'required|numeric|min:0.01';
         }
 
-        $request->validate($rules);
+        $request->validate($validationRules);
 
         $product->update($request->only([
             'name', 'hs_code', 'pct_code', 'default_tax_rate',
-            'uom', 'schedule_type', 'sro_reference', 'default_price'
+            'uom', 'schedule_type', 'sro_reference', 'serial_number', 'mrp', 'default_price'
         ]));
 
         return redirect('/products')->with('success', 'Product updated successfully.');
@@ -124,13 +150,13 @@ class ProductController extends Controller
                   ->orWhere('hs_code', 'ilike', "%{$query}%");
             })
             ->take(20)
-            ->get(['id', 'name', 'hs_code', 'pct_code', 'default_tax_rate', 'uom', 'default_price', 'schedule_type', 'sro_reference']);
+            ->get(['id', 'name', 'hs_code', 'pct_code', 'default_tax_rate', 'uom', 'default_price', 'schedule_type', 'sro_reference', 'serial_number', 'mrp']);
 
         $products->transform(function ($product) {
-            $config = \App\Services\ScheduleEngine::getScheduleConfig($product->schedule_type ?? 'standard');
-            $product->requires_sro = $config['requires_sro'];
-            $product->requires_serial = $config['requires_serial'];
-            $product->requires_mrp = $config['requires_mrp'];
+            $rules = \App\Services\ScheduleEngine::resolveValidationRules($product->schedule_type ?? 'standard', (float)($product->default_tax_rate ?? 18));
+            $product->requires_sro = $rules['requires_sro'];
+            $product->requires_serial = $rules['requires_serial'];
+            $product->requires_mrp = $rules['requires_mrp'];
             return $product;
         });
 

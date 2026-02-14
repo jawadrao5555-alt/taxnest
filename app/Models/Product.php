@@ -15,6 +15,8 @@ class Product extends Model
         'uom',
         'schedule_type',
         'sro_reference',
+        'serial_number',
+        'mrp',
         'default_price',
         'is_active',
     ];

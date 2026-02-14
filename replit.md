@@ -80,6 +80,15 @@ TaxNest is built on Laravel 12 with PHP 8.4, using Breeze for authentication. Th
 - InvoiceController uses explicit buyer_registration_type from form, falls back to NTN auto-detect for manual entries
 - Profile page consolidated with business profile, FBR Settings remains separate
 
+**Products Page Upgrade:**
+- Added `serial_number` (varchar 100) and `mrp` (decimal 14,2) columns to products table
+- Alpine.js dynamic form: MRP field appears for 3rd Schedule, SRO+Serial Number for reduced/exempt schedule types
+- ScheduleEngine rules drive both frontend (Alpine.js) and backend (ProductController) validation consistently
+- Tax calculation preview on create/edit: shows Price, Tax Rate, Tax Amount, Total (incl. Tax) per unit
+- Products index shows Tax Amount, Total, MRP, and SRO+Serial columns
+- ScheduleEngine::$scheduleTypes['3rd_schedule'] requires_mrp set to true for consistency
+- Search API uses resolveValidationRules (not getScheduleConfig) for accurate field requirements
+
 **FBR Real-Time & Profile Session:**
 - FBR submission changed from async queue to synchronous real-time response (submitToFbrSync helper)
 - Submit, Retry both now return immediate FBR result with execution time

@@ -68,47 +68,55 @@
                         </div>
                     </div>
 
-                    <div x-show="requiresMrp" x-transition class="mb-6" style="display:none">
-                        <div class="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg">
-                            <label class="block text-sm font-medium text-purple-700 dark:text-purple-300 mb-1">MRP / Retail Price (Rs.) <span class="text-red-500">*</span></label>
-                            <p class="text-xs text-purple-600 dark:text-purple-400 mb-2">Required for 3rd Schedule items</p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                MRP / Retail Price (Rs.)
+                                <span x-show="requiresMrp" class="text-red-500">*</span>
+                                <span x-show="!requiresMrp" class="text-gray-400 text-xs">(Optional)</span>
+                            </label>
                             <input type="number" step="0.01" min="0" name="mrp" x-model="mrp"
-                                class="w-full rounded-lg border-purple-300 dark:border-purple-600 bg-white dark:bg-gray-800 shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
+                                placeholder="0.00">
+                            <p x-show="requiresMrp" class="text-xs text-purple-600 mt-1">Required for 3rd Schedule</p>
                             @error('mrp') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
-                    </div>
-
-                    <div x-show="requiresSro" x-transition class="mb-6" style="display:none">
-                        <div class="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
-                            <div class="flex items-center justify-between mb-2">
-                                <label class="block text-sm font-medium text-amber-700 dark:text-amber-300">SRO Reference <span class="text-red-500">*</span></label>
-                                <button type="button" @click="sroLookupOpen = !sroLookupOpen" class="text-xs text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1">
-                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                                    SRO Lookup
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                SRO Reference
+                                <span x-show="requiresSro" class="text-red-500">*</span>
+                                <span x-show="!requiresSro" class="text-gray-400 text-xs">(Optional)</span>
+                            </label>
+                            <div class="flex gap-2">
+                                <input type="text" name="sro_reference" x-model="sroReference" value="{{ old('sro_reference') }}" placeholder="SRO 1125(I)/2011"
+                                    class="flex-1 rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                <button type="button" @click="sroLookupOpen = !sroLookupOpen" class="px-2.5 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-500 hover:text-emerald-600 hover:border-emerald-400 transition" title="SRO Lookup">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                                 </button>
                             </div>
-                            <input type="text" name="sro_reference" x-model="sroReference" value="{{ old('sro_reference') }}" placeholder="e.g., SRO 1125(I)/2011"
-                                class="w-full rounded-lg border-amber-300 dark:border-amber-600 bg-white dark:bg-gray-800 shadow-sm focus:ring-amber-500 focus:border-amber-500">
                             @error('sro_reference') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-
-                            <div x-show="sroLookupOpen" x-transition class="mt-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 p-3" style="display:none">
-                                <div class="flex gap-2 mb-2">
-                                    <input type="text" x-model="sroSearch" @keydown.enter.prevent="searchSro()" placeholder="Search SRO rules..." class="flex-1 rounded-lg border-gray-300 dark:border-gray-700 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
-                                    <button type="button" @click="searchSro()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700">Search</button>
-                                </div>
-                                <div class="max-h-48 overflow-y-auto space-y-1" x-html="sroResults"></div>
-                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Serial Number
+                                <span x-show="requiresSerial" class="text-red-500">*</span>
+                                <span x-show="!requiresSerial" class="text-gray-400 text-xs">(Optional)</span>
+                            </label>
+                            <input type="text" name="serial_number" x-model="serialNumber" value="{{ old('serial_number') }}" placeholder="e.g., 1, 2, 3..."
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            @error('serial_number') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                     </div>
 
-                    <div x-show="requiresSerial" x-transition class="mb-6" style="display:none">
-                        <div class="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
-                            <label class="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">SRO Item Serial Number <span class="text-red-500">*</span></label>
-                            <p class="text-xs text-blue-600 dark:text-blue-400 mb-2">Required for this schedule type</p>
-                            <input type="text" name="serial_number" x-model="serialNumber" value="{{ old('serial_number') }}" placeholder="e.g., 1, 2, 3..."
-                                class="w-full rounded-lg border-blue-300 dark:border-blue-600 bg-white dark:bg-gray-800 shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                            @error('serial_number') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                    <div x-show="sroLookupOpen" x-transition class="mb-6 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 p-3" style="display:none">
+                        <div class="flex gap-2 mb-2">
+                            <input type="text" x-model="sroSearch" @keydown.enter.prevent="searchSro()" placeholder="Search SRO rules..." class="flex-1 rounded-lg border-gray-300 dark:border-gray-700 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <button type="button" @click="searchSro()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700">Search</button>
+                            <button type="button" @click="sroLookupOpen = false" class="px-2 py-1.5 text-gray-400 hover:text-gray-600">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
                         </div>
+                        <div class="max-h-48 overflow-y-auto space-y-1" x-html="sroResults"></div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -154,7 +162,7 @@
                                 <p class="text-sm font-bold text-emerald-700 dark:text-emerald-400">Rs. <span x-text="formatNum(totalWithTax)">0.00</span></p>
                             </div>
                         </div>
-                        <div x-show="requiresMrp && parseFloat(mrp) > 0" x-transition class="mt-3 p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700" style="display:none">
+                        <div x-show="parseFloat(mrp) > 0" x-transition class="mt-3 p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700" style="display:none">
                             <div class="flex justify-between items-center">
                                 <span class="text-xs text-purple-600 dark:text-purple-400">MRP / Retail Price</span>
                                 <span class="text-sm font-bold text-purple-700 dark:text-purple-300">Rs. <span x-text="formatNum(mrp)">0.00</span></span>

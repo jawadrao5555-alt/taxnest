@@ -507,9 +507,6 @@
                     item.optional_sro = rules.optional_sro;
                     item.optional_serial = rules.optional_serial;
                     item.schedule_hint = rules.hint;
-                    if (!rules.requires_sro && !rules.optional_sro) item.sro_schedule_no = '';
-                    if (!rules.requires_serial && !rules.optional_serial) item.serial_no = '';
-                    if (!rules.requires_mrp) item.mrp = '';
                 },
 
                 addItem() {
@@ -674,6 +671,8 @@
                     item.tax_rate = Math.round(parseFloat(product.default_tax_rate));
                     this.applyScheduleRules(item);
                     if (product.sro_reference) item.sro_schedule_no = product.sro_reference;
+                    if (product.serial_number) item.serial_no = product.serial_number;
+                    if (product.mrp) item.mrp = product.mrp;
                     item.productSearch = product.name;
                     item.showDropdown = false;
                     item.hsLookupInfo = 'From product: ' + product.name + ' | Schedule: ' + item.schedule_type;

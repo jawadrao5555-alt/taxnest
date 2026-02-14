@@ -2,6 +2,9 @@
 use Illuminate\Support\Str;
 
 $dbUrl = env('DATABASE_URL', getenv('DATABASE_URL'));
+if (empty($dbUrl) && file_exists('/tmp/replitdb')) {
+    $dbUrl = trim(file_get_contents('/tmp/replitdb'));
+}
 $parsedUrl = $dbUrl ? parse_url($dbUrl) : [];
 
 return [

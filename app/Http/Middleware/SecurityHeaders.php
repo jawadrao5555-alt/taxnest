@@ -13,7 +13,6 @@ class SecurityHeaders
         $response = $next($request);
 
         $response->headers->set('X-Content-Type-Options', 'nosniff');
-        $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
         $response->headers->set('X-XSS-Protection', '1; mode=block');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
         $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
@@ -24,7 +23,7 @@ class SecurityHeaders
             "font-src 'self' https://fonts.bunny.net data:; " .
             "img-src 'self' data: blob: https:; " .
             "connect-src 'self' https: wss:; " .
-            "frame-ancestors 'self' https://*.replit.dev https://*.repl.co"
+            "frame-ancestors 'self' https://*.replit.dev https://*.repl.co https://*.replit.app https://*.replit.com"
         );
 
         return $response;

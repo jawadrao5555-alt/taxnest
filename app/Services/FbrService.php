@@ -58,7 +58,35 @@ class FbrService
         $curlError = curl_error($ch);
         curl_close($ch);
 
+        \Log::info('FBR Proxy Debug', [
+            'proxy_url' => $proxyUrl,
+            'proxy_http_code' => $httpCode,
+            'proxy_response_length' => strlen($responseBody ?: ''),
+            'proxy_response_raw' => substr($responseBody ?: '(empty)', 0, 2000),
+            'curl_error' => $curlError,
+        ]);
+
         $proxyResponse = json_decode($responseBody, true);
+
+        if ($proxyResponse && isset($proxyResponse['success']) && $proxyResponse['success'] === true) {
+            $fbrResponse = $proxyResponse['fbr_response'] ?? [];
+            if (empty($fbrResponse) && !empty($proxyResponse['invoice_number'])) {
+                $fbrResponse = [
+                    'invoiceNumber' => $proxyResponse['invoice_number'],
+                    'validationResponse' => [
+                        'statusCode' => '00',
+                        'status' => 'Valid',
+                        'error' => '',
+                    ],
+                ];
+            }
+            return [
+                'body' => json_encode($fbrResponse),
+                'http_code' => $proxyResponse['http_code'] ?? 200,
+                'curl_error' => '',
+            ];
+        }
+
         if ($proxyResponse && isset($proxyResponse['fbr_response'])) {
             return [
                 'body' => json_encode($proxyResponse['fbr_response']),

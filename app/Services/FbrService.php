@@ -108,7 +108,7 @@ class FbrService
             $taxRate = floatval($item->tax_rate ?? 18);
             $quantity = round(floatval($item->quantity), 4);
             $unitPrice = floatval($item->price);
-            $valueSalesExcludingST = round($quantity * $unitPrice, 2);
+            $valueSalesExcludingST = round($unitPrice, 2);
 
             $rawSaleType = $item->sale_type ?: ScheduleEngine::mapSaleType($scheduleType);
             $is3rdSchedule = (stripos($rawSaleType, '3rd Schedule') !== false);
@@ -180,7 +180,7 @@ class FbrService
             if ($needsSro) {
                 $sroValue = $item->sro_schedule_no ?? "";
                 if (stripos($sroValue, '3rd schedule') !== false) {
-                    $sroValue = '3rd Schedule Goods';
+                    $sroValue = '3rd Schedule goods';
                 }
                 $itemPayload["sroScheduleNo"] = $sroValue;
                 $itemPayload["sroItemSerialNo"] = $item->serial_no ?? "";

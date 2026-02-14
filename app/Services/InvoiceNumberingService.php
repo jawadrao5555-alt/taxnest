@@ -16,9 +16,9 @@ class InvoiceNumberingService
                 throw new \RuntimeException("Company not found: {$companyId}");
             }
 
-            $identifier = preg_replace('/[^0-9]/', '', $company->fbr_registration_no ?? '');
+            $identifier = trim($company->ntn ?? '');
             if (empty($identifier)) {
-                $identifier = preg_replace('/[^0-9]/', '', $company->ntn ?? '');
+                $identifier = preg_replace('/[^0-9]/', '', $company->fbr_registration_no ?? '');
             }
             if (empty($identifier)) {
                 $identifier = '0000000';
@@ -42,9 +42,9 @@ class InvoiceNumberingService
             return '0000000DI' . (int)(microtime(true) * 1000);
         }
 
-        $identifier = preg_replace('/[^0-9]/', '', $company->fbr_registration_no ?? '');
+        $identifier = trim($company->ntn ?? '');
         if (empty($identifier)) {
-            $identifier = preg_replace('/[^0-9]/', '', $company->ntn ?? '');
+            $identifier = preg_replace('/[^0-9]/', '', $company->fbr_registration_no ?? '');
         }
         if (empty($identifier)) {
             $identifier = '0000000';

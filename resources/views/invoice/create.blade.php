@@ -836,12 +836,27 @@
                         item.mrp = product.mrp;
                         item.mrpManual = (parseFloat(product.mrp) !== parseFloat(product.default_price));
                     }
-                    item.default_uom = product.uom || 'Numbers, pieces, units';
+                    item.default_uom = this.mapUom(product.uom);
                     item.productSearch = product.name;
                     item.showDropdown = false;
                     item.hsLookupInfo = 'From product: ' + product.name + ' | Schedule: ' + item.schedule_type;
                     this.calcTax(index);
                     this.validateMixedSchedules();
+                },
+
+                mapUom(productUom) {
+                    const map = {
+                        'PCS': 'Numbers, pieces, units',
+                        'KG': 'Kilograms',
+                        'LTR': 'Liters',
+                        'MTR': 'Meters',
+                        'SQM': 'Square meters',
+                        'CBM': 'Cubic meters',
+                        'PKT': 'Packs',
+                        'DOZ': 'Dozens',
+                        'SET': 'Others',
+                    };
+                    return map[productUom] || 'Numbers, pieces, units';
                 },
 
                 saveDraft() {

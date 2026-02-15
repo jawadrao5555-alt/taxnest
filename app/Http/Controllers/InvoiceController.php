@@ -642,9 +642,10 @@ class InvoiceController extends Controller
 
             $locked = DB::transaction(function () use ($invoice, $request) {
                 $lockedInvoice = Invoice::where('id', $invoice->id)->lockForUpdate()->first();
-                if (!$lockedInvoice || $lockedInvoice->status !== 'draft' || $lockedInvoice->is_fbr_processing) {
+                if (!$lockedInvoice || !in_array($lockedInvoice->status, ['draft', 'failed']) || $lockedInvoice->is_fbr_processing) {
                     return false;
                 }
+                $lockedInvoice->status = 'draft';
                 $lockedInvoice->is_fbr_processing = true;
                 $lockedInvoice->submitted_at = now();
                 $lockedInvoice->submission_mode = 'direct_mis';
@@ -710,9 +711,10 @@ class InvoiceController extends Controller
 
         $locked = DB::transaction(function () use ($invoice, $scoreResult) {
             $lockedInvoice = Invoice::where('id', $invoice->id)->lockForUpdate()->first();
-            if (!$lockedInvoice || $lockedInvoice->status !== 'draft' || $lockedInvoice->is_fbr_processing) {
+            if (!$lockedInvoice || !in_array($lockedInvoice->status, ['draft', 'failed']) || $lockedInvoice->is_fbr_processing) {
                 return false;
             }
+            $lockedInvoice->status = 'draft';
             $lockedInvoice->is_fbr_processing = true;
             $lockedInvoice->submitted_at = now();
             $lockedInvoice->submission_mode = 'smart';
@@ -1645,6 +1647,46 @@ class InvoiceController extends Controller
         } catch (\Exception $e) {
             $executionMs = round((microtime(true) - $startTime) * 1000);
             Log::error("FBR Sync Submit: Invoice #{$invoice->id} exception: " . $e->getMessage());
+
+            if (str_contains($e->getMessage(), 'previous success in fbr_logs')) {
+                $successLog = FbrLog::where('invoice_id', $invoice->id)
+                    ->where('status', 'success')
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+
+                if ($successLog) {
+                    $responseData = json_decode($successLog->response_payload, true);
+                    $fbrNum = $responseData['invoiceNumber']
+                        ?? $responseData['fbr_invoice_number']
+                        ?? ($responseData['validationResponse']['invoiceStatuses'][0]['invoiceNo'] ?? null);
+
+                    if (!$fbrNum && $successLog->response_payload) {
+                        if (preg_match('/"invoiceNumber"\s*:\s*"([^"]+)"/', $successLog->response_payload, $m)) {
+                            $fbrNum = $m[1];
+                        }
+                    }
+
+                    Log::info("Auto-recovering Invoice #{$invoice->id} from success log #{$successLog->id}, FBR number: {$fbrNum}");
+
+                    $invoice->status = 'locked';
+                    $invoice->fbr_status = 'production';
+                    $invoice->is_fbr_processing = false;
+                    if ($fbrNum) {
+                        $invoice->fbr_invoice_number = $fbrNum;
+                        $invoice->fbr_invoice_id = $fbrNum;
+                        $invoice->fbr_submission_date = $successLog->created_at;
+                    }
+                    $invoice->save();
+
+                    InvoiceActivityService::log($invoice->id, $invoice->company_id, 'auto_recovered', [
+                        'fbr_invoice_number' => $fbrNum,
+                        'success_log_id' => $successLog->id,
+                        'mode' => 'sync',
+                    ]);
+
+                    return ['status' => 'success', 'fbr_invoice_number' => $fbrNum, 'execution_ms' => $executionMs, 'auto_recovered' => true];
+                }
+            }
 
             $invoice->status = 'failed';
             $invoice->fbr_status = 'failed';

@@ -695,6 +695,49 @@ class FbrService
 
     public function submitInvoice($invoice, int $retryCount = 0)
     {
+        if (!empty($invoice->fbr_invoice_number)) {
+            \Log::warning("BLOCKED: Invoice #{$invoice->id} already has FBR number {$invoice->fbr_invoice_number}. Duplicate submission prevented.");
+            return [
+                'status' => 'failed',
+                'failure_type' => 'duplicate_blocked',
+                'errors' => ["Invoice already registered with FBR (number: {$invoice->fbr_invoice_number}). Duplicate submission blocked."],
+                'response_time_ms' => 0,
+            ];
+        }
+
+        if ($invoice->status === 'locked') {
+            \Log::warning("BLOCKED: Invoice #{$invoice->id} is locked. Submission prevented.");
+            return [
+                'status' => 'failed',
+                'failure_type' => 'duplicate_blocked',
+                'errors' => ['Invoice is already locked. Cannot resubmit.'],
+                'response_time_ms' => 0,
+            ];
+        }
+
+        if ($invoice->status === 'pending_verification' || $invoice->fbr_status === 'pending_verification') {
+            \Log::warning("BLOCKED: Invoice #{$invoice->id} is pending FBR verification. Submission prevented.");
+            return [
+                'status' => 'failed',
+                'failure_type' => 'pending_verification_blocked',
+                'errors' => ['Invoice is pending FBR verification. Check FBR portal before resubmitting.'],
+                'response_time_ms' => 0,
+            ];
+        }
+
+        $existingSuccess = FbrLog::where('invoice_id', $invoice->id)
+            ->where('status', 'success')
+            ->exists();
+        if ($existingSuccess) {
+            \Log::warning("BLOCKED: Invoice #{$invoice->id} has previous successful FBR submission in logs. Duplicate submission prevented.");
+            return [
+                'status' => 'failed',
+                'failure_type' => 'duplicate_blocked',
+                'errors' => ['Invoice has a previous successful FBR submission. Check FBR portal for existing invoice number.'],
+                'response_time_ms' => 0,
+            ];
+        }
+
         $payload = $this->buildPayload($invoice);
         $company = $invoice->company;
 

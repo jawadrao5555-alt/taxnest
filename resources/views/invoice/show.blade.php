@@ -20,49 +20,50 @@
             <div class="flex items-center flex-wrap gap-2">
                 @if($invoice->status === 'draft')
                 <a href="/invoice/{{ $invoice->id }}/edit" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">Edit</a>
-                <div x-data="{ showSubmitModal: false, submitEnv: '{{ $invoice->company->fbr_environment ?? 'sandbox' }}' }">
+                <div x-data="fbrSubmitEngine()" x-ref="submitRoot">
                     <button @click="showSubmitModal = true" class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition">Submit to PRAL</button>
-                    <div x-show="showSubmitModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                    <div x-show="showSubmitModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @keydown.escape.window="if(showSubmitModal && !submitting) showSubmitModal = false">
                         <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
                             <h3 class="text-lg font-bold text-gray-900 mb-4">Submit to PRAL</h3>
                             <div class="flex gap-3 mb-4">
                                 <label class="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border-2 cursor-pointer transition text-sm"
                                     :class="submitEnv === 'sandbox' ? 'border-amber-400 bg-amber-50' : 'border-gray-200'">
-                                    <input type="radio" value="sandbox" x-model="submitEnv" class="text-amber-500">
+                                    <input type="radio" value="sandbox" x-model="submitEnv" class="text-amber-500" :disabled="submitting">
                                     <span class="font-medium">Sandbox</span>
                                 </label>
                                 <label class="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border-2 cursor-pointer transition text-sm"
                                     :class="submitEnv === 'production' ? 'border-red-400 bg-red-50' : 'border-gray-200'">
-                                    <input type="radio" value="production" x-model="submitEnv" class="text-red-500">
+                                    <input type="radio" value="production" x-model="submitEnv" class="text-red-500" :disabled="submitting">
                                     <span class="font-medium">Production</span>
                                 </label>
                             </div>
-                            <div class="space-y-4" x-data="{ smartSubmitting: false, directSubmitting: false }">
-                                <form method="POST" action="/invoice/{{ $invoice->id }}/submit" @submit="if(smartSubmitting) { $event.preventDefault(); return; } smartSubmitting = true;">
-                                    @csrf
-                                    <input type="hidden" name="mode" value="smart">
-                                    <input type="hidden" name="fbr_environment" :value="submitEnv">
-                                    <button type="submit" :disabled="smartSubmitting" class="w-full p-4 border-2 border-emerald-200 rounded-lg hover:bg-emerald-50 text-left disabled:opacity-50 disabled:cursor-not-allowed">
-                                        <p class="font-semibold text-emerald-700" x-text="smartSubmitting ? 'Submitting to FBR...' : 'Smart Mode (Recommended)'"></p>
-                                        <p class="text-xs text-gray-500" x-show="!smartSubmitting">Runs compliance scoring, blocks CRITICAL risk invoices</p>
-                                        <p class="text-xs text-emerald-600 animate-pulse" x-show="smartSubmitting" x-cloak>Please wait, sending to FBR...</p>
-                                    </button>
-                                </form>
-                                <div x-data="{ showOverride: false }">
-                                    <button @click="showOverride = !showOverride" class="w-full p-4 border-2 border-orange-200 rounded-lg hover:bg-orange-50 text-left">
+                            <div class="space-y-4">
+                                <button @click="doSubmit('smart')" :disabled="submitting" class="w-full p-4 border-2 border-emerald-200 rounded-lg hover:bg-emerald-50 text-left disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <p class="font-semibold text-emerald-700" x-text="submitting && submitMode === 'smart' ? 'Submitting to FBR...' : 'Smart Mode (Recommended)'"></p>
+                                    <p class="text-xs text-gray-500" x-show="!(submitting && submitMode === 'smart')">Runs compliance scoring, blocks CRITICAL risk invoices</p>
+                                    <div x-show="submitting && submitMode === 'smart'" x-cloak class="flex items-center gap-2 mt-1">
+                                        <svg class="animate-spin h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                        <p class="text-xs text-emerald-600 animate-pulse">Please wait, sending to FBR...</p>
+                                    </div>
+                                </button>
+                                <div>
+                                    <button @click="showOverride = !showOverride" :disabled="submitting" class="w-full p-4 border-2 border-orange-200 rounded-lg hover:bg-orange-50 text-left disabled:opacity-50">
                                         <p class="font-semibold text-orange-700">Direct MIS Mode</p>
                                         <p class="text-xs text-gray-500">Skips compliance check - requires override reason</p>
                                     </button>
-                                    <form x-show="showOverride" method="POST" action="/invoice/{{ $invoice->id }}/submit" class="mt-3" @submit="if(directSubmitting) { $event.preventDefault(); return; } directSubmitting = true;">
-                                        @csrf
-                                        <input type="hidden" name="mode" value="direct_mis">
-                                        <input type="hidden" name="fbr_environment" :value="submitEnv">
-                                        <textarea name="override_reason" required minlength="10" placeholder="Enter override reason (min 10 characters)..." class="w-full rounded-lg border-gray-300 text-sm"></textarea>
-                                        <button type="submit" :disabled="directSubmitting" class="mt-2 w-full px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed" x-text="directSubmitting ? 'Submitting...' : 'Submit with Override'"></button>
-                                    </form>
+                                    <div x-show="showOverride" class="mt-3">
+                                        <textarea x-model="overrideReason" :disabled="submitting" minlength="10" placeholder="Enter override reason (min 10 characters)..." class="w-full rounded-lg border-gray-300 text-sm"></textarea>
+                                        <button @click="doSubmit('direct_mis')" :disabled="submitting || overrideReason.length < 10" class="mt-2 w-full px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                                            <span x-show="!(submitting && submitMode === 'direct_mis')">Submit with Override</span>
+                                            <span x-show="submitting && submitMode === 'direct_mis'" x-cloak class="flex items-center justify-center gap-2">
+                                                <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                                Submitting...
+                                            </span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                            <button @click="showSubmitModal = false" class="mt-4 w-full text-center text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+                            <button @click="showSubmitModal = false" :disabled="submitting" class="mt-4 w-full text-center text-sm text-gray-500 hover:text-gray-700 disabled:opacity-30">Cancel</button>
                         </div>
                     </div>
                 </div>
@@ -125,27 +126,26 @@
                 </form>
                 @endif
                 @if(in_array($invoice->status, ['failed', 'submitted']) && in_array(auth()->user()->role, ['company_admin', 'super_admin']))
-                <form method="POST" action="/invoice/{{ $invoice->id }}/resubmit-fbr" class="inline" x-data="{ submitting: false }" @submit="if(submitting) { $event.preventDefault(); return; } submitting = true;">
-                    @csrf
-                    <button type="submit" :disabled="submitting" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed" >
-                        <svg x-show="!submitting" class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                        <svg x-show="submitting" x-cloak class="animate-spin w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        <span x-text="submitting ? 'Submitting...' : 'Resubmit to FBR'"></span>
+                <div x-data="{ resubmitting: false }" class="inline">
+                    <button @click="resubmitToFbr($el)" :disabled="resubmitting" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed" >
+                        <svg x-show="!resubmitting" class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        <svg x-show="resubmitting" x-cloak class="animate-spin w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <span x-text="resubmitting ? 'Submitting...' : 'Resubmit to FBR'"></span>
                     </button>
-                </form>
+                </div>
                 @endif
                 @if($invoice->status === 'failed')
                 <a href="/invoice/{{ $invoice->id }}/edit" class="inline-flex items-center px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition">
                     <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     Edit & Fix
                 </a>
-                <form method="POST" action="/invoice/{{ $invoice->id }}/retry" class="inline">
-                    @csrf
-                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">
-                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                        Retry Submit
+                <div x-data="{ retrying: false }" class="inline">
+                    <button @click="retrySubmitToFbr($el)" :disabled="retrying" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                        <svg x-show="!retrying" class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        <svg x-show="retrying" x-cloak class="animate-spin w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <span x-text="retrying ? 'Retrying...' : 'Retry Submit'"></span>
                     </button>
-                </form>
+                </div>
                 @endif
                 @if(in_array(auth()->user()->role, ['company_admin', 'employee']))
                 <form method="POST" action="{{ route('invoice.duplicate', $invoice->id) }}" class="inline">
@@ -724,13 +724,230 @@
             @endif
         </div>
     </div>
-@if($invoice->fbr_invoice_number && session('success') && str_contains(session('success'), 'FBR'))
+
+<div id="fbrSuccessModal" style="display:none;" class="fixed inset-0 z-[60] flex items-center justify-center transition-opacity duration-300 opacity-0">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+    <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-6xl mx-4 h-[90vh] sm:h-[90vh] flex flex-col overflow-hidden" style="max-height: 90vh;">
+        <button onclick="closeFbrSuccessModal()" class="absolute top-4 right-4 z-10 p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition text-gray-500 hover:text-gray-700 dark:text-gray-400">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+
+        <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100">
+                        <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <div>
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">FBR Production Successful</span>
+                    </div>
+                </div>
+                <div class="sm:ml-auto text-right">
+                    <p class="text-sm font-bold text-gray-800 dark:text-gray-200" id="modalFbrNumber"></p>
+                    <p class="text-xs text-gray-500" id="modalTimestamp"></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-hidden p-4 min-h-0">
+            <iframe id="modalPdfIframe" src="" class="w-full h-full border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50"></iframe>
+        </div>
+
+        <div class="px-6 py-4 border-t border-gray-100 dark:border-gray-800 flex-shrink-0 bg-gray-50 dark:bg-gray-900">
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <button onclick="printFbrPdf()" class="inline-flex items-center justify-center px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition">
+                    <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                    Print
+                </button>
+                <button onclick="downloadFbrPdf()" class="inline-flex items-center justify-center px-5 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition">
+                    <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    Download PDF
+                </button>
+                <button onclick="closeFbrSuccessModal()" class="inline-flex items-center justify-center px-5 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition sm:ml-auto">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="fbrPendingBanner" style="display:none;" class="fixed top-4 left-1/2 -translate-x-1/2 z-[60] max-w-lg w-full mx-4">
+    <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 shadow-xl flex items-start gap-3">
+        <svg class="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+        <div class="flex-1">
+            <p class="text-sm font-bold text-amber-800">FBR Pending Verification</p>
+            <p class="text-xs text-amber-700 mt-1" id="pendingMessage"></p>
+            <button onclick="document.getElementById('fbrPendingBanner').style.display='none'" class="mt-2 text-xs text-amber-600 hover:text-amber-800 font-medium underline">Dismiss</button>
+        </div>
+    </div>
+</div>
+
+<div id="fbrErrorToast" style="display:none;" class="fixed top-4 right-4 z-[60] max-w-md w-full">
+    <div class="bg-red-50 border-2 border-red-300 rounded-xl p-4 shadow-xl flex items-start gap-3">
+        <svg class="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <div class="flex-1">
+            <p class="text-sm font-bold text-red-800">FBR Submission Failed</p>
+            <p class="text-xs text-red-700 mt-1" id="errorMessage"></p>
+            <button onclick="document.getElementById('fbrErrorToast').style.display='none'" class="mt-2 text-xs text-red-600 hover:text-red-800 font-medium underline">Dismiss</button>
+        </div>
+    </div>
+</div>
+
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        setTimeout(function() {
-            window.open('/invoice/{{ $invoice->id }}/pdf', '_blank');
-        }, 1500);
-    });
+let _fbrPdfUrl = '';
+
+function fbrSubmitEngine() {
+    return {
+        showSubmitModal: false,
+        submitEnv: '{{ $invoice->company->fbr_environment ?? "sandbox" }}',
+        submitting: false,
+        submitMode: '',
+        showOverride: false,
+        overrideReason: '',
+
+        async doSubmit(mode) {
+            if (this.submitting) return;
+            this.submitting = true;
+            this.submitMode = mode;
+
+            const body = new FormData();
+            body.append('_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
+            body.append('mode', mode);
+            body.append('fbr_environment', this.submitEnv);
+            if (mode === 'direct_mis') {
+                body.append('override_reason', this.overrideReason);
+            }
+
+            try {
+                const res = await fetch('/invoice/{{ $invoice->id }}/submit', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: body
+                });
+
+                const data = await res.json();
+                this.showSubmitModal = false;
+                handleFbrResponse(data);
+            } catch (e) {
+                showFbrError('Network error. Please check your connection and try again.');
+            }
+            this.submitting = false;
+        }
+    };
+}
+
+async function retrySubmitToFbr(el) {
+    const wrapper = el.closest('[x-data]');
+    if (!wrapper) return;
+    const comp = Alpine.$data(wrapper);
+    if (comp.retrying) return;
+    comp.retrying = true;
+
+    const body = new FormData();
+    body.append('_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
+
+    try {
+        const res = await fetch('/invoice/{{ $invoice->id }}/retry', {
+            method: 'POST',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: body
+        });
+
+        const data = await res.json();
+        handleFbrResponse(data);
+    } catch (e) {
+        showFbrError('Network error. Please check your connection and try again.');
+    }
+    comp.retrying = false;
+}
+
+async function resubmitToFbr(el) {
+    const wrapper = el.closest('[x-data]');
+    if (!wrapper) return;
+    const comp = Alpine.$data(wrapper);
+    if (comp.resubmitting) return;
+    comp.resubmitting = true;
+
+    const body = new FormData();
+    body.append('_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
+
+    try {
+        const res = await fetch('/invoice/{{ $invoice->id }}/resubmit-fbr', {
+            method: 'POST',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: body
+        });
+
+        const data = await res.json();
+        handleFbrResponse(data);
+    } catch (e) {
+        showFbrError('Network error. Please check your connection and try again.');
+    }
+    comp.resubmitting = false;
+}
+
+function handleFbrResponse(data) {
+    if (data.status === 'success') {
+        openFbrSuccessModal(data);
+    } else if (data.status === 'pending_verification') {
+        showFbrPending(data.message);
+    } else {
+        showFbrError(data.error_details || data.message || 'Unknown error');
+    }
+}
+
+function openFbrSuccessModal(data) {
+    _fbrPdfUrl = data.pdf_url || '';
+    document.getElementById('modalFbrNumber').textContent = 'FBR #: ' + (data.fbr_invoice_number || '');
+    document.getElementById('modalTimestamp').textContent = 'Submitted: ' + new Date().toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' });
+    document.getElementById('modalPdfIframe').src = _fbrPdfUrl;
+    const modal = document.getElementById('fbrSuccessModal');
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    requestAnimationFrame(() => { modal.classList.remove('opacity-0'); modal.classList.add('opacity-100'); });
+}
+
+function closeFbrSuccessModal() {
+    const modal = document.getElementById('fbrSuccessModal');
+    modal.classList.remove('opacity-100');
+    modal.classList.add('opacity-0');
+    setTimeout(() => {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+        document.getElementById('modalPdfIframe').src = '';
+        window.location.reload();
+    }, 300);
+}
+
+function printFbrPdf() {
+    try {
+        const iframe = document.getElementById('modalPdfIframe');
+        iframe.contentWindow.print();
+    } catch (e) {
+        window.open(_fbrPdfUrl, '_blank');
+    }
+}
+
+function downloadFbrPdf() {
+    if (_fbrPdfUrl) window.open(_fbrPdfUrl, '_blank');
+}
+
+function showFbrPending(message) {
+    document.getElementById('pendingMessage').textContent = message || 'FBR returned an ambiguous response. Please verify on FBR portal.';
+    document.getElementById('fbrPendingBanner').style.display = 'block';
+    setTimeout(() => { document.getElementById('fbrPendingBanner').style.display = 'none'; }, 15000);
+}
+
+function showFbrError(message) {
+    document.getElementById('errorMessage').textContent = message || 'FBR submission failed. Please try again.';
+    document.getElementById('fbrErrorToast').style.display = 'block';
+    setTimeout(() => { document.getElementById('fbrErrorToast').style.display = 'none'; }, 10000);
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && document.getElementById('fbrSuccessModal').style.display === 'flex') {
+        closeFbrSuccessModal();
+    }
+});
 </script>
-@endif
 </x-app-layout>

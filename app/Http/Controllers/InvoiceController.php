@@ -554,6 +554,9 @@ class InvoiceController extends Controller
                 'pending_verification' => 'Invoice is pending FBR verification. Please wait.',
                 default => 'Invoice cannot be submitted.',
             };
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['status' => 'error', 'message' => $msg, 'error_details' => $msg], 422);
+            }
             return redirect('/invoice/' . $invoice->id)->with('error', $msg);
         }
 
@@ -738,18 +741,49 @@ class InvoiceController extends Controller
 
         if ($result['status'] === 'success') {
             $fbrNum = $result['fbr_invoice_number'] ?? '';
-            return redirect('/invoice/' . $invoice->id)->with('success', 'FBR submission successful! Invoice Number: ' . $fbrNum . ' (Score: ' . $scoreResult['final_score'] . ', ' . $result['execution_ms'] . 'ms)');
+            $successMsg = 'FBR submission successful! Invoice Number: ' . $fbrNum . ' (Score: ' . $scoreResult['final_score'] . ', ' . $result['execution_ms'] . 'ms)';
+
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'status' => 'success',
+                    'invoice_id' => $invoice->id,
+                    'fbr_invoice_number' => $fbrNum,
+                    'pdf_url' => '/invoice/' . $invoice->id . '/pdf',
+                    'execution_ms' => $result['execution_ms'],
+                    'compliance_score' => $scoreResult['final_score'],
+                    'message' => 'Invoice successfully submitted to FBR',
+                ]);
+            }
+            return redirect('/invoice/' . $invoice->id)->with('success', $successMsg);
         }
 
         if ($result['status'] === 'pending_verification') {
-            return redirect('/invoice/' . $invoice->id)->with('warning', 'FBR returned an ambiguous response (' . $result['execution_ms'] . 'ms). Please verify on FBR portal and confirm.');
+            $warningMsg = 'FBR returned an ambiguous response (' . $result['execution_ms'] . 'ms). Please verify on FBR portal and confirm.';
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'status' => 'pending_verification',
+                    'invoice_id' => $invoice->id,
+                    'message' => $warningMsg,
+                ]);
+            }
+            return redirect('/invoice/' . $invoice->id)->with('warning', $warningMsg);
         }
 
         $errorMsg = 'FBR submission failed';
         if (!empty($result['errors'])) {
             $errorMsg .= ': ' . implode(' | ', array_slice($result['errors'], 0, 3));
         }
-        return redirect('/invoice/' . $invoice->id)->with('error', $errorMsg . ' (' . $result['execution_ms'] . 'ms)');
+        $errorMsg .= ' (' . $result['execution_ms'] . 'ms)';
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => 'error',
+                'invoice_id' => $invoice->id,
+                'message' => 'FBR submission failed',
+                'error_details' => $errorMsg,
+            ], 422);
+        }
+        return redirect('/invoice/' . $invoice->id)->with('error', $errorMsg);
     }
 
     public function retry(Request $request, Invoice $invoice)
@@ -759,8 +793,12 @@ class InvoiceController extends Controller
             abort(403);
         }
 
+        $jsonResponse = $request->expectsJson() || $request->ajax();
+
         if ($invoice->status !== 'failed') {
-            return redirect('/invoice/' . $invoice->id)->with('error', 'Only failed invoices can be retried.');
+            $msg = 'Only failed invoices can be retried.';
+            if ($jsonResponse) return response()->json(['status' => 'error', 'message' => $msg, 'error_details' => $msg], 422);
+            return redirect('/invoice/' . $invoice->id)->with('error', $msg);
         }
 
         $dispatched = \DB::transaction(function () use ($invoice) {
@@ -776,7 +814,9 @@ class InvoiceController extends Controller
         });
 
         if (!$dispatched) {
-            return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice status changed. Cannot retry.');
+            $msg = 'Invoice status changed. Cannot retry.';
+            if ($jsonResponse) return response()->json(['status' => 'error', 'message' => $msg, 'error_details' => $msg], 422);
+            return redirect('/invoice/' . $invoice->id)->with('error', $msg);
         }
 
         $invoice->refresh();
@@ -790,19 +830,46 @@ class InvoiceController extends Controller
         ]);
 
         $result = $this->submitToFbrSync($invoice);
+        $jsonResponse = $request->expectsJson() || $request->ajax();
 
         if ($result['status'] === 'success') {
             $fbrNum = $result['fbr_invoice_number'] ?? '';
+            if ($jsonResponse) {
+                return response()->json([
+                    'status' => 'success',
+                    'invoice_id' => $invoice->id,
+                    'fbr_invoice_number' => $fbrNum,
+                    'pdf_url' => '/invoice/' . $invoice->id . '/pdf',
+                    'execution_ms' => $result['execution_ms'],
+                    'message' => 'Invoice successfully submitted to FBR',
+                ]);
+            }
             return redirect('/invoice/' . $invoice->id)->with('success', 'FBR retry successful! Invoice Number: ' . $fbrNum . ' (' . $result['execution_ms'] . 'ms)');
         }
 
         if ($result['status'] === 'pending_verification') {
-            return redirect('/invoice/' . $invoice->id)->with('warning', 'FBR returned an ambiguous response. Please verify on FBR portal.');
+            $warningMsg = 'FBR returned an ambiguous response. Please verify on FBR portal.';
+            if ($jsonResponse) {
+                return response()->json([
+                    'status' => 'pending_verification',
+                    'invoice_id' => $invoice->id,
+                    'message' => $warningMsg,
+                ]);
+            }
+            return redirect('/invoice/' . $invoice->id)->with('warning', $warningMsg);
         }
 
         $errorMsg = 'FBR retry failed';
         if (!empty($result['errors'])) {
             $errorMsg .= ': ' . implode(' | ', array_slice($result['errors'], 0, 3));
+        }
+        if ($jsonResponse) {
+            return response()->json([
+                'status' => 'error',
+                'invoice_id' => $invoice->id,
+                'message' => 'FBR retry failed',
+                'error_details' => $errorMsg,
+            ], 422);
         }
         return redirect('/invoice/' . $invoice->id)->with('error', $errorMsg);
     }
@@ -821,21 +888,30 @@ class InvoiceController extends Controller
             }
         }
 
+        $jsonResponse = $request->expectsJson() || $request->ajax();
+
         if ($invoice->status === 'locked') {
             $msg = 'Invoice already submitted to FBR' . (!empty($invoice->fbr_invoice_number) ? ' with number: ' . $invoice->fbr_invoice_number : '') . '. Cannot resubmit.';
+            if ($jsonResponse) return response()->json(['status' => 'error', 'message' => $msg, 'error_details' => $msg], 422);
             return redirect('/invoice/' . $invoice->id)->with('error', $msg);
         }
 
         if ($invoice->status === 'pending_verification') {
-            return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice is pending FBR verification. Please check FBR portal first before resubmitting.');
+            $msg = 'Invoice is pending FBR verification. Please check FBR portal first before resubmitting.';
+            if ($jsonResponse) return response()->json(['status' => 'error', 'message' => $msg, 'error_details' => $msg], 422);
+            return redirect('/invoice/' . $invoice->id)->with('error', $msg);
         }
 
         if (!in_array($invoice->status, ['draft', 'failed', 'submitted'])) {
-            return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice cannot be submitted in current status.');
+            $msg = 'Invoice cannot be submitted in current status.';
+            if ($jsonResponse) return response()->json(['status' => 'error', 'message' => $msg, 'error_details' => $msg], 422);
+            return redirect('/invoice/' . $invoice->id)->with('error', $msg);
         }
 
         if (!empty($invoice->fbr_invoice_number)) {
-            return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice already has FBR number: ' . $invoice->fbr_invoice_number . '. Cannot resubmit.');
+            $msg = 'Invoice already has FBR number: ' . $invoice->fbr_invoice_number . '. Cannot resubmit.';
+            if ($jsonResponse) return response()->json(['status' => 'error', 'message' => $msg, 'error_details' => $msg], 422);
+            return redirect('/invoice/' . $invoice->id)->with('error', $msg);
         }
 
         $locked = DB::transaction(function () use ($invoice) {
@@ -850,7 +926,9 @@ class InvoiceController extends Controller
         });
 
         if (!$locked) {
-            return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice is no longer in a submittable state.');
+            $msg = 'Invoice is no longer in a submittable state.';
+            if ($jsonResponse) return response()->json(['status' => 'error', 'message' => $msg, 'error_details' => $msg], 422);
+            return redirect('/invoice/' . $invoice->id)->with('error', $msg);
         }
 
         $invoice->refresh();
@@ -864,7 +942,9 @@ class InvoiceController extends Controller
             \Log::error("FBR Resubmit: Invoice #{$invoice->id} blocked: " . $e->getMessage());
             $invoice->status = 'draft';
             $invoice->save();
-            return redirect('/invoice/' . $invoice->id)->with('error', 'FBR submission blocked: ' . $e->getMessage());
+            $msg = 'FBR submission blocked: ' . $e->getMessage();
+            if ($jsonResponse) return response()->json(['status' => 'error', 'message' => $msg, 'error_details' => $msg], 422);
+            return redirect('/invoice/' . $invoice->id)->with('error', $msg);
         }
 
         if ($response['status'] === 'success') {
@@ -900,6 +980,15 @@ class InvoiceController extends Controller
 
             \App\Services\ComplianceScoreService::recalculate($invoice->company_id);
 
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'status' => 'success',
+                    'invoice_id' => $invoice->id,
+                    'fbr_invoice_number' => $fbrNum,
+                    'pdf_url' => '/invoice/' . $invoice->id . '/pdf',
+                    'message' => 'Invoice successfully submitted to FBR',
+                ]);
+            }
             return redirect('/invoice/' . $invoice->id)->with('success', 'FBR submission successful! Invoice Number: ' . $fbrNum);
         }
 
@@ -908,6 +997,13 @@ class InvoiceController extends Controller
             $invoice->fbr_status = 'pending_verification';
             $invoice->save();
 
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'status' => 'pending_verification',
+                    'invoice_id' => $invoice->id,
+                    'message' => 'FBR response was ambiguous. Invoice marked for manual verification. Check FBR portal.',
+                ]);
+            }
             return redirect('/invoice/' . $invoice->id)->with('warning', 'FBR response was ambiguous. Invoice marked for manual verification. Check FBR portal.');
         }
 
@@ -928,6 +1024,14 @@ class InvoiceController extends Controller
             'environment' => $company->fbr_environment,
         ], request()->ip());
 
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => 'error',
+                'invoice_id' => $invoice->id,
+                'message' => 'FBR submission failed',
+                'error_details' => $errorMsg,
+            ], 422);
+        }
         return redirect('/invoice/' . $invoice->id)->with('error', $errorMsg);
     }
 

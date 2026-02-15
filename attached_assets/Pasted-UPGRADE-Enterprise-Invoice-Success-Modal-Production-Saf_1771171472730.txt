@@ -1,0 +1,148 @@
+UPGRADE: Enterprise Invoice Success Modal (Production Safe UX Layer)
+
+DO NOT change:
+- FBR payload structure
+- Submission logic
+- Idempotency shield
+- DB schema
+- Controller business rules
+
+Only upgrade response handling + frontend UX.
+
+========================================
+PHASE 1 — Backend Response Standardization
+========================================
+
+1. After successful FBR production submission:
+   - Do NOT redirect
+   - Do NOT return view()
+   - Return JSON response:
+
+{
+  "status": "success",
+  "invoice_id": X,
+  "fbr_invoice_number": "XXXXX",
+  "pdf_url": "/invoice/{id}/pdf",
+  "message": "Invoice successfully submitted to FBR"
+}
+
+2. On failure:
+Return JSON:
+
+{
+  "status": "error",
+  "message": "FBR submission failed",
+  "error_details": "..."
+}
+
+3. Preserve existing flash fallback for non-AJAX calls.
+
+========================================
+PHASE 2 — Frontend Submission Upgrade
+========================================
+
+1. Submit button:
+   - Disable on click
+   - Show spinner text: "Submitting to FBR..."
+   - Use fetch/AJAX instead of full redirect
+
+2. On success response:
+   - Trigger full-screen modal overlay
+   - DO NOT reload page
+
+3. On error:
+   - Show red toast notification
+   - Re-enable submit button
+
+========================================
+PHASE 3 — Enterprise Full-Screen Modal
+========================================
+
+Create reusable component: <InvoiceSuccessModal />
+
+Modal Requirements:
+
+- Fixed position
+- inset-0
+- z-50
+- backdrop blur (backdrop-blur-sm)
+- dark overlay bg-black/40
+- Escape key closes
+- Close button top-right
+
+Content Area:
+
+- White card container
+- max-w-6xl
+- h-[90vh]
+- flex column layout
+
+Top Section:
+- Green badge:
+   "FBR Production Successful"
+- FBR Invoice Number prominently displayed
+- Submission timestamp
+
+Main Section:
+- <iframe src="{pdf_url}" class="flex-1 w-full border rounded-md" />
+
+Bottom Action Bar:
+- Print Button
+- Download PDF Button
+- Close Button
+
+========================================
+PHASE 4 — Buttons Logic
+========================================
+
+Print:
+   iframe.contentWindow.print()
+
+Download:
+   window.open(pdf_url, '_blank')
+
+Close:
+   Hide modal
+   Keep user on invoice detail page
+
+========================================
+PHASE 5 — Mobile Optimization
+========================================
+
+- On mobile:
+   h-[95vh]
+   Buttons stacked vertically
+   Sticky bottom action bar
+
+========================================
+PHASE 6 — Safety & Guardrails
+========================================
+
+- Modal should only open if:
+   status === "success"
+
+- If status === "pending_verification":
+   Show amber banner instead
+   Do NOT open modal
+
+- If status === "error":
+   Show error toast
+
+========================================
+PHASE 7 — UX Polish
+========================================
+
+- Smooth fade-in animation
+- Prevent background scroll while modal open
+- Add success confetti animation (optional subtle)
+
+========================================
+
+NO:
+- New tab
+- Page reload
+- Route redirect
+- Duplicate submission
+- State mutation
+
+This is purely an Enterprise UX enhancement layer.

@@ -8,15 +8,15 @@
             </div>
         </div>
         <h2 class="text-xl font-bold" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Welcome Back</h2>
-        <p class="text-sm text-gray-500 mt-1">Login with your email, phone, username, CNIC or NTN</p>
+        <p class="text-sm text-gray-500 mt-1">Login to your TaxNest account</p>
     </div>
 
     <form method="POST" action="{{ route('login') }}" id="loginForm">
         @csrf
 
         <div>
-            <x-input-label for="login" value="Email / Phone / Username / CNIC / NTN" />
-            <x-text-input id="login" class="block mt-1 w-full" type="text" name="login" :value="old('login')" required autofocus autocomplete="username" placeholder="Enter email, phone, username, CNIC or NTN" />
+            <x-input-label for="login" value="Email / Phone / Username" />
+            <x-text-input id="login" class="block mt-1 w-full" type="text" name="login" :value="old('login')" required autofocus autocomplete="username" placeholder="Enter email, phone or username" />
             <x-input-error :messages="$errors->get('login')" class="mt-2" />
         </div>
 
@@ -65,6 +65,10 @@
                 <span class="inline-flex items-center gap-1 text-xs text-gray-500 px-2.5 py-1 rounded-full bg-gray-50/80 backdrop-blur-sm border border-gray-200/40">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0"/></svg>
                     CNIC / NTN
+                </span>
+                <span class="inline-flex items-center gap-1 text-xs text-gray-500 px-2.5 py-1 rounded-full bg-gray-50/80 backdrop-blur-sm border border-gray-200/40">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    FBR Registration
                 </span>
             </div>
         </div>

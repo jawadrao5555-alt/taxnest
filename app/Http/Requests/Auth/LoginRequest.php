@@ -59,7 +59,9 @@ class LoginRequest extends FormRequest
                     $q->where('ntn', $login)
                       ->orWhere('ntn', $normalizedId)
                       ->orWhere('cnic', $login)
-                      ->orWhere('cnic', $normalizedId);
+                      ->orWhere('cnic', $normalizedId)
+                      ->orWhere('fbr_registration_no', $login)
+                      ->orWhere('fbr_registration_no', $normalizedId);
                 })->first();
                 if ($company) {
                     $user = User::where('company_id', $company->id)

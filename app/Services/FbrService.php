@@ -592,7 +592,7 @@ class FbrService
         $cookieFile = storage_path('app/fbr_cookies_' . md5($token) . '.txt');
 
         $attempt = 0;
-        $maxAttempts = 2;
+        $maxAttempts = 5;
         $responseBody = '';
         $httpCode = 0;
         $curlError = '';
@@ -608,11 +608,13 @@ class FbrService
                 CURLOPT_POST           => true,
                 CURLOPT_POSTFIELDS     => $jsonBody,
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT        => 30,
+                CURLOPT_TIMEOUT        => 45,
+                CURLOPT_CONNECTTIMEOUT => 15,
                 CURLOPT_HTTPHEADER     => [
                     'Content-Type: application/json',
                     'Authorization: Bearer ' . $token,
                     'Accept: application/json',
+                    'Connection: keep-alive',
                 ],
                 CURLOPT_HEADERFUNCTION => function($curl, $header) use (&$responseHeaders) {
                     $len = strlen($header);
@@ -625,8 +627,11 @@ class FbrService
                 CURLOPT_COOKIEFILE     => $cookieFile,
                 CURLOPT_COOKIEJAR      => $cookieFile,
                 CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_MAXREDIRS      => 3,
                 CURLOPT_VERBOSE        => false,
-                CURLOPT_USERAGENT      => 'TaxNest/1.0 FBR-DI-Client',
+                CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                CURLOPT_ENCODING       => '',
             ]);
 
             $responseBody = curl_exec($ch);
@@ -635,7 +640,7 @@ class FbrService
             $curlInfo     = curl_getinfo($ch);
             curl_close($ch);
 
-            \Log::info("FBR Direct Attempt {$attempt}", [
+            \Log::info("FBR Direct Attempt {$attempt}/{$maxAttempts}", [
                 'invoice_id' => $invoiceId,
                 'http_code' => $httpCode,
                 'body_length' => strlen($responseBody ?: ''),
@@ -649,8 +654,15 @@ class FbrService
             }
 
             if ($httpCode === 200 && strlen(trim($responseBody ?: '')) === 0 && $attempt < $maxAttempts) {
-                \Log::info("FBR WAF cookie challenge detected, retrying with cookie for invoice #{$invoiceId}");
-                usleep(500000);
+                $delay = $attempt * 1000000;
+                \Log::info("FBR WAF challenge detected, retry #{$attempt} with {$delay}us delay for invoice #{$invoiceId}");
+                usleep($delay);
+                continue;
+            }
+
+            if ($httpCode === 0 && $attempt < $maxAttempts) {
+                \Log::info("FBR connection failed, retry #{$attempt} for invoice #{$invoiceId}");
+                usleep(2000000);
                 continue;
             }
 
@@ -729,34 +741,8 @@ class FbrService
         $result = $this->sendDirectToFbr($url, $token, $jsonBody, $invoiceId);
 
         $body = trim($result['body'] ?? '');
-        $hasError = !empty($result['curl_error']);
-        $emptyResponse = ($result['http_code'] === 200 && strlen($body) === 0);
-        $connectionFailed = ($result['http_code'] === 0);
-
-        if ($hasError || $emptyResponse || $connectionFailed) {
-            \Log::info("FBR direct failed, falling back to proxy for invoice #{$invoiceId}");
-            $proxyResult = $this->sendViaProxy($token, $jsonBody, $invoiceId, $action);
-
-            $proxyBody = $proxyResult['body'] ?? '';
-            $proxyData = json_decode($proxyBody, true);
-
-            if (is_array($proxyData) && isset($proxyData['fbr_response'])) {
-                $fbrResponse = json_encode($proxyData['fbr_response'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                $proxyHttpCode = $proxyData['http_code'] ?? $proxyResult['http_code'];
-
-                \Log::info("FBR Proxy unwrapped response", [
-                    'invoice_id' => $invoiceId,
-                    'proxy_success' => $proxyData['success'] ?? false,
-                    'proxy_invoice_number' => $proxyData['invoice_number'] ?? null,
-                    'fbr_http_code' => $proxyHttpCode,
-                    'fbr_response_preview' => substr($fbrResponse, 0, 500),
-                ]);
-
-                $proxyResult['body'] = $fbrResponse;
-                $proxyResult['http_code'] = (int) $proxyHttpCode;
-            }
-
-            $result = $proxyResult;
+        if ($result['http_code'] === 200 && strlen($body) === 0) {
+            \Log::warning("FBR returned empty response after all retries for invoice #{$invoiceId}. WAF may be blocking.");
         }
 
         return $result;

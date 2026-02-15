@@ -75,7 +75,7 @@ class DatabaseSeeder extends Seeder
             [
                 'buyer_name' => 'ABC Traders',
                 'buyer_ntn' => '7654321-0',
-                'status' => 'submitted',
+                'status' => 'draft',
                 'total_amount' => 15000,
                 'days_ago' => 1,
             ],
@@ -150,12 +150,12 @@ class DatabaseSeeder extends Seeder
                 'created_at' => $createdAt,
             ]);
 
-            if ($data['status'] === 'submitted' || $data['status'] === 'locked') {
+            if ($data['status'] === 'locked') {
                 InvoiceActivityLog::create([
                     'invoice_id' => $invoice->id,
                     'company_id' => $company->id,
                     'user_id' => $companyAdmin->id,
-                    'action' => 'submitted',
+                    'action' => 'locked',
                     'ip_address' => '127.0.0.1',
                     'created_at' => $createdAt->copy()->addHours(2),
                 ]);

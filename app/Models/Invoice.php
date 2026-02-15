@@ -40,10 +40,12 @@ class Invoice extends Model
         'invoice_date',
         'submitted_at',
         'fbr_submission_hash',
+        'is_fbr_processing',
     ];
 
     protected $casts = [
         'fbr_submission_date' => 'datetime',
+        'is_fbr_processing' => 'boolean',
         'total_value_excluding_st' => 'float',
         'total_sales_tax' => 'float',
         'wht_rate' => 'float',

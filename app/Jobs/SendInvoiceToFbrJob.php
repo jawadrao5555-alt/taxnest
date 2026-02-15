@@ -66,8 +66,8 @@ class SendInvoiceToFbrJob implements ShouldQueue
             return;
         }
 
-        if ($invoice->status !== 'submitted') {
-            Log::warning("SendInvoiceToFbrJob: Invoice #{$invoice->id} status is '{$invoice->status}', expected 'submitted'. Skipping.");
+        if (!$invoice->is_fbr_processing) {
+            Log::warning("SendInvoiceToFbrJob: Invoice #{$invoice->id} is not in processing state. Skipping.");
             $this->releaseLock();
             return;
         }
@@ -89,6 +89,7 @@ class SendInvoiceToFbrJob implements ShouldQueue
 
         if ($response['status'] === 'success') {
             $invoice->status = 'locked';
+            $invoice->is_fbr_processing = false;
             $fbrNum = $response['fbr_invoice_number'] ?? null;
             if ($fbrNum) {
                 $invoice->fbr_invoice_number = $fbrNum;
@@ -145,6 +146,7 @@ class SendInvoiceToFbrJob implements ShouldQueue
         if ($response['status'] === 'pending_verification') {
             $invoice->status = 'pending_verification';
             $invoice->fbr_status = 'pending_verification';
+            $invoice->is_fbr_processing = false;
             $invoice->save();
 
             InvoiceActivityService::log(
@@ -169,8 +171,9 @@ class SendInvoiceToFbrJob implements ShouldQueue
         $this->captureHsRejections($invoice, $response);
 
         if ($this->attempts() >= $this->tries) {
-            $invoice->status = 'failed';
+            $invoice->status = 'draft';
             $invoice->fbr_status = 'failed';
+            $invoice->is_fbr_processing = false;
             $invoice->save();
 
             InvoiceActivityService::log(
@@ -198,8 +201,9 @@ class SendInvoiceToFbrJob implements ShouldQueue
     {
         $invoice = Invoice::with(['company', 'items'])->find($this->invoiceId);
         if ($invoice) {
-            $invoice->status = 'failed';
+            $invoice->status = 'draft';
             $invoice->fbr_status = 'failed';
+            $invoice->is_fbr_processing = false;
             $invoice->save();
 
             $this->captureHsRejections($invoice, [

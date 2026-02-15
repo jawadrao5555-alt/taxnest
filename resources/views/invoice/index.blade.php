@@ -213,9 +213,7 @@
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold
                                         @if($invoice->status === 'draft') bg-gray-200 text-gray-700
-                                        @elseif($invoice->status === 'submitted') bg-blue-100 text-blue-800
                                         @elseif($invoice->status === 'locked') bg-green-100 text-green-800
-                                        @elseif($invoice->status === 'failed') bg-red-100 text-red-800
                                         @elseif($invoice->status === 'pending_verification') bg-amber-100 text-amber-800
                                         @endif">
                                         {{ $invoice->status === 'pending_verification' ? 'Pending' : ucfirst($invoice->status) }}
@@ -229,7 +227,7 @@
                                         {{ ucfirst($invoice->fbr_status) }}
                                     </span>
                                     @endif
-                                    @if($invoice->status === 'failed')
+                                    @if($invoice->status === 'draft' && $invoice->fbr_status === 'failed')
                                     @php
                                         $lastLog = $invoice->fbrLogs->first();
                                         $failReason = '';
@@ -249,7 +247,7 @@
                                     @endif
                                     @if($invoice->status === 'locked' && $invoice->fbr_invoice_number)
                                     <p class="text-xs text-emerald-600 mt-1 max-w-[200px] truncate" title="{{ $invoice->fbr_invoice_number }}">FBR: {{ $invoice->fbr_invoice_number }}</p>
-                                    @elseif(in_array($invoice->status, ['locked', 'pending_verification', 'submitted', 'failed']) && !$invoice->fbr_invoice_number && in_array(auth()->user()->role, ['company_admin', 'super_admin']))
+                                    @elseif(in_array($invoice->status, ['locked', 'pending_verification']) && !$invoice->fbr_invoice_number && in_array(auth()->user()->role, ['company_admin', 'super_admin']))
                                     <div x-data="{ showInput: false }" class="mt-1">
                                         <button x-show="!showInput" @click="showInput = true" class="text-xs text-blue-600 hover:text-blue-800 underline">+ FBR #</button>
                                         <form x-show="showInput" x-cloak method="POST" action="/invoice/{{ $invoice->id }}/update-fbr-number" class="flex items-center gap-1 mt-1">
@@ -272,7 +270,7 @@
                                         </form>
                                         @endif
                                     @else
-                                        @if($invoice->status === 'failed')
+                                        @if($invoice->status === 'draft' && $invoice->fbr_status === 'failed')
                                         <a href="/invoice/{{ $invoice->id }}/edit" class="text-amber-600 hover:text-amber-800 font-medium">Edit</a>
                                         <form method="POST" action="/invoice/{{ $invoice->id }}/retry" class="inline">
                                             @csrf

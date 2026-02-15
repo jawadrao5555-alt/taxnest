@@ -17,13 +17,13 @@ class MISController extends Controller
 {
     private function resolveDbStatus($status)
     {
-        $map = ['production' => 'locked', 'draft' => 'draft', 'failed' => 'submitted'];
+        $map = ['production' => 'locked', 'draft' => 'draft'];
         return $map[$status] ?? 'locked';
     }
 
     private function displayStatus($dbStatus)
     {
-        $map = ['locked' => 'production', 'submitted' => 'failed', 'draft' => 'draft'];
+        $map = ['locked' => 'production', 'draft' => 'draft'];
         return $map[$dbStatus] ?? $dbStatus;
     }
 

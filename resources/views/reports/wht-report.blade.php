@@ -45,7 +45,6 @@
                             <select name="status" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 <option value="production" {{ $status === 'production' ? 'selected' : '' }}>Production</option>
                                 <option value="draft" {{ $status === 'draft' ? 'selected' : '' }}>Draft</option>
-                                <option value="failed" {{ $status === 'failed' ? 'selected' : '' }}>Failed</option>
                             </select>
                         </div>
                     </div>

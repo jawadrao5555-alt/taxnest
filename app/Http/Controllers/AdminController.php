@@ -29,7 +29,7 @@ class AdminController extends Controller
         $totalUsers = User::count();
         $totalInvoices = Invoice::count();
         $draftInvoices = Invoice::where('status', 'draft')->count();
-        $submittedInvoices = Invoice::where('status', 'submitted')->count();
+        $submittedInvoices = Invoice::where('is_fbr_processing', true)->count();
         $lockedInvoices = Invoice::where('status', 'locked')->count();
         $failedLogs = FbrLog::where('status', 'failed')->count();
         $totalRevenue = Invoice::sum('total_amount');

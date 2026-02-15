@@ -104,7 +104,7 @@
                     <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider">Total Invoices</p>
                     <div class="mt-3 flex items-center space-x-2 text-xs">
                         <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">{{ $draftCount }} draft</span>
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium">{{ $submittedCount }} sent</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-medium">{{ $lockedCount }} locked</span>
                     </div>
                 </div>
 
@@ -267,7 +267,7 @@
                                 <p class="text-xs font-medium text-emerald-600/70 dark:text-emerald-500 mt-1 uppercase tracking-wider">Locked</p>
                             </div>
                             <div class="text-center p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-100 dark:border-amber-800">
-                                <p class="text-lg font-extrabold text-amber-700 dark:text-amber-400">{{ $draftCount + $submittedCount }}</p>
+                                <p class="text-lg font-extrabold text-amber-700 dark:text-amber-400">{{ $draftCount }}</p>
                                 <p class="text-xs font-medium text-amber-600/70 dark:text-amber-500 mt-1 uppercase tracking-wider">Pending</p>
                             </div>
                         </div>
@@ -446,10 +446,9 @@
                                 <span class="text-xs font-mono text-gray-400 dark:text-gray-500 font-medium">{{ $invoice->invoice_number ?? 'INV-' . $invoice->id }}</span>
                                 <span class="inline-flex px-2 py-0.5 rounded-lg text-xs font-bold
                                     @if($invoice->status === 'draft') bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300
-                                    @elseif($invoice->status === 'submitted') bg-blue-100/80 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400
                                     @elseif($invoice->status === 'locked') bg-emerald-100/80 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400
-                                    @else bg-red-100/80 text-red-700 dark:bg-red-900/30 dark:text-red-400
-                                    @endif">{{ ucfirst($invoice->status) }}</span>
+                                    @elseif($invoice->status === 'pending_verification') bg-amber-100/80 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400
+                                    @endif">{{ $invoice->status === 'pending_verification' ? 'Pending' : ucfirst($invoice->status) }}</span>
                             </div>
                             <p class="text-sm font-bold text-gray-900 dark:text-gray-100 truncate group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition">{{ $invoice->buyer_name }}</p>
                             <div class="flex items-center justify-between mt-2">
@@ -517,10 +516,10 @@
             new Chart(statusEl.getContext('2d'), {
                 type: 'doughnut',
                 data: {
-                    labels: ['Draft', 'Submitted', 'Locked'],
+                    labels: ['Draft', 'Locked'],
                     datasets: [{
-                        data: [{{ $statusData['draft'] }}, {{ $statusData['submitted'] }}, {{ $statusData['locked'] }}],
-                        backgroundColor: ['#f59e0b', '#6366f1', '#10b981'],
+                        data: [{{ $statusData['draft'] }}, {{ $statusData['locked'] }}],
+                        backgroundColor: ['#f59e0b', '#10b981'],
                         borderWidth: 0,
                         spacing: 3,
                         borderRadius: 4

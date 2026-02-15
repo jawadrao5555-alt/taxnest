@@ -66,7 +66,6 @@ class CacheService
                 ->select(
                     \Illuminate\Support\Facades\DB::raw('COUNT(*) as total'),
                     \Illuminate\Support\Facades\DB::raw("SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) as draft_count"),
-                    \Illuminate\Support\Facades\DB::raw("SUM(CASE WHEN status = 'submitted' THEN 1 ELSE 0 END) as submitted_count"),
                     \Illuminate\Support\Facades\DB::raw("SUM(CASE WHEN status = 'locked' THEN 1 ELSE 0 END) as locked_count"),
                     \Illuminate\Support\Facades\DB::raw('COALESCE(SUM(total_amount), 0) as total_revenue')
                 )

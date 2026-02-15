@@ -58,7 +58,7 @@
 
         .status-badge { display: inline-block; padding: 3px 14px; border-radius: 12px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
         .status-draft { background: #f3f4f6; color: #6b7280; }
-        .status-submitted { background: #dbeafe; color: #1e40af; }
+
         .status-locked { background: #d1fae5; color: #065f46; }
 
         .watermark { position: fixed; top: 40%; left: 15%; font-size: 60px; color: rgba(156, 163, 175, 0.12); font-weight: bold; text-transform: uppercase; transform: rotate(-35deg); letter-spacing: 10px; z-index: 9999; pointer-events: none; white-space: nowrap; }

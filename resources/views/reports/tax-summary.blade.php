@@ -36,7 +36,6 @@
                         <select name="status" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
                             <option value="production" {{ $status === 'production' ? 'selected' : '' }}>Production</option>
                             <option value="draft" {{ $status === 'draft' ? 'selected' : '' }}>Draft</option>
-                            <option value="failed" {{ $status === 'failed' ? 'selected' : '' }}>Failed</option>
                         </select>
                     </div>
                     <button type="submit" class="inline-flex items-center px-6 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition">

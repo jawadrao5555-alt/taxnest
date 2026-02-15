@@ -23,9 +23,9 @@
                     <div class="text-right">
                         <span class="inline-flex px-3 py-1 rounded-full text-sm font-medium
                             @if($invoice->status === 'draft') bg-yellow-100 text-yellow-800
-                            @elseif($invoice->status === 'submitted') bg-blue-100 text-blue-800
                             @elseif($invoice->status === 'locked') bg-green-100 text-green-800
-                            @endif">{{ ucfirst($invoice->status) }}</span>
+                            @elseif($invoice->status === 'pending_verification') bg-amber-100 text-amber-800
+                            @endif">{{ $invoice->status === 'pending_verification' ? 'Pending Verification' : ucfirst($invoice->status) }}</span>
                         <p class="text-sm text-gray-500 mt-1">#{{ $invoice->invoice_number }}</p>
                     </div>
                 </div>

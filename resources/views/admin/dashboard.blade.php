@@ -62,8 +62,6 @@
                     <div class="mt-2 flex items-center space-x-2 text-sm">
                         <span class="text-yellow-600">{{ $draftInvoices }} draft</span>
                         <span class="text-gray-300">|</span>
-                        <span class="text-blue-600">{{ $submittedInvoices }} submitted</span>
-                        <span class="text-gray-300">|</span>
                         <span class="text-green-600">{{ $lockedInvoices }} locked</span>
                     </div>
                 </div>
@@ -131,9 +129,9 @@
                                     <td class="px-4 py-3">
                                         <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium
                                             @if($invoice->status === 'draft') bg-yellow-100 text-yellow-800
-                                            @elseif($invoice->status === 'submitted') bg-blue-100 text-blue-800
                                             @elseif($invoice->status === 'locked') bg-green-100 text-green-800
-                                            @endif">{{ ucfirst($invoice->status) }}</span>
+                                            @elseif($invoice->status === 'pending_verification') bg-amber-100 text-amber-800
+                                            @endif">{{ $invoice->status === 'pending_verification' ? 'Pending' : ucfirst($invoice->status) }}</span>
                                     </td>
                                 </tr>
                                 @empty

@@ -65,7 +65,7 @@
                         <td class="right green">{{ number_format($inv->total_sales_tax, 2) }}</td>
                         <td class="right amber">{{ number_format($inv->wht_amount, 2) }}</td>
                         <td class="right bold">{{ number_format($inv->total_amount, 2) }}</td>
-                        <td class="center"><span class="badge {{ $inv->status === 'locked' ? 'badge-green' : ($inv->status === 'draft' ? 'badge-amber' : 'badge-red') }}">{{ $inv->status === 'locked' ? 'Production' : ($inv->status === 'submitted' ? 'Failed' : ucfirst($inv->status)) }}</span></td>
+                        <td class="center"><span class="badge {{ $inv->status === 'locked' ? 'badge-green' : ($inv->status === 'draft' ? 'badge-amber' : 'badge-red') }}">{{ $inv->status === 'locked' ? 'Production' : ucfirst($inv->status) }}</span></td>
                     </tr>
                     @endforeach
                 </tbody>
@@ -107,7 +107,7 @@
                         <td class="right green">{{ number_format($inv->total_sales_tax, 2) }}</td>
                         <td class="right amber">{{ number_format($inv->wht_amount, 2) }}</td>
                         <td class="right bold">{{ number_format($inv->total_amount, 2) }}</td>
-                        <td class="center"><span class="badge {{ $inv->status === 'locked' ? 'badge-green' : ($inv->status === 'draft' ? 'badge-amber' : 'badge-red') }}">{{ $inv->status === 'locked' ? 'Production' : ($inv->status === 'submitted' ? 'Failed' : ucfirst($inv->status)) }}</span></td>
+                        <td class="center"><span class="badge {{ $inv->status === 'locked' ? 'badge-green' : ($inv->status === 'draft' ? 'badge-amber' : 'badge-red') }}">{{ $inv->status === 'locked' ? 'Production' : ucfirst($inv->status) }}</span></td>
                     </tr>
                     @empty
                     <tr><td colspan="9" style="text-align:center; padding:20px; color:#9ca3af;">No invoices found.</td></tr>

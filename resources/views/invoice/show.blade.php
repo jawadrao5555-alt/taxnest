@@ -5,12 +5,12 @@
                 <nav class="flex items-center text-xs text-gray-400 mb-1">
                     <a href="{{ route('dashboard') }}" class="hover:text-emerald-600 transition">Dashboard</a>
                     <svg class="w-3.5 h-3.5 mx-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                    <a href="/invoices?tab={{ $invoice->status === 'draft' || $invoice->status === 'submitted' ? 'draft' : 'completed' }}" class="hover:text-emerald-600 transition">Invoices</a>
+                    <a href="/invoices?tab={{ $invoice->status === 'draft' ? 'draft' : 'completed' }}" class="hover:text-emerald-600 transition">Invoices</a>
                     <svg class="w-3.5 h-3.5 mx-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                     <span class="text-gray-600 dark:text-gray-300 font-medium">{{ $invoice->display_invoice_number }}</span>
                 </nav>
                 <div class="flex items-center space-x-3">
-                    <a href="/invoices?tab={{ $invoice->status === 'draft' || $invoice->status === 'submitted' ? 'draft' : 'completed' }}" class="inline-flex items-center text-gray-500 hover:text-emerald-600 transition text-sm">
+                    <a href="/invoices?tab={{ $invoice->status === 'draft' ? 'draft' : 'completed' }}" class="inline-flex items-center text-gray-500 hover:text-emerald-600 transition text-sm">
                         <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                         Back to Invoices
                     </a>
@@ -125,16 +125,7 @@
                     </button>
                 </form>
                 @endif
-                @if(in_array($invoice->status, ['failed', 'submitted']) && in_array(auth()->user()->role, ['company_admin', 'super_admin']))
-                <div x-data="{ resubmitting: false }" class="inline">
-                    <button @click="resubmitToFbr($el)" :disabled="resubmitting" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed" >
-                        <svg x-show="!resubmitting" class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                        <svg x-show="resubmitting" x-cloak class="animate-spin w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        <span x-text="resubmitting ? 'Submitting...' : 'Resubmit to FBR'"></span>
-                    </button>
-                </div>
-                @endif
-                @if($invoice->status === 'failed')
+                @if($invoice->status === 'draft' && $invoice->fbr_status === 'failed' && in_array(auth()->user()->role, ['company_admin', 'super_admin']))
                 <a href="/invoice/{{ $invoice->id }}/edit" class="inline-flex items-center px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition">
                     <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     Edit & Fix
@@ -252,17 +243,6 @@
                 </div>
             </div>
             @endif
-            @if($invoice->status === 'submitted')
-            <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-                <div class="flex items-start gap-3">
-                    <svg class="animate-spin w-6 h-6 text-blue-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    <div class="flex-1">
-                        <p class="text-sm font-bold text-blue-800">Submitting to FBR...</p>
-                        <p class="mt-1 text-sm text-blue-700">This invoice is being processed by FBR. Please wait and refresh this page.</p>
-                    </div>
-                </div>
-            </div>
-            @endif
             @if($invoice->status === 'pending_verification')
             <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
                 <div class="flex items-start gap-3">
@@ -298,7 +278,7 @@
                 </div>
             </div>
             @endif
-            @if($invoice->status === 'failed')
+            @if($invoice->status === 'draft' && $invoice->fbr_status === 'failed')
             @php
                 $lastFbrLog = \App\Models\FbrLog::where('invoice_id', $invoice->id)->orderBy('created_at', 'desc')->first();
                 $failErrors = [];
@@ -358,9 +338,7 @@
                         <div class="text-right">
                             <span class="inline-flex px-3 py-1 rounded-full text-sm font-bold
                                 @if($invoice->status === 'draft') bg-gray-200 text-gray-700
-                                @elseif($invoice->status === 'submitted') bg-blue-100 text-blue-800
                                 @elseif($invoice->status === 'locked') bg-green-100 text-green-800
-                                @elseif($invoice->status === 'failed') bg-red-100 text-red-800
                                 @elseif($invoice->status === 'pending_verification') bg-amber-100 text-amber-800
                                 @endif">
                                 {{ $invoice->status === 'pending_verification' ? 'Pending Verification' : ucfirst($invoice->status) }}
@@ -399,7 +377,7 @@
                             <p class="text-sm text-gray-600">Internal #: <span class="font-semibold text-gray-900">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</span></p>
 @if($invoice->fbr_invoice_number)
 <p class="text-sm text-gray-600">FBR #: <span class="font-semibold text-emerald-700">{{ $invoice->fbr_invoice_number }}</span></p>
-@elseif(in_array($invoice->status, ['locked', 'pending_verification', 'submitted', 'failed']) && in_array(auth()->user()->role, ['company_admin', 'super_admin']))
+@elseif(in_array($invoice->status, ['locked', 'pending_verification']) && in_array(auth()->user()->role, ['company_admin', 'super_admin']))
 <div x-data="{ showFbrInput: false, fbrVal: '' }" class="mt-1">
     <template x-if="!showFbrInput">
         <button @click="showFbrInput = true" class="text-xs text-blue-600 hover:text-blue-800 font-medium underline">+ Add FBR Invoice Number</button>

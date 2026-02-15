@@ -13,7 +13,7 @@ class WhtReportController extends Controller
 {
     private function resolveDbStatus($status)
     {
-        $map = ['production' => 'locked', 'draft' => 'draft', 'failed' => 'submitted'];
+        $map = ['production' => 'locked', 'draft' => 'draft'];
         return $map[$status] ?? 'locked';
     }
 

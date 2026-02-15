@@ -22,7 +22,7 @@
         .total-row td { background: #f0fdf4; font-size: 14px; font-weight: bold; color: #059669; border-top: 2px solid #059669; }
         .status { display: inline-block; padding: 3px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; }
         .status-draft { background: #fef3c7; color: #92400e; }
-        .status-submitted { background: #dbeafe; color: #1e40af; }
+
         .status-locked { background: #d1fae5; color: #065f46; }
     </style>
 </head>

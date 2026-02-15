@@ -1,0 +1,86 @@
+ENTERPRISE IDEMPOTENCY SHIELD — CORRECT SCOPED IMPLEMENTATION
+
+OBJECTIVE:
+Block duplicate submission of SAME invoice only.
+Allow different invoices even if data is identical.
+
+PHASE 1 — REMOVE GLOBAL BLOCKING
+1. Remove any global payload-based duplicate blocking across invoices.
+2. Remove cross-invoice SHA256(payload) uniqueness logic.
+3. Do NOT block based on:
+   - same buyer
+   - same amount
+   - same HS code
+   - same quantity
+   - same total
+   - same product
+   - same data
+
+PHASE 2 — SCOPE DUPLICATE CHECK TO invoice_id ONLY
+
+Before calling FBR:
+
+Wrap in DB::transaction() and lockForUpdate()
+
+Inside transaction perform checks:
+
+IF invoice.status == 'locked'
+    → THROW Exception("Invoice already submitted")
+
+IF invoice.fbr_invoice_number IS NOT NULL
+    → THROW Exception("Invoice already has FBR number")
+
+IF EXISTS(
+    SELECT 1 FROM fbr_logs
+    WHERE invoice_id = current_invoice_id
+    AND status = 'success'
+)
+    → THROW Exception("Invoice already successfully submitted")
+
+PHASE 3 — IDEMPOTENCY HASH (SCOPED)
+
+submission_hash = SHA256(invoice_id + invoiceRefNo)
+
+Store this hash on invoice record.
+Do NOT enforce uniqueness across invoices.
+Hash only protects same invoice re-entry.
+
+PHASE 4 — invoiceRefNo RULE
+
+invoiceRefNo must be deterministic:
+CompanyNTN + "DI" + internal_invoice_number
+
+No random timestamp-based regeneration allowed.
+
+PHASE 5 — STATUS FLOW CLEANUP
+
+Remove 'submitted' state completely.
+
+Allowed states:
+- draft
+- pending_verification
+- failed
+- locked
+
+Flow:
+draft → (FBR success) → locked
+draft → (FBR 500) → pending_verification
+draft → (validation error) → failed
+
+pending_verification must NOT auto-revert to draft.
+
+PHASE 6 — CONTROLLER LEVEL GUARD
+
+All routes (submit, retry, admin resubmit) must use same service guard.
+
+Never allow direct service call bypass without guard.
+
+FINAL EXPECTED BEHAVIOR:
+
+✓ Same invoice cannot be submitted twice.
+✓ Different invoices (even identical data) always allowed.
+✓ Race condition impossible.
+✓ Tinker cannot bypass protection.
+✓ Legitimate business invoices never blocked.
+
+IMPLEMENT AND CONFIRM.

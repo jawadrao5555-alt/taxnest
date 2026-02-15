@@ -679,63 +679,6 @@ class FbrService
         ];
     }
 
-    private function sendViaProxy(string $token, string $jsonBody, int $invoiceId, string $action = 'submit'): array
-    {
-        $proxyUrl = env('FBR_PROXY_URL', 'https://nestpay.replit.app/api/fbr-proxy/submit');
-        $payload = json_decode($jsonBody, true);
-
-        $proxyData = json_encode([
-            'token' => $token,
-            'action' => $action,
-            'payload' => $payload,
-        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
-
-        $responseHeaders = [];
-        $ch = curl_init($proxyUrl);
-        curl_setopt_array($ch, [
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $proxyData,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 60,
-            CURLOPT_HTTPHEADER     => [
-                'Content-Type: application/json',
-            ],
-            CURLOPT_HEADERFUNCTION => function($curl, $header) use (&$responseHeaders) {
-                $len = strlen($header);
-                $parts = explode(':', $header, 2);
-                if (count($parts) === 2) {
-                    $responseHeaders[strtolower(trim($parts[0]))] = trim($parts[1]);
-                }
-                return $len;
-            },
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_USERAGENT      => 'TaxNest/1.0 FBR-DI-Client',
-        ]);
-
-        $responseBody = curl_exec($ch);
-        $httpCode     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError    = curl_error($ch);
-        $curlInfo     = curl_getinfo($ch);
-        curl_close($ch);
-
-        \Log::info("FBR Proxy Attempt", [
-            'invoice_id' => $invoiceId,
-            'http_code' => $httpCode,
-            'body_length' => strlen($responseBody ?: ''),
-            'response_preview' => substr($responseBody ?: '(empty)', 0, 500),
-            'time_sec' => $curlInfo['total_time'] ?? null,
-        ]);
-
-        return [
-            'body' => $responseBody,
-            'http_code' => $httpCode,
-            'curl_error' => $curlError,
-            'response_headers' => $responseHeaders,
-            'curl_info' => $curlInfo,
-            'attempts' => 1,
-        ];
-    }
-
     private function sendToFbr(string $url, string $token, string $jsonBody, int $invoiceId, string $action = 'submit'): array
     {
         $result = $this->sendDirectToFbr($url, $token, $jsonBody, $invoiceId);

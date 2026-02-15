@@ -25,6 +25,7 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **Enterprise Analytics:** Provides KPIs and compliance metrics through dashboards.
 - **Security Hardening:** Implements `ForceHttps` and subscription-based access controls.
 - **Dynamic FBR Compliance:** Supports FBR Excel template alignment, PRAL API integration, per-item FBR fields, and pre-submission payload validation including a validate-only sandbox mode.
+- **CRITICAL 3rd Schedule Rule (Verified Feb 2026):** For 3rd Schedule items, `fixedNotifiedValueOrRetailPrice` MUST be TOTAL (MRP × quantity), NOT per-unit. `salesTaxApplicable = round(retailPriceTotal × rate / 100, 2)`. Rate format MUST be string ending with "%" (e.g., "5%"). Duplicate submission guard: blocks if fbr_invoice_number exists, status is locked/pending_verification, or fbr_logs has prior success.
 - **Global HS Intelligence Control System:** Centralized `global_hs_master` table, HS resolution, and dynamic validation for different tax schedules.
 - **Advanced HS Intelligence Engine:** Utilizes `hs_intelligence_logs` and `hs_rejection_history` for weighted suggestions and a 6-factor model.
 - **Live Rejection Learning Engine:** Feeds FBR rejection data into intelligence for confidence adjustments.

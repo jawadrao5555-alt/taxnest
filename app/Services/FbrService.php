@@ -61,9 +61,9 @@ class FbrService
                 if ($mrpPerUnit <= 0) {
                     $mrpPerUnit = $unitPrice;
                 }
-                $retailPrice = round($mrpPerUnit, 2);
-                $valueSalesExcludingST = round($retailPrice * $quantity, 2);
-                $salesTaxApplicable = round($valueSalesExcludingST * $taxRate / 100, 2);
+                $retailPrice = round($mrpPerUnit * $quantity, 2);
+                $valueSalesExcludingST = $retailPrice;
+                $salesTaxApplicable = round($retailPrice * $taxRate / 100, 2);
             } elseif ($isExempt) {
                 $retailPrice = round($unitPrice, 2);
                 $salesTaxApplicable = 0.00;

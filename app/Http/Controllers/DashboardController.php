@@ -43,6 +43,7 @@ class DashboardController extends Controller
             ->select(
                 DB::raw('COUNT(*) as total'),
                 DB::raw("SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) as draft_count"),
+                DB::raw("SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_count"),
                 DB::raw("SUM(CASE WHEN status = 'locked' THEN 1 ELSE 0 END) as locked_count"),
                 DB::raw('COALESCE(SUM(total_amount), 0) as total_revenue')
             )
@@ -50,6 +51,7 @@ class DashboardController extends Controller
 
         $totalInvoices = $invoiceCounts->total;
         $draftCount = $invoiceCounts->draft_count;
+        $failedCount = $invoiceCounts->failed_count;
         $lockedCount = $invoiceCounts->locked_count;
         $totalRevenue = $invoiceCounts->total_revenue;
 
@@ -77,6 +79,7 @@ class DashboardController extends Controller
 
         $statusData = [
             'draft' => $draftCount,
+            'failed' => $failedCount,
             'locked' => $lockedCount,
         ];
 
@@ -203,7 +206,7 @@ class DashboardController extends Controller
         ];
 
         return view('dashboard', compact(
-            'company', 'totalInvoices', 'draftCount', 'submittedCount', 'lockedCount',
+            'company', 'totalInvoices', 'draftCount', 'failedCount', 'lockedCount',
             'totalRevenue', 'subscription', 'invoiceLimit', 'invoicesUsed',
             'statusData', 'monthlyData', 'recentInvoices',
             'draftAging', 'fbrSuccessRate', 'complianceScore',

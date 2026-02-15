@@ -102,8 +102,9 @@
                     </div>
                     <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ $totalInvoices }}</p>
                     <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider">Total Invoices</p>
-                    <div class="mt-3 flex items-center space-x-2 text-xs">
+                    <div class="mt-3 flex items-center space-x-2 text-xs flex-wrap gap-y-1">
                         <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">{{ $draftCount }} draft</span>
+                        @if($failedCount > 0)<span class="inline-flex items-center px-2 py-0.5 rounded-md bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 font-medium">{{ $failedCount }} failed</span>@endif
                         <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-medium">{{ $lockedCount }} locked</span>
                     </div>
                 </div>
@@ -516,10 +517,10 @@
             new Chart(statusEl.getContext('2d'), {
                 type: 'doughnut',
                 data: {
-                    labels: ['Draft', 'Locked'],
+                    labels: ['Draft', 'Failed', 'Locked'],
                     datasets: [{
-                        data: [{{ $statusData['draft'] }}, {{ $statusData['locked'] }}],
-                        backgroundColor: ['#f59e0b', '#10b981'],
+                        data: [{{ $statusData['draft'] }}, {{ $statusData['failed'] }}, {{ $statusData['locked'] }}],
+                        backgroundColor: ['#f59e0b', '#ef4444', '#10b981'],
                         borderWidth: 0,
                         spacing: 3,
                         borderRadius: 4

@@ -150,11 +150,17 @@
             </div>
             <div class="flex gap-2 mb-6">
                 <a href="/invoices?tab=draft" class="px-4 py-2 rounded-lg text-sm font-medium transition {{ $tab === 'draft' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700' }}">
-                    Drafted Invoices
+                    Draft
                     <span class="ml-1 px-2 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-800">{{ $draftCount }}</span>
                 </a>
+                @if($failedCount > 0)
+                <a href="/invoices?tab=failed" class="px-4 py-2 rounded-lg text-sm font-medium transition {{ $tab === 'failed' ? 'bg-red-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700' }}">
+                    Failed
+                    <span class="ml-1 px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-800">{{ $failedCount }}</span>
+                </a>
+                @endif
                 <a href="/invoices?tab=completed" class="px-4 py-2 rounded-lg text-sm font-medium transition {{ $tab === 'completed' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700' }}">
-                    Completed Invoices
+                    Completed
                     <span class="ml-1 px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-800">{{ $completedCount }}</span>
                 </a>
             </div>
@@ -213,6 +219,7 @@
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold
                                         @if($invoice->status === 'draft') bg-gray-200 text-gray-700
+                                        @elseif($invoice->status === 'failed') bg-red-100 text-red-800
                                         @elseif($invoice->status === 'locked') bg-green-100 text-green-800
                                         @elseif($invoice->status === 'pending_verification') bg-amber-100 text-amber-800
                                         @endif">

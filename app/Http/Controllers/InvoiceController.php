@@ -44,12 +44,18 @@ class InvoiceController extends Controller
 
         if ($tab === 'completed') {
             $baseQuery->whereIn('status', ['locked', 'pending_verification']);
+        } elseif ($tab === 'failed') {
+            $baseQuery->where('status', 'failed');
         } else {
             $baseQuery->where('status', 'draft');
         }
 
         $draftCount = Invoice::where('company_id', $companyId)
             ->where('status', 'draft')
+            ->count();
+
+        $failedCount = Invoice::where('company_id', $companyId)
+            ->where('status', 'failed')
             ->count();
         
         $completedCount = Invoice::where('company_id', $companyId)
@@ -73,7 +79,7 @@ class InvoiceController extends Controller
 
         $invoices = $query->orderBy('created_at', 'desc')->paginate(15)->appends($request->query());
 
-        return view('invoice.index', compact('invoices', 'tab', 'draftCount', 'completedCount'));
+        return view('invoice.index', compact('invoices', 'tab', 'draftCount', 'failedCount', 'completedCount'));
     }
 
     public function create()
@@ -795,8 +801,8 @@ class InvoiceController extends Controller
 
         $jsonResponse = $request->expectsJson() || $request->ajax();
 
-        if ($invoice->status !== 'draft') {
-            $msg = 'Only draft invoices can be retried.';
+        if (!in_array($invoice->status, ['draft', 'failed'])) {
+            $msg = 'Only draft or failed invoices can be retried.';
             if ($jsonResponse) return response()->json(['status' => 'error', 'message' => $msg, 'error_details' => $msg], 422);
             return redirect('/invoice/' . $invoice->id)->with('error', $msg);
         }
@@ -809,9 +815,10 @@ class InvoiceController extends Controller
 
         $dispatched = \DB::transaction(function () use ($invoice) {
             $locked = Invoice::where('id', $invoice->id)->lockForUpdate()->first();
-            if ($locked->status !== 'draft' || $locked->is_fbr_processing) {
+            if (!in_array($locked->status, ['draft', 'failed']) || $locked->is_fbr_processing) {
                 return false;
             }
+            $locked->status = 'draft';
             $locked->is_fbr_processing = true;
             $locked->fbr_status = 'pending';
             $locked->submitted_at = now();
@@ -908,7 +915,7 @@ class InvoiceController extends Controller
             return redirect('/invoice/' . $invoice->id)->with('error', $msg);
         }
 
-        if ($invoice->status !== 'draft') {
+        if (!in_array($invoice->status, ['draft', 'failed'])) {
             $msg = 'Invoice cannot be submitted in current status.';
             if ($jsonResponse) return response()->json(['status' => 'error', 'message' => $msg, 'error_details' => $msg], 422);
             return redirect('/invoice/' . $invoice->id)->with('error', $msg);
@@ -928,9 +935,10 @@ class InvoiceController extends Controller
 
         $locked = DB::transaction(function () use ($invoice) {
             $lockedInvoice = Invoice::where('id', $invoice->id)->lockForUpdate()->first();
-            if (!$lockedInvoice || $lockedInvoice->status !== 'draft' || $lockedInvoice->is_fbr_processing) {
+            if (!$lockedInvoice || !in_array($lockedInvoice->status, ['draft', 'failed']) || $lockedInvoice->is_fbr_processing) {
                 return false;
             }
+            $lockedInvoice->status = 'draft';
             $lockedInvoice->is_fbr_processing = true;
             $lockedInvoice->submitted_at = now();
             $lockedInvoice->save();
@@ -1022,7 +1030,7 @@ class InvoiceController extends Controller
             return redirect('/invoice/' . $invoice->id)->with('warning', 'FBR response was ambiguous. Invoice marked for manual verification. Check FBR portal.');
         }
 
-        $invoice->status = 'draft';
+        $invoice->status = 'failed';
         $invoice->fbr_status = 'failed';
         $invoice->is_fbr_processing = false;
         $invoice->save();
@@ -1625,7 +1633,7 @@ class InvoiceController extends Controller
                 $errorMessages = array_map(fn($e) => "[{$e['code']}] {$e['message']}", $preErrors);
                 Log::warning("FBR Pre-Validation Failed: Invoice #{$invoice->id}", $preErrors);
 
-                $invoice->status = 'draft';
+                $invoice->status = 'failed';
                 $invoice->fbr_status = 'validation_failed';
                 $invoice->is_fbr_processing = false;
                 $invoice->save();
@@ -1638,7 +1646,7 @@ class InvoiceController extends Controller
             $executionMs = round((microtime(true) - $startTime) * 1000);
             Log::error("FBR Sync Submit: Invoice #{$invoice->id} exception: " . $e->getMessage());
 
-            $invoice->status = 'draft';
+            $invoice->status = 'failed';
             $invoice->fbr_status = 'failed';
             $invoice->is_fbr_processing = false;
             $invoice->save();
@@ -1761,7 +1769,7 @@ class InvoiceController extends Controller
             return ['status' => 'pending_verification', 'execution_ms' => $executionMs];
         }
 
-        $invoice->status = 'draft';
+        $invoice->status = 'failed';
         $invoice->fbr_status = 'failed';
         $invoice->is_fbr_processing = false;
         $invoice->save();

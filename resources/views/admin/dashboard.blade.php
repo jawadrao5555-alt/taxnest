@@ -129,6 +129,7 @@
                                     <td class="px-4 py-3">
                                         <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium
                                             @if($invoice->status === 'draft') bg-yellow-100 text-yellow-800
+                                            @elseif($invoice->status === 'failed') bg-red-100 text-red-800
                                             @elseif($invoice->status === 'locked') bg-green-100 text-green-800
                                             @elseif($invoice->status === 'pending_verification') bg-amber-100 text-amber-800
                                             @endif">{{ $invoice->status === 'pending_verification' ? 'Pending' : ucfirst($invoice->status) }}</span>

@@ -171,7 +171,7 @@ class SendInvoiceToFbrJob implements ShouldQueue
         $this->captureHsRejections($invoice, $response);
 
         if ($this->attempts() >= $this->tries) {
-            $invoice->status = 'draft';
+            $invoice->status = 'failed';
             $invoice->fbr_status = 'failed';
             $invoice->is_fbr_processing = false;
             $invoice->save();
@@ -201,7 +201,7 @@ class SendInvoiceToFbrJob implements ShouldQueue
     {
         $invoice = Invoice::with(['company', 'items'])->find($this->invoiceId);
         if ($invoice) {
-            $invoice->status = 'draft';
+            $invoice->status = 'failed';
             $invoice->fbr_status = 'failed';
             $invoice->is_fbr_processing = false;
             $invoice->save();

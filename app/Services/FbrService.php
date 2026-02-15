@@ -523,15 +523,10 @@ class FbrService
             $identifier = str_pad($cleanRegNo, 7, '0', STR_PAD_LEFT);
         }
 
-        $existingRef = $invoice->internal_invoice_number ?? '';
-        if (preg_match('/DI(\d{13})$/', $existingRef, $matches)) {
-            $timestamp = $matches[1];
-        } else {
-            $timestamp = (string)(int)(microtime(true) * 1000);
-            $timestamp = substr($timestamp, 0, 13);
-        }
+        $internalNumber = $invoice->internal_invoice_number ?? $invoice->invoice_number ?? (string) $invoice->id;
+        $cleanNumber = preg_replace('/[^A-Za-z0-9]/', '', $internalNumber);
 
-        return $identifier . 'DI' . $timestamp;
+        return $identifier . 'DI' . $cleanNumber;
     }
 
     private function formatNtnCnic(?string $value): string
@@ -736,38 +731,14 @@ class FbrService
                 throw new \Exception("FBR submission blocked: race condition guard triggered. Invoice #{$invoice->id}");
             }
 
-            $submissionHash = hash('sha256',
-                $invoice->id . '|' .
-                ($invoice->invoice_number ?? '') . '|' .
-                $invoice->company_id . '|' .
-                $invoice->total_amount . '|' .
-                now()->toIso8601String()
-            );
+            $invoiceRefNo = $this->resolveInvoiceRefNo($invoice);
+            $submissionHash = hash('sha256', $invoice->id . '|' . $invoiceRefNo);
 
-            try {
-                $invoice->fbr_submission_hash = $submissionHash;
-                $invoice->save();
-            } catch (\Illuminate\Database\QueryException $e) {
-                if (str_contains($e->getMessage(), 'unique') || str_contains($e->getMessage(), 'duplicate')) {
-                    \Log::critical("IDEMPOTENCY BLOCKED: Duplicate submission hash for Invoice #{$invoice->id}");
-                    throw new \Exception("FBR submission blocked: concurrent submission detected.");
-                }
-                throw $e;
-            }
+            $invoice->fbr_submission_hash = $submissionHash;
+            $invoice->save();
 
             $payload = $this->buildPayload($invoice);
             $company = $invoice->company;
-
-            $payloadHash = hash('sha256', json_encode($payload));
-            $duplicatePayload = FbrLog::where('request_payload_hash', $payloadHash)
-                ->where('status', 'success')
-                ->exists();
-            if ($duplicatePayload) {
-                $invoice->fbr_submission_hash = null;
-                $invoice->save();
-                \Log::critical("IDEMPOTENCY BLOCKED: Duplicate payload hash {$payloadHash} for Invoice #{$invoice->id}");
-                throw new \Exception("FBR submission blocked: duplicate payload detected.");
-            }
 
         $clearHashOnFailure = function () use ($invoice) {
             $invoice->fbr_submission_hash = null;
@@ -886,7 +857,6 @@ class FbrService
         $log = FbrLog::create([
             'invoice_id' => $invoice->id,
             'request_payload' => json_encode($payload),
-            'request_payload_hash' => $payloadHash,
             'status' => 'pending',
             'retry_count' => $retryCount,
         ]);

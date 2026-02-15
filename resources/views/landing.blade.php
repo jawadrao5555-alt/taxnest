@@ -57,7 +57,7 @@
                     TaxNest — Pakistan's Smart<br>FBR Compliance Platform
                 </h1>
                 <p class="text-xl text-emerald-100 mb-4 max-w-2xl mx-auto leading-relaxed">
-                    Validate Before You Submit. Smart invoicing with real-time compliance scoring, vendor risk detection, and seamless PRAL integration.
+                    Enterprise-grade FBR compliance with HS Intelligence, Risk Detection, Auto-Recovery, and real-time synchronous PRAL API v1.12 submission.
                 </p>
                 <p class="text-lg text-emerald-200 mb-10 font-semibold">
                     Plans starting at just Rs. 999/month
@@ -96,10 +96,10 @@
 
     <div class="bg-white border-b border-gray-100 py-6">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex flex-wrap items-center justify-center gap-8">
+            <div class="flex flex-wrap items-center justify-center gap-6 sm:gap-8">
                 <div class="flex items-center space-x-2 text-gray-500">
                     <svg class="w-6 h-6 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                    <span class="text-sm font-medium">FBR Approved</span>
+                    <span class="text-sm font-medium">FBR API v1.12</span>
                 </div>
                 <div class="flex items-center space-x-2 text-gray-500">
                     <svg class="w-6 h-6 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
@@ -110,12 +110,16 @@
                     <span class="text-sm font-medium">PRAL Integrated</span>
                 </div>
                 <div class="flex items-center space-x-2 text-gray-500">
-                    <svg class="w-6 h-6 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
-                    <span class="text-sm font-medium">Audit Compliant</span>
+                    <svg class="w-6 h-6 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    <span class="text-sm font-medium">Real-time Sync</span>
                 </div>
                 <div class="flex items-center space-x-2 text-gray-500">
-                    <svg class="w-6 h-6 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                    <span class="text-sm font-medium">Real-time Compliance</span>
+                    <svg class="w-6 h-6 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <span class="text-sm font-medium">Auto-Recovery</span>
+                </div>
+                <div class="flex items-center space-x-2 text-gray-500">
+                    <svg class="w-6 h-6 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                    <span class="text-sm font-medium">HS Intelligence</span>
                 </div>
             </div>
         </div>
@@ -134,40 +138,64 @@
                     <div class="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mb-5 group-hover:bg-emerald-200 transition">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">FBR Digital Integration</h3>
-                    <p class="text-gray-500 text-sm leading-relaxed">Direct PRAL API integration with real-time submission, QR code generation, and invoice locking for complete FBR compliance.</p>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">FBR API v1.12 Integration</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Direct PRAL API v1.12 with real-time synchronous submission, QR codes, invoice locking, and 3rd Schedule goods support.</p>
                 </div>
 
                 <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 hover:-translate-y-1 transition-all duration-300 rounded-2xl p-8 group">
                     <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-5 group-hover:bg-blue-200 transition">
-                        <svg class="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                        <svg class="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Compliance Score Engine</h3>
-                    <p class="text-gray-500 text-sm leading-relaxed">AI-powered hybrid scoring that validates tax rates, buyer NTN, banking rules, and structural compliance before submission.</p>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">HS Intelligence Engine</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">6-factor AI model learns from every submission. Auto-suggests HS codes, SRO numbers, and tax rates with confidence scoring.</p>
                 </div>
 
                 <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 hover:-translate-y-1 transition-all duration-300 rounded-2xl p-8 group">
                     <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-5 group-hover:bg-purple-200 transition">
-                        <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                        <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Multi-Branch Management</h3>
-                    <p class="text-gray-500 text-sm leading-relaxed">Manage multiple branches with branch-level invoicing, reporting, and analytics. Scale your operations seamlessly.</p>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Risk Intelligence Engine</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Pre-submission risk detection with anomaly scoring, compliance warnings, and automatic blocking of problematic invoices.</p>
                 </div>
 
                 <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 hover:-translate-y-1 transition-all duration-300 rounded-2xl p-8 group">
                     <div class="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-5 group-hover:bg-orange-200 transition">
-                        <svg class="w-6 h-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <svg class="w-6 h-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Customer Ledger</h3>
-                    <p class="text-gray-500 text-sm leading-relaxed">Track customer balances with auto-debit on invoice lock, manual payments, adjustments, and running balance per customer.</p>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Auto-Recovery System</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Enterprise-grade idempotency shield with automatic recovery for stuck invoices. No duplicate submissions, no data loss.</p>
                 </div>
 
                 <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 hover:-translate-y-1 transition-all duration-300 rounded-2xl p-8 group">
                     <div class="w-12 h-12 bg-rose-100 rounded-xl flex items-center justify-center mb-5 group-hover:bg-rose-200 transition">
-                        <svg class="w-6 h-6 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                        <svg class="w-6 h-6 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Enterprise Analytics</h3>
-                    <p class="text-gray-500 text-sm leading-relaxed">MIS reporting with monthly trends, HS concentration analysis, tax variance tracking, and executive compliance dashboards.</p>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">FBR Token Health Monitor</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Real-time FBR token status tracking, connectivity checks, expiry alerts, and automatic health diagnostics dashboard.</p>
+                </div>
+
+                <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 hover:-translate-y-1 transition-all duration-300 rounded-2xl p-8 group">
+                    <div class="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-5 group-hover:bg-indigo-200 transition">
+                        <svg class="w-6 h-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Compliance Score Engine</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Formula-based scoring validates tax rates, buyer NTN, banking rules, SRO compliance, and structural integrity before FBR submission.</p>
+                </div>
+
+                <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 hover:-translate-y-1 transition-all duration-300 rounded-2xl p-8 group">
+                    <div class="w-12 h-12 bg-cyan-100 rounded-xl flex items-center justify-center mb-5 group-hover:bg-cyan-200 transition">
+                        <svg class="w-6 h-6 text-cyan-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Multi-Company & Branch</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Full multi-tenant isolation with company approval workflow, multi-branch invoicing, and centralized admin oversight.</p>
+                </div>
+
+                <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 hover:-translate-y-1 transition-all duration-300 rounded-2xl p-8 group">
+                    <div class="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center mb-5 group-hover:bg-amber-200 transition">
+                        <svg class="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Customer Ledger System</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Automated debit entries on invoice lock, manual payment recording, credit adjustments, and running balance per customer.</p>
                 </div>
 
                 <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 hover:-translate-y-1 transition-all duration-300 rounded-2xl p-8 group">
@@ -175,7 +203,7 @@
                         <svg class="w-6 h-6 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Immutable Audit Logs</h3>
-                    <p class="text-gray-500 text-sm leading-relaxed">SHA-256 signed audit trail, integrity verification, compliance certificates, and tamper-proof activity tracking.</p>
+                    <p class="text-gray-500 text-sm leading-relaxed">SHA-256 signed audit trail with integrity verification, compliance certificates, and tamper-proof activity tracking.</p>
                 </div>
             </div>
         </div>
@@ -231,43 +259,43 @@
                     <div class="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mb-5">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Real-Time FBR Submission</h3>
-                    <p class="text-gray-500 text-sm leading-relaxed">Not just PDF generation. Direct PRAL API integration with live QR codes, invoice locking, and instant FBR response.</p>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Synchronous FBR Submission</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Real-time PRAL API v1.12 with instant response. No queue delays. Invoice locks immediately on success with live QR codes.</p>
                 </div>
                 <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:-translate-y-1 transition-all duration-300">
                     <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-5">
-                        <svg class="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                        <svg class="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">HS Intelligence Engine</h3>
-                    <p class="text-gray-500 text-sm leading-relaxed">6-factor AI model learns from every submission. Auto-suggests HS codes, SRO numbers, and tax rates with confidence scoring.</p>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Scoped Idempotency Shield</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">6-phase enterprise protection prevents duplicate FBR submissions. Per-invoice guards with SHA-256 submission hashing.</p>
                 </div>
                 <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:-translate-y-1 transition-all duration-300">
                     <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-5">
-                        <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                        <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Pre-Submission Validation</h3>
-                    <p class="text-gray-500 text-sm leading-relaxed">Compliance scoring catches errors before FBR sees them. Risk detection blocks problematic invoices automatically.</p>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Smart Auto-Recovery</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Stuck invoices auto-recover using FBR success logs. Failed invoices can be edited and resubmitted instantly.</p>
                 </div>
                 <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:-translate-y-1 transition-all duration-300">
                     <div class="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-5">
-                        <svg class="w-6 h-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                        <svg class="w-6 h-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Multi-Company & Branch</h3>
-                    <p class="text-gray-500 text-sm leading-relaxed">Enterprise-grade tenant isolation. Manage multiple companies and branches from a single admin dashboard.</p>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">6 Login Methods</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Login with Email, Phone, Username, CNIC, NTN, or FBR Registration number. Maximum flexibility for all user types.</p>
                 </div>
                 <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:-translate-y-1 transition-all duration-300">
                     <div class="w-12 h-12 bg-rose-100 rounded-xl flex items-center justify-center mb-5">
-                        <svg class="w-6 h-6 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                        <svg class="w-6 h-6 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Tamper-Proof Audit Trail</h3>
-                    <p class="text-gray-500 text-sm leading-relaxed">SHA-256 hashed audit logs with integrity verification. Every action tracked, timestamped, and immutable.</p>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Enterprise MIS Analytics</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Monthly trends, HS concentration, tax variance, compliance KPIs, and executive dashboards with real-time data.</p>
                 </div>
                 <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:-translate-y-1 transition-all duration-300">
                     <div class="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center mb-5">
                         <svg class="w-6 h-6 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Works Offline (PWA)</h3>
-                    <p class="text-gray-500 text-sm leading-relaxed">Install on any device. Create drafts offline, sync when connected. Keyboard shortcuts for power users.</p>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">PWA + Keyboard Shortcuts</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Install on any device. Offline drafts, Ctrl+S save, Ctrl+Enter submit, smart autofocus, and instant page transitions.</p>
                 </div>
             </div>
 
@@ -287,14 +315,19 @@
                         <tbody class="divide-y divide-gray-100">
                             @php
                             $comparisons = [
-                                ['Direct FBR/PRAL API', true, false],
-                                ['Real-time QR Codes', true, false],
-                                ['HS Code Intelligence', true, false],
-                                ['Compliance Scoring', true, false],
-                                ['Multi-Branch Support', true, 'partial'],
-                                ['Immutable Audit Logs', true, false],
-                                ['Offline PWA Support', true, false],
-                                ['Customer Ledger', true, 'partial'],
+                                ['Direct FBR/PRAL API v1.12', true, false],
+                                ['Synchronous FBR Submission', true, false],
+                                ['HS Intelligence Engine (AI)', true, false],
+                                ['Risk Detection & Compliance Scoring', true, false],
+                                ['Scoped Idempotency Shield', true, false],
+                                ['Auto-Recovery for Stuck Invoices', true, false],
+                                ['3rd Schedule Goods Support', true, false],
+                                ['6 Login Methods (Email/CNIC/NTN/FBR)', true, false],
+                                ['FBR Token Health Monitor', true, false],
+                                ['Multi-Branch + Company Isolation', true, 'partial'],
+                                ['Immutable SHA-256 Audit Logs', true, false],
+                                ['Customer Ledger System', true, 'partial'],
+                                ['PWA + Keyboard Shortcuts', true, false],
                                 ['Starts at Rs. 999/mo', true, false],
                             ];
                             @endphp
@@ -446,11 +479,14 @@
                                 ['Branches', '1', '3', 'Unlimited', 'Unlimited'],
                             ];
                             $checks = [
-                                ['FBR Integration', true, true, true, true],
+                                ['FBR API v1.12 Integration', true, true, true, true],
                                 ['PDF + QR Generation', true, true, true, true],
-                                ['Compliance Scoring', true, true, true, true],
-                                ['MIS Reports', false, true, true, true],
+                                ['Compliance & Risk Scoring', true, true, true, true],
+                                ['HS Intelligence Engine', true, true, true, true],
+                                ['Auto-Recovery System', true, true, true, true],
+                                ['MIS Reports & Analytics', false, true, true, true],
                                 ['Customer Ledger', false, true, true, true],
+                                ['FBR Token Health Monitor', false, false, true, true],
                                 ['Immutable Audit Logs', false, false, true, true],
                                 ['Priority Support', false, false, true, true],
                                 ['Dedicated Manager', false, false, false, true],
@@ -541,14 +577,14 @@
                         <span class="text-base font-semibold text-gray-900">What is TaxNest?</span>
                         <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 1 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 1" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">TaxNest is Pakistan's leading FBR-compliant tax and invoice management platform. It integrates directly with FBR's PRAL API for real-time invoice submission, compliance scoring, and QR code generation.</div>
+                    <div x-show="open === 1" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">TaxNest is Pakistan's enterprise-grade FBR compliance platform. It features direct PRAL API v1.12 integration with synchronous submission, HS Intelligence Engine with AI-powered code suggestions, Risk Detection, Auto-Recovery for stuck invoices, scoped idempotency protection, FBR Token Health Monitoring, and multi-company/branch management.</div>
                 </div>
                 <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 rounded-2xl overflow-hidden">
                     <button @click="open = open === 2 ? null : 2" class="w-full flex items-center justify-between p-6 text-left">
                         <span class="text-base font-semibold text-gray-900">Is TaxNest FBR approved?</span>
                         <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 2 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 2" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Yes, TaxNest integrates directly with FBR's PRAL API v1.12 for production invoice submission. All invoices are validated against FBR's compliance rules before submission.</div>
+                    <div x-show="open === 2" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Yes, TaxNest uses FBR's PRAL API v1.12 for synchronous production submission. Every invoice goes through compliance scoring, risk detection, and pre-submission validation. The system includes 3rd Schedule goods support, scoped idempotency protection, and auto-recovery for stuck submissions.</div>
                 </div>
                 <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 rounded-2xl overflow-hidden">
                     <button @click="open = open === 3 ? null : 3" class="w-full flex items-center justify-between p-6 text-left">
@@ -569,7 +605,7 @@
                         <span class="text-base font-semibold text-gray-900">Is my data secure?</span>
                         <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 5 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 5" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Absolutely. TaxNest uses SHA-256 encrypted audit logs, immutable transaction records, and encrypted FBR tokens. All data is stored securely with role-based access controls.</div>
+                    <div x-show="open === 5" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="px-6 pb-6 text-sm text-gray-600 leading-relaxed">Absolutely. TaxNest uses SHA-256 immutable audit logs, scoped idempotency shields to prevent duplicate submissions, encrypted FBR tokens with health monitoring, company-level tenant isolation, and role-based access controls. Login is supported via 6 methods including CNIC, NTN, and FBR Registration number.</div>
                 </div>
                 <div class="bg-white/70 backdrop-blur-xl border border-white/30 shadow-lg shadow-black/5 rounded-2xl overflow-hidden">
                     <button @click="open = open === 6 ? null : 6" class="w-full flex items-center justify-between p-6 text-left">

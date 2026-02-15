@@ -96,10 +96,7 @@ class FbrService
                 $rateNum = ($taxRate == intval($taxRate)) ? intval($taxRate) : round($taxRate, 2);
                 $rateValue = $rateNum . '%';
             }
-            $rateValue = trim($rateValue);
-            if (!str_ends_with($rateValue, '%')) {
-                $rateValue = $rateValue . '%';
-            }
+            $rateValue = rtrim(trim($rateValue), '%') . '%';
 
             $hsCode = $item->hs_code ?? "";
             $uomCode = $this->getUomByHsCode($hsCode, $item->default_uom ?? 'U');
@@ -699,54 +696,87 @@ class FbrService
 
     public function submitInvoice($invoice, int $retryCount = 0)
     {
-        if (!empty($invoice->fbr_invoice_number)) {
-            \Log::warning("BLOCKED: Invoice #{$invoice->id} already has FBR number {$invoice->fbr_invoice_number}. Duplicate submission prevented.");
-            return [
-                'status' => 'failed',
-                'failure_type' => 'duplicate_blocked',
-                'errors' => ["Invoice already registered with FBR (number: {$invoice->fbr_invoice_number}). Duplicate submission blocked."],
-                'response_time_ms' => 0,
-            ];
+        if (
+            $invoice->fbr_invoice_number ||
+            $invoice->status === 'locked' ||
+            $invoice->status === 'pending_verification' ||
+            $invoice->fbr_status === 'pending_verification' ||
+            FbrLog::where('invoice_id', $invoice->id)->where('status', 'success')->exists()
+        ) {
+            $reason = $invoice->fbr_invoice_number
+                ? "already has FBR number {$invoice->fbr_invoice_number}"
+                : ($invoice->status === 'locked' ? 'invoice is locked'
+                : ($invoice->status === 'pending_verification' || $invoice->fbr_status === 'pending_verification'
+                    ? 'pending FBR verification' : 'previous success in fbr_logs'));
+
+            \Log::critical("IDEMPOTENCY BLOCKED: Invoice #{$invoice->id} — {$reason}");
+            throw new \Exception("FBR submission blocked: {$reason}. Invoice #{$invoice->id}");
         }
 
-        if ($invoice->status === 'locked') {
-            \Log::warning("BLOCKED: Invoice #{$invoice->id} is locked. Submission prevented.");
-            return [
-                'status' => 'failed',
-                'failure_type' => 'duplicate_blocked',
-                'errors' => ['Invoice is already locked. Cannot resubmit.'],
-                'response_time_ms' => 0,
-            ];
+        if (!empty($invoice->fbr_submission_hash)) {
+            \Log::critical("IDEMPOTENCY BLOCKED: Invoice #{$invoice->id} — submission hash already set: {$invoice->fbr_submission_hash}");
+            throw new \Exception("FBR submission blocked: submission hash lock exists. Invoice #{$invoice->id}");
         }
 
-        if ($invoice->status === 'pending_verification' || $invoice->fbr_status === 'pending_verification') {
-            \Log::warning("BLOCKED: Invoice #{$invoice->id} is pending FBR verification. Submission prevented.");
-            return [
-                'status' => 'failed',
-                'failure_type' => 'pending_verification_blocked',
-                'errors' => ['Invoice is pending FBR verification. Check FBR portal before resubmitting.'],
-                'response_time_ms' => 0,
-            ];
-        }
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($invoice, $retryCount) {
+            $invoice = \App\Models\Invoice::where('id', $invoice->id)->lockForUpdate()->first();
 
-        $existingSuccess = FbrLog::where('invoice_id', $invoice->id)
-            ->where('status', 'success')
-            ->exists();
-        if ($existingSuccess) {
-            \Log::warning("BLOCKED: Invoice #{$invoice->id} has previous successful FBR submission in logs. Duplicate submission prevented.");
-            return [
-                'status' => 'failed',
-                'failure_type' => 'duplicate_blocked',
-                'errors' => ['Invoice has a previous successful FBR submission. Check FBR portal for existing invoice number.'],
-                'response_time_ms' => 0,
-            ];
-        }
+            if (!$invoice) {
+                throw new \Exception("FBR submission blocked: invoice not found during lock.");
+            }
 
-        $payload = $this->buildPayload($invoice);
-        $company = $invoice->company;
+            if (
+                $invoice->fbr_invoice_number ||
+                $invoice->status === 'locked' ||
+                $invoice->status === 'pending_verification' ||
+                $invoice->fbr_submission_hash ||
+                FbrLog::where('invoice_id', $invoice->id)->where('status', 'success')->exists()
+            ) {
+                \Log::critical("IDEMPOTENCY BLOCKED (inside transaction): Invoice #{$invoice->id}");
+                throw new \Exception("FBR submission blocked: race condition guard triggered. Invoice #{$invoice->id}");
+            }
+
+            $submissionHash = hash('sha256',
+                $invoice->id . '|' .
+                ($invoice->invoice_number ?? '') . '|' .
+                $invoice->company_id . '|' .
+                $invoice->total_amount . '|' .
+                now()->toIso8601String()
+            );
+
+            try {
+                $invoice->fbr_submission_hash = $submissionHash;
+                $invoice->save();
+            } catch (\Illuminate\Database\QueryException $e) {
+                if (str_contains($e->getMessage(), 'unique') || str_contains($e->getMessage(), 'duplicate')) {
+                    \Log::critical("IDEMPOTENCY BLOCKED: Duplicate submission hash for Invoice #{$invoice->id}");
+                    throw new \Exception("FBR submission blocked: concurrent submission detected.");
+                }
+                throw $e;
+            }
+
+            $payload = $this->buildPayload($invoice);
+            $company = $invoice->company;
+
+            $payloadHash = hash('sha256', json_encode($payload));
+            $duplicatePayload = FbrLog::where('request_payload_hash', $payloadHash)
+                ->where('status', 'success')
+                ->exists();
+            if ($duplicatePayload) {
+                $invoice->fbr_submission_hash = null;
+                $invoice->save();
+                \Log::critical("IDEMPOTENCY BLOCKED: Duplicate payload hash {$payloadHash} for Invoice #{$invoice->id}");
+                throw new \Exception("FBR submission blocked: duplicate payload detected.");
+            }
+
+        $clearHashOnFailure = function () use ($invoice) {
+            $invoice->fbr_submission_hash = null;
+            $invoice->save();
+        };
 
         $payloadErrors = ScheduleEngine::validateFbrPayload($payload);
         if (!empty($payloadErrors)) {
+            $clearHashOnFailure();
             $log = FbrLog::create([
                 'invoice_id' => $invoice->id,
                 'request_payload' => json_encode($payload),
@@ -789,6 +819,7 @@ class FbrService
             }
         }
         if (!empty($schemaErrors)) {
+            $clearHashOnFailure();
             $log = FbrLog::create([
                 'invoice_id' => $invoice->id,
                 'request_payload' => json_encode($payload),
@@ -833,6 +864,7 @@ class FbrService
         $url = $this->getPostUrl($company);
 
         if (empty($token)) {
+            $clearHashOnFailure();
             $log = FbrLog::create([
                 'invoice_id' => $invoice->id,
                 'request_payload' => json_encode($payload),
@@ -854,6 +886,7 @@ class FbrService
         $log = FbrLog::create([
             'invoice_id' => $invoice->id,
             'request_payload' => json_encode($payload),
+            'request_payload_hash' => $payloadHash,
             'status' => 'pending',
             'retry_count' => $retryCount,
         ]);
@@ -880,6 +913,7 @@ class FbrService
             $log->response_payload = $responseBody ?: '';
 
             if ($curlError) {
+                $clearHashOnFailure();
                 $log->status = 'failed';
                 $log->failure_type = 'connection_error';
                 $log->save();
@@ -904,6 +938,7 @@ class FbrService
             $responseData = $response->json();
 
             if (!$response->successful()) {
+                $clearHashOnFailure();
                 $failureType = $this->classifyFailure($response->status(), $response->body());
                 $log->status = 'failed';
                 $log->failure_type = $failureType;
@@ -943,6 +978,7 @@ class FbrService
                     ];
                 }
 
+                $clearHashOnFailure();
                 $log->status = 'failed';
                 $log->failure_type = 'invalid_response';
                 $log->save();
@@ -996,6 +1032,7 @@ class FbrService
                 ];
             }
 
+            $clearHashOnFailure();
             $log->status = 'failed';
             $log->failure_type = 'validation_error';
             $log->save();
@@ -1009,6 +1046,7 @@ class FbrService
             ];
 
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            $clearHashOnFailure();
             $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
             $log->status = 'failed';
             $log->failure_type = 'network_error';
@@ -1024,6 +1062,7 @@ class FbrService
             ];
 
         } catch (\Exception $e) {
+            $clearHashOnFailure();
             $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
             $log->status = 'failed';
             $log->failure_type = 'network_error';
@@ -1038,6 +1077,7 @@ class FbrService
                 "response_time_ms" => $responseTimeMs,
             ];
         }
+        });
     }
 
     private function parseFbrResponse(array $responseData): array

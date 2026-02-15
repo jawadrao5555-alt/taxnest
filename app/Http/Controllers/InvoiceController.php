@@ -858,7 +858,14 @@ class InvoiceController extends Controller
         $company = $invoice->company;
 
         $fbrService = new \App\Services\FbrService();
-        $response = $fbrService->submitInvoice($invoice, 0);
+        try {
+            $response = $fbrService->submitInvoice($invoice, 0);
+        } catch (\Exception $e) {
+            \Log::error("FBR Resubmit: Invoice #{$invoice->id} blocked: " . $e->getMessage());
+            $invoice->status = 'draft';
+            $invoice->save();
+            return redirect('/invoice/' . $invoice->id)->with('error', 'FBR submission blocked: ' . $e->getMessage());
+        }
 
         if ($response['status'] === 'success') {
             $fbrNum = $response['fbr_invoice_number'] ?? null;

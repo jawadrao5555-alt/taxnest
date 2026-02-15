@@ -17,6 +17,7 @@ class FbrLog extends Model
         'environment_used',
         'failure_category',
         'submission_latency_ms',
+        'request_payload_hash',
     ];
 
     public function invoice()

@@ -39,6 +39,7 @@ class Invoice extends Model
         'destination_province',
         'invoice_date',
         'submitted_at',
+        'fbr_submission_hash',
     ];
 
     protected $casts = [

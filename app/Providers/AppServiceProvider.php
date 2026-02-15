@@ -18,6 +18,14 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        if (app()->environment('production') && php_sapi_name() === 'cli') {
+            $command = $_SERVER['argv'][1] ?? '';
+            if (in_array($command, ['tinker'])) {
+                echo "CLI interactive shell disabled in production environment.\n";
+                exit(403);
+            }
+        }
+
         if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
             \Illuminate\Support\Facades\URL::forceScheme('https');
         } elseif (str_starts_with(config('app.url', ''), 'https://')) {

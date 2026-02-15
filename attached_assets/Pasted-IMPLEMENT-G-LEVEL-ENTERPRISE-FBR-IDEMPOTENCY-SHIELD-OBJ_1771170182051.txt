@@ -1,0 +1,101 @@
+IMPLEMENT G-LEVEL ENTERPRISE FBR IDEMPOTENCY SHIELD
+
+OBJECTIVE:
+Make FBR submission mathematically impossible to duplicate — even via Tinker, direct service call, queue race, or controller bypass.
+
+------------------------------------------
+PHASE 1 — DATABASE HARD LOCK
+------------------------------------------
+
+1) Add new column in invoices table:
+
+$table->string('fbr_submission_hash')->nullable()->unique();
+
+2) Generate submission hash BEFORE calling FBR:
+
+$fbrHash = hash('sha256', 
+    $invoice->invoiceRefNo .
+    $invoice->company_id .
+    $invoice->total_amount .
+    now()->toDateString()
+);
+
+3) Before submission:
+- If fbr_submission_hash already exists → BLOCK
+- If fbr_logs contains success for same invoiceRefNo → BLOCK
+
+4) Store hash immediately BEFORE FBR call inside DB::transaction() with lockForUpdate()
+
+------------------------------------------
+PHASE 2 — SERVICE LEVEL GLOBAL GUARD
+------------------------------------------
+
+Inside FbrService::submitInvoice():
+
+Add hard stop at top:
+
+if (
+    $invoice->fbr_invoice_number ||
+    $invoice->status === 'locked' ||
+    $invoice->status === 'pending_verification' ||
+    FbrLog::where('invoice_id', $invoice->id)
+          ->where('status', 'success')
+          ->exists()
+) {
+    throw new Exception('FBR submission blocked: already processed.');
+}
+
+------------------------------------------
+PHASE 3 — QUEUE ATOMICITY
+------------------------------------------
+
+Wrap entire submission inside:
+
+DB::transaction(function() use ($invoice) {
+    $invoice = Invoice::where('id', $invoice->id)
+        ->lockForUpdate()
+        ->first();
+});
+
+------------------------------------------
+PHASE 4 — RATE FORMAT ENFORCEMENT
+------------------------------------------
+
+Force rate always:
+
+$rate = rtrim($rate, '%') . '%';
+
+------------------------------------------
+PHASE 5 — TINKER BLOCK (Production Only)
+------------------------------------------
+
+Inside AppServiceProvider boot():
+
+if (app()->environment('production')) {
+    if (php_sapi_name() === 'cli') {
+        abort(403, 'CLI disabled in production');
+    }
+}
+
+------------------------------------------
+PHASE 6 — DUPLICATE PAYLOAD DETECTION
+------------------------------------------
+
+Before sending:
+
+$existing = FbrLog::where('request_payload_hash', hash('sha256', json_encode($payload)))
+    ->where('status', 'success')
+    ->exists();
+
+if ($existing) {
+    throw new Exception('Duplicate payload detected.');
+}
+
+------------------------------------------
+EXPECTED RESULT:
+✔ 0% duplicate risk
+✔ 0% race condition
+✔ 0% accidental double production
+✔ Even developer-level manual attempt blocked
+
+END IMPLEMENTATION

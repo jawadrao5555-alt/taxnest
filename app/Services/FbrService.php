@@ -62,7 +62,9 @@ class FbrService
                     $mrpPerUnit = $unitPrice;
                 }
                 $retailPrice = round($mrpPerUnit, 2);
-                $salesTaxApplicable = round(($valueSalesExcludingST * $taxRate) / 100, 2);
+                $unitTax = round(($retailPrice * $taxRate) / 100, 2);
+                $salesTaxApplicable = round($unitTax * $quantity, 2);
+                $valueSalesExcludingST = round($retailPrice * $quantity, 2);
             } elseif ($isExempt) {
                 $retailPrice = round($unitPrice, 2);
                 $salesTaxApplicable = 0.00;
@@ -90,9 +92,9 @@ class FbrService
             $totalValues = round($valueSalesExcludingST + $salesTaxApplicable + floatval($extraTaxVal) + $furtherTax + $fedPayable - $discount, 2);
 
             if ($isExempt) {
-                $rateStr = "Exempt";
+                $rateValue = 0;
             } else {
-                $rateStr = ($taxRate == intval($taxRate)) ? intval($taxRate) . "%" : number_format($taxRate, 1) . "%";
+                $rateValue = ($taxRate == intval($taxRate)) ? intval($taxRate) : round($taxRate, 2);
             }
 
             $hsCode = $item->hs_code ?? "";
@@ -100,7 +102,7 @@ class FbrService
 
             $itemPayload = [
                 "uoM" => $uomCode,
-                "rate" => $rateStr,
+                "rate" => $rateValue,
                 "hsCode" => $hsCode,
                 "discount" => (float) round($discount, 2),
                 "extraTax" => (float) round(floatval($extraTaxVal), 2),

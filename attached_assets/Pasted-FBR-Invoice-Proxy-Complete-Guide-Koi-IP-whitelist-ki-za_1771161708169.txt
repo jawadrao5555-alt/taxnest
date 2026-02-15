@@ -1,0 +1,141 @@
+FBR Invoice Proxy - Complete Guide
+Koi IP whitelist ki zaroorat NAHI. Proxy sab handle karega.
+
+URL:
+
+POST https://nestpay.replit.app/api/fbr-proxy/submit
+Header:
+
+Content-Type: application/json
+REQUEST BODY:
+
+{
+  "token": "APKA_FBR_BEARER_TOKEN",
+  "action": "submit",
+  "payload": {
+    "items": [
+      {
+        "uoM": "KG",
+        "rate": "5%",
+        "hsCode": "3105.3000",
+        "discount": 0.0,
+        "extraTax": 0.0,
+        "quantity": 3,
+        "saleType": "3rd Schedule Goods",
+        "fedPayable": 0.0,
+        "furtherTax": 0.0,
+        "totalValues": 819.66,
+        "productDescription": "Dap",
+        "salesTaxApplicable": 39.03,
+        "valueSalesExcludingST": 780.63,
+        "salesTaxWithheldAtSource": 0.0,
+        "fixedNotifiedValueOrRetailPrice": 260.21,
+        "sroScheduleNo": "3rd Schedule goods",
+        "sroItemSerialNo": "51"
+      }
+    ],
+    "invoiceDate": "2026-02-14",
+    "invoiceType": "Sale Invoice",
+    "documentTypeId": 1,
+    "buyerAddress": "lodhran",
+    "invoiceRefNo": "UNIQUE-REF-NUMBER",
+    "buyerProvince": "Punjab",
+    "sellerAddress": "YOUR SELLER ADDRESS",
+    "sellerNTNCNIC": "YOUR_NTN_OR_CNIC",
+    "sellerProvince": "Punjab",
+    "buyerBusinessName": "BUYER NAME",
+    "sellerBusinessName": "YOUR BUSINESS NAME",
+    "buyerRegistrationType": "Unregistered",
+    "buyerNTNCNIC": ""
+  }
+}
+PHP CODE:
+
+<?php
+$proxyUrl = "https://nestpay.replit.app/api/fbr-proxy/submit";
+$data = [
+    'token'   => 'FBR_TOKEN_YAHAN',
+    'action'  => 'submit',
+    'payload' => [
+        'items' => [
+            [
+                'uoM' => 'KG',
+                'rate' => '5%',
+                'hsCode' => '3105.3000',
+                'discount' => 0.0,
+                'extraTax' => 0.0,
+                'quantity' => 3,
+                'saleType' => '3rd Schedule Goods',
+                'fedPayable' => 0.0,
+                'furtherTax' => 0.0,
+                'totalValues' => 819.66,
+                'productDescription' => 'Dap',
+                'salesTaxApplicable' => 39.03,
+                'valueSalesExcludingST' => 780.63,
+                'salesTaxWithheldAtSource' => 0.0,
+                'fixedNotifiedValueOrRetailPrice' => 260.21,
+                'sroScheduleNo' => '3rd Schedule goods',
+                'sroItemSerialNo' => '51'
+            ]
+        ],
+        'invoiceDate' => date('Y-m-d'),
+        'invoiceType' => 'Sale Invoice',
+        'documentTypeId' => 1,
+        'buyerAddress' => 'lodhran',
+        'invoiceRefNo' => uniqid('INV-'),
+        'buyerProvince' => 'Punjab',
+        'sellerAddress' => 'YOUR ADDRESS',
+        'sellerNTNCNIC' => 'YOUR_NTN',
+        'sellerProvince' => 'Punjab',
+        'buyerBusinessName' => 'BUYER NAME',
+        'sellerBusinessName' => 'YOUR BUSINESS',
+        'buyerRegistrationType' => 'Unregistered',
+        'buyerNTNCNIC' => ''
+    ]
+];
+$ch = curl_init($proxyUrl);
+curl_setopt_array($ch, [
+    CURLOPT_POST           => true,
+    CURLOPT_POSTFIELDS     => json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION),
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_TIMEOUT        => 30,
+    CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+]);
+$response = curl_exec($ch);
+$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+curl_close($ch);
+$result = json_decode($response, true);
+if ($result['success']) {
+    echo "FBR Invoice: " . $result['invoice_number'];
+    // Save to your database
+} else {
+    echo "Error: " . $result['error'];
+}
+SUCCESS RESPONSE:
+
+{
+  "success": true,
+  "invoice_number": "3620291786117DIACXXXXX",
+  "fbr_response": {
+    "invoiceNumber": "3620291786117DIACXXXXX",
+    "validationResponse": {
+      "statusCode": "00",
+      "status": "Valid"
+    }
+  }
+}
+ERROR RESPONSE:
+
+{
+  "success": false,
+  "error": "error detail"
+}
+IMPORTANT NOTES:
+
+token = FBR IRIS Bearer Token (apka khud ka)
+invoiceRefNo = Har invoice ka UNIQUE hona chahiye
+saleType = "3rd Schedule Goods" (capital G)
+sroScheduleNo = "3rd Schedule goods" (small g)
+IP whitelist ki zaroorat NAHI — proxy handle karega
+FBR sandbox token use karein testing ke liye
+Yeh copy karke developer ko WhatsApp/email pe bhej dein — sab kuch ready hai

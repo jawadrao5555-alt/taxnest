@@ -7,16 +7,12 @@ expertMode = true
 [userenv.shared]
 APP_URL = "https://deeb2ffc-615d-44ed-a0cd-b1cde9f84756-00-24lu1hpq4f5ka.worf.replit.dev"
 DB_CONNECTION = "pgsql"
-DB_PORT = "5432"
-DB_PASSWORD = ""
-DB_HOST = "127.0.0.1"
-DB_USERNAME = "root"
-DB_DATABASE = "laravel"
 SESSION_SECURE_COOKIE = "true"
 SESSION_SAME_SITE = "none"
 SESSION_DOMAIN = ""
 SESSION_PARTITIONED_COOKIE = "true"
 FBR_PROXY_URL = "https://nestpay.replit.app/api/fbr-proxy/submit"
+ASSET_URL = "/"
 
 [userenv.production]
 APP_KEY = "base64:41WY2e9C1jMkW21wJQsxMC1NUk5mge9Rn7sx5oNo4x0="
@@ -70,6 +66,6 @@ externalPort = 80
 channel = "stable-25_05"
 
 [deployment]
-deploymentTarget = "autoscale"
+deploymentTarget = "vm"
 run = ["php", "artisan", "serve", "--host=0.0.0.0", "--port=5000"]
 publicDir = "dist/public"

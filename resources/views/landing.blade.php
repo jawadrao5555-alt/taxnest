@@ -668,8 +668,8 @@
             <form method="POST" action="/login">
                 @csrf
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Email / Phone / Username</label>
-                    <input type="text" name="login" required autofocus placeholder="Enter email, phone or username"
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email / Phone / Username / CNIC / NTN / FBR Reg</label>
+                    <input type="text" name="login" required autofocus placeholder="Enter email, phone, username, CNIC, NTN or FBR Reg"
                         class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                     @if($errors->has('login'))
                         <p class="text-red-500 text-xs mt-1">{{ $errors->first('login') }}</p>

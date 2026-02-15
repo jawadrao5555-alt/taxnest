@@ -15,8 +15,8 @@
         @csrf
 
         <div>
-            <x-input-label for="login" value="Email / Phone / Username" />
-            <x-text-input id="login" class="block mt-1 w-full" type="text" name="login" :value="old('login')" required autofocus autocomplete="username" placeholder="Enter email, phone or username" />
+            <x-input-label for="login" value="Email / Phone / Username / CNIC / NTN / FBR Reg" />
+            <x-text-input id="login" class="block mt-1 w-full" type="text" name="login" :value="old('login')" required autofocus autocomplete="username" placeholder="Enter email, phone, username, CNIC, NTN or FBR Reg" />
             <x-input-error :messages="$errors->get('login')" class="mt-2" />
         </div>
 

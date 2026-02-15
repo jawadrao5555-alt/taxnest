@@ -274,11 +274,30 @@
             });
         </script>
 
-        <div x-data="{ toasts: [], init() {
-            @if(session('success')) this.addToast({!! json_encode(session('success')) !!}, 'success'); @endif
-            @if(session('error')) this.addToast({!! json_encode(session('error')) !!}, 'error'); @endif
-            @if(session('warning')) this.addToast({!! json_encode(session('warning')) !!}, 'warning'); @endif
-        }, addToast(msg, type) { let id = Date.now(); this.toasts.push({id, msg, type}); setTimeout(() => this.toasts = this.toasts.filter(t => t.id !== id), 5000); } }" class="fixed top-4 right-4 z-50 space-y-2" style="pointer-events: none;">
+        <script>
+            document.addEventListener('alpine:init', () => {
+                Alpine.data('toastManager', () => ({
+                    toasts: [],
+                    init() {
+                        const el = this.$el;
+                        const msgs = JSON.parse(el.dataset.messages || '[]');
+                        msgs.forEach(m => this.addToast(m.msg, m.type));
+                    },
+                    addToast(msg, type) {
+                        let id = Date.now() + Math.random();
+                        this.toasts.push({id, msg, type});
+                        setTimeout(() => this.toasts = this.toasts.filter(t => t.id !== id), 5000);
+                    }
+                }));
+            });
+        </script>
+        @php
+            $toastMessages = [];
+            if(session('success')) $toastMessages[] = ['msg' => session('success'), 'type' => 'success'];
+            if(session('error')) $toastMessages[] = ['msg' => session('error'), 'type' => 'error'];
+            if(session('warning')) $toastMessages[] = ['msg' => session('warning'), 'type' => 'warning'];
+        @endphp
+        <div x-data="toastManager" data-messages="{{ json_encode($toastMessages) }}" class="fixed top-4 right-4 z-50 space-y-2" style="pointer-events: none;">
             <template x-for="toast in toasts" :key="toast.id">
                 <div x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform translate-x-8" x-transition:enter-end="opacity-100 transform translate-x-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0 transform translate-x-8"
                     class="px-4 py-3 rounded-xl shadow-lg border text-sm font-medium max-w-sm" style="pointer-events: auto;"

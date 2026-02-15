@@ -92,9 +92,14 @@ class FbrService
             $totalValues = round($valueSalesExcludingST + $salesTaxApplicable + floatval($extraTaxVal) + $furtherTax + $fedPayable - $discount, 2);
 
             if ($isExempt) {
-                $rateValue = 0;
+                $rateValue = "0%";
             } else {
-                $rateValue = ($taxRate == intval($taxRate)) ? intval($taxRate) : round($taxRate, 2);
+                $rateNum = ($taxRate == intval($taxRate)) ? intval($taxRate) : round($taxRate, 2);
+                $rateValue = $rateNum . '%';
+            }
+            $rateValue = trim($rateValue);
+            if (!str_ends_with($rateValue, '%')) {
+                $rateValue = $rateValue . '%';
             }
 
             $hsCode = $item->hs_code ?? "";
@@ -758,6 +763,48 @@ class FbrService
                 'status' => 'failed',
                 'failure_type' => 'payload_error',
                 'errors' => $payloadErrors,
+                'response_time_ms' => 0,
+            ];
+        }
+
+        $schemaErrors = [];
+        foreach ($payload['items'] as $idx => $pItem) {
+            $itemNum = $idx + 1;
+            if (!is_string($pItem['rate'] ?? null) || !str_ends_with($pItem['rate'], '%')) {
+                $schemaErrors[] = "Item {$itemNum}: rate must be string ending with '%', got: " . json_encode($pItem['rate'] ?? null);
+            }
+            if (!is_numeric($pItem['quantity'] ?? null)) {
+                $schemaErrors[] = "Item {$itemNum}: quantity must be numeric";
+            }
+            if (!is_numeric($pItem['fixedNotifiedValueOrRetailPrice'] ?? null)) {
+                $schemaErrors[] = "Item {$itemNum}: fixedNotifiedValueOrRetailPrice must be numeric";
+            }
+            if (!is_numeric($pItem['salesTaxApplicable'] ?? null)) {
+                $schemaErrors[] = "Item {$itemNum}: salesTaxApplicable must be numeric";
+            }
+            if (!is_numeric($pItem['valueSalesExcludingST'] ?? null)) {
+                $schemaErrors[] = "Item {$itemNum}: valueSalesExcludingST must be numeric";
+            }
+            if (!is_numeric($pItem['totalValues'] ?? null)) {
+                $schemaErrors[] = "Item {$itemNum}: totalValues must be numeric";
+            }
+        }
+        if (!empty($schemaErrors)) {
+            $log = FbrLog::create([
+                'invoice_id' => $invoice->id,
+                'request_payload' => json_encode($payload),
+                'status' => 'failed',
+                'response_payload' => json_encode(['schema_errors' => $schemaErrors]),
+                'response_time_ms' => 0,
+                'retry_count' => $retryCount,
+            ]);
+            $log->failure_type = 'schema_error';
+            $log->save();
+
+            return [
+                'status' => 'failed',
+                'failure_type' => 'schema_error',
+                'errors' => $schemaErrors,
                 'response_time_ms' => 0,
             ];
         }

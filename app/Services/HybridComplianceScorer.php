@@ -44,6 +44,65 @@ class HybridComplianceScorer
         ];
     }
 
+    public static function postFbrValidation(Invoice $invoice): void
+    {
+        if ($invoice->status !== 'locked' || $invoice->fbr_status !== 'production' || empty($invoice->fbr_invoice_number)) {
+            return;
+        }
+
+        $report = ComplianceReport::where('invoice_id', $invoice->id)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if (!$report) {
+            $report = ComplianceReport::create([
+                'company_id' => $invoice->company_id,
+                'invoice_id' => $invoice->id,
+                'rule_flags' => [],
+                'anomaly_flags' => [],
+                'final_score' => 100,
+                'risk_level' => 'LOW',
+                'is_fbr_validated' => true,
+                'pre_validation_flags' => [],
+            ]);
+            return;
+        }
+
+        $originalFlags = $report->rule_flags ?? [];
+
+        $clearedFlags = [
+            'RATE_MISMATCH' => false,
+            'BUYER_RISK' => false,
+            'BANKING_RISK' => $originalFlags['BANKING_RISK'] ?? false,
+            'STRUCTURE_ERROR' => false,
+        ];
+
+        $clearedDeductions = [];
+        if ($clearedFlags['BANKING_RISK']) {
+            $clearedDeductions['BANKING_RISK'] = 25;
+        }
+        $totalDeduction = array_sum($clearedDeductions);
+
+        $anomalyWeight = 0;
+        if (is_array($report->anomaly_flags)) {
+            $anomalyWeight = $report->anomaly_flags['risk_weight'] ?? 0;
+        }
+
+        $stabilityBonus = self::calculateStabilityBonus($invoice->company_id);
+        $newScore = 100 - $totalDeduction - $anomalyWeight + $stabilityBonus;
+        $newScore = (int) round(min(100, max(0, $newScore)));
+
+        $report->update([
+            'pre_validation_flags' => $originalFlags,
+            'rule_flags' => $clearedFlags,
+            'final_score' => $newScore,
+            'risk_level' => self::classifyRisk($newScore),
+            'is_fbr_validated' => true,
+        ]);
+
+        Company::where('id', $invoice->company_id)->update(['compliance_score' => $newScore]);
+    }
+
     public static function scoreForCompany(int $companyId): array
     {
         $latestInvoice = Invoice::where('company_id', $companyId)

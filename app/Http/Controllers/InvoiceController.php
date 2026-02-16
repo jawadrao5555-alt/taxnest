@@ -316,6 +316,16 @@ class InvoiceController extends Controller
             ->orderBy('created_at', 'desc')
             ->first();
 
+        if ($complianceReport
+            && !$complianceReport->is_fbr_validated
+            && $invoice->status === 'locked'
+            && $invoice->fbr_status === 'production'
+            && !empty($invoice->fbr_invoice_number)
+        ) {
+            HybridComplianceScorer::postFbrValidation($invoice);
+            $complianceReport->refresh();
+        }
+
         $riskAnalysis = null;
         if ($invoice->status === 'draft') {
             $riskAnalysis = RiskIntelligenceEngine::analyzeInvoice($invoice);
@@ -1738,6 +1748,8 @@ class InvoiceController extends Controller
                         'mode' => 'sync',
                     ]);
 
+                    HybridComplianceScorer::postFbrValidation($invoice);
+
                     return ['status' => 'success', 'fbr_invoice_number' => $fbrNum, 'execution_ms' => $executionMs, 'auto_recovered' => true];
                 }
             }
@@ -1846,6 +1858,7 @@ class InvoiceController extends Controller
             $company->update(['last_successful_submission' => now()]);
             HsUsagePatternService::recordSuccess($invoice);
             ComplianceScoreService::recalculate($invoice->company_id);
+            HybridComplianceScorer::postFbrValidation($invoice);
 
             return ['status' => 'success', 'fbr_invoice_number' => $fbrNum, 'execution_ms' => $executionMs];
         }

@@ -13,11 +13,15 @@ class ComplianceReport extends Model
         'anomaly_flags',
         'final_score',
         'risk_level',
+        'is_fbr_validated',
+        'pre_validation_flags',
     ];
 
     protected $casts = [
         'rule_flags' => 'array',
         'anomaly_flags' => 'array',
+        'is_fbr_validated' => 'boolean',
+        'pre_validation_flags' => 'array',
     ];
 
     public function company()

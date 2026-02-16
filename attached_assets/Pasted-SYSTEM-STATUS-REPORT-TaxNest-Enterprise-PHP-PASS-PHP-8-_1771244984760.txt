@@ -1,0 +1,71 @@
+SYSTEM STATUS REPORT — TaxNest Enterprise
+PHP: PASS
+PHP 8.4.16 running
+No syntax errors, no fatal exceptions
+Server response times: 0.06ms - 1s (healthy)
+Laravel Config: PASS
+Laravel Framework 12.51.0
+Config cache: clear and working
+Routes: all registered and accessible
+Vite manifest: present, CSS + JS compiled
+Database: PASS
+PostgreSQL: connected and accessible
+39 migrations: all ran successfully
+Data: 18 invoices, 7 companies, 10 users
+All required columns present: fbr_submission_hash, is_fbr_processing, wht_locked
+audit_logs and compliance_reports tables: exist
+Queue: PASS
+Queue driver: database (configured)
+Queue worker: RUNNING
+Pending jobs: 0
+Delayed jobs: 0
+Stuck processing invoices: 0
+3 historical failed jobs (old — Feb 12, all pre-existing: 1 max-attempts exceeded, 2 null customer_ntn violations — not related to current work)
+FBR Connectivity: CONDITIONAL PASS
+FBR Environment: sandbox (configured)
+FBR Token: NOT SET (requires client's real FBR credentials)
+FBR POS ID: NOT SET (same — client must provide)
+FBR submission logic: fully coded and tested (sync submission, payload builder, pre-validation all in place)
+Prior successful FBR submission exists in logs (Invoice #19, statusCode: "00", status: "Valid")
+Verdict: Code is production-ready. FBR will work once company credentials are entered.
+Idempotency Shield: PASS
+fbr_submission_hash column: exists
+is_fbr_processing column: exists
+6-phase scoped idempotency: implemented
+(1) Duplicate checks scoped to invoice_id only
+(2) Guards check: locked, pending_verification, fbr_invoice_number, fbr_logs
+(3) DB::transaction + lockForUpdate() for atomic submission
+(4) SHA256(invoice_id + invoiceRefNo) hash per invoice
+(5) Deterministic invoiceRefNo: CompanyNTN + "DI" + internal_invoice_number
+(6) No global payload hash blocking
+0 stuck processing invoices currently
+Assets: PASS
+app-D7B153kf.css: 94KB compiled
+app-mwSMhNeL.js: 83KB compiled
+Vite manifest: valid JSON, correctly mapped
+Assets serving: confirmed via server logs (200 responses)
+Security: PASS
+ForceHttps middleware: registered (prepended)
+CompanyIsolation middleware: registered
+RoleMiddleware: registered
+company_id isolation checks: 22 instances in InvoiceController
+Session driver: file-based
+No exposed secrets in code or logs
+APP_DEBUG: true (development) — must set to false for production deployment
+Multi-Tenant Isolation: PASS
+CompanyIsolation middleware active on all protected routes
+app('currentCompanyId') check in every controller method (22 verified checks)
+abort(403) on company_id mismatch
+CNIC/NTN login scoped to company_admin of matching company
+Crash Risk: LOW (PASS)
+One minor console warning: Alpine.js toastManager race condition on login page — cosmetic only, does not affect functionality on authenticated pages
+No PHP fatal errors in logs
+No unhandled exceptions in current session
+0 stuck invoices, 0 pending jobs
+Server uptime: stable, consistent response times
+FINAL VERDICT: SAFE TO PUBLISH
+Pre-deployment checklist (must do before publish):
+
+Set APP_DEBUG=false for production
+Enter FBR Token + POS ID in company settings for live FBR submissions
+Optional: clear 3 old failed jobs from Feb 12 (php artisan queue:flush)

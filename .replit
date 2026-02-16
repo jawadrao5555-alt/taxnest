@@ -13,6 +13,9 @@ SESSION_DOMAIN = ""
 SESSION_PARTITIONED_COOKIE = "true"
 FBR_PROXY_URL = "https://nestpay.replit.app/api/fbr-proxy/submit"
 ASSET_URL = "/"
+SESSION_DRIVER = "file"
+CACHE_STORE = "file"
+QUEUE_CONNECTION = "sync"
 
 [userenv.production]
 APP_KEY = "base64:41WY2e9C1jMkW21wJQsxMC1NUk5mge9Rn7sx5oNo4x0="
@@ -70,6 +73,7 @@ externalPort = 80
 channel = "stable-25_05"
 
 [deployment]
-deploymentTarget = "cloudrun"
+deploymentTarget = "autoscale"
 run = ["php", "artisan", "serve", "--host=0.0.0.0", "--port=5000"]
 publicDir = "dist/public"
+build = ["bash", "-c", "php artisan config:cache && php artisan route:cache && php artisan view:cache"]

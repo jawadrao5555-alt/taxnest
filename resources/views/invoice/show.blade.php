@@ -17,7 +17,7 @@
                     <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Invoice {{ $invoice->display_invoice_number }}</h2>
                 </div>
             </div>
-            <div class="flex items-center flex-wrap gap-2">
+            <div class="flex items-center flex-wrap gap-2" id="actionButtonsBlock">
                 @if($invoice->status === 'draft')
                 {{-- DRAFT: Edit, Verify Integrity, Submit to FBR, Duplicate, Delete, WHT --}}
                 <a href="/invoice/{{ $invoice->id }}/edit" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">Edit</a>
@@ -372,8 +372,8 @@
                             <p class="text-xs text-gray-400">{{ $invoice->company->email }}</p>
                             @endif
                         </div>
-                        <div class="text-right">
-                            <span class="inline-flex px-3 py-1 rounded-full text-sm font-bold
+                        <div class="text-right" id="statusBadgeBlock">
+                            <span id="invoiceStatusBadge" class="inline-flex px-3 py-1 rounded-full text-sm font-bold transition-all duration-200
                                 @if($invoice->status === 'draft') bg-gray-200 text-gray-700
                                 @elseif($invoice->status === 'failed') bg-red-100 text-red-800
                                 @elseif($invoice->status === 'locked') bg-green-100 text-green-800
@@ -381,16 +381,15 @@
                                 @endif">
                                 {{ $invoice->status === 'pending_verification' ? 'Pending Verification' : ucfirst($invoice->status) }}
                             </span>
-                            @if($invoice->fbr_status)
-                            <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ml-2
+                            <span id="fbrStatusBadge" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ml-2 transition-all duration-200
+                                @if(!$invoice->fbr_status) hidden @endif
                                 @if($invoice->fbr_status === 'production') bg-emerald-100 text-emerald-800
                                 @elseif($invoice->fbr_status === 'validated') bg-emerald-100 text-emerald-800
                                 @elseif($invoice->fbr_status === 'failed' || $invoice->fbr_status === 'validation_failed') bg-red-100 text-red-800
                                 @elseif($invoice->fbr_status === 'sandbox') bg-amber-100 text-amber-800
                                 @else bg-gray-100 text-gray-800 @endif">
-                                FBR: {{ $invoice->fbr_status === 'production' ? 'Production' : ($invoice->fbr_status === 'validation_failed' ? 'Validation Failed' : ucfirst($invoice->fbr_status)) }}
+                                FBR: {{ $invoice->fbr_status === 'production' ? 'Production' : ($invoice->fbr_status === 'validation_failed' ? 'Validation Failed' : ucfirst($invoice->fbr_status ?? '')) }}
                             </span>
-                            @endif
                             @if($invoice->status === 'locked' && $invoice->integrity_hash)
                             <p class="text-xs text-green-600 mt-1">SHA256 Protected</p>
                             @endif
@@ -871,6 +870,7 @@
 
 <script>
 let _fbrPdfUrl = '';
+let _lastFbrNumber = '';
 
 function fbrSubmitEngine() {
     return {
@@ -974,7 +974,8 @@ function handleFbrResponse(data) {
 
 function openFbrSuccessModal(data) {
     _fbrPdfUrl = data.pdf_url || '';
-    document.getElementById('modalFbrNumber').textContent = 'FBR #: ' + (data.fbr_invoice_number || '');
+    _lastFbrNumber = data.fbr_invoice_number || '';
+    document.getElementById('modalFbrNumber').textContent = 'FBR #: ' + _lastFbrNumber;
     document.getElementById('modalTimestamp').textContent = 'Submitted: ' + new Date().toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' });
     document.getElementById('modalPdfIframe').src = _fbrPdfUrl + '?preview=1';
     const modal = document.getElementById('fbrSuccessModal');
@@ -991,8 +992,113 @@ function closeFbrSuccessModal() {
         modal.style.display = 'none';
         document.body.style.overflow = '';
         document.getElementById('modalPdfIframe').src = '';
+        smartRefreshInvoiceStatus();
+    }, 250);
+}
+
+async function smartRefreshInvoiceStatus() {
+    try {
+        const res = await fetch('/invoice/{{ $invoice->id }}/status-json', {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        if (!res.ok) throw new Error('Status fetch failed');
+        const data = await res.json();
+        patchStatusBadge(data.status, data.fbr_status);
+        patchActionButtons(data.status, data.fbr_status, data.fbr_invoice_number, data.share_uuid, data.display_invoice_number);
+        showSuccessToast(data.fbr_invoice_number);
+    } catch (e) {
         window.location.reload();
-    }, 300);
+    }
+}
+
+function patchStatusBadge(status, fbrStatus) {
+    const badge = document.getElementById('invoiceStatusBadge');
+    const fbrBadge = document.getElementById('fbrStatusBadge');
+    if (badge) {
+        badge.className = 'inline-flex px-3 py-1 rounded-full text-sm font-bold transition-all duration-200';
+        const statusMap = { draft: 'bg-gray-200 text-gray-700', failed: 'bg-red-100 text-red-800', locked: 'bg-green-100 text-green-800', pending_verification: 'bg-amber-100 text-amber-800' };
+        badge.classList.add(...(statusMap[status] || 'bg-gray-200 text-gray-700').split(' '));
+        badge.textContent = status === 'pending_verification' ? 'Pending Verification' : status.charAt(0).toUpperCase() + status.slice(1);
+        badge.style.opacity = '0';
+        requestAnimationFrame(() => { badge.style.transition = 'opacity 200ms ease'; badge.style.opacity = '1'; });
+    }
+    if (fbrBadge) {
+        if (fbrStatus) {
+            fbrBadge.classList.remove('hidden');
+            fbrBadge.className = 'inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ml-2 transition-all duration-200';
+            const fbrMap = { production: 'bg-emerald-100 text-emerald-800', validated: 'bg-emerald-100 text-emerald-800', failed: 'bg-red-100 text-red-800', validation_failed: 'bg-red-100 text-red-800', sandbox: 'bg-amber-100 text-amber-800' };
+            fbrBadge.classList.add(...(fbrMap[fbrStatus] || 'bg-gray-100 text-gray-800').split(' '));
+            const fbrLabel = fbrStatus === 'production' ? 'Production' : fbrStatus === 'validation_failed' ? 'Validation Failed' : fbrStatus.charAt(0).toUpperCase() + fbrStatus.slice(1);
+            fbrBadge.textContent = 'FBR: ' + fbrLabel;
+            fbrBadge.style.opacity = '0';
+            requestAnimationFrame(() => { fbrBadge.style.transition = 'opacity 200ms ease'; fbrBadge.style.opacity = '1'; });
+        } else {
+            fbrBadge.classList.add('hidden');
+            fbrBadge.textContent = '';
+        }
+    }
+}
+
+function patchActionButtons(status, fbrStatus, fbrInvoiceNumber, shareUuid, displayNumber) {
+    const block = document.getElementById('actionButtonsBlock');
+    if (!block) return;
+    if (status === 'locked' && fbrStatus === 'production') {
+        block.style.opacity = '0';
+        let whatsappBtn = '';
+        if (shareUuid) {
+            const shareUrl = window.location.origin + '/share/invoice/' + shareUuid;
+            const waText = encodeURIComponent('Invoice ' + (displayNumber || '') + ': ' + shareUrl);
+            whatsappBtn = `<a href="https://wa.me/?text=${waText}" target="_blank" class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition">WhatsApp</a>`;
+        }
+        block.innerHTML = `
+            <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
+                <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                Download PDF
+            </a>
+            <button onclick="window.print()" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
+                <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                Print
+            </button>
+            <form method="POST" action="/invoice/{{ $invoice->id }}/duplicate" class="inline">
+                <input type="hidden" name="_token" value="${document.querySelector('meta[name=csrf-token]')?.content || ''}">
+                <button type="submit" class="inline-flex items-center px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-700 transition" onclick="return confirm('Create a duplicate of this invoice as a new draft?')">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/></svg>
+                    Duplicate
+                </button>
+            </form>
+            ${whatsappBtn}
+        `;
+        requestAnimationFrame(() => { block.style.transition = 'opacity 250ms ease'; block.style.opacity = '1'; });
+    }
+}
+
+function showSuccessToast(fbrNumber) {
+    const existing = document.getElementById('successToastLive');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.id = 'successToastLive';
+    toast.className = 'fixed top-4 right-4 z-[70] max-w-sm w-full transition-all duration-200';
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(2rem)';
+    toast.innerHTML = `
+        <div class="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-4 shadow-xl flex items-start gap-3">
+            <svg class="w-6 h-6 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <div class="flex-1">
+                <p class="text-sm font-bold text-emerald-800">Invoice Successfully Submitted to FBR</p>
+                ${fbrNumber ? `<p class="text-xs text-emerald-700 mt-1">FBR Invoice #: ${fbrNumber}</p>` : ''}
+            </div>
+            <button onclick="this.closest('#successToastLive').remove()" class="text-emerald-400 hover:text-emerald-600"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+        </div>
+    `;
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'translateX(0)'; });
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(2rem)';
+            setTimeout(() => toast.remove(), 200);
+        }
+    }, 4000);
 }
 
 function printFbrPdf() {
@@ -1003,7 +1109,7 @@ function printFbrPdf() {
     } catch (e) {
         const printWin = document.createElement('iframe');
         printWin.style.display = 'none';
-        printWin.src = _fbrPdfUrl;
+        printWin.src = _fbrPdfUrl + '?preview=1';
         document.body.appendChild(printWin);
         printWin.onload = function() {
             try { printWin.contentWindow.print(); } catch(ex) {}
@@ -1040,8 +1146,8 @@ function closeFbrPendingModal() {
     setTimeout(() => {
         modal.style.display = 'none';
         document.body.style.overflow = '';
-        window.location.reload();
-    }, 300);
+        smartRefreshInvoiceStatus();
+    }, 250);
 }
 
 function showFbrError(message) {

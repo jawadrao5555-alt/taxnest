@@ -205,6 +205,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
     Route::get('/api/enterprise/company/compliance', [InvoiceController::class, 'apiComplianceStatus']);
 
     Route::get('/invoice/{invoice}', [InvoiceController::class, 'show'])->name('invoice.show');
+    Route::get('/invoice/{invoice}/status-json', [InvoiceController::class, 'statusJson']);
     Route::get('/invoice/{invoice}/preview', [InvoiceController::class, 'preview']);
     Route::get('/invoice/{invoice}/pdf', [InvoiceController::class, 'pdf']);
     Route::get('/invoice/{invoice}/download', [InvoiceController::class, 'download']);

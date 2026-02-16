@@ -1564,6 +1564,23 @@ class InvoiceController extends Controller
         ]);
     }
 
+    public function statusJson(Invoice $invoice)
+    {
+        $companyId = app('currentCompanyId');
+        if ($invoice->company_id !== $companyId && auth()->user()->role !== 'super_admin') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        return response()->json([
+            'status' => $invoice->status,
+            'fbr_status' => $invoice->fbr_status,
+            'fbr_invoice_number' => $invoice->fbr_invoice_number,
+            'share_uuid' => $invoice->share_uuid,
+            'display_invoice_number' => $invoice->display_invoice_number,
+            'updated_at' => $invoice->updated_at?->toIso8601String(),
+        ]);
+    }
+
     public function apiComplianceStatus()
     {
         $companyId = app('currentCompanyId');

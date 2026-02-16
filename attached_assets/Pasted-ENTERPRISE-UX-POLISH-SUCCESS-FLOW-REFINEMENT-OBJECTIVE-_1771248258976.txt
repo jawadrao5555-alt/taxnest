@@ -1,0 +1,126 @@
+ENTERPRISE UX POLISH — SUCCESS FLOW REFINEMENT
+
+OBJECTIVE:
+After successful FBR submission, improve smooth SaaS-grade experience.
+
+DO NOT TOUCH:
+- FBR logic
+- Idempotency logic
+- Database schema
+- Submission guards
+
+ONLY UX / FRONTEND REFINEMENT.
+
+----------------------------------------
+1) Modal Close Auto Refresh (Smart Refresh)
+----------------------------------------
+
+When success modal closes:
+
+- Do NOT full reload immediately.
+- Instead:
+    → Trigger AJAX refresh of invoice detail section
+    → Re-render status badge dynamically
+    → Update action buttons based on new status
+    → Then show success toast
+
+Implementation:
+
+On modal close:
+    fetch(`/invoice/{id}/status-json`)
+    → return:
+        {
+          status,
+          fbr_status,
+          fbr_invoice_number,
+          updated_at
+        }
+
+Update DOM:
+    - Replace status badge
+    - Replace action buttons block
+    - Lock mutable UI sections
+
+No window.location reload unless fallback required.
+
+----------------------------------------
+2) Success Toast (Enterprise Style)
+----------------------------------------
+
+After modal close and status refresh:
+
+Show green toast:
+
+Title:
+"Invoice Successfully Submitted to FBR"
+
+Body:
+"FBR Invoice #: {fbr_invoice_number}"
+
+Auto hide after 4 seconds.
+
+No Alpine race condition.
+Use centralized toast manager.
+Prevent duplicate toasts.
+
+----------------------------------------
+3) Smooth Transition Animation
+----------------------------------------
+
+- Add fade-in animation to:
+    - Status badge
+    - Action buttons block
+    - Toast
+
+Duration: 200–250ms
+No heavy animation libraries.
+Use Tailwind transition utilities only.
+
+----------------------------------------
+4) Button State Sync
+----------------------------------------
+
+If status = locked AND fbr_status = production:
+    Hide:
+        - Edit
+        - Submit
+        - Verify
+        - WHT selector
+    Show:
+        - Download
+        - Print
+        - Duplicate
+        - WhatsApp (if enabled)
+
+This must happen without page reload.
+
+----------------------------------------
+5) Fallback Safety
+----------------------------------------
+
+If AJAX status fetch fails:
+    → fallback to window.location.reload()
+
+----------------------------------------
+6) Performance Rule
+----------------------------------------
+
+No additional API calls to FBR.
+No extra database writes.
+Only read invoice status endpoint.
+
+----------------------------------------
+
+Deliverables:
+- status-json route
+- Controller method returning JSON
+- JS listener for modal close
+- DOM patching logic
+- Toast integration
+- Animation polish
+
+RESULT:
+Full enterprise SaaS smooth experience.
+No reload shock.
+No UX lag.
+Production-grade finish.

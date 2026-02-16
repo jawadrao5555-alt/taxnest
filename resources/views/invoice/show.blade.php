@@ -19,12 +19,20 @@
             </div>
             <div class="flex items-center flex-wrap gap-2">
                 @if($invoice->status === 'draft')
+                {{-- DRAFT: Edit, Verify Integrity, Submit to FBR, Duplicate, Delete, WHT --}}
                 <a href="/invoice/{{ $invoice->id }}/edit" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">Edit</a>
+                <form method="POST" action="{{ route('invoice.verify', $invoice->id) }}" class="inline">
+                    @csrf
+                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                        Verify Integrity
+                    </button>
+                </form>
                 <div x-data="fbrSubmitEngine()" x-ref="submitRoot">
-                    <button @click="showSubmitModal = true" class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition">Submit to PRAL</button>
+                    <button @click="showSubmitModal = true" class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition">Submit to FBR</button>
                     <div x-show="showSubmitModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @keydown.escape.window="if(showSubmitModal && !submitting) showSubmitModal = false">
                         <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
-                            <h3 class="text-lg font-bold text-gray-900 mb-4">Submit to PRAL</h3>
+                            <h3 class="text-lg font-bold text-gray-900 mb-4">Submit to FBR</h3>
                             <div class="flex gap-3 mb-4">
                                 <label class="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border-2 cursor-pointer transition text-sm"
                                     :class="submitEnv === 'sandbox' ? 'border-amber-400 bg-amber-50' : 'border-gray-200'">
@@ -67,8 +75,104 @@
                         </div>
                     </div>
                 </div>
+                @if(in_array(auth()->user()->role, ['company_admin', 'employee']))
+                <form method="POST" action="{{ route('invoice.duplicate', $invoice->id) }}" class="inline">
+                    @csrf
+                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-700 transition" onclick="return confirm('Create a duplicate of this invoice as a new draft?')">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/></svg>
+                        Duplicate
+                    </button>
+                </form>
                 @endif
-                @if(in_array($invoice->status, ['draft', 'failed']))
+                <form method="POST" action="{{ route('invoice.destroy', $invoice->id) }}" class="inline">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition" onclick="return confirm('Are you sure you want to delete this draft invoice? This action cannot be undone.')">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        Delete
+                    </button>
+                </form>
+                <div x-data="{ showWhtModal: false, pdfWhtRate: {{ $invoice->wht_rate ?? 0 }} }" class="inline-flex items-center gap-2">
+                    <button @click="showWhtModal = true" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        WHT {{ ($invoice->wht_rate ?? 0) > 0 ? number_format($invoice->wht_rate, 1) . '%' : 'Set' }}
+                    </button>
+                    <div x-show="showWhtModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background-color: rgba(0,0,0,0.4);">
+                        <div @click.away="showWhtModal = false" class="bg-white rounded-xl shadow-2xl border border-gray-200 p-6 w-96 max-w-[90vw]">
+                            <div class="flex items-center justify-between mb-4">
+                                <p class="text-base font-bold text-gray-800">Withholding Tax Rate</p>
+                                <button @click="showWhtModal = false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                            </div>
+                            <p class="text-xs text-gray-500 mb-3">Select WHT rate for this invoice. It will be persisted immediately.</p>
+                            <form method="POST" action="/invoice/{{ $invoice->id }}/update-wht">
+                                @csrf
+                                <div class="space-y-2 mb-4">
+                                    <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                        :class="pdfWhtRate == 0 ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 hover:bg-gray-50'">
+                                        <input type="radio" name="wht_rate" value="0" x-model.number="pdfWhtRate" class="text-emerald-500">
+                                        <span class="text-sm font-semibold text-gray-800">No WHT (0%)</span>
+                                    </label>
+                                    <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                        :class="pdfWhtRate == 0.5 ? 'border-amber-400 bg-amber-50' : 'border-gray-200 hover:bg-gray-50'">
+                                        <input type="radio" name="wht_rate" value="0.5" x-model.number="pdfWhtRate" class="text-amber-500">
+                                        <span class="text-sm font-semibold text-gray-800">WHT 0.5%</span>
+                                    </label>
+                                    <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                        :class="pdfWhtRate == 1 ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'">
+                                        <input type="radio" name="wht_rate" value="1" x-model.number="pdfWhtRate" class="text-blue-500">
+                                        <span class="text-sm font-semibold text-gray-800">WHT 1%</span>
+                                    </label>
+                                    <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                        :class="pdfWhtRate == 2 ? 'border-orange-400 bg-orange-50' : 'border-gray-200 hover:bg-gray-50'">
+                                        <input type="radio" name="wht_rate" value="2" x-model.number="pdfWhtRate" class="text-orange-500">
+                                        <span class="text-sm font-semibold text-gray-800">WHT 2%</span>
+                                    </label>
+                                    <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                        :class="pdfWhtRate == 2.5 ? 'border-red-400 bg-red-50' : 'border-gray-200 hover:bg-gray-50'">
+                                        <input type="radio" name="wht_rate" value="2.5" x-model.number="pdfWhtRate" class="text-red-500">
+                                        <span class="text-sm font-semibold text-gray-800">WHT 2.5%</span>
+                                    </label>
+                                </div>
+                                <button type="submit" class="w-full px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition">Save WHT Rate</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                @elseif($invoice->status === 'locked' && $invoice->fbr_status === 'production')
+                {{-- LOCKED+PRODUCTION: Download PDF, Print, Duplicate, WhatsApp only --}}
+                <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    Download PDF
+                </a>
+                <button onclick="window.print()" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                    Print
+                </button>
+                @if(in_array(auth()->user()->role, ['company_admin', 'employee']))
+                <form method="POST" action="{{ route('invoice.duplicate', $invoice->id) }}" class="inline">
+                    @csrf
+                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-700 transition" onclick="return confirm('Create a duplicate of this invoice as a new draft?')">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/></svg>
+                        Duplicate
+                    </button>
+                </form>
+                @endif
+                @if($invoice->share_uuid)
+                <a href="https://wa.me/?text={{ urlencode('Invoice ' . $invoice->display_invoice_number . ': ' . url('/share/invoice/' . $invoice->share_uuid)) }}" target="_blank" class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition">WhatsApp</a>
+                @endif
+                @elseif($invoice->status === 'failed')
+                {{-- FAILED: Edit & Fix, Retry Submit, Validate, Duplicate --}}
+                <a href="/invoice/{{ $invoice->id }}/edit" class="inline-flex items-center px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    Edit & Fix
+                </a>
+                <div x-data="{ retrying: false }" class="inline">
+                    <button @click="retrySubmitToFbr($el)" :disabled="retrying" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                        <svg x-show="!retrying" class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        <svg x-show="retrying" x-cloak class="animate-spin w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <span x-text="retrying ? 'Retrying...' : 'Retry Submit'"></span>
+                    </button>
+                </div>
                 <div x-data="fbrValidator()">
                     <button @click="doValidate()" :disabled="validating" class="inline-flex items-center px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition disabled:opacity-50">
                         <svg x-show="validating" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -117,29 +221,6 @@
                     };
                 }
                 </script>
-                @endif
-                @if($invoice->status === 'failed' && in_array(auth()->user()->role, ['company_admin', 'super_admin']))
-                <a href="/invoice/{{ $invoice->id }}/edit" class="inline-flex items-center px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition">
-                    <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                    Edit & Fix
-                </a>
-                <div x-data="{ retrying: false }" class="inline">
-                    <button @click="retrySubmitToFbr($el)" :disabled="retrying" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
-                        <svg x-show="!retrying" class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                        <svg x-show="retrying" x-cloak class="animate-spin w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        <span x-text="retrying ? 'Retrying...' : 'Retry Submit'"></span>
-                    </button>
-                </div>
-                @endif
-                @if($invoice->status === 'locked')
-                <form method="POST" action="{{ route('invoice.verify', $invoice->id) }}" class="inline">
-                    @csrf
-                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
-                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                        Verify Integrity
-                    </button>
-                </form>
-                @endif
                 @if(in_array(auth()->user()->role, ['company_admin', 'employee']))
                 <form method="POST" action="{{ route('invoice.duplicate', $invoice->id) }}" class="inline">
                     @csrf
@@ -149,68 +230,18 @@
                     </button>
                 </form>
                 @endif
-                <a href="/invoice/{{ $invoice->id }}/preview" class="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition">Preview</a>
-                @if($invoice->status === 'locked' && $invoice->wht_locked)
-                <div class="inline-flex items-center px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm">
-                    <svg class="w-4 h-4 mr-1.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                    <span class="font-semibold text-gray-700">WHT {{ ($invoice->wht_rate ?? 0) > 0 ? number_format($invoice->wht_rate, 1) . '%' : '0%' }}</span>
-                    <span class="ml-1.5 text-xs text-gray-400">(Locked)</span>
-                </div>
-                @elseif(in_array($invoice->status, ['draft', 'failed', 'locked']))
-                <div x-data="{ showWhtModal: false, pdfWhtRate: {{ $invoice->wht_rate ?? 0 }} }" class="inline-flex items-center gap-2">
-                    <button @click="showWhtModal = true" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
-                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                        WHT {{ ($invoice->wht_rate ?? 0) > 0 ? number_format($invoice->wht_rate, 1) . '%' : 'Set' }}
+                @else
+                {{-- OTHER STATUSES (pending_verification, locked non-production): basic actions --}}
+                @if(in_array(auth()->user()->role, ['company_admin', 'employee']))
+                <form method="POST" action="{{ route('invoice.duplicate', $invoice->id) }}" class="inline">
+                    @csrf
+                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-700 transition" onclick="return confirm('Create a duplicate of this invoice as a new draft?')">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/></svg>
+                        Duplicate
                     </button>
-                    <div x-show="showWhtModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background-color: rgba(0,0,0,0.4);">
-                        <div @click.away="showWhtModal = false" class="bg-white rounded-xl shadow-2xl border border-gray-200 p-6 w-96 max-w-[90vw]">
-                            <div class="flex items-center justify-between mb-4">
-                                <p class="text-base font-bold text-gray-800">Withholding Tax Rate</p>
-                                <button @click="showWhtModal = false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
-                            </div>
-                            <p class="text-xs text-gray-500 mb-3">Select WHT rate for this invoice. It will be reflected in all PDF downloads.</p>
-                            <form method="POST" action="/invoice/{{ $invoice->id }}/update-wht">
-                                @csrf
-                                <div class="space-y-2 mb-4">
-                                    <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                        :class="pdfWhtRate == 0 ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 hover:bg-gray-50'">
-                                        <input type="radio" name="wht_rate" value="0" x-model.number="pdfWhtRate" class="text-emerald-500">
-                                        <span class="text-sm font-semibold text-gray-800">No WHT (0%)</span>
-                                    </label>
-                                    <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                        :class="pdfWhtRate == 0.5 ? 'border-amber-400 bg-amber-50' : 'border-gray-200 hover:bg-gray-50'">
-                                        <input type="radio" name="wht_rate" value="0.5" x-model.number="pdfWhtRate" class="text-amber-500">
-                                        <span class="text-sm font-semibold text-gray-800">WHT 0.5%</span>
-                                    </label>
-                                    <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                        :class="pdfWhtRate == 1 ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'">
-                                        <input type="radio" name="wht_rate" value="1" x-model.number="pdfWhtRate" class="text-blue-500">
-                                        <span class="text-sm font-semibold text-gray-800">WHT 1%</span>
-                                    </label>
-                                    <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                        :class="pdfWhtRate == 2 ? 'border-orange-400 bg-orange-50' : 'border-gray-200 hover:bg-gray-50'">
-                                        <input type="radio" name="wht_rate" value="2" x-model.number="pdfWhtRate" class="text-orange-500">
-                                        <span class="text-sm font-semibold text-gray-800">WHT 2%</span>
-                                    </label>
-                                    <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                        :class="pdfWhtRate == 2.5 ? 'border-red-400 bg-red-50' : 'border-gray-200 hover:bg-gray-50'">
-                                        <input type="radio" name="wht_rate" value="2.5" x-model.number="pdfWhtRate" class="text-red-500">
-                                        <span class="text-sm font-semibold text-gray-800">WHT 2.5%</span>
-                                    </label>
-                                </div>
-                                <div class="flex gap-2">
-                                    <button type="submit" class="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition">Save WHT Rate</button>
-                                    <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="flex-1 text-center px-4 py-2.5 bg-gray-600 text-white rounded-lg text-sm font-bold hover:bg-gray-700 transition">Download PDF</a>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
+                </form>
                 @endif
                 <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Download PDF</a>
-                @if($invoice->share_uuid)
-                <a href="https://wa.me/?text={{ urlencode('Invoice ' . $invoice->display_invoice_number . ': ' . url('/share/invoice/' . $invoice->share_uuid)) }}" target="_blank" class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition">WhatsApp</a>
-                <button onclick="navigator.clipboard.writeText('{{ url('/share/invoice/' . $invoice->share_uuid) }}').then(() => { this.textContent = 'Copied!'; setTimeout(() => { this.textContent = 'Copy Link'; }, 2000); })" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">Copy Link</button>
                 @endif
             </div>
         </div>
@@ -489,7 +520,7 @@
                 </div>
             </div>
 
-            @if(!empty($riskAnalysis) && $riskAnalysis['risk_count'] > 0)
+            @if(!($invoice->status === 'locked' && $invoice->fbr_status === 'production') && !empty($riskAnalysis) && $riskAnalysis['risk_count'] > 0)
             <div class="bg-white rounded-xl shadow-sm border {{ $riskAnalysis['risk_color']['border'] }} overflow-hidden mb-8">
                 <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                     <h3 class="text-lg font-semibold text-gray-800 flex items-center space-x-2">
@@ -531,7 +562,7 @@
             </div>
             @endif
 
-            @if(!empty($sroSuggestions) && count($sroSuggestions) > 0)
+            @if(!($invoice->status === 'locked' && $invoice->fbr_status === 'production') && !empty($sroSuggestions) && count($sroSuggestions) > 0)
             <div class="bg-white rounded-xl shadow-sm border border-blue-200 overflow-hidden mb-8">
                 <div class="px-6 py-4 border-b border-blue-100 flex items-center justify-between">
                     <h3 class="text-lg font-semibold text-gray-800 flex items-center space-x-2">
@@ -560,7 +591,7 @@
             </div>
             @endif
 
-            @if(!empty($vendorRisk) && $vendorRisk->vendor_score < 70)
+            @if(!($invoice->status === 'locked' && $invoice->fbr_status === 'production') && !empty($vendorRisk) && $vendorRisk->vendor_score < 70)
             <div class="bg-white rounded-xl shadow-sm border border-orange-200 overflow-hidden mb-8">
                 <div class="px-6 py-4 border-b border-orange-100 flex items-center justify-between">
                     <h3 class="text-lg font-semibold text-gray-800 flex items-center space-x-2">
@@ -594,6 +625,7 @@
             </div>
             @endif
 
+            @if(!($invoice->status === 'locked' && $invoice->fbr_status === 'production'))
             <div x-data="{ rejResult: null, rejLoading: false }" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-8">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
@@ -633,8 +665,9 @@
                     <p class="text-sm text-gray-400 text-center py-4">Click "Analyze" to run pre-submission rejection simulation</p>
                 </template>
             </div>
+            @endif
 
-            @if(!empty($complianceReport))
+            @if(!($invoice->status === 'locked' && $invoice->fbr_status === 'production') && !empty($complianceReport))
             @php
                 $isFbrValidated = $complianceReport->is_fbr_validated ?? false;
                 $ruleFlags = $complianceReport->rule_flags ?? [];

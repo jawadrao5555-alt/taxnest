@@ -1,0 +1,133 @@
+ENTERPRISE INVOICE IMMUTABILITY + WHT LOCK SYSTEM
+
+This is a UX + Financial Integrity refactor.
+DO NOT modify FBR logic.
+DO NOT change API logic.
+Only refactor UI behavior and WHT persistence.
+
+--------------------------------------------------
+PART 1 — INVOICE ACTION CLEANUP (STATUS BASED)
+--------------------------------------------------
+
+Refactor action buttons strictly based on invoice.status and fbr_status.
+
+1) If invoice.status = 'draft':
+
+Show ONLY:
+- Edit
+- Verify Integrity
+- Analyze
+- Submit to FBR
+- Duplicate
+- Delete
+- WHT selector (dropdown)
+
+Hide:
+- Download PDF
+- Print
+- WhatsApp
+- Copy Link
+
+--------------------------------------------------
+
+2) If invoice.status = 'locked' AND invoice.fbr_status = 'production':
+
+Show ONLY:
+- Download PDF
+- Print
+- Duplicate
+- WhatsApp (optional)
+
+Hide STRICTLY:
+- Edit
+- Submit
+- Verify Integrity
+- Analyze
+- WHT Set
+- Copy Link
+- Delete
+- Any mutable action
+
+Production invoice must behave as IMMUTABLE financial document.
+
+No editable state allowed.
+
+--------------------------------------------------
+
+3) Duplicate Behavior (Safe Clone Mode):
+
+When duplicating:
+
+- Create NEW invoice record
+- status = 'draft'
+- fbr_status = null
+- fbr_invoice_number = null
+- fbr_submission_hash = null
+- wht_locked = false
+- regenerate invoiceRefNo
+- DO NOT copy production timestamps
+- DO NOT copy FBR logs linkage
+
+Duplicate must NEVER carry production state.
+
+--------------------------------------------------
+PART 2 — ENTERPRISE WHT LOCK SYSTEM
+--------------------------------------------------
+
+1) WHT visible ONLY in draft stage.
+
+2) Ensure invoices table contains:
+- wht_rate (decimal)
+- wht_amount (decimal)
+- wht_locked (boolean default false)
+
+3) On draft invoice save:
+
+Calculate:
+wht_amount = subtotal × wht_rate / 100
+
+Persist immediately.
+
+No runtime calculation during PDF generation.
+
+--------------------------------------------------
+
+4) On FBR Production Success:
+
+Immediately:
+- set wht_locked = true
+- prevent any future WHT edits
+- create WHT ledger entry (financial record)
+
+--------------------------------------------------
+
+5) Guards (Controller + Service level):
+
+If:
+invoice.status = 'locked'
+OR
+invoice.wht_locked = true
+
+Block:
+- WHT modification
+- recalculation
+- mutation
+
+--------------------------------------------------
+
+6) Production Invoice View:
+
+- Hide WHT Set button
+- Show stored WHT summary line
+- PDF must use stored wht_amount only
+
+--------------------------------------------------
+
+STRICT RULE:
+
+No runtime WHT selection.
+No post-production mutation.
+No financial recalculation after production.
+Production invoice = read-only accounting record.
+
+END.

@@ -1339,9 +1339,15 @@ class InvoiceController extends Controller
         $subtotal = $invoice->items->sum(fn($item) => $item->price * $item->quantity);
         $totalTax = $invoice->items->sum('tax');
 
-        $whtRate = floatval(request()->query('wht_rate', $invoice->wht_rate ?? 0));
-        $whtAmount = round($subtotal * ($whtRate / 100), 2);
-        $netReceivable = round(($subtotal + $totalTax) + $whtAmount, 2);
+        if ($invoice->wht_locked || ($invoice->status === 'locked' && $invoice->fbr_status === 'production')) {
+            $whtRate = $invoice->wht_rate ?? 0;
+            $whtAmount = $invoice->wht_amount ?? 0;
+            $netReceivable = $invoice->net_receivable ?? $invoice->total_amount;
+        } else {
+            $whtRate = floatval(request()->query('wht_rate', $invoice->wht_rate ?? 0));
+            $whtAmount = round($subtotal * ($whtRate / 100), 2);
+            $netReceivable = round(($subtotal + $totalTax) + $whtAmount, 2);
+        }
 
         $qrBase64 = '';
         $fbrLogoBase64 = '';
@@ -1386,8 +1392,8 @@ class InvoiceController extends Controller
         $companyId = app('currentCompanyId');
         if ($invoice->company_id !== $companyId) abort(403);
 
-        if ($invoice->wht_locked || ($invoice->status === 'locked' && $invoice->fbr_status === 'production')) {
-            return redirect()->back()->with('error', 'WHT rate is locked after FBR production submission and cannot be changed.');
+        if ($invoice->wht_locked || $invoice->status !== 'draft') {
+            return redirect()->back()->with('error', 'WHT rate can only be modified on draft invoices.');
         }
 
         $request->validate([
@@ -1623,6 +1629,7 @@ class InvoiceController extends Controller
                 'override_reason' => null,
                 'override_by' => null,
                 'submission_mode' => null,
+                'fbr_submission_hash' => null,
             ]);
 
             foreach ($invoice->items as $item) {
@@ -1664,6 +1671,37 @@ class InvoiceController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Failed to duplicate invoice: ' . $e->getMessage());
+        }
+    }
+
+    public function destroy(Invoice $invoice)
+    {
+        $companyId = app('currentCompanyId');
+        if ($invoice->company_id !== $companyId) {
+            abort(403);
+        }
+
+        if ($invoice->status !== 'draft') {
+            return back()->with('error', 'Only draft invoices can be deleted.');
+        }
+
+        DB::beginTransaction();
+        try {
+            AuditLogService::log('invoice_deleted', 'Invoice', $invoice->id, null, [
+                'invoice_number' => $invoice->internal_invoice_number,
+                'buyer_name' => $invoice->buyer_name,
+                'total_amount' => $invoice->total_amount,
+                'user' => auth()->user()->name,
+            ]);
+
+            $invoice->items()->delete();
+            $invoice->delete();
+
+            DB::commit();
+            return redirect('/invoices?tab=draft')->with('success', 'Invoice deleted successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to delete invoice: ' . $e->getMessage());
         }
     }
 

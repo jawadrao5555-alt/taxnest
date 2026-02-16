@@ -1,0 +1,117 @@
+ENTERPRISE PDF SUCCESS MODAL FIX (FINAL PATCH)
+
+Issue:
+Invoice FBR success ke baad PDF direct download ho raha hai.
+Expected behavior:
+Same page pe AJAX success aaye,
+Then full-screen modal open ho,
+PDF iframe mein show ho,
+No new tab,
+No direct download.
+
+----------------------------------------
+STEP 1 — Ensure AJAX Submission (No Page Reload)
+----------------------------------------
+
+Invoice submit form must NOT use:
+- target="_blank"
+- normal form POST redirect
+
+Use JS fetch/AJAX submit:
+
+document.getElementById('invoiceSubmitForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.innerHTML = 'Submitting...';
+
+    const response = await fetch(this.action, {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+            'Accept': 'application/json'
+        },
+        body: new FormData(this)
+    });
+
+    const data = await response.json();
+
+    if (data.status === 'success') {
+        openInvoiceModal(data.invoice_id);
+    } else {
+        showError(data.message);
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = 'Submit to FBR';
+});
+
+----------------------------------------
+STEP 2 — Controller MUST return JSON (not file response)
+----------------------------------------
+
+In InvoiceController submit():
+
+return response()->json([
+    'status' => 'success',
+    'invoice_id' => $invoice->id,
+    'fbr_invoice_number' => $invoice->fbr_invoice_number
+]);
+
+DO NOT:
+return $pdf->download()
+
+----------------------------------------
+STEP 3 — Modal PDF Loader
+----------------------------------------
+
+function openInvoiceModal(invoiceId) {
+    const modal = document.getElementById('invoiceModal');
+    const iframe = document.getElementById('invoiceIframe');
+
+    iframe.src = '/invoices/' + invoiceId + '/pdf?preview=1';
+    modal.classList.remove('hidden');
+}
+
+----------------------------------------
+STEP 4 — PDF Route Must Support Inline View
+----------------------------------------
+
+Route:
+
+Route::get('/invoices/{invoice}/pdf', function ($invoice) {
+    $pdf = app(PdfService::class)->generate($invoice);
+
+    if (request()->has('preview')) {
+        return $pdf->stream('invoice.pdf'); // INLINE
+    }
+
+    return $pdf->download('invoice.pdf'); // Download only when explicitly clicked
+});
+
+----------------------------------------
+STEP 5 — REMOVE Auto-Download Behavior
+----------------------------------------
+
+Make sure no code calls:
+window.location = '/pdf'
+or
+window.open()
+
+Only modal loader should be used.
+
+----------------------------------------
+
+Expected Final Behavior:
+✔ Submit
+✔ Spinner
+✔ FBR success
+✔ Modal opens
+✔ PDF shows inline
+✔ Print / Download buttons inside modal
+✔ No page reload
+✔ No forced download
+
+No change to FBR logic.
+UI-only fix.

@@ -1299,31 +1299,8 @@ class InvoiceController extends Controller
         return back()->with('error', 'Integrity check FAILED. Invoice data may have been altered after FBR submission.');
     }
 
-    public function pdf(Invoice $invoice)
+    private function buildPdfData(Invoice $invoice): array
     {
-        $invoice->load('items', 'company');
-
-        $showWatermark = false;
-        $subscription = Subscription::where('company_id', $invoice->company_id)
-            ->where('active', true)
-            ->first();
-
-        if (!$subscription || $subscription->isExpired()) {
-            $showWatermark = true;
-        }
-
-        $html = view('invoice.pdf', compact('invoice', 'showWatermark'))->render();
-
-        return response($html)
-            ->header('Content-Type', 'text/html');
-    }
-
-    public function download(Invoice $invoice)
-    {
-        $companyId = app('currentCompanyId');
-        if ($invoice->company_id !== $companyId && auth()->user()->role !== 'super_admin') {
-            abort(403);
-        }
         $invoice->load('items', 'company');
 
         $showWatermark = false;
@@ -1370,7 +1347,7 @@ class InvoiceController extends Controller
             }
         }
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-professional', [
+        return [
             'invoice' => $invoice,
             'showWatermark' => $showWatermark,
             'isDraft' => $isDraft,
@@ -1381,8 +1358,32 @@ class InvoiceController extends Controller
             'net_receivable' => $netReceivable,
             'qrBase64' => $qrBase64,
             'fbrLogoBase64' => $fbrLogoBase64,
-        ]);
+        ];
+    }
 
+    public function pdf(Invoice $invoice)
+    {
+        $companyId = app('currentCompanyId');
+        if ($invoice->company_id !== $companyId && auth()->user()->role !== 'super_admin') {
+            abort(403);
+        }
+
+        $data = $this->buildPdfData($invoice);
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-professional', $data);
+        $filename = 'invoice-' . ($invoice->fbr_invoice_number ?? $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id) . '.pdf';
+
+        return $pdf->stream($filename);
+    }
+
+    public function download(Invoice $invoice)
+    {
+        $companyId = app('currentCompanyId');
+        if ($invoice->company_id !== $companyId && auth()->user()->role !== 'super_admin') {
+            abort(403);
+        }
+
+        $data = $this->buildPdfData($invoice);
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-professional', $data);
         $filename = 'invoice-' . ($invoice->fbr_invoice_number ?? $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id) . '.pdf';
         return $pdf->download($filename);
     }

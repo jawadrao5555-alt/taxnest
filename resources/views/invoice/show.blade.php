@@ -976,7 +976,7 @@ function openFbrSuccessModal(data) {
     _fbrPdfUrl = data.pdf_url || '';
     document.getElementById('modalFbrNumber').textContent = 'FBR #: ' + (data.fbr_invoice_number || '');
     document.getElementById('modalTimestamp').textContent = 'Submitted: ' + new Date().toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' });
-    document.getElementById('modalPdfIframe').src = _fbrPdfUrl;
+    document.getElementById('modalPdfIframe').src = _fbrPdfUrl + '?preview=1';
     const modal = document.getElementById('fbrSuccessModal');
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
@@ -1014,8 +1014,9 @@ function printFbrPdf() {
 
 function downloadFbrPdf() {
     if (_fbrPdfUrl) {
+        const downloadUrl = _fbrPdfUrl.replace('/pdf', '/download');
         const a = document.createElement('a');
-        a.href = _fbrPdfUrl.replace('/pdf', '/download');
+        a.href = downloadUrl;
         a.download = '';
         a.style.display = 'none';
         document.body.appendChild(a);

@@ -346,11 +346,12 @@
                             </span>
                             @if($invoice->fbr_status)
                             <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ml-2
-                                @if($invoice->fbr_status === 'submitted') bg-blue-100 text-blue-800
+                                @if($invoice->fbr_status === 'production') bg-emerald-100 text-emerald-800
                                 @elseif($invoice->fbr_status === 'validated') bg-emerald-100 text-emerald-800
-                                @elseif($invoice->fbr_status === 'failed') bg-red-100 text-red-800
+                                @elseif($invoice->fbr_status === 'failed' || $invoice->fbr_status === 'validation_failed') bg-red-100 text-red-800
+                                @elseif($invoice->fbr_status === 'sandbox') bg-amber-100 text-amber-800
                                 @else bg-gray-100 text-gray-800 @endif">
-                                FBR: {{ ucfirst($invoice->fbr_status) }}
+                                FBR: {{ $invoice->fbr_status === 'production' ? 'Production' : ($invoice->fbr_status === 'validation_failed' ? 'Validation Failed' : ucfirst($invoice->fbr_status)) }}
                             </span>
                             @endif
                             @if($invoice->status === 'locked' && $invoice->integrity_hash)
@@ -746,17 +747,36 @@
                     Close
                 </button>
             </div>
+            <p class="text-xs text-gray-400 mt-3 text-center">Protected by TaxNest Idempotency Shield — Duplicate submission impossible.</p>
         </div>
     </div>
 </div>
 
-<div id="fbrPendingBanner" style="display:none;" class="fixed top-4 left-1/2 -translate-x-1/2 z-[60] max-w-lg w-full mx-4">
-    <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 shadow-xl flex items-start gap-3">
-        <svg class="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-        <div class="flex-1">
-            <p class="text-sm font-bold text-amber-800">FBR Pending Verification</p>
-            <p class="text-xs text-amber-700 mt-1" id="pendingMessage"></p>
-            <button onclick="document.getElementById('fbrPendingBanner').style.display='none'" class="mt-2 text-xs text-amber-600 hover:text-amber-800 font-medium underline">Dismiss</button>
+<div id="fbrPendingModal" style="display:none;" class="fixed inset-0 z-[60] flex items-center justify-center transition-opacity duration-300 opacity-0">
+    <div class="absolute inset-0 bg-black/40" onclick="closeFbrPendingModal()"></div>
+    <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+        <div class="px-6 py-5 border-b border-amber-100 bg-amber-50">
+            <div class="flex items-center gap-3">
+                <div class="flex items-center justify-center w-10 h-10 rounded-full bg-amber-100">
+                    <svg class="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-amber-900">FBR Pending Verification</h3>
+                    <p class="text-xs text-amber-700">Response requires manual verification</p>
+                </div>
+            </div>
+        </div>
+        <div class="px-6 py-4">
+            <p class="text-sm text-gray-700" id="pendingMessage"></p>
+            <p class="text-xs text-gray-500 mt-3">FBR returned an ambiguous response. The invoice has been marked as pending verification. Please check FBR portal to confirm submission status.</p>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-100 bg-gray-50 flex flex-col gap-2">
+            <a href="https://e.fbr.gov.pk" target="_blank" rel="noopener" class="w-full text-center px-4 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700 transition">
+                Verify on FBR Portal
+            </a>
+            <button onclick="closeFbrPendingModal()" class="w-full text-center px-4 py-2.5 bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-300 transition">
+                Close
+            </button>
         </div>
     </div>
 </div>
@@ -901,20 +921,49 @@ function closeFbrSuccessModal() {
 function printFbrPdf() {
     try {
         const iframe = document.getElementById('modalPdfIframe');
+        iframe.contentWindow.focus();
         iframe.contentWindow.print();
     } catch (e) {
-        window.open(_fbrPdfUrl, '_blank');
+        const printWin = document.createElement('iframe');
+        printWin.style.display = 'none';
+        printWin.src = _fbrPdfUrl;
+        document.body.appendChild(printWin);
+        printWin.onload = function() {
+            try { printWin.contentWindow.print(); } catch(ex) {}
+            setTimeout(() => document.body.removeChild(printWin), 5000);
+        };
     }
 }
 
 function downloadFbrPdf() {
-    if (_fbrPdfUrl) window.open(_fbrPdfUrl, '_blank');
+    if (_fbrPdfUrl) {
+        const a = document.createElement('a');
+        a.href = _fbrPdfUrl.replace('/pdf', '/download');
+        a.download = '';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => document.body.removeChild(a), 100);
+    }
 }
 
 function showFbrPending(message) {
     document.getElementById('pendingMessage').textContent = message || 'FBR returned an ambiguous response. Please verify on FBR portal.';
-    document.getElementById('fbrPendingBanner').style.display = 'block';
-    setTimeout(() => { document.getElementById('fbrPendingBanner').style.display = 'none'; }, 15000);
+    const modal = document.getElementById('fbrPendingModal');
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    requestAnimationFrame(() => { modal.classList.remove('opacity-0'); modal.classList.add('opacity-100'); });
+}
+
+function closeFbrPendingModal() {
+    const modal = document.getElementById('fbrPendingModal');
+    modal.classList.remove('opacity-100');
+    modal.classList.add('opacity-0');
+    setTimeout(() => {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+        window.location.reload();
+    }, 300);
 }
 
 function showFbrError(message) {

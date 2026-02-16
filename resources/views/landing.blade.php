@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <title>TaxNest — Pakistan's Smart FBR Compliance Platform</title>
+    <title>TaxNest — Enterprise FBR Digital Invoicing Platform</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700,800&display=swap" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -54,10 +54,10 @@
                     FBR Compliant &bull; PRAL Integrated &bull; 14-Day Free Trial
                 </div>
                 <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight mb-6">
-                    TaxNest — Pakistan's Smart<br>FBR Compliance Platform
+                    TaxNest — Enterprise FBR<br>Digital Invoicing Platform
                 </h1>
                 <p class="text-xl text-emerald-100 mb-4 max-w-2xl mx-auto leading-relaxed">
-                    Enterprise-grade FBR compliance with HS Intelligence, Risk Detection, Auto-Recovery, and real-time synchronous PRAL API v1.12 submission.
+                    Zero Duplicate Risk. Intelligent HS Compliance. Production-Safe Architecture.
                 </p>
                 <p class="text-lg text-emerald-200 mb-10 font-semibold">
                     Plans starting at just Rs. 999/month

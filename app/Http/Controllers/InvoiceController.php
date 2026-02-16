@@ -628,6 +628,9 @@ class InvoiceController extends Controller
                 'risks' => $riskMessages,
             ]);
             $message = 'FBR submission blocked - CRITICAL intelligence risk (Score: ' . $riskAnalysis['risk_score'] . '/100). Issues: ' . implode(' | ', array_slice($riskMessages, 0, 3)) . '. Please resolve and resubmit.';
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['status' => 'error', 'message' => 'Submission blocked', 'error_details' => $message], 422);
+            }
             return redirect('/invoice/' . $invoice->id)->with('error', $message);
         }
 
@@ -656,7 +659,11 @@ class InvoiceController extends Controller
             });
 
             if (!$locked) {
-                return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice is no longer in a submittable state. It may have been submitted by another request.');
+                $lockMsg = 'Invoice is no longer in a submittable state. It may have been submitted by another request.';
+                if ($request->expectsJson() || $request->ajax()) {
+                    return response()->json(['status' => 'error', 'message' => 'Lock failed', 'error_details' => $lockMsg], 409);
+                }
+                return redirect('/invoice/' . $invoice->id)->with('error', $lockMsg);
             }
 
             \App\Models\OverrideLog::create([
@@ -680,14 +687,54 @@ class InvoiceController extends Controller
                 'override_reason' => $request->override_reason,
             ]);
 
-            SendInvoiceToFbrJob::safeDispatch($invoice->id, $fbrEnvironment);
-
             if ($invoice->buyer_ntn) {
                 $vendorResult = VendorRiskEngine::calculateVendorScore($invoice->company_id, $invoice->buyer_ntn);
                 VendorRiskEngine::persistVendorProfile($invoice->company_id, $invoice->buyer_ntn, $invoice->buyer_name, $vendorResult);
             }
 
-            return redirect('/invoices')->with('success', 'Invoice submitted via Direct MIS mode (compliance check skipped).');
+            $invoice->refresh();
+            $result = $this->submitToFbrSync($invoice, $fbrEnvironment);
+
+            if ($result['status'] === 'success') {
+                $fbrNum = $result['fbr_invoice_number'] ?? '';
+                if ($request->expectsJson() || $request->ajax()) {
+                    return response()->json([
+                        'status' => 'success',
+                        'invoice_id' => $invoice->id,
+                        'fbr_invoice_number' => $fbrNum,
+                        'pdf_url' => '/invoice/' . $invoice->id . '/pdf',
+                        'execution_ms' => $result['execution_ms'],
+                        'message' => 'Invoice submitted via Direct MIS mode',
+                    ]);
+                }
+                return redirect('/invoice/' . $invoice->id)->with('success', 'FBR submission successful! Invoice Number: ' . $fbrNum . ' (' . $result['execution_ms'] . 'ms)');
+            }
+
+            if ($result['status'] === 'pending_verification') {
+                $warningMsg = 'FBR returned an ambiguous response. Please verify on FBR portal.';
+                if ($request->expectsJson() || $request->ajax()) {
+                    return response()->json([
+                        'status' => 'pending_verification',
+                        'invoice_id' => $invoice->id,
+                        'message' => $warningMsg,
+                    ]);
+                }
+                return redirect('/invoice/' . $invoice->id)->with('warning', $warningMsg);
+            }
+
+            $errorMsg = 'FBR Direct MIS submission failed';
+            if (!empty($result['errors'])) {
+                $errorMsg .= ': ' . implode(' | ', array_slice($result['errors'], 0, 3));
+            }
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'status' => 'error',
+                    'invoice_id' => $invoice->id,
+                    'message' => 'FBR submission failed',
+                    'error_details' => $errorMsg,
+                ], 422);
+            }
+            return redirect('/invoice/' . $invoice->id)->with('error', $errorMsg);
         }
 
         $scoreResult = HybridComplianceScorer::score($invoice);
@@ -706,6 +753,9 @@ class InvoiceController extends Controller
             if ($scoreResult['rule_result']['flags']['STRUCTURE_ERROR'] ?? false) $flagMessages[] = 'Invoice structure error';
 
             $message = 'FBR submission blocked - CRITICAL compliance risk (Score: ' . $scoreResult['final_score'] . '). Issues: ' . implode(', ', $flagMessages) . '. Please fix and resubmit.';
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['status' => 'error', 'message' => 'Compliance blocked', 'error_details' => $message], 422);
+            }
             return redirect('/invoice/' . $invoice->id)->with('error', $message);
         }
 
@@ -723,7 +773,11 @@ class InvoiceController extends Controller
         });
 
         if (!$locked) {
-            return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice is no longer in a submittable state. It may have been submitted by another request.');
+            $lockMsg = 'Invoice is no longer in a submittable state. It may have been submitted by another request.';
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['status' => 'error', 'message' => 'Lock failed', 'error_details' => $lockMsg], 409);
+            }
+            return redirect('/invoice/' . $invoice->id)->with('error', $lockMsg);
         }
 
         $invoice->refresh();

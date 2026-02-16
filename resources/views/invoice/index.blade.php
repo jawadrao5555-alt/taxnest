@@ -227,11 +227,13 @@
                                     </span>
                                     @if($invoice->fbr_status && $invoice->fbr_status !== 'pending')
                                     <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium ml-1
-                                        @if($invoice->fbr_status === 'submitted') bg-blue-100 text-blue-700
+                                        @if($invoice->fbr_status === 'production') bg-emerald-100 text-emerald-700
                                         @elseif($invoice->fbr_status === 'validated') bg-emerald-100 text-emerald-700
-                                        @elseif($invoice->fbr_status === 'failed') bg-red-100 text-red-700
+                                        @elseif($invoice->fbr_status === 'failed' || $invoice->fbr_status === 'validation_failed') bg-red-100 text-red-700
+                                        @elseif($invoice->fbr_status === 'sandbox') bg-amber-100 text-amber-700
+                                        @else bg-gray-100 text-gray-700
                                         @endif">
-                                        {{ ucfirst($invoice->fbr_status) }}
+                                        {{ $invoice->fbr_status === 'production' ? 'Production' : ($invoice->fbr_status === 'validation_failed' ? 'Val. Failed' : ucfirst($invoice->fbr_status)) }}
                                     </span>
                                     @endif
                                     @if($invoice->status === 'draft' && $invoice->fbr_status === 'failed')

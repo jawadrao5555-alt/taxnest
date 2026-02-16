@@ -1,0 +1,138 @@
+ENTERPRISE UI + PDF MODAL FIX — IMPLEMENT CLEANLY
+
+1️⃣ BRAND POSITIONING (Landing + App Header)
+
+Update branding copy:
+
+Hero Title:
+TaxNest — Enterprise FBR Digital Invoicing Platform
+
+Hero Subtitle:
+Zero Duplicate Risk. Intelligent HS Compliance. Production-Safe Architecture.
+
+Remove technical overload from hero. Keep enterprise authority tone.
+
+------------------------------------------------------
+
+2️⃣ REMOVE "SUBMITTED" USER-FACING STATUS
+
+Backend:
+- Internal status "submitted" can exist for processing
+- BUT UI must NEVER show "submitted"
+- Only show:
+    Draft
+    Locked (Production)
+    Pending Verification
+    Failed
+
+If invoice is being processed:
+    Show spinner overlay
+    DO NOT change status visually to submitted
+
+------------------------------------------------------
+
+3️⃣ ENTERPRISE SUCCESS MODAL (NO NEW TAB, NO AUTO DOWNLOAD)
+
+REQUIREMENTS:
+
+After successful FBR production:
+
+- DO NOT redirect
+- DO NOT open new browser tab
+- DO NOT auto-download PDF
+
+Instead:
+
+✔ Show full-screen modal
+✔ Modal contains iframe with PDF preview
+✔ Top right:
+    - Print Button
+    - Download Button
+    - Close Button
+✔ Background page remains intact
+✔ Smooth fade-in animation
+
+TECHNICAL IMPLEMENTATION:
+
+A) Submit must be AJAX-based (fetch or axios)
+B) On success:
+    response returns:
+        { status: "success", pdf_url: "/invoice/{id}/pdf" }
+
+C) Frontend:
+
+- Inject modal dynamically
+- Set iframe src = pdf_url
+- Add ESC key close
+- Add backdrop click close
+- Body overflow hidden while modal open
+- Restore scroll when closed
+
+D) Ensure:
+    No page reload
+    No window.open
+    No location.href redirect
+
+------------------------------------------------------
+
+4️⃣ FIX EXISTING PDF BEHAVIOR BUG
+
+Search entire codebase for:
+
+window.open(
+target="_blank"
+return redirect()->route(...pdf...)
+return response()->download(...)
+
+REMOVE any auto-trigger after submit.
+
+PDF route should only be called when:
+    - User clicks Download
+    - User clicks Print
+
+------------------------------------------------------
+
+5️⃣ SMOOTH UX POLISH
+
+- Submit button:
+    Disable on click
+    Show spinner inside button
+    Prevent double click
+
+- On error:
+    Show inline toast (no page reload)
+
+- On pending_verification:
+    Show amber modal with:
+        "Verify on FBR Portal"
+        "Mark as Confirmed"
+        "Retry"
+
+------------------------------------------------------
+
+6️⃣ ENTERPRISE IDEMPOTENCY VISUAL MESSAGE
+
+On success modal footer show small text:
+
+"Protected by TaxNest Idempotency Shield — Duplicate submission impossible."
+
+------------------------------------------------------
+
+7️⃣ VALIDATION CHECKLIST (MANDATORY)
+
+After implementation verify:
+
+✔ Submit does NOT reload page
+✔ Submit does NOT open new tab
+✔ PDF shows inside modal
+✔ Closing modal keeps user on same invoice page
+✔ No duplicate submission possible
+✔ Locked invoice cannot re-submit
+✔ Pending_verification cannot auto-resubmit
+
+------------------------------------------------------
+
+IMPLEMENT CLEAN, MINIMAL, ENTERPRISE STYLE.
+NO GLASS EFFECT.
+NO HEAVY ANIMATION.
+FAST & SMOOTH FEEL.

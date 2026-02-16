@@ -1044,6 +1044,7 @@ class InvoiceController extends Controller
             $invoice->status = 'locked';
             $invoice->fbr_status = 'production';
             $invoice->is_fbr_processing = false;
+            $invoice->wht_locked = true;
             $invoice->integrity_hash = \App\Services\IntegrityHashService::generate($invoice);
             $invoice->qr_data = json_encode([
                 'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $company->fbr_registration_no ?: ($company->ntn ?? '')),
@@ -1150,6 +1151,7 @@ class InvoiceController extends Controller
 
             $invoice->status = 'locked';
             $invoice->fbr_status = 'production';
+            $invoice->wht_locked = true;
             $invoice->fbr_submission_date = $invoice->fbr_submission_date ?? now();
 
             if ($fbrInvoiceNumber) {
@@ -1251,6 +1253,7 @@ class InvoiceController extends Controller
 
         $invoice->status = 'locked';
         $invoice->fbr_status = 'production';
+        $invoice->wht_locked = true;
         $invoice->fbr_submission_date = $invoice->fbr_submission_date ?? now();
 
         $invoice->integrity_hash = IntegrityHashService::generate($invoice);
@@ -1382,6 +1385,10 @@ class InvoiceController extends Controller
     {
         $companyId = app('currentCompanyId');
         if ($invoice->company_id !== $companyId) abort(403);
+
+        if ($invoice->wht_locked || ($invoice->status === 'locked' && $invoice->fbr_status === 'production')) {
+            return redirect()->back()->with('error', 'WHT rate is locked after FBR production submission and cannot be changed.');
+        }
 
         $request->validate([
             'wht_rate' => 'required|numeric|min:0|max:100',
@@ -1597,6 +1604,7 @@ class InvoiceController extends Controller
                 'total_sales_tax' => $invoice->total_sales_tax,
                 'wht_rate' => $invoice->wht_rate,
                 'wht_amount' => $invoice->wht_amount,
+                'wht_locked' => false,
                 'net_receivable' => $invoice->net_receivable,
                 'branch_id' => $invoice->branch_id,
                 'document_type' => $invoice->document_type,
@@ -1735,6 +1743,7 @@ class InvoiceController extends Controller
                     $invoice->status = 'locked';
                     $invoice->fbr_status = 'production';
                     $invoice->is_fbr_processing = false;
+                    $invoice->wht_locked = true;
                     if ($fbrNum) {
                         $invoice->fbr_invoice_number = $fbrNum;
                         $invoice->fbr_invoice_id = $fbrNum;
@@ -1814,6 +1823,7 @@ class InvoiceController extends Controller
             $invoice->status = 'locked';
             $invoice->fbr_status = 'production';
             $invoice->is_fbr_processing = false;
+            $invoice->wht_locked = true;
             $invoice->integrity_hash = IntegrityHashService::generate($invoice);
             $invoice->qr_data = json_encode([
                 'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $company->fbr_registration_no ?: ($company->ntn ?? '')),

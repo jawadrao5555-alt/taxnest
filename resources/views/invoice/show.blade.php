@@ -148,8 +148,14 @@
                 </form>
                 @endif
                 <a href="/invoice/{{ $invoice->id }}/preview" class="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition">Preview</a>
+                @if($invoice->status === 'locked' && $invoice->wht_locked)
+                <div class="inline-flex items-center px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm">
+                    <svg class="w-4 h-4 mr-1.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    <span class="font-semibold text-gray-700">WHT {{ ($invoice->wht_rate ?? 0) > 0 ? number_format($invoice->wht_rate, 1) . '%' : '0%' }}</span>
+                    <span class="ml-1.5 text-xs text-gray-400">(Locked)</span>
+                </div>
+                @elseif(in_array($invoice->status, ['draft', 'failed', 'locked']))
                 <div x-data="{ showWhtModal: false, pdfWhtRate: {{ $invoice->wht_rate ?? 0 }} }" class="inline-flex items-center gap-2">
-                    @if($invoice->status === 'locked')
                     <button @click="showWhtModal = true" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
                         <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                         WHT {{ ($invoice->wht_rate ?? 0) > 0 ? number_format($invoice->wht_rate, 1) . '%' : 'Set' }}
@@ -160,7 +166,7 @@
                                 <p class="text-base font-bold text-gray-800">Withholding Tax Rate</p>
                                 <button @click="showWhtModal = false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
                             </div>
-                            <p class="text-xs text-gray-500 mb-3">Select WHT rate - it will be saved to this invoice permanently and reflected in all PDF downloads.</p>
+                            <p class="text-xs text-gray-500 mb-3">Select WHT rate for this invoice. It will be reflected in all PDF downloads.</p>
                             <form method="POST" action="/invoice/{{ $invoice->id }}/update-wht">
                                 @csrf
                                 <div class="space-y-2 mb-4">
@@ -197,11 +203,9 @@
                             </form>
                         </div>
                     </div>
-                    <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Download PDF</a>
-                    @else
-                    <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Download PDF</a>
-                    @endif
                 </div>
+                @endif
+                <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Download PDF</a>
                 @if($invoice->share_uuid)
                 <a href="https://wa.me/?text={{ urlencode('Invoice ' . $invoice->display_invoice_number . ': ' . url('/share/invoice/' . $invoice->share_uuid)) }}" target="_blank" class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition">WhatsApp</a>
                 <button onclick="navigator.clipboard.writeText('{{ url('/share/invoice/' . $invoice->share_uuid) }}').then(() => { this.textContent = 'Copied!'; setTimeout(() => { this.textContent = 'Copy Link'; }, 2000); })" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">Copy Link</button>

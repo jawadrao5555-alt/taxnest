@@ -19,6 +19,10 @@ APP_KEY = "base64:41WY2e9C1jMkW21wJQsxMC1NUk5mge9Rn7sx5oNo4x0="
 APP_ENV = "production"
 APP_DEBUG = "false"
 
+[userenv.development]
+APP_ENV = "production"
+APP_DEBUG = "false"
+
 [workflows]
 runButton = "Project"
 

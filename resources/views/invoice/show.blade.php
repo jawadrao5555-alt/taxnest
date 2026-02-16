@@ -624,35 +624,68 @@
             </div>
 
             @if(!empty($complianceReport))
-            <div class="bg-white rounded-xl shadow-sm border {{ $complianceReport->risk_level === 'CRITICAL' ? 'border-red-200' : ($complianceReport->risk_level === 'HIGH' ? 'border-orange-200' : 'border-gray-100') }} overflow-hidden mb-8">
-                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            @php
+                $isFbrValidated = $complianceReport->is_fbr_validated ?? false;
+                $ruleFlags = $complianceReport->rule_flags ?? [];
+                $preFlags = $complianceReport->pre_validation_flags ?? [];
+                $panelBorder = $isFbrValidated ? 'border-emerald-200' : ($complianceReport->risk_level === 'CRITICAL' ? 'border-red-200' : ($complianceReport->risk_level === 'HIGH' ? 'border-orange-200' : 'border-gray-100'));
+            @endphp
+            <div class="bg-white rounded-xl shadow-sm border {{ $panelBorder }} overflow-hidden mb-8">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
                     <h3 class="text-lg font-semibold text-gray-800 flex items-center space-x-2">
-                        <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                        <svg class="w-5 h-5 {{ $isFbrValidated ? 'text-emerald-600' : 'text-indigo-600' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
                         <span>Compliance Analysis</span>
                     </h3>
-                    @php $crBadge = \App\Services\HybridComplianceScorer::getRiskBadge($complianceReport->risk_level); @endphp
-                    <span class="inline-flex px-3 py-1 rounded-full text-xs font-bold {{ $crBadge['bg'] }} {{ $crBadge['text'] }}">
-                        Score: {{ $complianceReport->final_score }} - {{ $complianceReport->risk_level }}
-                    </span>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        @if($isFbrValidated)
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                            FBR VALIDATED &mdash; Structural Compliance Confirmed
+                        </span>
+                        @endif
+                        @php $crBadge = \App\Services\HybridComplianceScorer::getRiskBadge($complianceReport->risk_level); @endphp
+                        <span class="inline-flex px-3 py-1 rounded-full text-xs font-bold {{ $crBadge['bg'] }} {{ $crBadge['text'] }}">
+                            Score: {{ $complianceReport->final_score }} - {{ $complianceReport->risk_level }}
+                        </span>
+                    </div>
                 </div>
                 <div class="p-6">
-                    @php $ruleFlags = $complianceReport->rule_flags ?? []; @endphp
+                    @if($isFbrValidated && !empty($preFlags) && count(array_filter($preFlags)) > 0)
+                    <div class="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                        <p class="text-xs font-medium text-emerald-700">
+                            <svg class="w-4 h-4 inline-block mr-1 -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            Pre-submission simulation flagged {{ count(array_filter($preFlags)) }} issue(s). These were cleared after FBR confirmed statusCode "00" (production success).
+                        </p>
+                    </div>
+                    @endif
                     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                        <div class="p-3 rounded-lg {{ ($ruleFlags['RATE_MISMATCH'] ?? false) ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200' }}">
-                            <p class="text-xs font-medium {{ ($ruleFlags['RATE_MISMATCH'] ?? false) ? 'text-red-700' : 'text-green-700' }}">Tax Rate</p>
-                            <p class="text-sm font-bold {{ ($ruleFlags['RATE_MISMATCH'] ?? false) ? 'text-red-800' : 'text-green-800' }}">{{ ($ruleFlags['RATE_MISMATCH'] ?? false) ? 'MISMATCH' : 'OK' }}</p>
+                        @php
+                            $rateMismatch = $ruleFlags['RATE_MISMATCH'] ?? false;
+                            $rateCleared = $isFbrValidated && ($preFlags['RATE_MISMATCH'] ?? false) && !$rateMismatch;
+                        @endphp
+                        <div class="p-3 rounded-lg {{ $rateMismatch ? 'bg-red-50 border border-red-200' : ($rateCleared ? 'bg-emerald-50 border border-emerald-200' : 'bg-green-50 border border-green-200') }}">
+                            <p class="text-xs font-medium {{ $rateMismatch ? 'text-red-700' : ($rateCleared ? 'text-emerald-700' : 'text-green-700') }}">Tax Rate</p>
+                            <p class="text-sm font-bold {{ $rateMismatch ? 'text-red-800' : ($rateCleared ? 'text-emerald-800' : 'text-green-800') }}">{{ $rateMismatch ? 'MISMATCH' : ($rateCleared ? 'CLEARED' : 'OK') }}</p>
                         </div>
-                        <div class="p-3 rounded-lg {{ ($ruleFlags['BUYER_RISK'] ?? false) ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200' }}">
-                            <p class="text-xs font-medium {{ ($ruleFlags['BUYER_RISK'] ?? false) ? 'text-red-700' : 'text-green-700' }}">Buyer NTN (S.23)</p>
-                            <p class="text-sm font-bold {{ ($ruleFlags['BUYER_RISK'] ?? false) ? 'text-red-800' : 'text-green-800' }}">{{ ($ruleFlags['BUYER_RISK'] ?? false) ? 'AT RISK' : 'OK' }}</p>
+                        @php
+                            $buyerRisk = $ruleFlags['BUYER_RISK'] ?? false;
+                            $buyerCleared = $isFbrValidated && ($preFlags['BUYER_RISK'] ?? false) && !$buyerRisk;
+                        @endphp
+                        <div class="p-3 rounded-lg {{ $buyerRisk ? 'bg-red-50 border border-red-200' : ($buyerCleared ? 'bg-emerald-50 border border-emerald-200' : 'bg-green-50 border border-green-200') }}">
+                            <p class="text-xs font-medium {{ $buyerRisk ? 'text-red-700' : ($buyerCleared ? 'text-emerald-700' : 'text-green-700') }}">Buyer NTN (S.23)</p>
+                            <p class="text-sm font-bold {{ $buyerRisk ? 'text-red-800' : ($buyerCleared ? 'text-emerald-800' : 'text-green-800') }}">{{ $buyerRisk ? 'AT RISK' : ($buyerCleared ? 'CLEARED' : 'OK') }}</p>
                         </div>
                         <div class="p-3 rounded-lg {{ ($ruleFlags['BANKING_RISK'] ?? false) ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200' }}">
                             <p class="text-xs font-medium {{ ($ruleFlags['BANKING_RISK'] ?? false) ? 'text-red-700' : 'text-green-700' }}">Banking (S.73)</p>
                             <p class="text-sm font-bold {{ ($ruleFlags['BANKING_RISK'] ?? false) ? 'text-red-800' : 'text-green-800' }}">{{ ($ruleFlags['BANKING_RISK'] ?? false) ? 'VIOLATION' : 'OK' }}</p>
                         </div>
-                        <div class="p-3 rounded-lg {{ ($ruleFlags['STRUCTURE_ERROR'] ?? false) ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200' }}">
-                            <p class="text-xs font-medium {{ ($ruleFlags['STRUCTURE_ERROR'] ?? false) ? 'text-red-700' : 'text-green-700' }}">Structure (S.23)</p>
-                            <p class="text-sm font-bold {{ ($ruleFlags['STRUCTURE_ERROR'] ?? false) ? 'text-red-800' : 'text-green-800' }}">{{ ($ruleFlags['STRUCTURE_ERROR'] ?? false) ? 'ERROR' : 'OK' }}</p>
+                        @php
+                            $structError = $ruleFlags['STRUCTURE_ERROR'] ?? false;
+                            $structCleared = $isFbrValidated && ($preFlags['STRUCTURE_ERROR'] ?? false) && !$structError;
+                        @endphp
+                        <div class="p-3 rounded-lg {{ $structError ? 'bg-red-50 border border-red-200' : ($structCleared ? 'bg-emerald-50 border border-emerald-200' : 'bg-green-50 border border-green-200') }}">
+                            <p class="text-xs font-medium {{ $structError ? 'text-red-700' : ($structCleared ? 'text-emerald-700' : 'text-green-700') }}">Structure (S.23)</p>
+                            <p class="text-sm font-bold {{ $structError ? 'text-red-800' : ($structCleared ? 'text-emerald-800' : 'text-green-800') }}">{{ $structError ? 'ERROR' : ($structCleared ? 'CLEARED' : 'OK') }}</p>
                         </div>
                     </div>
                 </div>

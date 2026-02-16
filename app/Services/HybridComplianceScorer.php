@@ -70,12 +70,11 @@ class HybridComplianceScorer
 
         $originalFlags = $report->rule_flags ?? [];
 
-        $clearedFlags = [
+        $clearedFlags = array_merge($originalFlags, [
             'RATE_MISMATCH' => false,
             'BUYER_RISK' => false,
-            'BANKING_RISK' => $originalFlags['BANKING_RISK'] ?? false,
             'STRUCTURE_ERROR' => false,
-        ];
+        ]);
 
         $clearedDeductions = [];
         if ($clearedFlags['BANKING_RISK']) {

@@ -40,7 +40,7 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **Admin Company Deep View:** Comprehensive oversight for super administrators.
 - **Risk Intelligence Engine:** Pre-submission risk detection and anomaly logging.
 - **SRO Suggestion System:** Non-mandatory autofill with confidence-based suggestions.
-- **Enhanced Compliance Scoring:** Formula-based scoring incorporating various risk factors.
+- **Enhanced Compliance Scoring:** Formula-based scoring incorporating various risk factors. Post-FBR validation clears false-positive structural flags (RATE_MISMATCH, BUYER_RISK, STRUCTURE_ERROR) when invoice is locked/production with FBR invoice number. UI shows "FBR VALIDATED — Structural Compliance Confirmed" badge.
 - **Custom Billing Plan Builder:** Admin-only dynamic pricing calculator for subscriptions.
 - **Customer Registered/Unregistered Toggle:** Manages customer registration types with conditional form fields.
 - **Products Page Upgrade:** Enhanced product management with `serial_number`, `mrp`, and dynamic tax calculation previews based on schedule types.

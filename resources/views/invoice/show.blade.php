@@ -194,21 +194,24 @@
                 @elseif($invoice->status === 'locked' && $invoice->fbr_status === 'production')
                 {{-- LOCKED+PRODUCTION: PDF with WHT lock, Print, Duplicate, WhatsApp --}}
                 <div x-data="lockedPdfHandler()" class="inline-flex items-center gap-2">
-                    @if($invoice->wht_locked)
-                    <button @click="openPdfPopup()" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
-                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                        Download / Print
-                    </button>
-                    <span class="inline-flex items-center px-2.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-medium">
-                        <svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                        WHT {{ number_format($invoice->wht_rate, 1) }}%
-                    </span>
-                    @else
-                    <button @click="showWhtFirst = true" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
-                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                        Download / Print
-                    </button>
-                    @endif
+                    <template x-if="whtLocked">
+                        <div class="inline-flex items-center gap-2">
+                            <button @click="openPdfPopup()" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
+                                <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                Download / Print
+                            </button>
+                            <span class="inline-flex items-center px-2.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-medium">
+                                <svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                WHT <span x-text="lockedWhtRate"></span>%
+                            </span>
+                        </div>
+                    </template>
+                    <template x-if="!whtLocked">
+                        <button @click="showWhtFirst = true" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                            Download / Print
+                        </button>
+                    </template>
 
                     <div x-show="showWhtFirst" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background-color: rgba(0,0,0,0.4);">
                         <div @click.away="showWhtFirst = false" class="bg-white rounded-xl shadow-2xl border border-gray-200 p-6 w-96 max-w-[90vw]">
@@ -255,6 +258,8 @@
                 <script>
                 function lockedPdfHandler() {
                     return {
+                        whtLocked: {{ $invoice->wht_locked ? 'true' : 'false' }},
+                        lockedWhtRate: {{ $invoice->wht_rate ?? 0 }},
                         showWhtFirst: false,
                         selectedWht: {{ $invoice->wht_rate ?? 0 }},
                         savingWht: false,
@@ -274,6 +279,8 @@
                                 });
                                 const data = await res.json();
                                 if (data.status === 'ok') {
+                                    this.whtLocked = true;
+                                    this.lockedWhtRate = this.selectedWht;
                                     this.showWhtFirst = false;
                                     this.savingWht = false;
                                     openInlinePdfPopup();
@@ -1249,36 +1256,8 @@ function patchStatusBadge(status, fbrStatus) {
 }
 
 function patchActionButtons(status, fbrStatus, fbrInvoiceNumber, shareUuid, displayNumber, whtRate, whtLocked) {
-    const block = document.getElementById('actionButtonsBlock');
-    if (!block) return;
     if (status === 'locked' && fbrStatus === 'production') {
-        block.style.opacity = '0';
-        let whatsappBtn = '';
-        if (shareUuid) {
-            const shareUrl = window.location.origin + '/share/invoice/' + shareUuid;
-            const waText = encodeURIComponent('Invoice ' + (displayNumber || '') + ': ' + shareUrl);
-            whatsappBtn = `<a href="https://wa.me/?text=${waText}" target="_blank" class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition">WhatsApp</a>`;
-        }
-        let whtBadge = whtLocked ? `<span class="inline-flex items-center px-2.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-medium">
-            <svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-            WHT ${whtRate}%
-        </span>` : '';
-        block.innerHTML = `
-            <button onclick="openInlinePdfPopup()" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
-                <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                Download / Print
-            </button>
-            ${whtBadge}
-            <form method="POST" action="/invoice/{{ $invoice->id }}/duplicate" class="inline">
-                <input type="hidden" name="_token" value="${document.querySelector('meta[name=csrf-token]')?.content || ''}">
-                <button type="submit" class="inline-flex items-center px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-700 transition" onclick="return confirm('Create a duplicate of this invoice as a new draft?')">
-                    <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/></svg>
-                    Duplicate
-                </button>
-            </form>
-            ${whatsappBtn}
-        `;
-        requestAnimationFrame(() => { block.style.transition = 'opacity 250ms ease'; block.style.opacity = '1'; });
+        window.location.reload();
     }
 }
 

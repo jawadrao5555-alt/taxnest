@@ -1,15 +1,21 @@
 <?php
 use Illuminate\Support\Str;
 
-$explicitHost = getenv('DB_HOST');
+$isReplitProduction = false;
+if (file_exists('/tmp/replitdb')) {
+    $replitDbRaw = trim(file_get_contents('/tmp/replitdb'));
+    if (!empty($replitDbRaw) && !preg_match('/^postgres(ql)?:\/\//', $replitDbRaw)) {
+        $isReplitProduction = true;
+    }
+}
 
-if ($explicitHost && $explicitHost !== 'helium') {
-    $dbHost = $explicitHost;
-    $dbPort = getenv('DB_PORT') ?: env('DB_PORT', '5432');
-    $dbName = getenv('DB_DATABASE') ?: env('DB_DATABASE', 'neondb');
-    $dbUser = getenv('DB_USERNAME') ?: env('DB_USERNAME', 'neondb_owner');
-    $dbPass = getenv('DB_PASSWORD') ?: env('DB_PASSWORD', '');
-    $sslMode = 'prefer';
+if ($isReplitProduction) {
+    $dbHost = '169.254.254.254';
+    $dbPort = '5432';
+    $dbName = 'neondb';
+    $dbUser = 'neondb_owner';
+    $dbPass = '';
+    $sslMode = 'disable';
 } else {
     $dbUrl = null;
     if (file_exists('/tmp/replitdb')) {
@@ -31,17 +37,11 @@ if ($explicitHost && $explicitHost !== 'helium') {
         $parsedUrl = parse_url($normalized) ?: [];
     }
 
-    $pgHost = getenv('PGHOST');
-    $pgPort = getenv('PGPORT');
-    $pgUser = getenv('PGUSER');
-    $pgPass = getenv('PGPASSWORD');
-    $pgDb   = getenv('PGDATABASE');
-
-    $dbHost = $parsedUrl['host'] ?? ($pgHost ?: env('DB_HOST', '127.0.0.1'));
-    $dbPort = $parsedUrl['port'] ?? ($pgPort ?: env('DB_PORT', '5432'));
-    $dbName = isset($parsedUrl['path']) ? ltrim($parsedUrl['path'], '/') : ($pgDb ?: env('DB_DATABASE', 'laravel'));
-    $dbUser = $parsedUrl['user'] ?? ($pgUser ?: env('DB_USERNAME', 'root'));
-    $dbPass = $parsedUrl['pass'] ?? ($pgPass ?: env('DB_PASSWORD', ''));
+    $dbHost = $parsedUrl['host'] ?? env('DB_HOST', '127.0.0.1');
+    $dbPort = $parsedUrl['port'] ?? env('DB_PORT', '5432');
+    $dbName = isset($parsedUrl['path']) ? ltrim($parsedUrl['path'], '/') : env('DB_DATABASE', 'laravel');
+    $dbUser = $parsedUrl['user'] ?? env('DB_USERNAME', 'root');
+    $dbPass = $parsedUrl['pass'] ?? env('DB_PASSWORD', '');
 
     $sslMode = 'prefer';
     if (isset($parsedUrl['query'])) {

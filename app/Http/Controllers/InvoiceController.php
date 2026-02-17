@@ -1438,6 +1438,46 @@ class InvoiceController extends Controller
         return redirect('/invoice/' . $invoice->id . '/download');
     }
 
+    public function updateWhtAjax(Request $request, Invoice $invoice)
+    {
+        $companyId = app('currentCompanyId');
+        if ($invoice->company_id !== $companyId) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 403);
+        }
+
+        if ($invoice->wht_locked) {
+            return response()->json(['status' => 'error', 'message' => 'WHT rate is already locked on this invoice.'], 422);
+        }
+
+        if (in_array($invoice->status, ['locked', 'pending_verification'])) {
+            return response()->json(['status' => 'error', 'message' => 'Cannot modify WHT on this invoice in its current state.'], 422);
+        }
+
+        $request->validate([
+            'wht_rate' => 'required|numeric|min:0|max:100',
+        ]);
+
+        $whtRate = floatval($request->wht_rate);
+        $subtotal = $invoice->items->sum(fn($item) => $item->price * $item->quantity);
+        $totalTax = $invoice->items->sum('tax');
+        $whtAmount = round($subtotal * ($whtRate / 100), 2);
+        $netReceivable = round(($subtotal + $totalTax) + $whtAmount, 2);
+
+        $invoice->update([
+            'wht_rate' => $whtRate,
+            'wht_amount' => $whtAmount,
+            'net_receivable' => $netReceivable,
+            'wht_locked' => true,
+        ]);
+
+        return response()->json([
+            'status' => 'ok',
+            'wht_rate' => $whtRate,
+            'wht_amount' => $whtAmount,
+            'net_receivable' => $netReceivable,
+        ]);
+    }
+
     public function complianceCheck(Request $request)
     {
         $companyId = app('currentCompanyId');

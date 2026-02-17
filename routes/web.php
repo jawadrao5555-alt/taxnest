@@ -268,6 +268,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
     Route::get('/invoice/{invoice}/pdf', [InvoiceController::class, 'pdf']);
     Route::get('/invoice/{invoice}/download', [InvoiceController::class, 'download']);
     Route::post('/invoice/{invoice}/update-wht', [InvoiceController::class, 'updateWht'])->name('invoice.updateWht');
+    Route::post('/invoice/{invoice}/update-wht-ajax', [InvoiceController::class, 'updateWhtAjax'])->name('invoice.updateWhtAjax');
     Route::post('/invoice/{invoice}/verify', [InvoiceController::class, 'verifyIntegrity'])->name('invoice.verify');
 
     Route::get('/compliance/certificate', [ComplianceCertificateController::class, 'generate'])->name('compliance.certificate');

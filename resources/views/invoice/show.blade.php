@@ -157,15 +157,103 @@
                     </div>
                 </div>
                 @elseif($invoice->status === 'locked' && $invoice->fbr_status === 'production')
-                {{-- LOCKED+PRODUCTION: Download PDF, Print, Duplicate, WhatsApp only --}}
-                <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
-                    <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                    Download PDF
-                </a>
-                <button onclick="window.print()" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
-                    <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                    Print
-                </button>
+                {{-- LOCKED+PRODUCTION: PDF with WHT lock, Print, Duplicate, WhatsApp --}}
+                <div x-data="lockedPdfHandler()" class="inline-flex items-center gap-2">
+                    @if($invoice->wht_locked)
+                    <button @click="openPdfPopup()" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        Download / Print
+                    </button>
+                    <span class="inline-flex items-center px-2.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-medium">
+                        <svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                        WHT {{ number_format($invoice->wht_rate, 1) }}%
+                    </span>
+                    @else
+                    <button @click="showWhtFirst = true" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        Download / Print
+                    </button>
+                    @endif
+
+                    <div x-show="showWhtFirst" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background-color: rgba(0,0,0,0.4);">
+                        <div @click.away="showWhtFirst = false" class="bg-white rounded-xl shadow-2xl border border-gray-200 p-6 w-96 max-w-[90vw]">
+                            <div class="flex items-center justify-between mb-4">
+                                <p class="text-base font-bold text-gray-800">Select WHT Rate</p>
+                                <button @click="showWhtFirst = false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                            </div>
+                            <p class="text-xs text-gray-500 mb-3">WHT rate will be locked and applied to this invoice permanently.</p>
+                            <div class="space-y-2 mb-4">
+                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                    :class="selectedWht == 0 ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 hover:bg-gray-50'">
+                                    <input type="radio" value="0" x-model.number="selectedWht" class="text-emerald-500">
+                                    <span class="text-sm font-semibold text-gray-800">No WHT (0%)</span>
+                                </label>
+                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                    :class="selectedWht == 0.5 ? 'border-amber-400 bg-amber-50' : 'border-gray-200 hover:bg-gray-50'">
+                                    <input type="radio" value="0.5" x-model.number="selectedWht" class="text-amber-500">
+                                    <span class="text-sm font-semibold text-gray-800">WHT 0.5%</span>
+                                </label>
+                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                    :class="selectedWht == 1 ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'">
+                                    <input type="radio" value="1" x-model.number="selectedWht" class="text-blue-500">
+                                    <span class="text-sm font-semibold text-gray-800">WHT 1%</span>
+                                </label>
+                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                    :class="selectedWht == 2 ? 'border-orange-400 bg-orange-50' : 'border-gray-200 hover:bg-gray-50'">
+                                    <input type="radio" value="2" x-model.number="selectedWht" class="text-orange-500">
+                                    <span class="text-sm font-semibold text-gray-800">WHT 2%</span>
+                                </label>
+                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                    :class="selectedWht == 2.5 ? 'border-red-400 bg-red-50' : 'border-gray-200 hover:bg-gray-50'">
+                                    <input type="radio" value="2.5" x-model.number="selectedWht" class="text-red-500">
+                                    <span class="text-sm font-semibold text-gray-800">WHT 2.5%</span>
+                                </label>
+                            </div>
+                            <button @click="saveWhtAndOpen()" :disabled="savingWht" class="w-full px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
+                                <span x-show="!savingWht">Lock WHT & Open PDF</span>
+                                <span x-show="savingWht" x-cloak>Saving...</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+                <script>
+                function lockedPdfHandler() {
+                    return {
+                        showWhtFirst: false,
+                        selectedWht: {{ $invoice->wht_rate ?? 0 }},
+                        savingWht: false,
+                        openPdfPopup() {
+                            openInlinePdfPopup();
+                        },
+                        async saveWhtAndOpen() {
+                            this.savingWht = true;
+                            try {
+                                const body = new FormData();
+                                body.append('_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
+                                body.append('wht_rate', this.selectedWht);
+                                const res = await fetch('/invoice/{{ $invoice->id }}/update-wht-ajax', {
+                                    method: 'POST',
+                                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                                    body: body
+                                });
+                                const data = await res.json();
+                                if (data.status === 'ok') {
+                                    this.showWhtFirst = false;
+                                    this.savingWht = false;
+                                    openInlinePdfPopup();
+                                    return;
+                                } else {
+                                    alert(data.message || 'Failed to save WHT rate');
+                                }
+                            } catch(e) {
+                                alert('Network error saving WHT rate');
+                            }
+                            this.savingWht = false;
+                        }
+                    };
+                }
+                </script>
                 @if(in_array(auth()->user()->role, ['company_admin', 'employee']))
                 <form method="POST" action="{{ route('invoice.duplicate', $invoice->id) }}" class="inline">
                     @csrf
@@ -1082,13 +1170,9 @@ function patchActionButtons(status, fbrStatus, fbrInvoiceNumber, shareUuid, disp
             whatsappBtn = `<a href="https://wa.me/?text=${waText}" target="_blank" class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition">WhatsApp</a>`;
         }
         block.innerHTML = `
-            <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
+            <button onclick="openInlinePdfPopup()" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
                 <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                Download PDF
-            </a>
-            <button onclick="window.print()" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
-                <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                Print
+                Download / Print
             </button>
             <form method="POST" action="/invoice/{{ $invoice->id }}/duplicate" class="inline">
                 <input type="hidden" name="_token" value="${document.querySelector('meta[name=csrf-token]')?.content || ''}">
@@ -1159,6 +1243,39 @@ function downloadFbrPdf() {
         document.body.appendChild(a);
         a.click();
         setTimeout(() => document.body.removeChild(a), 100);
+    }
+}
+
+function openInlinePdfPopup() {
+    const existing = document.getElementById('inlinePdfPopup');
+    if (existing) existing.remove();
+    const popup = document.createElement('div');
+    popup.id = 'inlinePdfPopup';
+    popup.style.cssText = 'position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;background:rgba(0,0,0,0.6);';
+    popup.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:white;border-bottom:1px solid #e5e7eb;">
+            <span style="font-size:14px;font-weight:700;color:#1f2937;">Invoice PDF</span>
+            <div style="display:flex;gap:8px;">
+                <button onclick="printInlinePdf()" style="display:inline-flex;align-items:center;padding:6px 12px;background:#4f46e5;color:white;border-radius:8px;font-size:12px;font-weight:600;border:none;cursor:pointer;">Print</button>
+                <a href="/invoice/{{ $invoice->id }}/download" style="display:inline-flex;align-items:center;padding:6px 12px;background:#059669;color:white;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;">Download</a>
+                <button onclick="closeInlinePdfPopup()" style="display:inline-flex;align-items:center;padding:6px 12px;background:#e5e7eb;color:#374151;border-radius:8px;font-size:12px;font-weight:600;border:none;cursor:pointer;">Close</button>
+            </div>
+        </div>
+        <div style="flex:1;overflow:hidden;padding:8px;background:#f3f4f6;">
+            <iframe src="/invoice/{{ $invoice->id }}/pdf?t=${Date.now()}" style="width:100%;height:100%;border:0;border-radius:8px;background:white;"></iframe>
+        </div>
+    `;
+    document.body.appendChild(popup);
+    document.body.style.overflow = 'hidden';
+}
+function closeInlinePdfPopup() {
+    const popup = document.getElementById('inlinePdfPopup');
+    if (popup) { popup.remove(); document.body.style.overflow = ''; }
+}
+function printInlinePdf() {
+    const iframe = document.querySelector('#inlinePdfPopup iframe');
+    if (iframe && iframe.contentWindow) {
+        try { iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch(e) {}
     }
 }
 

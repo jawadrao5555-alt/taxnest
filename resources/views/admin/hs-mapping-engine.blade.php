@@ -46,8 +46,21 @@
             </div>
 
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6">
+                <div class="border-b border-gray-200 dark:border-gray-700">
+                    <nav class="flex -mb-px">
+                        <a href="{{ route('admin.hs-mapping-engine', ['tab' => 'mappings']) }}" class="px-6 py-4 text-sm font-medium border-b-2 {{ $tab === 'mappings' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300' }}">
+                            Mappings ({{ $stats['total'] }})
+                        </a>
+                        <a href="{{ route('admin.hs-mapping-engine', ['tab' => 'analytics']) }}" class="px-6 py-4 text-sm font-medium border-b-2 {{ $tab === 'analytics' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300' }}">
+                            Analytics
+                        </a>
+                    </nav>
+                </div>
+
+                @if($tab === 'mappings')
                 <div class="p-4 border-b border-gray-200 dark:border-gray-700">
                     <form method="GET" action="{{ route('admin.hs-mapping-engine') }}" class="flex flex-col sm:flex-row gap-3">
+                        <input type="hidden" name="tab" value="mappings">
                         <input type="text" name="search" value="{{ $search }}" placeholder="Search HS code, label, SRO, PCT..."
                             class="flex-1 rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                         <select name="sale_type" class="rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
@@ -76,7 +89,6 @@
                                 <th class="px-4 py-3">SRO</th>
                                 <th class="px-4 py-3">Serial#</th>
                                 <th class="px-4 py-3">MRP</th>
-                                <th class="px-4 py-3">PCT</th>
                                 <th class="px-4 py-3">Buyer</th>
                                 <th class="px-4 py-3">Priority</th>
                                 <th class="px-4 py-3">Status</th>
@@ -105,14 +117,14 @@
                                     <td class="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{{ $mapping->tax_rate }}%</td>
                                     <td class="px-4 py-3">
                                         @if($mapping->sro_applicable)
-                                            <span class="text-emerald-600 dark:text-emerald-400 font-medium">{{ $mapping->sro_number ?: 'Yes' }}</span>
+                                            <span class="text-emerald-600 dark:text-emerald-400 font-medium text-xs">{{ $mapping->sro_number ?: 'Yes' }}</span>
                                         @else
                                             <span class="text-gray-400">No</span>
                                         @endif
                                     </td>
                                     <td class="px-4 py-3">
                                         @if($mapping->serial_number_applicable)
-                                            <span class="text-emerald-600 dark:text-emerald-400 font-medium">{{ $mapping->serial_number_value ?: 'Yes' }}</span>
+                                            <span class="text-emerald-600 dark:text-emerald-400 font-medium text-xs">{{ $mapping->serial_number_value ?: 'Yes' }}</span>
                                         @else
                                             <span class="text-gray-400">No</span>
                                         @endif
@@ -124,7 +136,6 @@
                                             <span class="text-gray-400">No</span>
                                         @endif
                                     </td>
-                                    <td class="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-400">{{ $mapping->pct_code ?: '-' }}</td>
                                     <td class="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">{{ $mapping->buyer_type ? ucfirst($mapping->buyer_type) : 'Any' }}</td>
                                     <td class="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">{{ $mapping->priority }}</td>
                                     <td class="px-4 py-3">
@@ -135,10 +146,16 @@
                                         @endif
                                     </td>
                                     <td class="px-4 py-3">
-                                        <div class="flex items-center gap-2">
+                                        <div class="flex items-center gap-1.5">
                                             <button onclick="openEditModal({{ $mapping->id }}, {{ json_encode($mapping) }})" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300" title="Edit">
                                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                             </button>
+                                            <form method="POST" action="{{ route('admin.hs-mapping-engine.clone', $mapping->id) }}" class="inline" title="Clone">
+                                                @csrf
+                                                <button type="submit" class="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300">
+                                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                                </button>
+                                            </form>
                                             <form method="POST" action="{{ route('admin.hs-mapping-engine.destroy', $mapping->id) }}" onsubmit="return confirm('Delete this mapping?')" class="inline">
                                                 @csrf @method('DELETE')
                                                 <button type="submit" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300" title="Delete">
@@ -150,7 +167,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="12" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No HS code mappings found. Click "Add Mapping" to create one.</td>
+                                    <td colspan="11" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No HS code mappings found. Click "Add Mapping" to create one.</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -162,11 +179,111 @@
                         {{ $mappings->links() }}
                     </div>
                 @endif
+                @endif
+
+                @if($tab === 'analytics')
+                <div class="p-6">
+                    @if($analyticsData)
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                            <div>
+                                <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-3">Top Accepted Mappings</h3>
+                                @if(count($analyticsData['top_accepted']) > 0)
+                                    <div class="space-y-2">
+                                        @foreach($analyticsData['top_accepted'] as $item)
+                                            <div class="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-100 dark:border-green-800">
+                                                <div>
+                                                    <span class="font-mono text-sm font-medium text-gray-900 dark:text-gray-100">{{ $item->hs_code }}</span>
+                                                    <span class="text-xs text-gray-500 ml-2">{{ $item->label ?: $item->sale_type }}</span>
+                                                </div>
+                                                <span class="px-2.5 py-1 text-xs font-bold bg-green-600 text-white rounded-full">{{ $item->accept_count }} accepted</span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <p class="text-sm text-gray-400 italic">No accepted responses yet.</p>
+                                @endif
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-3">Top Rejected Mappings</h3>
+                                @if(count($analyticsData['top_rejected']) > 0)
+                                    <div class="space-y-2">
+                                        @foreach($analyticsData['top_rejected'] as $item)
+                                            <div class="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800">
+                                                <div>
+                                                    <span class="font-mono text-sm font-medium text-gray-900 dark:text-gray-100">{{ $item->hs_code }}</span>
+                                                    <span class="text-xs text-gray-500 ml-2">{{ $item->label ?: $item->sale_type }}</span>
+                                                </div>
+                                                <span class="px-2.5 py-1 text-xs font-bold bg-red-600 text-white rounded-full">{{ $item->reject_count }} rejected</span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <p class="text-sm text-gray-400 italic">No rejected responses yet.</p>
+                                @endif
+                            </div>
+                        </div>
+
+                        <div class="mb-6">
+                            <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-3">Company Response Activity</h3>
+                            @if(count($analyticsData['by_company']) > 0)
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    @foreach($analyticsData['by_company'] as $item)
+                                        <div class="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-600 flex items-center justify-between">
+                                            <span class="text-sm text-gray-700 dark:text-gray-300 truncate mr-2">{{ $item->company_name }}</span>
+                                            <span class="px-2 py-0.5 text-xs font-medium rounded-full flex-shrink-0 {{ $item->action === 'accepted' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : ($item->action === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' : 'bg-blue-100 text-blue-700') }}">
+                                                {{ $item->count }} {{ $item->action }}
+                                            </span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <p class="text-sm text-gray-400 italic">No company responses yet.</p>
+                            @endif
+                        </div>
+
+                        <div>
+                            <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-3">Recent Activity Log</h3>
+                            @if(count($analyticsData['recent_responses']) > 0)
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead class="bg-gray-50 dark:bg-gray-900/50 text-xs text-gray-600 dark:text-gray-400 uppercase">
+                                            <tr>
+                                                <th class="px-3 py-2 text-left">Time</th>
+                                                <th class="px-3 py-2 text-left">Company</th>
+                                                <th class="px-3 py-2 text-left">HS Code</th>
+                                                <th class="px-3 py-2 text-left">Mapping</th>
+                                                <th class="px-3 py-2 text-left">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                                            @foreach($analyticsData['recent_responses'] as $resp)
+                                                <tr>
+                                                    <td class="px-3 py-2 text-xs text-gray-500">{{ \Carbon\Carbon::parse($resp->created_at)->diffForHumans() }}</td>
+                                                    <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ $resp->company_name }}</td>
+                                                    <td class="px-3 py-2 font-mono text-gray-900 dark:text-gray-100">{{ $resp->hs_code }}</td>
+                                                    <td class="px-3 py-2 text-gray-600 dark:text-gray-400">{{ $resp->label ?: $resp->sale_type }}</td>
+                                                    <td class="px-3 py-2">
+                                                        <span class="px-2 py-0.5 text-xs font-medium rounded-full {{ $resp->action === 'accepted' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : ($resp->action === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' : 'bg-blue-100 text-blue-700') }}">
+                                                            {{ ucfirst($resp->action) }}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @else
+                                <p class="text-sm text-gray-400 italic">No responses recorded yet. Companies will appear here when they accept or reject mapping suggestions.</p>
+                            @endif
+                        </div>
+                    @endif
+                </div>
+                @endif
             </div>
         </div>
     </div>
 
-    <div id="addMappingModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div id="addMappingModal" class="hidden fixed inset-0 z-50 overflow-y-auto" x-data="{ hsAutoFilling: false }" x-cloak>
         <div class="flex items-center justify-center min-h-screen px-4">
             <div class="fixed inset-0 bg-black/50" onclick="document.getElementById('addMappingModal').classList.add('hidden')"></div>
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full relative z-10 max-h-[90vh] overflow-y-auto">
@@ -176,20 +293,26 @@
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
-                <form method="POST" action="{{ route('admin.hs-mapping-engine.store') }}" class="p-6 space-y-4">
+                <form method="POST" action="{{ route('admin.hs-mapping-engine.store') }}" class="p-6 space-y-4" id="addForm">
                     @csrf
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">HS Code *</label>
-                            <input type="text" name="hs_code" required placeholder="8471.3010" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm">
+                            <div class="relative">
+                                <input type="text" name="hs_code" id="add_hs_code" required placeholder="8471.3010" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm" @blur="hsAutoFill()">
+                                <div x-show="hsAutoFilling" class="absolute right-2 top-2">
+                                    <svg class="animate-spin h-4 w-4 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                </div>
+                            </div>
+                            <p id="addHsAutoFillStatus" class="mt-1 text-xs text-emerald-600 hidden"></p>
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Label / Description</label>
-                            <input type="text" name="label" placeholder="e.g. Laptop Computers" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm">
+                            <input type="text" name="label" id="add_label" placeholder="e.g. Laptop Computers" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm">
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Sale Type *</label>
-                            <select name="sale_type" required class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm">
+                            <select name="sale_type" id="add_sale_type" required class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm">
                                 <option value="standard">Standard Rate</option>
                                 <option value="reduced">Reduced Rate</option>
                                 <option value="3rd_schedule">3rd Schedule</option>
@@ -199,15 +322,15 @@
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Tax Rate (%) *</label>
-                            <input type="number" name="tax_rate" required step="0.01" min="0" max="100" value="18" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm">
+                            <input type="number" name="tax_rate" id="add_tax_rate" required step="0.01" min="0" max="100" value="18" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm">
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">PCT Code</label>
-                            <input type="text" name="pct_code" placeholder="8471.3010" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm">
+                            <input type="text" name="pct_code" id="add_pct_code" placeholder="8471.3010" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm">
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Default UOM</label>
-                            <input type="text" name="default_uom" placeholder="PCS, KG, LTR..." class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm">
+                            <input type="text" name="default_uom" id="add_default_uom" placeholder="PCS, KG, LTR..." class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm">
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Buyer Type</label>
@@ -224,7 +347,7 @@
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <label class="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg cursor-pointer">
-                            <input type="checkbox" name="sro_applicable" value="1" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" onchange="document.getElementById('sroNumberField').classList.toggle('hidden', !this.checked)">
+                            <input type="checkbox" name="sro_applicable" id="add_sro_applicable" value="1" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" onchange="document.getElementById('sroNumberField').classList.toggle('hidden', !this.checked)">
                             <span class="text-sm text-gray-700 dark:text-gray-300">SRO Applicable</span>
                         </label>
                         <label class="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg cursor-pointer">
@@ -232,13 +355,13 @@
                             <span class="text-sm text-gray-700 dark:text-gray-300">Serial # Applicable</span>
                         </label>
                         <label class="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg cursor-pointer">
-                            <input type="checkbox" name="mrp_required" value="1" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                            <input type="checkbox" name="mrp_required" id="add_mrp_required" value="1" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
                             <span class="text-sm text-gray-700 dark:text-gray-300">MRP Required</span>
                         </label>
                     </div>
                     <div id="sroNumberField" class="hidden">
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">SRO Number</label>
-                        <input type="text" name="sro_number" placeholder="e.g. SRO 1125(I)/2011" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm">
+                        <input type="text" name="sro_number" id="add_sro_number" placeholder="e.g. SRO 1125(I)/2011" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm">
                     </div>
                     <div id="serialNumberField" class="hidden">
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Serial Number Value</label>
@@ -379,6 +502,36 @@
             document.getElementById('edit_is_active').checked = mapping.is_active !== false;
 
             document.getElementById('editMappingModal').classList.remove('hidden');
+        }
+
+        async function hsAutoFill() {
+            let hsCode = document.getElementById('add_hs_code').value.trim();
+            if (!hsCode || hsCode.length < 4) return;
+            let statusEl = document.getElementById('addHsAutoFillStatus');
+            try {
+                let res = await fetch('/api/hs-mapping-autofill/' + encodeURIComponent(hsCode));
+                let data = await res.json();
+                if (data && data.found) {
+                    if (data.description) document.getElementById('add_label').value = data.description;
+                    if (data.pct_code) document.getElementById('add_pct_code').value = data.pct_code;
+                    if (data.schedule_type) document.getElementById('add_sale_type').value = data.schedule_type;
+                    if (data.tax_rate) document.getElementById('add_tax_rate').value = Math.round(parseFloat(data.tax_rate));
+                    if (data.default_uom) document.getElementById('add_default_uom').value = data.default_uom;
+                    if (data.sro_required) {
+                        document.getElementById('add_sro_applicable').checked = true;
+                        document.getElementById('sroNumberField').classList.remove('hidden');
+                        if (data.sro_number) document.getElementById('add_sro_number').value = data.sro_number;
+                    }
+                    if (data.mrp_required) document.getElementById('add_mrp_required').checked = true;
+                    statusEl.textContent = 'Auto-filled from HS Master: ' + data.description;
+                    statusEl.classList.remove('hidden');
+                } else {
+                    statusEl.textContent = 'HS code not found in master database';
+                    statusEl.classList.remove('hidden');
+                    statusEl.classList.remove('text-emerald-600');
+                    statusEl.classList.add('text-amber-600');
+                }
+            } catch(e) {}
         }
     </script>
 </x-app-layout>

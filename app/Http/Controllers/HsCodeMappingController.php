@@ -13,6 +13,7 @@ class HsCodeMappingController extends Controller
     {
         $search = $request->get('search', '');
         $saleTypeFilter = $request->get('sale_type', '');
+        $tab = $request->get('tab', 'mappings');
 
         $query = HsCodeMapping::query();
 
@@ -46,7 +47,12 @@ class HsCodeMappingController extends Controller
             ->count();
         $stats['multi_mapped'] = $hsGroups;
 
-        return view('admin.hs-mapping-engine', compact('mappings', 'stats', 'search', 'saleTypeFilter'));
+        $analyticsData = null;
+        if ($tab === 'analytics') {
+            $analyticsData = $this->getAnalyticsData();
+        }
+
+        return view('admin.hs-mapping-engine', compact('mappings', 'stats', 'search', 'saleTypeFilter', 'tab', 'analyticsData'));
     }
 
     public function store(Request $request)
@@ -72,6 +78,22 @@ class HsCodeMappingController extends Controller
         $validated['serial_number_applicable'] = $request->boolean('serial_number_applicable');
         $validated['mrp_required'] = $request->boolean('mrp_required');
         $validated['created_by'] = auth()->id();
+
+        $dupQuery = HsCodeMapping::where('hs_code', $validated['hs_code'])
+            ->where('sale_type', $validated['sale_type'])
+            ->where('tax_rate', $validated['tax_rate']);
+        $bt = $validated['buyer_type'] ?? null;
+        if ($bt) {
+            $dupQuery->where('buyer_type', $bt);
+        } else {
+            $dupQuery->where(function ($q) { $q->whereNull('buyer_type')->orWhere('buyer_type', ''); });
+        }
+        $duplicate = $dupQuery->first();
+
+        if ($duplicate) {
+            return redirect()->route('admin.hs-mapping-engine')
+                ->with('error', 'A mapping with the same HS Code (' . $validated['hs_code'] . '), Sale Type, Buyer Type and Tax Rate already exists (ID: ' . $duplicate->id . '). Please edit the existing mapping or use different values.');
+        }
 
         HsCodeMapping::create($validated);
 
@@ -119,33 +141,105 @@ class HsCodeMappingController extends Controller
         return redirect()->route('admin.hs-mapping-engine')->with('success', 'Mapping deleted successfully.');
     }
 
-    public function apiSuggestions($hsCode)
+    public function duplicate($id)
     {
-        $mappings = HsCodeMapping::active()
-            ->forHsCode($hsCode)
-            ->orderBy('priority')
-            ->get()
-            ->map(function ($m) {
-                return [
-                    'id' => $m->id,
-                    'hs_code' => $m->hs_code,
-                    'label' => $m->label,
-                    'sale_type' => $m->sale_type,
-                    'tax_rate' => (float) $m->tax_rate,
-                    'sro_applicable' => $m->sro_applicable,
-                    'sro_number' => $m->sro_number,
-                    'serial_number_applicable' => $m->serial_number_applicable,
-                    'serial_number_value' => $m->serial_number_value,
-                    'mrp_required' => $m->mrp_required,
-                    'pct_code' => $m->pct_code,
-                    'default_uom' => $m->default_uom,
-                    'buyer_type' => $m->buyer_type,
-                    'notes' => $m->notes,
-                    'priority' => $m->priority,
-                ];
-            });
+        $original = HsCodeMapping::findOrFail($id);
+        $clone = $original->replicate();
+        $clone->label = ($clone->label ? $clone->label . ' (Copy)' : 'Copy');
+        $clone->priority = $clone->priority + 1;
+        $clone->created_by = auth()->id();
+        $clone->updated_by = null;
+        $clone->save();
 
-        return response()->json(['mappings' => $mappings]);
+        return redirect()->route('admin.hs-mapping-engine')->with('success', 'Mapping cloned successfully (ID: ' . $clone->id . ').');
+    }
+
+    public function apiHsAutoFill($hsCode)
+    {
+        $master = DB::table('global_hs_master')->where('hs_code', $hsCode)->first();
+        if ($master) {
+            return response()->json([
+                'found' => true,
+                'description' => $master->description,
+                'pct_code' => $master->pct_code,
+                'schedule_type' => $master->schedule_type,
+                'tax_rate' => $master->tax_rate,
+                'default_uom' => $master->default_uom,
+                'sro_required' => $master->sro_required,
+                'sro_number' => $master->sro_number,
+                'mrp_required' => $master->mrp_required,
+            ]);
+        }
+        return response()->json(['found' => false]);
+    }
+
+    public function apiSuggestions(Request $request, $hsCode)
+    {
+        $buyerType = $request->get('buyer_type');
+
+        $query = HsCodeMapping::active()
+            ->forHsCode($hsCode)
+            ->orderBy('priority');
+
+        if ($buyerType) {
+            $query->where(function ($q) use ($buyerType) {
+                $q->where('buyer_type', $buyerType)
+                  ->orWhereNull('buyer_type')
+                  ->orWhere('buyer_type', '');
+            });
+        }
+
+        $mappings = $query->get();
+
+        $acceptCounts = HsMappingResponse::whereIn('hs_code_mapping_id', $mappings->pluck('id'))
+            ->where('action', 'accepted')
+            ->select('hs_code_mapping_id', DB::raw('count(*) as cnt'))
+            ->groupBy('hs_code_mapping_id')
+            ->pluck('cnt', 'hs_code_mapping_id');
+
+        $rejectCounts = HsMappingResponse::whereIn('hs_code_mapping_id', $mappings->pluck('id'))
+            ->where('action', 'rejected')
+            ->select('hs_code_mapping_id', DB::raw('count(*) as cnt'))
+            ->groupBy('hs_code_mapping_id')
+            ->pluck('cnt', 'hs_code_mapping_id');
+
+        $result = $mappings->map(function ($m) use ($acceptCounts, $rejectCounts) {
+            $accepted = $acceptCounts->get($m->id, 0);
+            $rejected = $rejectCounts->get($m->id, 0);
+            $total = $accepted + $rejected;
+            $confidence = 'new';
+            if ($total >= 5) {
+                $ratio = $accepted / $total;
+                if ($ratio >= 0.7) $confidence = 'high';
+                elseif ($ratio >= 0.4) $confidence = 'medium';
+                else $confidence = 'low';
+            } elseif ($total > 0) {
+                $confidence = 'building';
+            }
+
+            return [
+                'id' => $m->id,
+                'hs_code' => $m->hs_code,
+                'label' => $m->label,
+                'sale_type' => $m->sale_type,
+                'tax_rate' => (float) $m->tax_rate,
+                'sro_applicable' => $m->sro_applicable,
+                'sro_number' => $m->sro_number,
+                'serial_number_applicable' => $m->serial_number_applicable,
+                'serial_number_value' => $m->serial_number_value,
+                'mrp_required' => $m->mrp_required,
+                'pct_code' => $m->pct_code,
+                'default_uom' => $m->default_uom,
+                'buyer_type' => $m->buyer_type,
+                'notes' => $m->notes,
+                'priority' => $m->priority,
+                'confidence' => $confidence,
+                'accepted_count' => $accepted,
+                'rejected_count' => $rejected,
+            ];
+        });
+
+        return response()->json(['mappings' => $result]);
     }
 
     public function apiRecordResponse(Request $request)
@@ -163,16 +257,53 @@ class HsCodeMappingController extends Controller
 
         HsMappingResponse::create($validated);
 
+        if ($validated['action'] === 'custom' && !empty($validated['custom_values'])) {
+            $cv = $validated['custom_values'];
+            $companyId = auth()->user()->company_id;
+            $companyName = auth()->user()->company->name ?? 'Unknown';
+
+            if (!empty($cv['sale_type'])) {
+                $existsQuery = HsCodeMapping::where('hs_code', $validated['hs_code'])
+                    ->where('sale_type', $cv['sale_type'])
+                    ->where('tax_rate', $cv['tax_rate'] ?? 0);
+                $cvBuyer = $cv['buyer_type'] ?? null;
+                if ($cvBuyer) {
+                    $existsQuery->where('buyer_type', $cvBuyer);
+                } else {
+                    $existsQuery->where(function ($q) { $q->whereNull('buyer_type')->orWhere('buyer_type', ''); });
+                }
+
+                if (!$existsQuery->exists()) {
+                    HsCodeMapping::create([
+                        'hs_code' => $validated['hs_code'],
+                        'label' => 'Company Custom: ' . $companyName,
+                        'sale_type' => $cv['sale_type'],
+                        'tax_rate' => $cv['tax_rate'] ?? 0,
+                        'sro_applicable' => !empty($cv['sro_schedule_no']),
+                        'sro_number' => $cv['sro_schedule_no'] ?? null,
+                        'serial_number_applicable' => !empty($cv['serial_no']),
+                        'serial_number_value' => $cv['serial_no'] ?? null,
+                        'buyer_type' => $cvBuyer,
+                        'mrp_required' => false,
+                        'priority' => 50,
+                        'is_active' => true,
+                        'created_by' => auth()->id(),
+                        'notes' => 'Auto-created from company custom input (Company ID: ' . $companyId . ', ' . $companyName . ')',
+                    ]);
+                }
+            }
+        }
+
         return response()->json(['status' => 'recorded']);
     }
 
-    public function analytics()
+    private function getAnalyticsData()
     {
         $topAccepted = DB::table('hs_mapping_responses')
             ->join('hs_code_mappings', 'hs_mapping_responses.hs_code_mapping_id', '=', 'hs_code_mappings.id')
             ->where('hs_mapping_responses.action', 'accepted')
-            ->select('hs_code_mappings.hs_code', 'hs_code_mappings.label', DB::raw('count(*) as accept_count'))
-            ->groupBy('hs_code_mappings.hs_code', 'hs_code_mappings.label')
+            ->select('hs_code_mappings.hs_code', 'hs_code_mappings.label', 'hs_code_mappings.sale_type', DB::raw('count(*) as accept_count'))
+            ->groupBy('hs_code_mappings.hs_code', 'hs_code_mappings.label', 'hs_code_mappings.sale_type')
             ->orderByDesc('accept_count')
             ->limit(10)
             ->get();
@@ -180,8 +311,8 @@ class HsCodeMappingController extends Controller
         $topRejected = DB::table('hs_mapping_responses')
             ->join('hs_code_mappings', 'hs_mapping_responses.hs_code_mapping_id', '=', 'hs_code_mappings.id')
             ->where('hs_mapping_responses.action', 'rejected')
-            ->select('hs_code_mappings.hs_code', 'hs_code_mappings.label', DB::raw('count(*) as reject_count'))
-            ->groupBy('hs_code_mappings.hs_code', 'hs_code_mappings.label')
+            ->select('hs_code_mappings.hs_code', 'hs_code_mappings.label', 'hs_code_mappings.sale_type', DB::raw('count(*) as reject_count'))
+            ->groupBy('hs_code_mappings.hs_code', 'hs_code_mappings.label', 'hs_code_mappings.sale_type')
             ->orderByDesc('reject_count')
             ->limit(10)
             ->get();
@@ -194,10 +325,31 @@ class HsCodeMappingController extends Controller
             ->limit(20)
             ->get();
 
-        return response()->json([
+        $recentResponses = DB::table('hs_mapping_responses')
+            ->join('hs_code_mappings', 'hs_mapping_responses.hs_code_mapping_id', '=', 'hs_code_mappings.id')
+            ->join('companies', 'hs_mapping_responses.company_id', '=', 'companies.id')
+            ->select(
+                'hs_code_mappings.hs_code', 'hs_code_mappings.label', 'hs_code_mappings.sale_type',
+                'companies.name as company_name', 'hs_mapping_responses.action',
+                'hs_mapping_responses.created_at'
+            )
+            ->orderByDesc('hs_mapping_responses.created_at')
+            ->limit(15)
+            ->get();
+
+        $dailyTrend = DB::table('hs_mapping_responses')
+            ->select(DB::raw("DATE(created_at) as date"), 'action', DB::raw('count(*) as count'))
+            ->where('created_at', '>=', now()->subDays(30))
+            ->groupBy(DB::raw("DATE(created_at)"), 'action')
+            ->orderBy('date')
+            ->get();
+
+        return [
             'top_accepted' => $topAccepted,
             'top_rejected' => $topRejected,
             'by_company' => $byCompany,
-        ]);
+            'recent_responses' => $recentResponses,
+            'daily_trend' => $dailyTrend,
+        ];
     }
 }

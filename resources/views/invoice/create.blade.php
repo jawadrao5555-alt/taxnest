@@ -241,7 +241,13 @@
                                             <template x-for="(mp, mi) in item.adminMappings" :key="mp.id">
                                                 <div class="p-2.5 bg-white dark:bg-gray-800 rounded-lg border border-emerald-100 dark:border-emerald-800 hover:border-emerald-300 dark:hover:border-emerald-600 transition">
                                                     <div class="flex items-center justify-between mb-1.5">
-                                                        <span class="text-xs font-medium text-emerald-700 dark:text-emerald-300" x-text="mp.label || ('Mapping #' + (mi+1))"></span>
+                                                        <div class="flex items-center gap-2">
+                                                            <span class="text-xs font-medium text-emerald-700 dark:text-emerald-300" x-text="mp.label || ('Mapping #' + (mi+1))"></span>
+                                                            <span class="px-1.5 py-0.5 text-[10px] font-bold rounded-full"
+                                                                :class="mp.confidence === 'high' ? 'bg-green-100 text-green-700' : (mp.confidence === 'medium' ? 'bg-yellow-100 text-yellow-700' : (mp.confidence === 'low' ? 'bg-red-100 text-red-700' : (mp.confidence === 'building' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500')))"
+                                                                x-text="mp.confidence === 'high' ? 'HIGH' : (mp.confidence === 'medium' ? 'MEDIUM' : (mp.confidence === 'low' ? 'LOW' : (mp.confidence === 'building' ? 'BUILDING' : 'NEW')))"></span>
+                                                            <span x-show="mp.accepted_count > 0" class="text-[10px] text-gray-400" x-text="mp.accepted_count + ' used'"></span>
+                                                        </div>
                                                         <div class="flex gap-2">
                                                             <button type="button" @click="applyMapping(index, mp)" class="px-3 py-1 text-xs font-medium bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition">Use This</button>
                                                             <button type="button" @click="dismissMapping(index, mp.id, mp.hs_code)" class="px-2 py-1 text-xs font-medium text-gray-400 hover:text-gray-600 transition">Skip</button>
@@ -1105,7 +1111,9 @@
                     let item = this.items[index];
                     if (!item.hs_code || item.hs_code.length < 4) { item.adminMappings = null; item.showMappingPanel = false; return; }
                     try {
-                        let res = await fetch('/api/hs-mapping-suggestions/' + encodeURIComponent(item.hs_code));
+                        let buyerNtn = document.querySelector('input[name="buyer_ntn"]')?.value || '';
+                        let buyerParam = buyerNtn && buyerNtn.length > 5 ? 'registered' : 'unregistered';
+                        let res = await fetch('/api/hs-mapping-suggestions/' + encodeURIComponent(item.hs_code) + '?buyer_type=' + buyerParam);
                         if (res.ok) {
                             let data = await res.json();
                             if (data && data.mappings && data.mappings.length > 0) {
@@ -1135,16 +1143,25 @@
 
                 dismissMapping(index, mappingId, hsCode) {
                     let item = this.items[index];
-                    this.recordMappingResponse(mappingId, hsCode, 'rejected');
+                    let customVals = {
+                        sale_type: item.schedule_type || '',
+                        tax_rate: item.tax_rate || 0,
+                        sro_schedule_no: item.sro_schedule_no || '',
+                        serial_no: item.serial_no || '',
+                        buyer_type: (document.querySelector('input[name="buyer_ntn"]')?.value || '').length > 5 ? 'registered' : 'unregistered'
+                    };
+                    this.recordMappingResponse(mappingId, hsCode, 'custom', customVals);
                     item.showMappingPanel = false;
                 },
 
-                async recordMappingResponse(mappingId, hsCode, action) {
+                async recordMappingResponse(mappingId, hsCode, action, customValues) {
                     try {
+                        let body = { hs_code_mapping_id: mappingId, hs_code: hsCode, action: action };
+                        if (customValues) body.custom_values = customValues;
                         await fetch('/api/hs-mapping-response', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
-                            body: JSON.stringify({ hs_code_mapping_id: mappingId, hs_code: hsCode, action: action })
+                            body: JSON.stringify(body)
                         });
                     } catch(e) {}
                 }

@@ -4,7 +4,7 @@ use Illuminate\Support\Str;
 $dbUrl = null;
 if (file_exists('/tmp/replitdb')) {
     $raw = trim(file_get_contents('/tmp/replitdb'));
-    if (!empty($raw)) {
+    if (!empty($raw) && preg_match('/^postgres(ql)?:\/\//', $raw)) {
         $dbUrl = $raw;
     }
 }

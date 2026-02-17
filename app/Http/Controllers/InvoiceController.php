@@ -1479,6 +1479,69 @@ class InvoiceController extends Controller
         ]);
     }
 
+    public function correctWhtAjax(Request $request, Invoice $invoice)
+    {
+        $companyId = app('currentCompanyId');
+        if ($invoice->company_id !== $companyId) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 403);
+        }
+
+        if (!$invoice->wht_locked) {
+            return response()->json(['status' => 'error', 'message' => 'WHT is not locked yet. Use the lock flow first.'], 422);
+        }
+
+        if ($invoice->status === 'pending_verification') {
+            return response()->json(['status' => 'error', 'message' => 'Cannot modify WHT while invoice is pending FBR verification.'], 422);
+        }
+
+        $request->validate([
+            'wht_rate' => 'required|numeric|min:0|max:100',
+        ]);
+
+        $newRate = floatval($request->wht_rate);
+        $oldRate = floatval($invoice->wht_rate);
+        $oldAmount = floatval($invoice->wht_amount ?? 0);
+
+        $subtotal = $invoice->items->sum(fn($item) => $item->price * $item->quantity);
+        $totalTax = $invoice->items->sum('tax');
+        $whtAmount = round($subtotal * ($newRate / 100), 2);
+        $netReceivable = round(($subtotal + $totalTax) + $whtAmount, 2);
+
+        try {
+            \App\Models\AuditLog::create([
+                'company_id' => $companyId,
+                'user_id' => auth()->id(),
+                'action' => 'wht_rate_corrected',
+                'entity_type' => 'invoice',
+                'entity_id' => $invoice->id,
+                'details' => json_encode([
+                    'old_rate' => $oldRate,
+                    'new_rate' => $newRate,
+                    'old_amount' => $oldAmount,
+                    'new_amount' => $whtAmount,
+                    'invoice_number' => $invoice->internal_invoice_number ?? $invoice->invoice_number,
+                ]),
+                'ip_address' => $request->ip(),
+                'hash' => hash('sha256', $invoice->id . $oldRate . $newRate . now()->timestamp),
+            ]);
+        } catch (\Exception $e) {
+        }
+
+        $invoice->update([
+            'wht_rate' => $newRate,
+            'wht_amount' => $whtAmount,
+            'net_receivable' => $netReceivable,
+        ]);
+
+        return response()->json([
+            'status' => 'ok',
+            'wht_rate' => $newRate,
+            'wht_amount' => $whtAmount,
+            'net_receivable' => $netReceivable,
+            'message' => 'WHT rate corrected from ' . $oldRate . '% to ' . $newRate . '%',
+        ]);
+    }
+
     public function complianceCheck(Request $request)
     {
         $companyId = app('currentCompanyId');

@@ -664,13 +664,111 @@
                                 <td colspan="9" class="px-6 py-3 text-right text-sm font-bold text-gray-700 uppercase border-t-2 border-emerald-500">Grand Total</td>
                                 <td class="px-6 py-3 text-right text-lg font-bold text-emerald-600 border-t-2 border-emerald-500">Rs. {{ number_format($invoice->total_amount, 2) }}</td>
                             </tr>
-                            @if($invoice->wht_rate > 0)
+                            @if($invoice->wht_locked)
+                            <tr x-data="whtCorrectionHandler()" id="whtCorrectionRow">
+                                <td colspan="9" class="px-6 py-2 text-right text-sm text-blue-600">
+                                    WHT (<span x-text="currentRate"></span>%)
+                                    <svg class="w-3.5 h-3.5 inline-block ml-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                    <button @click="showCorrection = true" class="ml-2 text-xs text-amber-600 hover:text-amber-800 underline font-medium">Correct</button>
+                                    <div x-show="showCorrection" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background-color: rgba(0,0,0,0.4);">
+                                        <div @click.away="showCorrection = false" class="bg-white rounded-xl shadow-2xl border border-gray-200 p-6 w-96 max-w-[90vw]">
+                                            <div class="flex items-center justify-between mb-4">
+                                                <p class="text-base font-bold text-gray-800">Correct WHT Rate</p>
+                                                <button @click="showCorrection = false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                                            </div>
+                                            <p class="text-xs text-gray-500 mb-1">Current Rate: <span class="font-bold" x-text="currentRate + '%'"></span></p>
+                                            <p class="text-xs text-amber-600 mb-3">This will update the invoice and all future PDF downloads will reflect the new rate.</p>
+                                            <div class="space-y-2 mb-4">
+                                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                                    :class="newRate == 0 ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 hover:bg-gray-50'">
+                                                    <input type="radio" value="0" x-model.number="newRate" class="text-emerald-500">
+                                                    <span class="text-sm font-semibold text-gray-800">No WHT (0%)</span>
+                                                </label>
+                                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                                    :class="newRate == 0.5 ? 'border-amber-400 bg-amber-50' : 'border-gray-200 hover:bg-gray-50'">
+                                                    <input type="radio" value="0.5" x-model.number="newRate" class="text-amber-500">
+                                                    <span class="text-sm font-semibold text-gray-800">WHT 0.5%</span>
+                                                </label>
+                                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                                    :class="newRate == 1 ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'">
+                                                    <input type="radio" value="1" x-model.number="newRate" class="text-blue-500">
+                                                    <span class="text-sm font-semibold text-gray-800">WHT 1%</span>
+                                                </label>
+                                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                                    :class="newRate == 2 ? 'border-orange-400 bg-orange-50' : 'border-gray-200 hover:bg-gray-50'">
+                                                    <input type="radio" value="2" x-model.number="newRate" class="text-orange-500">
+                                                    <span class="text-sm font-semibold text-gray-800">WHT 2%</span>
+                                                </label>
+                                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                                    :class="newRate == 2.5 ? 'border-red-400 bg-red-50' : 'border-gray-200 hover:bg-gray-50'">
+                                                    <input type="radio" value="2.5" x-model.number="newRate" class="text-red-500">
+                                                    <span class="text-sm font-semibold text-gray-800">WHT 2.5%</span>
+                                                </label>
+                                            </div>
+                                            <button @click="saveCorrection()" :disabled="saving || newRate == currentRate" class="w-full px-4 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-bold hover:bg-amber-700 transition disabled:opacity-50">
+                                                <span x-show="!saving">Update WHT Rate</span>
+                                                <span x-show="saving" x-cloak>Saving...</span>
+                                            </button>
+                                            <template x-if="successMsg">
+                                                <p class="mt-2 text-xs text-emerald-600 font-medium text-center" x-text="successMsg"></p>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-2 text-right text-sm font-semibold text-blue-600">+ Rs. <span x-text="parseFloat(currentAmount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span></td>
+                            </tr>
+                            <tr>
+                                <td colspan="9" class="px-6 py-3 text-right text-sm font-bold text-emerald-700">Net Receivable</td>
+                                <td class="px-6 py-3 text-right text-lg font-bold text-emerald-700" id="netReceivableCell">Rs. <span x-data="{ val: {{ $invoice->net_receivable ?? $invoice->total_amount }} }" x-text="parseFloat(val).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span></td>
+                            </tr>
+                            <script>
+                            function whtCorrectionHandler() {
+                                return {
+                                    currentRate: {{ $invoice->wht_rate ?? 0 }},
+                                    currentAmount: {{ $invoice->wht_amount ?? 0 }},
+                                    currentNetReceivable: {{ $invoice->net_receivable ?? $invoice->total_amount }},
+                                    newRate: {{ $invoice->wht_rate ?? 0 }},
+                                    showCorrection: false,
+                                    saving: false,
+                                    successMsg: '',
+                                    async saveCorrection() {
+                                        this.saving = true;
+                                        this.successMsg = '';
+                                        try {
+                                            const fd = new FormData();
+                                            fd.append('_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
+                                            fd.append('wht_rate', this.newRate);
+                                            const res = await fetch('/invoice/{{ $invoice->id }}/correct-wht-ajax', {
+                                                method: 'POST',
+                                                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                                                body: fd
+                                            });
+                                            const data = await res.json();
+                                            if (data.status === 'ok') {
+                                                this.currentRate = data.wht_rate;
+                                                this.currentAmount = data.wht_amount;
+                                                this.currentNetReceivable = data.net_receivable;
+                                                this.successMsg = data.message || 'WHT rate updated successfully';
+                                                const nrCell = document.getElementById('netReceivableCell');
+                                                if (nrCell) {
+                                                    nrCell.innerHTML = 'Rs. ' + parseFloat(data.net_receivable).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                                                }
+                                                setTimeout(() => { this.showCorrection = false; this.successMsg = ''; }, 1500);
+                                            } else {
+                                                alert(data.message || 'Failed to update WHT rate');
+                                            }
+                                        } catch(e) {
+                                            alert('Network error updating WHT rate');
+                                        }
+                                        this.saving = false;
+                                    }
+                                };
+                            }
+                            </script>
+                            @elseif($invoice->wht_rate > 0)
                             <tr>
                                 <td colspan="9" class="px-6 py-2 text-right text-sm text-blue-600">
                                     WHT ({{ $invoice->wht_rate }}%)
-                                    @if($invoice->wht_locked)
-                                    <svg class="w-3.5 h-3.5 inline-block ml-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                                    @endif
                                 </td>
                                 <td class="px-6 py-2 text-right text-sm font-semibold text-blue-600">+ Rs. {{ number_format($invoice->wht_amount ?? 0, 2) }}</td>
                             </tr>

@@ -1767,8 +1767,8 @@ class InvoiceController extends Controller
             abort(403);
         }
 
-        if ($invoice->status !== 'draft') {
-            return back()->with('error', 'Only draft invoices can be deleted.');
+        if (!in_array($invoice->status, ['draft', 'failed'])) {
+            return back()->with('error', 'Only draft or failed invoices can be deleted.');
         }
 
         DB::beginTransaction();
@@ -1784,7 +1784,8 @@ class InvoiceController extends Controller
             $invoice->delete();
 
             DB::commit();
-            return redirect('/invoices?tab=draft')->with('success', 'Invoice deleted successfully.');
+            $tab = $invoice->status === 'failed' ? 'failed' : 'draft';
+            return redirect('/invoices?tab=' . $tab)->with('success', 'Invoice deleted successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Failed to delete invoice: ' . $e->getMessage());

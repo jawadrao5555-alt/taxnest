@@ -30,9 +30,14 @@
             setTimeout(function(){
                 if(!window.__alpineStarted){
                     window.__alpineStarted=true;
-                    var s=document.createElement('script');
-                    s.src='https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js';
-                    document.head.appendChild(s);
+                    var c=document.createElement('script');
+                    c.src='https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.14.8/dist/cdn.min.js';
+                    document.head.appendChild(c);
+                    c.onload=function(){
+                        var s=document.createElement('script');
+                        s.src='https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js';
+                        document.head.appendChild(s);
+                    };
                 }
             }, 2000);
         </script>

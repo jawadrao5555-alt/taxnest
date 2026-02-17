@@ -27,6 +27,7 @@ use App\Http\Controllers\WhtReportController;
 use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\AnnouncementController;
 
 Route::get('/share/invoice/{uuid}', [ShareController::class, 'show']);
 
@@ -337,6 +338,11 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::post('/admin/company/{company}/toggle-inventory', [AdminController::class, 'toggleInventory']);
         Route::post('/admin/company/{company}/update-limits', [AdminController::class, 'updateCompanyLimits']);
         Route::post('/admin/company/{company}/reset-limits', [AdminController::class, 'resetCompanyLimits']);
+        Route::get('/admin/announcements', [AnnouncementController::class, 'index'])->name('admin.announcements');
+        Route::post('/admin/announcements', [AnnouncementController::class, 'store'])->name('admin.announcements.store');
+        Route::post('/admin/announcements/{id}/toggle', [AnnouncementController::class, 'toggle'])->name('admin.announcements.toggle');
+        Route::delete('/admin/announcements/{id}/delete', [AnnouncementController::class, 'destroy'])->name('admin.announcements.destroy');
+
         Route::get('/admin/hs-master-export', [HsMasterExportController::class, 'index'])->name('admin.hs-master-export');
 
         Route::get('/admin/hs-master', [GlobalHsMasterController::class, 'index'])->name('admin.hs-master');
@@ -372,6 +378,8 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+    Route::post('/announcements/{id}/dismiss', [AnnouncementController::class, 'dismiss'])->name('announcements.dismiss');
+
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
     Route::get('/inventory/movements', [InventoryController::class, 'movements'])->name('inventory.movements');
     Route::post('/inventory/adjust', [InventoryController::class, 'adjust'])->name('inventory.adjust');

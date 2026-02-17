@@ -205,6 +205,16 @@ class DashboardController extends Controller
             'rejection_rate' => $rejectionRate,
         ];
 
+        $announcements = \App\Models\AdminAnnouncement::active()
+            ->forCompany($companyId)
+            ->whereDoesntHave('dismissals', function ($q) use ($user) {
+                $q->where('user_id', $user->id);
+            })
+            ->orderByRaw("CASE WHEN type = 'urgent' THEN 0 WHEN type = 'warning' THEN 1 ELSE 2 END")
+            ->orderBy('created_at', 'desc')
+            ->take(5)
+            ->get();
+
         return view('dashboard', compact(
             'company', 'totalInvoices', 'draftCount', 'failedCount', 'lockedCount',
             'totalRevenue', 'subscription', 'invoiceLimit', 'invoicesUsed',
@@ -213,7 +223,8 @@ class DashboardController extends Controller
             'hybridScore', 'riskLevel', 'riskBadge',
             'complianceTrend', 'recentActivity', 'smartInsights',
             'notifications', 'trialInfo',
-            'topCustomers', 'branchComparison', 'kpis', 'planTier'
+            'topCustomers', 'branchComparison', 'kpis', 'planTier',
+            'announcements'
         ));
     }
 

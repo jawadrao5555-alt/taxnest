@@ -84,6 +84,36 @@ class AdminController extends Controller
             ->take(10)
             ->get();
 
+        $topCompanies = Company::withCount('invoices')
+            ->select('companies.*')
+            ->selectRaw('(SELECT COALESCE(SUM(total_amount),0) FROM invoices WHERE invoices.company_id = companies.id) as company_revenue')
+            ->orderByDesc('company_revenue')
+            ->take(5)
+            ->get();
+
+        $monthlyRevenue = Invoice::selectRaw("TO_CHAR(created_at, 'YYYY-MM') as month, SUM(total_amount) as revenue, COUNT(*) as count")
+            ->where('created_at', '>=', now()->subMonths(6)->startOfMonth())
+            ->groupByRaw("TO_CHAR(created_at, 'YYYY-MM')")
+            ->orderBy('month')
+            ->get();
+
+        $expiringTrials = Subscription::with('company')
+            ->where('active', true)
+            ->where('ends_at', '<=', now()->addDays(7))
+            ->where('ends_at', '>', now())
+            ->orderBy('ends_at')
+            ->take(10)
+            ->get();
+
+        $activityFeed = \App\Models\AuditLog::with('user')
+            ->orderBy('created_at', 'desc')
+            ->take(15)
+            ->get();
+
+        $todayInvoices = Invoice::where('created_at', '>=', now()->startOfDay())->count();
+        $todayRevenue = Invoice::where('created_at', '>=', now()->startOfDay())->sum('total_amount');
+        $newCompaniesThisMonth = Company::where('created_at', '>=', now()->startOfMonth())->count();
+
         return view('admin.dashboard', compact(
             'totalCompanies', 'totalUsers', 'totalInvoices',
             'draftInvoices', 'submittedInvoices', 'lockedInvoices',
@@ -91,7 +121,9 @@ class AdminController extends Controller
             'recentInvoices', 'recentCompanies', 'recentAnomalies',
             'pendingCompanies', 'overrideStats',
             'topRejectedHsCodes', 'totalHsMaster', 'totalUnmapped',
-            'atRiskCompanies', 'platformAuditStats', 'companyScores'
+            'atRiskCompanies', 'platformAuditStats', 'companyScores',
+            'topCompanies', 'monthlyRevenue', 'expiringTrials',
+            'activityFeed', 'todayInvoices', 'todayRevenue', 'newCompaniesThisMonth'
         ));
     }
 

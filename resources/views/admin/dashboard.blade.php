@@ -349,6 +349,140 @@
                 @endif
             </div>
 
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-xl shadow-sm p-6 text-white">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-emerald-100">Today's Invoices</p>
+                            <p class="text-3xl font-bold mt-1">{{ $todayInvoices }}</p>
+                        </div>
+                        <svg class="w-8 h-8 text-emerald-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl shadow-sm p-6 text-white">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-blue-100">Today's Revenue</p>
+                            <p class="text-3xl font-bold mt-1">Rs. {{ number_format($todayRevenue) }}</p>
+                        </div>
+                        <svg class="w-8 h-8 text-blue-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-purple-500 to-purple-700 rounded-xl shadow-sm p-6 text-white">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-purple-100">New Companies (Month)</p>
+                            <p class="text-3xl font-bold mt-1">{{ $newCompaniesThisMonth }}</p>
+                        </div>
+                        <svg class="w-8 h-8 text-purple-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 flex items-center space-x-2 mb-4">
+                        <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                        <span>Top Companies by Revenue</span>
+                    </h3>
+                    <div class="space-y-3">
+                        @forelse($topCompanies as $tc)
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div>
+                                <p class="font-medium text-gray-900 text-sm">{{ $tc->name }}</p>
+                                <p class="text-xs text-gray-500">{{ $tc->invoices_count }} invoices</p>
+                            </div>
+                            <p class="font-bold text-emerald-700">Rs. {{ number_format($tc->company_revenue) }}</p>
+                        </div>
+                        @empty
+                        <p class="text-gray-400 text-center py-4">No revenue data yet</p>
+                        @endforelse
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 flex items-center space-x-2 mb-4">
+                        <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                        <span>Monthly Revenue (6 Months)</span>
+                    </h3>
+                    <div class="space-y-2">
+                        @php $maxRev = $monthlyRevenue->max('revenue') ?: 1; @endphp
+                        @forelse($monthlyRevenue as $mr)
+                        <div class="flex items-center space-x-3">
+                            <span class="text-xs font-medium text-gray-600 w-16">{{ \Carbon\Carbon::parse($mr->month . '-01')->format('M Y') }}</span>
+                            <div class="flex-1 bg-gray-200 rounded-full h-5 overflow-hidden">
+                                <div class="h-5 rounded-full bg-blue-500" style="width: {{ ($mr->revenue / $maxRev) * 100 }}%"></div>
+                            </div>
+                            <span class="text-xs font-bold text-gray-700 w-28 text-right">Rs. {{ number_format($mr->revenue) }}</span>
+                        </div>
+                        @empty
+                        <p class="text-gray-400 text-center py-4">No revenue data for past 6 months</p>
+                        @endforelse
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                @if($expiringTrials->count() > 0)
+                <div class="bg-white rounded-xl shadow-sm border border-amber-200 p-6">
+                    <h3 class="text-lg font-semibold text-amber-800 flex items-center space-x-2 mb-4">
+                        <svg class="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span>Expiring Trials (7 Days)</span>
+                    </h3>
+                    <div class="space-y-2">
+                        @foreach($expiringTrials as $trial)
+                        <div class="flex items-center justify-between p-3 bg-amber-50 rounded-lg">
+                            <div>
+                                <p class="font-medium text-gray-900 text-sm">{{ $trial->company->name ?? 'N/A' }}</p>
+                                <p class="text-xs text-gray-500">{{ $trial->plan_name ?? 'Trial' }}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-bold text-amber-700">{{ $trial->ends_at ? $trial->ends_at->diffForHumans() : 'N/A' }}</p>
+                                <p class="text-xs text-gray-500">{{ $trial->ends_at ? $trial->ends_at->format('M d, Y') : '' }}</p>
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 {{ $expiringTrials->count() == 0 ? 'lg:col-span-2' : '' }}">
+                    <h3 class="text-lg font-semibold text-gray-800 flex items-center space-x-2 mb-4">
+                        <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span>Recent Activity Feed</span>
+                    </h3>
+                    <div class="space-y-2 max-h-80 overflow-y-auto">
+                        @forelse($activityFeed as $activity)
+                        <div class="flex items-start space-x-3 p-2 hover:bg-gray-50 rounded-lg">
+                            <div class="flex-shrink-0 mt-1">
+                                @if(str_contains(strtolower($activity->action ?? ''), 'create'))
+                                    <span class="inline-flex w-6 h-6 rounded-full bg-green-100 items-center justify-center"><svg class="w-3.5 h-3.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></span>
+                                @elseif(str_contains(strtolower($activity->action ?? ''), 'delete'))
+                                    <span class="inline-flex w-6 h-6 rounded-full bg-red-100 items-center justify-center"><svg class="w-3.5 h-3.5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></span>
+                                @elseif(str_contains(strtolower($activity->action ?? ''), 'fbr'))
+                                    <span class="inline-flex w-6 h-6 rounded-full bg-blue-100 items-center justify-center"><svg class="w-3.5 h-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg></span>
+                                @else
+                                    <span class="inline-flex w-6 h-6 rounded-full bg-gray-100 items-center justify-center"><svg class="w-3.5 h-3.5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></span>
+                                @endif
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm text-gray-900">
+                                    <span class="font-medium">{{ $activity->user->name ?? 'System' }}</span>
+                                    <span class="text-gray-500">{{ $activity->action ?? 'performed action' }}</span>
+                                </p>
+                                @if($activity->description)
+                                <p class="text-xs text-gray-500 truncate">{{ $activity->description }}</p>
+                                @endif
+                                <p class="text-xs text-gray-400 mt-0.5">{{ $activity->created_at->diffForHumans() }}</p>
+                            </div>
+                        </div>
+                        @empty
+                        <p class="text-gray-400 text-center py-4">No recent activity</p>
+                        @endforelse
+                    </div>
+                </div>
+            </div>
+
             <div class="flex flex-wrap gap-3">
                 <a href="/admin/companies" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 transition">Manage Companies</a>
                 <a href="/admin/users" class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg font-medium text-sm hover:bg-purple-700 transition">Manage Users</a>

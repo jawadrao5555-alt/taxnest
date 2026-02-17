@@ -4,6 +4,50 @@
     <div class="py-4">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
+            @if(isset($announcements) && $announcements->count() > 0)
+            <div class="mb-4 space-y-2">
+                @foreach($announcements as $ann)
+                @php
+                    $annStyles = [
+                        'info' => ['bg' => 'bg-blue-50 dark:bg-blue-900/20', 'border' => 'border-blue-300 dark:border-blue-700', 'text' => 'text-blue-800 dark:text-blue-200', 'icon' => 'text-blue-500'],
+                        'warning' => ['bg' => 'bg-amber-50 dark:bg-amber-900/20', 'border' => 'border-amber-300 dark:border-amber-700', 'text' => 'text-amber-800 dark:text-amber-200', 'icon' => 'text-amber-500'],
+                        'urgent' => ['bg' => 'bg-red-50 dark:bg-red-900/20', 'border' => 'border-red-300 dark:border-red-700', 'text' => 'text-red-800 dark:text-red-200', 'icon' => 'text-red-500'],
+                        'success' => ['bg' => 'bg-green-50 dark:bg-green-900/20', 'border' => 'border-green-300 dark:border-green-700', 'text' => 'text-green-800 dark:text-green-200', 'icon' => 'text-green-500'],
+                    ];
+                    $s = $annStyles[$ann->type] ?? $annStyles['info'];
+                @endphp
+                <div class="rounded-lg border {{ $s['bg'] }} {{ $s['border'] }} p-3 flex items-start gap-3" id="announcement-{{ $ann->id }}">
+                    <div class="flex-shrink-0 mt-0.5">
+                        @if($ann->type === 'urgent')
+                        <svg class="w-5 h-5 {{ $s['icon'] }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                        @elseif($ann->type === 'warning')
+                        <svg class="w-5 h-5 {{ $s['icon'] }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        @else
+                        <svg class="w-5 h-5 {{ $s['icon'] }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
+                        @endif
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-semibold {{ $s['text'] }}">{{ $ann->title }}</p>
+                        <p class="text-xs {{ $s['text'] }} opacity-80 mt-0.5">{{ $ann->message }}</p>
+                    </div>
+                    <button onclick="dismissAnnouncement({{ $ann->id }})" class="flex-shrink-0 {{ $s['text'] }} opacity-60 hover:opacity-100 transition">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                @endforeach
+            </div>
+            <script>
+            function dismissAnnouncement(id) {
+                fetch('/announcements/' + id + '/dismiss', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' }
+                }).then(() => {
+                    document.getElementById('announcement-' + id).style.display = 'none';
+                });
+            }
+            </script>
+            @endif
+
             <div class="mb-5">
                 <div class="flex flex-col gap-3">
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">

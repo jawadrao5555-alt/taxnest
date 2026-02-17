@@ -1337,12 +1337,12 @@ class InvoiceController extends Controller
         $subtotal = $invoice->items->sum(fn($item) => $item->price * $item->quantity);
         $totalTax = $invoice->items->sum('tax');
 
-        if ($invoice->wht_locked || ($invoice->status === 'locked' && $invoice->fbr_status === 'production')) {
+        if ($invoice->status === 'locked' && $invoice->fbr_status === 'production') {
             $whtRate = $invoice->wht_rate ?? 0;
             $whtAmount = $invoice->wht_amount ?? 0;
             $netReceivable = $invoice->net_receivable ?? $invoice->total_amount;
         } else {
-            $whtRate = floatval(request()->query('wht_rate', $invoice->wht_rate ?? 0));
+            $whtRate = floatval($invoice->wht_rate ?? request()->query('wht_rate', 0));
             $whtAmount = round($subtotal * ($whtRate / 100), 2);
             $netReceivable = round(($subtotal + $totalTax) + $whtAmount, 2);
         }
@@ -1414,7 +1414,7 @@ class InvoiceController extends Controller
         $companyId = app('currentCompanyId');
         if ($invoice->company_id !== $companyId) abort(403);
 
-        if ($invoice->wht_locked || $invoice->status !== 'draft') {
+        if ($invoice->status !== 'draft') {
             return redirect()->back()->with('error', 'WHT rate can only be modified on draft invoices.');
         }
 
@@ -1432,9 +1432,11 @@ class InvoiceController extends Controller
             'wht_rate' => $whtRate,
             'wht_amount' => $whtAmount,
             'net_receivable' => $netReceivable,
+            'wht_locked' => ($whtRate > 0),
         ]);
 
-        return redirect()->back()->with('success', 'WHT rate updated to ' . $whtRate . '%. Invoice and PDF updated.');
+        $rateLabel = $whtRate > 0 ? $whtRate . '%' : '0% (No WHT)';
+        return redirect()->back()->with('success', 'WHT rate saved and locked at ' . $rateLabel . '. Download PDF to see it applied.');
     }
 
     public function complianceCheck(Request $request)

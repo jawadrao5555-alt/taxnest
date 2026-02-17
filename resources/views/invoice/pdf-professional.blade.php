@@ -220,9 +220,9 @@
                     <td>{{ $item->description }}</td>
                     <td>{{ $item->default_uom ?? 'PCS' }}</td>
                     <td class="text-right">{{ number_format($item->quantity, 0) }}</td>
-                    <td class="text-right">{{ number_format($item->price, 4) }}</td>
-                    <td class="text-right">{{ number_format($item->price * $item->quantity, 2) }}</td>
-                    <td class="text-right">{{ number_format($item->discount ?? 0, 2) }}</td>
+                    <td class="text-right">Rs. {{ number_format($item->price, 4) }}</td>
+                    <td class="text-right">Rs. {{ number_format($item->price * $item->quantity, 2) }}</td>
+                    <td class="text-right">Rs. {{ number_format($item->discount ?? 0, 2) }}</td>
                 </tr>
                 @endforeach
             </tbody>
@@ -238,16 +238,16 @@
                             <table>
                                 <tr>
                                     <td class="label">Sub Total:</td>
-                                    <td class="value">{{ number_format($subtotal, 2) }}</td>
+                                    <td class="value">Rs. {{ number_format($subtotal, 2) }}</td>
                                 </tr>
                                 <tr>
                                     <td class="label">GST:</td>
-                                    <td class="value">{{ number_format($totalTax, 2) }}</td>
+                                    <td class="value">Rs. {{ number_format($totalTax, 2) }}</td>
                                 </tr>
                                 @if(($wht_rate ?? 0) > 0)
                                 <tr>
                                     <td class="label">WHT ({{ $wht_rate }}%):</td>
-                                    <td class="value">{{ number_format($wht_amount ?? 0, 2) }}</td>
+                                    <td class="value">Rs. {{ number_format($wht_amount ?? 0, 2) }}</td>
                                 </tr>
                                 @endif
                                 <tr class="grand-total">

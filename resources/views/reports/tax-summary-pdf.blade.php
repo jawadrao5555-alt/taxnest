@@ -16,25 +16,25 @@
             </td>
             <td style="width:20%; padding:4px;">
                 <div class="summary-card">
-                    <div class="value">{{ number_format($yearTotals['total_billed'], 2) }}</div>
+                    <div class="value">Rs. {{ number_format($yearTotals['total_billed'], 2) }}</div>
                     <div class="label">Total Billed</div>
                 </div>
             </td>
             <td style="width:20%; padding:4px;">
                 <div class="summary-card highlight">
-                    <div class="value">{{ number_format($yearTotals['total_sales_tax'], 2) }}</div>
+                    <div class="value">Rs. {{ number_format($yearTotals['total_sales_tax'], 2) }}</div>
                     <div class="label">Sales Tax Collected</div>
                 </div>
             </td>
             <td style="width:20%; padding:4px;">
                 <div class="summary-card warning">
-                    <div class="value">{{ number_format($yearTotals['total_wht'], 2) }}</div>
+                    <div class="value">Rs. {{ number_format($yearTotals['total_wht'], 2) }}</div>
                     <div class="label">WHT Collected</div>
                 </div>
             </td>
             <td style="width:20%; padding:4px;">
                 <div class="summary-card">
-                    <div class="value">{{ number_format($yearTotals['total_net'], 2) }}</div>
+                    <div class="value">Rs. {{ number_format($yearTotals['total_net'], 2) }}</div>
                     <div class="label">Net Amount</div>
                 </div>
             </td>
@@ -45,7 +45,7 @@
         @foreach($partyGroups as $party => $rows)
         <div class="party-header">
             <h3>{{ $party }}</h3>
-            <div class="detail">Invoices: {{ $rows->sum('invoice_count') }} | Total Billed: {{ number_format($rows->sum('total_billed'), 2) }}</div>
+            <div class="detail">Invoices: {{ $rows->sum('invoice_count') }} | Total Billed: Rs. {{ number_format($rows->sum('total_billed'), 2) }}</div>
         </div>
         <table class="data-table">
             <thead>
@@ -63,10 +63,10 @@
                 <tr>
                     <td class="bold">{{ \Carbon\Carbon::createFromFormat('Y-m', $row->month_label)->format('F Y') }}</td>
                     <td class="center">{{ $row->invoice_count }}</td>
-                    <td class="right">{{ number_format($row->total_billed, 2) }}</td>
-                    <td class="right green bold">{{ number_format($row->total_sales_tax, 2) }}</td>
-                    <td class="right amber bold">{{ number_format($row->total_wht, 2) }}</td>
-                    <td class="right bold">{{ number_format($row->total_net, 2) }}</td>
+                    <td class="right">Rs. {{ number_format($row->total_billed, 2) }}</td>
+                    <td class="right green bold">Rs. {{ number_format($row->total_sales_tax, 2) }}</td>
+                    <td class="right amber bold">Rs. {{ number_format($row->total_wht, 2) }}</td>
+                    <td class="right bold">Rs. {{ number_format($row->total_net, 2) }}</td>
                 </tr>
                 @endforeach
             </tbody>
@@ -74,10 +74,10 @@
                 <tr>
                     <td>Subtotal</td>
                     <td class="center">{{ $rows->sum('invoice_count') }}</td>
-                    <td class="right">{{ number_format($rows->sum('total_billed'), 2) }}</td>
-                    <td class="right">{{ number_format($rows->sum('total_sales_tax'), 2) }}</td>
-                    <td class="right">{{ number_format($rows->sum('total_wht'), 2) }}</td>
-                    <td class="right">{{ number_format($rows->sum('total_net'), 2) }}</td>
+                    <td class="right">Rs. {{ number_format($rows->sum('total_billed'), 2) }}</td>
+                    <td class="right">Rs. {{ number_format($rows->sum('total_sales_tax'), 2) }}</td>
+                    <td class="right">Rs. {{ number_format($rows->sum('total_wht'), 2) }}</td>
+                    <td class="right">Rs. {{ number_format($rows->sum('total_net'), 2) }}</td>
                 </tr>
             </tfoot>
         </table>
@@ -100,10 +100,10 @@
                 <tr>
                     <td class="bold">{{ $party }}</td>
                     <td class="center">{{ $rows->sum('invoice_count') }}</td>
-                    <td class="right">{{ number_format($rows->sum('total_billed'), 2) }}</td>
-                    <td class="right green bold">{{ number_format($rows->sum('total_sales_tax'), 2) }}</td>
-                    <td class="right amber bold">{{ number_format($rows->sum('total_wht'), 2) }}</td>
-                    <td class="right bold">{{ number_format($rows->sum('total_net'), 2) }}</td>
+                    <td class="right">Rs. {{ number_format($rows->sum('total_billed'), 2) }}</td>
+                    <td class="right green bold">Rs. {{ number_format($rows->sum('total_sales_tax'), 2) }}</td>
+                    <td class="right amber bold">Rs. {{ number_format($rows->sum('total_wht'), 2) }}</td>
+                    <td class="right bold">Rs. {{ number_format($rows->sum('total_net'), 2) }}</td>
                 </tr>
                 @endforeach
             </tbody>
@@ -111,10 +111,10 @@
                 <tr>
                     <td>Grand Total</td>
                     <td class="center">{{ number_format($yearTotals['invoice_count']) }}</td>
-                    <td class="right">{{ number_format($yearTotals['total_billed'], 2) }}</td>
-                    <td class="right">{{ number_format($yearTotals['total_sales_tax'], 2) }}</td>
-                    <td class="right">{{ number_format($yearTotals['total_wht'], 2) }}</td>
-                    <td class="right">{{ number_format($yearTotals['total_net'], 2) }}</td>
+                    <td class="right">Rs. {{ number_format($yearTotals['total_billed'], 2) }}</td>
+                    <td class="right">Rs. {{ number_format($yearTotals['total_sales_tax'], 2) }}</td>
+                    <td class="right">Rs. {{ number_format($yearTotals['total_wht'], 2) }}</td>
+                    <td class="right">Rs. {{ number_format($yearTotals['total_net'], 2) }}</td>
                 </tr>
             </tfoot>
         </table>
@@ -135,10 +135,10 @@
                 <tr>
                     <td class="bold">{{ \Carbon\Carbon::createFromFormat('Y-m', $row->month_label)->format('F Y') }}</td>
                     <td class="center">{{ $row->invoice_count }}</td>
-                    <td class="right">{{ number_format($row->total_billed, 2) }}</td>
-                    <td class="right green bold">{{ number_format($row->total_sales_tax, 2) }}</td>
-                    <td class="right amber bold">{{ number_format($row->total_wht, 2) }}</td>
-                    <td class="right bold">{{ number_format($row->total_net, 2) }}</td>
+                    <td class="right">Rs. {{ number_format($row->total_billed, 2) }}</td>
+                    <td class="right green bold">Rs. {{ number_format($row->total_sales_tax, 2) }}</td>
+                    <td class="right amber bold">Rs. {{ number_format($row->total_wht, 2) }}</td>
+                    <td class="right bold">Rs. {{ number_format($row->total_net, 2) }}</td>
                 </tr>
                 @empty
                 <tr><td colspan="6" style="text-align:center; padding:20px; color:#9ca3af;">No production invoices found for {{ $year }}.</td></tr>
@@ -149,10 +149,10 @@
                 <tr>
                     <td>Yearly Total</td>
                     <td class="center">{{ number_format($yearTotals['invoice_count']) }}</td>
-                    <td class="right">{{ number_format($yearTotals['total_billed'], 2) }}</td>
-                    <td class="right">{{ number_format($yearTotals['total_sales_tax'], 2) }}</td>
-                    <td class="right">{{ number_format($yearTotals['total_wht'], 2) }}</td>
-                    <td class="right">{{ number_format($yearTotals['total_net'], 2) }}</td>
+                    <td class="right">Rs. {{ number_format($yearTotals['total_billed'], 2) }}</td>
+                    <td class="right">Rs. {{ number_format($yearTotals['total_sales_tax'], 2) }}</td>
+                    <td class="right">Rs. {{ number_format($yearTotals['total_wht'], 2) }}</td>
+                    <td class="right">Rs. {{ number_format($yearTotals['total_net'], 2) }}</td>
                 </tr>
             </tfoot>
             @endif

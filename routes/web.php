@@ -40,27 +40,45 @@ Route::get('/health', function () {
             $replitdbContent = substr($raw, 0, 30) . '...';
         }
     }
-    $dbUrlEnv = getenv('DATABASE_URL') ?: '';
-    $dbUrlHost = 'not_set';
-    if ($dbUrlEnv && preg_match('/^postgres(ql)?:\/\//', $dbUrlEnv)) {
-        $p = parse_url(preg_replace('/^postgres:\/\//', 'postgresql://', $dbUrlEnv));
-        $dbUrlHost = $p['host'] ?? 'parse_fail';
-    } elseif ($dbUrlEnv) {
-        $dbUrlHost = 'non_postgres:' . substr($dbUrlEnv, 0, 20);
+    $dbUrlGetenv = getenv('DATABASE_URL') ?: 'empty';
+    $dbUrlPhpEnv = $_ENV['DATABASE_URL'] ?? 'empty';
+    $dbUrlServer = $_SERVER['DATABASE_URL'] ?? 'empty';
+    $dbUrlLaravel = env('DATABASE_URL') ?: 'empty';
+    $dbUrlFile = file_exists('/tmp/prod_database_url') ? trim(file_get_contents('/tmp/prod_database_url')) : 'empty';
+    $dbUrlSources = [
+        'getenv' => ($dbUrlGetenv !== 'empty') ? 'set' : 'empty',
+        '_ENV' => ($dbUrlPhpEnv !== 'empty') ? 'set' : 'empty',
+        '_SERVER' => ($dbUrlServer !== 'empty') ? 'set' : 'empty',
+        'laravel_env' => ($dbUrlLaravel !== 'empty') ? 'set' : 'empty',
+        'file_dump' => ($dbUrlFile !== 'empty' && !empty($dbUrlFile)) ? 'set' : 'empty',
+    ];
+    $foundUrl = null;
+    foreach ([$dbUrlGetenv, $dbUrlPhpEnv, $dbUrlServer, $dbUrlLaravel] as $candidate) {
+        if ($candidate !== 'empty' && preg_match('/^postgres(ql)?:\/\//', $candidate)) {
+            $foundUrl = $candidate;
+            break;
+        }
+    }
+    $resolvedHost = 'none';
+    if ($foundUrl) {
+        $p = parse_url(preg_replace('/^postgres:\/\//', 'postgresql://', $foundUrl));
+        $resolvedHost = $p['host'] ?? 'parse_fail';
     }
     $info = [
         'status' => 'ok',
         'db_host' => config('database.connections.pgsql.host'),
         'db_port' => config('database.connections.pgsql.port'),
         'db_name' => config('database.connections.pgsql.database'),
+        'db_user' => config('database.connections.pgsql.username'),
         'session_driver' => config('session.driver'),
         'cache_driver' => config('cache.default'),
         'config_cached' => file_exists(base_path('bootstrap/cache/config.php')),
         'replitdb_exists' => file_exists('/tmp/replitdb'),
         'replitdb_content' => $replitdbContent,
-        'database_url_host' => $dbUrlHost,
-        'pghost_env' => getenv('PGHOST') ?: 'not_set',
-        'pguser_env' => getenv('PGUSER') ?: 'not_set',
+        'database_url_sources' => $dbUrlSources,
+        'resolved_db_host' => $resolvedHost,
+        'pghost_getenv' => getenv('PGHOST') ?: 'not_set',
+        'db_host_getenv' => getenv('DB_HOST') ?: 'not_set',
     ];
     try {
         $start = microtime(true);
@@ -69,7 +87,7 @@ Route::get('/health', function () {
         $info['db_time'] = round((microtime(true) - $start) * 1000) . 'ms';
     } catch (\Exception $e) {
         $info['db'] = 'failed';
-        $info['db_error'] = substr($e->getMessage(), 0, 200);
+        $info['db_error'] = substr($e->getMessage(), 0, 300);
     }
     return response()->json($info);
 });

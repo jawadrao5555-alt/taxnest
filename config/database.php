@@ -1,42 +1,53 @@
 <?php
 use Illuminate\Support\Str;
 
-$dbUrl = null;
-if (file_exists('/tmp/replitdb')) {
-    $raw = trim(file_get_contents('/tmp/replitdb'));
-    if (!empty($raw) && preg_match('/^postgres(ql)?:\/\//', $raw)) {
-        $dbUrl = $raw;
+$explicitHost = getenv('DB_HOST');
+
+if ($explicitHost && $explicitHost !== 'helium') {
+    $dbHost = $explicitHost;
+    $dbPort = getenv('DB_PORT') ?: env('DB_PORT', '5432');
+    $dbName = getenv('DB_DATABASE') ?: env('DB_DATABASE', 'neondb');
+    $dbUser = getenv('DB_USERNAME') ?: env('DB_USERNAME', 'neondb_owner');
+    $dbPass = getenv('DB_PASSWORD') ?: env('DB_PASSWORD', '');
+    $sslMode = 'prefer';
+} else {
+    $dbUrl = null;
+    if (file_exists('/tmp/replitdb')) {
+        $raw = trim(file_get_contents('/tmp/replitdb'));
+        if (!empty($raw) && preg_match('/^postgres(ql)?:\/\//', $raw)) {
+            $dbUrl = $raw;
+        }
     }
-}
-if (empty($dbUrl)) {
-    $candidate = env('DATABASE_URL', getenv('DATABASE_URL'));
-    if ($candidate && preg_match('/^postgres(ql)?:\/\//', $candidate)) {
-        $dbUrl = $candidate;
+    if (empty($dbUrl)) {
+        $candidate = env('DATABASE_URL', getenv('DATABASE_URL'));
+        if ($candidate && preg_match('/^postgres(ql)?:\/\//', $candidate)) {
+            $dbUrl = $candidate;
+        }
     }
-}
 
-$parsedUrl = [];
-if ($dbUrl) {
-    $normalized = preg_replace('/^postgres:\/\//', 'postgresql://', $dbUrl);
-    $parsedUrl = parse_url($normalized) ?: [];
-}
+    $parsedUrl = [];
+    if ($dbUrl) {
+        $normalized = preg_replace('/^postgres:\/\//', 'postgresql://', $dbUrl);
+        $parsedUrl = parse_url($normalized) ?: [];
+    }
 
-$pgHost = getenv('PGHOST');
-$pgPort = getenv('PGPORT');
-$pgUser = getenv('PGUSER');
-$pgPass = getenv('PGPASSWORD');
-$pgDb   = getenv('PGDATABASE');
+    $pgHost = getenv('PGHOST');
+    $pgPort = getenv('PGPORT');
+    $pgUser = getenv('PGUSER');
+    $pgPass = getenv('PGPASSWORD');
+    $pgDb   = getenv('PGDATABASE');
 
-$dbHost = $parsedUrl['host'] ?? ($pgHost ?: env('DB_HOST', '127.0.0.1'));
-$dbPort = $parsedUrl['port'] ?? ($pgPort ?: env('DB_PORT', '5432'));
-$dbName = isset($parsedUrl['path']) ? ltrim($parsedUrl['path'], '/') : ($pgDb ?: env('DB_DATABASE', 'laravel'));
-$dbUser = $parsedUrl['user'] ?? ($pgUser ?: env('DB_USERNAME', 'root'));
-$dbPass = $parsedUrl['pass'] ?? ($pgPass ?: env('DB_PASSWORD', ''));
+    $dbHost = $parsedUrl['host'] ?? ($pgHost ?: env('DB_HOST', '127.0.0.1'));
+    $dbPort = $parsedUrl['port'] ?? ($pgPort ?: env('DB_PORT', '5432'));
+    $dbName = isset($parsedUrl['path']) ? ltrim($parsedUrl['path'], '/') : ($pgDb ?: env('DB_DATABASE', 'laravel'));
+    $dbUser = $parsedUrl['user'] ?? ($pgUser ?: env('DB_USERNAME', 'root'));
+    $dbPass = $parsedUrl['pass'] ?? ($pgPass ?: env('DB_PASSWORD', ''));
 
-$sslMode = 'prefer';
-if (isset($parsedUrl['query'])) {
-    parse_str($parsedUrl['query'], $queryParams);
-    $sslMode = $queryParams['sslmode'] ?? 'prefer';
+    $sslMode = 'prefer';
+    if (isset($parsedUrl['query'])) {
+        parse_str($parsedUrl['query'], $queryParams);
+        $sslMode = $queryParams['sslmode'] ?? 'prefer';
+    }
 }
 
 return [

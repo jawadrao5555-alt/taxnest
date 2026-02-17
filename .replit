@@ -21,6 +21,11 @@ QUEUE_CONNECTION = "sync"
 APP_KEY = "base64:41WY2e9C1jMkW21wJQsxMC1NUk5mge9Rn7sx5oNo4x0="
 APP_ENV = "production"
 APP_DEBUG = "false"
+DB_HOST = "169.254.254.254"
+DB_DATABASE = "neondb"
+DB_USERNAME = "neondb_owner"
+DB_PORT = "5432"
+DB_PASSWORD = "password"
 
 [userenv.development]
 APP_ENV = "production"

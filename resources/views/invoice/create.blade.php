@@ -616,10 +616,10 @@
                 showQuickProduct: false,
                 quickProductName: '', quickProductHs: '', quickProductPrice: '', quickProductUom: 'Numbers, pieces, units',
                 quickProductSchedule: 'standard', quickProductTaxRate: companyStandardRate, quickProductSaving: false, quickProductItemIndex: null,
-                buyer_name: '{{ old("buyer_name", "Walk-in Customer") }}',
+                buyer_name: {!! json_encode(old("buyer_name", "Walk-in Customer")) !!},
                 buyer_ntn: '{{ old("buyer_ntn", "") }}',
                 buyer_cnic: '{{ old("buyer_cnic", "") }}',
-                buyer_address: '{{ old("buyer_address", ($company->city ?: ($company->address ?: ""))) }}',
+                buyer_address: {!! json_encode(old("buyer_address", ($company->city ?: ($company->address ?? "")))) !!},
                 buyer_reg_type: '{{ old("buyer_registration_type", "") }}',
                 document_type: '{{ old("document_type", "Sale Invoice") }}',
                 reference_invoice_number: '{{ old("reference_invoice_number", "") }}',
@@ -848,7 +848,7 @@
                     this.buyer_name = 'Walk-in Customer';
                     this.buyer_ntn = '';
                     this.buyer_cnic = '';
-                    this.buyer_address = '{{ $company->city ?: ($company->address ?: "") }}';
+                    this.buyer_address = {!! json_encode($company->city ?: ($company->address ?? "")) !!};
                     this.buyer_reg_type = '';
                     this.customerResults = [];
                 },

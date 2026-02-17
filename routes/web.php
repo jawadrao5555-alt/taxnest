@@ -31,7 +31,22 @@ Route::get('/demo-login/{role}', [\App\Http\Controllers\Auth\AuthenticatedSessio
     ->where('role', 'super_admin|company_admin|demo');
 
 Route::get('/health', function () {
-    return response('OK', 200);
+    $info = [
+        'status' => 'ok',
+        'db_host' => config('database.connections.pgsql.host'),
+        'session_driver' => config('session.driver'),
+        'cache_driver' => config('cache.default'),
+        'config_cached' => file_exists(base_path('bootstrap/cache/config.php')),
+    ];
+    try {
+        \DB::connection()->getPdo();
+        $info['db'] = 'connected';
+        $info['db_time'] = round((microtime(true) - LARAVEL_START) * 1000) . 'ms';
+    } catch (\Exception $e) {
+        $info['db'] = 'failed';
+        $info['db_error'] = $e->getMessage();
+    }
+    return response()->json($info);
 });
 
 Route::get('/', function () {

@@ -68,6 +68,11 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => $sslMode,
+            'connect_timeout' => 10,
+            'options' => [
+                PDO::ATTR_TIMEOUT => 10,
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            ],
         ],
     ],
     'migrations' => [

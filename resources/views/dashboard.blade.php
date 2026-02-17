@@ -136,6 +136,60 @@
             </div>
             @endif
 
+            @if(auth()->user()->role !== 'super_admin')
+            <div class="mb-6">
+                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        <span>Quick Actions</span>
+                    </h3>
+                    <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        <a href="/invoice/create" class="group flex flex-col items-center justify-center p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-md hover:scale-105 transition-all duration-300">
+                            <div class="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg mb-2 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-900/50 transition">
+                                <svg class="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            </div>
+                            <span class="text-xs font-semibold text-gray-700 dark:text-gray-300 text-center">New Invoice</span>
+                        </a>
+
+                        <a href="/invoices" class="group flex flex-col items-center justify-center p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md hover:scale-105 transition-all duration-300">
+                            <div class="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg mb-2 group-hover:bg-blue-200 dark:group-hover:bg-blue-900/50 transition">
+                                <svg class="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+                            </div>
+                            <span class="text-xs font-semibold text-gray-700 dark:text-gray-300 text-center">View Invoices</span>
+                        </a>
+
+                        <a href="/products" class="group flex flex-col items-center justify-center p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:border-purple-300 dark:hover:border-purple-700 hover:shadow-md hover:scale-105 transition-all duration-300">
+                            <div class="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg mb-2 group-hover:bg-purple-200 dark:group-hover:bg-purple-900/50 transition">
+                                <svg class="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            </div>
+                            <span class="text-xs font-semibold text-gray-700 dark:text-gray-300 text-center">Add Product</span>
+                        </a>
+
+                        <a href="/customer-profiles" class="group flex flex-col items-center justify-center p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:border-teal-300 dark:hover:border-teal-700 hover:shadow-md hover:scale-105 transition-all duration-300">
+                            <div class="p-3 bg-teal-100 dark:bg-teal-900/30 rounded-lg mb-2 group-hover:bg-teal-200 dark:group-hover:bg-teal-900/50 transition">
+                                <svg class="w-5 h-5 text-teal-600 dark:text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4M12 4a8 8 0 100 16 8 8 0 000-16zm0 6a2 2 0 100 4 2 2 0 000-4z"/></svg>
+                            </div>
+                            <span class="text-xs font-semibold text-gray-700 dark:text-gray-300 text-center">Add Customer</span>
+                        </a>
+
+                        <a href="/reports" class="group flex flex-col items-center justify-center p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:border-amber-300 dark:hover:border-amber-700 hover:shadow-md hover:scale-105 transition-all duration-300">
+                            <div class="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-lg mb-2 group-hover:bg-amber-200 dark:group-hover:bg-amber-900/50 transition">
+                                <svg class="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                            </div>
+                            <span class="text-xs font-semibold text-gray-700 dark:text-gray-300 text-center">Reports</span>
+                        </a>
+
+                        <a href="/fbr/connection-status" class="group flex flex-col items-center justify-center p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md hover:scale-105 transition-all duration-300">
+                            <div class="p-3 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg mb-2 group-hover:bg-indigo-200 dark:group-hover:bg-indigo-900/50 transition">
+                                <svg class="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
+                            </div>
+                            <span class="text-xs font-semibold text-gray-700 dark:text-gray-300 text-center">FBR Status</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            @endif
+
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
                 <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-5 relative overflow-hidden">
                     <div class="absolute top-0 left-0 right-0 h-0.5 border-t-2 border-blue-500"></div>

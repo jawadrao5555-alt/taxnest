@@ -343,6 +343,9 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::post('/admin/announcements/{id}/toggle', [AnnouncementController::class, 'toggle'])->name('admin.announcements.toggle');
         Route::delete('/admin/announcements/{id}/delete', [AnnouncementController::class, 'destroy'])->name('admin.announcements.destroy');
 
+        Route::get('/admin/invoice-override', [AdminController::class, 'invoiceSearch'])->name('admin.invoice-override');
+        Route::post('/admin/invoice-override/{id}', [AdminController::class, 'invoiceOverride'])->name('admin.invoice-override.action');
+
         Route::get('/admin/hs-master-export', [HsMasterExportController::class, 'index'])->name('admin.hs-master-export');
 
         Route::get('/admin/hs-master', [GlobalHsMasterController::class, 'index'])->name('admin.hs-master');

@@ -35,6 +35,12 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **Smart Invoice Memory Suggestions:** Provides community pattern suggestions for HS codes on invoice creation.
 - **HS Code Mapping Engine:** Admin-managed `hs_code_mappings` table with sale type, SRO, serial number, tax rate, MRP, buyer type, and priority per HS code. Multiple mappings per HS code. Real-time suggestions on invoice create page (company can accept or enter custom values). Response tracking in `hs_mapping_responses` table for analytics.
 
+- **Admin Announcement System:** Admin can create/manage announcements (info, warning, urgent, success) targeting all or specific companies. Dismissable banners on company dashboard.
+- **Collapsible Sidebar Navigation:** Alpine.js collapse plugin for collapsible Business, Reports, Management, Inventory, Admin sections with localStorage persistence.
+- **Admin Revenue Dashboard:** Top companies by revenue, monthly revenue chart (Chart.js), expiring trial warnings, today's activity metrics, activity feed timeline from audit logs.
+- **Admin Invoice Override:** Super admin can search invoices and manually lock/unlock or update FBR status with full audit logging.
+- **Dashboard Quick Actions:** Shortcut grid on company dashboard for common tasks (New Invoice, View Invoices, Add Product, Add Customer, Reports, FBR Status).
+
 **Key Features:**
 - **Smart Invoice Builder:** Guided invoice creation with auto-calculations and pre-submission compliance scoring.
 - **FBR-compliant PDF Generation:** Includes QR data and watermarks.

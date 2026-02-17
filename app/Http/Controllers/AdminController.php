@@ -659,6 +659,98 @@ class AdminController extends Controller
         return redirect('/admin/company/' . $company->id)->with('success', 'Company limits reset to plan defaults.');
     }
 
+    public function invoiceSearch(Request $request)
+    {
+        $invoices = collect();
+
+        if ($request->filled('q')) {
+            $q = $request->q;
+            $invoices = Invoice::with('company')
+                ->where(function ($query) use ($q) {
+                    $query->where('invoice_number', 'ilike', "%{$q}%")
+                        ->orWhere('fbr_invoice_number', 'ilike', "%{$q}%")
+                        ->orWhereHas('company', function ($cq) use ($q) {
+                            $cq->where('name', 'ilike', "%{$q}%");
+                        });
+
+                    if (is_numeric($q)) {
+                        $query->orWhere('id', $q);
+                    }
+                })
+                ->orderBy('created_at', 'desc')
+                ->limit(50)
+                ->get();
+        }
+
+        return view('admin.invoice-override', compact('invoices'));
+    }
+
+    public function invoiceOverride(Request $request, $id)
+    {
+        $invoice = Invoice::findOrFail($id);
+        $action = $request->input('action');
+        $user = auth()->user();
+
+        $oldValues = [
+            'status' => $invoice->status,
+            'fbr_status' => $invoice->fbr_status,
+        ];
+
+        switch ($action) {
+            case 'lock':
+                $invoice->status = 'locked';
+                $invoice->save();
+                break;
+
+            case 'unlock':
+                if ($invoice->fbr_invoice_number) {
+                    return response()->json(['error' => 'Cannot unlock invoice with FBR invoice number assigned.'], 422);
+                }
+                $invoice->status = 'draft';
+                $invoice->save();
+                break;
+
+            case 'update_fbr_status':
+                $newFbrStatus = $request->input('fbr_status');
+                if (!in_array($newFbrStatus, ['production', 'failed', 'validation_failed', 'pending'])) {
+                    return response()->json(['error' => 'Invalid FBR status value.'], 422);
+                }
+                $invoice->fbr_status = $newFbrStatus;
+                $invoice->save();
+                break;
+
+            default:
+                return response()->json(['error' => 'Invalid action.'], 422);
+        }
+
+        \App\Models\AuditLog::create([
+            'user_id' => $user->id,
+            'company_id' => $invoice->company_id,
+            'action' => 'admin_invoice_override',
+            'entity_type' => 'invoice',
+            'entity_id' => $invoice->id,
+            'old_values' => $oldValues,
+            'new_values' => [
+                'action' => $action,
+                'status' => $invoice->status,
+                'fbr_status' => $invoice->fbr_status,
+                'admin_user' => $user->name,
+                'admin_email' => $user->email,
+            ],
+            'ip_address' => $request->ip(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Invoice updated successfully.',
+            'invoice' => [
+                'id' => $invoice->id,
+                'status' => $invoice->status,
+                'fbr_status' => $invoice->fbr_status,
+            ],
+        ]);
+    }
+
     private function calcAuditProbability(Company $company)
     {
         $score = $company->compliance_score ?? 75;

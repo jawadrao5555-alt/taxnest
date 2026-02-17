@@ -901,11 +901,24 @@ function fbrSubmitEngine() {
                     body: body
                 });
 
+                const contentType = res.headers.get('content-type') || '';
+                if (!contentType.includes('application/json')) {
+                    this.showSubmitModal = false;
+                    if (res.redirected || res.status === 302) {
+                        window.location.reload();
+                        return;
+                    }
+                    showFbrError('Server returned unexpected response (HTTP ' + res.status + '). Please refresh and try again.');
+                    return;
+                }
+
                 const data = await res.json();
                 this.showSubmitModal = false;
                 handleFbrResponse(data);
             } catch (e) {
-                showFbrError('Network error. Please check your connection and try again.');
+                this.showSubmitModal = false;
+                console.error('FBR Submit Error:', e);
+                showFbrError('Network error: ' + (e.message || 'Please check your connection and try again.'));
             }
             this.submitting = false;
         }

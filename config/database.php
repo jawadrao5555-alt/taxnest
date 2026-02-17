@@ -88,6 +88,7 @@ return [
             'options' => [
                 PDO::ATTR_TIMEOUT => 10,
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_PERSISTENT => true,
             ],
         ],
     ],

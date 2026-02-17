@@ -583,10 +583,16 @@ class InvoiceController extends Controller
             ->first();
 
         if ($subscription && $subscription->isExpired()) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['status' => 'error', 'message' => 'Subscription expired', 'error_details' => 'Your subscription has expired.'], 422);
+            }
             return redirect('/invoices')->with('error', 'Your subscription has expired.');
         }
 
         if ($subscription && $subscription->trial_ends_at && $subscription->isTrialExpired()) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['status' => 'error', 'message' => 'Trial ended', 'error_details' => 'Your trial period has ended.'], 422);
+            }
             return redirect('/invoices')->with('error', 'Your trial period has ended.');
         }
 
@@ -595,15 +601,27 @@ class InvoiceController extends Controller
         $invoice->load('items', 'company');
 
         if (!empty($invoice->fbr_invoice_number)) {
-            return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice already has FBR number: ' . $invoice->fbr_invoice_number . '. Cannot resubmit.');
+            $msg = 'Invoice already has FBR number: ' . $invoice->fbr_invoice_number . '. Cannot resubmit.';
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['status' => 'error', 'message' => 'Already submitted', 'error_details' => $msg], 422);
+            }
+            return redirect('/invoice/' . $invoice->id)->with('error', $msg);
         }
 
         if ($invoice->status === 'pending_verification') {
-            return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice is pending FBR verification. Please check FBR portal first.');
+            $msg = 'Invoice is pending FBR verification. Please check FBR portal first.';
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['status' => 'error', 'message' => 'Pending verification', 'error_details' => $msg], 422);
+            }
+            return redirect('/invoice/' . $invoice->id)->with('error', $msg);
         }
 
         if ($invoice->status === 'locked') {
-            return redirect('/invoice/' . $invoice->id)->with('error', 'Invoice is already locked. Cannot resubmit.');
+            $msg = 'Invoice is already locked. Cannot resubmit.';
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['status' => 'error', 'message' => 'Already locked', 'error_details' => $msg], 422);
+            }
+            return redirect('/invoice/' . $invoice->id)->with('error', $msg);
         }
 
         $itemsForValidation = $invoice->items->map(function ($item) {
@@ -624,6 +642,9 @@ class InvoiceController extends Controller
         $submissionCheck = ScheduleEngine::validateForSubmission($itemsForValidation, $standardTaxRate);
         if (!$submissionCheck['valid']) {
             $errorHtml = $submissionCheck['message'] . ' ' . implode(' | ', $submissionCheck['errors']);
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['status' => 'error', 'message' => 'Validation failed', 'error_details' => $errorHtml], 422);
+            }
             return redirect('/invoice/' . $invoice->id)->with('error', $errorHtml);
         }
 

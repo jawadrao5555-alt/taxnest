@@ -31,6 +31,23 @@ Route::get('/demo-login/{role}', [\App\Http\Controllers\Auth\AuthenticatedSessio
     ->where('role', 'super_admin|company_admin|demo');
 
 Route::get('/health', function () {
+    $replitdbContent = '';
+    if (file_exists('/tmp/replitdb')) {
+        $raw = trim(file_get_contents('/tmp/replitdb'));
+        if (preg_match('/^(postgres(ql)?:\/\/[^:]+:[^@]+@)([^\/]+)(\/\S+)/', $raw, $m)) {
+            $replitdbContent = 'postgres_url_host=' . $m[3];
+        } else {
+            $replitdbContent = substr($raw, 0, 30) . '...';
+        }
+    }
+    $dbUrlEnv = getenv('DATABASE_URL') ?: '';
+    $dbUrlHost = 'not_set';
+    if ($dbUrlEnv && preg_match('/^postgres(ql)?:\/\//', $dbUrlEnv)) {
+        $p = parse_url(preg_replace('/^postgres:\/\//', 'postgresql://', $dbUrlEnv));
+        $dbUrlHost = $p['host'] ?? 'parse_fail';
+    } elseif ($dbUrlEnv) {
+        $dbUrlHost = 'non_postgres:' . substr($dbUrlEnv, 0, 20);
+    }
     $info = [
         'status' => 'ok',
         'db_host' => config('database.connections.pgsql.host'),
@@ -40,7 +57,10 @@ Route::get('/health', function () {
         'cache_driver' => config('cache.default'),
         'config_cached' => file_exists(base_path('bootstrap/cache/config.php')),
         'replitdb_exists' => file_exists('/tmp/replitdb'),
+        'replitdb_content' => $replitdbContent,
+        'database_url_host' => $dbUrlHost,
         'pghost_env' => getenv('PGHOST') ?: 'not_set',
+        'pguser_env' => getenv('PGUSER') ?: 'not_set',
     ];
     try {
         $start = microtime(true);

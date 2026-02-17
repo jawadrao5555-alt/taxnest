@@ -34,17 +34,22 @@ Route::get('/health', function () {
     $info = [
         'status' => 'ok',
         'db_host' => config('database.connections.pgsql.host'),
+        'db_port' => config('database.connections.pgsql.port'),
+        'db_name' => config('database.connections.pgsql.database'),
         'session_driver' => config('session.driver'),
         'cache_driver' => config('cache.default'),
         'config_cached' => file_exists(base_path('bootstrap/cache/config.php')),
+        'replitdb_exists' => file_exists('/tmp/replitdb'),
+        'pghost_env' => getenv('PGHOST') ?: 'not_set',
     ];
     try {
+        $start = microtime(true);
         \DB::connection()->getPdo();
         $info['db'] = 'connected';
-        $info['db_time'] = round((microtime(true) - LARAVEL_START) * 1000) . 'ms';
+        $info['db_time'] = round((microtime(true) - $start) * 1000) . 'ms';
     } catch (\Exception $e) {
         $info['db'] = 'failed';
-        $info['db_error'] = $e->getMessage();
+        $info['db_error'] = substr($e->getMessage(), 0, 200);
     }
     return response()->json($info);
 });

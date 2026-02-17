@@ -92,70 +92,105 @@
                         Delete
                     </button>
                 </form>
-                <div x-data="{ showWhtModal: false, pdfWhtRate: {{ $invoice->wht_rate ?? 0 }}, saving: false, whtLocked: {{ $invoice->wht_locked ? 'true' : 'false' }} }" class="inline-flex items-center gap-2">
-                    @if($invoice->wht_locked)
-                    <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
-                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                        Download PDF
-                    </a>
-                    <span class="inline-flex items-center px-3 py-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-sm font-medium">
-                        <svg class="w-3.5 h-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                        WHT {{ number_format($invoice->wht_rate, 1) }}% Locked
-                    </span>
-                    <button @click="showWhtModal = true" class="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200 transition border border-gray-200">
-                        <svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                        Change
-                    </button>
-                    @else
-                    <button @click="showWhtModal = true" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
-                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                        Download PDF
-                    </button>
-                    @endif
-                    <div x-show="showWhtModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background-color: rgba(0,0,0,0.4);">
-                        <div @click.away="showWhtModal = false" class="bg-white rounded-xl shadow-2xl border border-gray-200 p-6 w-96 max-w-[90vw]">
+                <div x-data="draftPdfHandler()" class="inline-flex items-center gap-2">
+                    <template x-if="whtLocked">
+                        <div class="inline-flex items-center gap-2">
+                            <button @click="openPdfPopup()" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
+                                <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                Download / Print
+                            </button>
+                            <span class="inline-flex items-center px-3 py-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-sm font-medium">
+                                <svg class="w-3.5 h-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                WHT <span x-text="selectedWht + '%'"></span> Locked
+                            </span>
+                        </div>
+                    </template>
+                    <template x-if="!whtLocked">
+                        <button @click="showWhtFirst = true" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                            Download PDF
+                        </button>
+                    </template>
+                    <div x-show="showWhtFirst" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background-color: rgba(0,0,0,0.4);">
+                        <div @click.away="showWhtFirst = false" class="bg-white rounded-xl shadow-2xl border border-gray-200 p-6 w-96 max-w-[90vw]">
                             <div class="flex items-center justify-between mb-4">
-                                <p class="text-base font-bold text-gray-800">Withholding Tax (WHT)</p>
-                                <button @click="showWhtModal = false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                                <p class="text-base font-bold text-gray-800">Select WHT Rate</p>
+                                <button @click="showWhtFirst = false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
                             </div>
-                            <p class="text-xs text-gray-500 mb-3">Select WHT rate. After saving, PDF will download with this WHT applied.</p>
-                            <form method="POST" action="/invoice/{{ $invoice->id }}/update-wht">
-                                @csrf
-                                <div class="space-y-2 mb-4">
-                                    <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                        :class="pdfWhtRate == 0 ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 hover:bg-gray-50'">
-                                        <input type="radio" name="wht_rate" value="0" x-model.number="pdfWhtRate" class="text-emerald-500">
-                                        <span class="text-sm font-semibold text-gray-800">No WHT (0%)</span>
-                                    </label>
-                                    <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                        :class="pdfWhtRate == 0.5 ? 'border-amber-400 bg-amber-50' : 'border-gray-200 hover:bg-gray-50'">
-                                        <input type="radio" name="wht_rate" value="0.5" x-model.number="pdfWhtRate" class="text-amber-500">
-                                        <span class="text-sm font-semibold text-gray-800">WHT 0.5%</span>
-                                    </label>
-                                    <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                        :class="pdfWhtRate == 1 ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'">
-                                        <input type="radio" name="wht_rate" value="1" x-model.number="pdfWhtRate" class="text-blue-500">
-                                        <span class="text-sm font-semibold text-gray-800">WHT 1%</span>
-                                    </label>
-                                    <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                        :class="pdfWhtRate == 2 ? 'border-orange-400 bg-orange-50' : 'border-gray-200 hover:bg-gray-50'">
-                                        <input type="radio" name="wht_rate" value="2" x-model.number="pdfWhtRate" class="text-orange-500">
-                                        <span class="text-sm font-semibold text-gray-800">WHT 2%</span>
-                                    </label>
-                                    <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                        :class="pdfWhtRate == 2.5 ? 'border-red-400 bg-red-50' : 'border-gray-200 hover:bg-gray-50'">
-                                        <input type="radio" name="wht_rate" value="2.5" x-model.number="pdfWhtRate" class="text-red-500">
-                                        <span class="text-sm font-semibold text-gray-800">WHT 2.5%</span>
-                                    </label>
-                                </div>
-                                <button type="submit" :disabled="saving" class="w-full px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
-                                    <span x-show="!saving">Save WHT & Download PDF</span>
-                                    <span x-show="saving" x-cloak>Saving...</span>
-                                </button>
-                            </form>
+                            <p class="text-xs text-gray-500 mb-3">WHT rate will be locked and applied to this invoice. PDF will open after saving.</p>
+                            <div class="space-y-2 mb-4">
+                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                    :class="selectedWht == 0 ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 hover:bg-gray-50'">
+                                    <input type="radio" value="0" x-model.number="selectedWht" class="text-emerald-500">
+                                    <span class="text-sm font-semibold text-gray-800">No WHT (0%)</span>
+                                </label>
+                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                    :class="selectedWht == 0.5 ? 'border-amber-400 bg-amber-50' : 'border-gray-200 hover:bg-gray-50'">
+                                    <input type="radio" value="0.5" x-model.number="selectedWht" class="text-amber-500">
+                                    <span class="text-sm font-semibold text-gray-800">WHT 0.5%</span>
+                                </label>
+                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                    :class="selectedWht == 1 ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'">
+                                    <input type="radio" value="1" x-model.number="selectedWht" class="text-blue-500">
+                                    <span class="text-sm font-semibold text-gray-800">WHT 1%</span>
+                                </label>
+                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                    :class="selectedWht == 2 ? 'border-orange-400 bg-orange-50' : 'border-gray-200 hover:bg-gray-50'">
+                                    <input type="radio" value="2" x-model.number="selectedWht" class="text-orange-500">
+                                    <span class="text-sm font-semibold text-gray-800">WHT 2%</span>
+                                </label>
+                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                    :class="selectedWht == 2.5 ? 'border-red-400 bg-red-50' : 'border-gray-200 hover:bg-gray-50'">
+                                    <input type="radio" value="2.5" x-model.number="selectedWht" class="text-red-500">
+                                    <span class="text-sm font-semibold text-gray-800">WHT 2.5%</span>
+                                </label>
+                            </div>
+                            <button @click="saveWhtAndOpen()" :disabled="savingWht" class="w-full px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
+                                <span x-show="!savingWht">Lock WHT & Open PDF</span>
+                                <span x-show="savingWht" x-cloak>Saving...</span>
+                            </button>
                         </div>
                     </div>
                 </div>
+                <script>
+                function draftPdfHandler() {
+                    return {
+                        showWhtFirst: false,
+                        selectedWht: {{ $invoice->wht_rate ?? 0 }},
+                        savingWht: false,
+                        whtLocked: {{ $invoice->wht_locked ? 'true' : 'false' }},
+                        openPdfPopup() {
+                            openInlinePdfPopup();
+                        },
+                        async saveWhtAndOpen() {
+                            this.savingWht = true;
+                            try {
+                                const body = new FormData();
+                                body.append('_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
+                                body.append('wht_rate', this.selectedWht);
+                                const res = await fetch('/invoice/{{ $invoice->id }}/update-wht-ajax', {
+                                    method: 'POST',
+                                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                                    body: body
+                                });
+                                const data = await res.json();
+                                if (data.status === 'ok') {
+                                    this.whtLocked = true;
+                                    this.showWhtFirst = false;
+                                    this.savingWht = false;
+                                    openInlinePdfPopup();
+                                    return;
+                                } else {
+                                    alert(data.message || 'Failed to save WHT rate');
+                                }
+                            } catch(e) {
+                                alert('Network error saving WHT rate');
+                            }
+                            this.savingWht = false;
+                        }
+                    };
+                }
+                </script>
                 @elseif($invoice->status === 'locked' && $invoice->fbr_status === 'production')
                 {{-- LOCKED+PRODUCTION: PDF with WHT lock, Print, Duplicate, WhatsApp --}}
                 <div x-data="lockedPdfHandler()" class="inline-flex items-center gap-2">
@@ -1132,7 +1167,7 @@ async function smartRefreshInvoiceStatus() {
         if (!res.ok) throw new Error('Status fetch failed');
         const data = await res.json();
         patchStatusBadge(data.status, data.fbr_status);
-        patchActionButtons(data.status, data.fbr_status, data.fbr_invoice_number, data.share_uuid, data.display_invoice_number);
+        patchActionButtons(data.status, data.fbr_status, data.fbr_invoice_number, data.share_uuid, data.display_invoice_number, data.wht_rate, data.wht_locked);
         showSuccessToast(data.fbr_invoice_number);
     } catch (e) {
         window.location.reload();
@@ -1167,7 +1202,7 @@ function patchStatusBadge(status, fbrStatus) {
     }
 }
 
-function patchActionButtons(status, fbrStatus, fbrInvoiceNumber, shareUuid, displayNumber) {
+function patchActionButtons(status, fbrStatus, fbrInvoiceNumber, shareUuid, displayNumber, whtRate, whtLocked) {
     const block = document.getElementById('actionButtonsBlock');
     if (!block) return;
     if (status === 'locked' && fbrStatus === 'production') {
@@ -1178,11 +1213,16 @@ function patchActionButtons(status, fbrStatus, fbrInvoiceNumber, shareUuid, disp
             const waText = encodeURIComponent('Invoice ' + (displayNumber || '') + ': ' + shareUrl);
             whatsappBtn = `<a href="https://wa.me/?text=${waText}" target="_blank" class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition">WhatsApp</a>`;
         }
+        let whtBadge = whtLocked ? `<span class="inline-flex items-center px-2.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-medium">
+            <svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+            WHT ${whtRate}%
+        </span>` : '';
         block.innerHTML = `
             <button onclick="openInlinePdfPopup()" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
                 <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                 Download / Print
             </button>
+            ${whtBadge}
             <form method="POST" action="/invoice/{{ $invoice->id }}/duplicate" class="inline">
                 <input type="hidden" name="_token" value="${document.querySelector('meta[name=csrf-token]')?.content || ''}">
                 <button type="submit" class="inline-flex items-center px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-700 transition" onclick="return confirm('Create a duplicate of this invoice as a new draft?')">

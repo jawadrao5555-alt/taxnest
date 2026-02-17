@@ -1643,6 +1643,8 @@ class InvoiceController extends Controller
             'fbr_invoice_number' => $invoice->fbr_invoice_number,
             'share_uuid' => $invoice->share_uuid,
             'display_invoice_number' => $invoice->display_invoice_number,
+            'wht_rate' => $invoice->wht_rate ?? 0,
+            'wht_locked' => (bool) $invoice->wht_locked,
             'updated_at' => $invoice->updated_at?->toIso8601String(),
         ]);
     }

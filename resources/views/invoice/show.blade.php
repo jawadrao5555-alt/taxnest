@@ -92,26 +92,34 @@
                         Delete
                     </button>
                 </form>
-                <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
-                    <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                    Download PDF
-                </a>
-                <div x-data="{ showWhtModal: false, pdfWhtRate: {{ $invoice->wht_rate ?? 0 }}, saving: false }" class="inline-flex items-center gap-2">
-                    <button @click="showWhtModal = true" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
-                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                        WHT {{ ($invoice->wht_rate ?? 0) > 0 ? number_format($invoice->wht_rate, 1) . '%' : 'Set' }}
-                        @if($invoice->wht_rate > 0)
-                        <svg class="w-3 h-3 ml-1 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                        @endif
+                <div x-data="{ showWhtModal: false, pdfWhtRate: {{ $invoice->wht_rate ?? 0 }}, saving: false, whtLocked: {{ $invoice->wht_locked ? 'true' : 'false' }} }" class="inline-flex items-center gap-2">
+                    @if($invoice->wht_locked)
+                    <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        Download PDF
+                    </a>
+                    <span class="inline-flex items-center px-3 py-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-sm font-medium">
+                        <svg class="w-3.5 h-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                        WHT {{ number_format($invoice->wht_rate, 1) }}% Locked
+                    </span>
+                    <button @click="showWhtModal = true" class="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200 transition border border-gray-200">
+                        <svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        Change
                     </button>
+                    @else
+                    <button @click="showWhtModal = true" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        Download PDF
+                    </button>
+                    @endif
                     <div x-show="showWhtModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background-color: rgba(0,0,0,0.4);">
                         <div @click.away="showWhtModal = false" class="bg-white rounded-xl shadow-2xl border border-gray-200 p-6 w-96 max-w-[90vw]">
                             <div class="flex items-center justify-between mb-4">
-                                <p class="text-base font-bold text-gray-800">Withholding Tax Rate</p>
+                                <p class="text-base font-bold text-gray-800">Withholding Tax (WHT)</p>
                                 <button @click="showWhtModal = false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
                             </div>
-                            <p class="text-xs text-gray-500 mb-3">Select WHT rate. Once saved, it will be locked and applied to all PDF downloads.</p>
-                            <form @submit.prevent="saving = true; $el.submit()" method="POST" action="/invoice/{{ $invoice->id }}/update-wht">
+                            <p class="text-xs text-gray-500 mb-3">Select WHT rate. After saving, PDF will download with this WHT applied.</p>
+                            <form method="POST" action="/invoice/{{ $invoice->id }}/update-wht">
                                 @csrf
                                 <div class="space-y-2 mb-4">
                                     <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
@@ -141,7 +149,7 @@
                                     </label>
                                 </div>
                                 <button type="submit" :disabled="saving" class="w-full px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
-                                    <span x-show="!saving">Save & Lock WHT Rate</span>
+                                    <span x-show="!saving">Save WHT & Download PDF</span>
                                     <span x-show="saving" x-cloak>Saving...</span>
                                 </button>
                             </form>

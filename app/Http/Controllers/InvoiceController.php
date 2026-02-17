@@ -1432,11 +1432,10 @@ class InvoiceController extends Controller
             'wht_rate' => $whtRate,
             'wht_amount' => $whtAmount,
             'net_receivable' => $netReceivable,
-            'wht_locked' => ($whtRate > 0),
+            'wht_locked' => true,
         ]);
 
-        $rateLabel = $whtRate > 0 ? $whtRate . '%' : '0% (No WHT)';
-        return redirect()->back()->with('success', 'WHT rate saved and locked at ' . $rateLabel . '. Download PDF to see it applied.');
+        return redirect('/invoice/' . $invoice->id . '/download');
     }
 
     public function complianceCheck(Request $request)

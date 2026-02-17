@@ -146,6 +146,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
         Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
         Route::post('/products/{product}/toggle', [ProductController::class, 'deactivate'])->name('products.toggle');
+        Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
         Route::get('/products/search', [ProductController::class, 'search'])->name('products.search');
 
         Route::get('/customer-profiles', [CustomerProfileController::class, 'index'])->name('customer-profiles.index');

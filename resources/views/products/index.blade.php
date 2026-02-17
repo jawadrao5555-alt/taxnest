@@ -104,6 +104,11 @@
                                             {{ $product->is_active ? 'Deactivate' : 'Activate' }}
                                         </button>
                                     </form>
+                                    <form method="POST" action="/products/{{ $product->id }}" class="inline" onsubmit="return confirm('Are you sure you want to permanently delete &quot;{{ addslashes($product->name) }}&quot;? This action cannot be undone.')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="text-red-600 hover:text-red-800 font-medium">Delete</button>
+                                    </form>
                                 </td>
                             </tr>
                         @empty

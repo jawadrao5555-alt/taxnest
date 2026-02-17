@@ -139,6 +139,17 @@ class ProductController extends Controller
         return redirect('/products')->with('success', 'Product status updated.');
     }
 
+    public function destroy(Product $product)
+    {
+        $companyId = app('currentCompanyId');
+        if ($product->company_id !== $companyId) abort(403);
+
+        $productName = $product->name;
+        $product->delete();
+
+        return redirect('/products')->with('success', "Product \"{$productName}\" deleted successfully.");
+    }
+
     public function search(Request $request)
     {
         $companyId = app('currentCompanyId');

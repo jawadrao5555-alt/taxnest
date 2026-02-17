@@ -1069,7 +1069,6 @@ class InvoiceController extends Controller
             $invoice->status = 'locked';
             $invoice->fbr_status = 'production';
             $invoice->is_fbr_processing = false;
-            $invoice->wht_locked = true;
             $invoice->integrity_hash = \App\Services\IntegrityHashService::generate($invoice);
             $invoice->qr_data = json_encode([
                 'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $company->fbr_registration_no ?: ($company->ntn ?? '')),
@@ -1176,7 +1175,6 @@ class InvoiceController extends Controller
 
             $invoice->status = 'locked';
             $invoice->fbr_status = 'production';
-            $invoice->wht_locked = true;
             $invoice->fbr_submission_date = $invoice->fbr_submission_date ?? now();
 
             if ($fbrInvoiceNumber) {
@@ -1278,7 +1276,6 @@ class InvoiceController extends Controller
 
         $invoice->status = 'locked';
         $invoice->fbr_status = 'production';
-        $invoice->wht_locked = true;
         $invoice->fbr_submission_date = $invoice->fbr_submission_date ?? now();
 
         $invoice->integrity_hash = IntegrityHashService::generate($invoice);
@@ -1868,7 +1865,6 @@ class InvoiceController extends Controller
                     $invoice->status = 'locked';
                     $invoice->fbr_status = 'production';
                     $invoice->is_fbr_processing = false;
-                    $invoice->wht_locked = true;
                     if ($fbrNum) {
                         $invoice->fbr_invoice_number = $fbrNum;
                         $invoice->fbr_invoice_id = $fbrNum;
@@ -1948,7 +1944,6 @@ class InvoiceController extends Controller
             $invoice->status = 'locked';
             $invoice->fbr_status = 'production';
             $invoice->is_fbr_processing = false;
-            $invoice->wht_locked = true;
             $invoice->integrity_hash = IntegrityHashService::generate($invoice);
             $invoice->qr_data = json_encode([
                 'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $company->fbr_registration_no ?: ($company->ntn ?? '')),

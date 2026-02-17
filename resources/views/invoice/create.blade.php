@@ -212,7 +212,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">HS Code</label>
-                                    <input type="text" :name="'items[' + index + '][hs_code]'" x-model="item.hs_code" @blur="lookupHsCode(index); fetchTaxRecommendation(index); fetchHsSuggestion(index)" required placeholder="8471.3010"
+                                    <input type="text" :name="'items[' + index + '][hs_code]'" x-model="item.hs_code" @blur="lookupHsCode(index); fetchTaxRecommendation(index); fetchHsSuggestion(index); fetchMappingSuggestions(index)" required placeholder="8471.3010"
                                         class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                     <div x-show="item.hsSuggestion" x-cloak class="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
                                         <div class="flex items-center justify-between mb-2">
@@ -228,6 +228,38 @@
                                             <div x-show="item.hsSuggestion?.sro_schedule_no"><span class="text-gray-500">SRO:</span> <span class="font-medium text-gray-800 dark:text-gray-200" x-text="item.hsSuggestion?.sro_schedule_no"></span></div>
                                             <div x-show="item.hsSuggestion?.mrp_required"><span class="text-gray-500">MRP:</span> <span class="font-medium text-emerald-600">Required</span></div>
                                         </div>
+                                    </div>
+                                    <div x-show="item.showMappingPanel && item.adminMappings && item.adminMappings.length > 0" x-cloak class="mt-2 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-lg">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <span class="text-xs font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1">
+                                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
+                                                Admin Mapping Suggestions
+                                            </span>
+                                            <button type="button" @click="item.showMappingPanel = false" class="px-2 py-1 text-xs font-medium text-gray-500 border border-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition">Close</button>
+                                        </div>
+                                        <div class="space-y-2">
+                                            <template x-for="(mp, mi) in item.adminMappings" :key="mp.id">
+                                                <div class="p-2.5 bg-white dark:bg-gray-800 rounded-lg border border-emerald-100 dark:border-emerald-800 hover:border-emerald-300 dark:hover:border-emerald-600 transition">
+                                                    <div class="flex items-center justify-between mb-1.5">
+                                                        <span class="text-xs font-medium text-emerald-700 dark:text-emerald-300" x-text="mp.label || ('Mapping #' + (mi+1))"></span>
+                                                        <div class="flex gap-2">
+                                                            <button type="button" @click="applyMapping(index, mp)" class="px-3 py-1 text-xs font-medium bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition">Use This</button>
+                                                            <button type="button" @click="dismissMapping(index, mp.id, mp.hs_code)" class="px-2 py-1 text-xs font-medium text-gray-400 hover:text-gray-600 transition">Skip</button>
+                                                        </div>
+                                                    </div>
+                                                    <div class="grid grid-cols-2 md:grid-cols-4 gap-1.5 text-xs">
+                                                        <div><span class="text-gray-400">Sale Type:</span> <span class="font-medium text-gray-700 dark:text-gray-300" x-text="mp.sale_type.replace('_',' ')"></span></div>
+                                                        <div><span class="text-gray-400">Tax:</span> <span class="font-medium text-gray-700 dark:text-gray-300" x-text="mp.tax_rate + '%'"></span></div>
+                                                        <div x-show="mp.sro_applicable"><span class="text-gray-400">SRO:</span> <span class="font-medium text-gray-700 dark:text-gray-300" x-text="mp.sro_number || 'Yes'"></span></div>
+                                                        <div x-show="mp.serial_number_applicable"><span class="text-gray-400">Serial:</span> <span class="font-medium text-gray-700 dark:text-gray-300" x-text="mp.serial_number_value || 'Yes'"></span></div>
+                                                        <div x-show="mp.mrp_required"><span class="text-gray-400">MRP:</span> <span class="font-medium text-amber-600">Required</span></div>
+                                                        <div x-show="mp.buyer_type"><span class="text-gray-400">Buyer:</span> <span class="font-medium text-gray-700 dark:text-gray-300" x-text="mp.buyer_type"></span></div>
+                                                    </div>
+                                                    <p x-show="mp.notes" class="mt-1 text-xs text-gray-400 italic" x-text="mp.notes"></p>
+                                                </div>
+                                            </template>
+                                        </div>
+                                        <p class="mt-2 text-xs text-gray-400">These are pre-configured mappings. Use one or enter your own values.</p>
                                     </div>
                                 </div>
                                 <div>
@@ -601,7 +633,9 @@
                     hsLookupInfo: '',
                     hsUnmapped: false,
                     taxRecommendation: null,
-                    hsSuggestion: null
+                    hsSuggestion: null,
+                    adminMappings: null,
+                    showMappingPanel: false
                 };
             }
 
@@ -1065,6 +1099,54 @@
                             item.taxRecommendation = null;
                         }
                     } catch(e) { item.taxRecommendation = null; }
+                },
+
+                async fetchMappingSuggestions(index) {
+                    let item = this.items[index];
+                    if (!item.hs_code || item.hs_code.length < 4) { item.adminMappings = null; item.showMappingPanel = false; return; }
+                    try {
+                        let res = await fetch('/api/hs-mapping-suggestions/' + encodeURIComponent(item.hs_code));
+                        if (res.ok) {
+                            let data = await res.json();
+                            if (data && data.mappings && data.mappings.length > 0) {
+                                item.adminMappings = data.mappings;
+                                item.showMappingPanel = true;
+                            } else {
+                                item.adminMappings = null;
+                                item.showMappingPanel = false;
+                            }
+                        }
+                    } catch(e) { item.adminMappings = null; item.showMappingPanel = false; }
+                },
+
+                applyMapping(index, mapping) {
+                    let item = this.items[index];
+                    item.schedule_type = mapping.sale_type;
+                    item.tax_rate = Math.round(mapping.tax_rate);
+                    if (mapping.pct_code) item.pct_code = mapping.pct_code;
+                    if (mapping.default_uom) item.default_uom = mapping.default_uom;
+                    if (mapping.sro_applicable && mapping.sro_number) item.sro_schedule_no = mapping.sro_number;
+                    if (mapping.serial_number_applicable && mapping.serial_number_value) item.serial_no = mapping.serial_number_value;
+                    this.calcTax(index);
+                    this.applyScheduleRules(item);
+                    this.recordMappingResponse(mapping.id, item.hs_code, 'accepted');
+                    item.showMappingPanel = false;
+                },
+
+                dismissMapping(index, mappingId, hsCode) {
+                    let item = this.items[index];
+                    this.recordMappingResponse(mappingId, hsCode, 'rejected');
+                    item.showMappingPanel = false;
+                },
+
+                async recordMappingResponse(mappingId, hsCode, action) {
+                    try {
+                        await fetch('/api/hs-mapping-response', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+                            body: JSON.stringify({ hs_code_mapping_id: mappingId, hs_code: hsCode, action: action })
+                        });
+                    } catch(e) {}
                 }
             };
         }

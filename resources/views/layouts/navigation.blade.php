@@ -123,6 +123,11 @@
             HS Master
         </a>
 
+        <a href="/admin/hs-mapping-engine" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->is('admin/hs-mapping-engine*') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
+            HS Mapping Engine
+        </a>
+
         <a href="/admin/system-health" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->is('admin/system-health*') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
             System Health

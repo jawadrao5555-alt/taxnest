@@ -18,6 +18,7 @@ use App\Http\Controllers\ShareController;
 use App\Http\Controllers\CompanyUserController;
 use App\Http\Controllers\CompanySettingsController;
 use App\Http\Controllers\CustomerLedgerController;
+use App\Http\Controllers\HsCodeMappingController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\TaxOverrideController;
@@ -188,6 +189,8 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
     });
     Route::get('/api/hs-lookup', [GlobalHsMasterController::class, 'apiLookup']);
     Route::get('/api/hs-search', [GlobalHsMasterController::class, 'apiSearch']);
+    Route::get('/api/hs-mapping-suggestions/{hsCode}', [HsCodeMappingController::class, 'apiSuggestions']);
+    Route::post('/api/hs-mapping-response', [HsCodeMappingController::class, 'apiRecordResponse']);
     Route::get('/api/sro-suggest', function (\Illuminate\Http\Request $request) {
         $scheduleType = $request->get('schedule_type', 'standard');
         $taxRate = $request->get('tax_rate') ? floatval($request->get('tax_rate')) : null;
@@ -346,6 +349,11 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::post('/admin/hs-unmapped/{id}/map', [HsMasterController::class, 'mapFromQueue'])->name('admin.hs-master-global.map');
         Route::post('/admin/hs-unmapped/{id}/reject', [HsMasterController::class, 'rejectSuggestion'])->name('admin.hs-master-global.reject');
         Route::post('/admin/hs-unmapped/{id}/regenerate', [HsMasterController::class, 'regenerateSuggestion'])->name('admin.hs-master-global.regenerate');
+
+        Route::get('/admin/hs-mapping-engine', [HsCodeMappingController::class, 'index'])->name('admin.hs-mapping-engine');
+        Route::post('/admin/hs-mapping-engine', [HsCodeMappingController::class, 'store'])->name('admin.hs-mapping-engine.store');
+        Route::put('/admin/hs-mapping-engine/{id}', [HsCodeMappingController::class, 'update'])->name('admin.hs-mapping-engine.update');
+        Route::delete('/admin/hs-mapping-engine/{id}', [HsCodeMappingController::class, 'destroy'])->name('admin.hs-mapping-engine.destroy');
     });
 });
 

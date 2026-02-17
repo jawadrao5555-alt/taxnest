@@ -1453,8 +1453,8 @@ class InvoiceController extends Controller
             return response()->json(['status' => 'error', 'message' => 'WHT rate is already locked on this invoice.'], 422);
         }
 
-        if (in_array($invoice->status, ['locked', 'pending_verification'])) {
-            return response()->json(['status' => 'error', 'message' => 'Cannot modify WHT on this invoice in its current state.'], 422);
+        if ($invoice->status === 'pending_verification') {
+            return response()->json(['status' => 'error', 'message' => 'Cannot modify WHT while invoice is pending FBR verification.'], 422);
         }
 
         $request->validate([

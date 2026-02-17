@@ -1542,6 +1542,46 @@ class InvoiceController extends Controller
         ]);
     }
 
+    public function whtManagement(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+
+        $query = Invoice::where('company_id', $companyId)
+            ->where('wht_locked', true)
+            ->with('items')
+            ->orderBy('created_at', 'desc');
+
+        if ($request->filled('filter')) {
+            $filter = $request->filter;
+            if ($filter === 'with_wht') {
+                $query->where('wht_rate', '>', 0);
+            } elseif ($filter === 'no_wht') {
+                $query->where('wht_rate', 0);
+            }
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('buyer_name', 'ilike', "%{$search}%")
+                  ->orWhere('internal_invoice_number', 'ilike', "%{$search}%")
+                  ->orWhere('fbr_invoice_number', 'ilike', "%{$search}%")
+                  ->orWhere('invoice_number', 'ilike', "%{$search}%");
+            });
+        }
+
+        $invoices = $query->paginate(25);
+
+        $stats = [
+            'total_locked' => Invoice::where('company_id', $companyId)->where('wht_locked', true)->count(),
+            'with_wht' => Invoice::where('company_id', $companyId)->where('wht_locked', true)->where('wht_rate', '>', 0)->count(),
+            'no_wht' => Invoice::where('company_id', $companyId)->where('wht_locked', true)->where('wht_rate', 0)->count(),
+            'total_wht_amount' => Invoice::where('company_id', $companyId)->where('wht_locked', true)->sum('wht_amount'),
+        ];
+
+        return view('invoice.wht-management', compact('invoices', 'stats'));
+    }
+
     public function complianceCheck(Request $request)
     {
         $companyId = app('currentCompanyId');

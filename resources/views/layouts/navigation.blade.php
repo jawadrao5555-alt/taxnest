@@ -42,6 +42,11 @@
             Ledger
         </a>
 
+        <a href="/wht-management" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->is('wht-management*') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+            WHT Manager
+        </a>
+
         <a href="/billing/plans" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->is('billing*') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
             Billing

@@ -574,6 +574,21 @@ class AdminController extends Controller
         return redirect('/admin/company/' . $company->id)->with('success', 'Internal account status updated.');
     }
 
+    public function toggleInventory(Request $request, Company $company)
+    {
+        $company->update(['inventory_enabled' => !$company->inventory_enabled]);
+        AuditLogService::log(
+            $company->inventory_enabled ? 'inventory_enabled' : 'inventory_disabled',
+            'Company', $company->id, null,
+            ['inventory_enabled' => $company->inventory_enabled]
+        );
+        SecurityLogService::log('inventory_toggled', auth()->id(), [
+            'company_id' => $company->id,
+            'inventory_enabled' => $company->inventory_enabled,
+        ]);
+        return redirect('/admin/company/' . $company->id)->with('success', 'Inventory module ' . ($company->inventory_enabled ? 'enabled' : 'disabled') . '.');
+    }
+
     public function updateCompanyLimits(Request $request, Company $company)
     {
         $request->validate([

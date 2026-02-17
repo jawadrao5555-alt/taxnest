@@ -25,6 +25,8 @@ use App\Http\Controllers\TaxOverrideController;
 use App\Http\Controllers\CustomerProfileController;
 use App\Http\Controllers\WhtReportController;
 use App\Http\Controllers\CsvImportController;
+use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\SupplierController;
 
 Route::get('/share/invoice/{uuid}', [ShareController::class, 'show']);
 
@@ -332,6 +334,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::get('/admin/companies/pending', [AdminController::class, 'pendingCompanies']);
         Route::post('/admin/company/{company}/change-plan', [AdminController::class, 'changePlan']);
         Route::post('/admin/company/{company}/toggle-internal', [AdminController::class, 'toggleInternalAccount']);
+        Route::post('/admin/company/{company}/toggle-inventory', [AdminController::class, 'toggleInventory']);
         Route::post('/admin/company/{company}/update-limits', [AdminController::class, 'updateCompanyLimits']);
         Route::post('/admin/company/{company}/reset-limits', [AdminController::class, 'resetCompanyLimits']);
         Route::get('/admin/hs-master-export', [HsMasterExportController::class, 'index'])->name('admin.hs-master-export');
@@ -366,6 +369,25 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/company', [ProfileController::class, 'updateCompany'])->name('profile.updateCompany');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+});
+
+Route::middleware('auth')->group(function () {
+    Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
+    Route::get('/inventory/movements', [InventoryController::class, 'movements'])->name('inventory.movements');
+    Route::post('/inventory/adjust', [InventoryController::class, 'adjust'])->name('inventory.adjust');
+    Route::put('/inventory/stock/{id}/min-stock', [InventoryController::class, 'updateMinStock'])->name('inventory.update-min-stock');
+    Route::get('/inventory/product/{productId}/movements', [InventoryController::class, 'productMovements'])->name('inventory.product-movements');
+    Route::get('/api/inventory/stock/{productId}', [InventoryController::class, 'apiStockCheck'])->name('api.inventory.stock-check');
+
+    Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
+    Route::post('/suppliers', [SupplierController::class, 'store'])->name('suppliers.store');
+    Route::put('/suppliers/{id}', [SupplierController::class, 'update'])->name('suppliers.update');
+    Route::delete('/suppliers/{id}', [SupplierController::class, 'destroy'])->name('suppliers.destroy');
+
+    Route::get('/purchase-orders', [SupplierController::class, 'purchaseOrders'])->name('purchase-orders.index');
+    Route::post('/purchase-orders', [SupplierController::class, 'storePurchaseOrder'])->name('purchase-orders.store');
+    Route::post('/purchase-orders/{id}/receive', [SupplierController::class, 'receivePurchaseOrder'])->name('purchase-orders.receive');
+    Route::post('/purchase-orders/{id}/cancel', [SupplierController::class, 'cancelPurchaseOrder'])->name('purchase-orders.cancel');
 });
 
 require __DIR__.'/auth.php';

@@ -395,6 +395,19 @@
                             </button>
                         </form>
                     </div>
+
+                    <div class="flex items-center justify-between p-4 rounded-lg {{ $company->inventory_enabled ? 'bg-cyan-50 border border-cyan-200' : 'bg-gray-50 border border-gray-200' }}">
+                        <div class="flex items-center space-x-3">
+                            <span class="inline-block w-3 h-3 rounded-full {{ $company->inventory_enabled ? 'bg-cyan-500' : 'bg-gray-400' }}"></span>
+                            <span class="text-sm font-semibold {{ $company->inventory_enabled ? 'text-cyan-800' : 'text-gray-700' }}">{{ $company->inventory_enabled ? 'Inventory Module Active' : 'Inventory Module Disabled' }}</span>
+                        </div>
+                        <form method="POST" action="/admin/company/{{ $company->id }}/toggle-inventory" onsubmit="return confirm('{{ $company->inventory_enabled ? 'Disable inventory module for this company?' : 'Enable inventory module? This will allow stock tracking, suppliers, and purchase orders.' }}')">
+                            @csrf
+                            <button type="submit" class="px-4 py-2 {{ $company->inventory_enabled ? 'bg-red-600 hover:bg-red-700' : 'bg-cyan-600 hover:bg-cyan-700' }} text-white text-sm rounded-lg font-medium transition">
+                                {{ $company->inventory_enabled ? 'Disable Inventory' : 'Enable Inventory' }}
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
 

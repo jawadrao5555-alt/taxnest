@@ -44,6 +44,7 @@ class Company extends Model
         'mobile',
         'city',
         'website',
+        'inventory_enabled',
     ];
 
     protected $casts = [
@@ -54,6 +55,7 @@ class Company extends Model
         'is_internal_account' => 'boolean',
         'onboarding_completed' => 'boolean',
         'standard_tax_rate' => 'float',
+        'inventory_enabled' => 'boolean',
     ];
 
     protected $hidden = [

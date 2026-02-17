@@ -109,7 +109,8 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer Name *</label>
-                            <input type="text" name="buyer_name" x-model="buyer_name" value="{{ old('buyer_name') }}" required autofocus
+                            <input type="text" name="buyer_name" x-model="buyer_name" required autofocus
+                                placeholder="Leave empty for Walk-in Customer"
                                 class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             @error('buyer_name') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
@@ -135,7 +136,8 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer Address *</label>
                             <textarea name="buyer_address" x-model="buyer_address" required rows="2"
-                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">{{ old('buyer_address') }}</textarea>
+                                placeholder="Auto-filled from company address"
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500"></textarea>
                             @error('buyer_address') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
@@ -614,10 +616,10 @@
                 showQuickProduct: false,
                 quickProductName: '', quickProductHs: '', quickProductPrice: '', quickProductUom: 'Numbers, pieces, units',
                 quickProductSchedule: 'standard', quickProductTaxRate: companyStandardRate, quickProductSaving: false, quickProductItemIndex: null,
-                buyer_name: '{{ old("buyer_name", "") }}',
+                buyer_name: '{{ old("buyer_name", "Walk-in Customer") }}',
                 buyer_ntn: '{{ old("buyer_ntn", "") }}',
                 buyer_cnic: '{{ old("buyer_cnic", "") }}',
-                buyer_address: '{{ old("buyer_address", "") }}',
+                buyer_address: '{{ old("buyer_address", ($company->city ?: ($company->address ?: ""))) }}',
                 buyer_reg_type: '{{ old("buyer_registration_type", "") }}',
                 document_type: '{{ old("document_type", "Sale Invoice") }}',
                 reference_invoice_number: '{{ old("reference_invoice_number", "") }}',
@@ -843,10 +845,10 @@
                 clearCustomer() {
                     this.selectedCustomerId = null;
                     this.customerSearch = '';
-                    this.buyer_name = '';
+                    this.buyer_name = 'Walk-in Customer';
                     this.buyer_ntn = '';
                     this.buyer_cnic = '';
-                    this.buyer_address = '';
+                    this.buyer_address = '{{ $company->city ?: ($company->address ?: "") }}';
                     this.buyer_reg_type = '';
                     this.customerResults = [];
                 },

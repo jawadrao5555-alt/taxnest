@@ -218,7 +218,7 @@
                     <td>{{ $index + 1 }}</td>
                     <td class="mono">{{ $item->hs_code }}</td>
                     <td>{{ $item->description }}</td>
-                    <td>{{ $item->unit ?? 'PCS' }}</td>
+                    <td>{{ $item->default_uom ?? 'PCS' }}</td>
                     <td class="text-right">{{ number_format($item->quantity, 0) }}</td>
                     <td class="text-right">{{ number_format($item->price, 4) }}</td>
                     <td class="text-right">{{ number_format($item->price * $item->quantity, 2) }}</td>

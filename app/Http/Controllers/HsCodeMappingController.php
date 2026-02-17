@@ -6,6 +6,7 @@ use App\Models\HsCodeMapping;
 use App\Models\HsMappingResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Response;
 
 class HsCodeMappingController extends Controller
 {
@@ -13,6 +14,7 @@ class HsCodeMappingController extends Controller
     {
         $search = $request->get('search', '');
         $saleTypeFilter = $request->get('sale_type', '');
+        $statusFilter = $request->get('status', '');
         $tab = $request->get('tab', 'mappings');
 
         $query = HsCodeMapping::query();
@@ -30,11 +32,18 @@ class HsCodeMappingController extends Controller
             $query->where('sale_type', $saleTypeFilter);
         }
 
+        if ($statusFilter === 'active') {
+            $query->where('is_active', true);
+        } elseif ($statusFilter === 'inactive') {
+            $query->where('is_active', false);
+        }
+
         $mappings = $query->orderBy('hs_code')->orderBy('priority')->paginate(25)->appends($request->query());
 
         $stats = [
             'total' => HsCodeMapping::count(),
             'active' => HsCodeMapping::where('is_active', true)->count(),
+            'inactive' => HsCodeMapping::where('is_active', false)->count(),
             'sro_applicable' => HsCodeMapping::where('sro_applicable', true)->count(),
             'total_responses' => HsMappingResponse::count(),
             'accepted' => HsMappingResponse::where('action', 'accepted')->count(),
@@ -52,7 +61,12 @@ class HsCodeMappingController extends Controller
             $analyticsData = $this->getAnalyticsData();
         }
 
-        return view('admin.hs-mapping-engine', compact('mappings', 'stats', 'search', 'saleTypeFilter', 'tab', 'analyticsData'));
+        $historyData = null;
+        if ($tab === 'history') {
+            $historyData = $this->getHistoryData($request);
+        }
+
+        return view('admin.hs-mapping-engine', compact('mappings', 'stats', 'search', 'saleTypeFilter', 'statusFilter', 'tab', 'analyticsData', 'historyData'));
     }
 
     public function store(Request $request)
@@ -95,7 +109,9 @@ class HsCodeMappingController extends Controller
                 ->with('error', 'A mapping with the same HS Code (' . $validated['hs_code'] . '), Sale Type, Buyer Type and Tax Rate already exists (ID: ' . $duplicate->id . '). Please edit the existing mapping or use different values.');
         }
 
-        HsCodeMapping::create($validated);
+        $mapping = HsCodeMapping::create($validated);
+
+        $this->logAudit($mapping->id, 'created', null, null, null, $mapping->toArray());
 
         return redirect()->route('admin.hs-mapping-engine')->with('success', 'HS Code Mapping created successfully.');
     }
@@ -103,6 +119,7 @@ class HsCodeMappingController extends Controller
     public function update(Request $request, $id)
     {
         $mapping = HsCodeMapping::findOrFail($id);
+        $oldValues = $mapping->toArray();
 
         $validated = $request->validate([
             'hs_code' => 'required|string|max:20',
@@ -130,12 +147,24 @@ class HsCodeMappingController extends Controller
 
         $mapping->update($validated);
 
+        $trackFields = ['hs_code', 'label', 'sale_type', 'tax_rate', 'sro_applicable', 'sro_number',
+            'serial_number_applicable', 'serial_number_value', 'mrp_required', 'pct_code', 'default_uom',
+            'buyer_type', 'priority', 'is_active'];
+        foreach ($trackFields as $field) {
+            $old = $oldValues[$field] ?? null;
+            $new = $mapping->$field;
+            if ((string) $old !== (string) $new) {
+                $this->logAudit($mapping->id, 'updated', $field, $old, $new);
+            }
+        }
+
         return redirect()->route('admin.hs-mapping-engine')->with('success', 'Mapping updated successfully.');
     }
 
     public function destroy($id)
     {
         $mapping = HsCodeMapping::findOrFail($id);
+        $this->logAudit($mapping->id, 'deleted', null, null, null, $mapping->toArray());
         $mapping->delete();
 
         return redirect()->route('admin.hs-mapping-engine')->with('success', 'Mapping deleted successfully.');
@@ -151,7 +180,148 @@ class HsCodeMappingController extends Controller
         $clone->updated_by = null;
         $clone->save();
 
+        $this->logAudit($clone->id, 'cloned', 'source_id', null, $original->id, $clone->toArray());
+
         return redirect()->route('admin.hs-mapping-engine')->with('success', 'Mapping cloned successfully (ID: ' . $clone->id . ').');
+    }
+
+    public function exportCsv()
+    {
+        $mappings = HsCodeMapping::orderBy('hs_code')->orderBy('priority')->get();
+
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="hs_code_mappings_' . date('Y-m-d_His') . '.csv"',
+        ];
+
+        $callback = function () use ($mappings) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, ['hs_code', 'label', 'sale_type', 'tax_rate', 'sro_applicable', 'sro_number',
+                'serial_number_applicable', 'serial_number_value', 'mrp_required', 'pct_code', 'default_uom',
+                'buyer_type', 'priority', 'is_active', 'notes']);
+
+            foreach ($mappings as $m) {
+                fputcsv($file, [
+                    $m->hs_code, $m->label, $m->sale_type, $m->tax_rate,
+                    $m->sro_applicable ? '1' : '0', $m->sro_number,
+                    $m->serial_number_applicable ? '1' : '0', $m->serial_number_value,
+                    $m->mrp_required ? '1' : '0', $m->pct_code, $m->default_uom,
+                    $m->buyer_type ?: '', $m->priority, $m->is_active ? '1' : '0', $m->notes,
+                ]);
+            }
+            fclose($file);
+        };
+
+        return Response::stream($callback, 200, $headers);
+    }
+
+    public function importCsv(Request $request)
+    {
+        $request->validate([
+            'csv_file' => 'required|file|mimes:csv,txt|max:5120',
+        ]);
+
+        $file = $request->file('csv_file');
+        $handle = fopen($file->getPathname(), 'r');
+
+        $header = fgetcsv($handle);
+        if (!$header) {
+            fclose($handle);
+            return redirect()->route('admin.hs-mapping-engine')->with('error', 'CSV file is empty or invalid.');
+        }
+
+        $header = array_map('trim', array_map('strtolower', $header));
+        $requiredCols = ['hs_code', 'sale_type', 'tax_rate'];
+        foreach ($requiredCols as $col) {
+            if (!in_array($col, $header)) {
+                fclose($handle);
+                return redirect()->route('admin.hs-mapping-engine')
+                    ->with('error', 'CSV missing required column: ' . $col . '. Required columns: hs_code, sale_type, tax_rate');
+            }
+        }
+
+        $imported = 0;
+        $skipped = 0;
+        $errors = [];
+        $lineNum = 1;
+        $validSaleTypes = ['standard', 'reduced', '3rd_schedule', 'exempt', 'zero_rated'];
+        $validBuyerTypes = ['registered', 'unregistered', ''];
+
+        while (($row = fgetcsv($handle)) !== false) {
+            $lineNum++;
+            if (count($row) < count($header)) {
+                $errors[] = "Line {$lineNum}: Insufficient columns";
+                continue;
+            }
+
+            $row = array_slice(array_map('trim', $row), 0, count($header));
+            $data = array_combine($header, $row);
+            if ($data === false) {
+                $errors[] = "Line {$lineNum}: Malformed row";
+                continue;
+            }
+
+            if (empty($data['hs_code'])) {
+                $errors[] = "Line {$lineNum}: Empty HS code";
+                continue;
+            }
+            if (!in_array($data['sale_type'] ?? '', $validSaleTypes)) {
+                $errors[] = "Line {$lineNum}: Invalid sale_type '" . ($data['sale_type'] ?? '') . "'";
+                continue;
+            }
+            $taxRate = floatval($data['tax_rate'] ?? 0);
+            if ($taxRate < 0 || $taxRate > 100) {
+                $errors[] = "Line {$lineNum}: Tax rate out of range (0-100)";
+                continue;
+            }
+
+            $buyerType = !empty($data['buyer_type']) && in_array($data['buyer_type'], ['registered', 'unregistered']) ? $data['buyer_type'] : null;
+
+            $dupQuery = HsCodeMapping::where('hs_code', $data['hs_code'])
+                ->where('sale_type', $data['sale_type'])
+                ->where('tax_rate', $taxRate);
+            if ($buyerType) {
+                $dupQuery->where('buyer_type', $buyerType);
+            } else {
+                $dupQuery->where(function ($q) { $q->whereNull('buyer_type')->orWhere('buyer_type', ''); });
+            }
+
+            if ($dupQuery->exists()) {
+                $skipped++;
+                continue;
+            }
+
+            $mapping = HsCodeMapping::create([
+                'hs_code' => $data['hs_code'],
+                'label' => $data['label'] ?? null,
+                'sale_type' => $data['sale_type'],
+                'tax_rate' => $taxRate,
+                'sro_applicable' => ($data['sro_applicable'] ?? '0') === '1',
+                'sro_number' => $data['sro_number'] ?? null,
+                'serial_number_applicable' => ($data['serial_number_applicable'] ?? '0') === '1',
+                'serial_number_value' => $data['serial_number_value'] ?? null,
+                'mrp_required' => ($data['mrp_required'] ?? '0') === '1',
+                'pct_code' => $data['pct_code'] ?? null,
+                'default_uom' => $data['default_uom'] ?? null,
+                'buyer_type' => $buyerType,
+                'priority' => intval($data['priority'] ?? 10),
+                'is_active' => ($data['is_active'] ?? '1') !== '0',
+                'notes' => $data['notes'] ?? null,
+                'created_by' => auth()->id(),
+            ]);
+
+            $this->logAudit($mapping->id, 'imported', null, null, null, $mapping->toArray());
+            $imported++;
+        }
+        fclose($handle);
+
+        $msg = "Import complete: {$imported} created, {$skipped} duplicates skipped.";
+        if (count($errors) > 0) {
+            $msg .= ' ' . count($errors) . ' errors: ' . implode('; ', array_slice($errors, 0, 5));
+            if (count($errors) > 5) $msg .= '... and ' . (count($errors) - 5) . ' more.';
+        }
+
+        return redirect()->route('admin.hs-mapping-engine')->with($imported > 0 ? 'success' : 'error', $msg);
     }
 
     public function apiHsAutoFill($hsCode)
@@ -295,6 +465,40 @@ class HsCodeMappingController extends Controller
         }
 
         return response()->json(['status' => 'recorded']);
+    }
+
+    private function logAudit($mappingId, $action, $fieldName = null, $oldValue = null, $newValue = null, $snapshot = null)
+    {
+        DB::table('hs_mapping_audit_logs')->insert([
+            'hs_code_mapping_id' => $mappingId,
+            'action' => $action,
+            'field_name' => $fieldName,
+            'old_value' => is_array($oldValue) || is_object($oldValue) ? json_encode($oldValue) : $oldValue,
+            'new_value' => is_array($newValue) || is_object($newValue) ? json_encode($newValue) : $newValue,
+            'changed_by' => auth()->id(),
+            'snapshot' => $snapshot ? json_encode($snapshot) : null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function getHistoryData(Request $request)
+    {
+        $query = DB::table('hs_mapping_audit_logs')
+            ->leftJoin('users', 'hs_mapping_audit_logs.changed_by', '=', 'users.id')
+            ->select(
+                'hs_mapping_audit_logs.*',
+                'users.name as user_name'
+            )
+            ->orderByDesc('hs_mapping_audit_logs.created_at');
+
+        $hsFilter = $request->get('history_hs', '');
+        if ($hsFilter) {
+            $mappingIds = HsCodeMapping::where('hs_code', 'ilike', "%{$hsFilter}%")->pluck('id');
+            $query->whereIn('hs_mapping_audit_logs.hs_code_mapping_id', $mappingIds);
+        }
+
+        return $query->paginate(20)->appends($request->query());
     }
 
     private function getAnalyticsData()

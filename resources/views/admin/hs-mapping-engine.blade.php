@@ -1,11 +1,21 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between flex-wrap gap-3">
             <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">HS Code Mapping Engine</h2>
-            <button onclick="document.getElementById('addMappingModal').classList.remove('hidden')" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">
-                <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                Add Mapping
-            </button>
+            <div class="flex items-center gap-2">
+                <a href="{{ route('admin.hs-mapping-engine.export') }}" class="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    Export CSV
+                </a>
+                <button onclick="document.getElementById('importModal').classList.remove('hidden')" class="inline-flex items-center px-3 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                    Import CSV
+                </button>
+                <button onclick="document.getElementById('addMappingModal').classList.remove('hidden')" class="inline-flex items-center px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    Add Mapping
+                </button>
+            </div>
         </div>
     </x-slot>
 
@@ -18,28 +28,32 @@
                 <div class="mb-4 p-4 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 rounded-lg">{{ session('error') }}</div>
             @endif
 
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 text-center">
+            <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-3 text-center">
                     <p class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{{ $stats['total'] }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Total Mappings</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Total</p>
                 </div>
-                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 text-center">
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-3 text-center">
                     <p class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ $stats['active'] }}</p>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Active</p>
                 </div>
-                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 text-center">
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-3 text-center">
+                    <p class="text-2xl font-bold text-gray-500 dark:text-gray-400">{{ $stats['inactive'] }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Inactive</p>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-3 text-center">
                     <p class="text-2xl font-bold text-amber-600 dark:text-amber-400">{{ $stats['sro_applicable'] }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">SRO Applicable</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">SRO</p>
                 </div>
-                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 text-center">
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-3 text-center">
                     <p class="text-2xl font-bold text-purple-600 dark:text-purple-400">{{ $stats['multi_mapped'] }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Multi-Mapped HS</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Multi-Mapped</p>
                 </div>
-                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 text-center">
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-3 text-center">
                     <p class="text-2xl font-bold text-green-600 dark:text-green-400">{{ $stats['accepted'] }}</p>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Accepted</p>
                 </div>
-                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 text-center">
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-3 text-center">
                     <p class="text-2xl font-bold text-red-600 dark:text-red-400">{{ $stats['rejected'] }}</p>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Rejected</p>
                 </div>
@@ -48,11 +62,14 @@
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6">
                 <div class="border-b border-gray-200 dark:border-gray-700">
                     <nav class="flex -mb-px">
-                        <a href="{{ route('admin.hs-mapping-engine', ['tab' => 'mappings']) }}" class="px-6 py-4 text-sm font-medium border-b-2 {{ $tab === 'mappings' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300' }}">
+                        <a href="{{ route('admin.hs-mapping-engine', ['tab' => 'mappings']) }}" class="px-5 py-3 text-sm font-medium border-b-2 {{ $tab === 'mappings' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300' }}">
                             Mappings ({{ $stats['total'] }})
                         </a>
-                        <a href="{{ route('admin.hs-mapping-engine', ['tab' => 'analytics']) }}" class="px-6 py-4 text-sm font-medium border-b-2 {{ $tab === 'analytics' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300' }}">
+                        <a href="{{ route('admin.hs-mapping-engine', ['tab' => 'analytics']) }}" class="px-5 py-3 text-sm font-medium border-b-2 {{ $tab === 'analytics' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300' }}">
                             Analytics
+                        </a>
+                        <a href="{{ route('admin.hs-mapping-engine', ['tab' => 'history']) }}" class="px-5 py-3 text-sm font-medium border-b-2 {{ $tab === 'history' ? 'border-purple-500 text-purple-600 dark:text-purple-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300' }}">
+                            Change History
                         </a>
                     </nav>
                 </div>
@@ -71,8 +88,13 @@
                             <option value="exempt" {{ $saleTypeFilter == 'exempt' ? 'selected' : '' }}>Exempt</option>
                             <option value="zero_rated" {{ $saleTypeFilter == 'zero_rated' ? 'selected' : '' }}>Zero Rated</option>
                         </select>
+                        <select name="status" class="rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
+                            <option value="">All Status</option>
+                            <option value="active" {{ $statusFilter == 'active' ? 'selected' : '' }}>Active Only</option>
+                            <option value="inactive" {{ $statusFilter == 'inactive' ? 'selected' : '' }}>Inactive Only</option>
+                        </select>
                         <button type="submit" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">Search</button>
-                        @if($search || $saleTypeFilter)
+                        @if($search || $saleTypeFilter || $statusFilter)
                             <a href="{{ route('admin.hs-mapping-engine') }}" class="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-500 transition text-center">Clear</a>
                         @endif
                     </form>
@@ -273,12 +295,99 @@
                                     </table>
                                 </div>
                             @else
-                                <p class="text-sm text-gray-400 italic">No responses recorded yet. Companies will appear here when they accept or reject mapping suggestions.</p>
+                                <p class="text-sm text-gray-400 italic">No responses recorded yet.</p>
                             @endif
                         </div>
                     @endif
                 </div>
                 @endif
+
+                @if($tab === 'history')
+                <div class="p-6">
+                    <div class="mb-4">
+                        <form method="GET" action="{{ route('admin.hs-mapping-engine') }}" class="flex gap-3">
+                            <input type="hidden" name="tab" value="history">
+                            <input type="text" name="history_hs" value="{{ request('history_hs') }}" placeholder="Filter by HS code..."
+                                class="rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-purple-500/50 focus:border-purple-500">
+                            <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition">Filter</button>
+                            @if(request('history_hs'))
+                                <a href="{{ route('admin.hs-mapping-engine', ['tab' => 'history']) }}" class="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-500 transition">Clear</a>
+                            @endif
+                        </form>
+                    </div>
+
+                    @if($historyData && count($historyData) > 0)
+                        <div class="space-y-3">
+                            @foreach($historyData as $log)
+                                <div class="p-3 rounded-lg border {{ $log->action === 'created' ? 'bg-green-50 dark:bg-green-900/10 border-green-100 dark:border-green-800' : ($log->action === 'deleted' ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-800' : ($log->action === 'imported' ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-800' : ($log->action === 'cloned' ? 'bg-purple-50 dark:bg-purple-900/10 border-purple-100 dark:border-purple-800' : 'bg-blue-50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-800'))) }}">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <div class="flex items-center gap-2">
+                                            <span class="px-2 py-0.5 text-xs font-bold rounded-full uppercase
+                                                {{ $log->action === 'created' ? 'bg-green-600 text-white' : ($log->action === 'deleted' ? 'bg-red-600 text-white' : ($log->action === 'imported' ? 'bg-amber-600 text-white' : ($log->action === 'cloned' ? 'bg-purple-600 text-white' : 'bg-blue-600 text-white'))) }}">
+                                                {{ $log->action }}
+                                            </span>
+                                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Mapping #{{ $log->hs_code_mapping_id }}</span>
+                                        </div>
+                                        <div class="flex items-center gap-2 text-xs text-gray-500">
+                                            <span>{{ $log->user_name ?? 'System' }}</span>
+                                            <span>{{ \Carbon\Carbon::parse($log->created_at)->format('M d, Y H:i') }}</span>
+                                        </div>
+                                    </div>
+                                    @if($log->field_name)
+                                        <div class="text-sm text-gray-600 dark:text-gray-400">
+                                            <span class="font-medium">{{ str_replace('_', ' ', ucfirst($log->field_name)) }}:</span>
+                                            @if($log->old_value !== null)
+                                                <span class="text-red-600 line-through">{{ \Illuminate\Support\Str::limit($log->old_value, 80) }}</span>
+                                                <span class="mx-1 text-gray-400">&rarr;</span>
+                                            @endif
+                                            <span class="text-green-600 font-medium">{{ \Illuminate\Support\Str::limit($log->new_value, 80) }}</span>
+                                        </div>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                        @if($historyData->hasPages())
+                            <div class="mt-4">
+                                {{ $historyData->links() }}
+                            </div>
+                        @endif
+                    @else
+                        <p class="text-sm text-gray-400 italic text-center py-8">No change history recorded yet. Changes will appear here as mappings are created, updated, or deleted.</p>
+                    @endif
+                </div>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    <div id="importModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-black/50" onclick="document.getElementById('importModal').classList.add('hidden')"></div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-lg w-full relative z-10">
+                <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">Import Mappings from CSV</h3>
+                    <button onclick="document.getElementById('importModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <form method="POST" action="{{ route('admin.hs-mapping-engine.import') }}" enctype="multipart/form-data" class="p-6 space-y-4">
+                    @csrf
+                    <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-lg p-3">
+                        <p class="text-xs text-amber-700 dark:text-amber-400 font-medium mb-1">CSV Format Requirements:</p>
+                        <p class="text-xs text-amber-600 dark:text-amber-500">Required columns: <span class="font-mono font-bold">hs_code, sale_type, tax_rate</span></p>
+                        <p class="text-xs text-amber-600 dark:text-amber-500 mt-1">Optional: label, sro_applicable (0/1), sro_number, serial_number_applicable (0/1), serial_number_value, mrp_required (0/1), pct_code, default_uom, buyer_type, priority, is_active (0/1), notes</p>
+                        <p class="text-xs text-amber-600 dark:text-amber-500 mt-1">Sale types: standard, reduced, 3rd_schedule, exempt, zero_rated</p>
+                        <p class="text-xs text-amber-600 dark:text-amber-500 mt-1">Duplicates (same HS+sale_type+tax_rate+buyer) will be skipped.</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select CSV File</label>
+                        <input type="file" name="csv_file" required accept=".csv,.txt" class="w-full text-sm text-gray-600 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100">
+                    </div>
+                    <div class="flex justify-end gap-3 pt-2">
+                        <button type="button" onclick="document.getElementById('importModal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-500 transition">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition">Import Mappings</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -299,8 +408,8 @@
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">HS Code *</label>
                             <div class="relative">
-                                <input type="text" name="hs_code" id="add_hs_code" required placeholder="8471.3010" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm" @blur="hsAutoFill()">
-                                <div x-show="hsAutoFilling" class="absolute right-2 top-2">
+                                <input type="text" name="hs_code" id="add_hs_code" required placeholder="8471.3010" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm" onblur="hsAutoFill()">
+                                <div id="hsAutoFillSpinner" class="absolute right-2 top-2 hidden">
                                     <svg class="animate-spin h-4 w-4 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                                 </div>
                             </div>
@@ -508,6 +617,8 @@
             let hsCode = document.getElementById('add_hs_code').value.trim();
             if (!hsCode || hsCode.length < 4) return;
             let statusEl = document.getElementById('addHsAutoFillStatus');
+            let spinner = document.getElementById('hsAutoFillSpinner');
+            spinner.classList.remove('hidden');
             try {
                 let res = await fetch('/api/hs-mapping-autofill/' + encodeURIComponent(hsCode));
                 let data = await res.json();
@@ -524,14 +635,16 @@
                     }
                     if (data.mrp_required) document.getElementById('add_mrp_required').checked = true;
                     statusEl.textContent = 'Auto-filled from HS Master: ' + data.description;
-                    statusEl.classList.remove('hidden');
+                    statusEl.className = 'mt-1 text-xs text-emerald-600';
                 } else {
                     statusEl.textContent = 'HS code not found in master database';
-                    statusEl.classList.remove('hidden');
-                    statusEl.classList.remove('text-emerald-600');
-                    statusEl.classList.add('text-amber-600');
+                    statusEl.className = 'mt-1 text-xs text-amber-600';
                 }
-            } catch(e) {}
+            } catch(e) {
+                statusEl.textContent = 'Auto-fill failed';
+                statusEl.className = 'mt-1 text-xs text-red-600';
+            }
+            spinner.classList.add('hidden');
         }
     </script>
 </x-app-layout>

@@ -273,10 +273,7 @@
                                     @if($tab === 'draft')
                                         @if($invoice->status === 'draft')
                                         <a href="/invoice/{{ $invoice->id }}/edit" class="text-blue-600 hover:text-blue-800 font-medium">Edit</a>
-                                        <form method="POST" action="/invoice/{{ $invoice->id }}/submit" class="inline">
-                                            @csrf
-                                            <button type="submit" class="text-purple-600 hover:text-purple-800 font-medium">Submit to FBR</button>
-                                        </form>
+                                        <a href="/invoice/{{ $invoice->id }}#submit" class="text-purple-600 hover:text-purple-800 font-medium">Submit to FBR</a>
                                         @endif
                                     @else
                                         @if($invoice->status === 'draft' && $invoice->fbr_status === 'failed')

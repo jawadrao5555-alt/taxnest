@@ -1516,5 +1516,15 @@ document.addEventListener('keydown', function(e) {
         closeFbrSuccessModal();
     }
 });
+
+if (window.location.hash === '#submit') {
+    setTimeout(function() {
+        const submitRoot = document.querySelector('[x-ref="submitRoot"]');
+        if (submitRoot) {
+            Alpine.$data(submitRoot).showSubmitModal = true;
+            history.replaceState(null, '', window.location.pathname);
+        }
+    }, 500);
+}
 </script>
 </x-app-layout>

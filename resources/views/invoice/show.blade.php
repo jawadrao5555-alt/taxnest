@@ -968,6 +968,44 @@
         </div>
 
         <div class="px-6 py-4 border-t border-gray-100 dark:border-gray-800 flex-shrink-0 bg-gray-50 dark:bg-gray-900">
+            <div id="modalWhtSection" class="mb-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div id="modalWhtSelector">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-sm font-bold text-gray-800 dark:text-gray-200">
+                            <svg class="w-4 h-4 inline mr-1 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                            Select WHT Rate
+                        </p>
+                        <span class="text-xs text-gray-500">Lock before printing</span>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mb-2">
+                        <label class="modal-wht-opt flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-gray-200 cursor-pointer hover:bg-gray-50 text-xs font-semibold transition">
+                            <input type="radio" name="modal_wht" value="0" checked class="text-emerald-500"> 0%
+                        </label>
+                        <label class="modal-wht-opt flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-gray-200 cursor-pointer hover:bg-gray-50 text-xs font-semibold transition">
+                            <input type="radio" name="modal_wht" value="0.5" class="text-amber-500"> 0.5%
+                        </label>
+                        <label class="modal-wht-opt flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-gray-200 cursor-pointer hover:bg-gray-50 text-xs font-semibold transition">
+                            <input type="radio" name="modal_wht" value="1" class="text-blue-500"> 1%
+                        </label>
+                        <label class="modal-wht-opt flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-gray-200 cursor-pointer hover:bg-gray-50 text-xs font-semibold transition">
+                            <input type="radio" name="modal_wht" value="2" class="text-orange-500"> 2%
+                        </label>
+                        <label class="modal-wht-opt flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-gray-200 cursor-pointer hover:bg-gray-50 text-xs font-semibold transition">
+                            <input type="radio" name="modal_wht" value="2.5" class="text-red-500"> 2.5%
+                        </label>
+                        <button onclick="lockWhtInModal()" id="modalWhtLockBtn" class="ml-auto px-4 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition">
+                            Lock WHT & Refresh PDF
+                        </button>
+                    </div>
+                </div>
+                <div id="modalWhtLocked" style="display:none;" class="flex items-center gap-2">
+                    <span class="inline-flex items-center px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-bold">
+                        <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                        WHT <span id="modalWhtRateText">0</span>% Locked
+                    </span>
+                    <span class="text-xs text-emerald-600 font-medium">PDF updated with WHT calculation</span>
+                </div>
+            </div>
             <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                 <button onclick="printFbrPdf()" class="inline-flex items-center justify-center px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition">
                     <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
@@ -1271,6 +1309,41 @@ function showSuccessToast(fbrNumber) {
             setTimeout(() => toast.remove(), 200);
         }
     }, 4000);
+}
+
+async function lockWhtInModal() {
+    const btn = document.getElementById('modalWhtLockBtn');
+    const selectedRadio = document.querySelector('input[name="modal_wht"]:checked');
+    const whtRate = selectedRadio ? parseFloat(selectedRadio.value) : 0;
+    btn.disabled = true;
+    btn.textContent = 'Locking...';
+    try {
+        const body = new FormData();
+        body.append('_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
+        body.append('wht_rate', whtRate);
+        const res = await fetch('/invoice/{{ $invoice->id }}/update-wht-ajax', {
+            method: 'POST',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: body
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+            document.getElementById('modalWhtSelector').style.display = 'none';
+            document.getElementById('modalWhtLocked').style.display = 'flex';
+            document.getElementById('modalWhtRateText').textContent = whtRate;
+            const iframe = document.getElementById('modalPdfIframe');
+            iframe.src = '/invoice/{{ $invoice->id }}/pdf?preview=1&t=' + Date.now();
+            _fbrPdfUrl = '/invoice/{{ $invoice->id }}/pdf';
+        } else {
+            alert(data.message || 'Failed to lock WHT rate');
+            btn.disabled = false;
+            btn.textContent = 'Lock WHT & Refresh PDF';
+        }
+    } catch(e) {
+        alert('Network error. Please try again.');
+        btn.disabled = false;
+        btn.textContent = 'Lock WHT & Refresh PDF';
+    }
 }
 
 function printFbrPdf() {

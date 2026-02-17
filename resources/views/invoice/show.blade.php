@@ -571,6 +571,7 @@
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">MRP</th>
                                 <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">ST WHT</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Pet. Levy</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-orange-500 uppercase">Further Tax</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
                             </tr>
                         </thead>
@@ -588,26 +589,34 @@
                                     @if($item->st_withheld_at_source) <span class="text-emerald-600 font-medium">Yes</span> @else <span class="text-gray-400">—</span> @endif
                                 </td>
                                 <td class="px-6 py-4 text-sm text-gray-700 text-right">{{ $item->petroleum_levy ? 'Rs. ' . number_format($item->petroleum_levy, 2) : '—' }}</td>
+                                <td class="px-6 py-4 text-sm text-orange-600 text-right">{{ ($item->further_tax ?? 0) > 0 ? 'Rs. ' . number_format($item->further_tax, 2) : '—' }}</td>
                                 <td class="px-6 py-4 text-sm font-semibold text-gray-900 text-right">Rs. {{ number_format(($item->price * $item->quantity) + $item->tax, 2) }}</td>
                             </tr>
                             @endforeach
                         </tbody>
                         <tfoot class="bg-gray-50">
                             <tr>
-                                <td colspan="8" class="px-6 py-3 text-right text-sm text-gray-600">Value Excl. ST</td>
+                                <td colspan="9" class="px-6 py-3 text-right text-sm text-gray-600">Value Excl. ST</td>
                                 <td class="px-6 py-3 text-right text-sm font-semibold text-gray-800">Rs. {{ number_format($invoice->total_value_excluding_st ?? ($invoice->total_amount - $invoice->items->sum('tax')), 2) }}</td>
                             </tr>
                             <tr>
-                                <td colspan="8" class="px-6 py-3 text-right text-sm text-gray-600">Total Sales Tax</td>
+                                <td colspan="9" class="px-6 py-3 text-right text-sm text-gray-600">Total Sales Tax</td>
                                 <td class="px-6 py-3 text-right text-sm font-semibold text-gray-800">Rs. {{ number_format($invoice->total_sales_tax ?? $invoice->items->sum('tax'), 2) }}</td>
                             </tr>
+                            @php $totalFurtherTax = $invoice->items->sum('further_tax'); @endphp
+                            @if($totalFurtherTax > 0)
                             <tr>
-                                <td colspan="8" class="px-6 py-3 text-right text-sm font-bold text-gray-700 uppercase border-t-2 border-emerald-500">Grand Total</td>
+                                <td colspan="9" class="px-6 py-3 text-right text-sm text-orange-600">Further Tax (4%)</td>
+                                <td class="px-6 py-3 text-right text-sm font-semibold text-orange-600">Rs. {{ number_format($totalFurtherTax, 2) }}</td>
+                            </tr>
+                            @endif
+                            <tr>
+                                <td colspan="9" class="px-6 py-3 text-right text-sm font-bold text-gray-700 uppercase border-t-2 border-emerald-500">Grand Total</td>
                                 <td class="px-6 py-3 text-right text-lg font-bold text-emerald-600 border-t-2 border-emerald-500">Rs. {{ number_format($invoice->total_amount, 2) }}</td>
                             </tr>
                             @if($invoice->wht_rate > 0)
                             <tr>
-                                <td colspan="8" class="px-6 py-2 text-right text-sm text-blue-600">
+                                <td colspan="9" class="px-6 py-2 text-right text-sm text-blue-600">
                                     WHT ({{ $invoice->wht_rate }}%)
                                     @if($invoice->wht_locked)
                                     <svg class="w-3.5 h-3.5 inline-block ml-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
@@ -616,7 +625,7 @@
                                 <td class="px-6 py-2 text-right text-sm font-semibold text-blue-600">+ Rs. {{ number_format($invoice->wht_amount ?? 0, 2) }}</td>
                             </tr>
                             <tr>
-                                <td colspan="8" class="px-6 py-3 text-right text-sm font-bold text-emerald-700">Net Receivable</td>
+                                <td colspan="9" class="px-6 py-3 text-right text-sm font-bold text-emerald-700">Net Receivable</td>
                                 <td class="px-6 py-3 text-right text-lg font-bold text-emerald-700">Rs. {{ number_format($invoice->net_receivable ?? $invoice->total_amount, 2) }}</td>
                             </tr>
                             @endif

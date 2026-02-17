@@ -69,6 +69,13 @@
                     @endforeach
                 </tbody>
                 <tfoot class="bg-gray-50">
+                    @php $totalFurtherTax = $invoice->items->sum('further_tax'); @endphp
+                    @if($totalFurtherTax > 0)
+                    <tr>
+                        <td colspan="5" class="px-6 py-3 text-right text-sm font-semibold text-orange-600">Further Tax (4%)</td>
+                        <td class="px-6 py-3 text-right text-sm font-semibold text-orange-600">Rs. {{ number_format($totalFurtherTax, 2) }}</td>
+                    </tr>
+                    @endif
                     <tr>
                         <td colspan="5" class="px-6 py-3 text-right text-sm font-bold text-gray-700">Grand Total</td>
                         <td class="px-6 py-3 text-right text-lg font-bold text-emerald-600">Rs. {{ number_format($invoice->total_amount, 2) }}</td>

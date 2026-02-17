@@ -244,6 +244,13 @@
                                     <td class="label">GST:</td>
                                     <td class="value">Rs. {{ number_format($totalTax, 2) }}</td>
                                 </tr>
+                                @php $totalFurtherTax = $invoice->items->sum('further_tax'); @endphp
+                                @if($totalFurtherTax > 0)
+                                <tr>
+                                    <td class="label">Further Tax (4%):</td>
+                                    <td class="value" style="color: #ea580c;">Rs. {{ number_format($totalFurtherTax, 2) }}</td>
+                                </tr>
+                                @endif
                                 @if(($wht_rate ?? 0) > 0)
                                 <tr>
                                     <td class="label">WHT ({{ $wht_rate }}%):</td>

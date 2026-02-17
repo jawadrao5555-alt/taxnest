@@ -143,6 +143,7 @@ class InvoiceController extends Controller
             'items.*.default_uom' => 'nullable|string|max:100',
             'items.*.st_withheld_at_source' => 'nullable',
             'items.*.petroleum_levy' => 'nullable|numeric|min:0',
+            'items.*.further_tax' => 'nullable|numeric|min:0',
         ], [
             'document_type.required' => 'Document type is required.',
             'destination_province.required' => 'Destination Province is required.',
@@ -245,6 +246,7 @@ class InvoiceController extends Controller
                     'sale_type' => $saleType,
                     'st_withheld_at_source' => !empty($item['st_withheld_at_source']),
                     'petroleum_levy' => !empty($item['petroleum_levy']) ? floatval($item['petroleum_levy']) : null,
+                    'further_tax' => !empty($item['further_tax']) ? floatval($item['further_tax']) : 0,
                     'description' => $item['description'],
                     'quantity' => $item['quantity'],
                     'price' => $item['price'],
@@ -405,6 +407,7 @@ class InvoiceController extends Controller
             'items.*.default_uom' => 'nullable|string|max:100',
             'items.*.st_withheld_at_source' => 'nullable',
             'items.*.petroleum_levy' => 'nullable|numeric|min:0',
+            'items.*.further_tax' => 'nullable|numeric|min:0',
         ], [
             'document_type.required' => 'Document type is required.',
             'destination_province.required' => 'Destination Province is required.',
@@ -511,6 +514,7 @@ class InvoiceController extends Controller
                     'sale_type' => $saleType,
                     'st_withheld_at_source' => !empty($item['st_withheld_at_source']),
                     'petroleum_levy' => !empty($item['petroleum_levy']) ? floatval($item['petroleum_levy']) : null,
+                    'further_tax' => !empty($item['further_tax']) ? floatval($item['further_tax']) : 0,
                     'description' => $item['description'],
                     'quantity' => $item['quantity'],
                     'price' => $item['price'],

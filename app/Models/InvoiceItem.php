@@ -19,6 +19,7 @@ class InvoiceItem extends Model
         'sale_type',
         'st_withheld_at_source',
         'petroleum_levy',
+        'further_tax',
         'description',
         'quantity',
         'price',
@@ -28,6 +29,7 @@ class InvoiceItem extends Model
     protected $casts = [
         'st_withheld_at_source' => 'boolean',
         'petroleum_levy' => 'float',
+        'further_tax' => 'float',
         'tax_rate' => 'float',
         'quantity' => 'float',
         'price' => 'float',

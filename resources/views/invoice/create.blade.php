@@ -158,6 +158,14 @@
                         </button>
                     </div>
 
+                    <div class="mb-4 flex items-center gap-3 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" x-model="applyFurtherTax" @change="recalcAllFurtherTax()" class="rounded border-gray-300 text-orange-600 focus:ring-orange-500">
+                            <span class="text-sm font-semibold text-orange-800 dark:text-orange-300">Apply Further Tax (4%)</span>
+                        </label>
+                        <span class="text-xs text-orange-600 dark:text-orange-400">Applicable on unregistered persons u/s 3(1A)</span>
+                    </div>
+
                     <div x-show="scheduleError" x-cloak class="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-3">
                         <p class="text-sm text-red-700 dark:text-red-400 font-medium" x-text="scheduleError"></p>
                     </div>
@@ -342,9 +350,11 @@
                                 </div>
                             </div>
                             <input type="hidden" :name="'items[' + index + '][tax]'" :value="item.tax">
-                            <div class="mt-2 flex justify-between text-sm text-gray-500 dark:text-gray-400">
+                            <input type="hidden" :name="'items[' + index + '][further_tax]'" :value="item.further_tax">
+                            <div class="mt-2 flex flex-wrap justify-between text-sm text-gray-500 dark:text-gray-400 gap-1">
                                 <span>Subtotal: <span class="font-medium text-gray-800 dark:text-gray-100" x-text="'Rs. ' + itemSubtotal(index)"></span></span>
                                 <span>Tax (<span x-text="item.tax_rate"></span>%): <span class="font-medium text-gray-800 dark:text-gray-100" x-text="'Rs. ' + parseFloat(item.tax || 0).toFixed(2)"></span></span>
+                                <span x-show="applyFurtherTax" x-cloak class="text-orange-600">Further Tax (4%): <span class="font-medium" x-text="'Rs. ' + parseFloat(item.further_tax || 0).toFixed(2)"></span></span>
                                 <span>Line Total: <span class="font-medium text-gray-800 dark:text-gray-100" x-text="'Rs. ' + itemTotal(index)"></span></span>
                             </div>
                             <div class="mt-1 text-xs text-gray-400 dark:text-gray-500">
@@ -361,6 +371,10 @@
                         <div class="flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
                             <span>Total Sales Tax</span>
                             <span class="font-medium" x-text="'Rs. ' + totalSalesTax()"></span>
+                        </div>
+                        <div x-show="applyFurtherTax" x-cloak class="flex justify-between items-center text-sm text-orange-600 dark:text-orange-400">
+                            <span>Further Tax (4%)</span>
+                            <span class="font-medium" x-text="'Rs. ' + totalFurtherTax()"></span>
                         </div>
                         <div class="flex justify-between items-center text-sm font-semibold text-gray-700 dark:text-gray-300 border-t border-gray-200 dark:border-gray-600 pt-2">
                             <span>Grand Total</span>
@@ -507,6 +521,10 @@
                         <span class="text-xs text-gray-400">Tax</span>
                         <p class="font-semibold text-emerald-600 dark:text-emerald-400" x-text="'Rs. ' + form.totalSalesTax()"></p>
                     </div>
+                    <div x-show="form.applyFurtherTax" x-cloak>
+                        <span class="text-xs text-orange-500">Further Tax</span>
+                        <p class="font-semibold text-orange-600 dark:text-orange-400" x-text="'Rs. ' + form.totalFurtherTax()"></p>
+                    </div>
                     <div>
                         <span class="text-xs text-gray-400">WHT</span>
                         <p class="font-semibold text-amber-600 dark:text-amber-400" x-text="'Rs. ' + form.whtAmount()"></p>
@@ -570,7 +588,7 @@
             function newItem() {
                 return {
                     product_id: '', hs_code: '', pct_code: '', description: '',
-                    quantity: 1, price: 0, tax_rate: companyStandardRate, tax: 0,
+                    quantity: 1, price: 0, tax_rate: companyStandardRate, tax: 0, further_tax: 0,
                     schedule_type: 'standard', sro_schedule_no: '', serial_no: '', mrp: '', mrpManual: false, sroSuggestion: null,
                     default_uom: 'Numbers, pieces, units',
                     st_withheld_at_source: false, petroleum_levy: '',
@@ -614,6 +632,7 @@
                 rejectionResult: null,
                 rejectionLoading: false,
                 scheduleError: '',
+                applyFurtherTax: false,
 
                 get buyerRegType() {
                     if (this.buyer_reg_type) return this.buyer_reg_type;
@@ -744,10 +763,25 @@
                     let qty = parseFloat(item.quantity || 0);
                     let subtotal = unitPrice * qty;
                     item.tax = parseFloat(((parseFloat(item.tax_rate || 0) / 100) * subtotal).toFixed(2));
+                    if (this.applyFurtherTax) {
+                        item.further_tax = parseFloat((subtotal * 0.04).toFixed(2));
+                    } else {
+                        item.further_tax = 0;
+                    }
                     if (!item.mrpManual && unitPrice > 0) {
                         item.mrp = unitPrice.toFixed(2);
                     }
                     this.applyScheduleRules(item);
+                },
+                recalcAllFurtherTax() {
+                    this.items.forEach((item, index) => {
+                        let subtotal = parseFloat(item.price || 0) * parseFloat(item.quantity || 0);
+                        if (this.applyFurtherTax) {
+                            item.further_tax = parseFloat((subtotal * 0.04).toFixed(2));
+                        } else {
+                            item.further_tax = 0;
+                        }
+                    });
                 },
                 itemSubtotal(index) {
                     let item = this.items[index];
@@ -755,7 +789,8 @@
                 },
                 itemTotal(index) {
                     let item = this.items[index];
-                    return ((parseFloat(item.price || 0) * parseFloat(item.quantity || 0)) + parseFloat(item.tax || 0)).toFixed(2);
+                    let sub = parseFloat(item.price || 0) * parseFloat(item.quantity || 0);
+                    return (sub + parseFloat(item.tax || 0) + parseFloat(item.further_tax || 0)).toFixed(2);
                 },
                 onDocTypeChange() {},
 
@@ -769,8 +804,13 @@
                         return total + parseFloat(item.tax || 0);
                     }, 0).toFixed(2);
                 },
+                totalFurtherTax() {
+                    return this.items.reduce((total, item) => {
+                        return total + parseFloat(item.further_tax || 0);
+                    }, 0).toFixed(2);
+                },
                 grandTotal() {
-                    return (parseFloat(this.totalExclST()) + parseFloat(this.totalSalesTax())).toFixed(2);
+                    return (parseFloat(this.totalExclST()) + parseFloat(this.totalSalesTax()) + parseFloat(this.totalFurtherTax())).toFixed(2);
                 },
                 whtAmount() {
                     return '0.00';

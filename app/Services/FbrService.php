@@ -84,7 +84,7 @@ class FbrService
                 $extraTaxVal = round(floatval($item->extra_tax ?? 0) * $quantity, 2);
             }
 
-            $furtherTax = round(floatval($item->further_tax ?? 0) * $quantity, 2);
+            $furtherTax = round(floatval($item->further_tax ?? 0), 2);
             $fedPayable = round(floatval($item->fed_payable ?? 0) * $quantity, 2);
             $discount = round(floatval($item->discount ?? 0) * $quantity, 2);
 

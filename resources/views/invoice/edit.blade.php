@@ -159,6 +159,14 @@
                         <button type="button" @click="addItem()" class="inline-flex items-center px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-100 transition">+ Add Item</button>
                     </div>
 
+                    <div class="mb-4 flex items-center gap-3 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" x-model="applyFurtherTax" @change="recalcAllFurtherTax()" class="rounded border-gray-300 text-orange-600 focus:ring-orange-500">
+                            <span class="text-sm font-semibold text-orange-800 dark:text-orange-300">Apply Further Tax (4%)</span>
+                        </label>
+                        <span class="text-xs text-orange-600 dark:text-orange-400">Applicable on unregistered persons u/s 3(1A)</span>
+                    </div>
+
                     <div x-show="scheduleError" x-cloak class="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-3">
                         <p class="text-sm text-red-700 dark:text-red-400 font-medium" x-text="scheduleError"></p>
                     </div>
@@ -299,9 +307,11 @@
                                 </div>
                             </div>
                             <input type="hidden" :name="'items[' + index + '][tax]'" :value="item.tax">
+                            <input type="hidden" :name="'items[' + index + '][further_tax]'" :value="item.further_tax">
                             <div class="mt-2 flex justify-between text-sm text-gray-500 dark:text-gray-400">
                                 <span>Subtotal: <span class="font-medium text-gray-800 dark:text-gray-100" x-text="'Rs. ' + itemSubtotal(index)"></span></span>
                                 <span>Tax (<span x-text="item.tax_rate"></span>%): <span class="font-medium text-gray-800 dark:text-gray-100" x-text="'Rs. ' + parseFloat(item.tax || 0).toFixed(2)"></span></span>
+                                <span x-show="applyFurtherTax" x-cloak class="text-orange-600">Further Tax (4%): <span class="font-medium" x-text="'Rs. ' + parseFloat(item.further_tax || 0).toFixed(2)"></span></span>
                                 <span>Line Total: <span class="font-medium text-gray-800 dark:text-gray-100" x-text="'Rs. ' + itemTotal(index)"></span></span>
                             </div>
                             <div class="mt-1 text-xs text-gray-400 dark:text-gray-500">
@@ -318,6 +328,10 @@
                         <div class="flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
                             <span>Total Sales Tax</span>
                             <span class="font-medium" x-text="'Rs. ' + totalSalesTax()"></span>
+                        </div>
+                        <div x-show="applyFurtherTax" x-cloak class="flex justify-between items-center text-sm text-orange-600 dark:text-orange-400">
+                            <span>Further Tax (4%)</span>
+                            <span class="font-medium" x-text="'Rs. ' + totalFurtherTax()"></span>
                         </div>
                         <div class="flex justify-between items-center text-sm font-semibold text-gray-700 dark:text-gray-300 border-t border-gray-200 dark:border-gray-600 pt-2">
                             <span>Grand Total</span>
@@ -388,6 +402,10 @@
                     <div>
                         <span class="text-gray-500 dark:text-gray-400">Tax:</span>
                         <span class="font-semibold text-gray-800 dark:text-gray-100 ml-1" x-text="'Rs. ' + form.totalSalesTax()"></span>
+                    </div>
+                    <div x-show="form.applyFurtherTax" x-cloak>
+                        <span class="text-orange-500 dark:text-orange-400">F.Tax:</span>
+                        <span class="font-semibold text-orange-600 dark:text-orange-400 ml-1" x-text="'Rs. ' + form.totalFurtherTax()"></span>
                     </div>
                 </div>
                 <div class="flex items-center space-x-2">
@@ -485,8 +503,10 @@
                         'productResults' => [],
                         'hsLookupInfo' => '',
                         'hsUnmapped' => false,
+                        'further_tax' => $i->further_tax ?? 0,
                     ];
                 })) !!},
+                applyFurtherTax: {!! json_encode($invoice->items->contains(fn($i) => ($i->further_tax ?? 0) > 0)) !!},
                 customerSearch: '',
                 customerResults: [],
                 showCustomerDropdown: false,
@@ -520,7 +540,8 @@
                         show_st_withheld: false, show_petroleum_levy: false,
                         requires_sro: false, requires_serial: false, requires_mrp: false,
                         optional_sro: false, optional_serial: false, schedule_hint: '',
-                        productSearch: '', showDropdown: false, productResults: [], hsLookupInfo: '', hsUnmapped: false
+                        productSearch: '', showDropdown: false, productResults: [], hsLookupInfo: '', hsUnmapped: false,
+                        further_tax: 0
                     };
                     if (this.items.length > 0) {
                         item.schedule_type = this.items[0].schedule_type;
@@ -589,6 +610,11 @@
                     let qty = parseFloat(item.quantity || 0);
                     let subtotal = unitPrice * qty;
                     item.tax = parseFloat(((parseFloat(item.tax_rate || 0) / 100) * subtotal).toFixed(2));
+                    if (this.applyFurtherTax) {
+                        item.further_tax = parseFloat((subtotal * 0.04).toFixed(2));
+                    } else {
+                        item.further_tax = 0;
+                    }
                     if (!item.mrpManual && unitPrice > 0) {
                         item.mrp = unitPrice.toFixed(2);
                     }
@@ -600,7 +626,7 @@
                 },
                 itemTotal(index) {
                     let item = this.items[index];
-                    return ((parseFloat(item.price || 0) * parseFloat(item.quantity || 0)) + parseFloat(item.tax || 0)).toFixed(2);
+                    return ((parseFloat(item.price || 0) * parseFloat(item.quantity || 0)) + parseFloat(item.tax || 0) + parseFloat(item.further_tax || 0)).toFixed(2);
                 },
                 onDocTypeChange() {},
 
@@ -614,8 +640,21 @@
                         return total + parseFloat(item.tax || 0);
                     }, 0).toFixed(2);
                 },
+                totalFurtherTax() {
+                    return this.items.reduce((total, item) => total + parseFloat(item.further_tax || 0), 0).toFixed(2);
+                },
+                recalcAllFurtherTax() {
+                    this.items.forEach((item) => {
+                        let subtotal = parseFloat(item.price || 0) * parseFloat(item.quantity || 0);
+                        if (this.applyFurtherTax) {
+                            item.further_tax = parseFloat((subtotal * 0.04).toFixed(2));
+                        } else {
+                            item.further_tax = 0;
+                        }
+                    });
+                },
                 grandTotal() {
-                    return (parseFloat(this.totalExclST()) + parseFloat(this.totalSalesTax())).toFixed(2);
+                    return (parseFloat(this.totalExclST()) + parseFloat(this.totalSalesTax()) + parseFloat(this.totalFurtherTax())).toFixed(2);
                 },
                 whtAmount() {
                     return '0.00';

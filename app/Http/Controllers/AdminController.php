@@ -140,9 +140,9 @@ class AdminController extends Controller
 
         $expiringTrials = Subscription::with('company')
             ->where('active', true)
-            ->where('ends_at', '<=', now()->addDays(7))
-            ->where('ends_at', '>', now())
-            ->orderBy('ends_at')
+            ->where('end_date', '<=', now()->addDays(7))
+            ->where('end_date', '>', now())
+            ->orderBy('end_date')
             ->take(10)
             ->get();
 

@@ -130,27 +130,28 @@ class DashboardController extends Controller
         $riskLevel = $hybridResult['risk_level'];
         $riskBadge = HybridComplianceScorer::getRiskBadge($riskLevel);
 
+        $sixMonthsAgo = now()->subMonths(5)->startOfMonth();
+
+        $reportAvgs = ComplianceReport::where('company_id', $companyId)
+            ->where('created_at', '>=', $sixMonthsAgo)
+            ->selectRaw("TO_CHAR(created_at, 'YYYY-MM') as ym, ROUND(AVG(final_score)) as avg_score")
+            ->groupByRaw("TO_CHAR(created_at, 'YYYY-MM')")
+            ->pluck('avg_score', 'ym');
+
+        $scoreAvgs = ComplianceScore::where('company_id', $companyId)
+            ->where('calculated_date', '>=', $sixMonthsAgo)
+            ->selectRaw("TO_CHAR(calculated_date, 'YYYY-MM') as ym, score")
+            ->orderBy('calculated_date', 'desc')
+            ->get()
+            ->groupBy('ym')
+            ->map(fn($g) => $g->first()->score);
+
         $complianceTrend = [];
         for ($i = 5; $i >= 0; $i--) {
             $month = now()->subMonths($i);
-            $monthReports = ComplianceReport::where('company_id', $companyId)
-                ->whereMonth('created_at', $month->month)
-                ->whereYear('created_at', $month->year)
-                ->get();
-
-            if ($monthReports->isNotEmpty()) {
-                $complianceTrend[] = ['month' => $month->format('M'), 'score' => round($monthReports->avg('final_score'))];
-            } else {
-                $scoreRecord = ComplianceScore::where('company_id', $companyId)
-                    ->whereMonth('calculated_date', $month->month)
-                    ->whereYear('calculated_date', $month->year)
-                    ->orderBy('calculated_date', 'desc')
-                    ->first();
-                $complianceTrend[] = [
-                    'month' => $month->format('M'),
-                    'score' => $scoreRecord ? $scoreRecord->score : 100,
-                ];
-            }
+            $ym = $month->format('Y-m');
+            $score = $reportAvgs[$ym] ?? $scoreAvgs[$ym] ?? 100;
+            $complianceTrend[] = ['month' => $month->format('M'), 'score' => (int) $score];
         }
 
         $recentActivity = InvoiceActivityLog::where('company_id', $companyId)
@@ -234,6 +235,30 @@ class DashboardController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
+        $execSixMonthsAgo = now()->subMonths(5)->startOfMonth();
+
+        $monthlyStats = Invoice::where('company_id', $companyId)
+            ->where('created_at', '>=', $execSixMonthsAgo)
+            ->selectRaw("TO_CHAR(created_at, 'YYYY-MM') as ym, COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue, COALESCE(SUM(total_sales_tax),0) as tax_collected")
+            ->groupByRaw("TO_CHAR(created_at, 'YYYY-MM')")
+            ->get()
+            ->keyBy('ym');
+
+        $fbrLogStats = DB::table('fbr_logs')
+            ->join('invoices', 'fbr_logs.invoice_id', '=', 'invoices.id')
+            ->where('invoices.company_id', $companyId)
+            ->where('invoices.created_at', '>=', $execSixMonthsAgo)
+            ->selectRaw("TO_CHAR(invoices.created_at, 'YYYY-MM') as ym, COUNT(*) as total, SUM(CASE WHEN fbr_logs.status = 'failed' THEN 1 ELSE 0 END) as failed")
+            ->groupByRaw("TO_CHAR(invoices.created_at, 'YYYY-MM')")
+            ->get()
+            ->keyBy('ym');
+
+        $complianceAvgs = ComplianceReport::where('company_id', $companyId)
+            ->where('created_at', '>=', $execSixMonthsAgo)
+            ->selectRaw("TO_CHAR(created_at, 'YYYY-MM') as ym, AVG(final_score) as avg_score")
+            ->groupByRaw("TO_CHAR(created_at, 'YYYY-MM')")
+            ->pluck('avg_score', 'ym');
+
         $monthlyVolume = [];
         $failureRateTrend = [];
         $taxCollectedTrend = [];
@@ -241,34 +266,16 @@ class DashboardController extends Controller
 
         for ($i = 5; $i >= 0; $i--) {
             $month = now()->subMonths($i);
-            $monthStart = $month->copy()->startOfMonth();
-            $monthEnd = $month->copy()->endOfMonth();
+            $ym = $month->format('Y-m');
+            $label = $month->format('M');
+            $ms = $monthlyStats[$ym] ?? null;
+            $fl = $fbrLogStats[$ym] ?? null;
+            $failRate = ($fl && $fl->total > 0) ? round(($fl->failed / $fl->total) * 100, 1) : 0;
 
-            $monthStats = Invoice::where('company_id', $companyId)
-                ->whereBetween('created_at', [$monthStart, $monthEnd])
-                ->select(
-                    DB::raw('COUNT(*) as count'),
-                    DB::raw('COALESCE(SUM(total_amount), 0) as revenue'),
-                    DB::raw('COALESCE(SUM(total_sales_tax), 0) as tax_collected')
-                )
-                ->first();
-
-            $invoiceIds = Invoice::where('company_id', $companyId)
-                ->whereBetween('created_at', [$monthStart, $monthEnd])
-                ->pluck('id');
-
-            $totalLogs = FbrLog::whereIn('invoice_id', $invoiceIds)->count();
-            $failedLogs = FbrLog::whereIn('invoice_id', $invoiceIds)->where('status', 'failed')->count();
-            $failRate = $totalLogs > 0 ? round(($failedLogs / $totalLogs) * 100, 1) : 0;
-
-            $monthReport = ComplianceReport::where('company_id', $companyId)
-                ->whereBetween('created_at', [$monthStart, $monthEnd])
-                ->avg('final_score');
-
-            $monthlyVolume[] = ['month' => $month->format('M'), 'count' => $monthStats->count, 'revenue' => round($monthStats->revenue)];
-            $failureRateTrend[] = ['month' => $month->format('M'), 'rate' => $failRate];
-            $taxCollectedTrend[] = ['month' => $month->format('M'), 'amount' => round($monthStats->tax_collected)];
-            $riskTrend[] = ['month' => $month->format('M'), 'score' => round($monthReport ?? 100)];
+            $monthlyVolume[] = ['month' => $label, 'count' => $ms->count ?? 0, 'revenue' => round($ms->revenue ?? 0)];
+            $failureRateTrend[] = ['month' => $label, 'rate' => $failRate];
+            $taxCollectedTrend[] = ['month' => $label, 'amount' => round($ms->tax_collected ?? 0)];
+            $riskTrend[] = ['month' => $label, 'score' => round($complianceAvgs[$ym] ?? 100)];
         }
 
         $auditTrend = AuditProbabilityEngine::getTrend($companyId);
@@ -281,9 +288,12 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
-        $totalInvoices = Invoice::where('company_id', $companyId)->count();
-        $totalRevenue = Invoice::where('company_id', $companyId)->sum('total_amount');
-        $lockedCount = Invoice::where('company_id', $companyId)->where('status', 'locked')->count();
+        $execInvStats = Invoice::where('company_id', $companyId)
+            ->select(DB::raw('COUNT(*) as total'), DB::raw('COALESCE(SUM(total_amount),0) as revenue'), DB::raw("SUM(CASE WHEN status = 'locked' THEN 1 ELSE 0 END) as locked"))
+            ->first();
+        $totalInvoices = $execInvStats->total;
+        $totalRevenue = $execInvStats->revenue;
+        $lockedCount = $execInvStats->locked;
 
         return view('executive-dashboard', compact(
             'company', 'monthlyVolume', 'failureRateTrend', 'taxCollectedTrend',

@@ -16,6 +16,7 @@ use App\Services\SecurityLogService;
 use App\Services\AuditLogService;
 use App\Services\IntegrityHashService;
 use App\Services\HsIntelligenceService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
@@ -25,15 +26,39 @@ class AdminController extends Controller
 {
     public function dashboard()
     {
-        $totalCompanies = Company::count();
-        $totalUsers = User::count();
-        $totalInvoices = Invoice::count();
-        $draftInvoices = Invoice::where('status', 'draft')->count();
-        $submittedInvoices = Invoice::where('is_fbr_processing', true)->count();
-        $lockedInvoices = Invoice::where('status', 'locked')->count();
-        $failedLogs = FbrLog::where('status', 'failed')->count();
-        $totalRevenue = Invoice::sum('total_amount');
-        $activeSubscriptions = Subscription::where('active', true)->count();
+        $invoiceStats = Cache::remember('admin_invoice_stats', 120, function () {
+            return Invoice::select(
+                DB::raw('COUNT(*) as total'),
+                DB::raw("SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) as draft"),
+                DB::raw("SUM(CASE WHEN status = 'locked' THEN 1 ELSE 0 END) as locked"),
+                DB::raw("SUM(CASE WHEN is_fbr_processing = true THEN 1 ELSE 0 END) as submitted"),
+                DB::raw('COALESCE(SUM(total_amount), 0) as revenue')
+            )->first();
+        });
+
+        $totalInvoices = $invoiceStats->total;
+        $draftInvoices = $invoiceStats->draft;
+        $lockedInvoices = $invoiceStats->locked;
+        $submittedInvoices = $invoiceStats->submitted;
+        $totalRevenue = $invoiceStats->revenue;
+
+        $platformCounts = Cache::remember('admin_platform_counts', 120, function () {
+            return [
+                'companies' => Company::count(),
+                'users' => User::count(),
+                'failed_logs' => FbrLog::where('status', 'failed')->count(),
+                'active_subs' => Subscription::where('active', true)->count(),
+                'pending' => Company::where('company_status', 'pending')->count(),
+                'new_companies_month' => Company::where('created_at', '>=', now()->startOfMonth())->count(),
+            ];
+        });
+
+        $totalCompanies = $platformCounts['companies'];
+        $totalUsers = $platformCounts['users'];
+        $failedLogs = $platformCounts['failed_logs'];
+        $activeSubscriptions = $platformCounts['active_subs'];
+        $pendingCompanies = $platformCounts['pending'];
+        $newCompaniesThisMonth = $platformCounts['new_companies_month'];
 
         $recentInvoices = Invoice::with('company')
             ->orderBy('created_at', 'desc')
@@ -51,51 +76,67 @@ class AdminController extends Controller
             ->take(10)
             ->get();
 
-        $pendingCompanies = Company::where('company_status', 'pending')->count();
+        $overrideStats = Cache::remember('admin_override_stats', 300, function () {
+            return [
+                'sector_rules' => \App\Models\SectorTaxRule::where('is_active', true)->count(),
+                'province_rules' => \App\Models\ProvinceTaxRule::where('is_active', true)->count(),
+                'customer_rules' => \App\Models\CustomerTaxRule::where('is_active', true)->count(),
+                'sro_rules' => \App\Models\SpecialSroRule::where('is_active', true)->count(),
+                'total_overrides_applied' => \App\Models\OverrideUsageLog::count(),
+                'overrides_this_month' => \App\Models\OverrideUsageLog::where('created_at', '>=', now()->startOfMonth())->count(),
+            ];
+        });
 
-        $overrideStats = [
-            'sector_rules' => \App\Models\SectorTaxRule::where('is_active', true)->count(),
-            'province_rules' => \App\Models\ProvinceTaxRule::where('is_active', true)->count(),
-            'customer_rules' => \App\Models\CustomerTaxRule::where('is_active', true)->count(),
-            'sro_rules' => \App\Models\SpecialSroRule::where('is_active', true)->count(),
-            'total_overrides_applied' => \App\Models\OverrideUsageLog::count(),
-            'overrides_this_month' => \App\Models\OverrideUsageLog::where('created_at', '>=', now()->startOfMonth())->count(),
-        ];
+        $topRejectedHsCodes = Cache::remember('admin_rejected_hs', 300, function () {
+            return HsIntelligenceService::getTopRejectedHsCodes(30, 10);
+        });
+        $totalHsMaster = Cache::remember('admin_hs_master_count', 600, function () {
+            return \App\Models\HsMasterGlobal::count();
+        });
+        $totalUnmapped = Cache::remember('admin_unmapped_count', 300, function () {
+            return DB::table('hs_unmapped_queue')->count();
+        });
 
-        $topRejectedHsCodes = HsIntelligenceService::getTopRejectedHsCodes(30, 10);
-        $totalHsMaster = \App\Models\HsMasterGlobal::count();
-        $totalUnmapped = DB::table('hs_unmapped_queue')->count();
+        $atRiskCompanies = Cache::remember('admin_at_risk', 300, function () {
+            return Company::whereNotNull('compliance_score')
+                ->orderBy('compliance_score', 'asc')
+                ->take(5)
+                ->get();
+        });
 
-        $atRiskCompanies = Company::whereNotNull('compliance_score')
-            ->orderBy('compliance_score', 'asc')
-            ->take(5)
-            ->get();
+        $platformAuditStats = Cache::remember('admin_audit_stats', 120, function () {
+            return [
+                'total_anomalies' => \App\Models\AnomalyLog::where('resolved', false)->count(),
+                'high_risk_companies' => Company::whereNotNull('compliance_score')->where('compliance_score', '<', 50)->count(),
+                'avg_compliance' => round(Company::whereNotNull('compliance_score')->avg('compliance_score') ?? 100),
+                'total_vendor_risks' => \App\Models\VendorRiskProfile::where('vendor_score', '<', 40)->count(),
+            ];
+        });
 
-        $platformAuditStats = [
-            'total_anomalies' => \App\Models\AnomalyLog::where('resolved', false)->count(),
-            'high_risk_companies' => Company::whereNotNull('compliance_score')->where('compliance_score', '<', 50)->count(),
-            'avg_compliance' => round(Company::whereNotNull('compliance_score')->avg('compliance_score') ?? 100),
-            'total_vendor_risks' => \App\Models\VendorRiskProfile::where('vendor_score', '<', 40)->count(),
-        ];
+        $companyScores = Cache::remember('admin_company_scores', 300, function () {
+            return Company::whereNotNull('compliance_score')
+                ->select('name', 'compliance_score', 'ntn')
+                ->orderBy('compliance_score', 'desc')
+                ->take(10)
+                ->get();
+        });
 
-        $companyScores = Company::whereNotNull('compliance_score')
-            ->select('name', 'compliance_score', 'ntn')
-            ->orderBy('compliance_score', 'desc')
-            ->take(10)
-            ->get();
+        $topCompanies = Cache::remember('admin_top_companies', 300, function () {
+            return Company::withCount('invoices')
+                ->select('companies.*')
+                ->selectRaw('(SELECT COALESCE(SUM(total_amount),0) FROM invoices WHERE invoices.company_id = companies.id) as company_revenue')
+                ->orderByDesc('company_revenue')
+                ->take(5)
+                ->get();
+        });
 
-        $topCompanies = Company::withCount('invoices')
-            ->select('companies.*')
-            ->selectRaw('(SELECT COALESCE(SUM(total_amount),0) FROM invoices WHERE invoices.company_id = companies.id) as company_revenue')
-            ->orderByDesc('company_revenue')
-            ->take(5)
-            ->get();
-
-        $monthlyRevenue = Invoice::selectRaw("TO_CHAR(created_at, 'YYYY-MM') as month, SUM(total_amount) as revenue, COUNT(*) as count")
-            ->where('created_at', '>=', now()->subMonths(6)->startOfMonth())
-            ->groupByRaw("TO_CHAR(created_at, 'YYYY-MM')")
-            ->orderBy('month')
-            ->get();
+        $monthlyRevenue = Cache::remember('admin_monthly_revenue', 300, function () {
+            return Invoice::selectRaw("TO_CHAR(created_at, 'YYYY-MM') as month, SUM(total_amount) as revenue, COUNT(*) as count")
+                ->where('created_at', '>=', now()->subMonths(6)->startOfMonth())
+                ->groupByRaw("TO_CHAR(created_at, 'YYYY-MM')")
+                ->orderBy('month')
+                ->get();
+        });
 
         $expiringTrials = Subscription::with('company')
             ->where('active', true)
@@ -110,9 +151,14 @@ class AdminController extends Controller
             ->take(15)
             ->get();
 
-        $todayInvoices = Invoice::where('created_at', '>=', now()->startOfDay())->count();
-        $todayRevenue = Invoice::where('created_at', '>=', now()->startOfDay())->sum('total_amount');
-        $newCompaniesThisMonth = Company::where('created_at', '>=', now()->startOfMonth())->count();
+        $todayStats = Cache::remember('admin_today_stats_' . now()->format('Y-m-d-H'), 120, function () {
+            return [
+                'invoices' => Invoice::where('created_at', '>=', now()->startOfDay())->count(),
+                'revenue' => Invoice::where('created_at', '>=', now()->startOfDay())->sum('total_amount'),
+            ];
+        });
+        $todayInvoices = $todayStats['invoices'];
+        $todayRevenue = $todayStats['revenue'];
 
         return view('admin.dashboard', compact(
             'totalCompanies', 'totalUsers', 'totalInvoices',

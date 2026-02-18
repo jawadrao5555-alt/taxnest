@@ -78,7 +78,7 @@ externalPort = 80
 channel = "stable-25_05"
 
 [deployment]
-deploymentTarget = "cloudrun"
-run = ["bash", "-c", "echo \"$DATABASE_URL\" > /tmp/prod_database_url; echo \"$PGHOST\" > /tmp/prod_pghost; php artisan serve --host=0.0.0.0 --port=5000"]
+deploymentTarget = "autoscale"
+run = ["bash", "-c", "php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan serve --host=0.0.0.0 --port=5000"]
 publicDir = "dist/public"
-build = ["bash", "-c", "php artisan config:clear && php artisan route:cache && php artisan view:cache"]
+build = ["bash", "-c", "npm run build"]

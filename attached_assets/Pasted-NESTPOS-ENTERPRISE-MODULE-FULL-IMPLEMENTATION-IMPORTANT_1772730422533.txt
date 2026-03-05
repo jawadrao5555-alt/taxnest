@@ -1,0 +1,206 @@
+NESTPOS ENTERPRISE MODULE – FULL IMPLEMENTATION
+
+IMPORTANT RULE
+Do NOT modify the existing Digital Invoice system (NestPay).
+Do NOT change any FBR submission logic.
+This task must create a completely separate POS module.
+
+--------------------------------------------------
+
+MODULE NAME
+NestPOS
+
+This module must work inside the existing system but remain isolated from Digital Invoicing.
+
+--------------------------------------------------
+
+1. CREATE DATABASE TABLES
+
+Create migrations for:
+
+pos_terminals
+services
+products
+customers
+pos_transactions
+pos_transaction_items
+pos_payments
+tax_rules
+pra_logs
+
+pos_transactions fields:
+
+id
+company_id
+terminal_id
+invoice_number
+subtotal
+discount_type (percentage / amount)
+discount_value
+discount_amount
+tax_rate
+tax_amount
+total_amount
+payment_method
+pra_invoice_number
+pra_response_code
+created_at
+
+tax_rules fields:
+
+id
+payment_method
+tax_rate
+
+Insert default tax rules:
+
+cash → 16
+debit_card → 5
+credit_card → 5
+qr_payment → 5
+
+--------------------------------------------------
+
+2. POS BILLING SCREEN
+
+Create a POS billing interface that supports:
+
+Add product or service
+Quantity
+Unit price
+Subtotal calculation
+
+Discount system must support:
+
+Percentage discount
+Direct amount discount
+
+Calculation order must be:
+
+Subtotal
+→ Discount
+→ Tax
+→ Final Total
+
+--------------------------------------------------
+
+3. PAYMENT METHOD TAX LOGIC
+
+Before finalizing an invoice show payment options:
+
+Cash
+Debit Card
+Credit Card
+QR / Raast
+
+Tax rules:
+
+Cash payment → 16%
+Card payment → 5%
+
+When payment method changes the tax must automatically recalculate.
+
+--------------------------------------------------
+
+4. PRA REPORTING TOGGLE
+
+Add a simple toggle switch on the main dashboard header.
+
+Label:
+
+PRA Reporting
+
+States:
+
+ON (green)
+OFF (red)
+
+Database field:
+
+companies.pra_reporting_enabled
+
+Logic:
+
+If ON
+→ invoice must be sent to PRA integration service
+
+If OFF
+→ invoice must be saved locally only
+
+--------------------------------------------------
+
+5. PRA INTEGRATION SERVICE
+
+Create service class:
+
+app/Services/PraIntegrationService.php
+
+Functions required:
+
+generatePayload()
+sendInvoice()
+storePraResponse()
+
+The service must only run when PRA reporting is enabled.
+
+--------------------------------------------------
+
+6. POS NAVIGATION MENU
+
+Add a new menu group:
+
+POS
+POS Dashboard
+Create Invoice
+Transactions
+POS Reports
+Services
+Products
+Customers
+
+--------------------------------------------------
+
+7. MULTI COMPANY SECURITY
+
+All POS data must be filtered using company_id.
+
+No company should see another company’s POS data.
+
+--------------------------------------------------
+
+8. RECEIPT LOGIC
+
+If PRA reporting ON:
+
+Print PRA invoice number and QR placeholder.
+
+If PRA reporting OFF:
+
+Print receipt as LOCAL INVOICE.
+
+--------------------------------------------------
+
+9. IMPORTANT
+
+Do NOT change:
+
+Digital invoice tables
+FBR submission logic
+Existing invoice controllers
+
+NestPOS must operate independently.
+
+--------------------------------------------------
+
+EXPECTED RESULT
+
+A complete POS module with:
+
+POS billing screen
+Discount system
+Payment-based tax calculation
+PRA reporting toggle
+POS navigation
+Separate database structure
+
+All built without affecting the existing Digital Invoice system.

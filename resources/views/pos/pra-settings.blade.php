@@ -28,6 +28,14 @@
                         <input type="text" name="pra_production_token" value="{{ $company->pra_production_token }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500" placeholder="Token from PRA POS registration">
                         <p class="text-xs text-gray-400 mt-1">Sandbox uses default test token. Production token is available on PRA registration screen.</p>
                     </div>
+                    <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Receipt Printer Size</label>
+                        <select name="receipt_printer_size" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <option value="80mm" {{ ($company->receipt_printer_size ?? '80mm') === '80mm' ? 'selected' : '' }}>80mm (Standard)</option>
+                            <option value="58mm" {{ ($company->receipt_printer_size ?? '80mm') === '58mm' ? 'selected' : '' }}>58mm (Compact)</option>
+                        </select>
+                        <p class="text-xs text-gray-400 mt-1">Select the thermal printer paper size used at your POS terminals.</p>
+                    </div>
                     <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
                         <p class="text-xs text-blue-700 dark:text-blue-400">
                             <strong>API Endpoints:</strong><br>

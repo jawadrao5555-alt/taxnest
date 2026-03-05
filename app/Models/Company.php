@@ -49,6 +49,7 @@ class Company extends Model
         'pra_environment',
         'pra_pos_id',
         'pra_production_token',
+        'receipt_printer_size',
     ];
 
     protected $casts = [

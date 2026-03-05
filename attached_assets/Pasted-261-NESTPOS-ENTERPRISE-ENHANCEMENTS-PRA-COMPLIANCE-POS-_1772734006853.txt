@@ -1,0 +1,134 @@
+261"}
+NESTPOS ENTERPRISE ENHANCEMENTS – PRA COMPLIANCE + POS HARDWARE SUPPORT
+
+IMPORTANT:
+These changes must remain inside the NestPOS module only.
+Do NOT modify the existing FBR Digital Invoice system.
+
+--------------------------------------------------
+
+1) PRA QR CODE GENERATION
+
+When PRA returns a successful response with pra_invoice_number:
+
+Generate a verification QR code for the invoice.
+
+Verification URL format:
+
+https://reg.pra.punjab.gov.pk/IMSFiscalReport/SearchPOSInvoice_Report.aspx?PRAInvNo={pra_invoice_number}
+
+Implementation:
+
+• Create field in pos_transactions table:
+
+pra_qr_code (text)
+
+• Generate QR code after PRA success.
+
+• Store QR code image or encoded string in pra_qr_code field.
+
+• Display QR code in:
+
+Transaction Detail page
+Receipt page
+
+• If PRA reporting is OFF → QR should not appear.
+
+
+--------------------------------------------------
+
+2) POS TERMINAL SYSTEM
+
+Support multiple POS terminals per company.
+
+Use existing table:
+
+pos_terminals
+
+Fields:
+
+id
+company_id
+terminal_name
+terminal_code
+location
+is_active
+created_at
+
+Each POS transaction must store:
+
+terminal_id
+
+Transaction validation rules:
+
+• Terminal must belong to the same company
+• Terminal must be active
+• Terminal ownership must be validated before invoice creation
+
+Display terminal information on:
+
+Receipt
+Transaction detail page
+
+
+--------------------------------------------------
+
+3) THERMAL RECEIPT OPTIMIZATION
+
+Optimize receipt layout for POS printers.
+
+Supported formats:
+
+80mm printer
+58mm printer
+
+Implementation:
+
+Create two Blade layouts:
+
+resources/views/pos/receipts/receipt_80mm.blade.php
+resources/views/pos/receipts/receipt_58mm.blade.php
+
+Company setting:
+
+receipt_printer_size
+
+Options:
+
+80mm
+58mm
+
+Receipt layout must include:
+
+Company name
+POS Invoice Number
+PRA Fiscal Invoice Number (if PRA enabled)
+Terminal name
+Date & time
+Items table
+Subtotal
+Discount
+Tax
+Total
+Payment method
+PRA QR code (if available)
+
+Use CSS optimized for thermal printing:
+
+font-size: 12px
+monospace alignment
+max width based on printer size
+
+--------------------------------------------------
+
+EXPECTED RESULT
+
+The NestPOS system will now support:
+
+• PRA fiscal QR verification
+• Multi-terminal POS environments
+• Thermal receipt printers (80mm / 58mm)
+• Terminal-level transaction tracking
+• PRA compliant receipt format
+
+All features must remain isolated from the FBR Digital Invoice sy

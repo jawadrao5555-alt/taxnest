@@ -99,9 +99,9 @@ class PosController extends Controller
         $totalAmount = round($afterDiscount + $taxAmount, 2);
 
         if ($request->terminal_id) {
-            $terminal = PosTerminal::where('company_id', $companyId)->where('id', $request->terminal_id)->first();
+            $terminal = PosTerminal::where('company_id', $companyId)->where('id', $request->terminal_id)->where('is_active', true)->first();
             if (!$terminal) {
-                return back()->withInput()->with('error', 'Invalid terminal selected.');
+                return back()->withInput()->with('error', 'Invalid or inactive terminal selected.');
             }
         }
 
@@ -258,10 +258,13 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $transaction = PosTransaction::where('company_id', $companyId)
-            ->with(['items', 'payments', 'creator'])
+            ->with(['items', 'payments', 'creator', 'terminal'])
             ->findOrFail($id);
 
-        return view('pos.receipt', compact('transaction', 'company'));
+        $printerSize = $company->receipt_printer_size ?? '80mm';
+        $receiptView = $printerSize === '58mm' ? 'pos.receipts.receipt_58mm' : 'pos.receipts.receipt_80mm';
+
+        return view($receiptView, compact('transaction', 'company'));
     }
 
     public function reports()
@@ -377,6 +380,67 @@ class PosController extends Controller
         ]);
     }
 
+    public function terminals()
+    {
+        $companyId = app('currentCompanyId');
+        $terminals = PosTerminal::where('company_id', $companyId)->orderBy('terminal_name')->get();
+        return view('pos.terminals', compact('terminals'));
+    }
+
+    public function storeTerminal(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $request->validate([
+            'terminal_name' => 'required|string|max:255',
+            'terminal_code' => 'required|string|max:100|unique:pos_terminals,terminal_code',
+            'location' => 'nullable|string|max:255',
+        ]);
+
+        PosTerminal::create([
+            'company_id' => $companyId,
+            'terminal_name' => $request->terminal_name,
+            'terminal_code' => $request->terminal_code,
+            'location' => $request->location,
+            'is_active' => true,
+        ]);
+
+        return back()->with('success', 'Terminal added successfully.');
+    }
+
+    public function updateTerminal(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $terminal = PosTerminal::where('company_id', $companyId)->findOrFail($id);
+
+        $request->validate([
+            'terminal_name' => 'required|string|max:255',
+            'terminal_code' => 'required|string|max:100|unique:pos_terminals,terminal_code,' . $id,
+            'location' => 'nullable|string|max:255',
+        ]);
+
+        $terminal->update([
+            'terminal_name' => $request->terminal_name,
+            'terminal_code' => $request->terminal_code,
+            'location' => $request->location,
+            'is_active' => $request->has('is_active'),
+        ]);
+
+        return back()->with('success', 'Terminal updated successfully.');
+    }
+
+    public function deleteTerminal($id)
+    {
+        $companyId = app('currentCompanyId');
+        $terminal = PosTerminal::where('company_id', $companyId)->findOrFail($id);
+
+        if ($terminal->transactions()->exists()) {
+            return back()->with('error', 'Cannot delete terminal with existing transactions. Deactivate it instead.');
+        }
+
+        $terminal->delete();
+        return back()->with('success', 'Terminal deleted.');
+    }
+
     public function praSettings(Request $request)
     {
         $companyId = app('currentCompanyId');
@@ -387,12 +451,14 @@ class PosController extends Controller
                 'pra_environment' => 'required|in:sandbox,production',
                 'pra_pos_id' => 'nullable|string',
                 'pra_production_token' => 'nullable|string',
+                'receipt_printer_size' => 'nullable|in:80mm,58mm',
             ]);
 
             $company->update([
                 'pra_environment' => $request->pra_environment,
                 'pra_pos_id' => $request->pra_pos_id,
                 'pra_production_token' => $request->pra_production_token,
+                'receipt_printer_size' => $request->receipt_printer_size ?? '80mm',
             ]);
 
             return back()->with('success', 'PRA settings updated successfully.');

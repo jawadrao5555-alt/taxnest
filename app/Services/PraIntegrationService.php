@@ -166,10 +166,38 @@ class PraIntegrationService
             'status' => $success ? 'success' : 'failed',
         ]);
 
-        $transaction->update([
+        $updateData = [
             'pra_response_code' => $responseCode,
             'pra_status' => $success ? 'submitted' : 'failed',
             'pra_invoice_number' => $praInvoiceNumber ?? $transaction->pra_invoice_number,
-        ]);
+        ];
+
+        if ($success && $praInvoiceNumber) {
+            $updateData['pra_qr_code'] = $this->generateQrCode($praInvoiceNumber);
+        }
+
+        $transaction->update($updateData);
+    }
+
+    public function generateQrCode(string $praInvoiceNumber): string
+    {
+        $verificationUrl = 'https://reg.pra.punjab.gov.pk/IMSFiscalReport/SearchPOSInvoice_Report.aspx?PRAInvNo=' . urlencode($praInvoiceNumber);
+
+        try {
+            $qrCode = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')
+                ->size(150)
+                ->margin(1)
+                ->generate($verificationUrl);
+
+            return 'data:image/svg+xml;base64,' . base64_encode($qrCode);
+        } catch (\Exception $e) {
+            Log::error('QR Code Generation Error', ['error' => $e->getMessage()]);
+            return '';
+        }
+    }
+
+    public function getVerificationUrl(string $praInvoiceNumber): string
+    {
+        return 'https://reg.pra.punjab.gov.pk/IMSFiscalReport/SearchPOSInvoice_Report.aspx?PRAInvNo=' . urlencode($praInvoiceNumber);
     }
 }

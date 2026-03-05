@@ -6,7 +6,7 @@
     <title>Receipt - {{ $transaction->invoice_number }}</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Courier New', monospace; font-size: 12px; max-width: 300px; margin: 0 auto; padding: 10px; background: #fff; color: #000; }
+        body { font-family: 'Courier New', monospace; font-size: 12px; max-width: 302px; margin: 0 auto; padding: 10px; background: #fff; color: #000; }
         .text-center { text-align: center; }
         .text-right { text-align: right; }
         .bold { font-weight: bold; }
@@ -15,32 +15,37 @@
         .header { margin-bottom: 10px; }
         .header h1 { font-size: 16px; font-weight: bold; margin-bottom: 2px; }
         .header p { font-size: 10px; }
-        .info-row { display: flex; justify-content: space-between; margin: 2px 0; }
-        .items-table { width: 100%; margin: 5px 0; }
-        .items-table th, .items-table td { text-align: left; padding: 2px 0; }
+        .info-row { display: flex; justify-content: space-between; margin: 2px 0; font-size: 11px; }
+        .invoice-numbers { border: 1px solid #000; padding: 6px; margin: 8px 0; font-size: 10px; }
+        .invoice-numbers .inv-row { display: flex; justify-content: space-between; margin: 2px 0; }
+        .invoice-numbers .inv-label { font-weight: bold; }
+        .items-table { width: 100%; margin: 5px 0; border-collapse: collapse; }
+        .items-table th, .items-table td { text-align: left; padding: 2px 0; font-size: 11px; }
         .items-table th { font-size: 10px; text-transform: uppercase; border-bottom: 1px solid #000; }
         .items-table .qty { width: 30px; text-align: center; }
         .items-table .price, .items-table .total { text-align: right; }
         .totals { margin: 5px 0; }
-        .totals .row { display: flex; justify-content: space-between; margin: 2px 0; }
+        .totals .row { display: flex; justify-content: space-between; margin: 2px 0; font-size: 11px; }
         .totals .grand-total { font-size: 16px; font-weight: bold; }
         .footer { margin-top: 10px; font-size: 10px; }
         .pra-badge { border: 2px solid #000; padding: 8px; margin: 8px 0; text-align: center; font-size: 10px; }
         .pra-badge .pra-title { font-size: 12px; font-weight: bold; margin-bottom: 4px; }
         .pra-badge .pra-number { font-size: 11px; font-weight: bold; letter-spacing: 0.5px; }
         .local-badge { border: 1px dashed #666; padding: 5px; margin: 8px 0; text-align: center; font-size: 10px; color: #666; }
-        .invoice-numbers { border: 1px solid #000; padding: 6px; margin: 8px 0; font-size: 10px; }
-        .invoice-numbers .inv-row { display: flex; justify-content: space-between; margin: 2px 0; }
-        .invoice-numbers .inv-label { font-weight: bold; }
-        .qr-placeholder { width: 80px; height: 80px; border: 1px solid #000; margin: 8px auto; display: flex; align-items: center; justify-content: center; font-size: 8px; }
+        .qr-code { text-align: center; margin: 8px 0; }
+        .qr-code img { width: 120px; height: 120px; }
+        .qr-code p { font-size: 8px; margin-top: 2px; }
         @media print {
-            body { max-width: 80mm; }
+            body { max-width: 80mm; padding: 2mm; }
             .no-print { display: none !important; }
+        }
+        @media screen {
+            .no-print { margin-bottom: 15px; text-align: center; font-family: Arial, sans-serif; }
         }
     </style>
 </head>
 <body>
-    <div class="no-print" style="text-align: center; margin-bottom: 15px; font-family: Arial, sans-serif;">
+    <div class="no-print">
         <button onclick="window.print()" style="padding: 10px 30px; background: #059669; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; margin-right: 10px;">Print Receipt</button>
         <button onclick="window.close()" style="padding: 10px 30px; background: #6b7280; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer;">Close</button>
     </div>
@@ -68,6 +73,9 @@
     </div>
 
     <div class="info-row"><span>Date:</span><span>{{ $transaction->created_at->format('d/m/Y H:i') }}</span></div>
+    @if($transaction->terminal)
+    <div class="info-row"><span>Terminal:</span><span>{{ $transaction->terminal->terminal_name }}</span></div>
+    @endif
     @if($transaction->customer_name)
     <div class="info-row"><span>Customer:</span><span>{{ $transaction->customer_name }}</span></div>
     @endif
@@ -82,7 +90,7 @@
         <tbody>
             @foreach($transaction->items as $item)
             <tr>
-                <td>{{ $item->item_name }}</td>
+                <td>{{ Str::limit($item->item_name, 16) }}</td>
                 <td class="qty">{{ $item->quantity }}</td>
                 <td class="price">{{ number_format($item->unit_price) }}</td>
                 <td class="total">{{ number_format($item->subtotal) }}</td>
@@ -111,9 +119,12 @@
         <div>POS Invoice #: {{ $transaction->invoice_number }}</div>
         <div class="pra-number">PRA #: {{ $transaction->pra_invoice_number }}</div>
     </div>
-    <div class="qr-placeholder">
-        QR CODE
+    @if($transaction->pra_qr_code)
+    <div class="qr-code">
+        <img src="{{ $transaction->pra_qr_code }}" alt="PRA Verification QR">
+        <p>Scan to verify on PRA portal</p>
     </div>
+    @endif
     @else
     <div class="local-badge">
         LOCAL INVOICE<br>

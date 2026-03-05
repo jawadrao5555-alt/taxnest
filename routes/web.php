@@ -175,6 +175,10 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::post('/services', [PosController::class, 'storeService'])->name('pos.services.store');
         Route::put('/services/{id}', [PosController::class, 'updateService'])->name('pos.services.update');
         Route::delete('/services/{id}', [PosController::class, 'deleteService'])->name('pos.services.delete');
+        Route::get('/terminals', [PosController::class, 'terminals'])->name('pos.terminals');
+        Route::post('/terminals', [PosController::class, 'storeTerminal'])->name('pos.terminals.store');
+        Route::put('/terminals/{id}', [PosController::class, 'updateTerminal'])->name('pos.terminals.update');
+        Route::delete('/terminals/{id}', [PosController::class, 'deleteTerminal'])->name('pos.terminals.delete');
         Route::get('/api/tax-rate', [PosController::class, 'getTaxRate'])->name('pos.api.tax-rate');
         Route::post('/api/toggle-pra', [PosController::class, 'togglePra'])->name('pos.api.toggle-pra');
         Route::match(['get', 'post'], '/pra-settings', [PosController::class, 'praSettings'])->name('pos.pra-settings');

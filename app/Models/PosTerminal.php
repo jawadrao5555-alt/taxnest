@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class PosTerminal extends Model
 {
     protected $fillable = [
-        'company_id', 'terminal_name', 'terminal_id', 'location', 'is_active',
+        'company_id', 'terminal_name', 'terminal_code', 'location', 'is_active',
     ];
 
     protected $casts = [

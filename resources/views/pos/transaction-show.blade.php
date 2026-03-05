@@ -184,7 +184,13 @@
                     <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                     <h3 class="text-sm font-semibold text-emerald-800 dark:text-emerald-300">PRA Verified</h3>
                 </div>
-                <p class="text-xs text-emerald-700 dark:text-emerald-400">This invoice has been successfully reported to PRA and cannot be resubmitted.</p>
+                <p class="text-xs text-emerald-700 dark:text-emerald-400 mb-3">This invoice has been successfully reported to PRA and cannot be resubmitted.</p>
+                @if($transaction->pra_qr_code)
+                <div class="flex flex-col items-center pt-3 border-t border-emerald-200 dark:border-emerald-700">
+                    <img src="{{ $transaction->pra_qr_code }}" alt="PRA Verification QR" class="w-32 h-32 mb-2">
+                    <a href="https://reg.pra.punjab.gov.pk/IMSFiscalReport/SearchPOSInvoice_Report.aspx?PRAInvNo={{ urlencode($transaction->pra_invoice_number) }}" target="_blank" class="text-xs text-emerald-600 hover:underline">Verify on PRA Portal</a>
+                </div>
+                @endif
             </div>
             @endif
         </div>

@@ -1,5 +1,24 @@
 <x-app-layout>
 <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    @if(session('success'))
+    <div class="mb-6 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-xl p-4">
+        <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <div class="text-sm text-emerald-800 dark:text-emerald-300 font-medium">{{ session('success') }}</div>
+        </div>
+    </div>
+    @endif
+
+    @if(session('error'))
+    <div class="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-xl p-4">
+        <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-red-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <div class="text-sm text-red-800 dark:text-red-300 font-medium">{{ session('error') }}</div>
+        </div>
+    </div>
+    @endif
+
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ $transaction->invoice_number }}</h1>
@@ -11,6 +30,24 @@
                 Print Receipt
             </a>
             <a href="{{ route('pos.transactions') }}" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition">Back</a>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-6">
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Invoice Numbers</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
+                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">POS Invoice Number (USIN)</p>
+                <p class="text-lg font-bold text-gray-900 dark:text-white font-mono">{{ $transaction->invoice_number }}</p>
+            </div>
+            <div class="rounded-lg p-4 border {{ $transaction->pra_invoice_number ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-700' : 'bg-gray-50 dark:bg-gray-800 border-gray-100 dark:border-gray-700' }}">
+                <p class="text-xs font-medium {{ $transaction->pra_invoice_number ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400' }} uppercase mb-1">PRA Fiscal Invoice Number</p>
+                @if($transaction->pra_invoice_number)
+                    <p class="text-lg font-bold text-emerald-700 dark:text-emerald-300 font-mono">{{ $transaction->pra_invoice_number }}</p>
+                @else
+                    <p class="text-sm text-gray-400 dark:text-gray-500 italic">Not submitted to PRA</p>
+                @endif
+            </div>
         </div>
     </div>
 
@@ -46,14 +83,14 @@
 
             @if($transaction->praLogs->isNotEmpty())
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-                <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">PRA Logs</h3>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">PRA Submission Logs</h3>
                 @foreach($transaction->praLogs as $log)
                 <div class="border border-gray-100 dark:border-gray-800 rounded-lg p-3 mb-2 last:mb-0">
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-medium {{ $log->status === 'success' ? 'text-emerald-600' : 'text-red-600' }}">{{ strtoupper($log->status) }}</span>
+                        <span class="text-xs font-medium px-2 py-0.5 rounded {{ $log->status === 'success' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : ($log->status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400') }}">{{ strtoupper($log->status) }}</span>
                         <span class="text-xs text-gray-500">{{ $log->created_at->format('d M Y H:i:s') }}</span>
                     </div>
-                    <p class="text-xs text-gray-600 dark:text-gray-400">Response Code: {{ $log->response_code }}</p>
+                    <p class="text-xs text-gray-600 dark:text-gray-400">Response Code: {{ $log->response_code ?? 'N/A' }}</p>
                 </div>
                 @endforeach
             </div>
@@ -112,24 +149,44 @@
                         <span class="text-gray-500">Created By</span>
                         <span class="text-gray-900 dark:text-white">{{ $transaction->creator->name ?? 'N/A' }}</span>
                     </div>
-                    <div class="flex justify-between">
+                    <div class="flex justify-between items-center">
                         <span class="text-gray-500">PRA Status</span>
-                        @if($transaction->pra_status === 'reported')
-                            <span class="text-emerald-600 font-medium">Reported</span>
+                        @if($transaction->pra_status === 'submitted')
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Submitted</span>
                         @elseif($transaction->pra_status === 'failed')
-                            <span class="text-red-600 font-medium">Failed</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">Failed</span>
+                        @elseif($transaction->pra_status === 'pending')
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">Pending</span>
                         @else
                             <span class="text-gray-400">Local Only</span>
                         @endif
                     </div>
-                    @if($transaction->pra_invoice_number)
-                    <div class="flex justify-between">
-                        <span class="text-gray-500">PRA Invoice #</span>
-                        <span class="text-gray-900 dark:text-white font-mono text-xs">{{ $transaction->pra_invoice_number }}</span>
-                    </div>
-                    @endif
                 </div>
             </div>
+
+            @if(!$transaction->pra_invoice_number && in_array($transaction->pra_status, ['pending', 'failed']))
+            <div class="bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-700 p-5">
+                <h3 class="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">PRA Retry Available</h3>
+                <p class="text-xs text-amber-700 dark:text-amber-400 mb-3">This invoice has not been reported to PRA. You can retry the submission.</p>
+                <form method="POST" action="{{ route('pos.transaction.retry-pra', $transaction->id) }}">
+                    @csrf
+                    <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-lg transition">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Retry PRA Submission
+                    </button>
+                </form>
+            </div>
+            @endif
+
+            @if($transaction->pra_invoice_number)
+            <div class="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-700 p-5">
+                <div class="flex items-center gap-2 mb-2">
+                    <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    <h3 class="text-sm font-semibold text-emerald-800 dark:text-emerald-300">PRA Verified</h3>
+                </div>
+                <p class="text-xs text-emerald-700 dark:text-emerald-400">This invoice has been successfully reported to PRA and cannot be resubmitted.</p>
+            </div>
+            @endif
         </div>
     </div>
 </div>

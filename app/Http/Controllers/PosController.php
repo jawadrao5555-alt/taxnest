@@ -98,8 +98,6 @@ class PosController extends Controller
         $taxAmount = round($afterDiscount * $taxRate / 100, 2);
         $totalAmount = round($afterDiscount + $taxAmount, 2);
 
-        $invoiceNumber = $this->generateInvoiceNumber($companyId);
-
         if ($request->terminal_id) {
             $terminal = PosTerminal::where('company_id', $companyId)->where('id', $request->terminal_id)->first();
             if (!$terminal) {
@@ -109,6 +107,9 @@ class PosController extends Controller
 
         DB::beginTransaction();
         try {
+            $invoiceNumber = $this->generateInvoiceNumber($companyId);
+            $submissionHash = hash('sha256', $companyId . '|' . $invoiceNumber . '|' . $totalAmount . '|' . now()->timestamp);
+
             $transaction = PosTransaction::create([
                 'company_id' => $companyId,
                 'terminal_id' => $request->terminal_id,
@@ -123,6 +124,8 @@ class PosController extends Controller
                 'tax_amount' => $taxAmount,
                 'total_amount' => $totalAmount,
                 'payment_method' => $request->payment_method,
+                'pra_status' => 'pending',
+                'submission_hash' => $submissionHash,
                 'created_by' => auth()->id(),
             ]);
 
@@ -145,20 +148,69 @@ class PosController extends Controller
                 'reference_number' => $request->reference_number,
             ]);
 
-            if ($company->pra_reporting_enabled) {
-                $praService = new PraIntegrationService($company);
-                $praResult = $praService->sendInvoice($transaction);
-                $transaction->refresh();
-            }
-
             DB::commit();
-
-            return redirect()->route('pos.receipt', $transaction->id)
-                ->with('success', 'Invoice created successfully! Invoice #' . $invoiceNumber);
-
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->withInput()->with('error', 'Failed to create invoice: ' . $e->getMessage());
+        }
+
+        $praMessage = '';
+        if ($company->pra_reporting_enabled) {
+            try {
+                $praService = new PraIntegrationService($company);
+                $praResult = $praService->sendInvoice($transaction);
+                $transaction->refresh();
+
+                if ($praResult['success']) {
+                    $praMessage = ' | PRA Fiscal Invoice Number: ' . ($transaction->pra_invoice_number ?? 'N/A');
+                } else {
+                    $praMessage = ' | PRA submission failed — saved locally for retry.';
+                }
+            } catch (\Exception $e) {
+                $transaction->update(['pra_status' => 'failed']);
+                $praMessage = ' | PRA submission failed — saved locally for retry.';
+            }
+        }
+
+        return redirect()->route('pos.transaction.show', $transaction->id)
+            ->with('success', 'Invoice Created Successfully! POS Invoice Number: ' . $invoiceNumber . $praMessage);
+    }
+
+    public function retryPra($id)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        $transaction = PosTransaction::where('company_id', $companyId)->lockForUpdate()->findOrFail($id);
+
+        if ($transaction->pra_invoice_number) {
+            return back()->with('error', 'This invoice has already been submitted to PRA. PRA Fiscal Invoice #: ' . $transaction->pra_invoice_number);
+        }
+
+        if ($transaction->pra_status === 'submitted') {
+            return back()->with('error', 'This invoice has already been successfully submitted to PRA.');
+        }
+
+        if (!in_array($transaction->pra_status, ['pending', 'failed'])) {
+            return back()->with('error', 'This invoice cannot be retried. Current status: ' . $transaction->pra_status);
+        }
+
+        if (!$company->pra_reporting_enabled) {
+            return back()->with('error', 'PRA reporting is currently disabled. Enable it from PRA Settings first.');
+        }
+
+        try {
+            $praService = new PraIntegrationService($company);
+            $praResult = $praService->sendInvoice($transaction);
+            $transaction->refresh();
+
+            if ($praResult['success']) {
+                return back()->with('success', 'PRA submission successful! PRA Fiscal Invoice Number: ' . ($transaction->pra_invoice_number ?? 'N/A'));
+            } else {
+                return back()->with('error', 'PRA submission failed: ' . ($praResult['message'] ?? 'Unknown error'));
+            }
+        } catch (\Exception $e) {
+            return back()->with('error', 'PRA connection failed: ' . $e->getMessage());
         }
     }
 
@@ -352,16 +404,20 @@ class PosController extends Controller
 
     private function generateInvoiceNumber(int $companyId): string
     {
+        $year = now()->format('Y');
+
         $lastTransaction = PosTransaction::where('company_id', $companyId)
+            ->where('invoice_number', 'like', "POS-{$year}-%")
             ->orderBy('id', 'desc')
+            ->lockForUpdate()
             ->first();
 
-        if ($lastTransaction && preg_match('/POS-\d+-(\d+)/', $lastTransaction->invoice_number, $matches)) {
+        if ($lastTransaction && preg_match('/POS-\d{4}-(\d+)/', $lastTransaction->invoice_number, $matches)) {
             $next = (int) $matches[1] + 1;
         } else {
             $next = 1;
         }
 
-        return 'POS-' . $companyId . '-' . str_pad($next, 6, '0', STR_PAD_LEFT);
+        return 'POS-' . $year . '-' . str_pad($next, 5, '0', STR_PAD_LEFT);
     }
 }

@@ -110,6 +110,10 @@ class PraIntegrationService
             return ['success' => false, 'message' => 'PRA reporting is disabled'];
         }
 
+        if ($transaction->pra_invoice_number) {
+            return ['success' => false, 'message' => 'Invoice already submitted to PRA. PRA Invoice #: ' . $transaction->pra_invoice_number];
+        }
+
         $payload = $this->generatePayload($transaction);
 
         $praLog = PraLog::create([
@@ -164,7 +168,7 @@ class PraIntegrationService
 
         $transaction->update([
             'pra_response_code' => $responseCode,
-            'pra_status' => $success ? 'reported' : 'failed',
+            'pra_status' => $success ? 'submitted' : 'failed',
             'pra_invoice_number' => $praInvoiceNumber ?? $transaction->pra_invoice_number,
         ]);
     }

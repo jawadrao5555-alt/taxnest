@@ -10,7 +10,7 @@ class PosTransaction extends Model
         'company_id', 'terminal_id', 'invoice_number', 'customer_name', 'customer_phone',
         'subtotal', 'discount_type', 'discount_value', 'discount_amount',
         'tax_rate', 'tax_amount', 'total_amount', 'payment_method',
-        'pra_invoice_number', 'pra_response_code', 'pra_status', 'created_by',
+        'pra_invoice_number', 'pra_response_code', 'pra_status', 'submission_hash', 'created_by',
     ];
 
     protected $casts = [

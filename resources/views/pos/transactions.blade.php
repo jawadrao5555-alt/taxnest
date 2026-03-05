@@ -57,10 +57,12 @@
                         <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{{ number_format($txn->tax_amount) }}</td>
                         <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">PKR {{ number_format($txn->total_amount) }}</td>
                         <td class="px-4 py-3">
-                            @if($txn->pra_status === 'reported')
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">Reported</span>
+                            @if($txn->pra_status === 'submitted')
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">Submitted</span>
                             @elseif($txn->pra_status === 'failed')
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">Failed</span>
+                            @elseif($txn->pra_status === 'pending')
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">Pending</span>
                             @else
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">Local</span>
                             @endif

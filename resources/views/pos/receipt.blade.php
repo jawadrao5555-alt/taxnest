@@ -25,8 +25,13 @@
         .totals .row { display: flex; justify-content: space-between; margin: 2px 0; }
         .totals .grand-total { font-size: 16px; font-weight: bold; }
         .footer { margin-top: 10px; font-size: 10px; }
-        .pra-badge { border: 1px solid #000; padding: 5px; margin: 8px 0; text-align: center; font-size: 10px; }
+        .pra-badge { border: 2px solid #000; padding: 8px; margin: 8px 0; text-align: center; font-size: 10px; }
+        .pra-badge .pra-title { font-size: 12px; font-weight: bold; margin-bottom: 4px; }
+        .pra-badge .pra-number { font-size: 11px; font-weight: bold; letter-spacing: 0.5px; }
         .local-badge { border: 1px dashed #666; padding: 5px; margin: 8px 0; text-align: center; font-size: 10px; color: #666; }
+        .invoice-numbers { border: 1px solid #000; padding: 6px; margin: 8px 0; font-size: 10px; }
+        .invoice-numbers .inv-row { display: flex; justify-content: space-between; margin: 2px 0; }
+        .invoice-numbers .inv-label { font-weight: bold; }
         .qr-placeholder { width: 80px; height: 80px; border: 1px solid #000; margin: 8px auto; display: flex; align-items: center; justify-content: center; font-size: 8px; }
         @media print {
             body { max-width: 80mm; }
@@ -49,7 +54,19 @@
 
     <div class="separator"></div>
 
-    <div class="info-row"><span>Invoice #:</span><span class="bold">{{ $transaction->invoice_number }}</span></div>
+    <div class="invoice-numbers">
+        <div class="inv-row">
+            <span class="inv-label">POS Invoice #:</span>
+            <span>{{ $transaction->invoice_number }}</span>
+        </div>
+        @if($transaction->pra_invoice_number)
+        <div class="inv-row">
+            <span class="inv-label">PRA Fiscal #:</span>
+            <span>{{ $transaction->pra_invoice_number }}</span>
+        </div>
+        @endif
+    </div>
+
     <div class="info-row"><span>Date:</span><span>{{ $transaction->created_at->format('d/m/Y H:i') }}</span></div>
     @if($transaction->customer_name)
     <div class="info-row"><span>Customer:</span><span>{{ $transaction->customer_name }}</span></div>
@@ -90,15 +107,17 @@
 
     @if($transaction->pra_invoice_number)
     <div class="pra-badge">
-        <strong>PRA FISCAL INVOICE</strong><br>
-        PRA #: {{ $transaction->pra_invoice_number }}
+        <div class="pra-title">PRA FISCAL INVOICE</div>
+        <div>POS Invoice #: {{ $transaction->invoice_number }}</div>
+        <div class="pra-number">PRA #: {{ $transaction->pra_invoice_number }}</div>
     </div>
     <div class="qr-placeholder">
         QR CODE
     </div>
     @else
     <div class="local-badge">
-        LOCAL INVOICE
+        LOCAL INVOICE<br>
+        {{ $transaction->invoice_number }}
     </div>
     @endif
 

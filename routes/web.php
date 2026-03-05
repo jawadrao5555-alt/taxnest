@@ -168,6 +168,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::post('/invoice/store', [PosController::class, 'storeInvoice'])->name('pos.invoice.store');
         Route::get('/transactions', [PosController::class, 'transactions'])->name('pos.transactions');
         Route::get('/transaction/{id}', [PosController::class, 'transactionShow'])->name('pos.transaction.show');
+        Route::post('/transaction/{id}/retry-pra', [PosController::class, 'retryPra'])->name('pos.transaction.retry-pra');
         Route::get('/transaction/{id}/receipt', [PosController::class, 'receipt'])->name('pos.receipt');
         Route::get('/reports', [PosController::class, 'reports'])->name('pos.reports');
         Route::get('/services', [PosController::class, 'services'])->name('pos.services');

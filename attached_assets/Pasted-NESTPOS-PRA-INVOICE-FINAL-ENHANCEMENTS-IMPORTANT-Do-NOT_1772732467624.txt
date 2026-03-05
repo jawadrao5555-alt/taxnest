@@ -1,0 +1,106 @@
+NESTPOS PRA INVOICE FINAL ENHANCEMENTS
+
+IMPORTANT:
+Do NOT modify the Digital Invoice (FBR) system.
+All changes must remain inside the NestPOS module.
+
+--------------------------------------------------
+
+1. SAVE AND DISPLAY BOTH INVOICE NUMBERS
+
+When an invoice is created and submitted to PRA:
+
+The system must store and display BOTH invoice numbers:
+
+1. POS Invoice Number (USIN)
+2. PRA Fiscal Invoice Number
+
+Database fields in pos_transactions:
+
+invoice_number           → POS invoice number (USIN)
+pra_invoice_number       → PRA fiscal invoice number
+pra_response_code        → PRA response code
+pra_status               → pending / submitted / failed
+
+After PRA response success, show message on screen:
+
+Invoice Created Successfully
+
+POS Invoice Number: POS-2026-00021
+PRA Fiscal Invoice Number: 90000520191112000369
+
+Both numbers must also appear on:
+
+Transaction Detail Page
+Printable Receipt
+
+--------------------------------------------------
+
+2. UNIQUE POS INVOICE NUMBER GENERATOR
+
+Create automatic invoice number generator.
+
+Format:
+
+POS-YYYY-00001
+
+Example:
+
+POS-2026-00001
+POS-2026-00002
+POS-2026-00003
+
+Rules:
+
+Each company must maintain its own numbering sequence.
+Invoice numbers must always be unique.
+
+--------------------------------------------------
+
+3. PRA RETRY PROTECTION
+
+If PRA API submission fails:
+
+Invoice must still be saved locally.
+
+Set status:
+
+pra_status = pending
+
+Allow retry submission from the Transaction Detail page.
+
+Possible statuses:
+
+pending
+submitted
+failed
+
+--------------------------------------------------
+
+4. DUPLICATE SUBMISSION PROTECTION
+
+Prevent the same invoice from being submitted twice to PRA.
+
+Rule:
+
+If pra_invoice_number already exists
+→ block PRA submission.
+
+Also create:
+
+submission_hash
+
+to ensure idempotency protection.
+
+--------------------------------------------------
+
+EXPECTED RESULT
+
+System must:
+
+Generate unique POS invoice numbers
+Send invoice to PRA when PRA Reporting is ON
+Save and display PRA fiscal invoice number
+Prevent duplicate submission
+Allow retry if PRA submission fails
+Store both POS and PRA invoice numbers in the system

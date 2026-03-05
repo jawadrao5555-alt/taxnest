@@ -432,6 +432,11 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::delete('/terminals/{id}', [PosController::class, 'deleteTerminal'])->name('pos.terminals.delete');
     Route::get('/api/tax-rate', [PosController::class, 'getTaxRate'])->name('pos.api.tax-rate');
     Route::post('/api/toggle-pra', [PosController::class, 'togglePra'])->name('pos.api.toggle-pra');
+    Route::post('/api/draft/save', [PosController::class, 'saveDraft'])->name('pos.api.draft.save');
+    Route::get('/api/draft/list', [PosController::class, 'getDrafts'])->name('pos.api.draft.list');
+    Route::delete('/api/draft/{id}', [PosController::class, 'deleteDraft'])->name('pos.api.draft.delete');
+    Route::post('/api/invoice/{id}/lock', [PosController::class, 'lockInvoice'])->name('pos.api.invoice.lock');
+    Route::post('/api/invoice/{id}/unlock', [PosController::class, 'unlockInvoice'])->name('pos.api.invoice.unlock');
     Route::match(['get', 'post'], '/pra-settings', [PosController::class, 'praSettings'])->name('pos.pra-settings');
     Route::get('/products', [PosController::class, 'products'])->name('pos.products');
     Route::get('/customers', [PosController::class, 'customers'])->name('pos.customers');

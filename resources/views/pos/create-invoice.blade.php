@@ -2,6 +2,47 @@
     <div class="pb-36" x-data="posInvoice()">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
 
+            <template x-if="showDraftRecovery">
+                <div class="mb-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-4">
+                    <div class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-amber-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                        <div class="flex-1">
+                            <h4 class="text-sm font-semibold text-amber-800 dark:text-amber-300">Recovered Draft Invoice</h4>
+                            <p class="text-xs text-amber-700 dark:text-amber-400 mt-1">An unfinished invoice was found. Continue editing?</p>
+                            <div class="flex gap-2 mt-3">
+                                <button type="button" @click="restoreDraft()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition">
+                                    Continue Editing
+                                </button>
+                                <button type="button" @click="discardDraft()" class="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-lg transition">
+                                    Discard Draft
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            @if(isset($pendingDrafts) && $pendingDrafts->count() > 0 && !request('draft_id'))
+            <div class="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl p-4">
+                <div class="flex items-start gap-3">
+                    <svg class="w-5 h-5 text-blue-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    <div class="flex-1">
+                        <h4 class="text-sm font-semibold text-blue-800 dark:text-blue-300">Pending Draft Invoices</h4>
+                        <div class="mt-2 space-y-1">
+                            @foreach($pendingDrafts as $draft)
+                            <div class="flex items-center justify-between text-xs">
+                                <a href="{{ route('pos.invoice.create', ['draft_id' => $draft->id]) }}" class="text-blue-600 hover:underline font-medium">
+                                    {{ $draft->invoice_number }} - {{ $draft->customer_name ?? 'Walk-in' }} - Rs {{ number_format($draft->total_amount, 2) }}
+                                </a>
+                                <span class="text-gray-400">{{ $draft->updated_at->diffForHumans() }}</span>
+                            </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
+
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
                 <div class="flex items-center space-x-3">
                     <a href="{{ route('pos.dashboard') }}" class="inline-flex items-center text-gray-500 hover:text-emerald-600 transition text-sm">
@@ -11,6 +52,14 @@
                     <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100">Create POS Invoice</h2>
                 </div>
                 <div class="mt-2 sm:mt-0 flex items-center space-x-2">
+                    <template x-if="draftId">
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                            Draft Auto-Saved
+                        </span>
+                    </template>
+                    <template x-if="autoSaveStatus">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs text-gray-400" x-text="autoSaveStatus"></span>
+                    </template>
                     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold"
                         :class="praEnabled ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'">
                         <span class="w-2 h-2 rounded-full mr-1.5" :class="praEnabled ? 'bg-emerald-500' : 'bg-gray-400'"></span>
@@ -21,6 +70,7 @@
 
             <form method="POST" action="{{ route('pos.invoice.store') }}" @submit.prevent="submitForm($event)" class="space-y-6">
                 @csrf
+                <input type="hidden" name="draft_id" :value="draftId">
 
                 @if($errors->any())
                 <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-xl p-4">
@@ -48,7 +98,7 @@
                             <select name="terminal_id" x-model="terminalId" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition">
                                 <option value="">Select Terminal</option>
                                 @foreach($terminals as $terminal)
-                                <option value="{{ $terminal->id }}">{{ $terminal->name }} ({{ $terminal->terminal_code }})</option>
+                                <option value="{{ $terminal->id }}">{{ $terminal->terminal_name }} ({{ $terminal->terminal_code }})</option>
                                 @endforeach
                             </select>
                         </div>
@@ -273,6 +323,11 @@
                 total: 0,
 
                 submitting: false,
+                draftId: {!! isset($draftInvoice) && $draftInvoice ? $draftInvoice->id : 'null' !!},
+                autoSaveTimer: null,
+                autoSaveStatus: '',
+                showDraftRecovery: false,
+                recoveredDraft: null,
 
                 paymentMethods: [
                     { value: 'cash', label: 'Cash', icon: '💵' },
@@ -282,8 +337,155 @@
                 ],
 
                 init() {
+                    @if(isset($draftInvoice) && $draftInvoice)
+                        this.loadServerDraft(@json($draftInvoice));
+                    @else
+                        this.checkLocalDraft();
+                    @endif
+
                     this.fetchTaxRate(this.paymentMethod);
                     this.recalculate();
+                    this.startAutoSave();
+
+                    window.addEventListener('beforeunload', () => {
+                        this.saveToLocalStorage();
+                    });
+                },
+
+                loadServerDraft(draft) {
+                    this.draftId = draft.id;
+                    this.customerName = draft.customer_name || '';
+                    this.customerPhone = draft.customer_phone || '';
+                    this.terminalId = draft.terminal_id || '';
+                    this.discountType = draft.discount_type || 'percentage';
+                    this.discountValue = parseFloat(draft.discount_value) || 0;
+                    this.paymentMethod = draft.payment_method || 'cash';
+
+                    if (draft.items && draft.items.length > 0) {
+                        this.items = draft.items.map(item => ({
+                            type: item.item_type || 'product',
+                            item_id: item.item_id || '',
+                            name: item.item_name || '',
+                            quantity: parseFloat(item.quantity) || 1,
+                            unit_price: parseFloat(item.unit_price) || 0
+                        }));
+                    }
+                },
+
+                checkLocalDraft() {
+                    try {
+                        const saved = localStorage.getItem('pos_draft_invoice');
+                        if (saved) {
+                            const data = JSON.parse(saved);
+                            const hasItems = data && data.items && data.items.length > 0 && data.items.some(i => i.name);
+                            const hasCustomer = data && (data.customer_name || data.customer_phone);
+                            const hasDraftId = data && data.draft_id;
+                            if (hasItems || hasCustomer || hasDraftId) {
+                                this.recoveredDraft = data;
+                                this.showDraftRecovery = true;
+                            }
+                        }
+                    } catch (e) {}
+                },
+
+                restoreDraft() {
+                    if (!this.recoveredDraft) return;
+                    const d = this.recoveredDraft;
+                    this.customerName = d.customer_name || '';
+                    this.customerPhone = d.customer_phone || '';
+                    this.terminalId = d.terminal_id || '';
+                    this.discountType = d.discount_type || 'percentage';
+                    this.discountValue = d.discount_value || 0;
+                    this.paymentMethod = d.payment_method || 'cash';
+                    this.draftId = d.draft_id || null;
+
+                    if (d.items && d.items.length > 0) {
+                        this.items = d.items;
+                    }
+
+                    this.showDraftRecovery = false;
+                    this.recoveredDraft = null;
+                    this.fetchTaxRate(this.paymentMethod);
+                    this.recalculate();
+                },
+
+                discardDraft() {
+                    this.showDraftRecovery = false;
+                    this.recoveredDraft = null;
+                    localStorage.removeItem('pos_draft_invoice');
+                },
+
+                saveToLocalStorage() {
+                    try {
+                        const data = {
+                            customer_name: this.customerName,
+                            customer_phone: this.customerPhone,
+                            terminal_id: this.terminalId,
+                            items: this.items,
+                            discount_type: this.discountType,
+                            discount_value: this.discountValue,
+                            payment_method: this.paymentMethod,
+                            draft_id: this.draftId,
+                            saved_at: new Date().toISOString()
+                        };
+                        localStorage.setItem('pos_draft_invoice', JSON.stringify(data));
+                    } catch (e) {}
+                },
+
+                startAutoSave() {
+                    this.autoSaveTimer = setInterval(() => {
+                        this.autoSaveDraft();
+                    }, 10000);
+                },
+
+                async autoSaveDraft() {
+                    const hasContent = this.items.some(i => i.name && i.name.trim() !== '');
+                    if (!hasContent) return;
+
+                    this.saveToLocalStorage();
+
+                    this.recalculate();
+
+                    try {
+                        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ||
+                                           document.querySelector('input[name="_token"]')?.value;
+
+                        const response = await fetch('/pos/api/draft/save', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: JSON.stringify({
+                                draft_id: this.draftId,
+                                terminal_id: this.terminalId,
+                                draft_data: {
+                                    customer_name: this.customerName,
+                                    customer_phone: this.customerPhone,
+                                    terminal_id: this.terminalId || null,
+                                    items: this.items,
+                                    discount_type: this.discountType,
+                                    discount_value: this.discountValue,
+                                    discount_amount: this.discountAmount,
+                                    payment_method: this.paymentMethod,
+                                    subtotal: this.subtotal,
+                                    tax_rate: this.taxRate,
+                                    tax_amount: this.taxAmount,
+                                    total_amount: this.total
+                                }
+                            })
+                        });
+
+                        const result = await response.json();
+                        if (result.success && result.draft_id) {
+                            this.draftId = result.draft_id;
+                            this.autoSaveStatus = 'Saved ' + new Date().toLocaleTimeString();
+                        }
+                    } catch (e) {
+                        this.autoSaveStatus = 'Auto-save: offline';
+                    }
                 },
 
                 addItem() {
@@ -369,6 +571,13 @@
                 submitForm(event) {
                     if (this.items.length === 0) return;
                     this.submitting = true;
+
+                    if (this.autoSaveTimer) {
+                        clearInterval(this.autoSaveTimer);
+                    }
+
+                    localStorage.removeItem('pos_draft_invoice');
+
                     this.$nextTick(() => {
                         event.target.submit();
                     });

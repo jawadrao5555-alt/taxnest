@@ -25,22 +25,26 @@ class PosController extends Controller
         $today = now()->startOfDay();
 
         $todayStats = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
             ->where('created_at', '>=', $today)
             ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue, COALESCE(AVG(total_amount),0) as avg_ticket')
             ->first();
 
         $monthStats = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
             ->where('created_at', '>=', now()->startOfMonth())
             ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue')
             ->first();
 
         $recentTransactions = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
             ->with('creator')
             ->orderBy('created_at', 'desc')
             ->take(10)
             ->get();
 
         $paymentBreakdown = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
             ->where('created_at', '>=', $today)
             ->selectRaw("payment_method, COUNT(*) as count, COALESCE(SUM(total_amount),0) as total")
             ->groupBy('payment_method')
@@ -53,7 +57,7 @@ class PosController extends Controller
         ));
     }
 
-    public function createInvoice()
+    public function createInvoice(Request $request)
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
@@ -62,7 +66,37 @@ class PosController extends Controller
         $taxRules = PosTaxRule::where('is_active', true)->get()->keyBy('payment_method');
         $terminals = PosTerminal::where('company_id', $companyId)->where('is_active', true)->get();
 
-        return view('pos.create-invoice', compact('company', 'products', 'services', 'taxRules', 'terminals'));
+        $draftInvoice = null;
+        if ($request->has('draft_id')) {
+            $draftInvoice = PosTransaction::where('company_id', $companyId)
+                ->where('id', $request->draft_id)
+                ->where('status', 'draft')
+                ->with('items')
+                ->first();
+
+            if ($draftInvoice) {
+                $currentTerminalId = $request->input('terminal_id');
+                if ($draftInvoice->isLocked() && $currentTerminalId && $draftInvoice->locked_by_terminal_id != $currentTerminalId) {
+                    $lockedTerminal = PosTerminal::find($draftInvoice->locked_by_terminal_id);
+                    $terminalName = $lockedTerminal ? $lockedTerminal->terminal_name : 'Unknown';
+                    return redirect()->route('pos.invoice.create')
+                        ->with('error', "This invoice is currently being edited on another terminal ({$terminalName}).");
+                }
+
+                if ($currentTerminalId) {
+                    $draftInvoice->acquireLock((int) $currentTerminalId);
+                }
+            }
+        }
+
+        $pendingDrafts = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'draft')
+            ->where('created_by', auth('pos')->id())
+            ->orderBy('updated_at', 'desc')
+            ->take(5)
+            ->get();
+
+        return view('pos.create-invoice', compact('company', 'products', 'services', 'taxRules', 'terminals', 'draftInvoice', 'pendingDrafts'));
     }
 
     public function storeInvoice(Request $request)
@@ -110,27 +144,65 @@ class PosController extends Controller
 
         DB::beginTransaction();
         try {
-            $invoiceNumber = $this->generateInvoiceNumber($companyId);
-            $submissionHash = hash('sha256', $companyId . '|' . $invoiceNumber . '|' . $totalAmount . '|' . now()->timestamp);
+            $draftId = $request->input('draft_id');
+            $transaction = null;
 
-            $transaction = PosTransaction::create([
-                'company_id' => $companyId,
-                'terminal_id' => $request->terminal_id,
-                'invoice_number' => $invoiceNumber,
-                'customer_name' => $request->customer_name,
-                'customer_phone' => $request->customer_phone,
-                'subtotal' => $subtotal,
-                'discount_type' => $discountType,
-                'discount_value' => $discountValue,
-                'discount_amount' => $discountAmount,
-                'tax_rate' => $taxRate,
-                'tax_amount' => $taxAmount,
-                'total_amount' => $totalAmount,
-                'payment_method' => $request->payment_method,
-                'pra_status' => $initialPraStatus,
-                'submission_hash' => $submissionHash,
-                'created_by' => auth('pos')->id(),
-            ]);
+            if ($draftId) {
+                $transaction = PosTransaction::where('company_id', $companyId)
+                    ->where('id', $draftId)
+                    ->where('status', 'draft')
+                    ->lockForUpdate()
+                    ->first();
+            }
+
+            if ($transaction) {
+                $invoiceNumber = $transaction->invoice_number;
+                $submissionHash = hash('sha256', $companyId . '|' . $invoiceNumber . '|' . $totalAmount . '|' . now()->timestamp);
+
+                $transaction->update([
+                    'terminal_id' => $request->terminal_id,
+                    'customer_name' => $request->customer_name,
+                    'customer_phone' => $request->customer_phone,
+                    'subtotal' => $subtotal,
+                    'discount_type' => $discountType,
+                    'discount_value' => $discountValue,
+                    'discount_amount' => $discountAmount,
+                    'tax_rate' => $taxRate,
+                    'tax_amount' => $taxAmount,
+                    'total_amount' => $totalAmount,
+                    'payment_method' => $request->payment_method,
+                    'status' => 'completed',
+                    'pra_status' => $initialPraStatus,
+                    'submission_hash' => $submissionHash,
+                    'locked_by_terminal_id' => null,
+                    'lock_time' => null,
+                ]);
+
+                $transaction->items()->delete();
+            } else {
+                $invoiceNumber = $this->generateInvoiceNumber($companyId);
+                $submissionHash = hash('sha256', $companyId . '|' . $invoiceNumber . '|' . $totalAmount . '|' . now()->timestamp);
+
+                $transaction = PosTransaction::create([
+                    'company_id' => $companyId,
+                    'terminal_id' => $request->terminal_id,
+                    'invoice_number' => $invoiceNumber,
+                    'customer_name' => $request->customer_name,
+                    'customer_phone' => $request->customer_phone,
+                    'subtotal' => $subtotal,
+                    'discount_type' => $discountType,
+                    'discount_value' => $discountValue,
+                    'discount_amount' => $discountAmount,
+                    'tax_rate' => $taxRate,
+                    'tax_amount' => $taxAmount,
+                    'total_amount' => $totalAmount,
+                    'payment_method' => $request->payment_method,
+                    'status' => 'completed',
+                    'pra_status' => $initialPraStatus,
+                    'submission_hash' => $submissionHash,
+                    'created_by' => auth('pos')->id(),
+                ]);
+            }
 
             foreach ($request->items as $item) {
                 PosTransactionItem::create([
@@ -228,7 +300,7 @@ class PosController extends Controller
     public function transactions(Request $request)
     {
         $companyId = app('currentCompanyId');
-        $query = PosTransaction::where('company_id', $companyId)->with('creator');
+        $query = PosTransaction::where('company_id', $companyId)->where('status', 'completed')->with('creator');
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -283,6 +355,7 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
 
         $dailySales = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
             ->where('created_at', '>=', now()->subDays(30))
             ->selectRaw("DATE(created_at) as date, COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue")
             ->groupByRaw('DATE(created_at)')
@@ -290,13 +363,14 @@ class PosController extends Controller
             ->get();
 
         $paymentSummary = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
             ->where('created_at', '>=', now()->startOfMonth())
             ->selectRaw("payment_method, COUNT(*) as count, COALESCE(SUM(total_amount),0) as total, COALESCE(SUM(tax_amount),0) as tax")
             ->groupBy('payment_method')
             ->get();
 
         $topItems = PosTransactionItem::whereHas('transaction', function ($q) use ($companyId) {
-            $q->where('company_id', $companyId)->where('created_at', '>=', now()->startOfMonth());
+            $q->where('company_id', $companyId)->where('status', 'completed')->where('created_at', '>=', now()->startOfMonth());
         })
             ->selectRaw("item_name, SUM(quantity) as total_qty, SUM(subtotal) as total_revenue")
             ->groupBy('item_name')
@@ -305,6 +379,7 @@ class PosController extends Controller
             ->get();
 
         $monthlyTrend = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
             ->where('created_at', '>=', now()->subMonths(6)->startOfMonth())
             ->selectRaw("TO_CHAR(created_at, 'YYYY-MM') as month, COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue")
             ->groupByRaw("TO_CHAR(created_at, 'YYYY-MM')")
@@ -491,6 +566,171 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $customers = CustomerProfile::where('company_id', $companyId)->orderBy('name')->get();
         return view('pos.customers', compact('customers'));
+    }
+
+    public function saveDraft(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+
+        $request->validate([
+            'draft_data' => 'required|array',
+        ]);
+
+        $draftId = $request->input('draft_id');
+        $draftData = $request->input('draft_data');
+
+        if ($draftId) {
+            $draft = PosTransaction::where('company_id', $companyId)
+                ->where('id', $draftId)
+                ->where('status', 'draft')
+                ->first();
+
+            if ($draft) {
+                if ($draft->isLocked() && $draft->locked_by_terminal_id != $request->input('terminal_id')) {
+                    return response()->json(['success' => false, 'message' => 'This invoice is currently being edited on another terminal.'], 423);
+                }
+
+                $draft->update([
+                    'customer_name' => $draftData['customer_name'] ?? null,
+                    'customer_phone' => $draftData['customer_phone'] ?? null,
+                    'terminal_id' => $draftData['terminal_id'] ?? null,
+                    'subtotal' => $draftData['subtotal'] ?? 0,
+                    'discount_type' => $draftData['discount_type'] ?? 'percentage',
+                    'discount_value' => $draftData['discount_value'] ?? 0,
+                    'discount_amount' => $draftData['discount_amount'] ?? 0,
+                    'tax_rate' => $draftData['tax_rate'] ?? 0,
+                    'tax_amount' => $draftData['tax_amount'] ?? 0,
+                    'total_amount' => $draftData['total_amount'] ?? 0,
+                    'payment_method' => $draftData['payment_method'] ?? 'cash',
+                ]);
+
+                $draft->items()->delete();
+                foreach (($draftData['items'] ?? []) as $item) {
+                    PosTransactionItem::create([
+                        'transaction_id' => $draft->id,
+                        'item_type' => $item['type'] ?? 'product',
+                        'item_id' => $item['item_id'] ?? null,
+                        'item_name' => $item['name'] ?? '',
+                        'quantity' => $item['quantity'] ?? 1,
+                        'unit_price' => $item['unit_price'] ?? 0,
+                        'subtotal' => round(($item['quantity'] ?? 1) * ($item['unit_price'] ?? 0), 2),
+                    ]);
+                }
+
+                return response()->json(['success' => true, 'draft_id' => $draft->id]);
+            }
+        }
+
+        DB::beginTransaction();
+        try {
+            $invoiceNumber = $this->generateInvoiceNumber($companyId);
+
+            $draft = PosTransaction::create([
+                'company_id' => $companyId,
+                'terminal_id' => $draftData['terminal_id'] ?? null,
+                'invoice_number' => $invoiceNumber,
+                'customer_name' => $draftData['customer_name'] ?? null,
+                'customer_phone' => $draftData['customer_phone'] ?? null,
+                'subtotal' => $draftData['subtotal'] ?? 0,
+                'discount_type' => $draftData['discount_type'] ?? 'percentage',
+                'discount_value' => $draftData['discount_value'] ?? 0,
+                'discount_amount' => $draftData['discount_amount'] ?? 0,
+                'tax_rate' => $draftData['tax_rate'] ?? 0,
+                'tax_amount' => $draftData['tax_amount'] ?? 0,
+                'total_amount' => $draftData['total_amount'] ?? 0,
+                'payment_method' => $draftData['payment_method'] ?? 'cash',
+                'status' => 'draft',
+                'pra_status' => 'local',
+                'created_by' => auth('pos')->id(),
+                'locked_by_terminal_id' => $draftData['terminal_id'] ?? null,
+                'lock_time' => now(),
+            ]);
+
+            foreach (($draftData['items'] ?? []) as $item) {
+                PosTransactionItem::create([
+                    'transaction_id' => $draft->id,
+                    'item_type' => $item['type'] ?? 'product',
+                    'item_id' => $item['item_id'] ?? null,
+                    'item_name' => $item['name'] ?? '',
+                    'quantity' => $item['quantity'] ?? 1,
+                    'unit_price' => $item['unit_price'] ?? 0,
+                    'subtotal' => round(($item['quantity'] ?? 1) * ($item['unit_price'] ?? 0), 2),
+                ]);
+            }
+
+            DB::commit();
+            return response()->json(['success' => true, 'draft_id' => $draft->id]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function getDrafts()
+    {
+        $companyId = app('currentCompanyId');
+
+        $drafts = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'draft')
+            ->with('items')
+            ->orderBy('updated_at', 'desc')
+            ->take(10)
+            ->get();
+
+        return response()->json(['drafts' => $drafts]);
+    }
+
+    public function deleteDraft($id)
+    {
+        $companyId = app('currentCompanyId');
+        $draft = PosTransaction::where('company_id', $companyId)
+            ->where('id', $id)
+            ->where('status', 'draft')
+            ->first();
+
+        if (!$draft) {
+            return response()->json(['success' => false, 'message' => 'Draft not found.'], 404);
+        }
+
+        $draft->items()->delete();
+        $draft->payments()->delete();
+        $draft->delete();
+
+        return response()->json(['success' => true]);
+    }
+
+    public function lockInvoice(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $terminalId = $request->input('terminal_id');
+
+        if (!$terminalId) {
+            return response()->json(['success' => false, 'message' => 'Terminal ID required.'], 400);
+        }
+
+        $transaction = PosTransaction::where('company_id', $companyId)->findOrFail($id);
+
+        if ($transaction->isLocked() && $transaction->locked_by_terminal_id != $terminalId) {
+            $lockedTerminal = PosTerminal::find($transaction->locked_by_terminal_id);
+            $terminalName = $lockedTerminal ? $lockedTerminal->terminal_name : 'Unknown';
+            return response()->json([
+                'success' => false,
+                'message' => "This invoice is currently being edited on another terminal ({$terminalName}).",
+                'locked_by' => $terminalName,
+                'lock_time' => $transaction->lock_time?->toISOString(),
+            ], 423);
+        }
+
+        $transaction->acquireLock((int) $terminalId);
+        return response()->json(['success' => true]);
+    }
+
+    public function unlockInvoice($id)
+    {
+        $companyId = app('currentCompanyId');
+        $transaction = PosTransaction::where('company_id', $companyId)->findOrFail($id);
+        $transaction->releaseLock();
+        return response()->json(['success' => true]);
     }
 
     private function generateInvoiceNumber(int $companyId): string

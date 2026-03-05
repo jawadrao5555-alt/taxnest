@@ -19,6 +19,7 @@ class SyncPosOfflineInvoicesJob implements ShouldQueue
     public function handle(): void
     {
         $transactions = PosTransaction::whereIn('pra_status', ['offline', 'pending'])
+            ->where('status', 'completed')
             ->whereNull('pra_invoice_number')
             ->with('company')
             ->orderBy('created_at', 'asc')

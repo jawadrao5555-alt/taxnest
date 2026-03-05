@@ -45,6 +45,10 @@ class Company extends Model
         'city',
         'website',
         'inventory_enabled',
+        'pra_reporting_enabled',
+        'pra_environment',
+        'pra_pos_id',
+        'pra_production_token',
     ];
 
     protected $casts = [
@@ -56,6 +60,7 @@ class Company extends Model
         'onboarding_completed' => 'boolean',
         'standard_tax_rate' => 'float',
         'inventory_enabled' => 'boolean',
+        'pra_reporting_enabled' => 'boolean',
     ];
 
     protected $hidden = [

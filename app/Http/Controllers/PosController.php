@@ -1,0 +1,367 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Company;
+use App\Models\Product;
+use App\Models\CustomerProfile;
+use App\Models\PosService;
+use App\Models\PosTerminal;
+use App\Models\PosTransaction;
+use App\Models\PosTransactionItem;
+use App\Models\PosPayment;
+use App\Models\PosTaxRule;
+use App\Models\PraLog;
+use App\Services\PraIntegrationService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+class PosController extends Controller
+{
+    public function dashboard()
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $today = now()->startOfDay();
+
+        $todayStats = PosTransaction::where('company_id', $companyId)
+            ->where('created_at', '>=', $today)
+            ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue, COALESCE(AVG(total_amount),0) as avg_ticket')
+            ->first();
+
+        $monthStats = PosTransaction::where('company_id', $companyId)
+            ->where('created_at', '>=', now()->startOfMonth())
+            ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue')
+            ->first();
+
+        $recentTransactions = PosTransaction::where('company_id', $companyId)
+            ->with('creator')
+            ->orderBy('created_at', 'desc')
+            ->take(10)
+            ->get();
+
+        $paymentBreakdown = PosTransaction::where('company_id', $companyId)
+            ->where('created_at', '>=', $today)
+            ->selectRaw("payment_method, COUNT(*) as count, COALESCE(SUM(total_amount),0) as total")
+            ->groupBy('payment_method')
+            ->get();
+
+        $praStatus = $company->pra_reporting_enabled;
+
+        return view('pos.dashboard', compact(
+            'company', 'todayStats', 'monthStats', 'recentTransactions', 'paymentBreakdown', 'praStatus'
+        ));
+    }
+
+    public function createInvoice()
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $products = Product::where('company_id', $companyId)->where('is_active', true)->get();
+        $services = PosService::where('company_id', $companyId)->where('is_active', true)->get();
+        $taxRules = PosTaxRule::where('is_active', true)->get()->keyBy('payment_method');
+        $terminals = PosTerminal::where('company_id', $companyId)->where('is_active', true)->get();
+
+        return view('pos.create-invoice', compact('company', 'products', 'services', 'taxRules', 'terminals'));
+    }
+
+    public function storeInvoice(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.name' => 'required|string',
+            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.unit_price' => 'required|numeric|min:0',
+            'payment_method' => 'required|in:cash,debit_card,credit_card,qr_payment',
+            'discount_type' => 'required|in:percentage,amount',
+            'discount_value' => 'nullable|numeric|min:0',
+        ]);
+
+        $subtotal = 0;
+        foreach ($request->items as $item) {
+            $subtotal += $item['quantity'] * $item['unit_price'];
+        }
+
+        $discountValue = (float) ($request->discount_value ?? 0);
+        $discountType = $request->discount_type;
+        if ($discountType === 'percentage') {
+            $discountAmount = round($subtotal * $discountValue / 100, 2);
+        } else {
+            $discountAmount = min($discountValue, $subtotal);
+        }
+
+        $afterDiscount = $subtotal - $discountAmount;
+        $taxRate = PosTaxRule::getRateForMethod($request->payment_method);
+        $taxAmount = round($afterDiscount * $taxRate / 100, 2);
+        $totalAmount = round($afterDiscount + $taxAmount, 2);
+
+        $invoiceNumber = $this->generateInvoiceNumber($companyId);
+
+        if ($request->terminal_id) {
+            $terminal = PosTerminal::where('company_id', $companyId)->where('id', $request->terminal_id)->first();
+            if (!$terminal) {
+                return back()->withInput()->with('error', 'Invalid terminal selected.');
+            }
+        }
+
+        DB::beginTransaction();
+        try {
+            $transaction = PosTransaction::create([
+                'company_id' => $companyId,
+                'terminal_id' => $request->terminal_id,
+                'invoice_number' => $invoiceNumber,
+                'customer_name' => $request->customer_name,
+                'customer_phone' => $request->customer_phone,
+                'subtotal' => $subtotal,
+                'discount_type' => $discountType,
+                'discount_value' => $discountValue,
+                'discount_amount' => $discountAmount,
+                'tax_rate' => $taxRate,
+                'tax_amount' => $taxAmount,
+                'total_amount' => $totalAmount,
+                'payment_method' => $request->payment_method,
+                'created_by' => auth()->id(),
+            ]);
+
+            foreach ($request->items as $item) {
+                PosTransactionItem::create([
+                    'transaction_id' => $transaction->id,
+                    'item_type' => $item['type'] ?? 'product',
+                    'item_id' => $item['item_id'] ?? null,
+                    'item_name' => $item['name'],
+                    'quantity' => $item['quantity'],
+                    'unit_price' => $item['unit_price'],
+                    'subtotal' => round($item['quantity'] * $item['unit_price'], 2),
+                ]);
+            }
+
+            PosPayment::create([
+                'transaction_id' => $transaction->id,
+                'payment_method' => $request->payment_method,
+                'amount' => $totalAmount,
+                'reference_number' => $request->reference_number,
+            ]);
+
+            if ($company->pra_reporting_enabled) {
+                $praService = new PraIntegrationService($company);
+                $praResult = $praService->sendInvoice($transaction);
+                $transaction->refresh();
+            }
+
+            DB::commit();
+
+            return redirect()->route('pos.receipt', $transaction->id)
+                ->with('success', 'Invoice created successfully! Invoice #' . $invoiceNumber);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withInput()->with('error', 'Failed to create invoice: ' . $e->getMessage());
+        }
+    }
+
+    public function transactions(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $query = PosTransaction::where('company_id', $companyId)->with('creator');
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('invoice_number', 'ilike', "%{$search}%")
+                    ->orWhere('customer_name', 'ilike', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('payment_method')) {
+            $query->where('payment_method', $request->payment_method);
+        }
+
+        if ($request->filled('date_from')) {
+            $query->where('created_at', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->where('created_at', '<=', $request->date_to . ' 23:59:59');
+        }
+
+        $transactions = $query->orderBy('created_at', 'desc')->paginate(20);
+
+        return view('pos.transactions', compact('transactions'));
+    }
+
+    public function transactionShow($id)
+    {
+        $companyId = app('currentCompanyId');
+        $transaction = PosTransaction::where('company_id', $companyId)
+            ->with(['items', 'payments', 'praLogs', 'creator', 'terminal'])
+            ->findOrFail($id);
+
+        return view('pos.transaction-show', compact('transaction'));
+    }
+
+    public function receipt($id)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $transaction = PosTransaction::where('company_id', $companyId)
+            ->with(['items', 'payments', 'creator'])
+            ->findOrFail($id);
+
+        return view('pos.receipt', compact('transaction', 'company'));
+    }
+
+    public function reports()
+    {
+        $companyId = app('currentCompanyId');
+
+        $dailySales = PosTransaction::where('company_id', $companyId)
+            ->where('created_at', '>=', now()->subDays(30))
+            ->selectRaw("DATE(created_at) as date, COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue")
+            ->groupByRaw('DATE(created_at)')
+            ->orderBy('date', 'desc')
+            ->get();
+
+        $paymentSummary = PosTransaction::where('company_id', $companyId)
+            ->where('created_at', '>=', now()->startOfMonth())
+            ->selectRaw("payment_method, COUNT(*) as count, COALESCE(SUM(total_amount),0) as total, COALESCE(SUM(tax_amount),0) as tax")
+            ->groupBy('payment_method')
+            ->get();
+
+        $topItems = PosTransactionItem::whereHas('transaction', function ($q) use ($companyId) {
+            $q->where('company_id', $companyId)->where('created_at', '>=', now()->startOfMonth());
+        })
+            ->selectRaw("item_name, SUM(quantity) as total_qty, SUM(subtotal) as total_revenue")
+            ->groupBy('item_name')
+            ->orderByDesc('total_revenue')
+            ->take(10)
+            ->get();
+
+        $monthlyTrend = PosTransaction::where('company_id', $companyId)
+            ->where('created_at', '>=', now()->subMonths(6)->startOfMonth())
+            ->selectRaw("TO_CHAR(created_at, 'YYYY-MM') as month, COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue")
+            ->groupByRaw("TO_CHAR(created_at, 'YYYY-MM')")
+            ->orderBy('month')
+            ->get();
+
+        return view('pos.reports', compact('dailySales', 'paymentSummary', 'topItems', 'monthlyTrend'));
+    }
+
+    public function services()
+    {
+        $companyId = app('currentCompanyId');
+        $services = PosService::where('company_id', $companyId)->orderBy('name')->get();
+        return view('pos.services', compact('services'));
+    }
+
+    public function storeService(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'price' => 'required|numeric|min:0',
+            'description' => 'nullable|string',
+        ]);
+
+        PosService::create([
+            'company_id' => $companyId,
+            'name' => $request->name,
+            'description' => $request->description,
+            'price' => $request->price,
+            'tax_rate' => $request->tax_rate ?? 0,
+            'is_active' => true,
+        ]);
+
+        return back()->with('success', 'Service added successfully.');
+    }
+
+    public function updateService(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $service = PosService::where('company_id', $companyId)->findOrFail($id);
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'price' => 'required|numeric|min:0',
+        ]);
+
+        $service->update([
+            'name' => $request->name,
+            'description' => $request->description,
+            'price' => $request->price,
+            'tax_rate' => $request->tax_rate ?? $service->tax_rate,
+            'is_active' => $request->has('is_active'),
+        ]);
+
+        return back()->with('success', 'Service updated successfully.');
+    }
+
+    public function deleteService($id)
+    {
+        $companyId = app('currentCompanyId');
+        PosService::where('company_id', $companyId)->findOrFail($id)->delete();
+        return back()->with('success', 'Service deleted.');
+    }
+
+    public function getTaxRate(Request $request)
+    {
+        $method = $request->payment_method ?? 'cash';
+        $rate = PosTaxRule::getRateForMethod($method);
+        return response()->json(['tax_rate' => $rate]);
+    }
+
+    public function togglePra(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $company->pra_reporting_enabled = !$company->pra_reporting_enabled;
+        $company->save();
+
+        return response()->json([
+            'success' => true,
+            'enabled' => $company->pra_reporting_enabled,
+            'message' => $company->pra_reporting_enabled ? 'PRA Reporting enabled' : 'PRA Reporting disabled',
+        ]);
+    }
+
+    public function praSettings(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        if ($request->isMethod('post')) {
+            $request->validate([
+                'pra_environment' => 'required|in:sandbox,production',
+                'pra_pos_id' => 'nullable|string',
+                'pra_production_token' => 'nullable|string',
+            ]);
+
+            $company->update([
+                'pra_environment' => $request->pra_environment,
+                'pra_pos_id' => $request->pra_pos_id,
+                'pra_production_token' => $request->pra_production_token,
+            ]);
+
+            return back()->with('success', 'PRA settings updated successfully.');
+        }
+
+        $praLogs = PraLog::where('company_id', $companyId)->orderBy('created_at', 'desc')->take(20)->get();
+        return view('pos.pra-settings', compact('company', 'praLogs'));
+    }
+
+    private function generateInvoiceNumber(int $companyId): string
+    {
+        $lastTransaction = PosTransaction::where('company_id', $companyId)
+            ->orderBy('id', 'desc')
+            ->first();
+
+        if ($lastTransaction && preg_match('/POS-\d+-(\d+)/', $lastTransaction->invoice_number, $matches)) {
+            $next = (int) $matches[1] + 1;
+        } else {
+            $next = 1;
+        }
+
+        return 'POS-' . $companyId . '-' . str_pad($next, 6, '0', STR_PAD_LEFT);
+    }
+}

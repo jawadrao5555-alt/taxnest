@@ -40,6 +40,7 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **Admin Revenue Dashboard:** Top companies by revenue, monthly revenue chart (Chart.js), expiring trial warnings, today's activity metrics, activity feed timeline from audit logs.
 - **Admin Invoice Override:** Super admin can search invoices and manually lock/unlock or update FBR status with full audit logging.
 - **Dashboard Quick Actions:** Shortcut grid on company dashboard for common tasks (New Invoice, View Invoices, Add Product, Add Customer, Reports, FBR Status).
+- **NestPOS Module:** Complete Point of Sale system with PRA (Punjab Revenue Authority) integration. Isolated from FBR Digital Invoicing. Includes POS billing screen, discount system (percentage/amount), payment-method-based tax calculation (Cash 16%, Card 5%), PRA reporting toggle, receipt printing, services management, transaction history, and POS reports. PRA API v1.2 compliant (PRAL IMS component). Tables: pos_terminals, pos_services, pos_transactions, pos_transaction_items, pos_payments, pos_tax_rules, pra_logs. PRA settings per company: pra_reporting_enabled, pra_environment (sandbox/production), pra_pos_id, pra_production_token.
 
 **Key Features:**
 - **Smart Invoice Builder:** Guided invoice creation with auto-calculations and pre-submission compliance scoring.
@@ -73,3 +74,4 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **Tailwind CSS:** For styling and responsive design.
 - **Alpine.js:** For interactive frontend components.
 - **Chart.js:** For data visualization in dashboards.
+- **PRA (Punjab Revenue Authority):** POS fiscal device integration via PRAL IMS API v1.2.

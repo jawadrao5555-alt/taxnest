@@ -18,6 +18,7 @@ use App\Http\Controllers\ShareController;
 use App\Http\Controllers\CompanyUserController;
 use App\Http\Controllers\CompanySettingsController;
 use App\Http\Controllers\CustomerLedgerController;
+use App\Http\Controllers\PosController;
 use App\Http\Controllers\HsCodeMappingController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\OnboardingController;
@@ -159,6 +160,23 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::get('/customer-profiles/{customerProfile}/edit', [CustomerProfileController::class, 'edit'])->name('customer-profiles.edit');
         Route::put('/customer-profiles/{customerProfile}', [CustomerProfileController::class, 'update'])->name('customer-profiles.update');
         Route::post('/customer-profiles/{customerProfile}/toggle', [CustomerProfileController::class, 'toggle'])->name('customer-profiles.toggle');
+    });
+
+    Route::middleware(['role:company_admin,employee'])->prefix('pos')->group(function () {
+        Route::get('/dashboard', [PosController::class, 'dashboard'])->name('pos.dashboard');
+        Route::get('/invoice/create', [PosController::class, 'createInvoice'])->name('pos.invoice.create');
+        Route::post('/invoice/store', [PosController::class, 'storeInvoice'])->name('pos.invoice.store');
+        Route::get('/transactions', [PosController::class, 'transactions'])->name('pos.transactions');
+        Route::get('/transaction/{id}', [PosController::class, 'transactionShow'])->name('pos.transaction.show');
+        Route::get('/transaction/{id}/receipt', [PosController::class, 'receipt'])->name('pos.receipt');
+        Route::get('/reports', [PosController::class, 'reports'])->name('pos.reports');
+        Route::get('/services', [PosController::class, 'services'])->name('pos.services');
+        Route::post('/services', [PosController::class, 'storeService'])->name('pos.services.store');
+        Route::put('/services/{id}', [PosController::class, 'updateService'])->name('pos.services.update');
+        Route::delete('/services/{id}', [PosController::class, 'deleteService'])->name('pos.services.delete');
+        Route::get('/api/tax-rate', [PosController::class, 'getTaxRate'])->name('pos.api.tax-rate');
+        Route::post('/api/toggle-pra', [PosController::class, 'togglePra'])->name('pos.api.toggle-pra');
+        Route::match(['get', 'post'], '/pra-settings', [PosController::class, 'praSettings'])->name('pos.pra-settings');
     });
 
     Route::middleware(['role:company_admin'])->group(function () {

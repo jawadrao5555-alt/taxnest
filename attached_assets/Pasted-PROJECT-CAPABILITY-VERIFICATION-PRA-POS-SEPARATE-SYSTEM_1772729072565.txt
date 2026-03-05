@@ -1,0 +1,75 @@
+PROJECT CAPABILITY VERIFICATION – PRA POS (SEPARATE SYSTEM)
+
+Context:
+I already have a production Laravel system called NestPay which handles FBR Digital Invoicing.
+
+IMPORTANT REQUIREMENT:
+The new project must be completely independent and must NOT modify, connect to, share database with, or access the existing NestPay system in any way.
+
+Goal:
+Build a new Laravel application called PRA POS for Punjab Revenue Authority POS reporting.
+
+Before development starts, confirm that the Replit environment can support the following architecture.
+
+Verification Points:
+
+1. Separate Laravel Application
+Confirm that a completely separate Laravel project can run in the same Replit workspace or environment without touching the existing NestPay project.
+
+Example structure:
+/
+├── nestpay/        (existing production project – DO NOT MODIFY)
+└── pra-pos/        (new Laravel PRA POS project)
+
+2. Independent Database
+Confirm that the new PRA POS project can use its own database connection and tables independent from NestPay.
+
+Example:
+nestpay_db
+pra_pos_db
+
+3. Laravel Project Support
+Confirm that Replit can run a full Laravel application with:
+- migrations
+- models
+- controllers
+- services
+- Blade views
+- API integrations
+
+4. External API Integration
+Confirm that Laravel HTTP client can call external APIs such as PRA POS APIs and receive responses properly.
+
+Example:
+Http::withToken(...)->post(...)
+
+5. Logging Capability
+Confirm that the application can store request/response logs for PRA API calls in a table like:
+pra_logs
+
+6. POS Interface
+Confirm that Replit can run a web POS interface including:
+- billing screen
+- item/service list
+- tax calculation
+- receipt preview
+- print support
+
+7. Multi-Company Support
+Confirm that the system can support multi-tenant architecture where each company stores:
+
+pra_api_token
+pra_api_url
+terminal_id
+
+8. Project Isolation Guarantee
+Confirm that the new PRA POS project can remain completely isolated so that:
+- no NestPay files are modified
+- no shared database tables are used
+- no shared routes or controllers exist
+
+9. Deployment Capability
+Confirm that this Laravel POS system can later be exported or deployed to external hosting (Hostinger / VPS / cPanel).
+
+Expected Output:
+Provide a confirmation report answering YES/NO for each of the above points and mention any limitations of Replit.

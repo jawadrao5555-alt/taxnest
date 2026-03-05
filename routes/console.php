@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 use App\Jobs\NightlyComplianceCronJob;
 use App\Jobs\CheckFbrTokenExpiryJob;
+use App\Jobs\SyncPosOfflineInvoicesJob;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -12,3 +13,4 @@ Artisan::command('inspire', function () {
 
 Schedule::job(new NightlyComplianceCronJob)->daily()->at('02:00');
 Schedule::job(new CheckFbrTokenExpiryJob)->daily()->at('06:00');
+Schedule::job(new SyncPosOfflineInvoicesJob)->everyTwoMinutes();

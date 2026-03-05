@@ -157,6 +157,10 @@
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">Failed</span>
                         @elseif($transaction->pra_status === 'pending')
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">Pending</span>
+                        @elseif($transaction->pra_status === 'offline')
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">Offline</span>
+                        @elseif($transaction->pra_status === 'local')
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">Local</span>
                         @else
                             <span class="text-gray-400">Local Only</span>
                         @endif
@@ -164,7 +168,24 @@
                 </div>
             </div>
 
-            @if(!$transaction->pra_invoice_number && in_array($transaction->pra_status, ['pending', 'failed']))
+            @if($transaction->pra_status === 'local')
+            <div class="bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Local Invoice</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400">This invoice was created while PRA reporting was off. It will not be synced to PRA.</p>
+            </div>
+            @elseif($transaction->pra_status === 'offline')
+            <div class="bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-700 p-5">
+                <h3 class="text-sm font-semibold text-orange-800 dark:text-orange-300 mb-2">Offline — Pending Sync</h3>
+                <p class="text-xs text-orange-700 dark:text-orange-400 mb-3">This invoice was saved offline and will sync to PRA automatically when connection is restored.</p>
+                <form method="POST" action="{{ route('pos.transaction.retry-pra', $transaction->id) }}">
+                    @csrf
+                    <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold rounded-lg transition">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Sync to PRA Now
+                    </button>
+                </form>
+            </div>
+            @elseif(!$transaction->pra_invoice_number && in_array($transaction->pra_status, ['pending', 'failed']))
             <div class="bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-700 p-5">
                 <h3 class="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">PRA Retry Available</h3>
                 <p class="text-xs text-amber-700 dark:text-amber-400 mb-3">This invoice has not been reported to PRA. You can retry the submission.</p>

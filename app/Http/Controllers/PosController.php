@@ -105,6 +105,9 @@ class PosController extends Controller
             }
         }
 
+        $praEnabled = (bool) $company->pra_reporting_enabled;
+        $initialPraStatus = $praEnabled ? 'pending' : 'local';
+
         DB::beginTransaction();
         try {
             $invoiceNumber = $this->generateInvoiceNumber($companyId);
@@ -124,9 +127,9 @@ class PosController extends Controller
                 'tax_amount' => $taxAmount,
                 'total_amount' => $totalAmount,
                 'payment_method' => $request->payment_method,
-                'pra_status' => 'pending',
+                'pra_status' => $initialPraStatus,
                 'submission_hash' => $submissionHash,
-                'created_by' => auth()->id(),
+                'created_by' => auth('pos')->id(),
             ]);
 
             foreach ($request->items as $item) {
@@ -155,7 +158,7 @@ class PosController extends Controller
         }
 
         $praMessage = '';
-        if ($company->pra_reporting_enabled) {
+        if ($praEnabled) {
             try {
                 $praService = new PraIntegrationService($company);
                 $praResult = $praService->sendInvoice($transaction);
@@ -164,12 +167,15 @@ class PosController extends Controller
                 if ($praResult['success']) {
                     $praMessage = ' | PRA Fiscal Invoice Number: ' . ($transaction->pra_invoice_number ?? 'N/A');
                 } else {
-                    $praMessage = ' | PRA submission failed — saved locally for retry.';
+                    $transaction->update(['pra_status' => 'offline']);
+                    $praMessage = ' | Offline Mode: Invoice saved locally and will sync automatically.';
                 }
             } catch (\Exception $e) {
-                $transaction->update(['pra_status' => 'failed']);
-                $praMessage = ' | PRA submission failed — saved locally for retry.';
+                $transaction->update(['pra_status' => 'offline']);
+                $praMessage = ' | Offline Mode: Invoice saved locally and will sync automatically.';
             }
+        } else {
+            $praMessage = ' | Local invoice (PRA reporting is off).';
         }
 
         return redirect()->route('pos.transaction.show', $transaction->id)
@@ -181,7 +187,7 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
-        $transaction = PosTransaction::where('company_id', $companyId)->lockForUpdate()->findOrFail($id);
+        $transaction = PosTransaction::where('company_id', $companyId)->findOrFail($id);
 
         if ($transaction->pra_invoice_number) {
             return back()->with('error', 'This invoice has already been submitted to PRA. PRA Fiscal Invoice #: ' . $transaction->pra_invoice_number);
@@ -191,7 +197,11 @@ class PosController extends Controller
             return back()->with('error', 'This invoice has already been successfully submitted to PRA.');
         }
 
-        if (!in_array($transaction->pra_status, ['pending', 'failed'])) {
+        if ($transaction->pra_status === 'local') {
+            return back()->with('error', 'This is a local invoice created while PRA reporting was off. It cannot be synced to PRA.');
+        }
+
+        if (!in_array($transaction->pra_status, ['pending', 'failed', 'offline'])) {
             return back()->with('error', 'This invoice cannot be retried. Current status: ' . $transaction->pra_status);
         }
 
@@ -210,7 +220,8 @@ class PosController extends Controller
                 return back()->with('error', 'PRA submission failed: ' . ($praResult['message'] ?? 'Unknown error'));
             }
         } catch (\Exception $e) {
-            return back()->with('error', 'PRA connection failed: ' . $e->getMessage());
+            $transaction->update(['pra_status' => 'offline']);
+            return back()->with('error', 'PRA connection failed — invoice will sync automatically when connection is restored.');
         }
     }
 

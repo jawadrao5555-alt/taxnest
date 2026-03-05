@@ -111,7 +111,7 @@
 
     <div class="separator"></div>
 
-    @if($transaction->pra_invoice_number)
+    @if($transaction->pra_status === 'submitted' && $transaction->pra_invoice_number)
     <div class="pra-badge">
         <div class="pra-title">PRA FISCAL</div>
         <div class="pra-number">{{ $transaction->pra_invoice_number }}</div>
@@ -122,8 +122,10 @@
         <p>Scan to verify</p>
     </div>
     @endif
+    @elseif($transaction->pra_status === 'offline')
+    <div class="local-badge">OFFLINE - Will sync</div>
     @else
-    <div class="local-badge">LOCAL INVOICE</div>
+    <div class="local-badge">LOCAL INVOICE<br>(Not reported to PRA)</div>
     @endif
 
     <div class="footer text-center">

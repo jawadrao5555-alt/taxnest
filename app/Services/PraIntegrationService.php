@@ -114,6 +114,20 @@ class PraIntegrationService
             return ['success' => false, 'message' => 'Invoice already submitted to PRA. PRA Invoice #: ' . $transaction->pra_invoice_number];
         }
 
+        if ($transaction->pra_status === 'local') {
+            return ['success' => false, 'message' => 'Local invoice cannot be synced to PRA'];
+        }
+
+        if ($transaction->submission_hash) {
+            $duplicate = PosTransaction::where('submission_hash', $transaction->submission_hash)
+                ->where('id', '!=', $transaction->id)
+                ->whereNotNull('pra_invoice_number')
+                ->exists();
+            if ($duplicate) {
+                return ['success' => false, 'message' => 'Duplicate submission detected via hash'];
+            }
+        }
+
         $payload = $this->generatePayload($transaction);
 
         $praLog = PraLog::create([

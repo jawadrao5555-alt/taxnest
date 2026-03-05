@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'company' => \App\Http\Middleware\CompanyIsolation::class,
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'rate_limit_company' => \App\Http\Middleware\RateLimitByCompany::class,
+            'pos.auth' => \App\Http\Middleware\PosAuth::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

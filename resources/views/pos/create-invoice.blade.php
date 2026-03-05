@@ -1,4 +1,4 @@
-<x-app-layout>
+<x-pos-layout>
     <div class="pb-36" x-data="posInvoice()">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
 
@@ -376,4 +376,4 @@
             };
         }
     </script>
-</x-app-layout>
+</x-pos-layout>

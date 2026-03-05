@@ -19,6 +19,7 @@ use App\Http\Controllers\CompanyUserController;
 use App\Http\Controllers\CompanySettingsController;
 use App\Http\Controllers\CustomerLedgerController;
 use App\Http\Controllers\PosController;
+use App\Http\Controllers\PosAuthController;
 use App\Http\Controllers\HsCodeMappingController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\OnboardingController;
@@ -101,6 +102,15 @@ Route::get('/', function () {
     return view('landing', ['showLogin' => false]);
 });
 
+Route::get('/pos', function () {
+    return view('pos.landing');
+})->name('pos.landing');
+Route::get('/pos/login', [PosAuthController::class, 'showLogin'])->name('pos.login');
+Route::post('/pos/login', [PosAuthController::class, 'login']);
+Route::get('/pos/register', [PosAuthController::class, 'showRegister'])->name('pos.register');
+Route::post('/pos/register', [PosAuthController::class, 'register']);
+Route::post('/pos/logout', [PosAuthController::class, 'logout'])->name('pos.logout');
+
 Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () {
 
     Route::get('/onboarding', [OnboardingController::class, 'index'])->name('onboarding');
@@ -162,27 +172,6 @@ Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () 
         Route::post('/customer-profiles/{customerProfile}/toggle', [CustomerProfileController::class, 'toggle'])->name('customer-profiles.toggle');
     });
 
-    Route::middleware(['role:company_admin,employee'])->prefix('pos')->group(function () {
-        Route::get('/dashboard', [PosController::class, 'dashboard'])->name('pos.dashboard');
-        Route::get('/invoice/create', [PosController::class, 'createInvoice'])->name('pos.invoice.create');
-        Route::post('/invoice/store', [PosController::class, 'storeInvoice'])->name('pos.invoice.store');
-        Route::get('/transactions', [PosController::class, 'transactions'])->name('pos.transactions');
-        Route::get('/transaction/{id}', [PosController::class, 'transactionShow'])->name('pos.transaction.show');
-        Route::post('/transaction/{id}/retry-pra', [PosController::class, 'retryPra'])->name('pos.transaction.retry-pra');
-        Route::get('/transaction/{id}/receipt', [PosController::class, 'receipt'])->name('pos.receipt');
-        Route::get('/reports', [PosController::class, 'reports'])->name('pos.reports');
-        Route::get('/services', [PosController::class, 'services'])->name('pos.services');
-        Route::post('/services', [PosController::class, 'storeService'])->name('pos.services.store');
-        Route::put('/services/{id}', [PosController::class, 'updateService'])->name('pos.services.update');
-        Route::delete('/services/{id}', [PosController::class, 'deleteService'])->name('pos.services.delete');
-        Route::get('/terminals', [PosController::class, 'terminals'])->name('pos.terminals');
-        Route::post('/terminals', [PosController::class, 'storeTerminal'])->name('pos.terminals.store');
-        Route::put('/terminals/{id}', [PosController::class, 'updateTerminal'])->name('pos.terminals.update');
-        Route::delete('/terminals/{id}', [PosController::class, 'deleteTerminal'])->name('pos.terminals.delete');
-        Route::get('/api/tax-rate', [PosController::class, 'getTaxRate'])->name('pos.api.tax-rate');
-        Route::post('/api/toggle-pra', [PosController::class, 'togglePra'])->name('pos.api.toggle-pra');
-        Route::match(['get', 'post'], '/pra-settings', [PosController::class, 'praSettings'])->name('pos.pra-settings');
-    });
 
     Route::middleware(['role:company_admin'])->group(function () {
         Route::get('/company/users', [CompanyUserController::class, 'index']);
@@ -422,6 +411,30 @@ Route::middleware('auth')->group(function () {
     Route::post('/purchase-orders', [SupplierController::class, 'storePurchaseOrder'])->name('purchase-orders.store');
     Route::post('/purchase-orders/{id}/receive', [SupplierController::class, 'receivePurchaseOrder'])->name('purchase-orders.receive');
     Route::post('/purchase-orders/{id}/cancel', [SupplierController::class, 'cancelPurchaseOrder'])->name('purchase-orders.cancel');
+});
+
+Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
+    Route::get('/dashboard', [PosController::class, 'dashboard'])->name('pos.dashboard');
+    Route::get('/invoice/create', [PosController::class, 'createInvoice'])->name('pos.invoice.create');
+    Route::post('/invoice/store', [PosController::class, 'storeInvoice'])->name('pos.invoice.store');
+    Route::get('/transactions', [PosController::class, 'transactions'])->name('pos.transactions');
+    Route::get('/transaction/{id}', [PosController::class, 'transactionShow'])->name('pos.transaction.show');
+    Route::post('/transaction/{id}/retry-pra', [PosController::class, 'retryPra'])->name('pos.transaction.retry-pra');
+    Route::get('/transaction/{id}/receipt', [PosController::class, 'receipt'])->name('pos.receipt');
+    Route::get('/reports', [PosController::class, 'reports'])->name('pos.reports');
+    Route::get('/services', [PosController::class, 'services'])->name('pos.services');
+    Route::post('/services', [PosController::class, 'storeService'])->name('pos.services.store');
+    Route::put('/services/{id}', [PosController::class, 'updateService'])->name('pos.services.update');
+    Route::delete('/services/{id}', [PosController::class, 'deleteService'])->name('pos.services.delete');
+    Route::get('/terminals', [PosController::class, 'terminals'])->name('pos.terminals');
+    Route::post('/terminals', [PosController::class, 'storeTerminal'])->name('pos.terminals.store');
+    Route::put('/terminals/{id}', [PosController::class, 'updateTerminal'])->name('pos.terminals.update');
+    Route::delete('/terminals/{id}', [PosController::class, 'deleteTerminal'])->name('pos.terminals.delete');
+    Route::get('/api/tax-rate', [PosController::class, 'getTaxRate'])->name('pos.api.tax-rate');
+    Route::post('/api/toggle-pra', [PosController::class, 'togglePra'])->name('pos.api.toggle-pra');
+    Route::match(['get', 'post'], '/pra-settings', [PosController::class, 'praSettings'])->name('pos.pra-settings');
+    Route::get('/products', [PosController::class, 'products'])->name('pos.products');
+    Route::get('/customers', [PosController::class, 'customers'])->name('pos.customers');
 });
 
 require __DIR__.'/auth.php';

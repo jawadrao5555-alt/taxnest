@@ -1,4 +1,4 @@
-<x-app-layout>
+<x-pos-layout>
 <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
     @if(session('success'))
@@ -196,4 +196,4 @@
         </div>
     </div>
 </div>
-</x-app-layout>
+</x-pos-layout>

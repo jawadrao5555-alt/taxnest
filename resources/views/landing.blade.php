@@ -32,10 +32,12 @@
                 <a href="#how-it-works" class="text-sm font-medium text-gray-600 hover:text-emerald-600 transition">How It Works</a>
                 <a href="#pricing" class="text-sm font-medium text-gray-600 hover:text-emerald-600 transition">Pricing</a>
                 <a href="#faq" class="text-sm font-medium text-gray-600 hover:text-emerald-600 transition">FAQ</a>
+                <a href="/pos" class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition shadow-sm">PRA POS</a>
                 <a href="/login" class="inline-flex items-center px-4 py-2 border-2 border-emerald-600 text-emerald-700 rounded-lg text-sm font-semibold hover:bg-emerald-50 transition">Login</a>
                 <a href="/register" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition shadow-sm">Sign Up Free</a>
             </div>
             <div class="md:hidden flex items-center space-x-2">
+                <a href="/pos" class="text-sm font-semibold text-white bg-purple-600 px-3 py-1.5 rounded-lg hover:bg-purple-700 transition">PRA POS</a>
                 <a href="/login" class="text-sm font-semibold text-emerald-700 border border-emerald-600 px-3 py-1.5 rounded-lg hover:bg-emerald-50 transition">Login</a>
                 <a href="/register" class="text-sm font-semibold text-white bg-emerald-600 px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition">Sign Up</a>
             </div>

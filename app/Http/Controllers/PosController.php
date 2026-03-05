@@ -468,6 +468,20 @@ class PosController extends Controller
         return view('pos.pra-settings', compact('company', 'praLogs'));
     }
 
+    public function products()
+    {
+        $companyId = app('currentCompanyId');
+        $products = Product::where('company_id', $companyId)->orderBy('name')->get();
+        return view('pos.products', compact('products'));
+    }
+
+    public function customers()
+    {
+        $companyId = app('currentCompanyId');
+        $customers = CustomerProfile::where('company_id', $companyId)->orderBy('name')->get();
+        return view('pos.customers', compact('customers'));
+    }
+
     private function generateInvoiceNumber(int $companyId): string
     {
         $year = now()->format('Y');

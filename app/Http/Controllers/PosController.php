@@ -1263,4 +1263,17 @@ class PosController extends Controller
 
         return 'POS-' . $year . '-' . str_pad($next, 5, '0', STR_PAD_LEFT);
     }
+
+    public function billing()
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $plans = \App\Models\PricingPlan::where('is_trial', false)->orderBy('price')->get();
+        $currentSubscription = \App\Models\Subscription::where('company_id', $companyId)
+            ->where('active', true)
+            ->with('pricingPlan')
+            ->first();
+
+        return view('pos.billing', compact('company', 'plans', 'currentSubscription'));
+    }
 }

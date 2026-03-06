@@ -30,7 +30,7 @@
             </div>
             <p class="mt-3 text-lg font-bold text-gray-800 tracking-tight">NestPOS</p>
 
-            <div class="w-full sm:max-w-md mt-6 px-6 py-6 bg-white/80 backdrop-blur-xl shadow-2xl shadow-purple-500/10 overflow-hidden rounded-2xl border border-white/50 animate-float">
+            <div class="w-full sm:max-w-md mt-6 px-6 py-6 overflow-hidden rounded-2xl animate-float" style="background: rgba(255,255,255,0.92); backdrop-filter: blur(20px); box-shadow: 0 25px 50px -12px rgba(124, 58, 237, 0.15), 0 0 0 1px rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.2);">
                 @if(session('status'))
                 <div class="mb-4 font-medium text-sm text-green-600">{{ session('status') }}</div>
                 @endif
@@ -44,7 +44,7 @@
                     @csrf
                     <div>
                         <label for="login" class="block font-medium text-sm text-gray-700">Email / Phone / Username / NTN</label>
-                        <input id="login" class="block mt-1 w-full border-gray-300 focus:border-purple-500 focus:ring-purple-500 rounded-md shadow-sm" type="text" name="login" value="{{ old('login') }}" required autofocus autocomplete="username" placeholder="Enter email, phone, username or NTN">
+                        <input id="login" class="block mt-1 w-full border-gray-300 focus:border-purple-500 focus:ring-purple-500 rounded-md shadow-sm" type="text" name="login" value="{{ old('login') }}" required autofocus autocomplete="username" placeholder="Enter email, phone, username or NTN" style="border: 1px solid #d1d5db; border-radius: 8px; padding: 10px 14px; width: 100%; font-size: 14px; box-sizing: border-box;">
                         @error('login')
                         <p class="text-sm text-red-600 mt-2">{{ $message }}</p>
                         @enderror
@@ -52,7 +52,7 @@
 
                     <div class="mt-4">
                         <label for="password" class="block font-medium text-sm text-gray-700">Password</label>
-                        <input id="password" class="block mt-1 w-full border-gray-300 focus:border-purple-500 focus:ring-purple-500 rounded-md shadow-sm" type="password" name="password" required autocomplete="current-password">
+                        <input id="password" class="block mt-1 w-full border-gray-300 focus:border-purple-500 focus:ring-purple-500 rounded-md shadow-sm" type="password" name="password" required autocomplete="current-password" style="border: 1px solid #d1d5db; border-radius: 8px; padding: 10px 14px; width: 100%; font-size: 14px; box-sizing: border-box;">
                         @error('password')
                         <p class="text-sm text-red-600 mt-2">{{ $message }}</p>
                         @enderror
@@ -66,7 +66,7 @@
                     </div>
 
                     <div class="mt-6">
-                        <button type="submit" class="w-full flex justify-center py-2.5 px-4 bg-gradient-to-r from-purple-500 to-violet-600 text-white font-bold rounded-xl shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30 hover:from-purple-600 hover:to-violet-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-200">
+                        <button type="submit" style="background: linear-gradient(135deg, #7c3aed, #8b5cf6); color: #ffffff; font-weight: 700; width: 100%; padding: 12px 16px; border-radius: 12px; border: none; font-size: 15px; cursor: pointer; box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35); letter-spacing: 0.3px; transition: all 0.2s;" onmouseover="this.style.boxShadow='0 6px 20px rgba(124, 58, 237, 0.45)'; this.style.background='linear-gradient(135deg, #6d28d9, #7c3aed)';" onmouseout="this.style.boxShadow='0 4px 14px rgba(124, 58, 237, 0.35)'; this.style.background='linear-gradient(135deg, #7c3aed, #8b5cf6)';">
                             Log in
                         </button>
                     </div>

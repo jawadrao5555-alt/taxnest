@@ -4,6 +4,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Session\TokenMismatchException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 
@@ -59,5 +60,30 @@ return Application::configure(basePath: dirname(__DIR__))
 
             $redirectTo = auth()->check() ? '/dashboard' : '/';
             return redirect($redirectTo)->with('error', 'This page cannot be accessed directly.');
+        });
+
+        $exceptions->renderable(function (TokenMismatchException $e, $request) {
+            if ($request->expectsJson()) {
+                return response()->json(['error' => 'Session expired. Please refresh and try again.'], 419);
+            }
+
+            $path = $request->path();
+            if (str_starts_with($path, 'admin/') || str_starts_with($path, 'admin')) {
+                if (auth('admin')->check()) {
+                    return redirect()->back()->with('error', 'Your session expired. Please try again.');
+                }
+                return redirect('/admin/login')->with('error', 'Session expired. Please log in again.');
+            }
+            if (str_starts_with($path, 'pos/') || str_starts_with($path, 'pos')) {
+                if (auth('pos')->check()) {
+                    return redirect()->back()->with('error', 'Your session expired. Please try again.');
+                }
+                return redirect('/pos/login')->with('error', 'Session expired. Please log in again.');
+            }
+
+            if (auth()->check()) {
+                return redirect()->back()->with('error', 'Your session expired. Please try again.');
+            }
+            return redirect('/login')->with('error', 'Session expired. Please log in again.');
         });
     })->create();

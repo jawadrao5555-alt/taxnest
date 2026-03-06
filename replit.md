@@ -8,6 +8,8 @@ TaxNest is a multi-company SaaS platform designed for comprehensive tax and invo
 - NestPOS Enterprise Store (company_id 11) is the dedicated POS company — completely separate from Digital Invoice
 - POS Admin: posadmin@taxnest.com / Admin@12345 (company_id 11, NestPOS Enterprise Store)
 - Digital Invoice and POS data are FULLY ISOLATED — no cross-contamination
+- POS billing is ANNUAL-ONLY (6% discount baked in) — no billing cycle toggle
+- DI billing has full cycle toggle: Monthly / Quarterly(-1%) / Semi-Annual(-3%) / Annual(-6%)
 - POS admin CANNOT login through Digital Invoice /login — auto-redirected to /pos/login
 - POS login page has "SaaS Admin Login" button for easy admin access
 - Test Trading Company (company_id 12, test@testtrading.pk / Admin@12345) — for testing admin approval workflow

@@ -422,6 +422,9 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::post('/transaction/{id}/retry-pra', [PosController::class, 'retryPra'])->name('pos.transaction.retry-pra');
     Route::get('/transaction/{id}/receipt', [PosController::class, 'receipt'])->name('pos.receipt');
     Route::get('/reports', [PosController::class, 'reports'])->name('pos.reports');
+    Route::get('/tax-reports', [PosController::class, 'taxReports'])->name('pos.tax-reports');
+    Route::get('/tax-reports/csv', [PosController::class, 'exportTaxReportCsv'])->name('pos.tax-reports.csv');
+    Route::get('/tax-reports/pdf', [PosController::class, 'exportTaxReportPdf'])->name('pos.tax-reports.pdf');
     Route::get('/services', [PosController::class, 'services'])->name('pos.services');
     Route::post('/services', [PosController::class, 'storeService'])->name('pos.services.store');
     Route::put('/services/{id}', [PosController::class, 'updateService'])->name('pos.services.update');

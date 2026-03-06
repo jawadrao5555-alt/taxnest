@@ -389,6 +389,196 @@ class PosController extends Controller
         return view('pos.reports', compact('dailySales', 'paymentSummary', 'topItems', 'monthlyTrend'));
     }
 
+    private function buildTaxReportQuery(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $query = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->with('terminal');
+
+        if ($request->filled('tax_rate')) {
+            $rate = (float) $request->tax_rate;
+            $query->where('tax_rate', $rate);
+        }
+
+        if ($request->filled('payment_method')) {
+            $query->where('payment_method', $request->payment_method);
+        }
+
+        if ($request->filled('customer')) {
+            $query->where('customer_name', 'ilike', '%' . $request->customer . '%');
+        }
+
+        if ($request->filled('period')) {
+            switch ($request->period) {
+                case 'today':
+                    $query->where('created_at', '>=', now()->startOfDay());
+                    break;
+                case 'weekly':
+                    $query->where('created_at', '>=', now()->startOfWeek());
+                    break;
+                case 'monthly':
+                    $query->where('created_at', '>=', now()->startOfMonth());
+                    break;
+            }
+        }
+
+        if ($request->filled('date_from')) {
+            $query->where('created_at', '>=', $request->date_from . ' 00:00:00');
+        }
+        if ($request->filled('date_to')) {
+            $query->where('created_at', '<=', $request->date_to . ' 23:59:59');
+        }
+
+        $query->orderBy('created_at', 'desc');
+        return $query;
+    }
+
+    private function getReportDateLabel(Request $request): string
+    {
+        if ($request->filled('date_from') && $request->filled('date_to')) {
+            return $request->date_from . ' to ' . $request->date_to;
+        }
+        if ($request->filled('date_from')) {
+            return $request->date_from . ' to Present';
+        }
+        if ($request->filled('date_to')) {
+            return 'Up to ' . $request->date_to;
+        }
+        if ($request->filled('period')) {
+            return match ($request->period) {
+                'today' => 'Today (' . now()->format('d M Y') . ')',
+                'weekly' => 'This Week (' . now()->startOfWeek()->format('d M') . ' - ' . now()->endOfWeek()->format('d M Y') . ')',
+                'monthly' => 'This Month (' . now()->format('M Y') . ')',
+                default => 'All Time',
+            };
+        }
+        return 'All Time';
+    }
+
+    public function taxReports(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $query = $this->buildTaxReportQuery($request);
+        $transactions = $query->paginate(50)->appends($request->all());
+
+        $summaryQuery = $this->buildTaxReportQuery($request);
+        $summary = $summaryQuery->reorder()->selectRaw('
+            COUNT(*) as total_invoices,
+            COALESCE(SUM(total_amount), 0) as total_sales,
+            COALESCE(SUM(discount_amount), 0) as total_discount,
+            COALESCE(SUM(subtotal - discount_amount), 0) as total_taxable,
+            COALESCE(SUM(tax_amount), 0) as total_tax
+        ')->first();
+
+        $dateLabel = $this->getReportDateLabel($request);
+
+        $taxRateLabel = 'All Taxes';
+        if ($request->filled('tax_rate')) {
+            $taxRateLabel = $request->tax_rate . '% Tax Only';
+        }
+
+        return view('pos.tax-reports', compact('company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel'));
+    }
+
+    public function exportTaxReportCsv(Request $request)
+    {
+        $query = $this->buildTaxReportQuery($request);
+        $transactions = $query->get();
+
+        $dateLabel = $this->getReportDateLabel($request);
+        $taxRateLabel = $request->filled('tax_rate') ? $request->tax_rate . '% Tax' : 'All Taxes';
+
+        $filename = 'NestPOS_Tax_Report_' . str_replace([' ', '/', '(', ')'], '_', $taxRateLabel) . '_' . now()->format('Ymd_His') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+
+        $callback = function () use ($transactions) {
+            $file = fopen('php://output', 'w');
+            fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+            fputcsv($file, [
+                'POS Invoice Number',
+                'PRA Fiscal Invoice Number',
+                'Invoice Date',
+                'Customer Name',
+                'Payment Method',
+                'Subtotal (PKR)',
+                'Discount Amount (PKR)',
+                'Taxable Amount (PKR)',
+                'Tax Rate (%)',
+                'Tax Amount (PKR)',
+                'Total Amount (PKR)',
+                'Terminal Name',
+                'PRA Status',
+            ]);
+
+            foreach ($transactions as $t) {
+                fputcsv($file, [
+                    $t->invoice_number,
+                    $t->pra_invoice_number ?? 'N/A',
+                    $t->created_at->format('d/m/Y H:i'),
+                    $t->customer_name ?? 'Walk-in',
+                    ucwords(str_replace('_', ' ', $t->payment_method)),
+                    number_format($t->subtotal, 2, '.', ''),
+                    number_format($t->discount_amount, 2, '.', ''),
+                    number_format($t->subtotal - $t->discount_amount, 2, '.', ''),
+                    number_format($t->tax_rate, 2, '.', ''),
+                    number_format($t->tax_amount, 2, '.', ''),
+                    number_format($t->total_amount, 2, '.', ''),
+                    $t->terminal?->terminal_name ?? 'N/A',
+                    strtoupper($t->pra_status ?? 'N/A'),
+                ]);
+            }
+
+            fputcsv($file, []);
+            fputcsv($file, ['SUMMARY']);
+            fputcsv($file, ['Total Invoices', $transactions->count()]);
+            fputcsv($file, ['Total Sales Amount (PKR)', number_format($transactions->sum('total_amount'), 2, '.', '')]);
+            fputcsv($file, ['Total Discount Amount (PKR)', number_format($transactions->sum('discount_amount'), 2, '.', '')]);
+            fputcsv($file, ['Total Taxable Amount (PKR)', number_format($transactions->sum(fn($t) => $t->subtotal - $t->discount_amount), 2, '.', '')]);
+            fputcsv($file, ['Total Tax Amount (PKR)', number_format($transactions->sum('tax_amount'), 2, '.', '')]);
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    public function exportTaxReportPdf(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $query = $this->buildTaxReportQuery($request);
+        $transactions = $query->get();
+
+        $summaryQuery = $this->buildTaxReportQuery($request);
+        $summary = $summaryQuery->reorder()->selectRaw('
+            COUNT(*) as total_invoices,
+            COALESCE(SUM(total_amount), 0) as total_sales,
+            COALESCE(SUM(discount_amount), 0) as total_discount,
+            COALESCE(SUM(subtotal - discount_amount), 0) as total_taxable,
+            COALESCE(SUM(tax_amount), 0) as total_tax
+        ')->first();
+
+        $dateLabel = $this->getReportDateLabel($request);
+        $taxRateLabel = $request->filled('tax_rate') ? $request->tax_rate . '% Tax Only' : 'All Taxes';
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.tax-report-pdf', compact(
+            'company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel'
+        ));
+
+        $pdf->setPaper('a4', 'landscape');
+
+        $filename = 'NestPOS_Tax_Report_' . str_replace([' ', '/', '(', ')'], '_', $taxRateLabel) . '_' . now()->format('Ymd_His') . '.pdf';
+
+        return $pdf->download($filename);
+    }
+
     public function services()
     {
         $companyId = app('currentCompanyId');

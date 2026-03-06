@@ -827,26 +827,45 @@ class PosController extends Controller
 
     public function downloadProductTemplate()
     {
-        $headers = ['Name', 'Price', 'Description', 'Category', 'SKU', 'Barcode', 'Tax Rate %', 'Unit (UOM)'];
-        $examples = [
-            ['Chicken Biryani', '450', 'Full plate biryani with raita', 'Food', 'CB-001', '8901234567890', '16', 'NOS'],
-            ['Pepsi 500ml', '120', 'Cold drink bottle', 'Beverages', 'PEP-500', '8901234567891', '5', 'NOS'],
-            ['Naan', '30', 'Tandoori naan', 'Food', 'NAN-001', '', '0', 'NOS'],
-        ];
+        $companyId = app('currentCompanyId');
+        $existingProducts = PosProduct::where('company_id', $companyId)->orderBy('name')->get();
 
-        $callback = function() use ($headers, $examples) {
+        $headers = ['Name', 'Price', 'Description', 'Category', 'SKU', 'Barcode', 'Tax Rate %', 'Unit (UOM)'];
+
+        $callback = function() use ($headers, $existingProducts) {
             $file = fopen('php://output', 'w');
             fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
             fputcsv($file, $headers);
-            foreach ($examples as $row) {
-                fputcsv($file, $row);
+
+            if ($existingProducts->isEmpty()) {
+                fputcsv($file, ['Chicken Biryani', '450', 'Full plate biryani with raita', 'Food', 'CB-001', '8901234567890', '16', 'NOS']);
+                fputcsv($file, ['Pepsi 500ml', '120', 'Cold drink bottle', 'Beverages', 'PEP-500', '8901234567891', '5', 'NOS']);
+                fputcsv($file, ['Naan', '30', 'Tandoori naan', 'Food', 'NAN-001', '', '0', 'NOS']);
+            } else {
+                foreach ($existingProducts as $p) {
+                    fputcsv($file, [
+                        $p->name,
+                        $p->price,
+                        $p->description ?? '',
+                        $p->category ?? '',
+                        $p->sku ?? '',
+                        $p->barcode ?? '',
+                        $p->tax_rate ?? 0,
+                        $p->uom ?? 'NOS',
+                    ]);
+                }
             }
+
             fclose($file);
         };
 
+        $filename = $existingProducts->isEmpty() ? 'pos_products_template.csv' : 'pos_products_export.csv';
+
         return response()->stream($callback, 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="pos_products_template.csv"',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate',
+            'Pragma' => 'no-cache',
         ]);
     }
 

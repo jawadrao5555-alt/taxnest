@@ -22,23 +22,31 @@
 
     <div id="importSection" class="hidden mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">Bulk Import Products from Excel/CSV</h3>
+
+        <div class="mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg px-4 py-3">
+            <p class="text-xs text-blue-800 dark:text-blue-300"><strong>How it works:</strong> Sirf woh products update honge jinki aap ne price ya details change ki hain. Baqi sab products jaise hain waise hi rahenge. Agar koi naya product CSV mein hai jo list mein nahi, woh add ho jayega. Agar same naam ka product hai, uski price/details update ho jayengi.</p>
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                <h4 class="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-2">Step 1: Download Template</h4>
-                <p class="text-xs text-gray-500 mb-3">Download the CSV template, fill in your products in Excel/Google Sheets, then save as CSV.</p>
+                <h4 class="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-2">Step 1: Download {{ $products->count() > 0 ? 'Your Products' : 'Template' }}</h4>
+                @if($products->count() > 0)
+                <p class="text-xs text-gray-500 mb-3">Apni current product list download karein. Excel mein kholein, prices change karein, naye products add karein, phir CSV save karke upload karein.</p>
+                @else
+                <p class="text-xs text-gray-500 mb-3">Blank template download karein. Excel mein kholein, products fill karein, phir CSV save karke upload karein.</p>
+                @endif
                 <a href="{{ route('pos.products.template') }}" style="background: linear-gradient(135deg, #7c3aed, #8b5cf6); color: #fff; padding: 8px 20px; border-radius: 8px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
                     <svg style="width:14px; height:14px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                    Download Template
+                    {{ $products->count() > 0 ? 'Export Products CSV (' . $products->count() . ')' : 'Download Empty Template' }}
                 </a>
                 <div class="mt-3 text-[11px] text-gray-400">
-                    <p class="font-semibold text-gray-500 mb-1">Template columns:</p>
+                    <p class="font-semibold text-gray-500 mb-1">CSV Columns:</p>
                     <p><strong>Name</strong> (required), <strong>Price</strong> (required), Description, Category, SKU, Barcode, Tax Rate %, Unit (UOM)</p>
-                    <p class="mt-1">Template includes 3 sample rows — delete them and add your own products.</p>
                 </div>
             </div>
             <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                <h4 class="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-2">Step 2: Upload File</h4>
-                <p class="text-xs text-gray-500 mb-3">Upload your filled CSV file. Existing products (same name) will be updated with new price.</p>
+                <h4 class="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-2">Step 2: Upload Updated File</h4>
+                <p class="text-xs text-gray-500 mb-3">CSV file upload karein. Changed products update honge, naye products add honge, baqi untouched rahenge.</p>
                 <form method="POST" action="{{ route('pos.products.import') }}" enctype="multipart/form-data" class="space-y-3">
                     @csrf
                     <input type="file" name="csv_file" accept=".csv,.txt" required class="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 dark:file:bg-purple-900/30 dark:file:text-purple-300">

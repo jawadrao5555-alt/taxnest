@@ -47,8 +47,17 @@
 <body>
     <div class="no-print">
         <button onclick="window.print()" style="padding: 10px 30px; background: #059669; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; margin-right: 10px;">Print Receipt</button>
-        <button onclick="window.close()" style="padding: 10px 30px; background: #6b7280; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer;">Close</button>
+        <a href="{{ route('pos.transactions') }}" style="padding: 10px 30px; background: #6b7280; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; text-decoration: none; display: inline-block;">Back to Transactions</a>
     </div>
+    <script>
+        window.onafterprint = function() {
+            if (window.opener) {
+                window.close();
+            } else {
+                window.location.href = '{{ route('pos.transactions') }}';
+            }
+        };
+    </script>
 
     <div class="header text-center">
         <h1>{{ $company->name }}</h1>

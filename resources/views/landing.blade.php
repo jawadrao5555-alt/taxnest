@@ -425,28 +425,28 @@
                         <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 1 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <div x-show="open === 1" x-collapse class="px-6 pb-6 text-gray-600 text-sm leading-relaxed">
-                        TaxNest is Pakistan's most advanced tax compliance platform with two products: <strong>Digital Invoice</strong> for FBR compliance (Federal Board of Revenue) and <strong>PRA POS</strong> for PRA compliance (Punjab Revenue Authority). Both products are completely isolated with separate databases, logins, and dashboards.
+                        TaxNest is Pakistan's most advanced tax compliance platform with two products: <strong>Digital Invoice</strong> for FBR compliance (Federal Board of Revenue) and <strong>NestPOS</strong> for PRA compliance (Punjab Revenue Authority). Both products are completely isolated with separate databases, logins, and dashboards.
                     </div>
                 </div>
 
                 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                     <button @click="open = open === 2 ? null : 2" class="w-full flex items-center justify-between p-6 text-left">
-                        <span class="text-base font-semibold text-gray-900">What is the difference between Digital Invoice and PRA POS?</span>
+                        <span class="text-base font-semibold text-gray-900">What is the difference between Digital Invoice and NestPOS?</span>
                         <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 2 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <div x-show="open === 2" x-collapse class="px-6 pb-6 text-gray-600 text-sm leading-relaxed">
                         <strong>Digital Invoice</strong> is for businesses that need to submit invoices to FBR (Federal Board of Revenue) via PRAL API v1.12. It includes HS Intelligence, compliance scoring, risk detection, and enterprise analytics.<br><br>
-                        <strong>PRA POS</strong> is a Point of Sale system for retail/service businesses that need PRA (Punjab Revenue Authority) fiscal device integration via PRAL IMS API v1.2. It includes thermal receipt printing, multi-terminal support, and real-time tax calculations based on payment method.
+                        <strong>NestPOS</strong> is a Point of Sale system for retail/service businesses that need PRA (Punjab Revenue Authority) fiscal device integration via PRAL IMS API v1.2. It includes thermal receipt printing, multi-terminal support, and real-time tax calculations based on payment method.
                     </div>
                 </div>
 
                 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                     <button @click="open = open === 3 ? null : 3" class="w-full flex items-center justify-between p-6 text-left">
-                        <span class="text-base font-semibold text-gray-900">Are Digital Invoice and PRA POS data separate?</span>
+                        <span class="text-base font-semibold text-gray-900">Are Digital Invoice and NestPOS data separate?</span>
                         <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 3 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <div x-show="open === 3" x-collapse class="px-6 pb-6 text-gray-600 text-sm leading-relaxed">
-                        Yes, 100%. Digital Invoice and PRA POS are completely isolated products. They have separate databases, separate login pages, separate dashboards, and separate user accounts. There is zero cross-contamination of data between the two systems.
+                        Yes, 100%. Digital Invoice and NestPOS are completely isolated products. They have separate databases, separate login pages, separate dashboards, and separate user accounts. There is zero cross-contamination of data between the two systems.
                     </div>
                 </div>
 
@@ -456,7 +456,7 @@
                         <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 4 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <div x-show="open === 4" x-collapse class="px-6 pb-6 text-gray-600 text-sm leading-relaxed">
-                        Yes! Both Digital Invoice and PRA POS come with a 14-day free trial. No credit card required. You get full access to all features during the trial period with up to 20 invoices/transactions.
+                        Yes! Both Digital Invoice and NestPOS come with a 14-day free trial. No credit card required. You get full access to all features during the trial period with up to 20 invoices/transactions.
                     </div>
                 </div>
 
@@ -467,7 +467,7 @@
                     </button>
                     <div x-show="open === 5" x-collapse class="px-6 pb-6 text-gray-600 text-sm leading-relaxed">
                         <strong>FBR (Digital Invoice):</strong> Uses PRAL API v1.12 for real-time synchronous invoice submission to FBR. Invoices are validated, scored for compliance, and submitted with HS codes, tax rates, and QR codes.<br><br>
-                        <strong>PRA POS:</strong> Uses PRAL IMS API v1.2 for fiscal device integration. Each transaction is fiscalized and assigned a PRA fiscal invoice number with QR code for receipt printing.
+                        <strong>NestPOS:</strong> Uses PRAL IMS API v1.2 for fiscal device integration. Each transaction is fiscalized and assigned a PRA fiscal invoice number with QR code for receipt printing.
                     </div>
                 </div>
 
@@ -495,7 +495,7 @@
                 </a>
                 <a href="/pos/register" class="px-8 py-4 bg-white/20 text-white border-2 border-white/40 rounded-xl text-sm font-bold hover:bg-white/30 transition w-full sm:w-auto flex items-center justify-center gap-2">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                    Start PRA POS
+                    Start NestPOS
                 </a>
             </div>
         </div>
@@ -522,7 +522,7 @@
                     </div>
                 </div>
                 <div>
-                    <h4 class="text-sm font-semibold text-white uppercase tracking-wider mb-4">PRA POS</h4>
+                    <h4 class="text-sm font-semibold text-white uppercase tracking-wider mb-4">NestPOS</h4>
                     <div class="space-y-2">
                         <a href="/pos/login" class="block text-sm text-gray-400 hover:text-purple-400 transition">POS Login</a>
                         <a href="/pos/register" class="block text-sm text-gray-400 hover:text-purple-400 transition">POS Sign Up</a>

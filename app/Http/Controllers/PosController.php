@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
-use App\Models\Product;
-use App\Models\CustomerProfile;
+use App\Models\PosProduct;
+use App\Models\PosCustomer;
 use App\Models\PosService;
 use App\Models\PosTerminal;
 use App\Models\PosTransaction;
@@ -61,8 +61,9 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        $products = Product::where('company_id', $companyId)->where('is_active', true)->get();
+        $products = PosProduct::where('company_id', $companyId)->where('is_active', true)->get();
         $services = PosService::where('company_id', $companyId)->where('is_active', true)->get();
+        $posCustomers = PosCustomer::where('company_id', $companyId)->where('is_active', true)->orderBy('name')->get();
         $taxRules = PosTaxRule::where('is_active', true)->get()->keyBy('payment_method');
         $terminals = PosTerminal::where('company_id', $companyId)->where('is_active', true)->get();
 
@@ -96,7 +97,7 @@ class PosController extends Controller
             ->take(5)
             ->get();
 
-        return view('pos.create-invoice', compact('company', 'products', 'services', 'taxRules', 'terminals', 'draftInvoice', 'pendingDrafts'));
+        return view('pos.create-invoice', compact('company', 'products', 'services', 'taxRules', 'terminals', 'draftInvoice', 'pendingDrafts', 'posCustomers'));
     }
 
     public function storeInvoice(Request $request)
@@ -205,10 +206,24 @@ class PosController extends Controller
             }
 
             foreach ($request->items as $item) {
+                $itemType = $item['type'] ?? 'product';
+                $itemId = $item['item_id'] ?? null;
+
+                if ($itemId) {
+                    if ($itemType === 'product') {
+                        $valid = PosProduct::where('company_id', $companyId)->where('id', $itemId)->exists();
+                    } else {
+                        $valid = PosService::where('company_id', $companyId)->where('id', $itemId)->exists();
+                    }
+                    if (!$valid) {
+                        $itemId = null;
+                    }
+                }
+
                 PosTransactionItem::create([
                     'transaction_id' => $transaction->id,
-                    'item_type' => $item['type'] ?? 'product',
-                    'item_id' => $item['item_id'] ?? null,
+                    'item_type' => $itemType,
+                    'item_id' => $itemId,
                     'item_name' => $item['name'],
                     'quantity' => $item['quantity'],
                     'unit_price' => $item['unit_price'],
@@ -755,15 +770,137 @@ class PosController extends Controller
     public function products()
     {
         $companyId = app('currentCompanyId');
-        $products = Product::where('company_id', $companyId)->orderBy('name')->get();
+        $products = PosProduct::where('company_id', $companyId)->orderBy('name')->get();
         return view('pos.products', compact('products'));
+    }
+
+    public function storeProduct(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'price' => 'required|numeric|min:0',
+            'tax_rate' => 'nullable|numeric|min:0|max:100',
+            'category' => 'nullable|string|max:100',
+            'sku' => 'nullable|string|max:100',
+            'barcode' => 'nullable|string|max:100',
+            'uom' => 'nullable|string|max:20',
+            'description' => 'nullable|string|max:500',
+        ]);
+
+        PosProduct::create([
+            'company_id' => $companyId,
+            'name' => $request->name,
+            'description' => $request->description,
+            'price' => $request->price,
+            'tax_rate' => $request->tax_rate ?? 0,
+            'category' => $request->category,
+            'sku' => $request->sku,
+            'barcode' => $request->barcode,
+            'uom' => $request->uom ?? 'NOS',
+        ]);
+
+        return back()->with('success', 'Product added successfully.');
+    }
+
+    public function updateProduct(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $product = PosProduct::where('company_id', $companyId)->findOrFail($id);
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'price' => 'required|numeric|min:0',
+            'tax_rate' => 'nullable|numeric|min:0|max:100',
+            'category' => 'nullable|string|max:100',
+            'sku' => 'nullable|string|max:100',
+            'barcode' => 'nullable|string|max:100',
+            'uom' => 'nullable|string|max:20',
+            'description' => 'nullable|string|max:500',
+        ]);
+
+        $product->update($request->only(['name', 'description', 'price', 'tax_rate', 'category', 'sku', 'barcode', 'uom']));
+        return back()->with('success', 'Product updated successfully.');
+    }
+
+    public function deleteProduct($id)
+    {
+        $companyId = app('currentCompanyId');
+        $product = PosProduct::where('company_id', $companyId)->findOrFail($id);
+        $product->delete();
+        return back()->with('success', 'Product deleted successfully.');
+    }
+
+    public function toggleProduct($id)
+    {
+        $companyId = app('currentCompanyId');
+        $product = PosProduct::where('company_id', $companyId)->findOrFail($id);
+        $product->update(['is_active' => !$product->is_active]);
+        return back()->with('success', $product->is_active ? 'Product activated.' : 'Product deactivated.');
     }
 
     public function customers()
     {
         $companyId = app('currentCompanyId');
-        $customers = CustomerProfile::where('company_id', $companyId)->orderBy('name')->get();
+        $customers = PosCustomer::where('company_id', $companyId)->orderBy('name')->get();
         return view('pos.customers', compact('customers'));
+    }
+
+    public function storeCustomer(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'phone' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:500',
+            'city' => 'nullable|string|max:100',
+            'ntn' => 'nullable|string|max:50',
+            'cnic' => 'nullable|string|max:20',
+            'type' => 'required|in:registered,unregistered',
+        ]);
+
+        PosCustomer::create(array_merge($request->only(['name', 'email', 'phone', 'address', 'city', 'ntn', 'cnic', 'type']), [
+            'company_id' => $companyId,
+        ]));
+
+        return back()->with('success', 'Customer added successfully.');
+    }
+
+    public function updateCustomer(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $customer = PosCustomer::where('company_id', $companyId)->findOrFail($id);
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'phone' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:500',
+            'city' => 'nullable|string|max:100',
+            'ntn' => 'nullable|string|max:50',
+            'cnic' => 'nullable|string|max:20',
+            'type' => 'required|in:registered,unregistered',
+        ]);
+
+        $customer->update($request->only(['name', 'email', 'phone', 'address', 'city', 'ntn', 'cnic', 'type']));
+        return back()->with('success', 'Customer updated successfully.');
+    }
+
+    public function deleteCustomer($id)
+    {
+        $companyId = app('currentCompanyId');
+        $customer = PosCustomer::where('company_id', $companyId)->findOrFail($id);
+        $customer->delete();
+        return back()->with('success', 'Customer deleted successfully.');
+    }
+
+    public function toggleCustomer($id)
+    {
+        $companyId = app('currentCompanyId');
+        $customer = PosCustomer::where('company_id', $companyId)->findOrFail($id);
+        $customer->update(['is_active' => !$customer->is_active]);
+        return back()->with('success', $customer->is_active ? 'Customer activated.' : 'Customer deactivated.');
     }
 
     public function saveDraft(Request $request)

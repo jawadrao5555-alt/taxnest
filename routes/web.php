@@ -443,7 +443,16 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::post('/api/invoice/{id}/unlock', [PosController::class, 'unlockInvoice'])->name('pos.api.invoice.unlock');
     Route::match(['get', 'post'], '/pra-settings', [PosController::class, 'praSettings'])->name('pos.pra-settings');
     Route::get('/products', [PosController::class, 'products'])->name('pos.products');
+    Route::post('/products', [PosController::class, 'storeProduct'])->name('pos.products.store');
+    Route::put('/products/{id}', [PosController::class, 'updateProduct'])->name('pos.products.update');
+    Route::delete('/products/{id}', [PosController::class, 'deleteProduct'])->name('pos.products.delete');
+    Route::post('/products/{id}/toggle', [PosController::class, 'toggleProduct'])->name('pos.products.toggle');
+
     Route::get('/customers', [PosController::class, 'customers'])->name('pos.customers');
+    Route::post('/customers', [PosController::class, 'storeCustomer'])->name('pos.customers.store');
+    Route::put('/customers/{id}', [PosController::class, 'updateCustomer'])->name('pos.customers.update');
+    Route::delete('/customers/{id}', [PosController::class, 'deleteCustomer'])->name('pos.customers.delete');
+    Route::post('/customers/{id}/toggle', [PosController::class, 'toggleCustomer'])->name('pos.customers.toggle');
 
     Route::get('/inventory', [PosInventoryController::class, 'dashboard'])->name('pos.inventory.dashboard');
     Route::get('/inventory/stock', [PosInventoryController::class, 'stock'])->name('pos.inventory.stock');

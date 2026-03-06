@@ -112,7 +112,7 @@ Route::get('/pos/register', [PosAuthController::class, 'showRegister'])->name('p
 Route::post('/pos/register', [PosAuthController::class, 'register']);
 Route::post('/pos/logout', [PosAuthController::class, 'logout'])->name('pos.logout');
 
-Route::middleware(['auth', 'company', 'rate_limit_company'])->group(function () {
+Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])->group(function () {
 
     Route::get('/onboarding', [OnboardingController::class, 'index'])->name('onboarding');
     Route::post('/onboarding/complete', [OnboardingController::class, 'complete']);
@@ -452,6 +452,57 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::match(['get', 'post'], '/inventory/adjust', [PosInventoryController::class, 'adjustStock'])->name('pos.inventory.adjust');
     Route::post('/inventory/min-stock', [PosInventoryController::class, 'updateMinStock'])->name('pos.inventory.min-stock');
     Route::post('/inventory/toggle', [PosInventoryController::class, 'toggleInventory'])->name('pos.inventory.toggle');
+});
+
+use App\Http\Controllers\SaasAdmin\AdminAuthController;
+use App\Http\Controllers\SaasAdmin\AdminDashboardController;
+use App\Http\Controllers\SaasAdmin\AdminCompanyController;
+use App\Http\Controllers\SaasAdmin\AdminPlanController;
+use App\Http\Controllers\SaasAdmin\AdminSubscriptionController;
+use App\Http\Controllers\SaasAdmin\AdminFranchiseController;
+use App\Http\Controllers\SaasAdmin\AdminUsageController;
+use App\Http\Controllers\SaasAdmin\AdminSystemController;
+use App\Http\Controllers\SaasAdmin\AdminAuditController;
+use App\Http\Controllers\Franchise\FranchiseAuthController;
+use App\Http\Controllers\Franchise\FranchiseDashboardController;
+
+Route::get('/admin/login', [AdminAuthController::class, 'showLogin'])->name('admin.login');
+Route::post('/admin/login', [AdminAuthController::class, 'login']);
+Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
+
+Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
+    Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('saas.admin.dashboard');
+    Route::get('/companies', [AdminCompanyController::class, 'index'])->name('saas.admin.companies');
+    Route::get('/companies/{id}', [AdminCompanyController::class, 'show'])->name('saas.admin.companies.show');
+    Route::post('/companies/{id}/approve', [AdminCompanyController::class, 'approve'])->name('saas.admin.companies.approve');
+    Route::post('/companies/{id}/reject', [AdminCompanyController::class, 'reject'])->name('saas.admin.companies.reject');
+    Route::post('/companies/{id}/suspend', [AdminCompanyController::class, 'suspend'])->name('saas.admin.companies.suspend');
+    Route::post('/companies/{id}/activate', [AdminCompanyController::class, 'activate'])->name('saas.admin.companies.activate');
+    Route::get('/plans', [AdminPlanController::class, 'index'])->name('saas.admin.plans');
+    Route::post('/plans', [AdminPlanController::class, 'store'])->name('saas.admin.plans.store');
+    Route::put('/plans/{id}', [AdminPlanController::class, 'update'])->name('saas.admin.plans.update');
+    Route::get('/subscriptions', [AdminSubscriptionController::class, 'index'])->name('saas.admin.subscriptions');
+    Route::post('/subscriptions/assign', [AdminSubscriptionController::class, 'assign'])->name('saas.admin.subscriptions.assign');
+    Route::post('/subscriptions/{id}/toggle', [AdminSubscriptionController::class, 'toggle'])->name('saas.admin.subscriptions.toggle');
+    Route::get('/franchises', [AdminFranchiseController::class, 'index'])->name('saas.admin.franchises');
+    Route::post('/franchises', [AdminFranchiseController::class, 'store'])->name('saas.admin.franchises.store');
+    Route::put('/franchises/{id}', [AdminFranchiseController::class, 'update'])->name('saas.admin.franchises.update');
+    Route::post('/franchises/{id}/toggle', [AdminFranchiseController::class, 'toggleStatus'])->name('saas.admin.franchises.toggle');
+    Route::get('/company-usage', [AdminUsageController::class, 'index'])->name('saas.admin.usage');
+    Route::get('/system-control', [AdminSystemController::class, 'index'])->name('saas.admin.system');
+    Route::post('/system-control/{key}/toggle', [AdminSystemController::class, 'toggle'])->name('saas.admin.system.toggle');
+    Route::get('/audit-logs', [AdminAuditController::class, 'index'])->name('saas.admin.audit');
+});
+
+Route::get('/franchise/login', [FranchiseAuthController::class, 'showLogin'])->name('franchise.login');
+Route::post('/franchise/login', [FranchiseAuthController::class, 'login']);
+Route::post('/franchise/logout', [FranchiseAuthController::class, 'logout'])->name('franchise.logout');
+
+Route::prefix('franchise')->middleware(['franchise.auth'])->group(function () {
+    Route::get('/dashboard', [FranchiseDashboardController::class, 'dashboard'])->name('franchise.dashboard');
+    Route::get('/companies', [FranchiseDashboardController::class, 'companies'])->name('franchise.companies');
+    Route::get('/subscriptions', [FranchiseDashboardController::class, 'subscriptions'])->name('franchise.subscriptions');
+    Route::get('/revenue', [FranchiseDashboardController::class, 'revenue'])->name('franchise.revenue');
 });
 
 require __DIR__.'/auth.php';

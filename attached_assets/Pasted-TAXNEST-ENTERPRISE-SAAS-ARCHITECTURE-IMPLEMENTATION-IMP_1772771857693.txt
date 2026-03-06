@@ -1,0 +1,276 @@
+TAXNEST ENTERPRISE SAAS ARCHITECTURE IMPLEMENTATION
+
+IMPORTANT:
+TaxNest currently contains two independent systems:
+1) Digital Invoice (FBR)
+2) NestPOS (PRA POS)
+
+This task introduces a SaaS management layer WITHOUT modifying existing POS or FBR logic.
+
+Do NOT break or refactor existing invoice or POS modules.
+
+-----------------------------------
+
+SECTION 1 — SUPER ADMIN PANEL
+
+Create a NestViewers Super Admin Panel.
+
+Admin URL:
+ /admin/login
+
+Admin Dashboard:
+ /admin/dashboard
+
+Admin capabilities:
+
+• Approve / reject companies
+• Enable / disable companies
+• Assign subscription plans
+• Monitor POS usage
+• Monitor PRA submissions
+• View system analytics
+• Control system switches
+
+Admin pages required:
+
+/admin/dashboard
+/admin/companies
+/admin/plans
+/admin/subscriptions
+/admin/franchises
+/admin/company-usage
+/admin/system-control
+/admin/audit-logs
+
+Create admin guard:
+
+auth:admin
+
+Create table:
+
+admin_users
+
+Fields:
+id
+name
+email
+password
+role
+created_at
+
+-----------------------------------
+
+SECTION 2 — COMPANY APPROVAL SYSTEM
+
+Add column in companies table:
+
+status
+
+Values:
+
+pending
+approved
+suspended
+rejected
+
+Signup behavior:
+
+New company registration:
+
+status = pending
+
+Login allowed but production submissions blocked.
+
+Admin approval enables full access.
+
+-----------------------------------
+
+SECTION 3 — FRANCHISE / RESELLER SYSTEM
+
+Create franchise system.
+
+Table:
+
+franchises
+
+Fields:
+
+id
+name
+email
+phone
+commission_rate
+status
+created_at
+
+Each company may belong to:
+
+franchise_id (nullable)
+
+Franchise panel routes:
+
+/franchise/login
+/franchise/dashboard
+/franchise/companies
+/franchise/subscriptions
+/franchise/revenue
+
+Franchise capabilities:
+
+• Register companies
+• Manage their companies
+• View usage statistics
+• Sell subscription plans
+
+Franchise cannot:
+
+• modify global plans
+• access system controls
+
+-----------------------------------
+
+SECTION 4 — SUBSCRIPTION BILLING SYSTEM
+
+Create tables:
+
+plans
+subscriptions
+subscription_invoices
+subscription_payments
+
+Plans example:
+
+Starter
+Business
+Enterprise
+
+Plan fields:
+
+id
+name
+price_monthly
+max_terminals
+max_users
+max_products
+inventory_enabled
+reports_enabled
+created_at
+
+-----------------------------------
+
+SECTION 5 — PLAN LIMIT ENFORCEMENT
+
+Important rule:
+
+POS transactions MUST remain unlimited.
+
+Limits apply only to:
+
+• terminals
+• users
+• products
+• inventory
+
+Create middleware:
+
+checkPlanLimit()
+
+Example:
+
+checkPlanLimit('terminals')
+
+-----------------------------------
+
+SECTION 6 — COMPANY USAGE MONITORING
+
+Create table:
+
+company_usage_stats
+
+Track:
+
+company_id
+total_pos_transactions
+total_sales_amount
+active_terminals
+active_users
+inventory_items
+last_activity_at
+
+Admin page:
+
+/admin/company-usage
+
+-----------------------------------
+
+SECTION 7 — SYSTEM CONTROL PANEL
+
+Admin must have emergency switches:
+
+• Disable PRA submissions
+• Disable POS system
+• Maintenance mode
+
+Page:
+
+/admin/system-control
+
+-----------------------------------
+
+SECTION 8 — AUDIT LOGS
+
+Create table:
+
+admin_audit_logs
+
+Track:
+
+admin_id
+action
+target_type
+target_id
+metadata
+created_at
+
+Examples:
+
+Company approved
+Subscription changed
+Account suspended
+
+-----------------------------------
+
+SECTION 9 — SECURITY RULES
+
+Ensure:
+
+• company_id isolation across all queries
+• admin routes protected by admin middleware
+• franchise routes protected by franchise middleware
+
+-----------------------------------
+
+SECTION 10 — FINAL REQUIREMENTS
+
+DO NOT break:
+
+• FBR Digital Invoice module
+• NestPOS module
+• PRA integration
+• existing authentication
+
+This SaaS layer must operate as a management layer on top of the existing system.
+
+-----------------------------------
+
+EXPECTED RESULT
+
+TaxNest becomes a full SaaS platform with:
+
+• Super Admin control
+• Franchise network
+• Subscription billing
+• Plan limits
+• Company approval system
+• Usage monitoring
+• POS unlimited transaction support

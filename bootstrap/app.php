@@ -22,6 +22,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'rate_limit_company' => \App\Http\Middleware\RateLimitByCompany::class,
             'pos.auth' => \App\Http\Middleware\PosAuth::class,
+            'admin.auth' => \App\Http\Middleware\AdminAuth::class,
+            'franchise.auth' => \App\Http\Middleware\FranchiseAuth::class,
+            'plan.limit' => \App\Http\Middleware\CheckPlanLimit::class,
+            'company.approval' => \App\Http\Middleware\CheckCompanyApproval::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

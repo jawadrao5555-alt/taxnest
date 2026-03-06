@@ -50,6 +50,8 @@ class Company extends Model
         'pra_pos_id',
         'pra_production_token',
         'receipt_printer_size',
+        'status',
+        'franchise_id',
     ];
 
     protected $casts = [
@@ -90,6 +92,16 @@ class Company extends Model
             return $this->fbr_production_token;
         }
         return $this->fbr_sandbox_token;
+    }
+
+    public function franchise()
+    {
+        return $this->belongsTo(Franchise::class);
+    }
+
+    public function usageStats()
+    {
+        return $this->hasOne(CompanyUsageStat::class);
     }
 
     public function users()

@@ -30,7 +30,6 @@
             <div class="hidden md:flex items-center space-x-6">
                 <a href="#products" class="text-sm font-medium text-gray-600 hover:text-emerald-600 transition">Products</a>
                 <a href="#features" class="text-sm font-medium text-gray-600 hover:text-emerald-600 transition">Features</a>
-                <a href="#pricing" class="text-sm font-medium text-gray-600 hover:text-emerald-600 transition">Pricing</a>
                 <a href="#faq" class="text-sm font-medium text-gray-600 hover:text-emerald-600 transition">FAQ</a>
                 <div class="flex items-center space-x-2 ml-2">
                     <a href="/login" class="inline-flex items-center px-4 py-2 border-2 border-emerald-600 text-emerald-700 rounded-lg text-sm font-semibold hover:bg-emerald-50 transition">DI Login</a>
@@ -66,7 +65,7 @@
                     Two powerful products. One platform. Complete FBR Digital Invoicing + PRA Point of Sale — fully isolated, enterprise-grade, built for Pakistan.
                 </p>
                 <p class="text-lg text-emerald-300 mb-10 font-semibold">
-                    Plans starting at just Rs. 999/month
+                    14-Day Free Trial &bull; No Credit Card Required
                 </p>
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
                     <a href="/register" class="inline-flex items-center px-8 py-4 bg-emerald-500 text-white rounded-xl text-lg font-bold hover:bg-emerald-600 transition shadow-lg shadow-emerald-900/30 w-full sm:w-auto justify-center">
@@ -187,8 +186,7 @@
                                 Multi-Branch
                             </div>
                         </div>
-                        <div class="flex items-center justify-between pt-4 border-t border-gray-100">
-                            <span class="text-sm text-gray-500">From <span class="font-bold text-gray-900">Rs. 999</span>/month</span>
+                        <div class="flex items-center justify-end pt-4 border-t border-gray-100">
                             <div class="flex space-x-2">
                                 <a href="/login" class="px-4 py-2 border-2 border-emerald-600 text-emerald-700 rounded-lg text-sm font-semibold hover:bg-emerald-50 transition">Login</a>
                                 <a href="/register" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition shadow-sm">Sign Up</a>
@@ -248,8 +246,7 @@
                                 Offline Billing
                             </div>
                         </div>
-                        <div class="flex items-center justify-between pt-4 border-t border-gray-100">
-                            <span class="text-sm text-gray-500">From <span class="font-bold text-gray-900">Rs. 999</span>/month</span>
+                        <div class="flex items-center justify-end pt-4 border-t border-gray-100">
                             <div class="flex space-x-2">
                                 <a href="/pos/login" class="px-4 py-2 border-2 border-purple-600 text-purple-700 rounded-lg text-sm font-semibold hover:bg-purple-50 transition">POS Login</a>
                                 <a href="/pos/register" class="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition shadow-sm">POS Sign Up</a>
@@ -387,7 +384,6 @@
                                 ['FBR + PRA Token Health Monitor', true, false],
                                 ['PWA + Keyboard Shortcuts', true, false],
                                 ['Separate DI + POS Isolation', true, false],
-                                ['Starts at Rs. 999/mo', true, false],
                             ];
                             @endphp
                             @foreach($comparisons as $comp)
@@ -412,125 +408,6 @@
                         </tbody>
                     </table>
                 </div>
-            </div>
-        </div>
-    </section>
-
-    <section id="pricing" class="py-20 bg-white" x-data="{
-        cycle: 'monthly',
-        product: 'di',
-        discounts: { monthly: 0, quarterly: 1, semi_annual: 3, annual: 6 },
-        months: { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 },
-        plans: [
-            { name: 'Retail', price: 999, invoices: '100', users: '2', branches: '1', tag: '' },
-            { name: 'Business', price: 2999, invoices: '700', users: '5', branches: '3', tag: 'MOST POPULAR' },
-            { name: 'Industrial', price: 6999, invoices: '2,500', users: '15', branches: 'Unlimited', tag: '' },
-            { name: 'Enterprise', price: 15000, invoices: 'Unlimited', users: 'Unlimited', branches: 'Unlimited', tag: 'BEST VALUE' }
-        ],
-        diFeatures: {
-            'Retail': ['100 invoices/mo', '2 users', '1 branch', 'FBR Integration', 'PDF + QR Codes', 'Compliance Scoring'],
-            'Business': ['700 invoices/mo', '5 users', '3 branches', 'FBR Integration', 'PDF + QR Codes', 'MIS Reports', 'Customer Ledger', 'HS Intelligence'],
-            'Industrial': ['2,500 invoices/mo', '15 users', 'Unlimited branches', 'FBR Integration', 'All Reports', 'Audit Logs', 'Priority Support'],
-            'Enterprise': ['Unlimited invoices', 'Unlimited users', 'Unlimited branches', 'FBR Integration', 'All Reports', 'Dedicated Manager', 'Custom Integrations']
-        },
-        posFeatures: {
-            'Retail': ['100 transactions/mo', '2 terminals', '1 branch', 'PRA Integration', 'Thermal Receipts', 'Tax Reports'],
-            'Business': ['700 transactions/mo', '5 terminals', '3 branches', 'PRA Integration', 'Thermal Receipts', 'POS Reports', 'Multi-Terminal', 'Customer Management'],
-            'Industrial': ['2,500 transactions/mo', '15 terminals', 'Unlimited branches', 'PRA Integration', 'All Reports', 'Inventory', 'Priority Support'],
-            'Enterprise': ['Unlimited transactions', 'Unlimited terminals', 'Unlimited branches', 'PRA Integration', 'All Reports', 'Dedicated Manager', 'Custom Integrations']
-        },
-        getFeatures(name) { return this.product === 'di' ? this.diFeatures[name] : this.posFeatures[name]; },
-        calcTotal(base) { let m = this.months[this.cycle]; let d = this.discounts[this.cycle]; let total = base * m; return Math.round(total - (total * d / 100)); },
-        calcMonthly(base) { return Math.round(this.calcTotal(base) / this.months[this.cycle]); },
-        savings(base) { let m = this.months[this.cycle]; return Math.round(base * m - this.calcTotal(base)); },
-        getSignupUrl() { return this.product === 'di' ? '/register' : '/pos/register'; }
-    }">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-8">
-                <p class="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-2">Pricing</p>
-                <h2 class="text-3xl sm:text-4xl font-extrabold text-gray-900">Aggressive Pricing for Market Leaders</h2>
-                <p class="mt-4 text-lg text-gray-500">Start with a 14-day free trial. No credit card required.</p>
-            </div>
-
-            <div class="flex justify-center mb-6">
-                <div class="inline-flex bg-gray-100 rounded-xl p-1.5 border border-gray-200">
-                    <button @click="product = 'di'" :class="product === 'di' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-800'" class="px-6 py-2.5 rounded-lg text-sm font-semibold transition flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                        Digital Invoice (FBR)
-                    </button>
-                    <button @click="product = 'pos'" :class="product === 'pos' ? 'bg-purple-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-800'" class="px-6 py-2.5 rounded-lg text-sm font-semibold transition flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                        NestPOS (PRA)
-                    </button>
-                </div>
-            </div>
-
-            <div class="flex justify-center mb-10">
-                <div class="inline-flex bg-white rounded-xl p-1.5 shadow-sm border border-gray-200">
-                    <button @click="cycle = 'monthly'" :class="cycle === 'monthly' ? (product === 'di' ? 'bg-emerald-600' : 'bg-purple-600') + ' text-white shadow-sm' : 'text-gray-600 hover:text-gray-800'" class="px-4 py-2 rounded-lg text-sm font-medium transition">Monthly</button>
-                    <button @click="cycle = 'quarterly'" :class="cycle === 'quarterly' ? (product === 'di' ? 'bg-emerald-600' : 'bg-purple-600') + ' text-white shadow-sm' : 'text-gray-600 hover:text-gray-800'" class="px-4 py-2 rounded-lg text-sm font-medium transition">Quarterly <span class="text-xs font-bold opacity-70">-1%</span></button>
-                    <button @click="cycle = 'semi_annual'" :class="cycle === 'semi_annual' ? (product === 'di' ? 'bg-emerald-600' : 'bg-purple-600') + ' text-white shadow-sm' : 'text-gray-600 hover:text-gray-800'" class="px-4 py-2 rounded-lg text-sm font-medium transition">Semi-Annual <span class="text-xs font-bold opacity-70">-3%</span></button>
-                    <button @click="cycle = 'annual'" :class="cycle === 'annual' ? (product === 'di' ? 'bg-emerald-600' : 'bg-purple-600') + ' text-white shadow-sm' : 'text-gray-600 hover:text-gray-800'" class="px-4 py-2 rounded-lg text-sm font-medium transition">Annual <span class="text-xs font-bold opacity-70">-6%</span></button>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
-                <template x-for="plan in plans" :key="plan.name">
-                    <div class="bg-white border-2 shadow-lg hover:-translate-y-1 transition-all duration-300 rounded-2xl relative"
-                         :class="plan.name === 'Business' ? (product === 'di' ? 'border-emerald-500 ring-2 ring-emerald-500/50' : 'border-purple-500 ring-2 ring-purple-500/50') : 'border-gray-200'">
-
-                        <div x-show="plan.tag" class="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                            <span class="text-white text-xs font-bold px-3 py-1 rounded-full" :class="product === 'di' ? 'bg-emerald-600' : 'bg-purple-600'" x-text="plan.tag"></span>
-                        </div>
-
-                        <div class="p-6">
-                            <h3 class="text-xl font-bold text-gray-900" x-text="plan.name"></h3>
-                            <div class="mt-4">
-                                <div x-show="cycle === 'monthly'">
-                                    <span class="text-3xl font-extrabold text-gray-900">Rs. <span x-text="plan.price.toLocaleString()"></span></span>
-                                    <span class="text-gray-500 text-sm">/mo</span>
-                                </div>
-                                <div x-show="cycle !== 'monthly'">
-                                    <span class="text-3xl font-extrabold text-gray-900">Rs. <span x-text="calcMonthly(plan.price).toLocaleString()"></span></span>
-                                    <span class="text-gray-500 text-sm">/mo</span>
-                                    <p class="text-xs text-gray-400 mt-1">Rs. <span x-text="calcTotal(plan.price).toLocaleString()"></span> total</p>
-                                    <p x-show="savings(plan.price) > 0" class="text-xs font-semibold mt-0.5" :class="product === 'di' ? 'text-emerald-600' : 'text-purple-600'">Save Rs. <span x-text="savings(plan.price).toLocaleString()"></span></p>
-                                </div>
-                            </div>
-                            <div class="mt-4 mb-4 flex flex-wrap gap-2">
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">
-                                    <span x-text="plan.invoices"></span>&nbsp;<span x-text="product === 'di' ? 'invoices' : 'transactions'"></span>
-                                </span>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-700">
-                                    <span x-text="plan.users"></span>&nbsp;<span x-text="product === 'di' ? 'users' : 'terminals'"></span>
-                                </span>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-700">
-                                    <span x-text="plan.branches"></span>&nbsp;branch<span x-show="plan.branches !== '1'">es</span>
-                                </span>
-                            </div>
-                            <ul class="space-y-2">
-                                <template x-for="f in getFeatures(plan.name)" :key="f">
-                                    <li class="flex items-center text-sm text-gray-600">
-                                        <svg class="w-4 h-4 mr-2 flex-shrink-0" :class="product === 'di' ? 'text-emerald-500' : 'text-purple-500'" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                        <span x-text="f"></span>
-                                    </li>
-                                </template>
-                            </ul>
-                            <a :href="getSignupUrl()" class="block w-full text-center mt-6 px-6 py-3 rounded-xl font-semibold text-sm transition text-white"
-                               :class="plan.name === 'Business' ? (product === 'di' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-purple-600 hover:bg-purple-700') : 'bg-gray-900 hover:bg-gray-800'">
-                                Start Free Trial
-                            </a>
-                        </div>
-                    </div>
-                </template>
-            </div>
-
-            <div class="mt-8 text-center">
-                <p class="text-gray-600 mb-3">Need a custom configuration?</p>
-                <a :href="getSignupUrl()" class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-bold hover:from-indigo-700 hover:to-purple-700 transition shadow-lg shadow-indigo-500/25">
-                    <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
-                    Build Custom Plan
-                </a>
             </div>
         </div>
     </section>
@@ -655,7 +532,7 @@
                 <div>
                     <h4 class="text-sm font-semibold text-white uppercase tracking-wider mb-4">Platform</h4>
                     <div class="space-y-2">
-                        <a href="#pricing" class="block text-sm text-gray-400 hover:text-white transition">Pricing</a>
+                        <a href="#features" class="block text-sm text-gray-400 hover:text-white transition">Features</a>
                         <a href="#faq" class="block text-sm text-gray-400 hover:text-white transition">FAQ</a>
                         <a href="/admin/login" class="block text-sm text-gray-400 hover:text-white transition">Admin Login</a>
                     </div>

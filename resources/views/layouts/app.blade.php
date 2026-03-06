@@ -144,12 +144,15 @@
 
                 @if(auth()->check() && auth()->user()->company_id)
                     @php $currentCompany = \App\Models\Company::find(auth()->user()->company_id); @endphp
-                    @if($currentCompany && $currentCompany->company_status === 'pending')
-                    <div class="bg-amber-500 text-white text-center py-2 px-4 text-sm font-medium">
-                        Your company registration is pending approval. Some features may be limited.
+                    @if($currentCompany && $currentCompany->status === 'pending')
+                    <div class="bg-amber-500 text-white py-3 px-4">
+                        <div class="max-w-7xl mx-auto flex items-center justify-center gap-2 text-sm font-semibold">
+                            <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                            <span>Account Approval Pending — Aap features dekh sakte hain lekin koi action nahi kar sakte jab tak admin approve na kare.</span>
+                        </div>
                     </div>
                     @endif
-                    @if($currentCompany && $currentCompany->company_status === 'suspended')
+                    @if($currentCompany && ($currentCompany->status === 'suspended' || $currentCompany->company_status === 'suspended'))
                     <div class="bg-red-600 text-white text-center py-2 px-4 text-sm font-medium">
                         Your company has been suspended. Please contact support.
                     </div>
@@ -278,6 +281,35 @@
                 if (badge) badge.classList.remove('hidden');
             });
         </script>
+
+        @if(!empty($companyPendingApproval))
+        <style>
+            .pending-overlay-wrapper { position: relative; }
+            form button[type="submit"],
+            a[href*="/store"], a[href*="/create"],
+            button.btn-premium,
+            a.btn-premium,
+            form:not(.no-pending-block) button[type="submit"] {
+                opacity: 0.5 !important;
+                cursor: not-allowed !important;
+                pointer-events: none !important;
+            }
+        </style>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                document.querySelectorAll('form:not(.no-pending-block)').forEach(function(form) {
+                    form.addEventListener('submit', function(e) {
+                        if (form.closest('[data-allow-pending]')) return;
+                        if (form.action && (form.action.includes('/logout') || form.action.includes('/toggle-dark-mode') || form.action.includes('/profile'))) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        alert('Account Approval Pending — Aap koi action nahi kar sakte jab tak admin approve na kare.');
+                        return false;
+                    });
+                });
+            });
+        </script>
+        @endif
 
         <script>
             document.addEventListener('alpine:init', () => {

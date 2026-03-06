@@ -28,6 +28,20 @@ class CheckCompanyApproval
             return response()->view('errors.company-rejected', [], 403);
         }
 
+        if ($company->status === 'pending') {
+            view()->share('companyPendingApproval', true);
+
+            if (!$request->isMethod('GET') && !$request->isMethod('HEAD')) {
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json([
+                        'error' => 'Your account is pending admin approval. Actions are disabled until approved.'
+                    ], 403);
+                }
+
+                return redirect()->back()->with('error', 'Your account is pending admin approval. You can view features but cannot perform actions until approved.');
+            }
+        }
+
         return $next($request);
     }
 }

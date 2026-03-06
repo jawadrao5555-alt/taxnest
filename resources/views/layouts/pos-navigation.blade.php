@@ -33,6 +33,33 @@
         Tax Reports
     </a>
 
+    @php $inventoryEnabled = \App\Models\Company::find(app('currentCompanyId'))?->inventory_enabled ?? false; @endphp
+    @if($inventoryEnabled)
+    <div class="pt-4 pb-1 px-4">
+        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Inventory</p>
+    </div>
+
+    <a href="{{ route('pos.inventory.dashboard') }}" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->routeIs('pos.inventory.dashboard') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+        Inventory Dashboard
+    </a>
+
+    <a href="{{ route('pos.inventory.stock') }}" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->routeIs('pos.inventory.stock') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+        Stock
+    </a>
+
+    <a href="{{ route('pos.inventory.movements') }}" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->routeIs('pos.inventory.movements') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
+        Stock Movements
+    </a>
+
+    <a href="{{ route('pos.inventory.low-stock') }}" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->routeIs('pos.inventory.low-stock') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+        Low Stock Alerts
+    </a>
+    @endif
+
     <div class="pt-4 pb-1 px-4">
         <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Manage</p>
     </div>

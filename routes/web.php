@@ -19,6 +19,7 @@ use App\Http\Controllers\CompanyUserController;
 use App\Http\Controllers\CompanySettingsController;
 use App\Http\Controllers\CustomerLedgerController;
 use App\Http\Controllers\PosController;
+use App\Http\Controllers\PosInventoryController;
 use App\Http\Controllers\PosAuthController;
 use App\Http\Controllers\HsCodeMappingController;
 use App\Http\Controllers\BranchController;
@@ -443,6 +444,14 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::match(['get', 'post'], '/pra-settings', [PosController::class, 'praSettings'])->name('pos.pra-settings');
     Route::get('/products', [PosController::class, 'products'])->name('pos.products');
     Route::get('/customers', [PosController::class, 'customers'])->name('pos.customers');
+
+    Route::get('/inventory', [PosInventoryController::class, 'dashboard'])->name('pos.inventory.dashboard');
+    Route::get('/inventory/stock', [PosInventoryController::class, 'stock'])->name('pos.inventory.stock');
+    Route::get('/inventory/movements', [PosInventoryController::class, 'movements'])->name('pos.inventory.movements');
+    Route::get('/inventory/low-stock', [PosInventoryController::class, 'lowStockAlerts'])->name('pos.inventory.low-stock');
+    Route::match(['get', 'post'], '/inventory/adjust', [PosInventoryController::class, 'adjustStock'])->name('pos.inventory.adjust');
+    Route::post('/inventory/min-stock', [PosInventoryController::class, 'updateMinStock'])->name('pos.inventory.min-stock');
+    Route::post('/inventory/toggle', [PosInventoryController::class, 'toggleInventory'])->name('pos.inventory.toggle');
 });
 
 require __DIR__.'/auth.php';

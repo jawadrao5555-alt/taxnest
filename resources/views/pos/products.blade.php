@@ -2,7 +2,15 @@
 <div class="p-4 sm:p-6 max-w-7xl mx-auto">
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-xl font-bold text-gray-900 dark:text-white">POS Products</h1>
-        <button onclick="document.getElementById('addProductForm').classList.toggle('hidden')" style="background: linear-gradient(135deg, #7c3aed, #8b5cf6); color: #fff; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; border: none; cursor: pointer;">+ Add Product</button>
+        <div class="flex items-center gap-2">
+            <button onclick="document.getElementById('importSection').classList.toggle('hidden')" style="background: linear-gradient(135deg, #059669, #10b981); color: #fff; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; border: none; cursor: pointer;">
+                <span style="display: inline-flex; align-items: center; gap: 4px;">
+                    <svg style="width:16px; height:16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                    Import Excel
+                </span>
+            </button>
+            <button onclick="document.getElementById('addProductForm').classList.toggle('hidden')" style="background: linear-gradient(135deg, #7c3aed, #8b5cf6); color: #fff; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; border: none; cursor: pointer;">+ Add Product</button>
+        </div>
     </div>
 
     @if(session('success'))
@@ -11,6 +19,37 @@
     @if($errors->any())
     <div class="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-300 rounded-lg px-4 py-3 text-sm">{{ $errors->first() }}</div>
     @endif
+
+    <div id="importSection" class="hidden mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">Bulk Import Products from Excel/CSV</h3>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                <h4 class="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-2">Step 1: Download Template</h4>
+                <p class="text-xs text-gray-500 mb-3">Download the CSV template, fill in your products in Excel/Google Sheets, then save as CSV.</p>
+                <a href="{{ route('pos.products.template') }}" style="background: linear-gradient(135deg, #7c3aed, #8b5cf6); color: #fff; padding: 8px 20px; border-radius: 8px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                    <svg style="width:14px; height:14px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    Download Template
+                </a>
+                <div class="mt-3 text-[11px] text-gray-400">
+                    <p class="font-semibold text-gray-500 mb-1">Template columns:</p>
+                    <p><strong>Name</strong> (required), <strong>Price</strong> (required), Description, Category, SKU, Barcode, Tax Rate %, Unit (UOM)</p>
+                    <p class="mt-1">Template includes 3 sample rows — delete them and add your own products.</p>
+                </div>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                <h4 class="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-2">Step 2: Upload File</h4>
+                <p class="text-xs text-gray-500 mb-3">Upload your filled CSV file. Existing products (same name) will be updated with new price.</p>
+                <form method="POST" action="{{ route('pos.products.import') }}" enctype="multipart/form-data" class="space-y-3">
+                    @csrf
+                    <input type="file" name="csv_file" accept=".csv,.txt" required class="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 dark:file:bg-purple-900/30 dark:file:text-purple-300">
+                    <button type="submit" style="background: linear-gradient(135deg, #059669, #10b981); color: #fff; padding: 8px 20px; border-radius: 8px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        <svg style="width:14px; height:14px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                        Upload & Import
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <div id="addProductForm" class="hidden mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Add New Product</h3>

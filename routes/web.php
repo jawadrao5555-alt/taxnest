@@ -444,6 +444,8 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::match(['get', 'post'], '/pra-settings', [PosController::class, 'praSettings'])->name('pos.pra-settings');
     Route::get('/products', [PosController::class, 'products'])->name('pos.products');
     Route::post('/products', [PosController::class, 'storeProduct'])->name('pos.products.store');
+    Route::get('/products/template', [PosController::class, 'downloadProductTemplate'])->name('pos.products.template');
+    Route::post('/products/import', [PosController::class, 'importProducts'])->name('pos.products.import');
     Route::put('/products/{id}', [PosController::class, 'updateProduct'])->name('pos.products.update');
     Route::delete('/products/{id}', [PosController::class, 'deleteProduct'])->name('pos.products.delete');
     Route::post('/products/{id}/toggle', [PosController::class, 'toggleProduct'])->name('pos.products.toggle');

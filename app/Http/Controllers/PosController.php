@@ -825,6 +825,142 @@ class PosController extends Controller
         return back()->with('success', 'Product added successfully.');
     }
 
+    public function downloadProductTemplate()
+    {
+        $headers = ['Name', 'Price', 'Description', 'Category', 'SKU', 'Barcode', 'Tax Rate %', 'Unit (UOM)'];
+        $examples = [
+            ['Chicken Biryani', '450', 'Full plate biryani with raita', 'Food', 'CB-001', '8901234567890', '16', 'NOS'],
+            ['Pepsi 500ml', '120', 'Cold drink bottle', 'Beverages', 'PEP-500', '8901234567891', '5', 'NOS'],
+            ['Naan', '30', 'Tandoori naan', 'Food', 'NAN-001', '', '0', 'NOS'],
+        ];
+
+        $callback = function() use ($headers, $examples) {
+            $file = fopen('php://output', 'w');
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+            fputcsv($file, $headers);
+            foreach ($examples as $row) {
+                fputcsv($file, $row);
+            }
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="pos_products_template.csv"',
+        ]);
+    }
+
+    public function importProducts(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+
+        $request->validate([
+            'csv_file' => 'required|file|mimes:csv,txt|max:2048',
+        ]);
+
+        $file = $request->file('csv_file');
+        $handle = fopen($file->getRealPath(), 'r');
+
+        if (!$handle) {
+            return back()->with('error', 'Could not read file.');
+        }
+
+        $header = fgetcsv($handle);
+        if (!$header) {
+            fclose($handle);
+            return back()->with('error', 'Empty file or invalid format.');
+        }
+
+        $header = array_map(function($h) {
+            return strtolower(trim(preg_replace('/[\x{FEFF}]/u', '', $h)));
+        }, $header);
+
+        $nameIdx = array_search('name', $header);
+        $priceIdx = array_search('price', $header);
+
+        if ($nameIdx === false || $priceIdx === false) {
+            fclose($handle);
+            return back()->with('error', 'CSV must have "Name" and "Price" columns. Download the template for the correct format.');
+        }
+
+        $descIdx = $this->findColumn($header, ['description']);
+        $catIdx = $this->findColumn($header, ['category']);
+        $skuIdx = $this->findColumn($header, ['sku']);
+        $barcodeIdx = $this->findColumn($header, ['barcode']);
+        $taxIdx = $this->findColumn($header, ['tax rate %', 'tax rate', 'tax_rate', 'tax']);
+        $uomIdx = $this->findColumn($header, ['unit (uom)', 'unit', 'uom']);
+
+        $imported = 0;
+        $skipped = 0;
+        $errors = [];
+        $row = 1;
+
+        while (($data = fgetcsv($handle)) !== false) {
+            $row++;
+            $name = trim($data[$nameIdx] ?? '');
+            $price = trim($data[$priceIdx] ?? '');
+
+            if ($name === '' || $price === '') {
+                $skipped++;
+                continue;
+            }
+
+            if (!is_numeric($price) || $price < 0) {
+                $errors[] = "Row {$row}: Invalid price for '{$name}'";
+                $skipped++;
+                continue;
+            }
+
+            $existing = PosProduct::where('company_id', $companyId)
+                ->whereRaw('LOWER(name) = ?', [strtolower($name)])
+                ->first();
+
+            if ($existing) {
+                $existing->update([
+                    'price' => (float) $price,
+                    'description' => $descIdx !== false ? trim($data[$descIdx] ?? '') ?: $existing->description : $existing->description,
+                    'category' => $catIdx !== false ? trim($data[$catIdx] ?? '') ?: $existing->category : $existing->category,
+                    'sku' => $skuIdx !== false ? trim($data[$skuIdx] ?? '') ?: $existing->sku : $existing->sku,
+                    'barcode' => $barcodeIdx !== false ? trim($data[$barcodeIdx] ?? '') ?: $existing->barcode : $existing->barcode,
+                    'tax_rate' => $taxIdx !== false && is_numeric(trim($data[$taxIdx] ?? '')) ? (float) trim($data[$taxIdx]) : $existing->tax_rate,
+                    'uom' => $uomIdx !== false && trim($data[$uomIdx] ?? '') !== '' ? strtoupper(trim($data[$uomIdx])) : $existing->uom,
+                ]);
+                $imported++;
+            } else {
+                PosProduct::create([
+                    'company_id' => $companyId,
+                    'name' => $name,
+                    'price' => (float) $price,
+                    'description' => $descIdx !== false ? trim($data[$descIdx] ?? '') : null,
+                    'category' => $catIdx !== false ? trim($data[$catIdx] ?? '') : null,
+                    'sku' => $skuIdx !== false ? trim($data[$skuIdx] ?? '') : null,
+                    'barcode' => $barcodeIdx !== false ? trim($data[$barcodeIdx] ?? '') : null,
+                    'tax_rate' => $taxIdx !== false && is_numeric(trim($data[$taxIdx] ?? '')) ? (float) trim($data[$taxIdx]) : 0,
+                    'uom' => $uomIdx !== false && trim($data[$uomIdx] ?? '') !== '' ? strtoupper(trim($data[$uomIdx])) : 'NOS',
+                    'is_active' => true,
+                ]);
+                $imported++;
+            }
+        }
+
+        fclose($handle);
+
+        $msg = "{$imported} products imported successfully.";
+        if ($skipped > 0) $msg .= " {$skipped} rows skipped.";
+        if (!empty($errors)) $msg .= " Issues: " . implode('; ', array_slice($errors, 0, 3));
+
+        return back()->with('success', $msg);
+    }
+
+    private function findColumn(array $header, array $names): int|false
+    {
+        foreach ($names as $name) {
+            $idx = array_search($name, $header);
+            if ($idx !== false) return $idx;
+        }
+        return false;
+    }
+
     public function updateProduct(Request $request, $id)
     {
         $companyId = app('currentCompanyId');

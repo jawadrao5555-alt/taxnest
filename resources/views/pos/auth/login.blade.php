@@ -79,6 +79,17 @@
                     </div>
                 </form>
             </div>
+
+            <div class="w-full sm:max-w-md mt-4 px-6">
+                <a href="/admin/login" style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 10px 16px; border-radius: 10px; border: 1px solid rgba(99, 102, 241, 0.3); background: rgba(99, 102, 241, 0.06); color: #6366f1; font-size: 13px; font-weight: 600; text-decoration: none; transition: all 0.2s;" onmouseover="this.style.background='rgba(99, 102, 241, 0.12)'; this.style.borderColor='rgba(99, 102, 241, 0.5)';" onmouseout="this.style.background='rgba(99, 102, 241, 0.06)'; this.style.borderColor='rgba(99, 102, 241, 0.3)';">
+                    <svg style="width: 16px; height: 16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    SaaS Admin Login
+                </a>
+            </div>
+
+            <div class="mt-3 text-center">
+                <a href="/" class="text-xs text-gray-400 hover:text-gray-600 transition">Digital Invoice (FBR) Portal</a>
+            </div>
         </div>
     </body>
 </html>

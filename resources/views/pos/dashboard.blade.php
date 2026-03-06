@@ -154,7 +154,7 @@
             </div>
             <span class="text-xs font-medium text-gray-700 dark:text-gray-300">Services</span>
         </a>
-        <a href="{{ route('products.index') }}" class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-teal-300 hover:shadow-md transition group">
+        <a href="{{ route('pos.products') }}" class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-teal-300 hover:shadow-md transition group">
             <div class="h-10 w-10 mx-auto rounded-lg bg-teal-50 dark:bg-teal-900/30 flex items-center justify-center mb-2 group-hover:bg-teal-100">
                 <svg class="w-5 h-5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
             </div>

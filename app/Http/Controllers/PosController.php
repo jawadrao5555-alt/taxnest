@@ -208,6 +208,8 @@ class PosController extends Controller
             foreach ($request->items as $item) {
                 $itemType = $item['type'] ?? 'product';
                 $itemId = $item['item_id'] ?? null;
+                $itemName = trim($item['name'] ?? '');
+                $itemPrice = (float) ($item['unit_price'] ?? 0);
 
                 if ($itemId) {
                     if ($itemType === 'product') {
@@ -220,14 +222,34 @@ class PosController extends Controller
                     }
                 }
 
+                if (!$itemId && $itemType === 'product' && $itemName !== '') {
+                    $existing = PosProduct::where('company_id', $companyId)
+                        ->whereRaw('LOWER(name) = ?', [strtolower($itemName)])
+                        ->first();
+
+                    if ($existing) {
+                        $itemId = $existing->id;
+                    } else {
+                        $newProduct = PosProduct::create([
+                            'company_id' => $companyId,
+                            'name' => $itemName,
+                            'price' => $itemPrice,
+                            'tax_rate' => 0,
+                            'uom' => 'NOS',
+                            'is_active' => true,
+                        ]);
+                        $itemId = $newProduct->id;
+                    }
+                }
+
                 PosTransactionItem::create([
                     'transaction_id' => $transaction->id,
                     'item_type' => $itemType,
                     'item_id' => $itemId,
-                    'item_name' => $item['name'],
+                    'item_name' => $itemName,
                     'quantity' => $item['quantity'],
-                    'unit_price' => $item['unit_price'],
-                    'subtotal' => round($item['quantity'] * $item['unit_price'], 2),
+                    'unit_price' => $itemPrice,
+                    'subtotal' => round($item['quantity'] * $itemPrice, 2),
                 ]);
             }
 

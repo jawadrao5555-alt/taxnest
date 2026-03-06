@@ -116,9 +116,8 @@
 
                     <div class="hidden sm:grid sm:grid-cols-12 gap-2 text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 px-1">
                         <div class="col-span-2">Type</div>
-                        <div class="col-span-3">Item</div>
-                        <div class="col-span-2">Name</div>
-                        <div class="col-span-1">Qty</div>
+                        <div class="col-span-4">Item Name</div>
+                        <div class="col-span-2">Qty</div>
                         <div class="col-span-2">Unit Price</div>
                         <div class="col-span-1">Subtotal</div>
                         <div class="col-span-1"></div>
@@ -133,27 +132,75 @@
                                     <option value="service">Service</option>
                                 </select>
                             </div>
-                            <div class="sm:col-span-3">
-                                <label class="block sm:hidden text-xs text-gray-500 mb-1">Select Item</label>
-                                <select x-model="item.item_id" @change="onItemSelect(index)" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition">
-                                    <option value="">-- Select --</option>
-                                    <template x-if="item.type === 'product'">
-                                        <template x-for="p in products" :key="p.id">
-                                            <option :value="p.id" x-text="p.name + ' - Rs ' + Number(p.price || p.unit_price || 0).toLocaleString()"></option>
+                            <div class="sm:col-span-4 relative" x-data="{ open: false, search: '' }" x-init="search = item.name || ''">
+                                <label class="block sm:hidden text-xs text-gray-500 mb-1">Item Name</label>
+                                <div class="relative">
+                                    <input type="text"
+                                        x-model="search"
+                                        @input="open = true; item.name = search; item.item_id = ''; item._isNew = true; recalculate()"
+                                        @focus="open = true"
+                                        @click.away="open = false"
+                                        @keydown.escape="open = false"
+                                        @keydown.arrow-down.prevent="$refs['dd'+index] && $refs['dd'+index].querySelector('[role=option]')?.focus()"
+                                        placeholder="Type or search product..."
+                                        class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 pr-8 focus:ring-2 focus:ring-emerald-500 transition">
+                                    <div class="absolute inset-y-0 right-0 flex items-center pr-2">
+                                        <template x-if="item.item_id && !item._isNew">
+                                            <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                         </template>
+                                        <template x-if="item._isNew && search.length > 0 && item.type === 'product'">
+                                            <span class="text-[9px] font-bold text-purple-500 uppercase">New</span>
+                                        </template>
+                                    </div>
+                                </div>
+                                <div x-show="open"
+                                    x-transition
+                                    :x-ref="'dd'+index"
+                                    class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                                    <template x-if="item.type === 'product'">
+                                        <div>
+                                            <template x-for="p in products.filter(pr => !search || pr.name.toLowerCase().includes(search.toLowerCase()))" :key="p.id">
+                                                <button type="button"
+                                                    role="option"
+                                                    @click="search = p.name; item.name = p.name; item.item_id = p.id; item.unit_price = parseFloat(p.price || p.unit_price || 0); item._isNew = false; open = false; recalculate()"
+                                                    class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50 dark:hover:bg-emerald-900/20 flex justify-between items-center transition">
+                                                    <span class="text-gray-900 dark:text-gray-100 font-medium" x-text="p.name"></span>
+                                                    <span class="text-xs text-gray-500" x-text="'Rs ' + Number(p.price || p.unit_price || 0).toLocaleString()"></span>
+                                                </button>
+                                            </template>
+                                            <template x-if="search.length > 0 && products.filter(pr => pr.name.toLowerCase().includes(search.toLowerCase())).length === 0">
+                                                <div class="px-3 py-2 text-xs text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
+                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                                    "<span x-text="search" class="font-semibold"></span>" will be added as new product
+                                                </div>
+                                            </template>
+                                            <template x-if="search.length > 0 && products.filter(pr => pr.name.toLowerCase() === search.toLowerCase()).length === 0 && products.filter(pr => pr.name.toLowerCase().includes(search.toLowerCase())).length > 0">
+                                                <div class="border-t border-gray-100 dark:border-gray-700 px-3 py-2 text-xs text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
+                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                                    Or add "<span x-text="search" class="font-semibold"></span>" as new product
+                                                </div>
+                                            </template>
+                                        </div>
                                     </template>
                                     <template x-if="item.type === 'service'">
-                                        <template x-for="s in services" :key="s.id">
-                                            <option :value="s.id" x-text="s.name + ' - Rs ' + Number(s.price || 0).toLocaleString()"></option>
-                                        </template>
+                                        <div>
+                                            <template x-for="s in services.filter(sv => !search || sv.name.toLowerCase().includes(search.toLowerCase()))" :key="s.id">
+                                                <button type="button"
+                                                    role="option"
+                                                    @click="search = s.name; item.name = s.name; item.item_id = s.id; item.unit_price = parseFloat(s.price || 0); item._isNew = false; open = false; recalculate()"
+                                                    class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50 dark:hover:bg-emerald-900/20 flex justify-between items-center transition">
+                                                    <span class="text-gray-900 dark:text-gray-100 font-medium" x-text="s.name"></span>
+                                                    <span class="text-xs text-gray-500" x-text="'Rs ' + Number(s.price || 0).toLocaleString()"></span>
+                                                </button>
+                                            </template>
+                                            <template x-if="services.filter(sv => !search || sv.name.toLowerCase().includes(search.toLowerCase())).length === 0">
+                                                <div class="px-3 py-2 text-xs text-gray-400">No matching services found</div>
+                                            </template>
+                                        </div>
                                     </template>
-                                </select>
+                                </div>
                             </div>
                             <div class="sm:col-span-2">
-                                <label class="block sm:hidden text-xs text-gray-500 mb-1">Name</label>
-                                <input type="text" x-model="item.name" placeholder="Item name" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition">
-                            </div>
-                            <div class="sm:col-span-1">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Qty</label>
                                 <input type="number" x-model.number="item.quantity" min="0.01" step="0.01" @input="recalculate()" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition text-center">
                             </div>
@@ -308,7 +355,7 @@
                 terminalId: '',
 
                 items: [
-                    { type: 'product', item_id: '', name: '', quantity: 1, unit_price: 0 }
+                    { type: 'product', item_id: '', name: '', quantity: 1, unit_price: 0, _isNew: false }
                 ],
 
                 discountType: 'percentage',
@@ -489,7 +536,7 @@
                 },
 
                 addItem() {
-                    this.items.push({ type: 'product', item_id: '', name: '', quantity: 1, unit_price: 0 });
+                    this.items.push({ type: 'product', item_id: '', name: '', quantity: 1, unit_price: 0, _isNew: false });
                 },
 
                 removeItem(index) {
@@ -501,26 +548,7 @@
                     this.items[index].item_id = '';
                     this.items[index].name = '';
                     this.items[index].unit_price = 0;
-                    this.recalculate();
-                },
-
-                onItemSelect(index) {
-                    let item = this.items[index];
-                    if (!item.item_id) return;
-
-                    if (item.type === 'product') {
-                        let found = this.products.find(p => p.id == item.item_id);
-                        if (found) {
-                            item.name = found.name;
-                            item.unit_price = parseFloat(found.price || found.unit_price || 0);
-                        }
-                    } else {
-                        let found = this.services.find(s => s.id == item.item_id);
-                        if (found) {
-                            item.name = found.name;
-                            item.unit_price = parseFloat(found.price || 0);
-                        }
-                    }
+                    this.items[index]._isNew = false;
                     this.recalculate();
                 },
 

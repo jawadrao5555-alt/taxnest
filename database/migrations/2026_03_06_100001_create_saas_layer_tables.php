@@ -17,6 +17,7 @@ return new class extends Migration
                 $table->string('email')->unique();
                 $table->string('password');
                 $table->string('role', 30)->default('admin');
+                $table->rememberToken();
                 $table->timestamps();
             });
         }

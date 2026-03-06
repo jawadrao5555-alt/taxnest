@@ -4,7 +4,10 @@
 TaxNest is a multi-company SaaS platform for tax and invoice management in Pakistan, ensuring compliance with FBR regulations. It provides Smart Invoicing, configurable governance, enterprise API, PDF generation, and a demo mode. The "Heavy Enterprise" version includes a Company Approval System, Customer Ledger, Multi-Branch support, FBR Token Health Monitor, Advanced Admin View, Immutable Audit Logs, Enterprise Analytics, and enhanced security. The project targets a high-volume market with competitive pricing and a 14-day free trial.
 
 ## User Preferences
-- ZIA CORPORATION is a REAL production account (not demo/internal) - NTN: 3620291786117, Owner: ZIA UR REHMAN
+- ZIA CORPORATION is a REAL production account (not demo/internal) - NTN: 3620291786117, Owner: ZIA UR REHMAN (Digital Invoice ONLY, NO POS data)
+- NestPOS Enterprise Store (company_id 11) is the dedicated POS company — completely separate from Digital Invoice
+- POS Admin: posadmin@taxnest.com / Admin@12345 (company_id 11, NestPOS Enterprise Store)
+- Digital Invoice and POS data are FULLY ISOLATED — no cross-contamination
 - Login supports: Email, Phone, Username, CNIC, NTN
 - CNIC/NTN login maps to company_admin user of matching company
 

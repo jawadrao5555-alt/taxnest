@@ -50,6 +50,7 @@ class Company extends Model
         'pra_pos_id',
         'pra_production_token',
         'receipt_printer_size',
+        'logo_path',
         'status',
         'franchise_id',
     ];

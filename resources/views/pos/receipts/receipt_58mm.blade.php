@@ -60,6 +60,9 @@
     </script>
 
     <div class="header text-center">
+        @if($company->logo_path)
+        <div style="margin-bottom: 4px;"><img src="{{ asset('storage/' . $company->logo_path) }}" alt="{{ $company->name }}" style="max-width: 120px; max-height: 40px; margin: 0 auto; display: block; object-fit: contain;"></div>
+        @endif
         <h1>{{ Str::limit($company->name, 24) }}</h1>
         @if($company->phone)<p>{{ $company->phone }}</p>@endif
         @if($company->ntn)<p>NTN: {{ $company->ntn }}</p>@endif

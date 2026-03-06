@@ -60,6 +60,9 @@
     </script>
 
     <div class="header text-center">
+        @if($company->logo_path)
+        <div style="margin-bottom: 6px;"><img src="{{ asset('storage/' . $company->logo_path) }}" alt="{{ $company->name }}" style="max-width: 160px; max-height: 60px; margin: 0 auto; display: block; object-fit: contain;"></div>
+        @endif
         <h1>{{ $company->name }}</h1>
         @if($company->address)<p>{{ $company->address }}</p>@endif
         @if($company->phone)<p>Tel: {{ $company->phone }}</p>@endif

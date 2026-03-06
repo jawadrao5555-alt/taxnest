@@ -443,6 +443,8 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::post('/api/invoice/{id}/unlock', [PosController::class, 'unlockInvoice'])->name('pos.api.invoice.unlock');
     Route::match(['get', 'post'], '/pra-settings', [PosController::class, 'praSettings'])->name('pos.pra-settings');
     Route::get('/billing', [PosController::class, 'billing'])->name('pos.billing');
+    Route::match(['get', 'post'], '/business-profile', [PosController::class, 'businessProfile'])->name('pos.business-profile');
+    Route::match(['get', 'post'], '/my-profile', [PosController::class, 'userProfile'])->name('pos.user-profile');
     Route::get('/products', [PosController::class, 'products'])->name('pos.products');
     Route::post('/products', [PosController::class, 'storeProduct'])->name('pos.products.store');
     Route::get('/products/template', [PosController::class, 'downloadProductTemplate'])->name('pos.products.template');

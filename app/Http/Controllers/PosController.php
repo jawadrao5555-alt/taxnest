@@ -1276,4 +1276,88 @@ class PosController extends Controller
 
         return view('pos.billing', compact('company', 'plans', 'currentSubscription'));
     }
+
+    public function businessProfile(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        if ($request->isMethod('post')) {
+            $rules = [
+                'name' => 'required|string|max:255',
+                'owner_name' => 'nullable|string|max:255',
+                'ntn' => 'nullable|string|max:50',
+                'email' => 'nullable|email|max:255',
+                'phone' => 'nullable|string|max:30',
+                'mobile' => 'nullable|string|max:30',
+                'address' => 'nullable|string|max:500',
+                'city' => 'nullable|string|max:100',
+                'business_activity' => 'nullable|string|max:255',
+                'website' => 'nullable|url|max:255',
+                'logo' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:2048',
+            ];
+
+            $request->validate($rules);
+
+            $data = $request->only(['name', 'owner_name', 'ntn', 'email', 'phone', 'mobile', 'address', 'city', 'business_activity', 'website']);
+
+            if ($request->hasFile('logo')) {
+                if ($company->logo_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($company->logo_path)) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->delete($company->logo_path);
+                }
+                $path = $request->file('logo')->store('company-logos', 'public');
+                $data['logo_path'] = $path;
+            }
+
+            if ($request->has('remove_logo') && $request->remove_logo === '1') {
+                if ($company->logo_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($company->logo_path)) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->delete($company->logo_path);
+                }
+                $data['logo_path'] = null;
+            }
+
+            $company->update($data);
+            return back()->with('success', 'Business profile updated successfully.');
+        }
+
+        return view('pos.business-profile', compact('company'));
+    }
+
+    public function userProfile(Request $request)
+    {
+        $user = \Illuminate\Support\Facades\Auth::guard('pos')->user();
+
+        if ($request->isMethod('post')) {
+            $action = $request->input('action');
+
+            if ($action === 'update_profile') {
+                $request->validate([
+                    'name' => 'required|string|max:255',
+                    'email' => 'required|email|max:255|unique:users,email,' . $user->id,
+                    'phone' => 'nullable|string|max:30',
+                ]);
+
+                $user->update($request->only(['name', 'email', 'phone']));
+                return back()->with('success', 'Profile updated successfully.');
+            }
+
+            if ($action === 'change_password') {
+                $request->validate([
+                    'current_password' => 'required',
+                    'new_password' => 'required|string|min:8|confirmed',
+                ]);
+
+                if (!\Illuminate\Support\Facades\Hash::check($request->current_password, $user->password)) {
+                    return back()->withErrors(['current_password' => 'Current password is incorrect.']);
+                }
+
+                $user->update([
+                    'password' => \Illuminate\Support\Facades\Hash::make($request->new_password),
+                ]);
+                return back()->with('success', 'Password changed successfully.');
+            }
+        }
+
+        return view('pos.user-profile', compact('user'));
+    }
 }

@@ -43,7 +43,7 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **Admin Revenue Dashboard:** Provides financial oversight, trial warnings, and activity feeds.
 - **Admin Invoice Override:** Super admin functionality to manually manage invoice status.
 - **Dashboard Quick Actions:** Shortcut grid for common user tasks.
-- **NestPOS Module:** A completely isolated Point of Sale system with PRA integration, separate authentication, layouts, and data models. Supports offline billing with auto-sync, dual invoice numbering (POS and PRA Fiscal), and comprehensive tax reporting with CSV/PDF export.
+- **NestPOS Module:** A completely isolated Point of Sale system with PRA integration, separate authentication, layouts, and data models. Supports offline billing with auto-sync, dual invoice numbering (POS and PRA Fiscal), comprehensive tax reporting with CSV/PDF export, business profile management with logo upload (printed on receipts), and user profile with password change.
 - **SaaS Management Layer:** A fully separated admin and franchise management system with distinct authentication, layouts, subscription plan builders, company approval workflows, and usage monitoring.
 
 **Key Features:**

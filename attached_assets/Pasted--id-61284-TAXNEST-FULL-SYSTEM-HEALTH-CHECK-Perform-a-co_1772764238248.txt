@@ -1,0 +1,219 @@
+" id="61284"}
+TAXNEST FULL SYSTEM HEALTH CHECK
+
+Perform a complete deep system verification for BOTH modules:
+
+1) Digital Invoice System (FBR)
+2) NestPOS System (PRA)
+
+The goal is to confirm that both systems are working perfectly and independently before further testing.
+
+--------------------------------------------------
+
+1) ROUTES VERIFICATION
+
+Verify all routes exist and are accessible.
+
+Digital Invoice routes:
+- /login
+- /register
+- /dashboard
+- /invoices
+- /products
+- /customers
+
+NestPOS routes:
+- /pos
+- /pos/login
+- /pos/register
+- /pos/dashboard
+- /pos/invoice/create
+- /pos/transactions
+- /pos/reports
+- /pos/tax-reports
+
+Ensure there are no route conflicts between / and /pos systems.
+
+--------------------------------------------------
+
+2) AUTHENTICATION GUARDS
+
+Verify authentication guards are properly separated.
+
+Digital Invoice:
+guard = web
+
+NestPOS:
+guard = pos
+
+Confirm:
+- Login sessions do not conflict
+- Logging into /dashboard does not auto-login /pos/dashboard
+
+--------------------------------------------------
+
+3) DATABASE TABLE INTEGRITY
+
+Verify all required tables exist and are operational.
+
+Digital Invoice tables:
+companies
+users
+invoices
+invoice_items
+fbr_logs
+audit_logs
+
+NestPOS tables:
+pos_terminals
+pos_services
+pos_transactions
+pos_transaction_items
+pos_payments
+pos_tax_rules
+pra_logs
+inventory_products
+inventory_stock
+inventory_movements
+
+Confirm:
+- Foreign keys valid
+- company_id isolation working
+
+--------------------------------------------------
+
+4) FBR DIGITAL INVOICE FLOW
+
+Test full flow:
+
+Create invoice
+Submit to FBR
+Receive FBR invoice number
+Lock invoice
+Generate PDF
+
+Verify:
+- Idempotency shield
+- Duplicate protection
+- Invoice lock
+
+--------------------------------------------------
+
+5) PRA POS FLOW
+
+Test full POS billing flow.
+
+Create POS invoice
+Select payment method
+Verify tax calculation:
+Cash → 16%
+Card / QR → 5%
+
+If PRA enabled:
+Send to PRA API
+Receive PRA fiscal number
+Generate QR code
+Save PRA logs
+
+--------------------------------------------------
+
+6) OFFLINE POS TEST
+
+Simulate PRA API failure.
+
+Expected behavior:
+
+Invoice saved
+pra_status = offline
+
+Verify:
+
+Auto Sync Job exists
+Scheduler runs every 2 minutes
+Offline invoices sync successfully once connection returns.
+
+--------------------------------------------------
+
+7) INVENTORY MODULE TEST
+
+If inventory_enabled = true:
+
+Create product
+Add stock
+Create sale
+Verify stock deduction
+Verify inventory_movements entry
+
+If inventory_enabled = false:
+
+Inventory checks must be skipped.
+
+--------------------------------------------------
+
+8) REPORTING SYSTEM TEST
+
+Verify POS tax reports:
+
+/pos/tax-reports
+
+Test filters:
+
+Tax rate
+Date range
+Customer
+Payment method
+
+Verify exports:
+
+CSV download
+PDF download
+
+Confirm summary totals match filtered results.
+
+--------------------------------------------------
+
+9) MULTI TERMINAL TEST
+
+Simulate two POS terminals.
+
+Verify:
+
+Invoice lock
+Second terminal blocked
+Lock expires after timeout.
+
+--------------------------------------------------
+
+10) CRASH RECOVERY TEST
+
+Create invoice draft.
+
+Simulate browser crash.
+
+Login again.
+
+Verify draft invoice recovery works.
+
+--------------------------------------------------
+
+FINAL OUTPUT REQUIRED
+
+Provide a system health report with:
+
+PASS / FAIL status for:
+
+Routes
+Authentication
+Database
+FBR Flow
+PRA Flow
+Offline POS
+Inventory
+Reports
+Terminal Lock
+Crash Recovery
+
+Final verdict:
+
+SYSTEM READY FOR TESTING
+or

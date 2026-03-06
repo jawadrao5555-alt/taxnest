@@ -229,6 +229,14 @@ class PosController extends Controller
             return back()->withInput()->with('error', 'Failed to create invoice: ' . $e->getMessage());
         }
 
+        $inventoryResult = PosInventoryController::deductStockForInvoice(
+            $companyId,
+            $request->items,
+            $transaction->id,
+            $invoiceNumber,
+            auth('pos')->id()
+        );
+
         $praMessage = '';
         if ($praEnabled) {
             try {

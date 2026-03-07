@@ -39,7 +39,7 @@
             </div>
             <div class="md:hidden flex items-center space-x-2">
                 <a href="/login" class="text-xs font-semibold text-emerald-700 border border-emerald-600 px-2.5 py-1.5 rounded-lg">DI</a>
-                <a href="/pos/login" class="text-xs font-semibold text-purple-700 border border-purple-600 px-2.5 py-1.5 rounded-lg">POS</a>
+                <a href="/pos/login" class="text-xs font-semibold text-purple-700 border border-purple-600 px-2.5 py-1.5 rounded-lg">PRA POS</a>
                 <a href="/register" class="text-xs font-semibold text-white bg-emerald-600 px-2.5 py-1.5 rounded-lg">Sign Up</a>
             </div>
         </div>
@@ -203,7 +203,7 @@
                                     <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                                 </div>
                                 <div>
-                                    <h3 class="text-2xl font-bold text-white">PRA POS</h3>
+                                    <h3 class="text-2xl font-bold text-white">NestPOS</h3>
                                     <p class="text-purple-100 text-sm">Point of Sale System</p>
                                 </div>
                             </div>

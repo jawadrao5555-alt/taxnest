@@ -14,7 +14,7 @@
         [x-cloak] { display: none !important; }
     </style>
 </head>
-<body class="antialiased text-gray-800">
+<body class="antialiased text-gray-800" style="scroll-behavior: smooth;">
 
     <nav class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-2xl border-b border-white/30 shadow-sm">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
@@ -26,7 +26,8 @@
             </a>
             <div class="hidden md:flex items-center space-x-8">
                 <a href="#features" class="text-sm font-medium text-gray-600 hover:text-purple-600 transition">Features</a>
-                <a href="#demo" class="text-sm font-medium text-gray-600 hover:text-purple-600 transition">Demo</a>
+                <a href="#pricing" class="text-sm font-medium text-gray-600 hover:text-purple-600 transition">Pricing</a>
+                <a href="#how-it-works" class="text-sm font-medium text-gray-600 hover:text-purple-600 transition">How It Works</a>
                 <a href="/" class="text-sm font-medium text-gray-600 hover:text-purple-600 transition">Digital Invoice</a>
                 <a href="/pos/login" class="inline-flex items-center px-4 py-2 border-2 border-purple-600 text-purple-700 rounded-lg text-sm font-semibold hover:bg-purple-50 transition">POS Login</a>
                 <a href="/pos/register" class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition shadow-sm">POS Sign Up</a>
@@ -46,7 +47,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
             <div class="text-center max-w-3xl mx-auto">
                 <div class="inline-flex items-center px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 mb-6">
-                    <span class="text-sm font-semibold text-white">PRA Punjab Integrated</span>
+                    <span class="text-sm font-semibold text-white">PRA Punjab Integrated &bull; PRAL IMS API v1.2</span>
                 </div>
                 <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight">
                     NestPOS<br>
@@ -60,8 +61,8 @@
                     <a href="/pos/register" class="px-8 py-3.5 bg-white text-purple-700 rounded-xl text-sm font-bold hover:bg-purple-50 transition shadow-lg">
                         Start Free Trial
                     </a>
-                    <a href="#demo" class="px-8 py-3.5 border-2 border-white/40 text-white rounded-xl text-sm font-bold hover:bg-white/10 transition">
-                        View Demo
+                    <a href="#how-it-works" class="px-8 py-3.5 border-2 border-white/40 text-white rounded-xl text-sm font-bold hover:bg-white/10 transition">
+                        See How It Works
                     </a>
                 </div>
             </div>
@@ -115,13 +116,113 @@
                         <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">POS Reports</h3>
-                    <p class="text-sm text-gray-600">Daily sales trends, payment method breakdown, top-selling products, and PRA submission analytics.</p>
+                    <p class="text-sm text-gray-600">Daily sales trends, payment method breakdown, top-selling products, and PRA submission analytics with CSV/PDF export.</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <section id="demo" class="py-20 bg-gray-50">
+    <section id="pricing" class="py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-gray-900">NestPOS Plans</h2>
+                <p class="mt-4 text-gray-600 max-w-2xl mx-auto">Simple annual billing with built-in 6% savings</p>
+                <div class="inline-flex items-center mt-4 px-4 py-2 bg-purple-50 border border-purple-200 rounded-lg">
+                    <svg class="w-4 h-4 text-purple-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span class="text-sm font-semibold text-purple-700">Annual billing only — 6% savings included</span>
+                </div>
+            </div>
+
+            @php $annualDiscount = 6; @endphp
+
+            @if(isset($plans) && $plans->count())
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
+                @foreach($plans as $plan)
+                @php
+                    $yearlyTotal = round($plan->price * 12 * (1 - $annualDiscount / 100));
+                    $perMonth = round($yearlyTotal / 12);
+                    $saved = round($plan->price * 12 * $annualDiscount / 100);
+                    $isPopular = $plan->name === 'Business';
+                @endphp
+                <div class="relative rounded-2xl overflow-hidden transition duration-300 hover:-translate-y-1 {{ $isPopular ? 'ring-2 ring-purple-500 shadow-lg shadow-purple-500/10' : 'shadow-sm' }}">
+                    @if($isPopular)
+                    <div class="bg-purple-600 text-center py-1.5">
+                        <span class="text-white text-xs font-bold tracking-wide">MOST POPULAR</span>
+                    </div>
+                    @endif
+                    <div class="bg-white border {{ $isPopular ? 'border-purple-500 border-t-0 rounded-b-2xl' : 'border-gray-200 rounded-2xl' }} p-5">
+                        <h3 class="text-lg font-bold text-gray-900">{{ $plan->name }}</h3>
+                        <div class="mt-3 mb-1">
+                            <span class="text-3xl font-black text-gray-900">Rs. {{ number_format($yearlyTotal) }}</span>
+                            <span class="text-gray-400 text-sm">/year</span>
+                        </div>
+                        <p class="text-xs text-gray-400">Rs. {{ number_format($perMonth) }}/mo effective</p>
+                        <p class="text-xs text-purple-600 font-medium mt-0.5">Save Rs. {{ number_format($saved) }}</p>
+
+                        <div class="mt-4 pt-4 border-t border-gray-100 space-y-2 text-sm text-gray-600">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                {{ $plan->getInvoiceLimitDisplay() }} transactions/mo
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                {{ $plan->getUserLimitDisplay() }} terminals
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                PRA fiscal receipts
+                            </div>
+                            @if($plan->name !== 'Retail')
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                Inventory management
+                            </div>
+                            @endif
+                            @if(in_array($plan->name, ['Industrial', 'Enterprise']))
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                Offline mode + auto-sync
+                            </div>
+                            @endif
+                            @if($plan->name === 'Enterprise')
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                Priority support
+                            </div>
+                            @endif
+                        </div>
+
+                        <div class="mt-5">
+                            <a href="/pos/register" class="block w-full py-2.5 rounded-lg text-sm font-semibold text-center transition {{ $isPopular ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-sm' : 'bg-gray-900 text-white hover:bg-gray-800' }}">
+                                Get {{ $plan->name }}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+
+            <div class="mt-8 text-center">
+                <div class="inline-flex flex-wrap items-center justify-center gap-6 text-xs text-gray-400">
+                    <span class="flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                        PRA compliant
+                    </span>
+                    <span class="flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        14-day free trial
+                    </span>
+                    <span class="flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                        6% annual savings
+                    </span>
+                </div>
+            </div>
+            @endif
+        </div>
+    </section>
+
+    <section id="how-it-works" class="py-20 bg-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
                 <h2 class="text-3xl font-bold text-gray-900">How NestPOS Works</h2>
@@ -174,9 +275,13 @@
                     <span class="text-xs text-gray-500 ml-2">by TaxNest</span>
                 </div>
                 <div class="flex items-center space-x-6 text-sm text-gray-400">
-                    <a href="/" class="hover:text-white transition">Digital Invoice (FBR)</a>
+                    <a href="/" class="hover:text-white transition">TaxNest Home</a>
+                    <a href="/login" class="hover:text-white transition">Digital Invoice (FBR)</a>
                     <a href="/pos/login" class="hover:text-white transition">POS Login</a>
                 </div>
+            </div>
+            <div class="mt-6 pt-6 border-t border-gray-800 text-center">
+                <p class="text-xs text-gray-500">&copy; {{ date('Y') }} TaxNest. All rights reserved. PRA IMS v1.2 Integrated.</p>
             </div>
         </div>
     </footer>

@@ -100,11 +100,18 @@ Route::get('/health', function () {
 });
 
 Route::get('/', function () {
-    return view('landing', ['showLogin' => false]);
+    $plans = \App\Models\PricingPlan::where('is_trial', false)->orderBy('price')->get();
+    return view('landing', ['showLogin' => false, 'plans' => $plans]);
 });
 
+Route::get('/di', function () {
+    $plans = \App\Models\PricingPlan::where('is_trial', false)->orderBy('price')->get();
+    return view('di-landing', ['plans' => $plans]);
+})->name('di.landing');
+
 Route::get('/pos', function () {
-    return view('pos.landing');
+    $plans = \App\Models\PricingPlan::where('is_trial', false)->orderBy('price')->get();
+    return view('pos.landing', ['plans' => $plans]);
 })->name('pos.landing');
 Route::get('/pos/login', [PosAuthController::class, 'showLogin'])->name('pos.login');
 Route::post('/pos/login', [PosAuthController::class, 'login']);

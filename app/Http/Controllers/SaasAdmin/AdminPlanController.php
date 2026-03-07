@@ -20,10 +20,10 @@ class AdminPlanController extends Controller
         $request->validate([
             'name' => 'required|string|max:100',
             'price' => 'required|numeric|min:0',
-            'invoice_limit' => 'required|integer|min:0',
-            'max_terminals' => 'nullable|integer|min:0',
-            'max_users' => 'nullable|integer|min:0',
-            'max_products' => 'nullable|integer|min:0',
+            'invoice_limit' => 'required|integer|min:-1',
+            'max_terminals' => 'nullable|integer|min:-1',
+            'max_users' => 'nullable|integer|min:-1',
+            'max_products' => 'nullable|integer|min:-1',
             'inventory_enabled' => 'boolean',
             'reports_enabled' => 'boolean',
         ]);
@@ -43,10 +43,10 @@ class AdminPlanController extends Controller
         $request->validate([
             'name' => 'required|string|max:100',
             'price' => 'required|numeric|min:0',
-            'invoice_limit' => 'required|integer|min:0',
-            'max_terminals' => 'nullable|integer|min:0',
-            'max_users' => 'nullable|integer|min:0',
-            'max_products' => 'nullable|integer|min:0',
+            'invoice_limit' => 'required|integer|min:-1',
+            'max_terminals' => 'nullable|integer|min:-1',
+            'max_users' => 'nullable|integer|min:-1',
+            'max_products' => 'nullable|integer|min:-1',
         ]);
 
         $plan->update(array_merge($request->all(), [

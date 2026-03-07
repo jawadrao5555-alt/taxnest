@@ -30,15 +30,16 @@
             <div class="hidden md:flex items-center space-x-6">
                 <a href="#products" class="text-sm font-medium text-gray-600 hover:text-emerald-600 transition">Products</a>
                 <a href="#features" class="text-sm font-medium text-gray-600 hover:text-emerald-600 transition">Features</a>
+                <a href="#pricing" class="text-sm font-medium text-gray-600 hover:text-emerald-600 transition">Pricing</a>
                 <a href="#faq" class="text-sm font-medium text-gray-600 hover:text-emerald-600 transition">FAQ</a>
                 <div class="flex items-center space-x-2 ml-2">
-                    <a href="/login" class="inline-flex items-center px-4 py-2 border-2 border-emerald-600 text-emerald-700 rounded-lg text-sm font-semibold hover:bg-emerald-50 transition">DI Login</a>
+                    <a href="/di" class="inline-flex items-center px-4 py-2 border-2 border-emerald-600 text-emerald-700 rounded-lg text-sm font-semibold hover:bg-emerald-50 transition">DI Login</a>
                     <a href="/pos/login" class="inline-flex items-center px-4 py-2 border-2 border-purple-600 text-purple-700 rounded-lg text-sm font-semibold hover:bg-purple-50 transition">POS Login</a>
                     <a href="/register" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition shadow-sm">Sign Up Free</a>
                 </div>
             </div>
             <div class="md:hidden flex items-center space-x-2">
-                <a href="/login" class="text-xs font-semibold text-emerald-700 border border-emerald-600 px-2.5 py-1.5 rounded-lg">DI</a>
+                <a href="/di" class="text-xs font-semibold text-emerald-700 border border-emerald-600 px-2.5 py-1.5 rounded-lg">DI</a>
                 <a href="/pos/login" class="text-xs font-semibold text-purple-700 border border-purple-600 px-2.5 py-1.5 rounded-lg">PRA POS</a>
                 <a href="/register" class="text-xs font-semibold text-white bg-emerald-600 px-2.5 py-1.5 rounded-lg">Sign Up</a>
             </div>
@@ -409,6 +410,60 @@
                     </table>
                 </div>
             </div>
+        </div>
+    </section>
+
+    <section id="pricing" class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <p class="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-2">Pricing</p>
+                <h2 class="text-3xl sm:text-4xl font-extrabold text-gray-900">Simple, Transparent Plans</h2>
+                <p class="mt-4 text-lg text-gray-500 max-w-2xl mx-auto">Same plans for both Digital Invoice and NestPOS. Start free, upgrade when ready.</p>
+            </div>
+
+            @if(isset($plans) && $plans->count())
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
+                @foreach($plans as $plan)
+                @php $isPopular = $plan->name === 'Business'; @endphp
+                <div class="relative rounded-2xl overflow-hidden transition duration-300 hover:-translate-y-1 {{ $isPopular ? 'ring-2 ring-emerald-500 shadow-lg' : 'shadow-sm' }}">
+                    @if($isPopular)
+                    <div class="bg-emerald-600 text-center py-1.5">
+                        <span class="text-white text-xs font-bold tracking-wide">MOST POPULAR</span>
+                    </div>
+                    @endif
+                    <div class="bg-white border {{ $isPopular ? 'border-emerald-500 border-t-0 rounded-b-2xl' : 'border-gray-200 rounded-2xl' }} p-5">
+                        <h3 class="text-lg font-bold text-gray-900">{{ $plan->name }}</h3>
+                        <div class="mt-3 mb-1">
+                            <span class="text-3xl font-black text-gray-900">Rs. {{ number_format($plan->price, 0) }}</span>
+                            <span class="text-gray-400 text-sm">/mo</span>
+                        </div>
+                        <p class="text-xs text-gray-400 mb-4">Starting price &bull; Discounts on annual billing</p>
+                        <div class="space-y-2 text-sm text-gray-600 mb-5">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                {{ $plan->invoice_limit > 0 ? number_format($plan->invoice_limit) . ' invoices/mo' : 'Unlimited invoices' }}
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                {{ ($plan->user_limit ?? 0) > 0 ? $plan->user_limit . ' users' : (($plan->user_limit ?? 0) == -1 ? 'Unlimited users' : ($plan->max_users ?? 'N/A') . ' users') }}
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                FBR + PRA compliance
+                            </div>
+                        </div>
+                        <a href="/register" class="block w-full py-2.5 rounded-lg text-sm font-semibold text-center transition {{ $isPopular ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-900 text-white hover:bg-gray-800' }}">
+                            Start Free Trial
+                        </a>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+
+            <div class="mt-8 text-center">
+                <p class="text-sm text-gray-500">14-day free trial on all plans &bull; No credit card required &bull; Up to 6% discount on annual billing</p>
+            </div>
+            @endif
         </div>
     </section>
 

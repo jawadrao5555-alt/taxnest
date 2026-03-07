@@ -63,11 +63,11 @@
                 <thead>
                     <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                         <th class="px-4 py-3">Customer</th>
-                        <th class="px-4 py-3">Phone</th>
-                        <th class="px-4 py-3">Email</th>
-                        <th class="px-4 py-3">City</th>
-                        <th class="px-4 py-3 text-center">Type</th>
-                        <th class="px-4 py-3 text-center">Status</th>
+                        <th class="px-4 py-3 hidden sm:table-cell">Phone</th>
+                        <th class="px-4 py-3 hidden lg:table-cell">Email</th>
+                        <th class="px-4 py-3 hidden md:table-cell">City</th>
+                        <th class="px-4 py-3 text-center hidden sm:table-cell">Type</th>
+                        <th class="px-4 py-3 text-center hidden sm:table-cell">Status</th>
                         <th class="px-4 py-3 text-center">Actions</th>
                     </tr>
                 </thead>
@@ -75,13 +75,13 @@
                     @forelse($customers as $customer)
                     <tr class="{{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }} {{ !$customer->is_active ? 'opacity-50' : '' }}" x-data="{ editing: false }">
                         <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ $customer->name }}</td>
-                        <td class="px-4 py-3 text-gray-500">{{ $customer->phone ?? '—' }}</td>
-                        <td class="px-4 py-3 text-gray-500 text-xs">{{ $customer->email ?? '—' }}</td>
-                        <td class="px-4 py-3 text-gray-500">{{ $customer->city ?? '—' }}</td>
-                        <td class="px-4 py-3 text-center">
+                        <td class="px-4 py-3 text-gray-500 hidden sm:table-cell">{{ $customer->phone ?? '—' }}</td>
+                        <td class="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">{{ $customer->email ?? '—' }}</td>
+                        <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ $customer->city ?? '—' }}</td>
+                        <td class="px-4 py-3 text-center hidden sm:table-cell">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $customer->type === 'registered' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' }}">{{ ucfirst($customer->type) }}</span>
                         </td>
-                        <td class="px-4 py-3 text-center">
+                        <td class="px-4 py-3 text-center hidden sm:table-cell">
                             <form method="POST" action="{{ route('pos.customers.toggle', $customer->id) }}" class="inline">
                                 @csrf
                                 <button type="submit" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $customer->is_active ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' }}">
@@ -101,20 +101,22 @@
                     </tr>
                     <tr x-show="editing" class="bg-purple-50/50 dark:bg-purple-900/10">
                         <td colspan="7" class="px-4 py-3">
-                            <form method="POST" action="{{ route('pos.customers.update', $customer->id) }}" class="flex flex-wrap gap-2 items-end">
+                            <form method="POST" action="{{ route('pos.customers.update', $customer->id) }}" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 items-end">
                                 @csrf @method('PUT')
-                                <input type="text" name="name" value="{{ $customer->name }}" required placeholder="Name" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-32">
-                                <input type="text" name="phone" value="{{ $customer->phone }}" placeholder="Phone" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-28">
-                                <input type="email" name="email" value="{{ $customer->email }}" placeholder="Email" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-36">
-                                <input type="text" name="city" value="{{ $customer->city }}" placeholder="City" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-24">
-                                <input type="text" name="cnic" value="{{ $customer->cnic }}" placeholder="CNIC" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-32">
-                                <input type="text" name="ntn" value="{{ $customer->ntn }}" placeholder="NTN" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-24">
-                                <select name="type" required class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-28">
+                                <input type="text" name="name" value="{{ $customer->name }}" required placeholder="Name" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
+                                <input type="text" name="phone" value="{{ $customer->phone }}" placeholder="Phone" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
+                                <input type="email" name="email" value="{{ $customer->email }}" placeholder="Email" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
+                                <input type="text" name="city" value="{{ $customer->city }}" placeholder="City" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
+                                <input type="text" name="cnic" value="{{ $customer->cnic }}" placeholder="CNIC" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
+                                <input type="text" name="ntn" value="{{ $customer->ntn }}" placeholder="NTN" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
+                                <select name="type" required class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
                                     <option value="unregistered" {{ $customer->type === 'unregistered' ? 'selected' : '' }}>Unregistered</option>
                                     <option value="registered" {{ $customer->type === 'registered' ? 'selected' : '' }}>Registered</option>
                                 </select>
-                                <button type="submit" class="text-xs font-semibold text-white px-3 py-1.5 rounded-lg" style="background: #7c3aed;">Save</button>
-                                <button type="button" @click="editing = false" class="text-xs text-gray-500 px-3 py-1.5">Cancel</button>
+                                <div class="flex gap-2">
+                                    <button type="submit" class="text-xs font-semibold text-white px-3 py-1.5 rounded-lg" style="background: #7c3aed;">Save</button>
+                                    <button type="button" @click="editing = false" class="text-xs text-gray-500 px-3 py-1.5">Cancel</button>
+                                </div>
                             </form>
                         </td>
                     </tr>

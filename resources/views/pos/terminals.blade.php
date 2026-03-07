@@ -45,14 +45,15 @@
     </div>
 
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="overflow-x-auto">
         <table class="w-full text-sm">
             <thead>
                 <tr class="bg-gray-50 dark:bg-gray-800 text-left text-xs text-gray-500 dark:text-gray-400 uppercase">
                     <th class="px-4 py-3">Terminal Name</th>
                     <th class="px-4 py-3">Code</th>
-                    <th class="px-4 py-3">Location</th>
+                    <th class="px-4 py-3 hidden sm:table-cell">Location</th>
                     <th class="px-4 py-3">Status</th>
-                    <th class="px-4 py-3">Transactions</th>
+                    <th class="px-4 py-3 hidden sm:table-cell">Transactions</th>
                     <th class="px-4 py-3">Actions</th>
                 </tr>
             </thead>
@@ -61,11 +62,11 @@
                 <tr class="border-b border-gray-100 dark:border-gray-800 {{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }}" x-data="{ editing: false }">
                     <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">
                         <span x-show="!editing">{{ $terminal->terminal_name }}</span>
-                        <form x-show="editing" method="POST" action="{{ route('pos.terminals.update', $terminal->id) }}" class="flex gap-2 items-center" x-cloak>
+                        <form x-show="editing" method="POST" action="{{ route('pos.terminals.update', $terminal->id) }}" class="flex flex-wrap gap-2 items-center" x-cloak>
                             @csrf @method('PUT')
-                            <input type="text" name="terminal_name" value="{{ $terminal->terminal_name }}" class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm px-2 py-1 w-28">
-                            <input type="text" name="terminal_code" value="{{ $terminal->terminal_code }}" class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm px-2 py-1 w-20">
-                            <input type="text" name="location" value="{{ $terminal->location }}" class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm px-2 py-1 w-24">
+                            <input type="text" name="terminal_name" value="{{ $terminal->terminal_name }}" class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm px-2 py-1 w-full sm:w-28">
+                            <input type="text" name="terminal_code" value="{{ $terminal->terminal_code }}" class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm px-2 py-1 w-full sm:w-20">
+                            <input type="text" name="location" value="{{ $terminal->location }}" class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm px-2 py-1 w-full sm:w-24">
                             <label class="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
                                 <input type="checkbox" name="is_active" {{ $terminal->is_active ? 'checked' : '' }} class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
                                 Active
@@ -75,7 +76,7 @@
                         </form>
                     </td>
                     <td class="px-4 py-3 text-gray-600 dark:text-gray-400 font-mono" x-show="!editing">{{ $terminal->terminal_code }}</td>
-                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400" x-show="!editing">{{ $terminal->location ?? '-' }}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400 hidden sm:table-cell" x-show="!editing">{{ $terminal->location ?? '-' }}</td>
                     <td class="px-4 py-3" x-show="!editing">
                         @if($terminal->is_active)
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Active</span>
@@ -83,7 +84,7 @@
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">Inactive</span>
                         @endif
                     </td>
-                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400" x-show="!editing">{{ $terminal->transactions_count ?? $terminal->transactions()->count() }}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400 hidden sm:table-cell" x-show="!editing">{{ $terminal->transactions_count ?? $terminal->transactions()->count() }}</td>
                     <td class="px-4 py-3" x-show="!editing">
                         <div class="flex gap-2">
                             <button @click="editing = true" class="text-blue-600 hover:underline text-xs font-medium">Edit</button>
@@ -101,6 +102,7 @@
                 @endforelse
             </tbody>
         </table>
+        </div>
     </div>
 </div>
 </x-pos-layout>

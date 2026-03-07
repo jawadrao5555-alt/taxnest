@@ -1,6 +1,6 @@
 <x-pos-layout>
 <div class="p-4 sm:p-6 max-w-7xl mx-auto">
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <h1 class="text-xl font-bold text-gray-900 dark:text-white">POS Products</h1>
         <div class="flex items-center gap-2">
             <button onclick="document.getElementById('importSection').classList.toggle('hidden')" style="background: linear-gradient(135deg, #059669, #10b981); color: #fff; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; border: none; cursor: pointer;">
@@ -111,11 +111,11 @@
                 <thead>
                     <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                         <th class="px-4 py-3">Product</th>
-                        <th class="px-4 py-3">Category</th>
-                        <th class="px-4 py-3">SKU</th>
+                        <th class="px-4 py-3 hidden md:table-cell">Category</th>
+                        <th class="px-4 py-3 hidden lg:table-cell">SKU</th>
                         <th class="px-4 py-3 text-right">Price</th>
-                        <th class="px-4 py-3 text-right">Tax %</th>
-                        <th class="px-4 py-3 text-center">Status</th>
+                        <th class="px-4 py-3 text-right hidden sm:table-cell">Tax %</th>
+                        <th class="px-4 py-3 text-center hidden sm:table-cell">Status</th>
                         <th class="px-4 py-3 text-center">Actions</th>
                     </tr>
                 </thead>
@@ -125,11 +125,11 @@
                         <td class="px-4 py-3">
                             <span x-show="!editing" class="font-medium text-gray-900 dark:text-white">{{ $product->name }}</span>
                         </td>
-                        <td class="px-4 py-3 text-gray-500">{{ $product->category ?? '—' }}</td>
-                        <td class="px-4 py-3 text-gray-500 text-xs">{{ $product->sku ?? '—' }}</td>
+                        <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ $product->category ?? '—' }}</td>
+                        <td class="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">{{ $product->sku ?? '—' }}</td>
                         <td class="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">PKR {{ number_format($product->price, 2) }}</td>
-                        <td class="px-4 py-3 text-right text-gray-500">{{ $product->tax_rate }}%</td>
-                        <td class="px-4 py-3 text-center">
+                        <td class="px-4 py-3 text-right text-gray-500 hidden sm:table-cell">{{ $product->tax_rate }}%</td>
+                        <td class="px-4 py-3 text-center hidden sm:table-cell">
                             <form method="POST" action="{{ route('pos.products.toggle', $product->id) }}" class="inline">
                                 @csrf
                                 <button type="submit" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $product->is_active ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' }}">
@@ -149,21 +149,23 @@
                     </tr>
                     <tr x-show="editing" class="bg-purple-50/50 dark:bg-purple-900/10">
                         <td colspan="7" class="px-4 py-3">
-                            <form method="POST" action="{{ route('pos.products.update', $product->id) }}" class="flex flex-wrap gap-2 items-end">
+                            <form method="POST" action="{{ route('pos.products.update', $product->id) }}" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 items-end">
                                 @csrf @method('PUT')
-                                <input type="text" name="name" value="{{ $product->name }}" required class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-36">
-                                <input type="number" name="price" value="{{ $product->price }}" step="0.01" required class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-24">
-                                <input type="number" name="tax_rate" value="{{ $product->tax_rate }}" step="0.01" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-20">
-                                <input type="text" name="category" value="{{ $product->category }}" placeholder="Category" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-28">
-                                <input type="text" name="sku" value="{{ $product->sku }}" placeholder="SKU" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-24">
-                                <input type="text" name="barcode" value="{{ $product->barcode }}" placeholder="Barcode" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-28">
-                                <select name="uom" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-24">
+                                <input type="text" name="name" value="{{ $product->name }}" required placeholder="Name" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full col-span-2 sm:col-span-1">
+                                <input type="number" name="price" value="{{ $product->price }}" step="0.01" required placeholder="Price" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
+                                <input type="number" name="tax_rate" value="{{ $product->tax_rate }}" step="0.01" placeholder="Tax %" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
+                                <input type="text" name="category" value="{{ $product->category }}" placeholder="Category" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
+                                <input type="text" name="sku" value="{{ $product->sku }}" placeholder="SKU" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
+                                <input type="text" name="barcode" value="{{ $product->barcode }}" placeholder="Barcode" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
+                                <select name="uom" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
                                     @foreach(['NOS','KGS','LTR','MTR','PCS','PKT','BOX'] as $u)
                                     <option value="{{ $u }}" {{ $product->uom === $u ? 'selected' : '' }}>{{ $u }}</option>
                                     @endforeach
                                 </select>
-                                <button type="submit" class="text-xs font-semibold text-white px-3 py-1.5 rounded-lg" style="background: #7c3aed;">Save</button>
-                                <button type="button" @click="editing = false" class="text-xs text-gray-500 px-3 py-1.5">Cancel</button>
+                                <div class="flex gap-2 col-span-2 sm:col-span-1">
+                                    <button type="submit" class="text-xs font-semibold text-white px-3 py-1.5 rounded-lg" style="background: #7c3aed;">Save</button>
+                                    <button type="button" @click="editing = false" class="text-xs text-gray-500 px-3 py-1.5">Cancel</button>
+                                </div>
                             </form>
                         </td>
                     </tr>

@@ -32,9 +32,9 @@
                     <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-800 bg-gray-800/50">
                         <th class="px-4 py-3">Company</th>
                         <th class="px-4 py-3">Plan</th>
-                        <th class="px-4 py-3">Cycle</th>
-                        <th class="px-4 py-3">Start</th>
-                        <th class="px-4 py-3">End</th>
+                        <th class="px-4 py-3 hidden sm:table-cell">Cycle</th>
+                        <th class="px-4 py-3 hidden md:table-cell">Start</th>
+                        <th class="px-4 py-3 hidden md:table-cell">End</th>
                         <th class="px-4 py-3 text-center">Status</th>
                         <th class="px-4 py-3 text-center">Action</th>
                     </tr>
@@ -44,9 +44,9 @@
                     <tr class="hover:bg-gray-800/50">
                         <td class="px-4 py-3 text-white font-medium">{{ $sub->company->name ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-300">{{ $sub->pricingPlan->name ?? '—' }}</td>
-                        <td class="px-4 py-3 text-gray-400">{{ ucfirst($sub->billing_cycle) }}</td>
-                        <td class="px-4 py-3 text-gray-400 text-xs">{{ $sub->start_date->format('d M Y') }}</td>
-                        <td class="px-4 py-3 text-gray-400 text-xs">{{ $sub->end_date->format('d M Y') }}</td>
+                        <td class="px-4 py-3 text-gray-400 hidden sm:table-cell">{{ ucfirst($sub->billing_cycle) }}</td>
+                        <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">{{ $sub->start_date->format('d M Y') }}</td>
+                        <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">{{ $sub->end_date->format('d M Y') }}</td>
                         <td class="px-4 py-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $sub->active ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">{{ $sub->active ? 'Active' : 'Inactive' }}</span>
                         </td>

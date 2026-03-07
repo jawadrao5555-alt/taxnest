@@ -22,10 +22,10 @@
                 <thead>
                     <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-800 bg-gray-800/50">
                         <th class="px-4 py-3">Company</th>
-                        <th class="px-4 py-3">NTN</th>
-                        <th class="px-4 py-3">Franchise</th>
+                        <th class="px-4 py-3 hidden sm:table-cell">NTN</th>
+                        <th class="px-4 py-3 hidden md:table-cell">Franchise</th>
                         <th class="px-4 py-3 text-center">Status</th>
-                        <th class="px-4 py-3">Created</th>
+                        <th class="px-4 py-3 hidden sm:table-cell">Created</th>
                         <th class="px-4 py-3 text-center">Actions</th>
                     </tr>
                 </thead>
@@ -38,12 +38,12 @@
                         <td class="px-4 py-3">
                             <a href="{{ route('saas.admin.companies.show', $company->id) }}" class="text-white font-medium hover:text-indigo-400 transition">{{ $company->name }}</a>
                         </td>
-                        <td class="px-4 py-3 text-gray-400">{{ $company->ntn ?? '—' }}</td>
-                        <td class="px-4 py-3 text-gray-400">{{ $company->franchise->name ?? '—' }}</td>
+                        <td class="px-4 py-3 text-gray-400 hidden sm:table-cell">{{ $company->ntn ?? '—' }}</td>
+                        <td class="px-4 py-3 text-gray-400 hidden md:table-cell">{{ $company->franchise->name ?? '—' }}</td>
                         <td class="px-4 py-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $statusColors[$company->status] ?? 'bg-gray-800 text-gray-400' }}">{{ $company->status }}</span>
                         </td>
-                        <td class="px-4 py-3 text-gray-500 text-xs">{{ $company->created_at->format('d M Y') }}</td>
+                        <td class="px-4 py-3 text-gray-500 text-xs hidden sm:table-cell">{{ $company->created_at->format('d M Y') }}</td>
                         <td class="px-4 py-3 text-center">
                             <div class="flex items-center justify-center gap-1">
                                 @if($company->status === 'pending')

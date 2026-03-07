@@ -31,11 +31,11 @@
                     <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                         <th class="px-4 py-3">Product</th>
                         <th class="px-4 py-3 text-right">Current Stock</th>
-                        <th class="px-4 py-3 text-right">Min Level</th>
-                        <th class="px-4 py-3 text-right">Avg Cost</th>
-                        <th class="px-4 py-3 text-right">Stock Value</th>
+                        <th class="px-4 py-3 text-right hidden sm:table-cell">Min Level</th>
+                        <th class="px-4 py-3 text-right hidden lg:table-cell">Avg Cost</th>
+                        <th class="px-4 py-3 text-right hidden md:table-cell">Stock Value</th>
                         <th class="px-4 py-3 text-center">Status</th>
-                        <th class="px-4 py-3 text-right">Min Level Setting</th>
+                        <th class="px-4 py-3 text-right hidden sm:table-cell">Min Level Setting</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -54,13 +54,13 @@
                     <tr class="{{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }}">
                         <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ $stock->product->name ?? 'Unknown' }}</td>
                         <td class="px-4 py-3 text-right font-bold {{ $stock->quantity <= 0 ? 'text-red-600' : ($stock->isLowStock() ? 'text-amber-600' : 'text-gray-900 dark:text-white') }}">{{ number_format($stock->quantity, 0) }}</td>
-                        <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{{ number_format($stock->min_stock_level, 0) }}</td>
-                        <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-400">PKR {{ number_format($stock->avg_purchase_price, 2) }}</td>
-                        <td class="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">PKR {{ number_format($stock->quantity * $stock->avg_purchase_price, 0) }}</td>
+                        <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-400 hidden sm:table-cell">{{ number_format($stock->min_stock_level, 0) }}</td>
+                        <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-400 hidden lg:table-cell">PKR {{ number_format($stock->avg_purchase_price, 2) }}</td>
+                        <td class="px-4 py-3 text-right font-medium text-gray-900 dark:text-white hidden md:table-cell">PKR {{ number_format($stock->quantity * $stock->avg_purchase_price, 0) }}</td>
                         <td class="px-4 py-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $statusClass }}">{{ $statusText }}</span>
                         </td>
-                        <td class="px-4 py-3 text-right" x-data="{ editing: false, minLevel: {{ $stock->min_stock_level }}, saving: false }">
+                        <td class="px-4 py-3 text-right hidden sm:table-cell" x-data="{ editing: false, minLevel: {{ $stock->min_stock_level }}, saving: false }">
                             <template x-if="!editing">
                                 <button @click="editing = true" class="text-xs text-purple-600 hover:underline">Edit</button>
                             </template>

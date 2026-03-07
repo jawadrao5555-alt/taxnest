@@ -71,7 +71,7 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **Layout:** Responsive sidebar with a single scrollable content area.
 - **Styling:** Consistent use of dark/light modes, standardized components, and an emerald-600 primary color palette.
 - **PWA Enhancements:** Install prompts, offline badges, update banners, and manifest shortcuts.
-- **Mobile Responsiveness:** Optimized for mobile with hamburger menus and `overflow-x-auto` for tables.
+- **Mobile Responsiveness:** Fully responsive at 375px+. Landing pages stack cards vertically on mobile. POS sidebar uses slide-out drawer. All data tables use progressive column hiding (`hidden sm/md/lg:table-cell`) for essential-first display. Inline edit forms use responsive grids (`grid-cols-2 sm:grid-cols-3 lg:grid-cols-4`) instead of fixed widths. All tables have `overflow-x-auto`. Header rows stack on mobile with `flex-col sm:flex-row`.
 - **Enterprise UX Engine:** Includes toast notifications, loading spinners, page transitions, and auto-scrolling to errors.
 - **Keyboard Shortcuts:** Implemented for invoice creation.
 - **Intelligent Autofocus:** Automatically advances input fields.

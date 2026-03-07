@@ -35,14 +35,15 @@
     </div>
 
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="overflow-x-auto">
         <table class="w-full text-sm">
             <thead>
                 <tr class="bg-gray-50 dark:bg-gray-800 text-left text-xs text-gray-500 uppercase">
                     <th class="px-4 py-3">Name</th>
-                    <th class="px-4 py-3">Description</th>
+                    <th class="px-4 py-3 hidden md:table-cell">Description</th>
                     <th class="px-4 py-3 text-right">Price</th>
-                    <th class="px-4 py-3 text-right">Tax Rate</th>
-                    <th class="px-4 py-3">Status</th>
+                    <th class="px-4 py-3 text-right hidden sm:table-cell">Tax Rate</th>
+                    <th class="px-4 py-3 hidden sm:table-cell">Status</th>
                     <th class="px-4 py-3">Actions</th>
                 </tr>
             </thead>
@@ -50,10 +51,10 @@
                 @forelse($services as $service)
                 <tr class="border-b border-gray-100 dark:border-gray-800 {{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }}" x-data="{ editing: false }">
                     <td class="px-4 py-3 font-medium text-gray-900 dark:text-white" x-show="!editing">{{ $service->name }}</td>
-                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400" x-show="!editing">{{ $service->description ?? '-' }}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400 hidden md:table-cell" x-show="!editing">{{ $service->description ?? '-' }}</td>
                     <td class="px-4 py-3 text-right text-gray-900 dark:text-white" x-show="!editing">PKR {{ number_format($service->price, 2) }}</td>
-                    <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300" x-show="!editing">{{ $service->tax_rate }}%</td>
-                    <td class="px-4 py-3" x-show="!editing">
+                    <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300 hidden sm:table-cell" x-show="!editing">{{ $service->tax_rate }}%</td>
+                    <td class="px-4 py-3 hidden sm:table-cell" x-show="!editing">
                         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $service->is_active ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400' }}">
                             {{ $service->is_active ? 'Active' : 'Inactive' }}
                         </span>
@@ -68,15 +69,17 @@
                         </div>
                     </td>
                     <td colspan="6" class="px-4 py-3" x-show="editing" x-cloak>
-                        <form method="POST" action="{{ route('pos.services.update', $service->id) }}" class="flex items-center gap-2 flex-wrap">
+                        <form method="POST" action="{{ route('pos.services.update', $service->id) }}" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 items-end">
                             @csrf @method('PUT')
-                            <input type="text" name="name" value="{{ $service->name }}" required class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1 w-32">
-                            <input type="text" name="description" value="{{ $service->description }}" class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1 w-32">
-                            <input type="number" name="price" value="{{ $service->price }}" step="0.01" required class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1 w-24">
-                            <input type="number" name="tax_rate" value="{{ $service->tax_rate }}" step="0.01" class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1 w-20">
-                            <label class="flex items-center gap-1 text-xs"><input type="checkbox" name="is_active" {{ $service->is_active ? 'checked' : '' }} class="rounded"> Active</label>
-                            <button type="submit" class="text-emerald-600 text-xs font-medium hover:underline">Save</button>
-                            <button type="button" @click="editing = false" class="text-gray-500 text-xs hover:underline">Cancel</button>
+                            <input type="text" name="name" value="{{ $service->name }}" required placeholder="Name" class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1 w-full">
+                            <input type="text" name="description" value="{{ $service->description }}" placeholder="Description" class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1 w-full">
+                            <input type="number" name="price" value="{{ $service->price }}" step="0.01" required placeholder="Price" class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1 w-full">
+                            <input type="number" name="tax_rate" value="{{ $service->tax_rate }}" step="0.01" placeholder="Tax %" class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1 w-full">
+                            <div class="flex items-center gap-2">
+                                <label class="flex items-center gap-1 text-xs"><input type="checkbox" name="is_active" {{ $service->is_active ? 'checked' : '' }} class="rounded"> Active</label>
+                                <button type="submit" class="text-emerald-600 text-xs font-medium hover:underline">Save</button>
+                                <button type="button" @click="editing = false" class="text-gray-500 text-xs hover:underline">Cancel</button>
+                            </div>
                         </form>
                     </td>
                 </tr>
@@ -85,6 +88,7 @@
                 @endforelse
             </tbody>
         </table>
+        </div>
     </div>
 </div>
 </x-pos-layout>

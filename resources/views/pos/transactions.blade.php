@@ -30,13 +30,13 @@
                 <thead>
                     <tr class="bg-gray-50 dark:bg-gray-800 text-left text-xs text-gray-500 dark:text-gray-400 uppercase">
                         <th class="px-4 py-3">Invoice #</th>
-                        <th class="px-4 py-3">Customer</th>
-                        <th class="px-4 py-3">Payment</th>
-                        <th class="px-4 py-3 text-right">Subtotal</th>
-                        <th class="px-4 py-3 text-right">Tax</th>
+                        <th class="px-4 py-3 hidden md:table-cell">Customer</th>
+                        <th class="px-4 py-3 hidden sm:table-cell">Payment</th>
+                        <th class="px-4 py-3 text-right hidden lg:table-cell">Subtotal</th>
+                        <th class="px-4 py-3 text-right hidden lg:table-cell">Tax</th>
                         <th class="px-4 py-3 text-right">Total</th>
-                        <th class="px-4 py-3">PRA Status</th>
-                        <th class="px-4 py-3">Date</th>
+                        <th class="px-4 py-3 hidden sm:table-cell">PRA Status</th>
+                        <th class="px-4 py-3 hidden md:table-cell">Date</th>
                         <th class="px-4 py-3">Actions</th>
                     </tr>
                 </thead>
@@ -46,17 +46,17 @@
                         <td class="px-4 py-3 font-medium text-emerald-600">
                             <a href="{{ route('pos.transaction.show', $txn->id) }}" class="hover:underline">{{ $txn->invoice_number }}</a>
                         </td>
-                        <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ $txn->customer_name ?? 'Walk-in' }}</td>
-                        <td class="px-4 py-3">
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-300 hidden md:table-cell">{{ $txn->customer_name ?? 'Walk-in' }}</td>
+                        <td class="px-4 py-3 hidden sm:table-cell">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
                                 {{ $txn->payment_method === 'cash' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' }}">
                                 {{ ucwords(str_replace('_', ' ', $txn->payment_method)) }}
                             </span>
                         </td>
-                        <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{{ number_format($txn->subtotal) }}</td>
-                        <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{{ number_format($txn->tax_amount) }}</td>
+                        <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300 hidden lg:table-cell">{{ number_format($txn->subtotal) }}</td>
+                        <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300 hidden lg:table-cell">{{ number_format($txn->tax_amount) }}</td>
                         <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">PKR {{ number_format($txn->total_amount) }}</td>
-                        <td class="px-4 py-3">
+                        <td class="px-4 py-3 hidden sm:table-cell">
                             @if($txn->pra_status === 'submitted')
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">Submitted</span>
                             @elseif($txn->pra_status === 'failed')
@@ -71,7 +71,7 @@
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">Local</span>
                             @endif
                         </td>
-                        <td class="px-4 py-3 text-gray-500 text-xs">{{ $txn->created_at->format('d M Y H:i') }}</td>
+                        <td class="px-4 py-3 text-gray-500 text-xs hidden md:table-cell">{{ $txn->created_at->format('d M Y H:i') }}</td>
                         <td class="px-4 py-3">
                             <a href="{{ route('pos.receipt', $txn->id) }}" class="text-emerald-600 hover:underline text-xs font-medium">Receipt</a>
                         </td>

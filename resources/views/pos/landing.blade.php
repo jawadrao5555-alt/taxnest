@@ -94,7 +94,7 @@
                         <a href="#how-it-works" class="text-sm font-medium text-gray-500 hover:text-purple-600 transition">How It Works</a>
                     </div>
                     <div class="border-l border-gray-200 pl-6 mr-6">
-                        <a href="/di" class="group flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-emerald-50 transition">
+                        <a href="/digital-invoice" class="group flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-emerald-50 transition">
                             <div class="w-7 h-7 rounded-lg bg-emerald-100 group-hover:bg-emerald-200 flex items-center justify-center transition">
                                 <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                             </div>
@@ -126,7 +126,7 @@
                 <a href="#pricing" @click="mobileOpen = false" class="block px-3 py-2 text-sm font-medium text-gray-600 hover:text-purple-600 rounded-lg hover:bg-gray-50 transition">Pricing</a>
                 <a href="#how-it-works" @click="mobileOpen = false" class="block px-3 py-2 text-sm font-medium text-gray-600 hover:text-purple-600 rounded-lg hover:bg-gray-50 transition">How It Works</a>
                 <div class="border-t border-gray-100 pt-3 mt-2">
-                    <a href="/di" class="flex items-center space-x-3 px-3 py-3 rounded-xl hover:bg-emerald-50 transition">
+                    <a href="/digital-invoice" class="flex items-center space-x-3 px-3 py-3 rounded-xl hover:bg-emerald-50 transition">
                         <div class="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center">
                             <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                         </div>

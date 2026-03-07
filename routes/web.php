@@ -103,10 +103,14 @@ Route::get('/', function () {
     return view('landing', ['showLogin' => false]);
 });
 
-Route::get('/di', function () {
+Route::get('/digital-invoice', function () {
     $plans = \App\Models\PricingPlan::where('is_trial', false)->orderBy('price')->get();
     return view('di-landing', ['plans' => $plans]);
 })->name('di.landing');
+
+Route::get('/di', function () {
+    return redirect('/digital-invoice');
+});
 
 Route::get('/pos', function () {
     $plans = \App\Models\PricingPlan::where('is_trial', false)->orderBy('price')->get();

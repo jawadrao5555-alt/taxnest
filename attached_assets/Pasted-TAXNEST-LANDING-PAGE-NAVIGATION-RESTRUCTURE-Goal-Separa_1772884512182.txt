@@ -1,0 +1,147 @@
+TAXNEST LANDING PAGE NAVIGATION RESTRUCTURE
+
+Goal:
+Separate the two products clearly in the top navigation and ensure that login/signup occurs inside each product landing page instead of appearing as global tabs.
+
+Do NOT modify backend systems. This is a UI/UX structure change only.
+
+---------------------------------
+
+1. TOP NAVIGATION STRUCTURE
+
+Replace current navigation with:
+
+Logo (TaxNest)
+
+Navigation items:
+
+Digital Invoice
+PRA POS
+Pricing
+Documentation
+Contact
+
+Remove global "Login / Sign Up" buttons from the top navigation.
+
+---------------------------------
+
+2. PRODUCT LANDING PAGE SYSTEM
+
+Each product must have its own landing page.
+
+Routes:
+
+/digital-invoice
+/pos
+
+When user clicks:
+
+Digital Invoice → redirect to
+/digital-invoice
+
+PRA POS → redirect to
+/pos
+
+---------------------------------
+
+3. LOGIN & SIGNUP LOCATION
+
+Login and signup must exist ONLY inside the product landing pages.
+
+Digital Invoice landing page must contain:
+
+Buttons:
+
+Start Free Trial
+Sign In
+
+Sign In route:
+/login
+
+Signup route:
+/register
+
+---------------------------------
+
+PRA POS landing page must contain:
+
+Buttons:
+
+Start POS Trial
+POS Login
+
+Routes:
+
+/pos/login
+/pos/register
+
+---------------------------------
+
+4. LANDING PAGE LAYOUT
+
+Each product landing page must include:
+
+Hero Section
+Product Features
+Screenshots
+Pricing
+FAQ
+Signup CTA
+
+---------------------------------
+
+5. DESIGN IMPROVEMENT
+
+Replace current color scheme with a cleaner SaaS style.
+
+Recommended palette:
+
+Primary: Emerald / Green
+Secondary: Indigo / Purple
+Background: White + Light Gray
+
+Use:
+
+Glass cards
+Soft gradients
+Rounded buttons
+Consistent spacing
+
+---------------------------------
+
+6. PRODUCT SEPARATION
+
+Digital Invoice page must reference:
+
+FBR Digital Invoicing
+PRAL Integration
+HS Code Intelligence
+Compliance Engine
+
+PRA POS page must reference:
+
+POS Billing
+Inventory
+Offline Mode
+PRA Fiscal Reporting
+
+---------------------------------
+
+7. FINAL RESULT
+
+Top navigation shows:
+
+Digital Invoice | PRA POS | Pricing | Docs | Contact
+
+Clicking a product opens its dedicated landing page.
+
+Login and signup appear inside each product page only.
+
+No global login tabs in the top navigation.
+
+The UI must feel like a professional SaaS product website.
+
+---------------------------------
+
+Do not break any existing routes or authentication systems.
+This task is UI/UX restructuring only.

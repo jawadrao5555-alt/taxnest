@@ -46,11 +46,12 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **NestPOS Module:** A completely isolated Point of Sale system with PRA integration, separate authentication, layouts, and data models. Supports offline billing with auto-sync, dual invoice numbering (POS and PRA Fiscal), comprehensive tax reporting with CSV/PDF export, business profile management with logo upload (printed on receipts), and user profile with password change.
 - **SaaS Management Layer:** A fully separated admin and franchise management system with distinct authentication, layouts, subscription plan builders, company approval workflows, and usage monitoring.
 - **Dynamic Landing Pages:** Three separate landing pages with product-isolated login:
-  - `/` — Main TaxNest landing (product overview, features, FAQ — NO pricing, NO login buttons in nav)
-  - `/di` — Dedicated DI landing page (FBR features, billing cycles, pricing plans, login modal, sign up)
+  - `/` — Main TaxNest landing (product overview, features, pricing overview, FAQ, contact — NO login buttons in nav)
+  - `/digital-invoice` — Dedicated DI landing page (FBR features, billing cycles, pricing plans, login modal, sign up)
   - `/pos` — Dedicated NestPOS landing page (PRA features, annual pricing, login modal, POS sign up)
+  - `/di` — Redirects to `/digital-invoice`
   - `/login` — Renders DI landing with login modal auto-open (Laravel auth redirect target)
-  - Navigation flow: Main landing nav has product cards (DI→/di, POS→/pos) + section links only; each product page has its own login modal + sign up + "< Home" back link
+  - Navigation flow: Main landing nav has flat links (Digital Invoice→/digital-invoice, PRA POS→/pos, Pricing, Features, Contact); each product page has its own login modal + sign up + "< Home" back link
 - **Admin Plan Management:** SaaS admin can edit all plan details inline (name, price, limits, features) at `/admin/plans`. Changes auto-reflect on all landing and billing pages since they read from `pricing_plans` table.
 
 **Key Features:**

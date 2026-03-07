@@ -19,7 +19,7 @@
 </head>
 <body class="antialiased text-gray-800 scroll-smooth">
 
-    <nav class="fixed top-0 w-full z-50 bg-white/95 backdrop-blur-2xl border-b border-gray-200/60 shadow-sm" x-data="{ mobileOpen: false, productsOpen: false }" @click.away="productsOpen = false">
+    <nav class="fixed top-0 w-full z-50 bg-white/95 backdrop-blur-2xl border-b border-gray-200/60 shadow-sm" x-data="{ mobileOpen: false }">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
                 <a href="/" class="flex items-center space-x-2.5">
@@ -30,41 +30,12 @@
                 </a>
 
                 <div class="hidden lg:flex items-center space-x-1">
-                    <div class="relative">
-                        <button @click="productsOpen = !productsOpen" class="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">
-                            <span>Products</span>
-                            <svg class="w-4 h-4 transition-transform" :class="productsOpen ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                        </button>
-                        <div x-show="productsOpen" x-cloak x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="absolute top-full left-0 mt-1 w-72 bg-white rounded-xl shadow-xl border border-gray-200/80 overflow-hidden z-50">
-                            <a href="/di" class="group flex items-center space-x-3 px-4 py-3.5 hover:bg-emerald-50 transition border-b border-gray-100">
-                                <div class="w-10 h-10 rounded-xl bg-emerald-100 group-hover:bg-emerald-200 flex items-center justify-center flex-shrink-0 transition">
-                                    <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-semibold text-gray-900 block">Digital Invoice</span>
-                                    <span class="text-xs text-gray-500">FBR tax compliance & invoicing</span>
-                                </div>
-                                <svg class="w-4 h-4 text-gray-300 group-hover:text-emerald-500 ml-auto flex-shrink-0 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                            </a>
-                            <a href="/pos" class="group flex items-center space-x-3 px-4 py-3.5 hover:bg-purple-50 transition">
-                                <div class="w-10 h-10 rounded-xl bg-purple-100 group-hover:bg-purple-200 flex items-center justify-center flex-shrink-0 transition">
-                                    <svg class="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-semibold text-gray-900 block">NestPOS</span>
-                                    <span class="text-xs text-gray-500">PRA point of sale system</span>
-                                </div>
-                                <svg class="w-4 h-4 text-gray-300 group-hover:text-purple-500 ml-auto flex-shrink-0 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                            </a>
-                        </div>
-                    </div>
+                    <a href="/digital-invoice" class="px-3 py-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800 rounded-lg hover:bg-emerald-50 transition">Digital Invoice</a>
+                    <a href="/pos" class="px-3 py-2 text-sm font-semibold text-purple-700 hover:text-purple-800 rounded-lg hover:bg-purple-50 transition">PRA POS</a>
+                    <span class="w-px h-5 bg-gray-200 mx-1"></span>
+                    <a href="#pricing" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Pricing</a>
                     <a href="#features" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Features</a>
-                    <a href="#faq" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">FAQ</a>
-                </div>
-
-                <div class="hidden lg:flex items-center space-x-3">
-                    <a href="/di" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700 hover:text-emerald-700 rounded-lg hover:bg-emerald-50 transition">Sign In</a>
-                    <a href="/di" class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl text-sm font-semibold hover:from-emerald-700 hover:to-teal-700 transition shadow-sm shadow-emerald-600/20">Get Started Free</a>
+                    <a href="#contact" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Contact</a>
                 </div>
 
                 <button @click="mobileOpen = !mobileOpen" class="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition">
@@ -73,35 +44,31 @@
                 </button>
             </div>
 
-            <div x-show="mobileOpen" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-2" class="lg:hidden border-t border-gray-100 py-4">
+            <div x-show="mobileOpen" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-2" class="lg:hidden border-t border-gray-100 py-3">
                 <div class="space-y-1 px-1">
-                    <a href="#features" @click="mobileOpen = false" class="block px-3 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Features</a>
-                    <a href="#faq" @click="mobileOpen = false" class="block px-3 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">FAQ</a>
-                </div>
-                <div class="border-t border-gray-100 pt-3 mt-3 px-1">
-                    <p class="px-3 pb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Products</p>
-                    <a href="/di" class="flex items-center space-x-3 px-3 py-3 rounded-xl hover:bg-emerald-50 transition">
-                        <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+                    <a href="/digital-invoice" class="flex items-center space-x-3 px-3 py-3 rounded-xl hover:bg-emerald-50 transition">
+                        <div class="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
                             <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                         </div>
                         <div>
                             <span class="text-sm font-semibold text-gray-900 block">Digital Invoice</span>
-                            <span class="text-xs text-gray-500">FBR tax compliance & invoicing</span>
+                            <span class="text-xs text-emerald-600">FBR Tax Compliance</span>
                         </div>
                     </a>
                     <a href="/pos" class="flex items-center space-x-3 px-3 py-3 rounded-xl hover:bg-purple-50 transition">
-                        <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
+                        <div class="w-9 h-9 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
                             <svg class="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                         </div>
                         <div>
-                            <span class="text-sm font-semibold text-gray-900 block">NestPOS</span>
-                            <span class="text-xs text-gray-500">PRA point of sale system</span>
+                            <span class="text-sm font-semibold text-gray-900 block">PRA POS</span>
+                            <span class="text-xs text-purple-600">PRA Point of Sale</span>
                         </div>
                     </a>
                 </div>
-                <div class="border-t border-gray-100 pt-3 mt-3 px-1 space-y-2">
-                    <a href="/di" class="block w-full text-center px-4 py-2.5 text-sm font-semibold text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 transition">Sign In</a>
-                    <a href="/di" class="block w-full text-center px-4 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl hover:from-emerald-700 hover:to-teal-700 transition shadow-sm">Get Started Free</a>
+                <div class="border-t border-gray-100 pt-2 mt-2 px-1 space-y-1">
+                    <a href="#pricing" @click="mobileOpen = false" class="block px-3 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Pricing</a>
+                    <a href="#features" @click="mobileOpen = false" class="block px-3 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Features</a>
+                    <a href="#contact" @click="mobileOpen = false" class="block px-3 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Contact</a>
                 </div>
             </div>
         </div>
@@ -246,7 +213,7 @@
                             </div>
                         </div>
                         <div class="pt-4 border-t border-gray-100">
-                            <a href="/di" class="block w-full py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition shadow-sm text-center">
+                            <a href="/digital-invoice" class="block w-full py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition shadow-sm text-center">
                                 View Details & Plans
                             </a>
                         </div>
@@ -470,6 +437,40 @@
     </section>
 
 
+    <section id="pricing" class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <p class="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-2">Pricing</p>
+                <h2 class="text-3xl sm:text-4xl font-extrabold text-gray-900">Simple, Transparent Pricing</h2>
+                <p class="mt-4 text-lg text-gray-500 max-w-2xl mx-auto">Each product has its own pricing plans. Visit the product page for detailed plans and a 14-day free trial.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <div class="bg-gray-50 rounded-2xl border border-gray-200 p-8 text-center hover:shadow-lg transition-shadow">
+                    <div class="w-14 h-14 rounded-xl bg-emerald-100 flex items-center justify-center mx-auto mb-5">
+                        <svg class="w-7 h-7 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">Digital Invoice</h3>
+                    <p class="text-gray-500 text-sm mb-6">FBR-compliant invoicing with multiple billing cycles and volume discounts</p>
+                    <a href="/digital-invoice#pricing" class="inline-flex items-center px-6 py-3 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition shadow-sm">
+                        View DI Plans
+                        <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    </a>
+                </div>
+                <div class="bg-gray-50 rounded-2xl border border-gray-200 p-8 text-center hover:shadow-lg transition-shadow">
+                    <div class="w-14 h-14 rounded-xl bg-purple-100 flex items-center justify-center mx-auto mb-5">
+                        <svg class="w-7 h-7 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">NestPOS</h3>
+                    <p class="text-gray-500 text-sm mb-6">PRA point of sale with annual billing and built-in 6% discount</p>
+                    <a href="/pos#pricing" class="inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-xl text-sm font-semibold hover:bg-purple-700 transition shadow-sm">
+                        View POS Plans
+                        <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <section id="faq" class="py-20 bg-gray-50">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
@@ -542,12 +543,45 @@
         </div>
     </section>
 
+    <section id="contact" class="py-20 bg-white">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <p class="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-2">Get in Touch</p>
+                <h2 class="text-3xl sm:text-4xl font-extrabold text-gray-900">Contact Us</h2>
+                <p class="mt-4 text-lg text-gray-500">Have questions? We're here to help you choose the right solution.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-gray-50 rounded-2xl border border-gray-100 p-6 text-center">
+                    <div class="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    </div>
+                    <h3 class="font-semibold text-gray-900 mb-1">Email</h3>
+                    <p class="text-sm text-gray-500">support@taxnest.com</p>
+                </div>
+                <div class="bg-gray-50 rounded-2xl border border-gray-100 p-6 text-center">
+                    <div class="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                    </div>
+                    <h3 class="font-semibold text-gray-900 mb-1">Phone</h3>
+                    <p class="text-sm text-gray-500">+92-XXX-XXXXXXX</p>
+                </div>
+                <div class="bg-gray-50 rounded-2xl border border-gray-100 p-6 text-center">
+                    <div class="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    </div>
+                    <h3 class="font-semibold text-gray-900 mb-1">Location</h3>
+                    <p class="text-sm text-gray-500">Pakistan</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <section class="py-16 bg-gradient-to-r from-emerald-600 via-teal-600 to-purple-600">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h2 class="text-3xl font-bold text-white mb-4">Ready to Get Compliant?</h2>
             <p class="text-white/80 mb-8 text-lg">Choose a product to explore features, pricing, and get started.</p>
             <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <a href="/di" class="px-8 py-4 bg-white text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-50 transition shadow-lg w-full sm:w-auto flex items-center justify-center gap-2">
+                <a href="/digital-invoice" class="px-8 py-4 bg-white text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-50 transition shadow-lg w-full sm:w-auto flex items-center justify-center gap-2">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                     Digital Invoice
                 </a>

@@ -76,7 +76,7 @@
                         <span class="text-xs font-medium hidden sm:inline">Home</span>
                     </a>
                     <div class="w-px h-6 bg-gray-200"></div>
-                    <a href="/di" class="flex items-center space-x-2">
+                    <a href="/digital-invoice" class="flex items-center space-x-2">
                         <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
                             <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                         </div>

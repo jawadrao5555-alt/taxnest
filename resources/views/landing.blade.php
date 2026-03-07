@@ -20,7 +20,7 @@
         .btn-glow:hover { transform: translateY(-1px); box-shadow: 0 8px 24px -4px rgba(16,185,129,0.4); }
         .btn-glow-purple { transition: all 0.25s ease; }
         .btn-glow-purple:hover { transform: translateY(-1px); box-shadow: 0 8px 24px -4px rgba(139,92,246,0.4); }
-        .stat-glass { background: rgba(255,255,255,0.06); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+        .stat-glass { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); }
     </style>
 </head>
 <body class="antialiased text-gray-700 scroll-smooth bg-white">
@@ -82,32 +82,32 @@
 
             <div class="mt-20 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto">
                 <div class="stat-glass rounded-2xl p-5 text-center">
-                    <div class="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center mx-auto mb-3">
-                        <svg class="w-[18px] h-[18px] text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
                     </div>
                     <p class="text-2xl sm:text-3xl font-bold text-white">99.9%</p>
-                    <p class="text-xs text-gray-500 mt-1">Uptime SLA</p>
+                    <p class="text-xs text-gray-400 mt-1">Uptime SLA</p>
                 </div>
                 <div class="stat-glass rounded-2xl p-5 text-center">
-                    <div class="w-9 h-9 rounded-lg bg-teal-500/10 flex items-center justify-center mx-auto mb-3">
-                        <svg class="w-[18px] h-[18px] text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                    <div class="w-10 h-10 rounded-xl bg-teal-500/20 flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-5 h-5 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                     </div>
                     <p class="text-2xl sm:text-3xl font-bold text-white">50k+</p>
-                    <p class="text-xs text-gray-500 mt-1">Invoices Processed</p>
+                    <p class="text-xs text-gray-400 mt-1">Invoices Processed</p>
                 </div>
                 <div class="stat-glass rounded-2xl p-5 text-center">
-                    <div class="w-9 h-9 rounded-lg bg-purple-500/10 flex items-center justify-center mx-auto mb-3">
-                        <svg class="w-[18px] h-[18px] text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    <div class="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                     </div>
                     <p class="text-2xl sm:text-3xl font-bold text-white">500+</p>
-                    <p class="text-xs text-gray-500 mt-1">Companies Trust Us</p>
+                    <p class="text-xs text-gray-400 mt-1">Companies Trust Us</p>
                 </div>
                 <div class="stat-glass rounded-2xl p-5 text-center">
-                    <div class="w-9 h-9 rounded-lg bg-blue-500/10 flex items-center justify-center mx-auto mb-3">
-                        <svg class="w-[18px] h-[18px] text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                    <div class="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                     </div>
                     <p class="text-2xl sm:text-3xl font-bold text-white">2</p>
-                    <p class="text-xs text-gray-500 mt-1">Integrated Products</p>
+                    <p class="text-xs text-gray-400 mt-1">Integrated Products</p>
                 </div>
             </div>
         </div>
@@ -116,24 +116,24 @@
     <div class="bg-gray-50 border-b border-gray-100 py-5">
         <div class="max-w-[1200px] mx-auto px-5 sm:px-8">
             <div class="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
-                <div class="flex items-center space-x-2 text-gray-400">
-                    <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                <div class="flex items-center space-x-2 text-gray-600">
+                    <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                     <span class="text-[13px] font-medium">FBR API v1.12</span>
                 </div>
-                <div class="flex items-center space-x-2 text-gray-400">
-                    <svg class="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <div class="flex items-center space-x-2 text-gray-600">
+                    <svg class="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <span class="text-[13px] font-medium">PRA IMS v1.2</span>
                 </div>
-                <div class="flex items-center space-x-2 text-gray-400">
-                    <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                <div class="flex items-center space-x-2 text-gray-600">
+                    <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                     <span class="text-[13px] font-medium">SHA-256 Encrypted</span>
                 </div>
-                <div class="flex items-center space-x-2 text-gray-400">
-                    <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                <div class="flex items-center space-x-2 text-gray-600">
+                    <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     <span class="text-[13px] font-medium">Real-time Sync</span>
                 </div>
-                <div class="flex items-center space-x-2 text-gray-400">
-                    <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                <div class="flex items-center space-x-2 text-gray-600">
+                    <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                     <span class="text-[13px] font-medium">PWA Ready</span>
                 </div>
             </div>
@@ -152,24 +152,24 @@
                 <div class="card-hover bg-white rounded-2xl border border-gray-200 overflow-hidden">
                     <div class="p-8">
                         <div class="flex items-center space-x-4 mb-6">
-                            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                                <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                            <div class="w-16 h-16 rounded-[14px] bg-emerald-50 flex items-center justify-center shadow-md">
+                                <svg class="w-8 h-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                             </div>
                             <div>
                                 <h3 class="text-xl font-bold text-gray-900">Digital Invoice</h3>
-                                <p class="text-[13px] text-emerald-600 font-medium">FBR Compliance System</p>
+                                <p class="text-[13px] text-emerald-600 font-semibold">FBR Compliance System</p>
                             </div>
                         </div>
-                        <p class="text-[15px] text-gray-500 leading-relaxed mb-6">Enterprise-grade FBR digital invoicing with PRAL API v1.12 integration, real-time synchronous submission, and intelligent compliance scoring.</p>
+                        <p class="text-[15px] text-gray-600 leading-relaxed mb-6">Enterprise-grade FBR digital invoicing with PRAL API v1.12 integration, real-time synchronous submission, and intelligent compliance scoring.</p>
                         <div class="grid grid-cols-2 gap-2.5 mb-8">
                             @foreach(['FBR API v1.12', 'HS Intelligence AI', 'Risk Detection', 'Idempotency Shield', 'PDF + QR Codes', 'MIS Analytics', 'Customer Ledger', 'Multi-Branch'] as $feature)
-                            <div class="flex items-center text-[13px] text-gray-600">
-                                <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <div class="flex items-center text-[13px] text-gray-700">
+                                <svg class="w-4 h-4 text-emerald-600 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                 {{ $feature }}
                             </div>
                             @endforeach
                         </div>
-                        <a href="/digital-invoice" class="btn-glow block w-full py-3 bg-emerald-600 text-white rounded-[10px] text-[14px] font-semibold hover:bg-emerald-700 transition text-center">
+                        <a href="/digital-invoice" class="btn-glow block w-full py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-[10px] text-[14px] font-semibold hover:from-emerald-700 hover:to-emerald-800 text-center">
                             Explore Digital Invoice
                         </a>
                     </div>
@@ -178,24 +178,24 @@
                 <div class="card-hover bg-white rounded-2xl border border-gray-200 overflow-hidden">
                     <div class="p-8">
                         <div class="flex items-center space-x-4 mb-6">
-                            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
-                                <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                            <div class="w-16 h-16 rounded-[14px] bg-purple-50 flex items-center justify-center shadow-md">
+                                <svg class="w-8 h-8 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                             </div>
                             <div>
                                 <h3 class="text-xl font-bold text-gray-900">NestPOS</h3>
-                                <p class="text-[13px] text-purple-600 font-medium">Point of Sale System</p>
+                                <p class="text-[13px] text-purple-600 font-semibold">Point of Sale System</p>
                             </div>
                         </div>
-                        <p class="text-[15px] text-gray-500 leading-relaxed mb-6">Complete POS billing system with PRA fiscal device integration via PRAL IMS API v1.2, thermal receipts, and real-time tax calculations.</p>
+                        <p class="text-[15px] text-gray-600 leading-relaxed mb-6">Complete POS billing system with PRA fiscal device integration via PRAL IMS API v1.2, thermal receipts, and real-time tax calculations.</p>
                         <div class="grid grid-cols-2 gap-2.5 mb-8">
                             @foreach(['PRA IMS v1.2', 'Thermal Receipts', 'Multi-Terminal', 'Smart Billing', 'Cash/Card/QR Tax', 'POS Reports', 'Fiscal QR Codes', 'Offline Billing'] as $feature)
-                            <div class="flex items-center text-[13px] text-gray-600">
-                                <svg class="w-4 h-4 text-purple-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <div class="flex items-center text-[13px] text-gray-700">
+                                <svg class="w-4 h-4 text-purple-600 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                 {{ $feature }}
                             </div>
                             @endforeach
                         </div>
-                        <a href="/pos" class="btn-glow-purple block w-full py-3 bg-purple-600 text-white rounded-[10px] text-[14px] font-semibold hover:bg-purple-700 text-center">
+                        <a href="/pos" class="btn-glow-purple block w-full py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-[10px] text-[14px] font-semibold hover:from-purple-700 hover:to-purple-800 text-center">
                             Explore NestPOS
                         </a>
                     </div>
@@ -235,11 +235,11 @@
                 @endphp
                 @foreach($features as $f)
                 <div class="card-hover bg-white rounded-2xl p-6 border border-gray-100">
-                    <div class="w-11 h-11 bg-{{ $f[3] }}-50 rounded-xl flex items-center justify-center mb-4">
-                        <svg class="w-5 h-5 text-{{ $f[3] }}-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $f[2] }}"/></svg>
+                    <div class="w-12 h-12 bg-{{ $f[3] }}-50 rounded-xl flex items-center justify-center mb-4 shadow-sm">
+                        <svg class="w-6 h-6 text-{{ $f[3] }}-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $f[2] }}"/></svg>
                     </div>
                     <h3 class="text-[15px] font-bold text-gray-900 mb-2">{{ $f[0] }}</h3>
-                    <p class="text-[13px] text-gray-500 leading-relaxed">{{ $f[1] }}</p>
+                    <p class="text-[13px] text-gray-600 leading-relaxed">{{ $f[1] }}</p>
                 </div>
                 @endforeach
             </div>

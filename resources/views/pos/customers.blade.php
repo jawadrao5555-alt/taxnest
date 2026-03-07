@@ -1,8 +1,8 @@
 <x-pos-layout>
 <div class="p-4 sm:p-6 max-w-7xl mx-auto">
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <h1 class="text-xl font-bold text-gray-900 dark:text-white">POS Customers</h1>
-        <button onclick="document.getElementById('addCustomerForm').classList.toggle('hidden')" style="background: linear-gradient(135deg, #7c3aed, #8b5cf6); color: #fff; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; border: none; cursor: pointer;">+ Add Customer</button>
+        <button onclick="document.getElementById('addCustomerForm').classList.toggle('hidden')" class="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-md hover:shadow-lg transition">+ Add Customer</button>
     </div>
 
     @if(session('success'))
@@ -12,7 +12,7 @@
     <div class="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-300 rounded-lg px-4 py-3 text-sm">{{ $errors->first() }}</div>
     @endif
 
-    <div id="addCustomerForm" class="hidden mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
+    <div id="addCustomerForm" class="hidden mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-md p-5">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Add New Customer</h3>
         <form method="POST" action="{{ route('pos.customers.store') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             @csrf
@@ -48,7 +48,7 @@
                 <input type="text" name="city" placeholder="City" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
             </div>
             <div class="flex items-end">
-                <button type="submit" style="background: linear-gradient(135deg, #7c3aed, #8b5cf6); color: #fff; padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; width: 100%;">Save Customer</button>
+                <button type="submit" class="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white px-5 py-2 rounded-lg text-sm font-semibold shadow-md hover:shadow-lg transition">Save Customer</button>
             </div>
             <div class="sm:col-span-2 lg:col-span-4">
                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Address</label>
@@ -57,7 +57,7 @@
         </form>
     </div>
 
-    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-md overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
@@ -114,7 +114,7 @@
                                     <option value="registered" {{ $customer->type === 'registered' ? 'selected' : '' }}>Registered</option>
                                 </select>
                                 <div class="flex gap-2">
-                                    <button type="submit" class="text-xs font-semibold text-white px-3 py-1.5 rounded-lg" style="background: #7c3aed;">Save</button>
+                                    <button type="submit" class="text-xs font-semibold text-white px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 transition">Save</button>
                                     <button type="button" @click="editing = false" class="text-xs text-gray-500 px-3 py-1.5">Cancel</button>
                                 </div>
                             </form>

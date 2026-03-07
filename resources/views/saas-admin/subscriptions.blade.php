@@ -1,5 +1,5 @@
 <x-admin-layout>
-<div class="p-6 max-w-7xl mx-auto">
+<div class="p-4 sm:p-6 max-w-7xl mx-auto">
     <h1 class="text-2xl font-bold text-white mb-6">Subscriptions</h1>
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6" x-data="{ showForm: false }">
@@ -7,9 +7,9 @@
             <h3 class="text-sm font-semibold text-white">Assign Subscription</h3>
             <button @click="showForm = !showForm" class="text-xs text-indigo-400 hover:underline" x-text="showForm ? 'Hide' : 'Assign New'"></button>
         </div>
-        <form x-show="showForm" method="POST" action="{{ route('saas.admin.subscriptions.assign') }}" class="flex flex-col sm:flex-row gap-3">
+        <form x-show="showForm" method="POST" action="{{ route('saas.admin.subscriptions.assign') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             @csrf
-            <select name="company_id" required class="flex-1 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+            <select name="company_id" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                 <option value="">Select Company</option>
                 @foreach($companies as $c)<option value="{{ $c->id }}">{{ $c->name }}</option>@endforeach
             </select>

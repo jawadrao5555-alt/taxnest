@@ -1,10 +1,10 @@
 <x-admin-layout>
-<div class="p-6 max-w-7xl mx-auto">
+<div class="p-4 sm:p-6 max-w-7xl mx-auto">
     <h1 class="text-2xl font-bold text-white mb-6">Companies</h1>
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
-        <form method="GET" class="flex flex-col sm:flex-row gap-3">
-            <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by name or NTN..." class="flex-1 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-4 py-2 focus:ring-2 focus:ring-indigo-500">
+        <form method="GET" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by name or NTN..." class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-4 py-2 focus:ring-2 focus:ring-indigo-500">
             <select name="status" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-4 py-2 focus:ring-2 focus:ring-indigo-500">
                 <option value="">All Statuses</option>
                 <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>Pending</option>

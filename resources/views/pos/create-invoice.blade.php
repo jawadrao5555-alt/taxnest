@@ -82,7 +82,7 @@
                 </div>
                 @endif
 
-                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                     <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Customer & Terminal</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
@@ -105,7 +105,7 @@
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Invoice Items</h3>
                         <button type="button" @click="addItem()" class="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition btn-premium">
@@ -227,7 +227,7 @@
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                         <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Discount</h3>
                         <div class="flex items-center space-x-2 mb-3">
                             <button type="button" @click="discountType = 'percentage'; recalculate()"
@@ -249,7 +249,7 @@
                         </div>
                     </div>
 
-                    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                         <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Payment Method</h3>
                         <div class="grid grid-cols-2 gap-2">
                             <template x-for="pm in paymentMethods" :key="pm.value">
@@ -264,7 +264,7 @@
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                     <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Tax Calculation Summary</h3>
                     <div class="space-y-2">
                         <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">

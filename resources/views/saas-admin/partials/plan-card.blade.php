@@ -36,7 +36,7 @@
     <form x-show="editing" method="POST" action="{{ route('saas.admin.plans.update', $plan->id) }}" class="space-y-3">
         @csrf
         @method('PUT')
-        <div class="grid grid-cols-2 gap-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
                 <label class="text-[10px] text-gray-500 uppercase">Name</label>
                 <input type="text" name="name" value="{{ $plan->name }}" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">

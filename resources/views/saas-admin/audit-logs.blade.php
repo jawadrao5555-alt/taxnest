@@ -1,10 +1,10 @@
 <x-admin-layout>
-<div class="p-6 max-w-7xl mx-auto">
+<div class="p-4 sm:p-6 max-w-7xl mx-auto">
     <h1 class="text-2xl font-bold text-white mb-6">Admin Audit Logs</h1>
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
-        <form method="GET" class="flex flex-col sm:flex-row gap-3">
-            <input type="text" name="action" value="{{ request('action') }}" placeholder="Search by action..." class="flex-1 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+        <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <input type="text" name="action" value="{{ request('action') }}" placeholder="Search by action..." class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
             <input type="date" name="date_from" value="{{ request('date_from') }}" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
             <input type="date" name="date_to" value="{{ request('date_to') }}" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
             <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Filter</button>

@@ -38,7 +38,7 @@
                         <span class="text-white text-xs font-bold tracking-wide">MOST POPULAR</span>
                     </div>
                     @endif
-                    <div class="bg-white dark:bg-gray-900 border {{ $isPopular ? 'border-purple-500 border-t-0' : 'border-gray-200 dark:border-gray-800' }} {{ $isPopular ? '' : 'rounded-2xl' }} {{ $isPopular ? 'rounded-b-2xl' : '' }} p-5">
+                    <div class="bg-white dark:bg-gray-900 shadow-md border {{ $isPopular ? 'border-purple-500 border-t-0' : 'border-gray-200 dark:border-gray-800' }} {{ $isPopular ? '' : 'rounded-2xl' }} {{ $isPopular ? 'rounded-b-2xl' : '' }} p-5">
                         @if($isCurrent)
                         <span class="inline-block px-2 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 rounded text-[10px] font-bold mb-2">YOUR PLAN</span>
                         @endif

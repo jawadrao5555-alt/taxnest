@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="overflow-x-hidden">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -23,24 +23,24 @@
         .stat-glass { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); }
     </style>
 </head>
-<body class="antialiased text-gray-700 scroll-smooth bg-white">
+<body class="antialiased text-gray-700 scroll-smooth bg-white overflow-x-hidden">
 
     <nav class="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-        <div class="max-w-[1200px] mx-auto px-5 sm:px-8">
-            <div class="flex items-center justify-between h-[60px]">
-                <a href="/" class="flex items-center space-x-2.5 flex-shrink-0">
-                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
-                        <svg class="w-[18px] h-[18px] text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
+            <div class="flex items-center justify-between py-2.5 sm:py-0 sm:h-[60px]">
+                <a href="/" class="flex items-center space-x-2 flex-shrink-0">
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+                        <svg class="w-4 h-4 sm:w-[18px] sm:h-[18px] text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                     </div>
-                    <span class="text-[17px] font-bold text-gray-900 tracking-tight">TaxNest</span>
+                    <span class="text-sm sm:text-[17px] font-bold text-gray-900 tracking-tight">TaxNest</span>
                 </a>
 
-                <div class="flex items-center flex-wrap justify-end gap-1.5 sm:gap-2">
-                    <a href="/digital-invoice" class="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-[13px] font-semibold text-white bg-emerald-600 rounded-full hover:bg-emerald-700 transition shadow-sm">Digital Invoice</a>
-                    <a href="/pos" class="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-[13px] font-semibold text-white bg-purple-600 rounded-full hover:bg-purple-700 transition shadow-sm">PRA POS</a>
-                    <a href="#pricing" class="px-2.5 py-1.5 sm:px-3 text-xs sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Pricing</a>
-                    <a href="#features" class="px-2.5 py-1.5 sm:px-3 text-xs sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Docs</a>
-                    <a href="#contact" class="px-2.5 py-1.5 sm:px-3 text-xs sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Contact</a>
+                <div class="flex items-center flex-wrap justify-end gap-1 sm:gap-2">
+                    <a href="/digital-invoice" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-emerald-600 rounded-full hover:bg-emerald-700 transition shadow-sm">Digital Invoice</a>
+                    <a href="/pos" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-purple-600 rounded-full hover:bg-purple-700 transition shadow-sm">PRA POS</a>
+                    <a href="#pricing" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Pricing</a>
+                    <a href="#features" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Docs</a>
+                    <a href="#contact" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Contact</a>
                 </div>
             </div>
         </div>
@@ -50,14 +50,14 @@
         <div class="hero-glow absolute inset-0"></div>
         <div class="absolute inset-0 opacity-[0.03]" style="background-image: url('data:image/svg+xml,%3Csvg width=&quot;60&quot; height=&quot;60&quot; viewBox=&quot;0 0 60 60&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;%3E%3Cg fill=&quot;none&quot; fill-rule=&quot;evenodd&quot;%3E%3Cg fill=&quot;%23ffffff&quot; fill-opacity=&quot;1&quot;%3E%3Cpath d=&quot;M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z&quot;/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"></div>
 
-        <div class="max-w-[1200px] mx-auto px-5 sm:px-8 relative">
+        <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8 relative">
             <div class="text-center max-w-3xl mx-auto">
                 <div class="inline-flex items-center px-3.5 py-1.5 bg-white/[0.07] rounded-full text-[13px] font-medium text-gray-300 mb-8 border border-white/[0.08]">
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-2 animate-pulse"></span>
                     FBR + PRA Compliant Platform
                 </div>
 
-                <h1 class="text-[40px] sm:text-[52px] lg:text-[56px] font-bold text-white leading-[1.1] tracking-tight mb-6">
+                <h1 class="text-[28px] sm:text-[52px] lg:text-[56px] font-bold text-white leading-[1.1] tracking-tight mb-6">
                     TaxNest — Pakistan's Most Advanced
                     <span class="block mt-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-300 bg-clip-text text-transparent">Tax Compliance Platform</span>
                 </h1>
@@ -114,7 +114,7 @@
     </section>
 
     <div class="bg-gray-50 border-b border-gray-100 py-5">
-        <div class="max-w-[1200px] mx-auto px-5 sm:px-8">
+        <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
                 <div class="flex items-center space-x-2 text-gray-600">
                     <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
@@ -140,8 +140,8 @@
         </div>
     </div>
 
-    <section id="products" class="py-24 sm:py-30 bg-white">
-        <div class="max-w-[1200px] mx-auto px-5 sm:px-8">
+    <section id="products" class="py-24 lg:py-28 bg-white">
+        <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="text-center mb-16 fade-up">
                 <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Two Products, One Platform</p>
                 <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Choose Your Solution</h2>
@@ -149,7 +149,7 @@
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl mx-auto">
-                <div class="card-hover bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                <div class="card-hover bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
                     <div class="p-8">
                         <div class="flex items-center space-x-4 mb-6">
                             <div class="w-16 h-16 rounded-[14px] bg-emerald-50 flex items-center justify-center shadow-md">
@@ -169,13 +169,13 @@
                             </div>
                             @endforeach
                         </div>
-                        <a href="/digital-invoice" class="btn-glow block w-full py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-[10px] text-[14px] font-semibold hover:from-emerald-700 hover:to-emerald-800 text-center">
+                        <a href="/digital-invoice" class="btn-glow block w-full py-3 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white rounded-[10px] text-[14px] font-semibold hover:from-emerald-600 hover:to-emerald-800 shadow-md hover:shadow-lg text-center">
                             Explore Digital Invoice
                         </a>
                     </div>
                 </div>
 
-                <div class="card-hover bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                <div class="card-hover bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
                     <div class="p-8">
                         <div class="flex items-center space-x-4 mb-6">
                             <div class="w-16 h-16 rounded-[14px] bg-purple-50 flex items-center justify-center shadow-md">
@@ -195,7 +195,7 @@
                             </div>
                             @endforeach
                         </div>
-                        <a href="/pos" class="btn-glow-purple block w-full py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-[10px] text-[14px] font-semibold hover:from-purple-700 hover:to-purple-800 text-center">
+                        <a href="/pos" class="btn-glow-purple block w-full py-3 bg-gradient-to-r from-purple-500 to-purple-700 text-white rounded-[10px] text-[14px] font-semibold hover:from-purple-600 hover:to-purple-800 shadow-md hover:shadow-lg text-center">
                             Explore NestPOS
                         </a>
                     </div>
@@ -211,8 +211,8 @@
         </div>
     </section>
 
-    <section id="features" class="py-24 sm:py-30 bg-gray-50">
-        <div class="max-w-[1200px] mx-auto px-5 sm:px-8">
+    <section id="features" class="py-24 lg:py-28 bg-gray-50">
+        <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="text-center mb-16 fade-up">
                 <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Enterprise Architecture</p>
                 <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Built Different From Day One</h2>
@@ -234,7 +234,7 @@
                 ];
                 @endphp
                 @foreach($features as $f)
-                <div class="card-hover bg-white rounded-2xl p-6 border border-gray-100">
+                <div class="card-hover bg-white rounded-xl shadow-md p-6 border border-gray-100 hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
                     <div class="w-12 h-12 bg-{{ $f[3] }}-50 rounded-xl flex items-center justify-center mb-4 shadow-sm">
                         <svg class="w-6 h-6 text-{{ $f[3] }}-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $f[2] }}"/></svg>
                     </div>
@@ -245,7 +245,7 @@
             </div>
 
             <div class="mt-16 fade-up">
-                <div class="bg-white rounded-2xl border border-gray-100 p-8 max-w-3xl mx-auto">
+                <div class="bg-white rounded-xl shadow-md border border-gray-100 p-8 max-w-3xl mx-auto">
                     <h3 class="text-[15px] font-bold text-gray-900 mb-5">Platform Capabilities</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         @foreach([
@@ -269,15 +269,15 @@
         </div>
     </section>
 
-    <section class="py-24 sm:py-30 bg-white">
-        <div class="max-w-[1200px] mx-auto px-5 sm:px-8">
+    <section class="py-24 lg:py-28 bg-white">
+        <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="text-center mb-16 fade-up">
                 <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Comparison</p>
                 <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">TaxNest vs Traditional Software</h2>
                 <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto">See how TaxNest compares to generic accounting tools</p>
             </div>
 
-            <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden max-w-4xl mx-auto fade-up">
+            <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden max-w-4xl mx-auto fade-up">
                 <div class="overflow-x-auto">
                     <table class="w-full">
                         <thead>
@@ -332,15 +332,15 @@
         </div>
     </section>
 
-    <section id="pricing" class="py-24 sm:py-30 bg-gray-50">
-        <div class="max-w-[1200px] mx-auto px-5 sm:px-8">
+    <section id="pricing" class="py-24 lg:py-28 bg-gray-50">
+        <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="text-center mb-16 fade-up">
                 <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Pricing</p>
                 <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Simple, Transparent Pricing</h2>
                 <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">Each product has its own plans. Visit the product page for details and start your 14-day free trial.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto fade-up">
-                <div class="card-hover bg-white rounded-2xl border border-gray-200 p-8 text-center">
+                <div class="card-hover bg-white rounded-xl shadow-md border border-gray-200 p-8 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
                     <div class="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center mx-auto mb-5">
                         <svg class="w-7 h-7 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                     </div>
@@ -351,7 +351,7 @@
                         <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                     </a>
                 </div>
-                <div class="card-hover bg-white rounded-2xl border border-gray-200 p-8 text-center">
+                <div class="card-hover bg-white rounded-xl shadow-md border border-gray-200 p-8 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
                     <div class="w-14 h-14 rounded-2xl bg-purple-50 flex items-center justify-center mx-auto mb-5">
                         <svg class="w-7 h-7 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     </div>
@@ -366,7 +366,7 @@
         </div>
     </section>
 
-    <section id="faq" class="py-24 sm:py-30 bg-white">
+    <section id="faq" class="py-24 lg:py-28 bg-white">
         <div class="max-w-3xl mx-auto px-5 sm:px-8">
             <div class="text-center mb-12 fade-up">
                 <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">FAQ</p>
@@ -384,7 +384,7 @@
                 ];
                 @endphp
                 @foreach($faqs as $i => $faq)
-                <div class="bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
+                <div class="bg-gray-50 rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                     <button @click="open = open === {{ $i+1 }} ? null : {{ $i+1 }}" class="w-full flex items-center justify-between p-5 text-left">
                         <span class="text-[14px] font-semibold text-gray-900 pr-4">{{ $faq[0] }}</span>
                         <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0" :class="open === {{ $i+1 }} ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -398,7 +398,7 @@
         </div>
     </section>
 
-    <section id="contact" class="py-24 sm:py-30 bg-gray-50">
+    <section id="contact" class="py-24 lg:py-28 bg-gray-50">
         <div class="max-w-3xl mx-auto px-5 sm:px-8">
             <div class="text-center mb-12 fade-up">
                 <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Get in Touch</p>
@@ -406,21 +406,21 @@
                 <p class="mt-4 text-[17px] text-gray-500">Have questions? We're here to help you choose the right solution.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-5 fade-up">
-                <div class="card-hover bg-white rounded-2xl border border-gray-200 p-6 text-center">
+                <div class="card-hover bg-white rounded-xl shadow-md border border-gray-200 p-6 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
                     <div class="w-11 h-11 bg-emerald-50 rounded-xl flex items-center justify-center mx-auto mb-4">
                         <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     </div>
                     <h3 class="text-[14px] font-semibold text-gray-900 mb-1">Email</h3>
                     <p class="text-[13px] text-gray-500">support@taxnest.com</p>
                 </div>
-                <div class="card-hover bg-white rounded-2xl border border-gray-200 p-6 text-center">
+                <div class="card-hover bg-white rounded-xl shadow-md border border-gray-200 p-6 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
                     <div class="w-11 h-11 bg-emerald-50 rounded-xl flex items-center justify-center mx-auto mb-4">
                         <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
                     </div>
                     <h3 class="text-[14px] font-semibold text-gray-900 mb-1">Phone</h3>
                     <p class="text-[13px] text-gray-500">+92-XXX-XXXXXXX</p>
                 </div>
-                <div class="card-hover bg-white rounded-2xl border border-gray-200 p-6 text-center">
+                <div class="card-hover bg-white rounded-xl shadow-md border border-gray-200 p-6 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
                     <div class="w-11 h-11 bg-emerald-50 rounded-xl flex items-center justify-center mx-auto mb-4">
                         <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     </div>
@@ -450,7 +450,7 @@
     </section>
 
     <footer class="bg-[#0a0f1a] border-t border-white/[0.06] pt-14 pb-8">
-        <div class="max-w-[1200px] mx-auto px-5 sm:px-8">
+        <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-8 pb-10 border-b border-white/[0.06]">
                 <div>
                     <div class="flex items-center space-x-2 mb-4">

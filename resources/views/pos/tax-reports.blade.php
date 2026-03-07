@@ -17,7 +17,7 @@
         </div>
     </div>
 
-    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-6">
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <form method="GET" action="{{ route('pos.tax-reports') }}" class="space-y-4">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
@@ -75,29 +75,29 @@
     </div>
 
     <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center">
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Invoices</p>
             <p class="text-xl font-bold text-gray-900 dark:text-white">{{ number_format($summary->total_invoices) }}</p>
         </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center">
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Sales</p>
             <p class="text-xl font-bold text-emerald-600">PKR {{ number_format($summary->total_sales, 2) }}</p>
         </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center">
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Discount</p>
             <p class="text-xl font-bold text-red-500">PKR {{ number_format($summary->total_discount, 2) }}</p>
         </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center">
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Taxable</p>
             <p class="text-xl font-bold text-gray-900 dark:text-white">PKR {{ number_format($summary->total_taxable, 2) }}</p>
         </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center col-span-2 sm:col-span-1">
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center col-span-2 sm:col-span-1">
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Tax</p>
             <p class="text-xl font-bold text-purple-600">PKR {{ number_format($summary->total_tax, 2) }}</p>
         </div>
     </div>
 
-    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>

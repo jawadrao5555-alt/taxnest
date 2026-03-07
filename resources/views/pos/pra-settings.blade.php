@@ -8,7 +8,7 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="lg:col-span-2 space-y-6">
-            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">PRA Configuration</h3>
                 <form method="POST" action="{{ route('pos.pra-settings') }}" class="space-y-4">
                     @csrf
@@ -49,7 +49,7 @@
         </div>
 
         <div class="space-y-6">
-            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Status</h3>
                 <div class="space-y-3 text-sm">
                     <div class="flex justify-between">
@@ -69,7 +69,7 @@
                 </div>
             </div>
 
-            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Recent PRA Logs</h3>
                 @forelse($praLogs as $log)
                 <div class="border-b border-gray-100 dark:border-gray-800 last:border-0 py-2">

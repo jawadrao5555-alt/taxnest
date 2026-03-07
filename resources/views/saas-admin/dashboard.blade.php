@@ -1,8 +1,8 @@
 <x-admin-layout>
-<div class="p-6 max-w-7xl mx-auto">
+<div class="p-4 sm:p-6 max-w-7xl mx-auto">
     <h1 class="text-2xl font-bold text-white mb-6">Admin Dashboard</h1>
 
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <p class="text-xs text-gray-500 mb-1">Total Companies</p>
             <p class="text-2xl font-bold text-white">{{ number_format($stats['total_companies']) }}</p>
@@ -26,7 +26,7 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-white mb-3">Platform Stats</h3>
             <div class="space-y-3">

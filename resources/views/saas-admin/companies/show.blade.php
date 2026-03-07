@@ -1,13 +1,13 @@
 <x-admin-layout>
-<div class="p-6 max-w-5xl mx-auto">
-    <div class="flex items-center gap-3 mb-6">
+<div class="p-4 sm:p-6 max-w-5xl mx-auto">
+    <div class="flex flex-wrap items-center gap-3 mb-6">
         <a href="{{ route('saas.admin.companies') }}" class="text-gray-500 hover:text-indigo-400 transition text-sm">&larr; Back</a>
-        <h1 class="text-2xl font-bold text-white">{{ $company->name }}</h1>
+        <h1 class="text-2xl font-bold text-white truncate">{{ $company->name }}</h1>
         @php $sc = ['approved' => 'bg-emerald-900/30 text-emerald-400', 'pending' => 'bg-amber-900/30 text-amber-400', 'suspended' => 'bg-red-900/30 text-red-400', 'rejected' => 'bg-gray-800 text-gray-400']; @endphp
         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $sc[$company->status] ?? 'bg-gray-800 text-gray-400' }}">{{ $company->status }}</span>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-white mb-3">Company Details</h3>
             <div class="space-y-2 text-sm">
@@ -33,10 +33,10 @@
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
         <h3 class="text-sm font-semibold text-white mb-3">Actions</h3>
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-col sm:flex-row flex-wrap gap-2">
             @if($company->status === 'pending')
-            <form method="POST" action="{{ route('saas.admin.companies.approve', $company->id) }}">@csrf<button class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg transition">Approve Company</button></form>
-            <form method="POST" action="{{ route('saas.admin.companies.reject', $company->id) }}">@csrf<button class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition">Reject Company</button></form>
+            <form method="POST" action="{{ route('saas.admin.companies.approve', $company->id) }}" class="w-full sm:w-auto">@csrf<button class="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg transition">Approve Company</button></form>
+            <form method="POST" action="{{ route('saas.admin.companies.reject', $company->id) }}" class="w-full sm:w-auto">@csrf<button class="w-full sm:w-auto px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition">Reject Company</button></form>
             @elseif($company->status === 'approved')
             <form method="POST" action="{{ route('saas.admin.companies.suspend', $company->id) }}">@csrf<button class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm rounded-lg transition">Suspend Company</button></form>
             @elseif($company->status === 'suspended' || $company->status === 'rejected')

@@ -19,21 +19,21 @@
     </div>
     @endif
 
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ $transaction->invoice_number }}</h1>
             <p class="text-sm text-gray-500 mt-1">{{ $transaction->created_at->format('d M Y H:i:s') }}</p>
         </div>
         <div class="flex gap-2">
-            <a href="{{ route('pos.receipt', $transaction->id) }}" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition">
+            <a href="{{ route('pos.receipt', $transaction->id) }}" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                 Print Receipt
             </a>
-            <a href="{{ route('pos.transactions') }}" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition">Back</a>
+            <a href="{{ route('pos.transactions') }}" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm font-semibold rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition">Back</a>
         </div>
     </div>
 
-    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-6">
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Invoice Numbers</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
@@ -53,7 +53,7 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="lg:col-span-2 space-y-6">
-            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Items</h3>
                 <table class="w-full text-sm">
                     <thead>
@@ -82,7 +82,7 @@
             </div>
 
             @if($transaction->praLogs->isNotEmpty())
-            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">PRA Submission Logs</h3>
                 @foreach($transaction->praLogs as $log)
                 <div class="border border-gray-100 dark:border-gray-800 rounded-lg p-3 mb-2 last:mb-0">
@@ -98,7 +98,7 @@
         </div>
 
         <div class="space-y-6">
-            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Summary</h3>
                 <div class="space-y-3 text-sm">
                     <div class="flex justify-between">
@@ -122,7 +122,7 @@
                 </div>
             </div>
 
-            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Details</h3>
                 <div class="space-y-3 text-sm">
                     <div class="flex justify-between">

@@ -70,12 +70,16 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 **UI/UX Design:**
 - **Layout:** Responsive sidebar with a single scrollable content area.
 - **Styling:** Consistent use of dark/light modes, standardized components, and an emerald-600 primary color palette.
+- **Design System:** Unified SaaS-grade design: Cards use `rounded-xl shadow-md` with `hover:-translate-y-1 hover:shadow-xl transition-all duration-300`. Buttons use `rounded-lg font-semibold` with gradient fills. Section padding `py-24 lg:py-28` minimum.
+- **Product Visual Separation:** Digital Invoice uses emerald theme (`from-emerald-500 to-emerald-700`), NestPOS uses purple theme (`from-purple-500 to-purple-700`). Gradient CTA buttons with `shadow-md hover:shadow-lg`.
+- **Navigation:** All landing pages use visible wrapping nav (NO hamburger menu). Nav items wrap into multiple lines on mobile using `flex-wrap`. Text scales down on smallest screens (`text-[10px] sm:text-[13px]`).
 - **PWA Enhancements:** Install prompts, offline badges, update banners, and manifest shortcuts.
-- **Mobile Responsiveness:** Fully responsive at 375px+. Landing pages stack cards vertically on mobile. POS sidebar uses slide-out drawer. All data tables use progressive column hiding (`hidden sm/md/lg:table-cell`) for essential-first display. Inline edit forms use responsive grids (`grid-cols-2 sm:grid-cols-3 lg:grid-cols-4`) instead of fixed widths. All tables have `overflow-x-auto`. Header rows stack on mobile with `flex-col sm:flex-row`.
+- **Mobile Responsiveness:** Fully responsive at 320px+. `overflow-x-hidden` on `<html>` and `<body>` prevents horizontal scroll. Landing pages stack cards vertically on mobile. POS sidebar uses slide-out drawer. All data tables use progressive column hiding (`hidden sm/md/lg:table-cell`) for essential-first display. Inline edit forms use responsive grids (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`) instead of fixed widths. All tables have `overflow-x-auto`. Header rows stack on mobile with `flex-col sm:flex-row`. Buttons use `w-full sm:w-auto` for full-width on mobile. Section padding uses `px-3 sm:px-5 md:px-8`.
 - **Enterprise UX Engine:** Includes toast notifications, loading spinners, page transitions, and auto-scrolling to errors.
 - **Keyboard Shortcuts:** Implemented for invoice creation.
 - **Intelligent Autofocus:** Automatically advances input fields.
 - **Sticky Bottom Summary:** Displays financial totals and FBR environment badge.
+- **CSS Build:** Tailwind CSS is pre-compiled via Vite. After any blade template changes that use new Tailwind classes, must run `npx vite build` to regenerate `public/build/assets/app-*.css`.
 
 ## External Dependencies
 - **PostgreSQL:** Primary database.

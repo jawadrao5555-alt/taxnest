@@ -1,5 +1,5 @@
 <x-admin-layout>
-<div class="p-6 max-w-7xl mx-auto">
+<div class="p-4 sm:p-6 max-w-7xl mx-auto">
     <h1 class="text-2xl font-bold text-white mb-6">Franchises</h1>
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6" x-data="{ showForm: false }">
@@ -7,7 +7,7 @@
             <h3 class="text-sm font-semibold text-white">Create Franchise</h3>
             <button @click="showForm = !showForm" class="text-xs text-indigo-400 hover:underline" x-text="showForm ? 'Hide' : 'New Franchise'"></button>
         </div>
-        <form x-show="showForm" method="POST" action="{{ route('saas.admin.franchises.store') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <form x-show="showForm" method="POST" action="{{ route('saas.admin.franchises.store') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end">
             @csrf
             <input type="text" name="name" placeholder="Franchise Name" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
             <input type="email" name="email" placeholder="Email" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">

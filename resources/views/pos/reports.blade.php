@@ -3,7 +3,7 @@
     <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">POS Reports</h1>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Payment Method Summary (This Month)</h3>
             <table class="w-full text-sm">
                 <thead>
@@ -33,7 +33,7 @@
             </table>
         </div>
 
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Top Selling Items (This Month)</h3>
             <table class="w-full text-sm">
                 <thead>
@@ -60,7 +60,7 @@
         </div>
     </div>
 
-    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-6">
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Daily Sales (Last 30 Days)</h3>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
@@ -86,7 +86,7 @@
         </div>
     </div>
 
-    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Monthly Trend (Last 6 Months)</h3>
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             @foreach($monthlyTrend as $mt)

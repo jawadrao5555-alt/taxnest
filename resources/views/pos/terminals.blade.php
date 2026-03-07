@@ -1,6 +1,6 @@
 <x-pos-layout>
 <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">POS Terminals</h1>
     </div>
 
@@ -15,7 +15,7 @@
     </div>
     @endif
 
-    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-6">
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Add New Terminal</h3>
         <form method="POST" action="{{ route('pos.terminals.store') }}" class="grid grid-cols-1 sm:grid-cols-4 gap-4">
             @csrf
@@ -44,7 +44,7 @@
         @endif
     </div>
 
-    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md overflow-hidden">
         <div class="overflow-x-auto">
         <table class="w-full text-sm">
             <thead>

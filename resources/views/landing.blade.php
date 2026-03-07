@@ -30,8 +30,13 @@
                 </a>
 
                 <div class="hidden lg:flex items-center">
-                    <div class="flex items-center border-r border-gray-200 pr-6 mr-6">
-                        <a href="/di" class="group flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-emerald-50 transition mr-1">
+                    <div class="flex items-center space-x-5 mr-6">
+                        <a href="#products" class="text-sm font-medium text-gray-500 hover:text-gray-900 transition">Products</a>
+                        <a href="#features" class="text-sm font-medium text-gray-500 hover:text-gray-900 transition">Features</a>
+                        <a href="#faq" class="text-sm font-medium text-gray-500 hover:text-gray-900 transition">FAQ</a>
+                    </div>
+                    <div class="border-l border-gray-200 pl-6 flex items-center space-x-1">
+                        <a href="/di" class="group flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-emerald-50 transition">
                             <div class="w-7 h-7 rounded-lg bg-emerald-100 group-hover:bg-emerald-200 flex items-center justify-center transition">
                                 <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                             </div>
@@ -50,15 +55,6 @@
                             </div>
                         </a>
                     </div>
-                    <div class="flex items-center space-x-5 mr-6">
-                        <a href="#products" class="text-sm font-medium text-gray-500 hover:text-gray-900 transition">Products</a>
-                        <a href="#features" class="text-sm font-medium text-gray-500 hover:text-gray-900 transition">Features</a>
-                        <a href="#faq" class="text-sm font-medium text-gray-500 hover:text-gray-900 transition">FAQ</a>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        <a href="/login" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition">Log in</a>
-                        <a href="/register" class="inline-flex items-center px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition shadow-sm shadow-emerald-600/20">Start Free Trial</a>
-                    </div>
                 </div>
 
                 <button @click="mobileOpen = !mobileOpen" class="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition">
@@ -68,32 +64,30 @@
             </div>
 
             <div x-show="mobileOpen" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-2" class="lg:hidden border-t border-gray-100 py-4 space-y-2">
-                <a href="/di" class="flex items-center space-x-3 px-3 py-3 rounded-xl hover:bg-emerald-50 transition">
-                    <div class="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center">
-                        <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                    </div>
-                    <div>
-                        <span class="text-sm font-semibold text-gray-900 block">Digital Invoice</span>
-                        <span class="text-xs text-emerald-600">FBR Tax Compliance</span>
-                    </div>
-                </a>
-                <a href="/pos" class="flex items-center space-x-3 px-3 py-3 rounded-xl hover:bg-purple-50 transition">
-                    <div class="w-9 h-9 rounded-lg bg-purple-100 flex items-center justify-center">
-                        <svg class="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                    </div>
-                    <div>
-                        <span class="text-sm font-semibold text-gray-900 block">PRA POS</span>
-                        <span class="text-xs text-purple-600">PRA Point of Sale</span>
-                    </div>
-                </a>
-                <div class="border-t border-gray-100 pt-3 mt-2 flex flex-col space-y-1">
+                <div class="flex flex-col space-y-1 px-1">
                     <a href="#products" @click="mobileOpen = false" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Products</a>
                     <a href="#features" @click="mobileOpen = false" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Features</a>
                     <a href="#faq" @click="mobileOpen = false" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">FAQ</a>
                 </div>
-                <div class="border-t border-gray-100 pt-3 mt-2 flex space-x-2 px-3">
-                    <a href="/login" class="flex-1 text-center py-2.5 text-sm font-semibold text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50 transition">Log in</a>
-                    <a href="/register" class="flex-1 text-center py-2.5 text-sm font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 transition">Start Free Trial</a>
+                <div class="border-t border-gray-100 pt-3 mt-2">
+                    <a href="/di" class="flex items-center space-x-3 px-3 py-3 rounded-xl hover:bg-emerald-50 transition">
+                        <div class="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                        </div>
+                        <div>
+                            <span class="text-sm font-semibold text-gray-900 block">Digital Invoice</span>
+                            <span class="text-xs text-emerald-600">FBR Tax Compliance</span>
+                        </div>
+                    </a>
+                    <a href="/pos" class="flex items-center space-x-3 px-3 py-3 rounded-xl hover:bg-purple-50 transition">
+                        <div class="w-9 h-9 rounded-lg bg-purple-100 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                        </div>
+                        <div>
+                            <span class="text-sm font-semibold text-gray-900 block">PRA POS</span>
+                            <span class="text-xs text-purple-600">PRA Point of Sale</span>
+                        </div>
+                    </a>
                 </div>
             </div>
         </div>
@@ -122,12 +116,9 @@
                     14-Day Free Trial &bull; No Credit Card Required
                 </p>
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <a href="/register" class="inline-flex items-center px-8 py-4 bg-emerald-500 text-white rounded-xl text-lg font-bold hover:bg-emerald-600 transition shadow-lg shadow-emerald-900/30 w-full sm:w-auto justify-center">
-                        Start 14-Day Free Trial
-                        <svg class="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-                    </a>
-                    <a href="#products" class="inline-flex items-center px-8 py-4 bg-transparent text-white rounded-xl text-lg font-bold hover:bg-white/10 transition border-2 border-white/30 w-full sm:w-auto justify-center">
+                    <a href="#products" class="inline-flex items-center px-8 py-4 bg-emerald-500 text-white rounded-xl text-lg font-bold hover:bg-emerald-600 transition shadow-lg shadow-emerald-900/30 w-full sm:w-auto justify-center">
                         Explore Products
+                        <svg class="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </a>
                 </div>
             </div>
@@ -240,11 +231,10 @@
                                 Multi-Branch
                             </div>
                         </div>
-                        <div class="flex items-center justify-end pt-4 border-t border-gray-100">
-                            <div class="flex space-x-2">
-                                <a href="/login" class="px-4 py-2 border-2 border-emerald-600 text-emerald-700 rounded-lg text-sm font-semibold hover:bg-emerald-50 transition">Login</a>
-                                <a href="/register" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition shadow-sm">Sign Up</a>
-                            </div>
+                        <div class="pt-4 border-t border-gray-100">
+                            <a href="/di" class="block w-full py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition shadow-sm text-center">
+                                View Details & Plans
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -300,11 +290,10 @@
                                 Offline Billing
                             </div>
                         </div>
-                        <div class="flex items-center justify-end pt-4 border-t border-gray-100">
-                            <div class="flex space-x-2">
-                                <a href="/pos/login" class="px-4 py-2 border-2 border-purple-600 text-purple-700 rounded-lg text-sm font-semibold hover:bg-purple-50 transition">POS Login</a>
-                                <a href="/pos/register" class="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition shadow-sm">POS Sign Up</a>
-                            </div>
+                        <div class="pt-4 border-t border-gray-100">
+                            <a href="/pos" class="block w-full py-2.5 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition shadow-sm text-center">
+                                View Details & Plans
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -571,7 +560,7 @@
                 <div>
                     <h4 class="text-sm font-semibold text-white uppercase tracking-wider mb-4">Digital Invoice</h4>
                     <div class="space-y-2">
-                        <a href="/di" class="block text-sm text-gray-400 hover:text-emerald-400 transition">DI Landing</a>
+                        <a href="/di" class="block text-sm text-gray-400 hover:text-emerald-400 transition">View Product</a>
                         <a href="/login" class="block text-sm text-gray-400 hover:text-emerald-400 transition">DI Login</a>
                         <a href="/register" class="block text-sm text-gray-400 hover:text-emerald-400 transition">DI Sign Up</a>
                     </div>
@@ -579,7 +568,7 @@
                 <div>
                     <h4 class="text-sm font-semibold text-white uppercase tracking-wider mb-4">PRA POS</h4>
                     <div class="space-y-2">
-                        <a href="/pos" class="block text-sm text-gray-400 hover:text-purple-400 transition">POS Landing</a>
+                        <a href="/pos" class="block text-sm text-gray-400 hover:text-purple-400 transition">View Product</a>
                         <a href="/pos/login" class="block text-sm text-gray-400 hover:text-purple-400 transition">POS Login</a>
                         <a href="/pos/register" class="block text-sm text-gray-400 hover:text-purple-400 transition">POS Sign Up</a>
                     </div>

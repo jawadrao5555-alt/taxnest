@@ -14,7 +14,58 @@
         [x-cloak] { display: none !important; }
     </style>
 </head>
-<body class="antialiased text-gray-800" style="scroll-behavior: smooth;">
+<body class="antialiased text-gray-800" style="scroll-behavior: smooth;" x-data="{ showLoginModal: false }">
+
+    <div x-show="showLoginModal" x-cloak x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4" @click.self="showLoginModal = false" @keydown.escape.window="showLoginModal = false">
+        <div x-show="showLoginModal" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95 translate-y-4" x-transition:enter-end="opacity-100 scale-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="bg-white rounded-2xl shadow-2xl w-full max-w-md relative overflow-hidden">
+            <div class="bg-gradient-to-r from-purple-600 to-violet-600 px-6 py-5">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white">NestPOS Login</h3>
+                            <p class="text-purple-100 text-xs">PRA Point of Sale</p>
+                        </div>
+                    </div>
+                    <button @click="showLoginModal = false" class="text-white/70 hover:text-white transition p-1">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+            </div>
+            <form method="POST" action="/pos/login" class="p-6 space-y-4">
+                @csrf
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email or Username</label>
+                    <input type="text" name="login" required autofocus class="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition" placeholder="Enter your credential">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input type="password" name="password" required class="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition" placeholder="Enter your password">
+                </div>
+                <div class="flex items-center justify-between">
+                    <label class="flex items-center text-sm text-gray-600">
+                        <input type="checkbox" name="remember" class="rounded border-gray-300 text-purple-600 focus:ring-purple-500 mr-2">
+                        Remember me
+                    </label>
+                </div>
+                @if($errors->any())
+                <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+                    @foreach($errors->all() as $error)
+                    <p class="text-sm text-red-600">{{ $error }}</p>
+                    @endforeach
+                </div>
+                @endif
+                <button type="submit" class="w-full py-2.5 bg-purple-600 text-white rounded-xl text-sm font-bold hover:bg-purple-700 transition shadow-sm">
+                    Sign In
+                </button>
+                <p class="text-center text-sm text-gray-500">
+                    Don't have an account? <a href="/pos/register" class="text-purple-600 font-semibold hover:text-purple-700">POS Sign Up</a>
+                </p>
+            </form>
+        </div>
+    </div>
 
     <nav class="fixed top-0 w-full z-50 bg-white/95 backdrop-blur-2xl border-b border-gray-200/60 shadow-sm" x-data="{ mobileOpen: false }">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -54,7 +105,7 @@
                         </a>
                     </div>
                     <div class="flex items-center space-x-2">
-                        <a href="/pos/login" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition">Log in</a>
+                        <button @click="showLoginModal = true" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition">Log in</button>
                         <a href="/pos/register" class="inline-flex items-center px-5 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-semibold hover:bg-purple-700 transition shadow-sm shadow-purple-600/20">POS Sign Up</a>
                     </div>
                 </div>
@@ -86,7 +137,7 @@
                     </a>
                 </div>
                 <div class="border-t border-gray-100 pt-3 mt-2 flex space-x-2 px-3">
-                    <a href="/pos/login" class="flex-1 text-center py-2.5 text-sm font-semibold text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50 transition">Log in</a>
+                    <button @click="showLoginModal = true; mobileOpen = false" class="flex-1 text-center py-2.5 text-sm font-semibold text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50 transition">Log in</button>
                     <a href="/pos/register" class="flex-1 text-center py-2.5 text-sm font-semibold text-white bg-purple-600 rounded-xl hover:bg-purple-700 transition">POS Sign Up</a>
                 </div>
             </div>
@@ -313,7 +364,7 @@
             <p class="text-purple-100 mb-8">Start your 14-day free trial. No credit card required.</p>
             <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <a href="/pos/register" class="px-8 py-3.5 bg-white text-purple-700 rounded-xl text-sm font-bold hover:bg-purple-50 transition shadow-lg">Create POS Account</a>
-                <a href="/pos/login" class="px-8 py-3.5 border-2 border-white/40 text-white rounded-xl text-sm font-bold hover:bg-white/10 transition">Login to POS</a>
+                <button @click="showLoginModal = true" class="px-8 py-3.5 border-2 border-white/40 text-white rounded-xl text-sm font-bold hover:bg-white/10 transition">Login to POS</button>
             </div>
         </div>
     </section>
@@ -331,7 +382,7 @@
                 <div class="flex items-center space-x-6 text-sm text-gray-400">
                     <a href="/" class="hover:text-white transition">TaxNest Home</a>
                     <a href="/di" class="hover:text-white transition">Digital Invoice (FBR)</a>
-                    <a href="/pos/login" class="hover:text-white transition">POS Login</a>
+                    <button @click="showLoginModal = true" class="hover:text-white transition">POS Login</button>
                 </div>
             </div>
             <div class="mt-6 pt-6 border-t border-gray-800 text-center">

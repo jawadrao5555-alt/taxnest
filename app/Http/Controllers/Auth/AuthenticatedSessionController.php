@@ -16,8 +16,7 @@ class AuthenticatedSessionController extends Controller
      */
     public function create(): View|RedirectResponse
     {
-        $plans = \App\Models\PricingPlan::where('is_trial', false)->orderBy('price')->get();
-        return view('landing', ['showLogin' => true, 'plans' => $plans]);
+        return view('landing', ['showLogin' => true]);
     }
 
     /**

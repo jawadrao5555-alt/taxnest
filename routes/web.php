@@ -100,8 +100,7 @@ Route::get('/health', function () {
 });
 
 Route::get('/', function () {
-    $plans = \App\Models\PricingPlan::where('is_trial', false)->orderBy('price')->get();
-    return view('landing', ['showLogin' => false, 'plans' => $plans]);
+    return view('landing', ['showLogin' => false]);
 });
 
 Route::get('/di', function () {

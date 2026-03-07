@@ -51,6 +51,7 @@
                         </a>
                     </div>
                     <div class="flex items-center space-x-5 mr-6">
+                        <a href="#products" class="text-sm font-medium text-gray-500 hover:text-gray-900 transition">Products</a>
                         <a href="#features" class="text-sm font-medium text-gray-500 hover:text-gray-900 transition">Features</a>
                         <a href="#pricing" class="text-sm font-medium text-gray-500 hover:text-gray-900 transition">Pricing</a>
                         <a href="#faq" class="text-sm font-medium text-gray-500 hover:text-gray-900 transition">FAQ</a>
@@ -87,6 +88,7 @@
                     </div>
                 </a>
                 <div class="border-t border-gray-100 pt-3 mt-2 flex flex-col space-y-1">
+                    <a href="#products" @click="mobileOpen = false" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Products</a>
                     <a href="#features" @click="mobileOpen = false" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Features</a>
                     <a href="#pricing" @click="mobileOpen = false" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Pricing</a>
                     <a href="#faq" @click="mobileOpen = false" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">FAQ</a>
@@ -468,53 +470,120 @@
 
     <section id="pricing" class="py-20 bg-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-12">
+            <div class="text-center mb-14">
                 <p class="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-2">Pricing</p>
-                <h2 class="text-3xl sm:text-4xl font-extrabold text-gray-900">Simple, Transparent Plans</h2>
-                <p class="mt-4 text-lg text-gray-500 max-w-2xl mx-auto">Same plans for both Digital Invoice and NestPOS. Start free, upgrade when ready.</p>
+                <h2 class="text-3xl sm:text-4xl font-extrabold text-gray-900">Transparent Plans for Both Products</h2>
+                <p class="mt-4 text-lg text-gray-500 max-w-2xl mx-auto">14-day free trial on all plans. No credit card required.</p>
             </div>
 
             @if(isset($plans) && $plans->count())
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
-                @foreach($plans as $plan)
-                @php $isPopular = $plan->name === 'Business'; @endphp
-                <div class="relative rounded-2xl overflow-hidden transition duration-300 hover:-translate-y-1 {{ $isPopular ? 'ring-2 ring-emerald-500 shadow-lg' : 'shadow-sm' }}">
-                    @if($isPopular)
-                    <div class="bg-emerald-600 text-center py-1.5">
-                        <span class="text-white text-xs font-bold tracking-wide">MOST POPULAR</span>
+            <div class="mb-16">
+                <div class="flex items-center gap-3 mb-8">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
+                        <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                     </div>
-                    @endif
-                    <div class="bg-white border {{ $isPopular ? 'border-emerald-500 border-t-0 rounded-b-2xl' : 'border-gray-200 rounded-2xl' }} p-5">
-                        <h3 class="text-lg font-bold text-gray-900">{{ $plan->name }}</h3>
-                        <div class="mt-3 mb-1">
-                            <span class="text-3xl font-black text-gray-900">Rs. {{ number_format($plan->price, 0) }}</span>
-                            <span class="text-gray-400 text-sm">/mo</span>
-                        </div>
-                        <p class="text-xs text-gray-400 mb-4">Starting price &bull; Discounts on annual billing</p>
-                        <div class="space-y-2 text-sm text-gray-600 mb-5">
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                {{ $plan->invoice_limit > 0 ? number_format($plan->invoice_limit) . ' invoices/mo' : 'Unlimited invoices' }}
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                {{ ($plan->user_limit ?? 0) > 0 ? $plan->user_limit . ' users' : (($plan->user_limit ?? 0) == -1 ? 'Unlimited users' : ($plan->max_users ?? 'N/A') . ' users') }}
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                FBR + PRA compliance
-                            </div>
-                        </div>
-                        <a href="/register" class="block w-full py-2.5 rounded-lg text-sm font-semibold text-center transition {{ $isPopular ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-900 text-white hover:bg-gray-800' }}">
-                            Start Free Trial
-                        </a>
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-900">Digital Invoice Plans</h3>
+                        <p class="text-sm text-gray-500">FBR Compliance &bull; Monthly billing &bull; Up to 6% off on annual</p>
                     </div>
                 </div>
-                @endforeach
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 max-w-5xl">
+                    @foreach($plans as $plan)
+                    @php $isPopular = $plan->name === 'Business'; @endphp
+                    <div class="relative rounded-2xl overflow-hidden transition duration-300 hover:-translate-y-1 {{ $isPopular ? 'ring-2 ring-emerald-500 shadow-lg' : 'shadow-sm' }}">
+                        @if($isPopular)
+                        <div class="bg-emerald-600 text-center py-1.5">
+                            <span class="text-white text-xs font-bold tracking-wide">BEST VALUE</span>
+                        </div>
+                        @endif
+                        <div class="bg-white border {{ $isPopular ? 'border-emerald-500 border-t-0 rounded-b-2xl' : 'border-gray-200 rounded-2xl' }} p-5">
+                            <h4 class="text-lg font-bold text-gray-900">{{ $plan->name }}</h4>
+                            <div class="mt-3 mb-1">
+                                <span class="text-3xl font-black text-gray-900">Rs. {{ number_format($plan->price, 0) }}</span>
+                                <span class="text-gray-400 text-sm">/mo</span>
+                            </div>
+                            <p class="text-xs text-emerald-600 font-medium mb-4">Save up to 6% on annual billing</p>
+                            <div class="space-y-2 text-sm text-gray-600 mb-5">
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    {{ $plan->invoice_limit > 0 ? number_format($plan->invoice_limit) . ' invoices/mo' : 'Unlimited invoices' }}
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    FBR real-time submission
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    HS Intelligence + PDF/QR
+                                </div>
+                            </div>
+                            <a href="/di" class="block w-full py-2.5 rounded-lg text-sm font-semibold text-center transition {{ $isPopular ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-900 text-white hover:bg-gray-800' }}">
+                                View Details
+                            </a>
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
             </div>
 
-            <div class="mt-8 text-center">
-                <p class="text-sm text-gray-500">14-day free trial on all plans &bull; No credit card required &bull; Up to 6% discount on annual billing</p>
+            <div class="border-t border-gray-200 pt-16">
+                <div class="flex items-center gap-3 mb-8">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-sm">
+                        <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-900">PRA POS Plans</h3>
+                        <p class="text-sm text-gray-500">PRA Compliance &bull; Annual billing only &bull; 6% savings included</p>
+                    </div>
+                </div>
+                @php $annualDiscount = 6; @endphp
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 max-w-5xl">
+                    @foreach($plans as $plan)
+                    @php
+                        $yearlyTotal = round($plan->price * 12 * (1 - $annualDiscount / 100));
+                        $perMonth = round($yearlyTotal / 12);
+                        $saved = round($plan->price * 12 * $annualDiscount / 100);
+                        $isPopular = $plan->name === 'Business';
+                    @endphp
+                    <div class="relative rounded-2xl overflow-hidden transition duration-300 hover:-translate-y-1 {{ $isPopular ? 'ring-2 ring-purple-500 shadow-lg shadow-purple-500/10' : 'shadow-sm' }}">
+                        @if($isPopular)
+                        <div class="bg-purple-600 text-center py-1.5">
+                            <span class="text-white text-xs font-bold tracking-wide">MOST POPULAR</span>
+                        </div>
+                        @endif
+                        <div class="bg-white border {{ $isPopular ? 'border-purple-500 border-t-0 rounded-b-2xl' : 'border-gray-200 rounded-2xl' }} p-5">
+                            <h4 class="text-lg font-bold text-gray-900">{{ $plan->name }}</h4>
+                            <div class="mt-3 mb-1">
+                                <span class="text-3xl font-black text-gray-900">Rs. {{ number_format($yearlyTotal) }}</span>
+                                <span class="text-gray-400 text-sm">/year</span>
+                            </div>
+                            <p class="text-xs text-gray-400">Rs. {{ number_format($perMonth) }}/mo effective</p>
+                            <p class="text-xs text-purple-600 font-medium mt-0.5 mb-4">Save Rs. {{ number_format($saved) }}</p>
+                            <div class="space-y-2 text-sm text-gray-600 mb-5">
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    {{ $plan->invoice_limit > 0 ? number_format($plan->invoice_limit) . ' transactions/mo' : 'Unlimited transactions' }}
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    PRA fiscal receipts
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    Thermal printing + reports
+                                </div>
+                            </div>
+                            <a href="/pos" class="block w-full py-2.5 rounded-lg text-sm font-semibold text-center transition {{ $isPopular ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-gray-900 text-white hover:bg-gray-800' }}">
+                                View Details
+                            </a>
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+            </div>
+
+            <div class="mt-10 text-center">
+                <p class="text-sm text-gray-500">14-day free trial on all plans &bull; No credit card required</p>
             </div>
             @endif
         </div>

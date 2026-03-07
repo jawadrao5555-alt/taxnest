@@ -19,15 +19,22 @@
     <nav class="fixed top-0 w-full z-50 bg-white/95 backdrop-blur-2xl border-b border-gray-200/60 shadow-sm" x-data="{ mobileOpen: false }">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
-                <a href="/" class="flex items-center space-x-2.5">
-                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-sm">
-                        <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                    </div>
-                    <div>
-                        <span class="text-lg font-extrabold text-gray-900 tracking-tight block leading-tight">PRA POS</span>
-                        <span class="text-[10px] text-gray-400 font-medium leading-none">by TaxNest</span>
-                    </div>
-                </a>
+                <div class="flex items-center space-x-3">
+                    <a href="/" class="flex items-center space-x-1.5 text-gray-400 hover:text-purple-600 transition group" title="Back to TaxNest Home">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                        <span class="text-xs font-medium hidden sm:inline">Home</span>
+                    </a>
+                    <div class="w-px h-6 bg-gray-200"></div>
+                    <a href="/pos" class="flex items-center space-x-2">
+                        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-sm">
+                            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                        </div>
+                        <div>
+                            <span class="text-lg font-extrabold text-gray-900 tracking-tight block leading-tight">PRA POS</span>
+                            <span class="text-[10px] text-gray-400 font-medium leading-none">by TaxNest</span>
+                        </div>
+                    </a>
+                </div>
 
                 <div class="hidden lg:flex items-center">
                     <div class="flex items-center space-x-5 mr-6">
@@ -59,6 +66,11 @@
             </div>
 
             <div x-show="mobileOpen" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-2" class="lg:hidden border-t border-gray-100 py-4 space-y-2">
+                <a href="/" class="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-500 hover:text-purple-600 rounded-lg hover:bg-gray-50 transition">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    <span>TaxNest Home</span>
+                </a>
+                <div class="border-t border-gray-100 pt-2 mt-1"></div>
                 <a href="#features" @click="mobileOpen = false" class="block px-3 py-2 text-sm font-medium text-gray-600 hover:text-purple-600 rounded-lg hover:bg-gray-50 transition">Features</a>
                 <a href="#pricing" @click="mobileOpen = false" class="block px-3 py-2 text-sm font-medium text-gray-600 hover:text-purple-600 rounded-lg hover:bg-gray-50 transition">Pricing</a>
                 <a href="#how-it-works" @click="mobileOpen = false" class="block px-3 py-2 text-sm font-medium text-gray-600 hover:text-purple-600 rounded-lg hover:bg-gray-50 transition">How It Works</a>

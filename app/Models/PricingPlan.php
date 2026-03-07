@@ -14,6 +14,7 @@ class PricingPlan extends Model
         'is_trial',
         'price',
         'features',
+        'product_type',
     ];
 
     protected $casts = [

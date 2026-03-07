@@ -71,7 +71,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
                 <div class="flex items-center space-x-3">
-                    <a href="/" class="flex items-center space-x-1.5 text-gray-400 hover:text-purple-600 transition group" title="Back to TaxNest Home">
+                    <a href="/" class="flex items-center space-x-1.5 text-gray-500 hover:text-purple-600 transition group" title="Back to TaxNest Home">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                         <span class="text-xs font-medium hidden sm:inline">Home</span>
                     </a>
@@ -82,7 +82,7 @@
                         </div>
                         <div>
                             <span class="text-lg font-extrabold text-gray-900 tracking-tight block leading-tight">PRA POS</span>
-                            <span class="text-[10px] text-gray-400 font-medium leading-none">by TaxNest</span>
+                            <span class="text-[10px] text-gray-500 font-medium leading-none">by TaxNest</span>
                         </div>
                     </a>
                 </div>
@@ -178,7 +178,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-16">
                 <h2 class="text-3xl font-bold text-gray-900">POS Features</h2>
-                <p class="mt-4 text-gray-600 max-w-2xl mx-auto">Everything you need to run your retail or service business with full PRA compliance.</p>
+                <p class="mt-4 text-gray-700 max-w-2xl mx-auto">Everything you need to run your retail or service business with full PRA compliance.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
@@ -186,42 +186,42 @@
                         <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Smart Billing</h3>
-                    <p class="text-sm text-gray-600">Add products and services, apply discounts (percentage or amount), with dynamic tax calculation based on payment method.</p>
+                    <p class="text-sm text-gray-700">Add products and services, apply discounts (percentage or amount), with dynamic tax calculation based on payment method.</p>
                 </div>
                 <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
                     <div class="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center mb-4">
                         <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Payment Methods</h3>
-                    <p class="text-sm text-gray-600">Cash (16% GST), Card/QR (5% GST). Tax automatically adjusts when payment method changes. Cash, Debit, Credit, QR/Raast supported.</p>
+                    <p class="text-sm text-gray-700">Cash (16% GST), Card/QR (5% GST). Tax automatically adjusts when payment method changes. Cash, Debit, Credit, QR/Raast supported.</p>
                 </div>
                 <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
                     <div class="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center mb-4">
                         <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">PRA Integration</h3>
-                    <p class="text-sm text-gray-600">Real-time fiscal device reporting to Punjab Revenue Authority via PRAL IMS API v1.2. Sandbox and production environments.</p>
+                    <p class="text-sm text-gray-700">Real-time fiscal device reporting to Punjab Revenue Authority via PRAL IMS API v1.2. Sandbox and production environments.</p>
                 </div>
                 <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
                     <div class="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center mb-4">
                         <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Thermal Receipts</h3>
-                    <p class="text-sm text-gray-600">Print-optimized receipts for 80mm and 58mm thermal printers. PRA QR code and fiscal invoice number on every receipt.</p>
+                    <p class="text-sm text-gray-700">Print-optimized receipts for 80mm and 58mm thermal printers. PRA QR code and fiscal invoice number on every receipt.</p>
                 </div>
                 <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
                     <div class="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center mb-4">
                         <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Multi-Terminal</h3>
-                    <p class="text-sm text-gray-600">Register and manage multiple POS terminals. Track transactions per terminal with location and status management.</p>
+                    <p class="text-sm text-gray-700">Register and manage multiple POS terminals. Track transactions per terminal with location and status management.</p>
                 </div>
                 <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
                     <div class="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center mb-4">
                         <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">POS Reports</h3>
-                    <p class="text-sm text-gray-600">Daily sales trends, payment method breakdown, top-selling products, and PRA submission analytics with CSV/PDF export.</p>
+                    <p class="text-sm text-gray-700">Daily sales trends, payment method breakdown, top-selling products, and PRA submission analytics with CSV/PDF export.</p>
                 </div>
             </div>
         </div>
@@ -231,74 +231,53 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
                 <h2 class="text-3xl font-bold text-gray-900">NestPOS Plans</h2>
-                <p class="mt-4 text-gray-600 max-w-2xl mx-auto">Simple annual billing with built-in 6% savings</p>
+                <p class="mt-4 text-gray-700 max-w-2xl mx-auto">Simple annual billing with built-in 6% savings</p>
                 <div class="inline-flex items-center mt-4 px-4 py-2 bg-purple-50 border border-purple-200 rounded-lg">
                     <svg class="w-4 h-4 text-purple-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <span class="text-sm font-semibold text-purple-700">Annual billing only — 6% savings included</span>
                 </div>
             </div>
 
-            @php $annualDiscount = 6; @endphp
-
             @if(isset($plans) && $plans->count())
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
                 @foreach($plans as $plan)
                 @php
-                    $yearlyTotal = round($plan->price * 12 * (1 - $annualDiscount / 100));
-                    $perMonth = round($yearlyTotal / 12);
-                    $saved = round($plan->price * 12 * $annualDiscount / 100);
                     $isPopular = $plan->name === 'Business';
+                    $perMonth = round($plan->price / 12);
+                    $features = [];
+                    if ($plan->name === 'Starter') {
+                        $features = ['1 POS Terminal', 'POS Billing', 'Thermal Receipt', 'Cash / Card / QR Payments', 'Basic Reports'];
+                    } elseif ($plan->name === 'Business') {
+                        $features = ['3 POS Terminals', 'POS Billing', 'Offline Billing', 'PRA Integration', 'Advanced Reports', 'Multi-terminal Support'];
+                    } elseif ($plan->name === 'Pro') {
+                        $features = ['Unlimited Terminals', 'PRA Fiscal Reporting', 'Inventory Module', 'Advanced Analytics', 'Priority Support'];
+                    }
                 @endphp
-                <div class="relative rounded-2xl overflow-hidden transition duration-300 hover:-translate-y-1 {{ $isPopular ? 'ring-2 ring-purple-500 shadow-lg shadow-purple-500/10' : 'shadow-sm' }}">
+                <div class="relative rounded-2xl overflow-hidden transition duration-300 hover:-translate-y-1 {{ $isPopular ? 'ring-2 ring-purple-500 shadow-xl shadow-purple-500/10' : 'shadow-md' }}">
                     @if($isPopular)
                     <div class="bg-purple-600 text-center py-1.5">
                         <span class="text-white text-xs font-bold tracking-wide">MOST POPULAR</span>
                     </div>
                     @endif
-                    <div class="bg-white border {{ $isPopular ? 'border-purple-500 border-t-0 rounded-b-2xl' : 'border-gray-200 rounded-2xl' }} p-5">
-                        <h3 class="text-lg font-bold text-gray-900">{{ $plan->name }}</h3>
-                        <div class="mt-3 mb-1">
-                            <span class="text-3xl font-black text-gray-900">Rs. {{ number_format($yearlyTotal) }}</span>
-                            <span class="text-gray-400 text-sm">/year</span>
+                    <div class="bg-white border {{ $isPopular ? 'border-purple-500 border-t-0 rounded-b-2xl' : 'border-gray-200 rounded-2xl' }} p-6">
+                        <h3 class="text-xl font-bold text-gray-900">{{ $plan->name }}</h3>
+                        <div class="mt-4 mb-1">
+                            <span class="text-3xl font-black text-gray-900">Rs. {{ number_format($plan->price) }}</span>
+                            <span class="text-gray-600 text-sm font-medium">/year</span>
                         </div>
-                        <p class="text-xs text-gray-400">Rs. {{ number_format($perMonth) }}/mo effective</p>
-                        <p class="text-xs text-purple-600 font-medium mt-0.5">Save Rs. {{ number_format($saved) }}</p>
+                        <p class="text-sm text-gray-600">Rs. {{ number_format($perMonth) }}/mo effective</p>
 
-                        <div class="mt-4 pt-4 border-t border-gray-100 space-y-2 text-sm text-gray-600">
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                {{ $plan->getInvoiceLimitDisplay() }} transactions/mo
+                        <div class="mt-5 pt-5 border-t border-gray-100 space-y-3">
+                            @foreach($features as $feature)
+                            <div class="flex items-center gap-2.5">
+                                <svg class="w-4.5 h-4.5 text-purple-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                <span class="text-sm text-gray-800 font-medium">{{ $feature }}</span>
                             </div>
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                {{ $plan->getUserLimitDisplay() }} terminals
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                PRA fiscal receipts
-                            </div>
-                            @if($plan->name !== 'Retail')
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Inventory management
-                            </div>
-                            @endif
-                            @if(in_array($plan->name, ['Industrial', 'Enterprise']))
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Offline mode + auto-sync
-                            </div>
-                            @endif
-                            @if($plan->name === 'Enterprise')
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Priority support
-                            </div>
-                            @endif
+                            @endforeach
                         </div>
 
-                        <div class="mt-5">
-                            <a href="/pos/register" class="block w-full py-2.5 rounded-lg text-sm font-semibold text-center transition {{ $isPopular ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-sm' : 'bg-gray-900 text-white hover:bg-gray-800' }}">
+                        <div class="mt-6">
+                            <a href="/pos/register" class="block w-full py-3 rounded-xl text-sm font-bold text-center transition {{ $isPopular ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-sm shadow-purple-600/20' : 'bg-gray-900 text-white hover:bg-gray-800' }}">
                                 Get {{ $plan->name }}
                             </a>
                         </div>
@@ -307,18 +286,18 @@
                 @endforeach
             </div>
 
-            <div class="mt-8 text-center">
-                <div class="inline-flex flex-wrap items-center justify-center gap-6 text-xs text-gray-400">
+            <div class="mt-10 text-center">
+                <div class="inline-flex flex-wrap items-center justify-center gap-6 text-sm text-gray-600">
                     <span class="flex items-center gap-1.5">
-                        <svg class="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                        <svg class="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                         PRA compliant
                     </span>
                     <span class="flex items-center gap-1.5">
-                        <svg class="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <svg class="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         14-day free trial
                     </span>
                     <span class="flex items-center gap-1.5">
-                        <svg class="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                        <svg class="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                         6% annual savings
                     </span>
                 </div>
@@ -331,28 +310,28 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
                 <h2 class="text-3xl font-bold text-gray-900">How NestPOS Works</h2>
-                <p class="mt-4 text-gray-600">Simple 4-step billing process with automatic compliance</p>
+                <p class="mt-4 text-gray-700">Simple 4-step billing process with automatic compliance</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div class="text-center">
                     <div class="w-16 h-16 rounded-2xl bg-purple-600 text-white flex items-center justify-center text-2xl font-bold mx-auto mb-4">1</div>
                     <h4 class="font-bold text-gray-900 mb-2">Add Items</h4>
-                    <p class="text-sm text-gray-600">Select products or services from your catalog with quantity and pricing</p>
+                    <p class="text-sm text-gray-700">Select products or services from your catalog with quantity and pricing</p>
                 </div>
                 <div class="text-center">
                     <div class="w-16 h-16 rounded-2xl bg-purple-600 text-white flex items-center justify-center text-2xl font-bold mx-auto mb-4">2</div>
                     <h4 class="font-bold text-gray-900 mb-2">Apply Discount</h4>
-                    <p class="text-sm text-gray-600">Choose percentage or flat amount discount for the entire bill</p>
+                    <p class="text-sm text-gray-700">Choose percentage or flat amount discount for the entire bill</p>
                 </div>
                 <div class="text-center">
                     <div class="w-16 h-16 rounded-2xl bg-purple-600 text-white flex items-center justify-center text-2xl font-bold mx-auto mb-4">3</div>
                     <h4 class="font-bold text-gray-900 mb-2">Select Payment</h4>
-                    <p class="text-sm text-gray-600">Cash, Card, or QR — tax rate adjusts automatically per PRA rules</p>
+                    <p class="text-sm text-gray-700">Cash, Card, or QR — tax rate adjusts automatically per PRA rules</p>
                 </div>
                 <div class="text-center">
                     <div class="w-16 h-16 rounded-2xl bg-purple-600 text-white flex items-center justify-center text-2xl font-bold mx-auto mb-4">4</div>
                     <h4 class="font-bold text-gray-900 mb-2">Print Receipt</h4>
-                    <p class="text-sm text-gray-600">Invoice submitted to PRA, receipt printed with fiscal number and QR code</p>
+                    <p class="text-sm text-gray-700">Invoice submitted to PRA, receipt printed with fiscal number and QR code</p>
                 </div>
             </div>
         </div>

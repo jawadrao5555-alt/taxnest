@@ -53,6 +53,7 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
   - `/login` — Renders DI landing with login modal auto-open (Laravel auth redirect target)
   - Navigation flow: Main landing nav has flat links (Digital Invoice→/digital-invoice, PRA POS→/pos, Pricing, Features, Contact); each product page has its own login modal + sign up + "< Home" back link
 - **Admin Plan Management:** SaaS admin can edit all plan details inline (name, price, limits, features) at `/admin/plans`. Changes auto-reflect on all landing and billing pages since they read from `pricing_plans` table.
+- **Product-Type Plan Separation:** `pricing_plans` table has a `product_type` column (`di` or `pos`). DI landing (`/digital-invoice`) shows only `product_type='di'` plans (Retail, Business, Industrial, Enterprise with monthly prices). POS landing (`/pos`) shows only `product_type='pos'` plans (Starter Rs 9,999/yr, Business Rs 14,999/yr, Pro Rs 24,999/yr with annual prices stored directly in `price` field).
 
 **Key Features:**
 - **Smart Invoice Builder:** Guided invoice creation with compliance scoring.

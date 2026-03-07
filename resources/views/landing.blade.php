@@ -6,358 +6,288 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <title>TaxNest — Pakistan's Most Advanced Tax Compliance Platform</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700,800&display=swap" rel="stylesheet">
+    <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800&display=swap" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
-        body { font-family: 'Figtree', sans-serif; }
-        .glass-card { background: rgba(255,255,255,0.15); backdrop-filter: blur(16px) saturate(180%); border: 1px solid rgba(255,255,255,0.25); transition: all 0.3s ease; }
-        .glass-card:hover { background: rgba(255,255,255,0.25); transform: translateY(-2px); }
-        .hero-gradient { background: linear-gradient(135deg, #0f172a 0%, #1e293b 30%, #064e3b 60%, #059669 100%); }
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
         [x-cloak] { display: none !important; }
-        .scroll-smooth { scroll-behavior: smooth; }
+        .fade-up { opacity: 0; transform: translateY(24px); transition: opacity 0.7s ease, transform 0.7s ease; }
+        .fade-up.visible { opacity: 1; transform: translateY(0); }
+        .hero-glow { background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(16,185,129,0.18) 0%, transparent 70%), radial-gradient(ellipse 60% 50% at 80% 50%, rgba(139,92,246,0.1) 0%, transparent 60%); }
+        .card-hover { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 40px -12px rgba(0,0,0,0.12); }
+        .btn-glow { transition: all 0.25s ease; }
+        .btn-glow:hover { transform: translateY(-1px); box-shadow: 0 8px 24px -4px rgba(16,185,129,0.4); }
+        .btn-glow-purple { transition: all 0.25s ease; }
+        .btn-glow-purple:hover { transform: translateY(-1px); box-shadow: 0 8px 24px -4px rgba(139,92,246,0.4); }
+        .stat-glass { background: rgba(255,255,255,0.06); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
     </style>
 </head>
-<body class="antialiased text-gray-800 scroll-smooth">
+<body class="antialiased text-gray-700 scroll-smooth bg-white">
 
-    <nav class="fixed top-0 w-full z-50 bg-white border-b border-gray-200/80 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-14 sm:h-16">
-                <a href="/" class="flex items-center space-x-2 flex-shrink-0">
-                    <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
-                        <svg class="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+    <nav class="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+        <div class="max-w-[1200px] mx-auto px-5 sm:px-8">
+            <div class="flex items-center justify-between h-[60px]">
+                <a href="/" class="flex items-center space-x-2.5 flex-shrink-0">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+                        <svg class="w-[18px] h-[18px] text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                     </div>
-                    <span class="text-lg sm:text-xl font-extrabold text-gray-900 tracking-tight">TaxNest</span>
+                    <span class="text-[17px] font-bold text-gray-900 tracking-tight">TaxNest</span>
                 </a>
 
-                <div class="flex items-center flex-wrap justify-end gap-1 sm:gap-1.5">
-                    <a href="/digital-invoice" class="px-2.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-white bg-emerald-600 rounded-full hover:bg-emerald-700 transition shadow-sm">Digital Invoice</a>
-                    <a href="/pos" class="px-2.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-white bg-purple-600 rounded-full hover:bg-purple-700 transition shadow-sm">PRA POS</a>
-                    <a href="#pricing" class="px-2 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition">Pricing</a>
-                    <a href="#features" class="px-2 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition">Docs</a>
-                    <a href="#contact" class="px-2 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition">Contact</a>
+                <div class="flex items-center flex-wrap justify-end gap-1.5 sm:gap-2">
+                    <a href="/digital-invoice" class="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-[13px] font-semibold text-white bg-emerald-600 rounded-full hover:bg-emerald-700 transition shadow-sm">Digital Invoice</a>
+                    <a href="/pos" class="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-[13px] font-semibold text-white bg-purple-600 rounded-full hover:bg-purple-700 transition shadow-sm">PRA POS</a>
+                    <a href="#pricing" class="px-2.5 py-1.5 sm:px-3 text-xs sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Pricing</a>
+                    <a href="#features" class="px-2.5 py-1.5 sm:px-3 text-xs sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Docs</a>
+                    <a href="#contact" class="px-2.5 py-1.5 sm:px-3 text-xs sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Contact</a>
                 </div>
             </div>
         </div>
     </nav>
 
-    <section class="hero-gradient pt-28 pb-20 relative overflow-hidden">
-        <div class="absolute inset-0 opacity-10">
-            <div class="absolute top-20 left-10 w-72 h-72 bg-emerald-400 rounded-full blur-3xl"></div>
-            <div class="absolute bottom-10 right-20 w-96 h-96 bg-purple-400 rounded-full blur-3xl"></div>
-            <div class="absolute top-40 right-40 w-48 h-48 bg-teal-300 rounded-full blur-3xl"></div>
-        </div>
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-            <div class="text-center max-w-4xl mx-auto">
-                <div class="inline-flex items-center px-4 py-1.5 bg-white/10 backdrop-blur-sm rounded-full text-sm font-medium text-white mb-6 border border-white/20">
-                    <svg class="w-4 h-4 mr-2 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-                    FBR + PRA Compliant &bull; Enterprise Grade &bull; 14-Day Free Trial
+    <section class="relative pt-32 pb-28 sm:pt-40 sm:pb-36 bg-[#0a0f1a] overflow-hidden">
+        <div class="hero-glow absolute inset-0"></div>
+        <div class="absolute inset-0 opacity-[0.03]" style="background-image: url('data:image/svg+xml,%3Csvg width=&quot;60&quot; height=&quot;60&quot; viewBox=&quot;0 0 60 60&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;%3E%3Cg fill=&quot;none&quot; fill-rule=&quot;evenodd&quot;%3E%3Cg fill=&quot;%23ffffff&quot; fill-opacity=&quot;1&quot;%3E%3Cpath d=&quot;M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z&quot;/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"></div>
+
+        <div class="max-w-[1200px] mx-auto px-5 sm:px-8 relative">
+            <div class="text-center max-w-3xl mx-auto">
+                <div class="inline-flex items-center px-3.5 py-1.5 bg-white/[0.07] rounded-full text-[13px] font-medium text-gray-300 mb-8 border border-white/[0.08]">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-2 animate-pulse"></span>
+                    FBR + PRA Compliant Platform
                 </div>
-                <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight mb-6">
-                    Pakistan's Most Advanced<br>
-                    <span class="bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-teal-300">Tax Compliance Platform</span>
+
+                <h1 class="text-[40px] sm:text-[52px] lg:text-[56px] font-bold text-white leading-[1.1] tracking-tight mb-6">
+                    TaxNest — Pakistan's Most Advanced
+                    <span class="block mt-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-300 bg-clip-text text-transparent">Tax Compliance Platform</span>
                 </h1>
-                <p class="text-xl text-gray-300 mb-4 max-w-3xl mx-auto leading-relaxed">
-                    Two powerful products. One platform. Complete FBR Digital Invoicing + PRA Point of Sale — fully isolated, enterprise-grade, built for Pakistan.
+
+                <p class="text-[17px] sm:text-lg text-gray-400 leading-relaxed mb-10 max-w-2xl mx-auto">
+                    Manage FBR Digital Invoicing and PRA POS billing in one secure enterprise platform. Fully isolated, real-time compliant.
                 </p>
-                <p class="text-lg text-emerald-300 mb-10 font-semibold">
-                    14-Day Free Trial &bull; No Credit Card Required
-                </p>
-                <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <a href="#products" class="inline-flex items-center px-8 py-4 bg-emerald-500 text-white rounded-xl text-lg font-bold hover:bg-emerald-600 transition shadow-lg shadow-emerald-900/30 w-full sm:w-auto justify-center">
+
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+                    <a href="#products" class="btn-glow inline-flex items-center px-7 py-3.5 bg-emerald-500 text-white rounded-[10px] text-[15px] font-semibold hover:bg-emerald-600 w-full sm:w-auto justify-center">
+                        Start Free Trial
+                        <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                    </a>
+                    <a href="#products" class="inline-flex items-center px-7 py-3.5 bg-white/[0.06] text-gray-300 border border-white/[0.1] rounded-[10px] text-[15px] font-semibold hover:bg-white/[0.1] hover:text-white transition w-full sm:w-auto justify-center">
                         Explore Products
-                        <svg class="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </a>
                 </div>
+
+                <p class="text-[13px] text-gray-500 mt-5">14-day free trial &middot; No credit card required</p>
             </div>
 
-            <div class="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-4xl mx-auto">
-                <div class="glass-card rounded-xl p-4 text-center">
-                    <p class="text-3xl font-extrabold text-white">99.9%</p>
-                    <p class="text-sm text-gray-300 mt-1">Uptime SLA</p>
+            <div class="mt-20 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto">
+                <div class="stat-glass rounded-2xl p-5 text-center">
+                    <div class="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-[18px] h-[18px] text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                    </div>
+                    <p class="text-2xl sm:text-3xl font-bold text-white">99.9%</p>
+                    <p class="text-xs text-gray-500 mt-1">Uptime SLA</p>
                 </div>
-                <div class="glass-card rounded-xl p-4 text-center">
-                    <p class="text-3xl font-extrabold text-white">50k+</p>
-                    <p class="text-sm text-gray-300 mt-1">Invoices Processed</p>
+                <div class="stat-glass rounded-2xl p-5 text-center">
+                    <div class="w-9 h-9 rounded-lg bg-teal-500/10 flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-[18px] h-[18px] text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                    </div>
+                    <p class="text-2xl sm:text-3xl font-bold text-white">50k+</p>
+                    <p class="text-xs text-gray-500 mt-1">Invoices Processed</p>
                 </div>
-                <div class="glass-card rounded-xl p-4 text-center">
-                    <p class="text-3xl font-extrabold text-white">500+</p>
-                    <p class="text-sm text-gray-300 mt-1">Companies Trust Us</p>
+                <div class="stat-glass rounded-2xl p-5 text-center">
+                    <div class="w-9 h-9 rounded-lg bg-purple-500/10 flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-[18px] h-[18px] text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    </div>
+                    <p class="text-2xl sm:text-3xl font-bold text-white">500+</p>
+                    <p class="text-xs text-gray-500 mt-1">Companies Trust Us</p>
                 </div>
-                <div class="glass-card rounded-xl p-4 text-center">
-                    <p class="text-3xl font-extrabold text-white">2</p>
-                    <p class="text-sm text-gray-300 mt-1">Integrated Products</p>
+                <div class="stat-glass rounded-2xl p-5 text-center">
+                    <div class="w-9 h-9 rounded-lg bg-blue-500/10 flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-[18px] h-[18px] text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                    </div>
+                    <p class="text-2xl sm:text-3xl font-bold text-white">2</p>
+                    <p class="text-xs text-gray-500 mt-1">Integrated Products</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <div class="bg-white border-b border-gray-100 py-5">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="bg-gray-50 border-b border-gray-100 py-5">
+        <div class="max-w-[1200px] mx-auto px-5 sm:px-8">
             <div class="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
-                <div class="flex items-center space-x-2 text-gray-500">
-                    <svg class="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                    <span class="text-sm font-medium">FBR API v1.12</span>
+                <div class="flex items-center space-x-2 text-gray-400">
+                    <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    <span class="text-[13px] font-medium">FBR API v1.12</span>
                 </div>
-                <div class="flex items-center space-x-2 text-gray-500">
-                    <svg class="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span class="text-sm font-medium">PRA IMS v1.2</span>
+                <div class="flex items-center space-x-2 text-gray-400">
+                    <svg class="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span class="text-[13px] font-medium">PRA IMS v1.2</span>
                 </div>
-                <div class="flex items-center space-x-2 text-gray-500">
-                    <svg class="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                    <span class="text-sm font-medium">SHA-256 Encrypted</span>
+                <div class="flex items-center space-x-2 text-gray-400">
+                    <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    <span class="text-[13px] font-medium">SHA-256 Encrypted</span>
                 </div>
-                <div class="flex items-center space-x-2 text-gray-500">
-                    <svg class="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                    <span class="text-sm font-medium">Real-time Sync</span>
+                <div class="flex items-center space-x-2 text-gray-400">
+                    <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    <span class="text-[13px] font-medium">Real-time Sync</span>
                 </div>
-                <div class="flex items-center space-x-2 text-gray-500">
-                    <svg class="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                    <span class="text-sm font-medium">PWA Ready</span>
+                <div class="flex items-center space-x-2 text-gray-400">
+                    <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                    <span class="text-[13px] font-medium">PWA Ready</span>
                 </div>
             </div>
         </div>
     </div>
 
-    <section id="products" class="py-20 bg-gray-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-16">
-                <p class="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-2">Two Products, One Platform</p>
-                <h2 class="text-3xl sm:text-4xl font-extrabold text-gray-900">Choose Your Solution</h2>
-                <p class="mt-4 text-lg text-gray-500 max-w-2xl mx-auto">Both products are 100% isolated — separate data, separate logins, separate dashboards. Use one or both.</p>
+    <section id="products" class="py-24 sm:py-30 bg-white">
+        <div class="max-w-[1200px] mx-auto px-5 sm:px-8">
+            <div class="text-center mb-16 fade-up">
+                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Two Products, One Platform</p>
+                <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Choose Your Solution</h2>
+                <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">Both products are 100% isolated — separate data, separate logins, separate dashboards.</p>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div class="bg-white rounded-2xl shadow-lg border-2 border-emerald-200 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-                    <div class="bg-gradient-to-r from-emerald-600 to-teal-600 p-6">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-                                    <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                                </div>
-                                <div>
-                                    <h3 class="text-2xl font-bold text-white">Digital Invoice</h3>
-                                    <p class="text-emerald-100 text-sm">FBR Compliance System</p>
-                                </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl mx-auto">
+                <div class="card-hover bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                    <div class="p-8">
+                        <div class="flex items-center space-x-4 mb-6">
+                            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                                <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                             </div>
-                            <span class="px-3 py-1 bg-white/20 rounded-full text-xs font-bold text-white">FBR</span>
-                        </div>
-                    </div>
-                    <div class="p-6">
-                        <p class="text-gray-600 mb-6">Enterprise-grade FBR digital invoicing with PRAL API v1.12 integration, real-time synchronous submission, and intelligent compliance scoring.</p>
-                        <div class="grid grid-cols-2 gap-3 mb-6">
-                            <div class="flex items-center text-sm text-gray-700">
-                                <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                FBR API v1.12
-                            </div>
-                            <div class="flex items-center text-sm text-gray-700">
-                                <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                HS Intelligence AI
-                            </div>
-                            <div class="flex items-center text-sm text-gray-700">
-                                <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Risk Detection Engine
-                            </div>
-                            <div class="flex items-center text-sm text-gray-700">
-                                <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Idempotency Shield
-                            </div>
-                            <div class="flex items-center text-sm text-gray-700">
-                                <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                PDF + QR Codes
-                            </div>
-                            <div class="flex items-center text-sm text-gray-700">
-                                <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                MIS Analytics
-                            </div>
-                            <div class="flex items-center text-sm text-gray-700">
-                                <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Customer Ledger
-                            </div>
-                            <div class="flex items-center text-sm text-gray-700">
-                                <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Multi-Branch
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-900">Digital Invoice</h3>
+                                <p class="text-[13px] text-emerald-600 font-medium">FBR Compliance System</p>
                             </div>
                         </div>
-                        <div class="pt-4 border-t border-gray-100">
-                            <a href="/digital-invoice" class="block w-full py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition shadow-sm text-center">
-                                View Details & Plans
-                            </a>
+                        <p class="text-[15px] text-gray-500 leading-relaxed mb-6">Enterprise-grade FBR digital invoicing with PRAL API v1.12 integration, real-time synchronous submission, and intelligent compliance scoring.</p>
+                        <div class="grid grid-cols-2 gap-2.5 mb-8">
+                            @foreach(['FBR API v1.12', 'HS Intelligence AI', 'Risk Detection', 'Idempotency Shield', 'PDF + QR Codes', 'MIS Analytics', 'Customer Ledger', 'Multi-Branch'] as $feature)
+                            <div class="flex items-center text-[13px] text-gray-600">
+                                <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                {{ $feature }}
+                            </div>
+                            @endforeach
                         </div>
+                        <a href="/digital-invoice" class="btn-glow block w-full py-3 bg-emerald-600 text-white rounded-[10px] text-[14px] font-semibold hover:bg-emerald-700 transition text-center">
+                            Explore Digital Invoice
+                        </a>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-2xl shadow-lg border-2 border-purple-200 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-                    <div class="bg-gradient-to-r from-purple-600 to-violet-600 p-6">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-                                    <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                                </div>
-                                <div>
-                                    <h3 class="text-2xl font-bold text-white">NestPOS</h3>
-                                    <p class="text-purple-100 text-sm">Point of Sale System</p>
-                                </div>
+                <div class="card-hover bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                    <div class="p-8">
+                        <div class="flex items-center space-x-4 mb-6">
+                            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
+                                <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                             </div>
-                            <span class="px-3 py-1 bg-white/20 rounded-full text-xs font-bold text-white">PRA</span>
-                        </div>
-                    </div>
-                    <div class="p-6">
-                        <p class="text-gray-600 mb-6">Complete POS billing system with PRA (Punjab Revenue Authority) fiscal device integration via PRAL IMS API v1.2, thermal receipts, and real-time tax calculations.</p>
-                        <div class="grid grid-cols-2 gap-3 mb-6">
-                            <div class="flex items-center text-sm text-gray-700">
-                                <svg class="w-4 h-4 text-purple-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                PRA IMS v1.2
-                            </div>
-                            <div class="flex items-center text-sm text-gray-700">
-                                <svg class="w-4 h-4 text-purple-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Thermal Receipts
-                            </div>
-                            <div class="flex items-center text-sm text-gray-700">
-                                <svg class="w-4 h-4 text-purple-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Multi-Terminal
-                            </div>
-                            <div class="flex items-center text-sm text-gray-700">
-                                <svg class="w-4 h-4 text-purple-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Smart Billing
-                            </div>
-                            <div class="flex items-center text-sm text-gray-700">
-                                <svg class="w-4 h-4 text-purple-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Cash/Card/QR Tax
-                            </div>
-                            <div class="flex items-center text-sm text-gray-700">
-                                <svg class="w-4 h-4 text-purple-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                POS Reports
-                            </div>
-                            <div class="flex items-center text-sm text-gray-700">
-                                <svg class="w-4 h-4 text-purple-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Fiscal QR Codes
-                            </div>
-                            <div class="flex items-center text-sm text-gray-700">
-                                <svg class="w-4 h-4 text-purple-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Offline Billing
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-900">NestPOS</h3>
+                                <p class="text-[13px] text-purple-600 font-medium">Point of Sale System</p>
                             </div>
                         </div>
-                        <div class="pt-4 border-t border-gray-100">
-                            <a href="/pos" class="block w-full py-2.5 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition shadow-sm text-center">
-                                View Details & Plans
-                            </a>
+                        <p class="text-[15px] text-gray-500 leading-relaxed mb-6">Complete POS billing system with PRA fiscal device integration via PRAL IMS API v1.2, thermal receipts, and real-time tax calculations.</p>
+                        <div class="grid grid-cols-2 gap-2.5 mb-8">
+                            @foreach(['PRA IMS v1.2', 'Thermal Receipts', 'Multi-Terminal', 'Smart Billing', 'Cash/Card/QR Tax', 'POS Reports', 'Fiscal QR Codes', 'Offline Billing'] as $feature)
+                            <div class="flex items-center text-[13px] text-gray-600">
+                                <svg class="w-4 h-4 text-purple-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                {{ $feature }}
+                            </div>
+                            @endforeach
                         </div>
+                        <a href="/pos" class="btn-glow-purple block w-full py-3 bg-purple-600 text-white rounded-[10px] text-[14px] font-semibold hover:bg-purple-700 text-center">
+                            Explore NestPOS
+                        </a>
                     </div>
                 </div>
             </div>
 
-            <div class="mt-10 text-center">
-                <div class="inline-flex items-center px-6 py-3 bg-amber-50 border border-amber-200 rounded-xl">
-                    <svg class="w-5 h-5 text-amber-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                    <span class="text-sm font-medium text-amber-800">Both products are 100% isolated — separate databases, separate logins, separate data. No cross-contamination.</span>
+            <div class="mt-8 text-center">
+                <div class="inline-flex items-center px-5 py-2.5 bg-amber-50 border border-amber-200/60 rounded-xl">
+                    <svg class="w-4 h-4 text-amber-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    <span class="text-[13px] font-medium text-amber-800">100% isolated — separate databases, logins, and data. No cross-contamination.</span>
                 </div>
             </div>
         </div>
     </section>
 
-    <section id="features" class="py-20 bg-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-16">
-                <p class="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-2">Enterprise Architecture</p>
-                <h2 class="text-3xl sm:text-4xl font-extrabold text-gray-900">Built Different From Day One</h2>
-                <p class="mt-4 text-lg text-gray-500 max-w-2xl mx-auto">No generic accounting software. TaxNest is purpose-built for Pakistan's tax ecosystem with enterprise-grade infrastructure.</p>
+    <section id="features" class="py-24 sm:py-30 bg-gray-50">
+        <div class="max-w-[1200px] mx-auto px-5 sm:px-8">
+            <div class="text-center mb-16 fade-up">
+                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Enterprise Architecture</p>
+                <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Built Different From Day One</h2>
+                <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">Purpose-built for Pakistan's tax ecosystem with enterprise-grade infrastructure.</p>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:-translate-y-1 transition-all duration-300 group">
-                    <div class="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-emerald-200 transition">
-                        <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 fade-up">
+                @php
+                $features = [
+                    ['Real-time FBR + PRA Sync', 'Direct PRAL API v1.12 for FBR and IMS API v1.2 for PRA. Synchronous submission with instant responses.', 'M13 10V3L4 14h7v7l9-11h-7z', 'emerald'],
+                    ['HS Intelligence Engine', '6-factor AI model learns from every submission. Auto-suggests HS codes, SRO numbers, and tax rates.', 'M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z', 'blue'],
+                    ['Risk Intelligence Engine', 'Pre-submission risk detection with anomaly scoring, compliance warnings, and automatic blocking.', 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z', 'purple'],
+                    ['6-Phase Idempotency Shield', 'Enterprise-grade duplicate prevention. Per-invoice guards with SHA-256 hashing and auto-recovery.', 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', 'orange'],
+                    ['Immutable Audit Logs', 'SHA-256 signed audit trail with integrity verification and tamper-proof activity tracking.', 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z', 'indigo'],
+                    ['Multi-Tenant Architecture', 'Complete company isolation with approval workflow, multi-branch invoicing, and role-based access.', 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4', 'cyan'],
+                    ['Token Health Monitor', 'Real-time FBR/PRA token status, connectivity checks, expiry alerts, and health diagnostics.', 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z', 'rose'],
+                    ['6 Login Methods', 'Email, Phone, Username, CNIC, NTN, or FBR Registration. Maximum flexibility for all business types.', 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z', 'amber'],
+                    ['PWA + Keyboard Shortcuts', 'Install on any device. Ctrl+S save, Ctrl+Enter submit, offline drafts, and instant transitions.', 'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z', 'teal'],
+                ];
+                @endphp
+                @foreach($features as $f)
+                <div class="card-hover bg-white rounded-2xl p-6 border border-gray-100">
+                    <div class="w-11 h-11 bg-{{ $f[3] }}-50 rounded-xl flex items-center justify-center mb-4">
+                        <svg class="w-5 h-5 text-{{ $f[3] }}-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $f[2] }}"/></svg>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Real-time FBR + PRA Sync</h3>
-                    <p class="text-gray-500 text-sm leading-relaxed">Direct PRAL API v1.12 for FBR and IMS API v1.2 for PRA. Synchronous submission with instant responses and invoice locking.</p>
+                    <h3 class="text-[15px] font-bold text-gray-900 mb-2">{{ $f[0] }}</h3>
+                    <p class="text-[13px] text-gray-500 leading-relaxed">{{ $f[1] }}</p>
                 </div>
+                @endforeach
+            </div>
 
-                <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:-translate-y-1 transition-all duration-300 group">
-                    <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-blue-200 transition">
-                        <svg class="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+            <div class="mt-16 fade-up">
+                <div class="bg-white rounded-2xl border border-gray-100 p-8 max-w-3xl mx-auto">
+                    <h3 class="text-[15px] font-bold text-gray-900 mb-5">Platform Capabilities</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        @foreach([
+                            'Real-time FBR PRAL API submission',
+                            'PRA POS fiscal reporting',
+                            'Offline billing + auto sync',
+                            'Inventory + reporting engine',
+                            'Compliance scoring + risk alerts',
+                            'SHA-256 immutable audit logs',
+                            'Multi-branch invoicing',
+                            'Thermal receipt printing'
+                        ] as $cap)
+                        <div class="flex items-center text-[14px] text-gray-600">
+                            <svg class="w-4.5 h-4.5 text-emerald-500 mr-2.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            {{ $cap }}
+                        </div>
+                        @endforeach
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">HS Intelligence Engine</h3>
-                    <p class="text-gray-500 text-sm leading-relaxed">6-factor AI model learns from every submission. Auto-suggests HS codes, SRO numbers, and tax rates with confidence scoring.</p>
-                </div>
-
-                <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:-translate-y-1 transition-all duration-300 group">
-                    <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-purple-200 transition">
-                        <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Risk Intelligence Engine</h3>
-                    <p class="text-gray-500 text-sm leading-relaxed">Pre-submission risk detection with anomaly scoring, compliance warnings, and automatic blocking of problematic invoices.</p>
-                </div>
-
-                <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:-translate-y-1 transition-all duration-300 group">
-                    <div class="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-orange-200 transition">
-                        <svg class="w-6 h-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">6-Phase Idempotency Shield</h3>
-                    <p class="text-gray-500 text-sm leading-relaxed">Enterprise-grade protection prevents duplicate submissions. Per-invoice guards with SHA-256 hashing and auto-recovery.</p>
-                </div>
-
-                <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:-translate-y-1 transition-all duration-300 group">
-                    <div class="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-indigo-200 transition">
-                        <svg class="w-6 h-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Immutable Audit Logs</h3>
-                    <p class="text-gray-500 text-sm leading-relaxed">SHA-256 signed audit trail with integrity verification, compliance certificates, and tamper-proof activity tracking.</p>
-                </div>
-
-                <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:-translate-y-1 transition-all duration-300 group">
-                    <div class="w-12 h-12 bg-cyan-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-cyan-200 transition">
-                        <svg class="w-6 h-6 text-cyan-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Multi-Tenant Architecture</h3>
-                    <p class="text-gray-500 text-sm leading-relaxed">Complete company isolation with approval workflow, multi-branch invoicing, role-based access, and centralized admin oversight.</p>
-                </div>
-
-                <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:-translate-y-1 transition-all duration-300 group">
-                    <div class="w-12 h-12 bg-rose-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-rose-200 transition">
-                        <svg class="w-6 h-6 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Token Health Monitor</h3>
-                    <p class="text-gray-500 text-sm leading-relaxed">Real-time FBR/PRA token status tracking, connectivity checks, expiry alerts, and automatic health diagnostics.</p>
-                </div>
-
-                <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:-translate-y-1 transition-all duration-300 group">
-                    <div class="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-amber-200 transition">
-                        <svg class="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">6 Login Methods</h3>
-                    <p class="text-gray-500 text-sm leading-relaxed">Email, Phone, Username, CNIC, NTN, or FBR Registration number. Maximum flexibility for all business types in Pakistan.</p>
-                </div>
-
-                <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:-translate-y-1 transition-all duration-300 group">
-                    <div class="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-teal-200 transition">
-                        <svg class="w-6 h-6 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">PWA + Keyboard Shortcuts</h3>
-                    <p class="text-gray-500 text-sm leading-relaxed">Install on any device. Ctrl+S save, Ctrl+Enter submit, smart autofocus, offline drafts, and instant page transitions.</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <section class="py-20 bg-gray-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-16">
-                <p class="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-2">Comparison</p>
-                <h2 class="text-3xl sm:text-4xl font-extrabold text-gray-900">TaxNest vs Traditional Software</h2>
-                <p class="mt-4 text-lg text-gray-500 max-w-2xl mx-auto">See how TaxNest compares to generic accounting tools</p>
+    <section class="py-24 sm:py-30 bg-white">
+        <div class="max-w-[1200px] mx-auto px-5 sm:px-8">
+            <div class="text-center mb-16 fade-up">
+                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Comparison</p>
+                <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">TaxNest vs Traditional Software</h2>
+                <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto">See how TaxNest compares to generic accounting tools</p>
             </div>
 
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden max-w-4xl mx-auto">
+            <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden max-w-4xl mx-auto fade-up">
                 <div class="overflow-x-auto">
                     <table class="w-full">
                         <thead>
-                            <tr class="border-b border-gray-200">
-                                <th class="text-left py-4 px-6 text-sm font-medium text-gray-500">Capability</th>
-                                <th class="text-center py-4 px-6 text-sm font-bold text-emerald-700">TaxNest</th>
-                                <th class="text-center py-4 px-6 text-sm font-bold text-gray-500">Others</th>
+                            <tr class="border-b border-gray-100 bg-gray-50/50">
+                                <th class="text-left py-4 px-6 text-[13px] font-medium text-gray-500">Capability</th>
+                                <th class="text-center py-4 px-6 text-[13px] font-bold text-emerald-700">TaxNest</th>
+                                <th class="text-center py-4 px-6 text-[13px] font-bold text-gray-400">Others</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-100">
+                        <tbody class="divide-y divide-gray-50">
                             @php
                             $comparisons = [
                                 ['Direct FBR PRAL API v1.12', true, false],
@@ -377,20 +307,20 @@
                             ];
                             @endphp
                             @foreach($comparisons as $comp)
-                            <tr class="{{ $loop->even ? 'bg-gray-50/50' : '' }}">
-                                <td class="py-3 px-6 text-sm font-medium text-gray-700">{{ $comp[0] }}</td>
-                                <td class="py-3 px-6 text-center">
+                            <tr class="hover:bg-gray-50/50 transition">
+                                <td class="py-3.5 px-6 text-[13px] font-medium text-gray-700">{{ $comp[0] }}</td>
+                                <td class="py-3.5 px-6 text-center">
                                     @if($comp[1] === true)
                                     <svg class="w-5 h-5 text-emerald-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                     @endif
                                 </td>
-                                <td class="py-3 px-6 text-center">
+                                <td class="py-3.5 px-6 text-center">
                                     @if($comp[2] === true)
                                     <svg class="w-5 h-5 text-emerald-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                     @elseif($comp[2] === 'partial')
-                                    <span class="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded">Limited</span>
+                                    <span class="text-[11px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Limited</span>
                                     @else
-                                    <svg class="w-5 h-5 text-red-400 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                    <svg class="w-4 h-4 text-gray-300 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                                     @endif
                                 </td>
                             </tr>
@@ -402,33 +332,32 @@
         </div>
     </section>
 
-
-    <section id="pricing" class="py-20 bg-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-16">
-                <p class="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-2">Pricing</p>
-                <h2 class="text-3xl sm:text-4xl font-extrabold text-gray-900">Simple, Transparent Pricing</h2>
-                <p class="mt-4 text-lg text-gray-500 max-w-2xl mx-auto">Each product has its own pricing plans. Visit the product page for detailed plans and a 14-day free trial.</p>
+    <section id="pricing" class="py-24 sm:py-30 bg-gray-50">
+        <div class="max-w-[1200px] mx-auto px-5 sm:px-8">
+            <div class="text-center mb-16 fade-up">
+                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Pricing</p>
+                <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Simple, Transparent Pricing</h2>
+                <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">Each product has its own plans. Visit the product page for details and start your 14-day free trial.</p>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-                <div class="bg-gray-50 rounded-2xl border border-gray-200 p-8 text-center hover:shadow-lg transition-shadow">
-                    <div class="w-14 h-14 rounded-xl bg-emerald-100 flex items-center justify-center mx-auto mb-5">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto fade-up">
+                <div class="card-hover bg-white rounded-2xl border border-gray-200 p-8 text-center">
+                    <div class="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center mx-auto mb-5">
                         <svg class="w-7 h-7 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-2">Digital Invoice</h3>
-                    <p class="text-gray-500 text-sm mb-6">FBR-compliant invoicing with multiple billing cycles and volume discounts</p>
-                    <a href="/digital-invoice#pricing" class="inline-flex items-center px-6 py-3 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition shadow-sm">
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Digital Invoice</h3>
+                    <p class="text-[14px] text-gray-500 mb-6 leading-relaxed">FBR-compliant invoicing with multiple billing cycles and volume discounts</p>
+                    <a href="/digital-invoice#pricing" class="btn-glow inline-flex items-center px-6 py-3 bg-emerald-600 text-white rounded-[10px] text-[14px] font-semibold hover:bg-emerald-700 transition">
                         View DI Plans
                         <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                     </a>
                 </div>
-                <div class="bg-gray-50 rounded-2xl border border-gray-200 p-8 text-center hover:shadow-lg transition-shadow">
-                    <div class="w-14 h-14 rounded-xl bg-purple-100 flex items-center justify-center mx-auto mb-5">
+                <div class="card-hover bg-white rounded-2xl border border-gray-200 p-8 text-center">
+                    <div class="w-14 h-14 rounded-2xl bg-purple-50 flex items-center justify-center mx-auto mb-5">
                         <svg class="w-7 h-7 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-2">NestPOS</h3>
-                    <p class="text-gray-500 text-sm mb-6">PRA point of sale with annual billing and built-in 6% discount</p>
-                    <a href="/pos#pricing" class="inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-xl text-sm font-semibold hover:bg-purple-700 transition shadow-sm">
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">NestPOS</h3>
+                    <p class="text-[14px] text-gray-500 mb-6 leading-relaxed">PRA point of sale with annual billing and built-in 6% discount</p>
+                    <a href="/pos#pricing" class="btn-glow-purple inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-[10px] text-[14px] font-semibold hover:bg-purple-700">
                         View POS Plans
                         <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                     </a>
@@ -437,121 +366,82 @@
         </div>
     </section>
 
-    <section id="faq" class="py-20 bg-gray-50">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-12">
-                <p class="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-2">FAQ</p>
-                <h2 class="text-3xl sm:text-4xl font-extrabold text-gray-900">Frequently Asked Questions</h2>
+    <section id="faq" class="py-24 sm:py-30 bg-white">
+        <div class="max-w-3xl mx-auto px-5 sm:px-8">
+            <div class="text-center mb-12 fade-up">
+                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">FAQ</p>
+                <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Frequently Asked Questions</h2>
             </div>
-            <div class="space-y-4" x-data="{ open: null }">
-                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <button @click="open = open === 1 ? null : 1" class="w-full flex items-center justify-between p-6 text-left">
-                        <span class="text-base font-semibold text-gray-900">What is TaxNest?</span>
-                        <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 1 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            <div class="space-y-3 fade-up" x-data="{ open: null }">
+                @php
+                $faqs = [
+                    ['What is TaxNest?', 'TaxNest is Pakistan\'s most advanced tax compliance platform with two products: <strong>Digital Invoice</strong> for FBR compliance (Federal Board of Revenue) and <strong>NestPOS</strong> for PRA compliance (Punjab Revenue Authority). Both products are completely isolated with separate databases, logins, and dashboards.'],
+                    ['What is the difference between Digital Invoice and NestPOS?', '<strong>Digital Invoice</strong> is for businesses that need to submit invoices to FBR via PRAL API v1.12. It includes HS Intelligence, compliance scoring, risk detection, and enterprise analytics.<br><br><strong>NestPOS</strong> is a Point of Sale system for retail/service businesses that need PRA fiscal device integration via PRAL IMS API v1.2. It includes thermal receipt printing, multi-terminal support, and real-time tax calculations.'],
+                    ['Are Digital Invoice and NestPOS data separate?', 'Yes, 100%. They have separate databases, separate login pages, separate dashboards, and separate user accounts. There is zero cross-contamination of data between the two systems.'],
+                    ['Is there a free trial?', 'Yes! Both products come with a 14-day free trial. No credit card required. You get full access to all features during the trial period with up to 20 invoices/transactions.'],
+                    ['How does FBR/PRA compliance work?', '<strong>FBR (Digital Invoice):</strong> Uses PRAL API v1.12 for real-time synchronous invoice submission. Invoices are validated, scored for compliance, and submitted with HS codes, tax rates, and QR codes.<br><br><strong>NestPOS:</strong> Uses PRAL IMS API v1.2 for fiscal device integration. Each transaction is fiscalized and assigned a PRA fiscal invoice number with QR code.'],
+                    ['What security measures are in place?', 'TaxNest uses SHA-256 encrypted immutable audit logs, role-based access control, company isolation middleware, 6-phase idempotency shield for duplicate prevention, and HTTPS encryption. All critical operations are logged with tamper-proof hashing.'],
+                ];
+                @endphp
+                @foreach($faqs as $i => $faq)
+                <div class="bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
+                    <button @click="open = open === {{ $i+1 }} ? null : {{ $i+1 }}" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="text-[14px] font-semibold text-gray-900 pr-4">{{ $faq[0] }}</span>
+                        <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0" :class="open === {{ $i+1 }} ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 1" x-collapse class="px-6 pb-6 text-gray-600 text-sm leading-relaxed">
-                        TaxNest is Pakistan's most advanced tax compliance platform with two products: <strong>Digital Invoice</strong> for FBR compliance (Federal Board of Revenue) and <strong>NestPOS</strong> for PRA compliance (Punjab Revenue Authority). Both products are completely isolated with separate databases, logins, and dashboards.
+                    <div x-show="open === {{ $i+1 }}" x-collapse class="px-5 pb-5 text-[13px] text-gray-500 leading-relaxed">
+                        {!! $faq[1] !!}
                     </div>
                 </div>
+                @endforeach
+            </div>
+        </div>
+    </section>
 
-                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <button @click="open = open === 2 ? null : 2" class="w-full flex items-center justify-between p-6 text-left">
-                        <span class="text-base font-semibold text-gray-900">What is the difference between Digital Invoice and NestPOS?</span>
-                        <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 2 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                    </button>
-                    <div x-show="open === 2" x-collapse class="px-6 pb-6 text-gray-600 text-sm leading-relaxed">
-                        <strong>Digital Invoice</strong> is for businesses that need to submit invoices to FBR (Federal Board of Revenue) via PRAL API v1.12. It includes HS Intelligence, compliance scoring, risk detection, and enterprise analytics.<br><br>
-                        <strong>NestPOS</strong> is a Point of Sale system for retail/service businesses that need PRA (Punjab Revenue Authority) fiscal device integration via PRAL IMS API v1.2. It includes thermal receipt printing, multi-terminal support, and real-time tax calculations based on payment method.
+    <section id="contact" class="py-24 sm:py-30 bg-gray-50">
+        <div class="max-w-3xl mx-auto px-5 sm:px-8">
+            <div class="text-center mb-12 fade-up">
+                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Get in Touch</p>
+                <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Contact Us</h2>
+                <p class="mt-4 text-[17px] text-gray-500">Have questions? We're here to help you choose the right solution.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 fade-up">
+                <div class="card-hover bg-white rounded-2xl border border-gray-200 p-6 text-center">
+                    <div class="w-11 h-11 bg-emerald-50 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     </div>
+                    <h3 class="text-[14px] font-semibold text-gray-900 mb-1">Email</h3>
+                    <p class="text-[13px] text-gray-500">support@taxnest.com</p>
                 </div>
-
-                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <button @click="open = open === 3 ? null : 3" class="w-full flex items-center justify-between p-6 text-left">
-                        <span class="text-base font-semibold text-gray-900">Are Digital Invoice and NestPOS data separate?</span>
-                        <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 3 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                    </button>
-                    <div x-show="open === 3" x-collapse class="px-6 pb-6 text-gray-600 text-sm leading-relaxed">
-                        Yes, 100%. Digital Invoice and NestPOS are completely isolated products. They have separate databases, separate login pages, separate dashboards, and separate user accounts. There is zero cross-contamination of data between the two systems.
+                <div class="card-hover bg-white rounded-2xl border border-gray-200 p-6 text-center">
+                    <div class="w-11 h-11 bg-emerald-50 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
                     </div>
+                    <h3 class="text-[14px] font-semibold text-gray-900 mb-1">Phone</h3>
+                    <p class="text-[13px] text-gray-500">+92-XXX-XXXXXXX</p>
                 </div>
-
-                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <button @click="open = open === 4 ? null : 4" class="w-full flex items-center justify-between p-6 text-left">
-                        <span class="text-base font-semibold text-gray-900">Is there a free trial?</span>
-                        <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 4 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                    </button>
-                    <div x-show="open === 4" x-collapse class="px-6 pb-6 text-gray-600 text-sm leading-relaxed">
-                        Yes! Both Digital Invoice and NestPOS come with a 14-day free trial. No credit card required. You get full access to all features during the trial period with up to 20 invoices/transactions.
+                <div class="card-hover bg-white rounded-2xl border border-gray-200 p-6 text-center">
+                    <div class="w-11 h-11 bg-emerald-50 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     </div>
-                </div>
-
-                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <button @click="open = open === 5 ? null : 5" class="w-full flex items-center justify-between p-6 text-left">
-                        <span class="text-base font-semibold text-gray-900">How does FBR/PRA compliance work?</span>
-                        <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 5 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                    </button>
-                    <div x-show="open === 5" x-collapse class="px-6 pb-6 text-gray-600 text-sm leading-relaxed">
-                        <strong>FBR (Digital Invoice):</strong> Uses PRAL API v1.12 for real-time synchronous invoice submission to FBR. Invoices are validated, scored for compliance, and submitted with HS codes, tax rates, and QR codes.<br><br>
-                        <strong>NestPOS:</strong> Uses PRAL IMS API v1.2 for fiscal device integration. Each transaction is fiscalized and assigned a PRA fiscal invoice number with QR code for receipt printing.
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <button @click="open = open === 6 ? null : 6" class="w-full flex items-center justify-between p-6 text-left">
-                        <span class="text-base font-semibold text-gray-900">What security measures are in place?</span>
-                        <svg class="w-5 h-5 text-gray-500 transition-transform" :class="open === 6 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                    </button>
-                    <div x-show="open === 6" x-collapse class="px-6 pb-6 text-gray-600 text-sm leading-relaxed">
-                        TaxNest uses SHA-256 encrypted immutable audit logs, role-based access control, company isolation middleware, 6-phase idempotency shield for duplicate prevention, and HTTPS encryption. All critical operations are logged with tamper-proof hashing.
-                    </div>
+                    <h3 class="text-[14px] font-semibold text-gray-900 mb-1">Location</h3>
+                    <p class="text-[13px] text-gray-500">Pakistan</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <section id="contact" class="py-20 bg-white">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-12">
-                <p class="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-2">Get in Touch</p>
-                <h2 class="text-3xl sm:text-4xl font-extrabold text-gray-900">Contact Us</h2>
-                <p class="mt-4 text-lg text-gray-500">Have questions? We're here to help you choose the right solution.</p>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="bg-gray-50 rounded-2xl border border-gray-100 p-6 text-center">
-                    <div class="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                    </div>
-                    <h3 class="font-semibold text-gray-900 mb-1">Email</h3>
-                    <p class="text-sm text-gray-500">support@taxnest.com</p>
-                </div>
-                <div class="bg-gray-50 rounded-2xl border border-gray-100 p-6 text-center">
-                    <div class="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                    </div>
-                    <h3 class="font-semibold text-gray-900 mb-1">Phone</h3>
-                    <p class="text-sm text-gray-500">+92-XXX-XXXXXXX</p>
-                </div>
-                <div class="bg-gray-50 rounded-2xl border border-gray-100 p-6 text-center">
-                    <div class="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                    </div>
-                    <h3 class="font-semibold text-gray-900 mb-1">Location</h3>
-                    <p class="text-sm text-gray-500">Pakistan</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section class="py-16 bg-gradient-to-r from-emerald-600 via-teal-600 to-purple-600">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 class="text-3xl font-bold text-white mb-4">Ready to Get Compliant?</h2>
-            <p class="text-white/80 mb-8 text-lg">Choose a product to explore features, pricing, and get started.</p>
-            <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <a href="/digital-invoice" class="px-8 py-4 bg-white text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-50 transition shadow-lg w-full sm:w-auto flex items-center justify-center gap-2">
+    <section class="py-20 bg-[#0a0f1a] relative overflow-hidden">
+        <div class="hero-glow absolute inset-0 opacity-50"></div>
+        <div class="max-w-3xl mx-auto px-5 sm:px-8 text-center relative">
+            <h2 class="text-[28px] sm:text-[32px] font-bold text-white tracking-tight mb-4">Ready to Get Compliant?</h2>
+            <p class="text-gray-400 mb-8 text-[17px]">Choose a product to explore features, pricing, and get started.</p>
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <a href="/digital-invoice" class="btn-glow px-7 py-3.5 bg-emerald-500 text-white rounded-[10px] text-[15px] font-semibold hover:bg-emerald-600 w-full sm:w-auto flex items-center justify-center gap-2">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                     Digital Invoice
                 </a>
-                <a href="/pos" class="px-8 py-4 bg-white/20 text-white border-2 border-white/40 rounded-xl text-sm font-bold hover:bg-white/30 transition w-full sm:w-auto flex items-center justify-center gap-2">
+                <a href="/pos" class="px-7 py-3.5 bg-white/[0.06] text-gray-300 border border-white/[0.1] rounded-[10px] text-[15px] font-semibold hover:bg-white/[0.1] hover:text-white transition w-full sm:w-auto flex items-center justify-center gap-2">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     PRA POS
                 </a>
@@ -559,47 +449,66 @@
         </div>
     </section>
 
-    <footer class="bg-gray-900 pt-12 pb-6">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-8 pb-8 border-b border-gray-800">
+    <footer class="bg-[#0a0f1a] border-t border-white/[0.06] pt-14 pb-8">
+        <div class="max-w-[1200px] mx-auto px-5 sm:px-8">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-8 pb-10 border-b border-white/[0.06]">
                 <div>
                     <div class="flex items-center space-x-2 mb-4">
                         <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
                             <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                         </div>
-                        <span class="text-sm font-bold text-white">TaxNest</span>
+                        <span class="text-[14px] font-bold text-white">TaxNest</span>
                     </div>
-                    <p class="text-xs text-gray-400 leading-relaxed">Pakistan's most advanced tax compliance platform.</p>
+                    <p class="text-[12px] text-gray-500 leading-relaxed">Pakistan's most advanced tax compliance platform.</p>
                 </div>
                 <div>
-                    <h4 class="text-xs font-semibold text-white uppercase tracking-wider mb-3">Products</h4>
-                    <div class="space-y-2">
-                        <a href="/digital-invoice" class="block text-sm text-gray-400 hover:text-emerald-400 transition">Digital Invoice</a>
-                        <a href="/pos" class="block text-sm text-gray-400 hover:text-purple-400 transition">PRA POS</a>
-                    </div>
-                </div>
-                <div>
-                    <h4 class="text-xs font-semibold text-white uppercase tracking-wider mb-3">Platform</h4>
-                    <div class="space-y-2">
-                        <a href="#features" class="block text-sm text-gray-400 hover:text-white transition">Features</a>
-                        <a href="#pricing" class="block text-sm text-gray-400 hover:text-white transition">Pricing</a>
-                        <a href="#faq" class="block text-sm text-gray-400 hover:text-white transition">FAQ</a>
+                    <h4 class="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-4">Products</h4>
+                    <div class="space-y-2.5">
+                        <a href="/digital-invoice" class="block text-[13px] text-gray-500 hover:text-emerald-400 transition">Digital Invoice</a>
+                        <a href="/pos" class="block text-[13px] text-gray-500 hover:text-purple-400 transition">PRA POS</a>
                     </div>
                 </div>
                 <div>
-                    <h4 class="text-xs font-semibold text-white uppercase tracking-wider mb-3">Compliance</h4>
-                    <div class="space-y-2">
-                        <span class="flex items-center text-xs text-gray-400"><svg class="w-3.5 h-3.5 mr-1.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>FBR API v1.12</span>
-                        <span class="flex items-center text-xs text-gray-400"><svg class="w-3.5 h-3.5 mr-1.5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>PRA IMS v1.2</span>
-                        <span class="flex items-center text-xs text-gray-400"><svg class="w-3.5 h-3.5 mr-1.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>SHA-256 Encrypted</span>
+                    <h4 class="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-4">Resources</h4>
+                    <div class="space-y-2.5">
+                        <a href="#features" class="block text-[13px] text-gray-500 hover:text-white transition">Documentation</a>
+                        <a href="#features" class="block text-[13px] text-gray-500 hover:text-white transition">API Guide</a>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-4">Company</h4>
+                    <div class="space-y-2.5">
+                        <a href="#faq" class="block text-[13px] text-gray-500 hover:text-white transition">About</a>
+                        <a href="#contact" class="block text-[13px] text-gray-500 hover:text-white transition">Contact</a>
                     </div>
                 </div>
             </div>
-            <div class="pt-6 text-center">
-                <p class="text-xs text-gray-500">&copy; {{ date('Y') }} TaxNest. All rights reserved.</p>
+            <div class="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <p class="text-[12px] text-gray-600">&copy; {{ date('Y') }} TaxNest. All rights reserved.</p>
+                <div class="flex items-center space-x-5">
+                    <span class="flex items-center text-[11px] text-gray-600"><svg class="w-3 h-3 mr-1 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>FBR API v1.12</span>
+                    <span class="flex items-center text-[11px] text-gray-600"><svg class="w-3 h-3 mr-1 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>PRA IMS v1.2</span>
+                    <span class="flex items-center text-[11px] text-gray-600"><svg class="w-3 h-3 mr-1 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>SHA-256</span>
+                </div>
             </div>
         </div>
     </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const observer = new IntersectionObserver(function(entries) {
+                entries.forEach(function(entry) {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                    }
+                });
+            }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+            document.querySelectorAll('.fade-up').forEach(function(el) {
+                observer.observe(el);
+            });
+        });
+    </script>
 
 </body>
 </html>

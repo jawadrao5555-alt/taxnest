@@ -1,0 +1,199 @@
+8421"}
+TAXNEST PREMIUM UI POLISH
+
+Goal:
+Upgrade the current TaxNest landing UI to a premium SaaS look similar to Stripe, Vercel, or Notion.
+
+Do NOT change backend logic.  
+This task is strictly UI/UX polish.
+
+------------------------------------------------
+
+1. TYPOGRAPHY UPGRADE
+
+Replace default font with a premium SaaS font stack.
+
+Primary font:
+Inter
+
+Font hierarchy:
+
+Hero Title:
+font-weight: 700
+font-size: 56px
+
+Section titles:
+font-weight: 600
+font-size: 32px
+
+Body text:
+font-weight: 400
+font-size: 18px
+
+------------------------------------------------
+
+2. HERO SECTION REDESIGN
+
+Current hero looks flat.
+
+Improve with:
+
+• soft radial gradient background
+• centered container (max-width 1200px)
+• more vertical spacing
+• stronger headline
+
+Example structure:
+
+Badge:
+"FBR + PRA COMPLIANT PLATFORM"
+
+Headline:
+TaxNest — Pakistan's Most Advanced
+Tax Compliance Platform
+
+Subtext:
+Manage FBR Digital Invoicing and PRA POS
+in one secure enterprise platform.
+
+Primary button:
+Start Free Trial
+
+Secondary button:
+Explore Products
+
+------------------------------------------------
+
+3. PRODUCT CARDS (MOST IMPORTANT)
+
+Digital Invoice and PRA POS must appear as two premium cards.
+
+Card style:
+
+white background
+border radius: 16px
+soft shadow
+hover elevation
+
+Card content:
+
+Icon
+Title
+Short description
+"Explore" button
+
+Layout:
+
+[ Digital Invoice ]    [ PRA POS ]
+
+------------------------------------------------
+
+4. BUTTON STYLE
+
+Replace flat buttons with modern SaaS buttons.
+
+Primary button:
+
+background: emerald gradient
+border radius: 10px
+padding: 14px 26px
+font-weight: 600
+
+Hover effect:
+slight lift + darker gradient
+
+------------------------------------------------
+
+5. STATISTICS SECTION
+
+Improve KPI blocks.
+
+Current:
+flat rectangles
+
+Upgrade:
+
+Glass cards
+soft shadow
+icon above number
+
+Example:
+
+99.9%
+Uptime SLA
+
+50k+
+Invoices Processed
+
+------------------------------------------------
+
+6. SECTION SPACING
+
+Increase vertical spacing.
+
+Each section must have:
+
+padding-top: 120px
+padding-bottom: 120px
+
+Content container max-width:
+1200px
+
+------------------------------------------------
+
+7. FEATURE ICONS
+
+Add icon + text rows.
+
+Example:
+
+✓ Real-time FBR PRAL API submission  
+✓ PRA POS fiscal reporting  
+✓ Offline billing + auto sync  
+✓ Inventory + reporting engine  
+
+Icons should be outline style (Heroicons).
+
+------------------------------------------------
+
+8. FOOTER IMPROVEMENT
+
+Footer must include 3 columns:
+
+Products
+Digital Invoice
+PRA POS
+
+Resources
+Documentation
+API Guide
+
+Company
+About
+Contact
+
+------------------------------------------------
+
+9. ANIMATION (SUBTLE)
+
+Add small animations:
+
+hover card lift
+button hover glow
+fade-in sections on scroll
+
+Use Alpine.js or simple CSS transitions.
+
+------------------------------------------------
+
+10. FINAL RESULT
+
+The landing page should feel like a modern SaaS product website.
+
+Reference inspiration:
+
+Stripe.com
+Vercel.com
+Linear.app
+
+TaxNest must look like a professional enterprise platform, not a basic admin tem

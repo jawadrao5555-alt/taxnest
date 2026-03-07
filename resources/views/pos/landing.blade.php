@@ -244,14 +244,7 @@
                 @php
                     $isPopular = $plan->name === 'Business';
                     $perMonth = round($plan->price / 12);
-                    $features = [];
-                    if ($plan->name === 'Starter') {
-                        $features = ['1 POS Terminal', 'POS Billing', 'Thermal Receipt', 'Cash / Card / QR Payments', 'Basic Reports'];
-                    } elseif ($plan->name === 'Business') {
-                        $features = ['3 POS Terminals', 'POS Billing', 'Offline Billing', 'PRA Integration', 'Advanced Reports', 'Multi-terminal Support'];
-                    } elseif ($plan->name === 'Pro') {
-                        $features = ['Unlimited Terminals', 'PRA Fiscal Reporting', 'Inventory Module', 'Advanced Analytics', 'Priority Support'];
-                    }
+                    $features = is_array($plan->features) ? $plan->features : (is_string($plan->features) ? json_decode($plan->features, true) : []);
                 @endphp
                 <div class="relative rounded-2xl overflow-hidden transition duration-300 hover:-translate-y-1 {{ $isPopular ? 'ring-2 ring-purple-500 shadow-xl shadow-purple-500/10' : 'shadow-md' }}">
                     @if($isPopular)
@@ -268,12 +261,23 @@
                         <p class="text-sm text-gray-600">Rs. {{ number_format($perMonth) }}/mo effective</p>
 
                         <div class="mt-5 pt-5 border-t border-gray-100 space-y-3">
-                            @foreach($features as $feature)
-                            <div class="flex items-center gap-2.5">
-                                <svg class="w-4.5 h-4.5 text-purple-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                                <span class="text-sm text-gray-800 font-medium">{{ $feature }}</span>
-                            </div>
-                            @endforeach
+                            @if(!empty($features))
+                                @foreach($features as $feature)
+                                <div class="flex items-center gap-2.5">
+                                    <svg class="w-4.5 h-4.5 text-purple-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                    <span class="text-sm text-gray-800 font-medium">{{ $feature }}</span>
+                                </div>
+                                @endforeach
+                            @else
+                                <div class="flex items-center gap-2.5">
+                                    <svg class="w-4.5 h-4.5 text-purple-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                    <span class="text-sm text-gray-800 font-medium">POS Billing</span>
+                                </div>
+                                <div class="flex items-center gap-2.5">
+                                    <svg class="w-4.5 h-4.5 text-purple-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                    <span class="text-sm text-gray-800 font-medium">PRA fiscal receipts</span>
+                                </div>
+                            @endif
                         </div>
 
                         <div class="mt-6">

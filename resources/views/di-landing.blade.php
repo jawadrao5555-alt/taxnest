@@ -311,27 +311,27 @@
                         </div>
                         <p class="text-xs text-emerald-600 font-medium">Save up to 6% on annual billing</p>
 
+                        @php
+                            $diFeatures = is_array($plan->features) ? $plan->features : (is_string($plan->features) ? json_decode($plan->features, true) : []);
+                        @endphp
                         <div class="mt-4 pt-4 border-t border-gray-100 space-y-2 text-sm text-gray-600">
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                {{ $plan->invoice_limit > 0 ? number_format($plan->invoice_limit) . ' invoices/mo' : 'Unlimited invoices' }}
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                {{ ($plan->user_limit ?? 0) > 0 ? $plan->user_limit : (($plan->user_limit ?? 0) == -1 ? 'Unlimited' : ($plan->max_users ?? 'N/A')) }} users
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                FBR real-time submission
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                HS Intelligence + PDF/QR
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Customer ledger + analytics
-                            </div>
+                            @if(!empty($diFeatures))
+                                @foreach($diFeatures as $feature)
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    {{ $feature }}
+                                </div>
+                                @endforeach
+                            @else
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    {{ $plan->invoice_limit > 0 ? number_format($plan->invoice_limit) . ' invoices/mo' : 'Unlimited invoices' }}
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    FBR real-time submission
+                                </div>
+                            @endif
                         </div>
 
                         <div class="mt-5">

@@ -13,14 +13,22 @@ class PricingPlan extends Model
         'branch_limit',
         'is_trial',
         'price',
+        'price_monthly',
         'features',
         'product_type',
+        'max_terminals',
+        'max_users',
+        'max_products',
+        'inventory_enabled',
+        'reports_enabled',
     ];
 
     protected $casts = [
         'features' => 'array',
         'is_trial' => 'boolean',
         'price' => 'decimal:2',
+        'inventory_enabled' => 'boolean',
+        'reports_enabled' => 'boolean',
     ];
 
     public function subscriptions()

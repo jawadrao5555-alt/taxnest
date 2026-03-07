@@ -11,8 +11,9 @@ class AdminPlanController extends Controller
 {
     public function index()
     {
-        $plans = PricingPlan::orderBy('price')->get();
-        return view('saas-admin.plans', compact('plans'));
+        $diPlans = PricingPlan::where('product_type', 'di')->orderBy('price')->get();
+        $posPlans = PricingPlan::where('product_type', 'pos')->orderBy('price')->get();
+        return view('saas-admin.plans', compact('diPlans', 'posPlans'));
     }
 
     public function store(Request $request)
@@ -21,18 +22,25 @@ class AdminPlanController extends Controller
             'name' => 'required|string|max:100',
             'price' => 'required|numeric|min:0',
             'invoice_limit' => 'required|integer|min:-1',
+            'product_type' => 'required|in:di,pos',
             'max_terminals' => 'nullable|integer|min:-1',
             'max_users' => 'nullable|integer|min:-1',
             'max_products' => 'nullable|integer|min:-1',
             'inventory_enabled' => 'boolean',
             'reports_enabled' => 'boolean',
+            'features_text' => 'nullable|string',
         ]);
 
-        $plan = PricingPlan::create(array_merge($request->all(), [
-            'price_monthly' => $request->price,
+        $features = array_filter(array_map('trim', explode("\n", $request->input('features_text', ''))));
+
+        $plan = PricingPlan::create(array_merge($request->except('features_text'), [
+            'price_monthly' => $request->product_type === 'di' ? $request->price : null,
+            'features' => $features,
+            'inventory_enabled' => $request->boolean('inventory_enabled'),
+            'reports_enabled' => $request->boolean('reports_enabled'),
         ]));
 
-        AdminAuditLog::log(auth('admin')->id(), 'Plan created', 'PricingPlan', $plan->id, ['name' => $plan->name]);
+        AdminAuditLog::log(auth('admin')->id(), 'Plan created', 'PricingPlan', $plan->id, ['name' => $plan->name, 'product_type' => $plan->product_type]);
         return back()->with('success', "Plan '{$plan->name}' created.");
     }
 
@@ -44,18 +52,23 @@ class AdminPlanController extends Controller
             'name' => 'required|string|max:100',
             'price' => 'required|numeric|min:0',
             'invoice_limit' => 'required|integer|min:-1',
+            'product_type' => 'required|in:di,pos',
             'max_terminals' => 'nullable|integer|min:-1',
             'max_users' => 'nullable|integer|min:-1',
             'max_products' => 'nullable|integer|min:-1',
+            'features_text' => 'nullable|string',
         ]);
 
-        $plan->update(array_merge($request->all(), [
-            'price_monthly' => $request->price,
+        $features = array_filter(array_map('trim', explode("\n", $request->input('features_text', ''))));
+
+        $plan->update(array_merge($request->except('features_text'), [
+            'price_monthly' => $request->product_type === 'di' ? $request->price : null,
+            'features' => $features,
             'inventory_enabled' => $request->boolean('inventory_enabled'),
             'reports_enabled' => $request->boolean('reports_enabled'),
         ]));
 
-        AdminAuditLog::log(auth('admin')->id(), 'Plan updated', 'PricingPlan', $plan->id, ['name' => $plan->name]);
+        AdminAuditLog::log(auth('admin')->id(), 'Plan updated', 'PricingPlan', $plan->id, ['name' => $plan->name, 'product_type' => $plan->product_type]);
         return back()->with('success', "Plan '{$plan->name}' updated.");
     }
 }

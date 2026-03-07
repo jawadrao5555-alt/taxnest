@@ -1,0 +1,116 @@
+TAXNEST NAVIGATION FIX — REMOVE HAMBURGER MENU
+
+Problem:
+Current mobile layout hides navigation items inside a hamburger menu (three-line icon). This is not acceptable for the product design.
+
+Goal:
+Always display main product buttons directly in the header navigation.
+
+---------------------------------
+
+1. REMOVE HAMBURGER MENU
+
+Remove the mobile hamburger navigation icon.
+
+Do not collapse the menu into a hidden dropdown.
+
+Navigation must remain visible on all screen sizes.
+
+---------------------------------
+
+2. HEADER NAVIGATION STRUCTURE
+
+Top navigation must contain these visible buttons:
+
+TaxNest Logo
+
+Digital Invoice
+PRA POS
+Pricing
+Documentation
+Contact
+
+Buttons must remain visible horizontally.
+
+---------------------------------
+
+3. PRODUCT BUTTON STYLE
+
+Use pill-style buttons for the two main products:
+
+Primary Button:
+Digital Invoice
+
+Secondary Button:
+PRA POS
+
+Both must be clearly visible and clickable.
+
+---------------------------------
+
+4. PRODUCT ROUTING
+
+Digital Invoice button → /digital-invoice
+
+PRA POS button → /pos
+
+Each must open its own landing page.
+
+---------------------------------
+
+5. LOGIN / SIGNUP
+
+Login and signup should NOT appear in the header.
+
+They must exist inside the respective landing pages.
+
+Digital Invoice page:
+Start Free Trial
+Sign In
+
+PRA POS page:
+Start POS Trial
+POS Login
+
+---------------------------------
+
+6. FOOTER PRODUCT BUTTONS
+
+Footer must include a product section with clear buttons:
+
+Products
+- Digital Invoice
+- PRA POS
+
+Each linking to its landing page.
+
+---------------------------------
+
+7. MOBILE RESPONSIVE RULE
+
+On mobile screens:
+
+Navigation buttons must wrap to two lines if needed.
+
+Example:
+
+Digital Invoice | PRA POS
+Pricing | Docs | Contact
+
+Do NOT hide them inside a hamburger menu.
+
+---------------------------------
+
+8. DESIGN IMPROVEMENT
+
+Use a cleaner SaaS header style:
+
+White background
+Subtle border bottom
+Soft shadows
+Consistent spacing
+
+---------------------------------
+
+Do NOT modify backend routes or authentication.
+This change is strictly navigation and layout.

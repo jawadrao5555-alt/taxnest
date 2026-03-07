@@ -369,27 +369,12 @@
         </div>
     </section>
 
-    <footer class="bg-gray-900 py-8">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex flex-col md:flex-row items-center justify-between">
-                <div class="flex items-center space-x-2 mb-4 md:mb-0">
-                    <div class="w-6 h-6 rounded bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
-                        <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                    </div>
-                    <span class="text-sm font-bold text-white">NestPOS</span>
-                    <span class="text-xs text-gray-500 ml-2">by TaxNest</span>
-                </div>
-                <div class="flex items-center space-x-6 text-sm text-gray-400">
-                    <a href="/" class="hover:text-white transition">TaxNest Home</a>
-                    <a href="/di" class="hover:text-white transition">Digital Invoice (FBR)</a>
-                    <button @click="showLoginModal = true" class="hover:text-white transition">POS Login</button>
-                </div>
-            </div>
-            <div class="mt-6 pt-6 border-t border-gray-800 text-center">
-                <p class="text-xs text-gray-500">&copy; {{ date('Y') }} TaxNest. All rights reserved. PRA IMS v1.2 Integrated.</p>
-            </div>
+    <div class="bg-gray-900 py-4">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <p class="text-xs text-gray-500">&copy; {{ date('Y') }} TaxNest. All rights reserved.</p>
+            <span class="text-xs text-gray-500 flex items-center"><svg class="w-3.5 h-3.5 mr-1 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>PRA IMS v1.2 Integrated</span>
         </div>
-    </footer>
+    </div>
 
 </body>
 </html>

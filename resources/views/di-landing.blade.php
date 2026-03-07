@@ -404,32 +404,17 @@
             <p class="text-emerald-100 mb-8">Start your 14-day free trial. No credit card required.</p>
             <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <a href="/register" class="px-8 py-3.5 bg-white text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-50 transition shadow-lg">Create Free Account</a>
-                <a href="/login" class="px-8 py-3.5 border-2 border-white/40 text-white rounded-xl text-sm font-bold hover:bg-white/10 transition">Login to Dashboard</a>
+                <button @click="showLoginModal = true" class="px-8 py-3.5 border-2 border-white/40 text-white rounded-xl text-sm font-bold hover:bg-white/10 transition">Login to Dashboard</button>
             </div>
         </div>
     </section>
 
-    <footer class="bg-gray-900 py-8">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex flex-col md:flex-row items-center justify-between">
-                <div class="flex items-center space-x-2 mb-4 md:mb-0">
-                    <div class="w-6 h-6 rounded bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
-                        <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                    </div>
-                    <span class="text-sm font-bold text-white">Digital Invoice</span>
-                    <span class="text-xs text-gray-500 ml-2">by TaxNest</span>
-                </div>
-                <div class="flex items-center space-x-6 text-sm text-gray-400">
-                    <a href="/" class="hover:text-white transition">TaxNest Home</a>
-                    <a href="/pos" class="hover:text-white transition">PRA POS</a>
-                    <button @click="showLoginModal = true" class="hover:text-white transition">DI Login</button>
-                </div>
-            </div>
-            <div class="mt-6 pt-6 border-t border-gray-800 text-center">
-                <p class="text-xs text-gray-500">&copy; {{ date('Y') }} TaxNest. All rights reserved. FBR API v1.12 Integrated.</p>
-            </div>
+    <div class="bg-gray-900 py-4">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <p class="text-xs text-gray-500">&copy; {{ date('Y') }} TaxNest. All rights reserved.</p>
+            <span class="text-xs text-gray-500 flex items-center"><svg class="w-3.5 h-3.5 mr-1 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>FBR API v1.12 Integrated</span>
         </div>
-    </footer>
+    </div>
 
 </body>
 </html>

@@ -531,67 +531,30 @@
     <section class="py-16 bg-gradient-to-r from-emerald-600 via-teal-600 to-purple-600">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h2 class="text-3xl font-bold text-white mb-4">Ready to Get Compliant?</h2>
-            <p class="text-white/80 mb-8 text-lg">Start your 14-day free trial. No credit card required. Choose the product that fits your business.</p>
+            <p class="text-white/80 mb-8 text-lg">Choose a product to explore features, pricing, and get started.</p>
             <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <a href="/register" class="px-8 py-4 bg-white text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-50 transition shadow-lg w-full sm:w-auto flex items-center justify-center gap-2">
+                <a href="/di" class="px-8 py-4 bg-white text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-50 transition shadow-lg w-full sm:w-auto flex items-center justify-center gap-2">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                    Start Digital Invoice
+                    Digital Invoice
                 </a>
-                <a href="/pos/register" class="px-8 py-4 bg-white/20 text-white border-2 border-white/40 rounded-xl text-sm font-bold hover:bg-white/30 transition w-full sm:w-auto flex items-center justify-center gap-2">
+                <a href="/pos" class="px-8 py-4 bg-white/20 text-white border-2 border-white/40 rounded-xl text-sm font-bold hover:bg-white/30 transition w-full sm:w-auto flex items-center justify-center gap-2">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                    Start NestPOS
+                    PRA POS
                 </a>
             </div>
         </div>
     </section>
 
-    <footer class="bg-gray-900 py-12">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
-                <div>
-                    <div class="flex items-center space-x-2 mb-4">
-                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
-                            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                        </div>
-                        <span class="text-lg font-bold text-white">TaxNest</span>
-                    </div>
-                    <p class="text-sm text-gray-400 leading-relaxed">Pakistan's most advanced tax compliance platform. FBR + PRA integrated.</p>
-                </div>
-                <div>
-                    <h4 class="text-sm font-semibold text-white uppercase tracking-wider mb-4">Digital Invoice</h4>
-                    <div class="space-y-2">
-                        <a href="/di" class="block text-sm text-gray-400 hover:text-emerald-400 transition">View Product</a>
-                        <a href="/login" class="block text-sm text-gray-400 hover:text-emerald-400 transition">DI Login</a>
-                        <a href="/register" class="block text-sm text-gray-400 hover:text-emerald-400 transition">DI Sign Up</a>
-                    </div>
-                </div>
-                <div>
-                    <h4 class="text-sm font-semibold text-white uppercase tracking-wider mb-4">PRA POS</h4>
-                    <div class="space-y-2">
-                        <a href="/pos" class="block text-sm text-gray-400 hover:text-purple-400 transition">View Product</a>
-                        <a href="/pos/login" class="block text-sm text-gray-400 hover:text-purple-400 transition">POS Login</a>
-                        <a href="/pos/register" class="block text-sm text-gray-400 hover:text-purple-400 transition">POS Sign Up</a>
-                    </div>
-                </div>
-                <div>
-                    <h4 class="text-sm font-semibold text-white uppercase tracking-wider mb-4">Platform</h4>
-                    <div class="space-y-2">
-                        <a href="#features" class="block text-sm text-gray-400 hover:text-white transition">Features</a>
-                        <a href="#faq" class="block text-sm text-gray-400 hover:text-white transition">FAQ</a>
-                        <a href="/admin/login" class="block text-sm text-gray-400 hover:text-white transition">Admin Login</a>
-                    </div>
-                </div>
-            </div>
-            <div class="mt-8 pt-8 border-t border-gray-800 flex flex-col md:flex-row items-center justify-between">
-                <p class="text-sm text-gray-500">&copy; {{ date('Y') }} TaxNest. All rights reserved.</p>
-                <div class="flex items-center space-x-4 mt-4 md:mt-0">
-                    <span class="text-xs text-gray-500 flex items-center"><svg class="w-3.5 h-3.5 mr-1 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>FBR API v1.12</span>
-                    <span class="text-xs text-gray-500 flex items-center"><svg class="w-3.5 h-3.5 mr-1 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>PRA IMS v1.2</span>
-                    <span class="text-xs text-gray-500 flex items-center"><svg class="w-3.5 h-3.5 mr-1 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>SHA-256</span>
-                </div>
+    <div class="bg-gray-900 py-4">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <p class="text-xs text-gray-500">&copy; {{ date('Y') }} TaxNest. All rights reserved.</p>
+            <div class="flex items-center space-x-4">
+                <span class="text-xs text-gray-500 flex items-center"><svg class="w-3.5 h-3.5 mr-1 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>FBR API v1.12</span>
+                <span class="text-xs text-gray-500 flex items-center"><svg class="w-3.5 h-3.5 mr-1 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>PRA IMS v1.2</span>
+                <span class="text-xs text-gray-500 flex items-center"><svg class="w-3.5 h-3.5 mr-1 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>SHA-256</span>
             </div>
         </div>
-    </footer>
+    </div>
 
 </body>
 </html>

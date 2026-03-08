@@ -10,8 +10,64 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
         body { font-family: 'Figtree', sans-serif; }
-        .di-gradient { background: linear-gradient(135deg, #064e3b 0%, #059669 40%, #34d399 70%, #a7f3d0 100%); }
+        .di-gradient {
+            background: linear-gradient(135deg, #022c22 0%, #065f46 40%, #059669 80%, #065f46 100%);
+            position: relative;
+        }
+        .di-gradient::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+            opacity: 0.4;
+            pointer-events: none;
+        }
         [x-cloak] { display: none !important; }
+        @keyframes di-float {
+            0%, 100% { transform: translateY(0px) scale(1); }
+            50% { transform: translateY(-30px) scale(1.05); }
+        }
+        @keyframes di-float-reverse {
+            0%, 100% { transform: translateY(0px) scale(1.05); }
+            50% { transform: translateY(20px) scale(1); }
+        }
+        @keyframes di-pulse-glow {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .di-orb-1 { animation: di-float 8s ease-in-out infinite; }
+        .di-orb-2 { animation: di-float-reverse 10s ease-in-out infinite; }
+        .di-orb-3 { animation: di-float 12s ease-in-out infinite 2s; }
+        .di-hero-heading { text-shadow: 0 2px 20px rgba(0,0,0,0.15), 0 4px 40px rgba(5,150,105,0.2); }
+        .di-card-accent { position: relative; overflow: hidden; }
+        .di-card-accent::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #10b981, #14b8a6, #059669);
+            border-radius: 12px 12px 0 0;
+        }
+        .di-step-connector {
+            position: relative;
+        }
+        .di-step-connector::after {
+            content: '';
+            position: absolute;
+            top: 28px;
+            left: calc(50% + 35px);
+            width: calc(100% - 70px);
+            height: 2px;
+            background: linear-gradient(90deg, #10b981, #d1fae5);
+        }
+        .di-step-connector:last-child::after {
+            display: none;
+        }
+        @media (max-width: 639px) {
+            .di-step-connector::after { display: none; }
+        }
     </style>
 </head>
 <body class="antialiased text-gray-800 overflow-x-hidden" style="scroll-behavior: smooth;" x-data="{ showLoginModal: {{ isset($showLogin) && $showLogin ? 'true' : 'false' }} }">
@@ -105,25 +161,26 @@
     </nav>
 
     <section class="di-gradient pt-32 pb-24 lg:pb-28 relative overflow-hidden">
-        <div class="absolute inset-0 opacity-10">
-            <div class="absolute top-20 left-10 w-72 h-72 bg-white rounded-full blur-3xl"></div>
-            <div class="absolute bottom-10 right-20 w-96 h-96 bg-emerald-200 rounded-full blur-3xl"></div>
+        <div class="absolute inset-0">
+            <div class="di-orb-1 absolute top-10 left-[10%] w-72 h-72 bg-emerald-400/15 rounded-full blur-3xl"></div>
+            <div class="di-orb-2 absolute bottom-10 right-[15%] w-96 h-96 bg-teal-300/10 rounded-full blur-3xl"></div>
+            <div class="di-orb-3 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-emerald-500/8 rounded-full blur-3xl" style="animation: di-pulse-glow 6s ease-in-out infinite;"></div>
         </div>
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div class="text-center max-w-3xl mx-auto">
-                <div class="inline-flex items-center px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 mb-6">
-                    <span class="text-sm font-semibold text-white">FBR PRAL API v1.12 Integrated</span>
+                <div class="inline-flex items-center px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 mb-6">
+                    <span class="text-sm font-semibold text-emerald-200">FBR PRAL API v1.12 Integrated</span>
                 </div>
-                <h1 class="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight">
+                <h1 class="di-hero-heading text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight">
                     Digital Invoice<br>
-                    <span class="text-emerald-100">FBR Tax Compliance</span>
+                    <span class="text-emerald-200/90">FBR Tax Compliance</span>
                 </h1>
-                <p class="mt-6 text-base sm:text-lg text-emerald-100 max-w-2xl mx-auto">
+                <p class="mt-6 text-base sm:text-lg text-emerald-100/80 max-w-2xl mx-auto">
                     Enterprise-grade FBR digital invoicing. Real-time synchronous submission via PRAL API v1.12, HS Intelligence, compliance scoring, risk detection, and immutable audit logs.
                 </p>
                 <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <a href="/register" class="w-full sm:w-auto px-8 py-3.5 bg-white text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-50 transition shadow-lg text-center">Start 14-Day Free Trial</a>
-                    <button @click="showLoginModal = true" class="w-full sm:w-auto px-8 py-3.5 border-2 border-white/40 text-white rounded-xl text-sm font-bold hover:bg-white/10 transition">Login to Dashboard</button>
+                    <a href="/register" class="w-full sm:w-auto px-8 py-3.5 bg-white text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-50 transition shadow-2xl shadow-white/20 text-center">Start 14-Day Free Trial</a>
+                    <button @click="showLoginModal = true" class="w-full sm:w-auto px-8 py-3.5 border border-white/30 bg-white/5 backdrop-blur-sm text-white rounded-xl text-sm font-bold hover:bg-white/15 hover:border-white/50 transition">Login to Dashboard</button>
                 </div>
             </div>
         </div>
@@ -136,64 +193,64 @@
                 <p class="mt-4 text-gray-600 max-w-2xl mx-auto">Purpose-built for Pakistan's Federal Board of Revenue regulations with enterprise-grade infrastructure.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <div class="bg-gray-50 rounded-xl shadow-md p-6 border border-gray-100 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                    <div class="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center mb-4">
+                <div class="di-card-accent bg-white rounded-xl shadow-md p-6 border border-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Real-time FBR Submission</h3>
                     <p class="text-sm text-gray-600">Direct synchronous submission to FBR via PRAL API v1.12. Instant confirmation, automatic invoice locking, and QR code generation.</p>
                 </div>
-                <div class="bg-gray-50 rounded-xl shadow-md p-6 border border-gray-100 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                    <div class="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center mb-4">
+                <div class="di-card-accent bg-white rounded-xl shadow-md p-6 border border-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">HS Intelligence Engine</h3>
                     <p class="text-sm text-gray-600">AI-powered HS code suggestions with confidence scoring. Auto-suggests tax rates, SRO numbers, and learns from every submission.</p>
                 </div>
-                <div class="bg-gray-50 rounded-xl shadow-md p-6 border border-gray-100 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                    <div class="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center mb-4">
+                <div class="di-card-accent bg-white rounded-xl shadow-md p-6 border border-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Risk Detection Engine</h3>
                     <p class="text-sm text-gray-600">Pre-submission risk analysis with anomaly scoring. Blocks problematic invoices before they reach FBR.</p>
                 </div>
-                <div class="bg-gray-50 rounded-xl shadow-md p-6 border border-gray-100 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                    <div class="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center mb-4">
+                <div class="di-card-accent bg-white rounded-xl shadow-md p-6 border border-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Compliance Scoring</h3>
                     <p class="text-sm text-gray-600">Formula-based scoring system rates every invoice before submission. Ensures maximum compliance with FBR regulations.</p>
                 </div>
-                <div class="bg-gray-50 rounded-xl shadow-md p-6 border border-gray-100 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                    <div class="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center mb-4">
+                <div class="di-card-accent bg-white rounded-xl shadow-md p-6 border border-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">PDF + QR Generation</h3>
                     <p class="text-sm text-gray-600">FBR-compliant PDF invoices with watermarks, QR codes, and dual invoice numbering (internal + FBR).</p>
                 </div>
-                <div class="bg-gray-50 rounded-xl shadow-md p-6 border border-gray-100 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                    <div class="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center mb-4">
+                <div class="di-card-accent bg-white rounded-xl shadow-md p-6 border border-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Immutable Audit Logs</h3>
                     <p class="text-sm text-gray-600">SHA-256 signed audit trail with integrity verification. Tamper-proof activity tracking for compliance.</p>
                 </div>
-                <div class="bg-gray-50 rounded-xl shadow-md p-6 border border-gray-100 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                    <div class="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center mb-4">
+                <div class="di-card-accent bg-white rounded-xl shadow-md p-6 border border-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Multi-Branch Support</h3>
                     <p class="text-sm text-gray-600">Manage multiple business branches with centralized invoicing, customer ledger, and role-based access control.</p>
                 </div>
-                <div class="bg-gray-50 rounded-xl shadow-md p-6 border border-gray-100 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                    <div class="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center mb-4">
+                <div class="di-card-accent bg-white rounded-xl shadow-md p-6 border border-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Enterprise Analytics</h3>
                     <p class="text-sm text-gray-600">KPIs, compliance metrics, customer ledger analytics, and detailed MIS dashboards for business intelligence.</p>
                 </div>
-                <div class="bg-gray-50 rounded-xl shadow-md p-6 border border-gray-100 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                    <div class="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center mb-4">
+                <div class="di-card-accent bg-white rounded-xl shadow-md p-6 border border-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">6 Login Methods</h3>
@@ -257,13 +314,13 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto" x-data="{ cycle: 'monthly' }" x-init="$watch('cycle', () => {})" @click.window="cycle = $event.target.closest('[x-data]')?.querySelector ? cycle : cycle" x-effect="cycle = document.querySelector('[x-data] button.bg-emerald-600')?.textContent?.includes('Annual') ? 'annual' : document.querySelector('[x-data] button.bg-emerald-600')?.textContent?.includes('Semi') ? 'semi_annual' : document.querySelector('[x-data] button.bg-emerald-600')?.textContent?.includes('Quarterly') ? 'quarterly' : 'monthly'">
                 @foreach($plans as $plan)
                 @php $isPopular = $plan->name === 'Business'; @endphp
-                <div class="relative rounded-xl shadow-md overflow-hidden transition duration-300 hover:-translate-y-1 hover:shadow-xl {{ $isPopular ? 'ring-2 ring-emerald-500' : '' }}">
+                <div class="relative rounded-xl shadow-md overflow-hidden transition duration-300 hover:-translate-y-1 hover:shadow-xl {{ $isPopular ? 'ring-2 ring-emerald-400/80 shadow-lg shadow-emerald-500/10' : '' }}">
                     @if($isPopular)
-                    <div class="bg-emerald-600 text-center py-1.5">
+                    <div class="bg-gradient-to-r from-emerald-500 to-teal-500 text-center py-1.5">
                         <span class="text-white text-xs font-bold tracking-wide">BEST VALUE</span>
                     </div>
                     @endif
-                    <div class="bg-white border {{ $isPopular ? 'border-emerald-500 border-t-0 rounded-b-xl' : 'border-gray-200 rounded-xl' }} p-5">
+                    <div class="{{ $isPopular ? 'bg-gradient-to-b from-emerald-50/50 to-white border-emerald-400/30 border-t-0 rounded-b-xl' : 'bg-white border-gray-200 rounded-xl' }} border p-5">
                         <h3 class="text-lg font-bold text-gray-900">{{ $plan->name }}</h3>
                         <div class="mt-3 mb-1">
                             <span class="text-3xl font-black text-gray-900">Rs. {{ number_format($plan->price, 0) }}</span>
@@ -329,28 +386,28 @@
                 <p class="mt-4 text-gray-600">Simple 5-step process from invoice creation to FBR submission</p>
             </div>
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-6">
-                <div class="text-center">
-                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-700 text-white flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-md">1</div>
+                <div class="text-center di-step-connector">
+                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 text-white flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-lg shadow-emerald-500/25">1</div>
                     <h4 class="font-bold text-gray-900 mb-2">Create Invoice</h4>
                     <p class="text-xs text-gray-600">Add buyer details, line items, HS codes, and tax rates using the smart invoice builder</p>
                 </div>
-                <div class="text-center">
-                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-700 text-white flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-md">2</div>
+                <div class="text-center di-step-connector">
+                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 text-white flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-lg shadow-emerald-500/25">2</div>
                     <h4 class="font-bold text-gray-900 mb-2">AI Validation</h4>
                     <p class="text-xs text-gray-600">HS Intelligence auto-suggests codes, risk engine checks for anomalies, compliance score calculated</p>
                 </div>
-                <div class="text-center">
-                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-700 text-white flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-md">3</div>
+                <div class="text-center di-step-connector">
+                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 text-white flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-lg shadow-emerald-500/25">3</div>
                     <h4 class="font-bold text-gray-900 mb-2">Submit to FBR</h4>
                     <p class="text-xs text-gray-600">One-click real-time submission to FBR via PRAL API. Idempotency shield prevents duplicates</p>
                 </div>
-                <div class="text-center">
-                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-700 text-white flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-md">4</div>
+                <div class="text-center di-step-connector">
+                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 text-white flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-lg shadow-emerald-500/25">4</div>
                     <h4 class="font-bold text-gray-900 mb-2">FBR Confirmation</h4>
                     <p class="text-xs text-gray-600">Receive FBR invoice number, QR code, and confirmation. Invoice auto-locked for compliance</p>
                 </div>
-                <div class="text-center">
-                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-700 text-white flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-md">5</div>
+                <div class="text-center di-step-connector">
+                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 text-white flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-lg shadow-emerald-500/25">5</div>
                     <h4 class="font-bold text-gray-900 mb-2">Download PDF</h4>
                     <p class="text-xs text-gray-600">Generate FBR-compliant PDF with watermarks, QR codes, and dual invoice numbering</p>
                 </div>
@@ -358,18 +415,21 @@
         </div>
     </section>
 
-    <section class="py-24 lg:py-28 bg-gradient-to-r from-emerald-600 to-emerald-800">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 class="text-3xl font-bold text-white mb-4">Ready to Get FBR Compliant?</h2>
-            <p class="text-emerald-100 mb-8">Start your 14-day free trial. No credit card required.</p>
+    <section class="py-24 lg:py-28 bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-800 relative overflow-hidden">
+        <div class="absolute inset-0">
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-400/10 rounded-full blur-3xl"></div>
+        </div>
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+            <h2 class="text-3xl font-bold text-white mb-4 di-hero-heading">Ready to Get FBR Compliant?</h2>
+            <p class="text-emerald-100/80 mb-8">Start your 14-day free trial. No credit card required.</p>
             <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <a href="/register" class="w-full sm:w-auto px-8 py-3.5 bg-white text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-50 transition shadow-lg text-center">Create Free Account</a>
-                <button @click="showLoginModal = true" class="w-full sm:w-auto px-8 py-3.5 border-2 border-white/40 text-white rounded-xl text-sm font-bold hover:bg-white/10 transition">Login to Dashboard</button>
+                <a href="/register" class="w-full sm:w-auto px-8 py-3.5 bg-white text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-50 transition shadow-2xl shadow-white/15 text-center">Create Free Account</a>
+                <button @click="showLoginModal = true" class="w-full sm:w-auto px-8 py-3.5 border border-white/30 bg-white/5 backdrop-blur-sm text-white rounded-xl text-sm font-bold hover:bg-white/15 hover:border-white/50 transition">Login to Dashboard</button>
             </div>
         </div>
     </section>
 
-    <div class="bg-gray-900 py-4">
+    <div class="bg-gray-900 py-4 border-t border-gradient-to-r" style="border-image: linear-gradient(90deg, #10b981, #14b8a6, #059669) 1;">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
             <p class="text-xs text-gray-500">&copy; {{ date('Y') }} TaxNest. All rights reserved.</p>
             <span class="text-xs text-gray-500 flex items-center"><svg class="w-3.5 h-3.5 mr-1 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>FBR API v1.12 Integrated</span>

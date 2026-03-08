@@ -13,23 +13,63 @@
         [x-cloak] { display: none !important; }
         .fade-up { opacity: 0; transform: translateY(24px); transition: opacity 0.7s ease, transform 0.7s ease; }
         .fade-up.visible { opacity: 1; transform: translateY(0); }
-        .hero-glow { background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(16,185,129,0.18) 0%, transparent 70%), radial-gradient(ellipse 60% 50% at 80% 50%, rgba(139,92,246,0.1) 0%, transparent 60%); }
+        .hero-glow {
+            background:
+                radial-gradient(ellipse 80% 60% at 50% -10%, rgba(16,185,129,0.22) 0%, transparent 70%),
+                radial-gradient(ellipse 60% 50% at 80% 50%, rgba(139,92,246,0.14) 0%, transparent 60%),
+                radial-gradient(ellipse 40% 40% at 20% 80%, rgba(6,182,212,0.10) 0%, transparent 50%);
+        }
         .card-hover { transition: transform 0.3s ease, box-shadow 0.3s ease; }
         .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 40px -12px rgba(0,0,0,0.12); }
         .btn-glow { transition: all 0.25s ease; }
         .btn-glow:hover { transform: translateY(-1px); box-shadow: 0 8px 24px -4px rgba(16,185,129,0.4); }
         .btn-glow-purple { transition: all 0.25s ease; }
         .btn-glow-purple:hover { transform: translateY(-1px); box-shadow: 0 8px 24px -4px rgba(139,92,246,0.4); }
-        .stat-glass { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); }
+        .stat-glass { background: rgba(255,255,255,0.08); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.15); }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) translateX(0px); }
+            25% { transform: translateY(-20px) translateX(10px); }
+            50% { transform: translateY(-10px) translateX(-5px); }
+            75% { transform: translateY(-25px) translateX(5px); }
+        }
+        @keyframes float-reverse {
+            0%, 100% { transform: translateY(0px) translateX(0px); }
+            25% { transform: translateY(15px) translateX(-10px); }
+            50% { transform: translateY(5px) translateX(8px); }
+            75% { transform: translateY(20px) translateX(-5px); }
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% center; }
+            100% { background-position: 200% center; }
+        }
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 0.4; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.05); }
+        }
+        .orb-1 { animation: float 8s ease-in-out infinite; }
+        .orb-2 { animation: float-reverse 10s ease-in-out infinite; }
+        .orb-3 { animation: float 12s ease-in-out infinite 2s; }
+        .shimmer-text {
+            background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0) 100%);
+            background-size: 200% 100%;
+            animation: shimmer 4s ease-in-out infinite;
+        }
+        .gradient-border-top { border-top: 4px solid; border-image: linear-gradient(to right, #10b981, #14b8a6) 1; }
+        .gradient-border-top-purple { border-top: 4px solid; border-image: linear-gradient(to right, #8b5cf6, #a78bfa) 1; }
+        .pricing-glow { box-shadow: 0 0 80px -20px rgba(16,185,129,0.25), 0 0 40px -10px rgba(139,92,246,0.15); }
+        .grid-overlay {
+            background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
     </style>
 </head>
 <body class="antialiased text-gray-700 scroll-smooth bg-white overflow-x-hidden">
 
-    <nav class="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+    <nav class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-2xl border-b border-gray-100/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="flex items-center justify-between py-2.5 sm:py-0 sm:h-[60px]">
                 <a href="/" class="flex items-center space-x-2 flex-shrink-0">
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
                         <svg class="w-4 h-4 sm:w-[18px] sm:h-[18px] text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                     </div>
                     <span class="text-sm sm:text-[17px] font-bold text-gray-900 tracking-tight">TaxNest</span>
@@ -48,11 +88,16 @@
 
     <section class="relative pt-32 pb-28 sm:pt-40 sm:pb-36 bg-[#0a0f1a] overflow-hidden">
         <div class="hero-glow absolute inset-0"></div>
+        <div class="grid-overlay absolute inset-0"></div>
         <div class="absolute inset-0 opacity-[0.03]" style="background-image: url('data:image/svg+xml,%3Csvg width=&quot;60&quot; height=&quot;60&quot; viewBox=&quot;0 0 60 60&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;%3E%3Cg fill=&quot;none&quot; fill-rule=&quot;evenodd&quot;%3E%3Cg fill=&quot;%23ffffff&quot; fill-opacity=&quot;1&quot;%3E%3Cpath d=&quot;M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z&quot;/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"></div>
+
+        <div class="orb-1 absolute top-20 left-[10%] w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="orb-2 absolute bottom-10 right-[15%] w-96 h-96 bg-purple-500/8 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="orb-3 absolute top-1/2 left-[60%] w-64 h-64 bg-teal-400/8 rounded-full blur-3xl pointer-events-none"></div>
 
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8 relative">
             <div class="text-center max-w-3xl mx-auto">
-                <div class="inline-flex items-center px-3.5 py-1.5 bg-white/[0.07] rounded-full text-[13px] font-medium text-gray-300 mb-8 border border-white/[0.08]">
+                <div class="inline-flex items-center px-3.5 py-1.5 bg-white/[0.07] rounded-full text-[13px] font-medium text-gray-300 mb-8 border border-white/[0.08] backdrop-blur-sm">
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-2 animate-pulse"></span>
                     FBR + PRA Compliant Platform
                 </div>
@@ -67,11 +112,11 @@
                 </p>
 
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
-                    <a href="#products" class="btn-glow inline-flex items-center px-7 py-3.5 bg-emerald-500 text-white rounded-[10px] text-[15px] font-semibold hover:bg-emerald-600 w-full sm:w-auto justify-center">
+                    <a href="#products" class="btn-glow inline-flex items-center px-7 py-3.5 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-[10px] text-[15px] font-semibold hover:from-emerald-500 hover:to-teal-600 w-full sm:w-auto justify-center shadow-lg shadow-emerald-500/25">
                         Start Free Trial
                         <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
                     </a>
-                    <a href="#products" class="inline-flex items-center px-7 py-3.5 bg-white/[0.06] text-gray-300 border border-white/[0.1] rounded-[10px] text-[15px] font-semibold hover:bg-white/[0.1] hover:text-white transition w-full sm:w-auto justify-center">
+                    <a href="#products" class="inline-flex items-center px-7 py-3.5 bg-white/[0.06] text-gray-300 border border-white/[0.12] rounded-[10px] text-[15px] font-semibold hover:bg-white/[0.15] hover:text-white hover:border-white/[0.2] transition w-full sm:w-auto justify-center backdrop-blur-sm">
                         Explore Products
                         <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </a>
@@ -113,7 +158,8 @@
         </div>
     </section>
 
-    <div class="bg-gray-50 border-b border-gray-100 py-5">
+    <div class="relative bg-gradient-to-r from-gray-50 via-white to-gray-50 border-b border-gray-100 py-5">
+        <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/40 to-transparent"></div>
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
                 <div class="flex items-center space-x-2 text-gray-600">
@@ -149,10 +195,10 @@
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl mx-auto">
-                <div class="card-hover bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+                <div class="card-hover bg-white rounded-xl shadow-md ring-1 ring-gray-200/50 overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300 gradient-border-top">
                     <div class="p-8">
                         <div class="flex items-center space-x-4 mb-6">
-                            <div class="w-16 h-16 rounded-[14px] bg-emerald-50 flex items-center justify-center shadow-md">
+                            <div class="w-16 h-16 rounded-[14px] bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center shadow-md">
                                 <svg class="w-8 h-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                             </div>
                             <div>
@@ -175,10 +221,10 @@
                     </div>
                 </div>
 
-                <div class="card-hover bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+                <div class="card-hover bg-white rounded-xl shadow-md ring-1 ring-gray-200/50 overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300 gradient-border-top-purple">
                     <div class="p-8">
                         <div class="flex items-center space-x-4 mb-6">
-                            <div class="w-16 h-16 rounded-[14px] bg-purple-50 flex items-center justify-center shadow-md">
+                            <div class="w-16 h-16 rounded-[14px] bg-gradient-to-br from-purple-50 to-violet-50 flex items-center justify-center shadow-md">
                                 <svg class="w-8 h-8 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                             </div>
                             <div>
@@ -234,8 +280,8 @@
                 ];
                 @endphp
                 @foreach($features as $f)
-                <div class="card-hover bg-white rounded-xl shadow-md p-6 border border-gray-100 hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-                    <div class="w-12 h-12 bg-{{ $f[3] }}-50 rounded-xl flex items-center justify-center mb-4 shadow-sm">
+                <div class="group card-hover bg-white rounded-xl shadow-md p-6 ring-1 ring-gray-100 hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+                    <div class="w-12 h-12 bg-{{ $f[3] }}-50 group-hover:bg-gradient-to-br group-hover:from-{{ $f[3] }}-50 group-hover:to-{{ $f[3] }}-100 rounded-xl flex items-center justify-center mb-4 shadow-sm transition-all duration-300">
                         <svg class="w-6 h-6 text-{{ $f[3] }}-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $f[2] }}"/></svg>
                     </div>
                     <h3 class="text-[15px] font-bold text-gray-900 mb-2">{{ $f[0] }}</h3>
@@ -245,7 +291,7 @@
             </div>
 
             <div class="mt-16 fade-up">
-                <div class="bg-white rounded-xl shadow-md border border-gray-100 p-8 max-w-3xl mx-auto">
+                <div class="bg-white rounded-xl shadow-md ring-1 ring-gray-100 p-8 max-w-3xl mx-auto">
                     <h3 class="text-[15px] font-bold text-gray-900 mb-5">Platform Capabilities</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         @foreach([
@@ -281,9 +327,9 @@
                 <div class="overflow-x-auto">
                     <table class="w-full">
                         <thead>
-                            <tr class="border-b border-gray-100 bg-gray-50/50">
-                                <th class="text-left py-4 px-6 text-[13px] font-medium text-gray-500">Capability</th>
-                                <th class="text-center py-4 px-6 text-[13px] font-bold text-emerald-700">TaxNest</th>
+                            <tr class="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900">
+                                <th class="text-left py-4 px-6 text-[13px] font-medium text-gray-300">Capability</th>
+                                <th class="text-center py-4 px-6 text-[13px] font-bold text-emerald-400">TaxNest</th>
                                 <th class="text-center py-4 px-6 text-[13px] font-bold text-gray-400">Others</th>
                             </tr>
                         </thead>
@@ -340,27 +386,33 @@
                 <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">Each product has its own plans. Visit the product page for details and start your 14-day free trial.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto fade-up">
-                <div class="card-hover bg-white rounded-xl shadow-md border border-gray-200 p-8 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-                    <div class="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center mx-auto mb-5">
-                        <svg class="w-7 h-7 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                <div class="relative card-hover bg-white rounded-xl shadow-md ring-1 ring-gray-200/50 p-8 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+                    <div class="absolute inset-0 rounded-xl bg-gradient-to-br from-emerald-500/5 to-teal-500/5 pointer-events-none"></div>
+                    <div class="relative">
+                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center mx-auto mb-5 shadow-sm">
+                            <svg class="w-7 h-7 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">Digital Invoice</h3>
+                        <p class="text-[14px] text-gray-500 mb-6 leading-relaxed">FBR-compliant invoicing with multiple billing cycles and volume discounts</p>
+                        <a href="/digital-invoice#pricing" class="btn-glow inline-flex items-center px-6 py-3 bg-emerald-600 text-white rounded-[10px] text-[14px] font-semibold hover:bg-emerald-700 transition">
+                            View DI Plans
+                            <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                        </a>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Digital Invoice</h3>
-                    <p class="text-[14px] text-gray-500 mb-6 leading-relaxed">FBR-compliant invoicing with multiple billing cycles and volume discounts</p>
-                    <a href="/digital-invoice#pricing" class="btn-glow inline-flex items-center px-6 py-3 bg-emerald-600 text-white rounded-[10px] text-[14px] font-semibold hover:bg-emerald-700 transition">
-                        View DI Plans
-                        <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                    </a>
                 </div>
-                <div class="card-hover bg-white rounded-xl shadow-md border border-gray-200 p-8 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-                    <div class="w-14 h-14 rounded-2xl bg-purple-50 flex items-center justify-center mx-auto mb-5">
-                        <svg class="w-7 h-7 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                <div class="relative card-hover bg-white rounded-xl shadow-md ring-1 ring-gray-200/50 p-8 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+                    <div class="absolute inset-0 rounded-xl bg-gradient-to-br from-purple-500/5 to-violet-500/5 pointer-events-none"></div>
+                    <div class="relative">
+                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-50 to-violet-50 flex items-center justify-center mx-auto mb-5 shadow-sm">
+                            <svg class="w-7 h-7 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">NestPOS</h3>
+                        <p class="text-[14px] text-gray-500 mb-6 leading-relaxed">PRA point of sale with annual billing and built-in 6% discount</p>
+                        <a href="/pos#pricing" class="btn-glow-purple inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-[10px] text-[14px] font-semibold hover:bg-purple-700">
+                            View POS Plans
+                            <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                        </a>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">NestPOS</h3>
-                    <p class="text-[14px] text-gray-500 mb-6 leading-relaxed">PRA point of sale with annual billing and built-in 6% discount</p>
-                    <a href="/pos#pricing" class="btn-glow-purple inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-[10px] text-[14px] font-semibold hover:bg-purple-700">
-                        View POS Plans
-                        <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                    </a>
                 </div>
             </div>
         </div>
@@ -384,7 +436,7 @@
                 ];
                 @endphp
                 @foreach($faqs as $i => $faq)
-                <div class="bg-gray-50 rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                <div class="bg-white rounded-xl border border-gray-200/80 overflow-hidden transition-shadow duration-300" :class="open === {{ $i+1 }} ? 'shadow-lg ring-1 ring-emerald-100' : 'shadow-sm'">
                     <button @click="open = open === {{ $i+1 }} ? null : {{ $i+1 }}" class="w-full flex items-center justify-between p-5 text-left">
                         <span class="text-[14px] font-semibold text-gray-900 pr-4">{{ $faq[0] }}</span>
                         <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0" :class="open === {{ $i+1 }} ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -406,23 +458,23 @@
                 <p class="mt-4 text-[17px] text-gray-500">Have questions? We're here to help you choose the right solution.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-5 fade-up">
-                <div class="card-hover bg-white rounded-xl shadow-md border border-gray-200 p-6 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-                    <div class="w-11 h-11 bg-emerald-50 rounded-xl flex items-center justify-center mx-auto mb-4">
+                <div class="card-hover bg-white rounded-xl shadow-md ring-1 ring-gray-200/50 p-6 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+                    <div class="w-11 h-11 bg-gradient-to-br from-emerald-400/20 to-teal-400/20 rounded-xl flex items-center justify-center mx-auto mb-4">
                         <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     </div>
                     <h3 class="text-[14px] font-semibold text-gray-900 mb-1">Email</h3>
                     <p class="text-[13px] text-gray-500">support@taxnest.com</p>
                 </div>
-                <div class="card-hover bg-white rounded-xl shadow-md border border-gray-200 p-6 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-                    <div class="w-11 h-11 bg-emerald-50 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                <div class="card-hover bg-white rounded-xl shadow-md ring-1 ring-gray-200/50 p-6 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+                    <div class="w-11 h-11 bg-gradient-to-br from-blue-400/20 to-indigo-400/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
                     </div>
                     <h3 class="text-[14px] font-semibold text-gray-900 mb-1">Phone</h3>
                     <p class="text-[13px] text-gray-500">+92-XXX-XXXXXXX</p>
                 </div>
-                <div class="card-hover bg-white rounded-xl shadow-md border border-gray-200 p-6 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-                    <div class="w-11 h-11 bg-emerald-50 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <div class="card-hover bg-white rounded-xl shadow-md ring-1 ring-gray-200/50 p-6 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+                    <div class="w-11 h-11 bg-gradient-to-br from-purple-400/20 to-violet-400/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     </div>
                     <h3 class="text-[14px] font-semibold text-gray-900 mb-1">Location</h3>
                     <p class="text-[13px] text-gray-500">Pakistan</p>
@@ -432,16 +484,18 @@
     </section>
 
     <section class="py-20 bg-[#0a0f1a] relative overflow-hidden">
-        <div class="hero-glow absolute inset-0 opacity-50"></div>
+        <div class="hero-glow absolute inset-0 opacity-60"></div>
+        <div class="orb-1 absolute top-0 left-[20%] w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="orb-2 absolute bottom-0 right-[20%] w-56 h-56 bg-purple-500/8 rounded-full blur-3xl pointer-events-none"></div>
         <div class="max-w-3xl mx-auto px-5 sm:px-8 text-center relative">
             <h2 class="text-[28px] sm:text-[32px] font-bold text-white tracking-tight mb-4">Ready to Get Compliant?</h2>
             <p class="text-gray-400 mb-8 text-[17px]">Choose a product to explore features, pricing, and get started.</p>
             <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
-                <a href="/digital-invoice" class="btn-glow px-7 py-3.5 bg-emerald-500 text-white rounded-[10px] text-[15px] font-semibold hover:bg-emerald-600 w-full sm:w-auto flex items-center justify-center gap-2">
+                <a href="/digital-invoice" class="btn-glow px-7 py-3.5 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-[10px] text-[15px] font-semibold hover:from-emerald-500 hover:to-teal-600 w-full sm:w-auto flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                     Digital Invoice
                 </a>
-                <a href="/pos" class="px-7 py-3.5 bg-white/[0.06] text-gray-300 border border-white/[0.1] rounded-[10px] text-[15px] font-semibold hover:bg-white/[0.1] hover:text-white transition w-full sm:w-auto flex items-center justify-center gap-2">
+                <a href="/pos" class="btn-glow-purple px-7 py-3.5 bg-gradient-to-r from-purple-500 to-violet-600 text-white border border-purple-400/20 rounded-[10px] text-[15px] font-semibold hover:from-purple-600 hover:to-violet-700 transition w-full sm:w-auto flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     PRA POS
                 </a>
@@ -449,12 +503,13 @@
         </div>
     </section>
 
-    <footer class="bg-[#0a0f1a] border-t border-white/[0.06] pt-14 pb-8">
+    <footer class="bg-[#0a0f1a] pt-14 pb-8 relative">
+        <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent"></div>
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-8 pb-10 border-b border-white/[0.06]">
                 <div>
                     <div class="flex items-center space-x-2 mb-4">
-                        <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+                        <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
                             <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                         </div>
                         <span class="text-[14px] font-bold text-white">TaxNest</span>

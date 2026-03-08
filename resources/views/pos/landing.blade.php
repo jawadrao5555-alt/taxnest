@@ -10,7 +10,52 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
         body { font-family: 'Figtree', sans-serif; }
-        .pos-gradient { background: linear-gradient(135deg, #7c3aed 0%, #a855f7 40%, #c084fc 70%, #e9d5ff 100%); }
+        .pos-gradient {
+            background: linear-gradient(135deg, #1e1b4b 0%, #5b21b6 40%, #7c3aed 70%, #a855f7 100%);
+            position: relative;
+        }
+        .pos-gradient::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+            opacity: 0.4;
+            pointer-events: none;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) translateX(0px); }
+            25% { transform: translateY(-20px) translateX(10px); }
+            50% { transform: translateY(-10px) translateX(-5px); }
+            75% { transform: translateY(-25px) translateX(5px); }
+        }
+        @keyframes float-reverse {
+            0%, 100% { transform: translateY(0px) translateX(0px); }
+            25% { transform: translateY(15px) translateX(-10px); }
+            50% { transform: translateY(5px) translateX(8px); }
+            75% { transform: translateY(20px) translateX(-5px); }
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% center; }
+            100% { background-position: 200% center; }
+        }
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 0.4; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.05); }
+        }
+        .orb { position: absolute; border-radius: 9999px; filter: blur(80px); pointer-events: none; }
+        .card-accent-top {
+            position: relative;
+        }
+        .card-accent-top::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #7c3aed, #a855f7, #c084fc);
+            border-radius: 12px 12px 0 0;
+        }
     </style>
 </head>
 <body class="antialiased text-gray-800 overflow-x-hidden" style="scroll-behavior: smooth;" x-data="{ showLoginModal: false }">
@@ -102,28 +147,29 @@
     </nav>
 
     <section class="pos-gradient pt-32 pb-24 lg:pb-28 relative overflow-hidden">
-        <div class="absolute inset-0 opacity-10">
-            <div class="absolute top-20 left-10 w-72 h-72 bg-white rounded-full blur-3xl"></div>
-            <div class="absolute bottom-10 right-20 w-96 h-96 bg-purple-200 rounded-full blur-3xl"></div>
-        </div>
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+        <div class="orb w-72 h-72 bg-purple-400/30 top-16 left-10" style="animation: float 8s ease-in-out infinite;"></div>
+        <div class="orb w-96 h-96 bg-violet-300/20 bottom-10 right-10" style="animation: float-reverse 10s ease-in-out infinite;"></div>
+        <div class="orb w-48 h-48 bg-fuchsia-400/20 top-1/2 left-1/3" style="animation: float 12s ease-in-out infinite 2s;"></div>
+        <div class="orb w-64 h-64 bg-indigo-400/15 top-10 right-1/4" style="animation: pulse-glow 6s ease-in-out infinite;"></div>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div class="text-center max-w-3xl mx-auto">
-                <div class="inline-flex items-center px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 mb-6">
+                <div class="inline-flex items-center px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 mb-6">
                     <span class="text-sm font-semibold text-white">PRA Punjab Integrated &bull; PRAL IMS API v1.2</span>
                 </div>
-                <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight">
+                <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight" style="text-shadow: 0 2px 20px rgba(0,0,0,0.3);">
                     NestPOS<br>
-                    <span class="text-purple-100">Enterprise Point of Sale</span>
+                    <span class="text-purple-200">Enterprise Point of Sale</span>
                 </h1>
-                <p class="mt-6 text-lg text-purple-100 max-w-2xl mx-auto">
+                <p class="mt-6 text-lg text-purple-100/90 max-w-2xl mx-auto">
                     Complete POS billing system with PRA (Punjab Revenue Authority) fiscal device integration.
                     Thermal receipt printing, real-time tax calculations, and full compliance reporting.
                 </p>
                 <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <a href="/pos/register" class="w-full sm:w-auto px-8 py-3.5 bg-white text-purple-700 rounded-xl text-sm font-bold hover:bg-purple-50 transition shadow-lg text-center">
+                    <a href="/pos/register" class="w-full sm:w-auto px-8 py-3.5 bg-white text-purple-700 rounded-xl text-sm font-bold hover:bg-purple-50 transition shadow-2xl hover:shadow-purple-500/25 text-center">
                         Start Free Trial
                     </a>
-                    <a href="#how-it-works" class="w-full sm:w-auto px-8 py-3.5 border-2 border-white/40 text-white rounded-xl text-sm font-bold hover:bg-white/10 transition text-center">
+                    <a href="#how-it-works" class="w-full sm:w-auto px-8 py-3.5 border-2 border-white/30 text-white rounded-xl text-sm font-bold hover:bg-white/15 backdrop-blur-sm transition text-center">
                         See How It Works
                     </a>
                 </div>
@@ -138,43 +184,43 @@
                 <p class="mt-4 text-gray-700 max-w-2xl mx-auto">Everything you need to run your retail or service business with full PRA compliance.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <div class="bg-gray-50 rounded-xl shadow-md p-6 border border-gray-100 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                    <div class="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center mb-4">
+                <div class="card-accent-top bg-white rounded-xl shadow-md p-6 ring-1 ring-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-400/20 to-violet-400/20 group-hover:from-purple-400/30 group-hover:to-violet-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Smart Billing</h3>
                     <p class="text-sm text-gray-700">Add products and services, apply discounts (percentage or amount), with dynamic tax calculation based on payment method.</p>
                 </div>
-                <div class="bg-gray-50 rounded-xl shadow-md p-6 border border-gray-100 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                    <div class="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center mb-4">
+                <div class="card-accent-top bg-white rounded-xl shadow-md p-6 ring-1 ring-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-400/20 to-violet-400/20 group-hover:from-purple-400/30 group-hover:to-violet-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Payment Methods</h3>
                     <p class="text-sm text-gray-700">Cash (16% GST), Card/QR (5% GST). Tax automatically adjusts when payment method changes. Cash, Debit, Credit, QR/Raast supported.</p>
                 </div>
-                <div class="bg-gray-50 rounded-xl shadow-md p-6 border border-gray-100 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                    <div class="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center mb-4">
+                <div class="card-accent-top bg-white rounded-xl shadow-md p-6 ring-1 ring-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-400/20 to-violet-400/20 group-hover:from-purple-400/30 group-hover:to-violet-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">PRA Integration</h3>
                     <p class="text-sm text-gray-700">Real-time fiscal device reporting to Punjab Revenue Authority via PRAL IMS API v1.2. Sandbox and production environments.</p>
                 </div>
-                <div class="bg-gray-50 rounded-xl shadow-md p-6 border border-gray-100 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                    <div class="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center mb-4">
+                <div class="card-accent-top bg-white rounded-xl shadow-md p-6 ring-1 ring-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-400/20 to-violet-400/20 group-hover:from-purple-400/30 group-hover:to-violet-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Thermal Receipts</h3>
                     <p class="text-sm text-gray-700">Print-optimized receipts for 80mm and 58mm thermal printers. PRA QR code and fiscal invoice number on every receipt.</p>
                 </div>
-                <div class="bg-gray-50 rounded-xl shadow-md p-6 border border-gray-100 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                    <div class="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center mb-4">
+                <div class="card-accent-top bg-white rounded-xl shadow-md p-6 ring-1 ring-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-400/20 to-violet-400/20 group-hover:from-purple-400/30 group-hover:to-violet-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Multi-Terminal</h3>
                     <p class="text-sm text-gray-700">Register and manage multiple POS terminals. Track transactions per terminal with location and status management.</p>
                 </div>
-                <div class="bg-gray-50 rounded-xl shadow-md p-6 border border-gray-100 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                    <div class="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center mb-4">
+                <div class="card-accent-top bg-white rounded-xl shadow-md p-6 ring-1 ring-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-400/20 to-violet-400/20 group-hover:from-purple-400/30 group-hover:to-violet-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">POS Reports</h3>
@@ -205,11 +251,13 @@
                 @endphp
                 <div class="relative rounded-xl overflow-hidden transition duration-300 hover:-translate-y-1 shadow-md hover:shadow-xl {{ $isPopular ? 'ring-2 ring-purple-500' : '' }}">
                     @if($isPopular)
+                    <div class="absolute -inset-1 bg-gradient-to-r from-purple-500 via-violet-500 to-fuchsia-500 rounded-xl blur-lg opacity-30" style="animation: pulse-glow 4s ease-in-out infinite;"></div>
+                    <div class="relative">
                     <div class="bg-gradient-to-r from-purple-500 to-purple-700 text-center py-1.5">
                         <span class="text-white text-xs font-bold tracking-wide">MOST POPULAR</span>
                     </div>
                     @endif
-                    <div class="bg-white border {{ $isPopular ? 'border-purple-500 border-t-0 rounded-b-xl' : 'border-gray-200 rounded-xl' }} p-6">
+                    <div class="bg-white border {{ $isPopular ? 'border-purple-500 border-t-0 rounded-b-xl backdrop-blur-xl' : 'border-gray-200 rounded-xl' }} p-6 relative">
                         <h3 class="text-xl font-bold text-gray-900">{{ $plan->name }}</h3>
                         <div class="mt-4 mb-1">
                             <span class="text-3xl font-black text-gray-900">Rs. {{ number_format($plan->price) }}</span>
@@ -243,6 +291,9 @@
                             </a>
                         </div>
                     </div>
+                    @if($isPopular)
+                    </div>
+                    @endif
                 </div>
                 @endforeach
             </div>
@@ -298,18 +349,23 @@
         </div>
     </section>
 
-    <section class="py-24 lg:py-28 bg-gradient-to-r from-purple-500 to-purple-700">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 class="text-3xl font-bold text-white mb-4">Ready to Get Started?</h2>
-            <p class="text-purple-100 mb-8">Start your 14-day free trial. No credit card required.</p>
+    <section class="py-24 lg:py-28 relative overflow-hidden" style="background: linear-gradient(135deg, #1e1b4b 0%, #5b21b6 50%, #7c3aed 100%);">
+        <div class="absolute inset-0">
+            <div class="orb w-80 h-80 bg-purple-400/20 top-0 left-1/4" style="animation: float 8s ease-in-out infinite;"></div>
+            <div class="orb w-64 h-64 bg-violet-300/15 bottom-0 right-1/4" style="animation: float-reverse 10s ease-in-out infinite;"></div>
+        </div>
+        <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(139,92,246,0.3),transparent_70%)]"></div>
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+            <h2 class="text-3xl font-bold text-white mb-4" style="text-shadow: 0 2px 15px rgba(0,0,0,0.3);">Ready to Get Started?</h2>
+            <p class="text-purple-200 mb-8">Start your 14-day free trial. No credit card required.</p>
             <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <a href="/pos/register" class="w-full sm:w-auto px-8 py-3.5 bg-white text-purple-700 rounded-xl text-sm font-bold hover:bg-purple-50 transition shadow-lg text-center">Create POS Account</a>
-                <button @click="showLoginModal = true" class="w-full sm:w-auto px-8 py-3.5 border-2 border-white/40 text-white rounded-xl text-sm font-bold hover:bg-white/10 transition text-center">Login to POS</button>
+                <a href="/pos/register" class="w-full sm:w-auto px-8 py-3.5 bg-white text-purple-700 rounded-xl text-sm font-bold hover:bg-purple-50 transition shadow-2xl hover:shadow-purple-500/25 text-center">Create POS Account</a>
+                <button @click="showLoginModal = true" class="w-full sm:w-auto px-8 py-3.5 border-2 border-white/30 text-white rounded-xl text-sm font-bold hover:bg-white/15 backdrop-blur-sm transition text-center">Login to POS</button>
             </div>
         </div>
     </section>
 
-    <div class="bg-gray-900 py-4">
+    <div class="bg-gray-900 py-4" style="border-top: 2px solid transparent; border-image: linear-gradient(90deg, #7c3aed, #a855f7, #c084fc) 1;">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
             <p class="text-xs text-gray-500">&copy; {{ date('Y') }} TaxNest. All rights reserved.</p>
             <span class="text-xs text-gray-500 flex items-center"><svg class="w-3.5 h-3.5 mr-1 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>PRA IMS v1.2 Integrated</span>

@@ -90,3 +90,4 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **Alpine.js:** Interactive frontend components.
 - **Chart.js:** Data visualization.
 - **PRA (Punjab Revenue Authority):** POS fiscal device integration via PRAL IMS API v1.2.
+- **PRA Proxy Support:** `PraIntegrationService` supports proxy routing via `PRA_PROXY_URL` and `PRA_PROXY_SECRET` env vars. When set, PRA API calls route through a Pakistani proxy server (required because PRA's `ims.pral.com.pk` blocks non-Pakistani IPs). Proxy script at `pra-proxy/index.php` is ready to deploy on any Pakistani VPS. `pos_transactions` table uses composite unique `(company_id, invoice_number)` instead of global unique on `invoice_number`.

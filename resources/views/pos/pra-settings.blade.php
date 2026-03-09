@@ -66,7 +66,20 @@
                         <span class="text-gray-500">POS ID</span>
                         <span class="text-gray-900 dark:text-white">{{ $company->pra_pos_id ?? 'Not Set' }}</span>
                     </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Connection</span>
+                        @if($proxyEnabled)
+                        <span class="text-blue-600 font-semibold">Via Proxy</span>
+                        @else
+                        <span class="text-gray-900 dark:text-white">Direct</span>
+                        @endif
+                    </div>
                 </div>
+                @if($proxyEnabled)
+                <div class="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <p class="text-xs text-blue-600 dark:text-blue-400 font-medium">PRA Proxy Active — Requests routed through Pakistani server</p>
+                </div>
+                @endif
             </div>
 
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">

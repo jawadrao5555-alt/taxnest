@@ -786,7 +786,8 @@ class PosController extends Controller
         }
 
         $praLogs = PraLog::where('company_id', $companyId)->orderBy('created_at', 'desc')->take(20)->get();
-        return view('pos.pra-settings', compact('company', 'praLogs'));
+        $proxyEnabled = !empty(env('PRA_PROXY_URL'));
+        return view('pos.pra-settings', compact('company', 'praLogs', 'proxyEnabled'));
     }
 
     public function products()

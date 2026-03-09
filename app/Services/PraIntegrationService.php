@@ -34,6 +34,21 @@ class PraIntegrationService
         return (bool) $this->company->pra_reporting_enabled;
     }
 
+    public function useProxy(): bool
+    {
+        return !empty(env('PRA_PROXY_URL'));
+    }
+
+    public function getProxyUrl(): string
+    {
+        return env('PRA_PROXY_URL', '');
+    }
+
+    public function getProxySecret(): string
+    {
+        return env('PRA_PROXY_SECRET', '');
+    }
+
     public function getApiUrl(): string
     {
         $env = $this->company->pra_environment ?? 'sandbox';
@@ -138,9 +153,28 @@ class PraIntegrationService
         ]);
 
         try {
-            $response = Http::timeout(30)
-                ->withToken($this->getToken())
-                ->post($this->getApiUrl(), $payload);
+            if ($this->useProxy()) {
+                $proxyPayload = [
+                    'pra_url' => $this->getApiUrl(),
+                    'pra_token' => $this->getToken(),
+                    'invoice_data' => $payload,
+                ];
+
+                $proxyRequest = Http::timeout(45);
+
+                $proxySecret = $this->getProxySecret();
+                if ($proxySecret) {
+                    $proxyRequest = $proxyRequest->withHeaders([
+                        'X-Proxy-Secret' => $proxySecret,
+                    ]);
+                }
+
+                $response = $proxyRequest->post($this->getProxyUrl(), $proxyPayload);
+            } else {
+                $response = Http::timeout(30)
+                    ->withToken($this->getToken())
+                    ->post($this->getApiUrl(), $payload);
+            }
 
             $responseData = $response->json();
             $responseCode = $responseData['Code'] ?? (string) $response->status();
@@ -160,6 +194,7 @@ class PraIntegrationService
             Log::error('PRA Integration Error', [
                 'transaction_id' => $transaction->id,
                 'error' => $e->getMessage(),
+                'mode' => $this->useProxy() ? 'proxy' : 'direct',
             ]);
 
             $this->storePraResponse($praLog, $transaction, ['error' => $e->getMessage()], '500', false, null);

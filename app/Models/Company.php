@@ -48,6 +48,7 @@ class Company extends Model
         'pra_reporting_enabled',
         'pra_environment',
         'pra_pos_id',
+        'pra_access_code',
         'pra_production_token',
         'receipt_printer_size',
         'logo_path',

@@ -290,25 +290,37 @@
                 @endforeach
             </div>
 
-            <div class="mt-16 fade-up">
-                <div class="bg-white rounded-xl shadow-md ring-1 ring-gray-100 p-8 max-w-3xl mx-auto">
-                    <h3 class="text-[15px] font-bold text-gray-900 mb-5">Platform Capabilities</h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        @foreach([
-                            'Real-time FBR PRAL API submission',
-                            'PRA POS fiscal reporting',
-                            'Offline billing + auto sync',
-                            'Inventory + reporting engine',
-                            'Compliance scoring + risk alerts',
-                            'SHA-256 immutable audit logs',
-                            'Multi-branch invoicing',
-                            'Thermal receipt printing'
-                        ] as $cap)
-                        <div class="flex items-center text-[14px] text-gray-600">
-                            <svg class="w-4.5 h-4.5 text-emerald-500 mr-2.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                            {{ $cap }}
+            <div class="mt-14 fade-up">
+                <div class="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl shadow-xl overflow-hidden max-w-4xl mx-auto">
+                    <div class="absolute inset-0 opacity-[0.04]" style="background-image: url('data:image/svg+xml,%3Csvg width=&quot;40&quot; height=&quot;40&quot; viewBox=&quot;0 0 40 40&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;%3E%3Cg fill=&quot;%23ffffff&quot; fill-opacity=&quot;1&quot; fill-rule=&quot;evenodd&quot;%3E%3Cpath d=&quot;M0 40L40 0H20L0 20M40 40V20L20 40&quot;/%3E%3C/g%3E%3C/svg%3E');"></div>
+                    <div class="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-emerald-500 via-teal-400 to-purple-500"></div>
+                    <div class="relative px-6 py-6 sm:px-8 sm:py-7">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 flex-shrink-0">
+                                    <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+                                </div>
+                                <h3 class="text-[15px] font-bold text-white tracking-tight">Platform Capabilities</h3>
+                            </div>
+                            <span class="inline-flex items-center px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-[11px] font-semibold text-emerald-400 tracking-wide">BUILT FOR ENTERPRISE</span>
                         </div>
-                        @endforeach
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-2.5">
+                            @foreach([
+                                'Real-time FBR PRAL API',
+                                'PRA POS fiscal reporting',
+                                'Offline billing + auto sync',
+                                'Inventory + reporting engine',
+                                'Compliance scoring + risk alerts',
+                                'SHA-256 immutable audit logs',
+                                'Multi-branch invoicing',
+                                'Thermal receipt printing'
+                            ] as $cap)
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                <span class="text-[13px] text-gray-300 font-medium">{{ $cap }}</span>
+                            </div>
+                            @endforeach
+                        </div>
                     </div>
                 </div>
             </div>

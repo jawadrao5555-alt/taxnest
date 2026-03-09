@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Company;
+use App\Models\AdminUser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 
 class PosAuthController extends Controller
@@ -25,6 +28,14 @@ class PosAuthController extends Controller
             'login' => 'required|string',
             'password' => 'required|string',
         ]);
+
+        $throttleKey = Str::transliterate(Str::lower($request->input('login')) . '|' . $request->ip());
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+            return back()->withErrors([
+                'login' => "Too many login attempts. Please try again in {$seconds} seconds.",
+            ])->withInput($request->only('login'));
+        }
 
         $login = trim($request->login);
         $user = null;
@@ -45,10 +56,23 @@ class PosAuthController extends Controller
         }
 
         if ($user && Hash::check($request->password, $user->password)) {
+            RateLimiter::clear($throttleKey);
             Auth::guard('pos')->login($user, $request->boolean('remember'));
             $request->session()->regenerate();
             return redirect()->intended('/pos/dashboard');
         }
+
+        if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
+            $admin = AdminUser::where('email', $login)->first();
+            if ($admin && Hash::check($request->password, $admin->password)) {
+                RateLimiter::clear($throttleKey);
+                Auth::guard('admin')->login($admin, $request->boolean('remember'));
+                $request->session()->regenerate();
+                return redirect('/admin/dashboard');
+            }
+        }
+
+        RateLimiter::hit($throttleKey);
 
         return back()->withErrors([
             'login' => 'These credentials do not match our records.',

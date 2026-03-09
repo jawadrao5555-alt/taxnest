@@ -11,7 +11,8 @@ TaxNest is a multi-company SaaS platform designed for comprehensive tax and invo
 - POS billing is ANNUAL-ONLY (6% discount baked in) — no billing cycle toggle
 - DI billing has full cycle toggle: Monthly / Quarterly(-1%) / Semi-Annual(-3%) / Annual(-6%)
 - POS admin CANNOT login through Digital Invoice /login — auto-redirected to /pos/login
-- POS login page has "SaaS Admin Login" button for easy admin access
+- **Unified Login**: All login forms (POS, DI, POS modal) auto-detect admin vs company user — single form, no separate admin login button. Admin credentials on any login form → admin guard + redirect to /admin/dashboard. Rate-limited (5 attempts/key).
+- Login pages use premium dark glassmorphism design: POS = deep purple gradient, DI modal = deep emerald gradient, Admin = indigo-navy gradient
 - Test Trading Company (company_id 12, test@testtrading.pk / Admin@12345) — for testing admin approval workflow
 - Pending companies can VIEW all features but CANNOT perform any actions until admin approves
 - Login supports: Email, Phone, Username, CNIC, NTN

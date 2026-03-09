@@ -61,51 +61,53 @@
 <body class="antialiased text-gray-800 overflow-x-hidden" style="scroll-behavior: smooth;" x-data="{ showLoginModal: false }">
 
     <div x-show="showLoginModal" x-cloak x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4" @click.self="showLoginModal = false" @keydown.escape.window="showLoginModal = false">
-        <div x-show="showLoginModal" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95 translate-y-4" x-transition:enter-end="opacity-100 scale-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="bg-white rounded-2xl shadow-2xl w-full max-w-md relative overflow-hidden">
-            <div class="bg-gradient-to-r from-purple-500 to-purple-700 px-6 py-5">
+        <div x-show="showLoginModal" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95 translate-y-4" x-transition:enter-end="opacity-100 scale-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="w-full max-w-md relative overflow-hidden rounded-2xl" style="background: linear-gradient(135deg, #1e1b4b 0%, #4c1d95 50%, #581c87 100%); box-shadow: 0 25px 60px -12px rgba(0,0,0,0.5);">
+            <div class="absolute inset-0 overflow-hidden">
+                <div class="absolute -top-20 -right-20 w-40 h-40 bg-purple-400/10 rounded-full blur-2xl"></div>
+                <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-violet-400/10 rounded-full blur-2xl"></div>
+            </div>
+            <div class="relative px-6 py-5">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                        <div class="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/10">
+                            <svg class="w-5 h-5 text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                         </div>
                         <div>
-                            <h3 class="text-lg font-bold text-white">NestPOS Login</h3>
-                            <p class="text-purple-100 text-xs">PRA Point of Sale</p>
+                            <h3 class="text-lg font-bold text-white">NestPOS</h3>
+                            <p class="text-purple-200/50 text-xs">PRA Point of Sale</p>
                         </div>
                     </div>
-                    <button @click="showLoginModal = false" class="text-white/70 hover:text-white transition p-1">
+                    <button @click="showLoginModal = false" class="text-white/40 hover:text-white transition p-1">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
             </div>
-            <form method="POST" action="/pos/login" class="p-6 space-y-4">
+            <form method="POST" action="/pos/login" class="relative px-6 pb-6 space-y-4">
                 @csrf
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Email or Username</label>
-                    <input type="text" name="login" required autofocus class="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition" placeholder="Enter your credential">
+                    <label class="block text-sm font-medium text-purple-100/70 mb-1.5">Email / Phone / Username / NTN</label>
+                    <input type="text" name="login" required autofocus class="w-full px-4 py-2.5 rounded-xl text-sm text-white placeholder-purple-300/30 transition" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); outline: none;" placeholder="Enter your credential" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(139,92,246,0.12)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                    <input type="password" name="password" required class="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition" placeholder="Enter your password">
+                    <label class="block text-sm font-medium text-purple-100/70 mb-1.5">Password</label>
+                    <input type="password" name="password" required autocomplete="current-password" class="w-full px-4 py-2.5 rounded-xl text-sm text-white placeholder-purple-300/30 transition" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); outline: none;" placeholder="Enter your password" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(139,92,246,0.12)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
                 </div>
-                <div class="flex items-center justify-between">
-                    <label class="flex items-center text-sm text-gray-600">
-                        <input type="checkbox" name="remember" class="rounded border-gray-300 text-purple-600 focus:ring-purple-500 mr-2">
-                        Remember me
-                    </label>
+                <div class="flex items-center">
+                    <input type="checkbox" name="remember" class="rounded bg-white/5 border-white/10 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 mr-2 w-4 h-4">
+                    <span class="text-sm text-purple-200/40">Remember me</span>
                 </div>
                 @if($errors->any())
-                <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+                <div class="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
                     @foreach($errors->all() as $error)
-                    <p class="text-sm text-red-600">{{ $error }}</p>
+                    <p class="text-sm text-red-400">{{ $error }}</p>
                     @endforeach
                 </div>
                 @endif
-                <button type="submit" class="w-full py-2.5 bg-gradient-to-r from-purple-500 to-purple-700 text-white rounded-xl text-sm font-bold hover:shadow-lg transition shadow-md">
+                <button type="submit" class="w-full py-3 rounded-xl text-sm font-bold text-white transition-all duration-200" style="background: linear-gradient(135deg, #7c3aed, #a855f7); box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4);" onmouseover="this.style.boxShadow='0 6px 28px rgba(124, 58, 237, 0.55)'; this.style.transform='translateY(-1px)';" onmouseout="this.style.boxShadow='0 4px 20px rgba(124, 58, 237, 0.4)'; this.style.transform='translateY(0)';">
                     Sign In
                 </button>
-                <p class="text-center text-sm text-gray-500">
-                    Don't have an account? <a href="/pos/register" class="text-purple-600 font-semibold hover:text-purple-700">POS Sign Up</a>
+                <p class="text-center text-sm text-purple-200/40">
+                    Don't have an account? <a href="/pos/register" class="font-semibold text-purple-300 hover:text-white transition">POS Sign Up</a>
                 </p>
             </form>
         </div>

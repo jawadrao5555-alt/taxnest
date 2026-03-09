@@ -27,6 +27,11 @@ class AuthenticatedSessionController extends Controller
     {
         $request->authenticate();
 
+        if (session()->pull('admin_login_redirect')) {
+            $request->session()->regenerate();
+            return redirect('/admin/dashboard');
+        }
+
         $user = Auth::user();
         if ($user && $user->company_id) {
             $company = \App\Models\Company::find($user->company_id);

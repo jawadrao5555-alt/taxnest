@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use App\Models\User;
+use App\Models\AdminUser;
 
 class LoginRequest extends FormRequest
 {
@@ -72,15 +73,25 @@ class LoginRequest extends FormRequest
             }
         }
 
-        if (!$user || !Auth::attempt(['email' => $user->email, 'password' => $password], $remember)) {
-            RateLimiter::hit($this->throttleKey());
-
-            throw ValidationException::withMessages([
-                'login' => trans('auth.failed'),
-            ]);
+        if ($user && Auth::attempt(['email' => $user->email, 'password' => $password], $remember)) {
+            RateLimiter::clear($this->throttleKey());
+            return;
         }
 
-        RateLimiter::clear($this->throttleKey());
+        if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
+            $admin = AdminUser::where('email', $login)->first();
+            if ($admin && Auth::guard('admin')->attempt(['email' => $login, 'password' => $password], $remember)) {
+                RateLimiter::clear($this->throttleKey());
+                session(['admin_login_redirect' => true]);
+                return;
+            }
+        }
+
+        RateLimiter::hit($this->throttleKey());
+
+        throw ValidationException::withMessages([
+            'login' => trans('auth.failed'),
+        ]);
     }
 
     public function ensureIsNotRateLimited(): void

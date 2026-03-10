@@ -173,6 +173,11 @@ class PraIntegrationService
             } else {
                 $response = Http::timeout(30)
                     ->withToken($this->getToken())
+                    ->withOptions([
+                        'curl' => [
+                            CURLOPT_SSL_CIPHER_LIST => 'DEFAULT:!DH',
+                        ],
+                    ])
                     ->post($this->getApiUrl(), $payload);
             }
 

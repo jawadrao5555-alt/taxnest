@@ -16,7 +16,6 @@ ASSET_URL = "/"
 SESSION_DRIVER = "file"
 CACHE_STORE = "file"
 QUEUE_CONNECTION = "sync"
-PRA_PROXY_URL = "https://nestpay.replit.app/api/pra-proxy/submit"
 
 [userenv.production]
 APP_KEY = "base64:41WY2e9C1jMkW21wJQsxMC1NUk5mge9Rn7sx5oNo4x0="

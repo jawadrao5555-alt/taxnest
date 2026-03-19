@@ -17,11 +17,12 @@ class PraIntegrationService
         'debit_card' => 2,
         'credit_card' => 2,
         'qr_payment' => 2,
-        'mixed' => 5,
+        'mixed' => 3,
     ];
 
     private const SANDBOX_URL = 'https://ims.pral.com.pk/ims/sandbox/api/Live/PostData';
     private const PRODUCTION_URL = 'https://ims.pral.com.pk/ims/production/api/Live/PostData';
+    private const LOCAL_FISCAL_ENDPOINT = '/api/IMSFiscal/GetInvoiceNumberByModel';
     private const SANDBOX_TOKEN = '24d8fab3-f2e9-398f-ae17-b387125ec4a2';
 
     public function __construct(Company $company)
@@ -32,6 +33,17 @@ class PraIntegrationService
     public function isEnabled(): bool
     {
         return (bool) $this->company->pra_reporting_enabled;
+    }
+
+    public function getLocalFiscalUrl(): string
+    {
+        $url = env('PRA_LOCAL_FISCAL_URL') ?: (isset($_ENV['PRA_LOCAL_FISCAL_URL']) ? $_ENV['PRA_LOCAL_FISCAL_URL'] : (getenv('PRA_LOCAL_FISCAL_URL') ?: ''));
+        return $url;
+    }
+
+    public function useLocalFiscal(): bool
+    {
+        return !empty($this->getLocalFiscalUrl());
     }
 
     public function useProxy(): bool
@@ -65,6 +77,16 @@ class PraIntegrationService
         return self::SANDBOX_TOKEN;
     }
 
+    private function sanitizeBuyerName(?string $name): string
+    {
+        if (empty($name)) {
+            return 'Customer';
+        }
+        $clean = preg_replace('/[^a-zA-Z\s]/', '', $name);
+        $clean = trim(preg_replace('/\s+/', ' ', $clean));
+        return !empty($clean) ? $clean : 'Customer';
+    }
+
     public function generatePayload(PosTransaction $transaction): array
     {
         $transaction->load('items');
@@ -74,22 +96,26 @@ class PraIntegrationService
         $taxRate = (float) $transaction->tax_rate;
 
         $items = $transaction->items->map(function ($item, $index) use ($itemsSubtotal, $totalDiscount, $taxRate) {
-            $itemSubtotal = (float) $item->subtotal;
-            $itemDiscount = $itemsSubtotal > 0 ? round($totalDiscount * ($itemSubtotal / $itemsSubtotal), 2) : 0;
-            $saleValue = $itemSubtotal - $itemDiscount;
-            $taxCharged = round($saleValue * $taxRate / 100, 2);
-            $totalAmount = round($saleValue + $taxCharged, 2);
+            $qty = (float) $item->quantity;
+            $unitPrice = (float) $item->unit_price;
+            $lineSubtotal = (float) $item->subtotal;
+            $itemDiscount = $itemsSubtotal > 0 ? round($totalDiscount * ($lineSubtotal / $itemsSubtotal), 2) : 0;
+            $perUnitDiscount = $qty > 0 ? round($itemDiscount / $qty, 2) : 0;
+            $saleValuePerUnit = round($unitPrice - $perUnitDiscount, 2);
+            $lineSaleValue = round($saleValuePerUnit * $qty, 2);
+            $taxCharged = round($lineSaleValue * $taxRate / 100, 2);
+            $totalAmount = round($lineSaleValue + $taxCharged, 2);
 
             return [
                 'ItemCode' => $item->item_id ? sprintf('%04d', $item->item_id) : sprintf('IT_%04d', $index + 1),
-                'ItemName' => $item->item_name,
-                'Quantity' => (float) $item->quantity,
+                'ItemName' => preg_replace('/[^a-zA-Z0-9\s]/', '', $item->item_name),
+                'Quantity' => $qty,
                 'PCTCode' => '00000000',
                 'TaxRate' => $taxRate,
-                'SaleValue' => $saleValue,
+                'SaleValue' => $saleValuePerUnit,
                 'TotalAmount' => $totalAmount,
                 'TaxCharged' => $taxCharged,
-                'Discount' => $itemDiscount,
+                'Discount' => 0.0,
                 'FurtherTax' => 0.0,
                 'InvoiceType' => 1,
                 'RefUSIN' => null,
@@ -98,21 +124,25 @@ class PraIntegrationService
 
         $paymentMode = self::PAYMENT_MODE_MAP[$transaction->payment_method] ?? 1;
 
+        $totalSaleValue = array_sum(array_map(fn($i) => round($i['SaleValue'] * $i['Quantity'], 2), $items));
+        $totalTaxCharged = array_sum(array_column($items, 'TaxCharged'));
+        $totalBillAmount = array_sum(array_column($items, 'TotalAmount'));
+
         return [
             'InvoiceNumber' => '',
             'POSID' => (int) ($this->company->pra_pos_id ?? 0),
             'USIN' => $transaction->invoice_number,
-            'DateTime' => $transaction->created_at->format('Y-m-d H:i:s'),
-            'BuyerName' => $transaction->customer_name ?? '',
+            'DateTime' => $transaction->created_at->format('Y-m-d\TH:i:s'),
+            'BuyerName' => $this->sanitizeBuyerName($transaction->customer_name),
             'BuyerPNTN' => '',
             'BuyerCNIC' => '',
             'BuyerPhoneNumber' => $transaction->customer_phone ?? '',
-            'TotalSaleValue' => (float) $transaction->subtotal,
+            'TotalSaleValue' => $totalSaleValue,
             'TotalQuantity' => (float) $transaction->items->sum('quantity'),
-            'TotalTaxCharged' => (float) $transaction->tax_amount,
-            'Discount' => (float) $transaction->discount_amount,
+            'TotalTaxCharged' => $totalTaxCharged,
+            'Discount' => 0.0,
             'FurtherTax' => 0.0,
-            'TotalBillAmount' => (float) $transaction->total_amount,
+            'TotalBillAmount' => $totalBillAmount,
             'PaymentMode' => $paymentMode,
             'RefUSIN' => null,
             'InvoiceType' => 1,
@@ -153,10 +183,63 @@ class PraIntegrationService
             'status' => 'pending',
         ]);
 
-        $mode = $this->useProxy() ? 'proxy' : 'direct';
+        $mode = 'direct';
+        if ($this->useLocalFiscal()) {
+            $mode = 'local_fiscal';
+        } elseif ($this->useProxy()) {
+            $mode = 'proxy';
+        }
+
         $response = null;
 
         try {
+            if ($mode === 'local_fiscal') {
+                $localUrl = rtrim($this->getLocalFiscalUrl(), '/') . self::LOCAL_FISCAL_ENDPOINT;
+
+                Log::info('PRA Local Fiscal: Submitting invoice', [
+                    'transaction_id' => $transaction->id,
+                    'url' => $localUrl,
+                    'pos_id' => $payload['POSID'],
+                ]);
+
+                $response = Http::timeout(30)
+                    ->withHeaders([
+                        'Content-Type' => 'application/json',
+                        'ngrok-skip-browser-warning' => 'true',
+                    ])
+                    ->post($localUrl, $payload);
+
+                $responseData = $response->json();
+
+                if ($response->status() === 404 || $response->status() === 502 || $response->status() === 503) {
+                    Log::warning('PRA Local Fiscal unavailable, trying proxy/direct', [
+                        'transaction_id' => $transaction->id,
+                        'status' => $response->status(),
+                    ]);
+                    $mode = $this->useProxy() ? 'proxy' : 'direct';
+                    $response = null;
+                } else {
+                    $responseCode = $responseData['Code'] ?? (string) $response->status();
+                    $praInvoiceNumber = $responseData['InvoiceNumber'] ?? null;
+                    $success = $responseCode === '100';
+
+                    if ($praInvoiceNumber === 'Not Available') {
+                        $praInvoiceNumber = null;
+                        $success = false;
+                    }
+
+                    $this->storePraResponse($praLog, $transaction, $responseData, $responseCode, $success, $praInvoiceNumber);
+
+                    return [
+                        'success' => $success,
+                        'response_code' => $responseCode,
+                        'data' => $responseData,
+                        'pra_invoice_number' => $praInvoiceNumber,
+                        'message' => $responseData['Response'] ?? ($responseData['Errors'] ?? 'No response message'),
+                    ];
+                }
+            }
+
             if ($mode === 'proxy') {
                 $proxyPayload = [
                     'pra_url' => $this->getApiUrl(),
@@ -200,7 +283,12 @@ class PraIntegrationService
             $responseData = $response->json();
             $responseCode = $responseData['Code'] ?? (string) $response->status();
             $praInvoiceNumber = $responseData['InvoiceNumber'] ?? null;
-            $success = $responseCode === '100' || $response->successful();
+            $success = $responseCode === '100';
+
+            if ($praInvoiceNumber === 'Not Available') {
+                $praInvoiceNumber = null;
+                $success = false;
+            }
 
             $this->storePraResponse($praLog, $transaction, $responseData, $responseCode, $success, $praInvoiceNumber);
 
@@ -209,7 +297,7 @@ class PraIntegrationService
                 'response_code' => $responseCode,
                 'data' => $responseData,
                 'pra_invoice_number' => $praInvoiceNumber,
-                'message' => $responseData['Response'] ?? 'No response message',
+                'message' => $responseData['Response'] ?? ($responseData['Errors'] ?? 'No response message'),
             ];
         } catch (\Exception $e) {
             $errorMsg = $e->getMessage();

@@ -59,7 +59,8 @@ class PosAuthController extends Controller
             RateLimiter::clear($throttleKey);
             Auth::guard('pos')->login($user, $request->boolean('remember'));
             $request->session()->regenerate();
-            return redirect()->intended('/pos/dashboard');
+            $request->session()->forget('url.intended');
+            return redirect('/pos/dashboard');
         }
 
         if (filter_var($login, FILTER_VALIDATE_EMAIL)) {

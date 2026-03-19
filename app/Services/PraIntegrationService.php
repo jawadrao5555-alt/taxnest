@@ -36,17 +36,18 @@ class PraIntegrationService
 
     public function useProxy(): bool
     {
-        return !empty(env('PRA_PROXY_URL'));
+        $url = env('PRA_PROXY_URL') ?: (isset($_ENV['PRA_PROXY_URL']) ? $_ENV['PRA_PROXY_URL'] : getenv('PRA_PROXY_URL'));
+        return !empty($url);
     }
 
     public function getProxyUrl(): string
     {
-        return env('PRA_PROXY_URL', '');
+        return env('PRA_PROXY_URL') ?: (isset($_ENV['PRA_PROXY_URL']) ? $_ENV['PRA_PROXY_URL'] : (getenv('PRA_PROXY_URL') ?: ''));
     }
 
     public function getProxySecret(): string
     {
-        return env('PRA_PROXY_SECRET', '');
+        return env('PRA_PROXY_SECRET') ?: (isset($_ENV['PRA_PROXY_SECRET']) ? $_ENV['PRA_PROXY_SECRET'] : (getenv('PRA_PROXY_SECRET') ?: ''));
     }
 
     public function getApiUrl(): string
@@ -152,8 +153,11 @@ class PraIntegrationService
             'status' => 'pending',
         ]);
 
+        $mode = $this->useProxy() ? 'proxy' : 'direct';
+        $response = null;
+
         try {
-            if ($this->useProxy()) {
+            if ($mode === 'proxy') {
                 $proxyPayload = [
                     'pra_url' => $this->getApiUrl(),
                     'pra_token' => $this->getToken(),
@@ -170,7 +174,19 @@ class PraIntegrationService
                 }
 
                 $response = $proxyRequest->post($this->getProxyUrl(), $proxyPayload);
-            } else {
+
+                if ($response->status() === 404 || $response->status() === 502 || $response->status() === 503) {
+                    Log::warning('PRA Proxy unavailable, attempting direct connection', [
+                        'transaction_id' => $transaction->id,
+                        'proxy_url' => $this->getProxyUrl(),
+                        'proxy_status' => $response->status(),
+                    ]);
+                    $mode = 'direct_fallback';
+                    $response = null;
+                }
+            }
+
+            if ($response === null) {
                 $response = Http::timeout(30)
                     ->withToken($this->getToken())
                     ->withOptions([
@@ -196,18 +212,29 @@ class PraIntegrationService
                 'message' => $responseData['Response'] ?? 'No response message',
             ];
         } catch (\Exception $e) {
+            $errorMsg = $e->getMessage();
+            $userMessage = 'PRA API connection failed.';
+
+            if (str_contains($errorMsg, 'TLS connect error') || str_contains($errorMsg, 'SSL')) {
+                $userMessage = 'PRA server blocked connection (IP not whitelisted). Invoice saved offline — will sync when Pakistani proxy server is configured.';
+            } elseif (str_contains($errorMsg, 'Connection refused') || str_contains($errorMsg, 'timed out')) {
+                $userMessage = 'PRA server not reachable. Invoice saved offline — will auto-retry later.';
+            }
+
             Log::error('PRA Integration Error', [
                 'transaction_id' => $transaction->id,
-                'error' => $e->getMessage(),
-                'mode' => $this->useProxy() ? 'proxy' : 'direct',
+                'error' => $errorMsg,
+                'mode' => $mode,
             ]);
 
-            $this->storePraResponse($praLog, $transaction, ['error' => $e->getMessage()], '500', false, null);
+            $this->storePraResponse($praLog, $transaction, ['error' => $errorMsg], '500', false, null);
+
+            $transaction->update(['pra_status' => 'offline']);
 
             return [
                 'success' => false,
                 'response_code' => '500',
-                'message' => 'PRA API connection failed: ' . $e->getMessage(),
+                'message' => $userMessage,
             ];
         }
     }

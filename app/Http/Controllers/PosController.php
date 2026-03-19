@@ -52,8 +52,15 @@ class PosController extends Controller
 
         $praStatus = $company->pra_reporting_enabled;
 
+        $drafts = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'draft')
+            ->with('items')
+            ->orderBy('updated_at', 'desc')
+            ->take(20)
+            ->get();
+
         return view('pos.dashboard', compact(
-            'company', 'todayStats', 'monthStats', 'recentTransactions', 'paymentBreakdown', 'praStatus'
+            'company', 'todayStats', 'monthStats', 'recentTransactions', 'paymentBreakdown', 'praStatus', 'drafts'
         ));
     }
 

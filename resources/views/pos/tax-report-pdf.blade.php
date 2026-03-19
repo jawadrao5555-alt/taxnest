@@ -63,6 +63,7 @@
                     <th class="right">Subtotal</th>
                     <th class="right">Discount</th>
                     <th class="right">Taxable</th>
+                    <th class="right">Exempt</th>
                     <th class="right">Tax %</th>
                     <th class="right">Tax Amt</th>
                     <th class="right">Total</th>
@@ -84,7 +85,8 @@
                     </td>
                     <td class="right">{{ number_format($t->subtotal, 2) }}</td>
                     <td class="right" style="color:#dc2626;">{{ number_format($t->discount_amount, 2) }}</td>
-                    <td class="right">{{ number_format($t->subtotal - $t->discount_amount, 2) }}</td>
+                    <td class="right">{{ number_format($t->subtotal - $t->discount_amount - ($t->exempt_amount ?? 0), 2) }}</td>
+                    <td class="right" style="color:#d97706;">{{ ($t->exempt_amount ?? 0) > 0 ? number_format($t->exempt_amount, 2) : '—' }}</td>
                     <td class="right" style="font-weight:bold;">{{ number_format($t->tax_rate, 0) }}%</td>
                     <td class="right" style="color:#7c3aed;font-weight:bold;">{{ number_format($t->tax_amount, 2) }}</td>
                     <td class="right" style="font-weight:bold;">{{ number_format($t->total_amount, 2) }}</td>
@@ -108,6 +110,7 @@
                     <td class="right">—</td>
                     <td class="right" style="color:#dc2626;">{{ number_format($summary->total_discount, 2) }}</td>
                     <td class="right">{{ number_format($summary->total_taxable, 2) }}</td>
+                    <td class="right" style="color:#d97706;">{{ number_format($summary->total_exempt ?? 0, 2) }}</td>
                     <td class="right">—</td>
                     <td class="right" style="color:#7c3aed;">{{ number_format($summary->total_tax, 2) }}</td>
                     <td class="right" style="color:#059669;">{{ number_format($summary->total_sales, 2) }}</td>
@@ -134,6 +137,10 @@
                 <div class="summary-item">
                     <div class="summary-label">Total Taxable Amount</div>
                     <div class="summary-value">PKR {{ number_format($summary->total_taxable, 2) }}</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">Tax Exempt Amount</div>
+                    <div class="summary-value" style="color:#d97706;">PKR {{ number_format($summary->total_exempt ?? 0, 2) }}</div>
                 </div>
                 <div class="summary-item">
                     <div class="summary-label">Total Tax Collected</div>

@@ -97,6 +97,12 @@
                     <option value="BOX">BOX (Boxes)</option>
                 </select>
             </div>
+            <div class="flex items-center gap-3 pt-5">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="is_tax_exempt" value="1" class="rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                    <span class="text-xs font-medium text-gray-600 dark:text-gray-400">Tax Exempt</span>
+                </label>
+            </div>
             <div class="flex items-end">
                 <button type="submit" class="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white px-5 py-2 rounded-lg text-sm font-semibold shadow-md hover:shadow-lg transition">Save Product</button>
             </div>
@@ -121,7 +127,12 @@
                     @forelse($products as $product)
                     <tr class="{{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }} {{ !$product->is_active ? 'opacity-50' : '' }}" x-data="{ editing: false }">
                         <td class="px-4 py-3">
-                            <span x-show="!editing" class="font-medium text-gray-900 dark:text-white">{{ $product->name }}</span>
+                            <div x-show="!editing" class="flex items-center gap-2">
+                                <span class="font-medium text-gray-900 dark:text-white">{{ $product->name }}</span>
+                                @if($product->is_tax_exempt)
+                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">EXEMPT</span>
+                                @endif
+                            </div>
                         </td>
                         <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ $product->category ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">{{ $product->sku ?? '—' }}</td>
@@ -160,6 +171,12 @@
                                     <option value="{{ $u }}" {{ $product->uom === $u ? 'selected' : '' }}>{{ $u }}</option>
                                     @endforeach
                                 </select>
+                                <div class="flex items-center gap-3">
+                                    <label class="flex items-center gap-1.5 cursor-pointer">
+                                        <input type="checkbox" name="is_tax_exempt" value="1" {{ $product->is_tax_exempt ? 'checked' : '' }} class="rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                                        <span class="text-xs text-gray-600 dark:text-gray-400">Tax Exempt</span>
+                                    </label>
+                                </div>
                                 <div class="flex gap-2 col-span-2 sm:col-span-1">
                                     <button type="submit" class="text-xs font-semibold text-white px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 transition">Save</button>
                                     <button type="button" @click="editing = false" class="text-xs text-gray-500 px-3 py-1.5">Cancel</button>

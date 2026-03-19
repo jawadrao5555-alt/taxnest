@@ -162,9 +162,12 @@
                                             <template x-for="p in products.filter(pr => !search || pr.name.toLowerCase().includes(search.toLowerCase()))" :key="p.id">
                                                 <button type="button"
                                                     role="option"
-                                                    @click="search = p.name; item.name = p.name; item.item_id = p.id; item.unit_price = parseFloat(p.price || p.unit_price || 0); item._isNew = false; open = false; recalculate()"
+                                                    @click="search = p.name; item.name = p.name; item.item_id = p.id; item.unit_price = parseFloat(p.price || p.unit_price || 0); item.is_tax_exempt = !!p.is_tax_exempt; item._isNew = false; open = false; recalculate()"
                                                     class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50 dark:hover:bg-emerald-900/20 flex justify-between items-center transition">
-                                                    <span class="text-gray-900 dark:text-gray-100 font-medium" x-text="p.name"></span>
+                                                    <span class="flex items-center gap-1.5">
+                                                        <span class="text-gray-900 dark:text-gray-100 font-medium" x-text="p.name"></span>
+                                                        <span x-show="p.is_tax_exempt" class="inline-flex px-1 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">EXEMPT</span>
+                                                    </span>
                                                     <span class="text-xs text-gray-500" x-text="'Rs ' + Number(p.price || p.unit_price || 0).toLocaleString()"></span>
                                                 </button>
                                             </template>
@@ -187,9 +190,12 @@
                                             <template x-for="s in services.filter(sv => !search || sv.name.toLowerCase().includes(search.toLowerCase()))" :key="s.id">
                                                 <button type="button"
                                                     role="option"
-                                                    @click="search = s.name; item.name = s.name; item.item_id = s.id; item.unit_price = parseFloat(s.price || 0); item._isNew = false; open = false; recalculate()"
+                                                    @click="search = s.name; item.name = s.name; item.item_id = s.id; item.unit_price = parseFloat(s.price || 0); item.is_tax_exempt = !!s.is_tax_exempt; item._isNew = false; open = false; recalculate()"
                                                     class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50 dark:hover:bg-emerald-900/20 flex justify-between items-center transition">
-                                                    <span class="text-gray-900 dark:text-gray-100 font-medium" x-text="s.name"></span>
+                                                    <span class="flex items-center gap-1.5">
+                                                        <span class="text-gray-900 dark:text-gray-100 font-medium" x-text="s.name"></span>
+                                                        <span x-show="s.is_tax_exempt" class="inline-flex px-1 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">EXEMPT</span>
+                                                    </span>
                                                     <span class="text-xs text-gray-500" x-text="'Rs ' + Number(s.price || 0).toLocaleString()"></span>
                                                 </button>
                                             </template>
@@ -208,9 +214,10 @@
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Unit Price</label>
                                 <input type="number" x-model.number="item.unit_price" min="0" step="0.01" @input="recalculate()" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition">
                             </div>
-                            <div class="sm:col-span-1 flex items-center">
+                            <div class="sm:col-span-1 flex items-center gap-1">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1 mr-2">Subtotal</label>
                                 <span class="text-sm font-semibold text-gray-800 dark:text-gray-200" x-text="'Rs ' + (item.quantity * item.unit_price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
+                                <span x-show="item.is_tax_exempt" class="inline-flex items-center px-1 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 whitespace-nowrap">TAX FREE</span>
                             </div>
                             <div class="sm:col-span-1 flex items-center justify-end">
                                 <button type="button" @click="removeItem(index)" x-show="items.length > 1" class="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition">
@@ -283,6 +290,10 @@
                             <span>Tax (<span x-text="taxRate + '%'"></span>)</span>
                             <span class="font-medium text-gray-800 dark:text-gray-200" x-text="'Rs ' + taxAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
                         </div>
+                        <div x-show="exemptAmount > 0" class="flex justify-between text-xs text-amber-600 dark:text-amber-400">
+                            <span>Tax Exempt Amount</span>
+                            <span class="font-medium" x-text="'Rs ' + exemptAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
+                        </div>
                         <div class="flex justify-between text-base font-bold text-gray-900 dark:text-white border-t-2 border-gray-200 dark:border-gray-700 pt-3 mt-2">
                             <span>Total</span>
                             <span class="text-emerald-600" x-text="'Rs ' + total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
@@ -297,6 +308,7 @@
                         <input type="hidden" :name="'items['+index+'][name]'" :value="item.name">
                         <input type="hidden" :name="'items['+index+'][quantity]'" :value="item.quantity">
                         <input type="hidden" :name="'items['+index+'][unit_price]'" :value="item.unit_price">
+                        <input type="hidden" :name="'items['+index+'][is_tax_exempt]'" :value="item.is_tax_exempt ? '1' : '0'">
                     </div>
                 </template>
                 <input type="hidden" name="discount_type" :value="discountType">
@@ -355,7 +367,7 @@
                 terminalId: '',
 
                 items: [
-                    { type: 'product', item_id: '', name: '', quantity: 1, unit_price: 0, _isNew: false }
+                    { type: 'product', item_id: '', name: '', quantity: 1, unit_price: 0, _isNew: false, is_tax_exempt: false }
                 ],
 
                 discountType: 'percentage',
@@ -367,6 +379,7 @@
                 afterDiscount: 0,
                 taxRate: 0,
                 taxAmount: 0,
+                exemptAmount: 0,
                 total: 0,
 
                 submitting: false,
@@ -409,13 +422,25 @@
                     this.paymentMethod = draft.payment_method || 'cash';
 
                     if (draft.items && draft.items.length > 0) {
-                        this.items = draft.items.map(item => ({
-                            type: item.item_type || 'product',
-                            item_id: item.item_id || '',
-                            name: item.item_name || '',
-                            quantity: parseFloat(item.quantity) || 1,
-                            unit_price: parseFloat(item.unit_price) || 0
-                        }));
+                        this.items = draft.items.map(item => {
+                            let isExempt = !!item.is_tax_exempt;
+                            if (item.item_id && item.item_type === 'product') {
+                                const p = this.products.find(pr => pr.id == item.item_id);
+                                if (p) isExempt = !!p.is_tax_exempt;
+                            } else if (item.item_id && item.item_type === 'service') {
+                                const s = this.services.find(sv => sv.id == item.item_id);
+                                if (s) isExempt = !!s.is_tax_exempt;
+                            }
+                            return {
+                                type: item.item_type || 'product',
+                                item_id: item.item_id || '',
+                                name: item.item_name || '',
+                                quantity: parseFloat(item.quantity) || 1,
+                                unit_price: parseFloat(item.unit_price) || 0,
+                                is_tax_exempt: isExempt,
+                                _isNew: false
+                            };
+                        });
                     }
                 },
 
@@ -536,7 +561,7 @@
                 },
 
                 addItem() {
-                    this.items.push({ type: 'product', item_id: '', name: '', quantity: 1, unit_price: 0, _isNew: false });
+                    this.items.push({ type: 'product', item_id: '', name: '', quantity: 1, unit_price: 0, _isNew: false, is_tax_exempt: false });
                 },
 
                 removeItem(index) {
@@ -548,6 +573,7 @@
                     this.items[index].item_id = '';
                     this.items[index].name = '';
                     this.items[index].unit_price = 0;
+                    this.items[index].is_tax_exempt = false;
                     this.items[index]._isNew = false;
                     this.recalculate();
                 },
@@ -580,8 +606,16 @@
 
                 recalculate() {
                     this.subtotal = 0;
+                    let taxableSub = 0;
+                    let exemptSub = 0;
                     this.items.forEach(item => {
-                        this.subtotal += (parseFloat(item.quantity) || 0) * (parseFloat(item.unit_price) || 0);
+                        let lineTotal = (parseFloat(item.quantity) || 0) * (parseFloat(item.unit_price) || 0);
+                        this.subtotal += lineTotal;
+                        if (item.is_tax_exempt) {
+                            exemptSub += lineTotal;
+                        } else {
+                            taxableSub += lineTotal;
+                        }
                     });
                     this.subtotal = Math.round(this.subtotal * 100) / 100;
 
@@ -592,7 +626,9 @@
                     }
 
                     this.afterDiscount = Math.round((this.subtotal - this.discountAmount) * 100) / 100;
-                    this.taxAmount = Math.round(this.afterDiscount * this.taxRate / 100 * 100) / 100;
+                    let taxableAfterDiscount = this.subtotal > 0 ? Math.round(taxableSub / this.subtotal * this.afterDiscount * 100) / 100 : 0;
+                    this.exemptAmount = Math.round((this.afterDiscount - taxableAfterDiscount) * 100) / 100;
+                    this.taxAmount = Math.round(taxableAfterDiscount * this.taxRate / 100 * 100) / 100;
                     this.total = Math.round((this.afterDiscount + this.taxAmount) * 100) / 100;
                 },
 

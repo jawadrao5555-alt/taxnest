@@ -9,11 +9,15 @@ class PosTransactionItem extends Model
     protected $fillable = [
         'transaction_id', 'item_type', 'item_id', 'item_name',
         'quantity', 'unit_price', 'subtotal',
+        'is_tax_exempt', 'tax_rate', 'tax_amount',
     ];
 
     protected $casts = [
         'unit_price' => 'decimal:2',
         'subtotal' => 'decimal:2',
+        'is_tax_exempt' => 'boolean',
+        'tax_rate' => 'decimal:2',
+        'tax_amount' => 'decimal:2',
     ];
 
     public function transaction()

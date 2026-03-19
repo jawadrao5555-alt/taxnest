@@ -91,7 +91,11 @@
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Taxable</p>
             <p class="text-xl font-bold text-gray-900 dark:text-white">PKR {{ number_format($summary->total_taxable, 2) }}</p>
         </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center col-span-2 sm:col-span-1">
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Tax Exempt</p>
+            <p class="text-xl font-bold text-amber-600">PKR {{ number_format($summary->total_exempt ?? 0, 2) }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Tax</p>
             <p class="text-xl font-bold text-purple-600">PKR {{ number_format($summary->total_tax, 2) }}</p>
         </div>
@@ -110,6 +114,7 @@
                         <th class="px-4 py-3 text-right">Subtotal</th>
                         <th class="px-4 py-3 text-right">Discount</th>
                         <th class="px-4 py-3 text-right">Taxable</th>
+                        <th class="px-4 py-3 text-right hidden lg:table-cell">Exempt</th>
                         <th class="px-4 py-3 text-right">Tax %</th>
                         <th class="px-4 py-3 text-right">Tax Amt</th>
                         <th class="px-4 py-3 text-right">Total</th>
@@ -133,7 +138,14 @@
                         </td>
                         <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ number_format($t->subtotal, 2) }}</td>
                         <td class="px-4 py-3 text-right text-red-500 whitespace-nowrap">{{ number_format($t->discount_amount, 2) }}</td>
-                        <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ number_format($t->subtotal - $t->discount_amount, 2) }}</td>
+                        <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ number_format($t->subtotal - $t->discount_amount - ($t->exempt_amount ?? 0), 2) }}</td>
+                        <td class="px-4 py-3 text-right whitespace-nowrap hidden lg:table-cell">
+                            @if(($t->exempt_amount ?? 0) > 0)
+                            <span class="text-amber-600 dark:text-amber-400 font-medium">{{ number_format($t->exempt_amount, 2) }}</span>
+                            @else
+                            <span class="text-gray-400">—</span>
+                            @endif
+                        </td>
                         <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white whitespace-nowrap">{{ number_format($t->tax_rate, 0) }}%</td>
                         <td class="px-4 py-3 text-right text-purple-600 dark:text-purple-400 font-medium whitespace-nowrap">{{ number_format($t->tax_amount, 2) }}</td>
                         <td class="px-4 py-3 text-right font-bold text-gray-900 dark:text-white whitespace-nowrap">{{ number_format($t->total_amount, 2) }}</td>
@@ -169,6 +181,7 @@
                         <td class="px-4 py-3 text-right text-gray-900 dark:text-white">—</td>
                         <td class="px-4 py-3 text-right text-red-600">PKR {{ number_format($summary->total_discount, 2) }}</td>
                         <td class="px-4 py-3 text-right text-gray-900 dark:text-white">PKR {{ number_format($summary->total_taxable, 2) }}</td>
+                        <td class="px-4 py-3 text-right text-amber-600 hidden lg:table-cell">PKR {{ number_format($summary->total_exempt ?? 0, 2) }}</td>
                         <td class="px-4 py-3 text-right text-gray-900 dark:text-white">—</td>
                         <td class="px-4 py-3 text-right text-purple-600">PKR {{ number_format($summary->total_tax, 2) }}</td>
                         <td class="px-4 py-3 text-right text-emerald-600">PKR {{ number_format($summary->total_sales, 2) }}</td>

@@ -122,10 +122,10 @@ class PosController extends Controller
             'discount_value' => 'nullable|numeric|min:0',
         ]);
 
-        $subtotal = 0;
-        foreach ($request->items as $item) {
-            $subtotal += $item['quantity'] * $item['unit_price'];
-        }
+        $companyItems = $this->resolveItemExemptions($request->items, $companyId);
+        $subtotal = array_sum(array_column($companyItems, 'lineTotal'));
+        $taxableSubtotal = array_sum(array_map(fn($i) => $i['isExempt'] ? 0 : $i['lineTotal'], $companyItems));
+        $exemptSubtotal = $subtotal - $taxableSubtotal;
 
         $discountValue = (float) ($request->discount_value ?? 0);
         $discountType = $request->discount_type;
@@ -136,8 +136,11 @@ class PosController extends Controller
         }
 
         $afterDiscount = $subtotal - $discountAmount;
+        $taxableAfterDiscount = $subtotal > 0 ? round($taxableSubtotal / $subtotal * $afterDiscount, 2) : 0;
+        $exemptAfterDiscount = round($afterDiscount - $taxableAfterDiscount, 2);
+
         $taxRate = PosTaxRule::getRateForMethod($request->payment_method);
-        $taxAmount = round($afterDiscount * $taxRate / 100, 2);
+        $taxAmount = round($taxableAfterDiscount * $taxRate / 100, 2);
         $totalAmount = round($afterDiscount + $taxAmount, 2);
 
         if ($request->terminal_id) {
@@ -177,6 +180,7 @@ class PosController extends Controller
                     'discount_amount' => $discountAmount,
                     'tax_rate' => $taxRate,
                     'tax_amount' => $taxAmount,
+                    'exempt_amount' => $exemptAfterDiscount,
                     'total_amount' => $totalAmount,
                     'payment_method' => $request->payment_method,
                     'status' => 'completed',
@@ -203,6 +207,7 @@ class PosController extends Controller
                     'discount_amount' => $discountAmount,
                     'tax_rate' => $taxRate,
                     'tax_amount' => $taxAmount,
+                    'exempt_amount' => $exemptAfterDiscount,
                     'total_amount' => $totalAmount,
                     'payment_method' => $request->payment_method,
                     'status' => 'completed',
@@ -212,51 +217,23 @@ class PosController extends Controller
                 ]);
             }
 
-            foreach ($request->items as $item) {
-                $itemType = $item['type'] ?? 'product';
-                $itemId = $item['item_id'] ?? null;
-                $itemName = trim($item['name'] ?? '');
-                $itemPrice = (float) ($item['unit_price'] ?? 0);
-
-                if ($itemId) {
-                    if ($itemType === 'product') {
-                        $valid = PosProduct::where('company_id', $companyId)->where('id', $itemId)->exists();
-                    } else {
-                        $valid = PosService::where('company_id', $companyId)->where('id', $itemId)->exists();
-                    }
-                    if (!$valid) {
-                        $itemId = null;
-                    }
-                }
-
-                if (!$itemId && $itemType === 'product' && $itemName !== '') {
-                    $existing = PosProduct::where('company_id', $companyId)
-                        ->whereRaw('LOWER(name) = ?', [strtolower($itemName)])
-                        ->first();
-
-                    if ($existing) {
-                        $itemId = $existing->id;
-                    } else {
-                        $newProduct = PosProduct::create([
-                            'company_id' => $companyId,
-                            'name' => $itemName,
-                            'price' => $itemPrice,
-                            'tax_rate' => 0,
-                            'uom' => 'NOS',
-                            'is_active' => true,
-                        ]);
-                        $itemId = $newProduct->id;
-                    }
-                }
+            foreach ($companyItems as $ri) {
+                $itemTaxRate = $ri['isExempt'] ? 0 : $taxRate;
+                $itemDiscountShare = $subtotal > 0 ? round($discountAmount * ($ri['lineTotal'] / $subtotal), 2) : 0;
+                $itemTaxableAmount = $ri['lineTotal'] - $itemDiscountShare;
+                $itemTaxAmount = round($itemTaxableAmount * $itemTaxRate / 100, 2);
 
                 PosTransactionItem::create([
                     'transaction_id' => $transaction->id,
-                    'item_type' => $itemType,
-                    'item_id' => $itemId,
-                    'item_name' => $itemName,
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $itemPrice,
-                    'subtotal' => round($item['quantity'] * $itemPrice, 2),
+                    'item_type' => $ri['type'],
+                    'item_id' => $ri['item_id'],
+                    'item_name' => $ri['name'],
+                    'quantity' => $ri['quantity'],
+                    'unit_price' => $ri['price'],
+                    'subtotal' => $ri['lineTotal'],
+                    'is_tax_exempt' => $ri['isExempt'],
+                    'tax_rate' => $itemTaxRate,
+                    'tax_amount' => $itemTaxAmount,
                 ]);
             }
 
@@ -349,10 +326,9 @@ class PosController extends Controller
             'discount_value' => 'nullable|numeric|min:0',
         ]);
 
-        $subtotal = 0;
-        foreach ($request->items as $item) {
-            $subtotal += $item['quantity'] * $item['unit_price'];
-        }
+        $companyItems = $this->resolveItemExemptions($request->items, $companyId);
+        $subtotal = array_sum(array_column($companyItems, 'lineTotal'));
+        $taxableSubtotal = array_sum(array_map(fn($i) => $i['isExempt'] ? 0 : $i['lineTotal'], $companyItems));
 
         $discountValue = (float) ($request->discount_value ?? 0);
         $discountType = $request->discount_type;
@@ -363,8 +339,11 @@ class PosController extends Controller
         }
 
         $afterDiscount = $subtotal - $discountAmount;
+        $taxableAfterDiscount = $subtotal > 0 ? round($taxableSubtotal / $subtotal * $afterDiscount, 2) : 0;
+        $exemptAfterDiscount = round($afterDiscount - $taxableAfterDiscount, 2);
+
         $taxRate = PosTaxRule::getRateForMethod($request->payment_method);
-        $taxAmount = round($afterDiscount * $taxRate / 100, 2);
+        $taxAmount = round($taxableAfterDiscount * $taxRate / 100, 2);
         $totalAmount = round($afterDiscount + $taxAmount, 2);
 
         DB::beginTransaction();
@@ -379,6 +358,7 @@ class PosController extends Controller
                 'discount_amount' => $discountAmount,
                 'tax_rate' => $taxRate,
                 'tax_amount' => $taxAmount,
+                'exempt_amount' => $exemptAfterDiscount,
                 'total_amount' => $totalAmount,
                 'payment_method' => $request->payment_method,
                 'pra_status' => $company->pra_reporting_enabled ? 'pending' : ($transaction->pra_status ?? 'local'),
@@ -386,31 +366,23 @@ class PosController extends Controller
 
             $transaction->items()->delete();
 
-            foreach ($request->items as $item) {
-                $itemType = $item['type'] ?? 'product';
-                $itemId = $item['item_id'] ?? null;
-                $itemName = trim($item['name'] ?? '');
-                $itemPrice = (float) ($item['unit_price'] ?? 0);
-
-                if ($itemId) {
-                    if ($itemType === 'product') {
-                        $valid = PosProduct::where('company_id', $companyId)->where('id', $itemId)->exists();
-                    } else {
-                        $valid = PosService::where('company_id', $companyId)->where('id', $itemId)->exists();
-                    }
-                    if (!$valid) {
-                        $itemId = null;
-                    }
-                }
+            foreach ($companyItems as $ri) {
+                $itemTaxRate = $ri['isExempt'] ? 0 : $taxRate;
+                $itemDiscountShare = $subtotal > 0 ? round($discountAmount * ($ri['lineTotal'] / $subtotal), 2) : 0;
+                $itemTaxableAmount = $ri['lineTotal'] - $itemDiscountShare;
+                $itemTaxAmount = round($itemTaxableAmount * $itemTaxRate / 100, 2);
 
                 PosTransactionItem::create([
                     'transaction_id' => $transaction->id,
-                    'item_type' => $itemType,
-                    'item_id' => $itemId,
-                    'item_name' => $itemName,
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $itemPrice,
-                    'subtotal' => round($item['quantity'] * $itemPrice, 2),
+                    'item_type' => $ri['type'],
+                    'item_id' => $ri['item_id'],
+                    'item_name' => $ri['name'],
+                    'quantity' => $ri['quantity'],
+                    'unit_price' => $ri['price'],
+                    'subtotal' => $ri['lineTotal'],
+                    'is_tax_exempt' => $ri['isExempt'],
+                    'tax_rate' => $itemTaxRate,
+                    'tax_amount' => $itemTaxAmount,
                 ]);
             }
 
@@ -747,8 +719,9 @@ class PosController extends Controller
             COUNT(*) as total_invoices,
             COALESCE(SUM(total_amount), 0) as total_sales,
             COALESCE(SUM(discount_amount), 0) as total_discount,
-            COALESCE(SUM(subtotal - discount_amount), 0) as total_taxable,
-            COALESCE(SUM(tax_amount), 0) as total_tax
+            COALESCE(SUM(subtotal - discount_amount - COALESCE(exempt_amount, 0)), 0) as total_taxable,
+            COALESCE(SUM(tax_amount), 0) as total_tax,
+            COALESCE(SUM(exempt_amount), 0) as total_exempt
         ')->first();
 
         $dateLabel = $this->getReportDateLabel($request);
@@ -789,6 +762,7 @@ class PosController extends Controller
                 'Subtotal (PKR)',
                 'Discount Amount (PKR)',
                 'Taxable Amount (PKR)',
+                'Tax Exempt Amount (PKR)',
                 'Tax Rate (%)',
                 'Tax Amount (PKR)',
                 'Total Amount (PKR)',
@@ -805,7 +779,8 @@ class PosController extends Controller
                     ucwords(str_replace('_', ' ', $t->payment_method)),
                     number_format($t->subtotal, 2, '.', ''),
                     number_format($t->discount_amount, 2, '.', ''),
-                    number_format($t->subtotal - $t->discount_amount, 2, '.', ''),
+                    number_format($t->subtotal - $t->discount_amount - ($t->exempt_amount ?? 0), 2, '.', ''),
+                    number_format($t->exempt_amount ?? 0, 2, '.', ''),
                     number_format($t->tax_rate, 2, '.', ''),
                     number_format($t->tax_amount, 2, '.', ''),
                     number_format($t->total_amount, 2, '.', ''),
@@ -819,7 +794,8 @@ class PosController extends Controller
             fputcsv($file, ['Total Invoices', $transactions->count()]);
             fputcsv($file, ['Total Sales Amount (PKR)', number_format($transactions->sum('total_amount'), 2, '.', '')]);
             fputcsv($file, ['Total Discount Amount (PKR)', number_format($transactions->sum('discount_amount'), 2, '.', '')]);
-            fputcsv($file, ['Total Taxable Amount (PKR)', number_format($transactions->sum(fn($t) => $t->subtotal - $t->discount_amount), 2, '.', '')]);
+            fputcsv($file, ['Total Taxable Amount (PKR)', number_format($transactions->sum(fn($t) => $t->subtotal - $t->discount_amount - ($t->exempt_amount ?? 0)), 2, '.', '')]);
+            fputcsv($file, ['Total Tax Exempt Amount (PKR)', number_format($transactions->sum('exempt_amount'), 2, '.', '')]);
             fputcsv($file, ['Total Tax Amount (PKR)', number_format($transactions->sum('tax_amount'), 2, '.', '')]);
 
             fclose($file);
@@ -840,8 +816,9 @@ class PosController extends Controller
             COUNT(*) as total_invoices,
             COALESCE(SUM(total_amount), 0) as total_sales,
             COALESCE(SUM(discount_amount), 0) as total_discount,
-            COALESCE(SUM(subtotal - discount_amount), 0) as total_taxable,
-            COALESCE(SUM(tax_amount), 0) as total_tax
+            COALESCE(SUM(subtotal - discount_amount - COALESCE(exempt_amount, 0)), 0) as total_taxable,
+            COALESCE(SUM(tax_amount), 0) as total_tax,
+            COALESCE(SUM(exempt_amount), 0) as total_exempt
         ')->first();
 
         $dateLabel = $this->getReportDateLabel($request);
@@ -881,6 +858,7 @@ class PosController extends Controller
             'price' => $request->price,
             'tax_rate' => $request->tax_rate ?? 0,
             'is_active' => true,
+            'is_tax_exempt' => $request->has('is_tax_exempt'),
         ]);
 
         return back()->with('success', 'Service added successfully.');
@@ -902,6 +880,7 @@ class PosController extends Controller
             'price' => $request->price,
             'tax_rate' => $request->tax_rate ?? $service->tax_rate,
             'is_active' => $request->has('is_active'),
+            'is_tax_exempt' => $request->has('is_tax_exempt'),
         ]);
 
         return back()->with('success', 'Service updated successfully.');
@@ -1014,6 +993,7 @@ class PosController extends Controller
                 'pra_pos_id' => $request->pra_pos_id,
                 'pra_production_token' => $request->pra_production_token,
                 'receipt_printer_size' => $request->receipt_printer_size ?? '80mm',
+                'inventory_enabled' => $request->has('inventory_enabled'),
             ]);
 
             return back()->with('success', 'PRA settings updated successfully.');
@@ -1055,6 +1035,7 @@ class PosController extends Controller
             'sku' => $request->sku,
             'barcode' => $request->barcode,
             'uom' => $request->uom ?? 'NOS',
+            'is_tax_exempt' => $request->has('is_tax_exempt'),
         ]);
 
         return back()->with('success', 'Product added successfully.');
@@ -1231,7 +1212,10 @@ class PosController extends Controller
             'description' => 'nullable|string|max:500',
         ]);
 
-        $product->update($request->only(['name', 'description', 'price', 'tax_rate', 'category', 'sku', 'barcode', 'uom']));
+        $product->update(array_merge(
+            $request->only(['name', 'description', 'price', 'tax_rate', 'category', 'sku', 'barcode', 'uom']),
+            ['is_tax_exempt' => $request->has('is_tax_exempt')]
+        ));
         return back()->with('success', 'Product updated successfully.');
     }
 
@@ -1478,6 +1462,69 @@ class PosController extends Controller
         $transaction = PosTransaction::where('company_id', $companyId)->findOrFail($id);
         $transaction->releaseLock();
         return response()->json(['success' => true]);
+    }
+
+    private function resolveItemExemptions(array $requestItems, int $companyId): array
+    {
+        $resolved = [];
+        foreach ($requestItems as $item) {
+            $itemType = $item['type'] ?? 'product';
+            $itemId = $item['item_id'] ?? null;
+            $itemName = trim($item['name'] ?? '');
+            $itemPrice = (float) ($item['unit_price'] ?? 0);
+            $qty = (float) ($item['quantity'] ?? 0);
+            $isExempt = !empty($item['is_tax_exempt']);
+
+            if ($itemId) {
+                if ($itemType === 'product') {
+                    $obj = PosProduct::where('company_id', $companyId)->where('id', $itemId)->first();
+                    if ($obj) {
+                        $isExempt = (bool) $obj->is_tax_exempt;
+                    } else {
+                        $itemId = null;
+                    }
+                } else {
+                    $obj = PosService::where('company_id', $companyId)->where('id', $itemId)->first();
+                    if ($obj) {
+                        $isExempt = (bool) $obj->is_tax_exempt;
+                    } else {
+                        $itemId = null;
+                    }
+                }
+            }
+
+            if (!$itemId && $itemType === 'product' && $itemName !== '') {
+                $existing = PosProduct::where('company_id', $companyId)
+                    ->whereRaw('LOWER(name) = ?', [strtolower($itemName)])
+                    ->first();
+                if ($existing) {
+                    $itemId = $existing->id;
+                    $isExempt = (bool) $existing->is_tax_exempt;
+                } else {
+                    $newProduct = PosProduct::create([
+                        'company_id' => $companyId,
+                        'name' => $itemName,
+                        'price' => $itemPrice,
+                        'tax_rate' => 0,
+                        'uom' => 'NOS',
+                        'is_active' => true,
+                    ]);
+                    $itemId = $newProduct->id;
+                    $isExempt = false;
+                }
+            }
+
+            $resolved[] = [
+                'type' => $itemType,
+                'item_id' => $itemId,
+                'name' => $itemName,
+                'price' => $itemPrice,
+                'quantity' => $qty,
+                'lineTotal' => round($qty * $itemPrice, 2),
+                'isExempt' => $isExempt,
+            ];
+        }
+        return $resolved;
     }
 
     private function generateInvoiceNumber(int $companyId): string

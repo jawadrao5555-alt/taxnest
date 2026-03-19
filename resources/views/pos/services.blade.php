@@ -28,8 +28,12 @@
                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Description</label>
                 <input type="text" name="description" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500" placeholder="Optional">
             </div>
-            <div class="flex items-end">
-                <button type="submit" class="w-full px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition">Add Service</button>
+            <div class="flex items-center gap-3 pt-5">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="is_tax_exempt" value="1" class="rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                    <span class="text-xs font-medium text-gray-600 dark:text-gray-400">Tax Exempt</span>
+                </label>
+                <button type="submit" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition">Add Service</button>
             </div>
         </form>
     </div>
@@ -50,7 +54,14 @@
             <tbody>
                 @forelse($services as $service)
                 <tr class="border-b border-gray-100 dark:border-gray-800 {{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }}" x-data="{ editing: false }">
-                    <td class="px-4 py-3 font-medium text-gray-900 dark:text-white" x-show="!editing">{{ $service->name }}</td>
+                    <td class="px-4 py-3" x-show="!editing">
+                        <div class="flex items-center gap-2">
+                            <span class="font-medium text-gray-900 dark:text-white">{{ $service->name }}</span>
+                            @if($service->is_tax_exempt)
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">EXEMPT</span>
+                            @endif
+                        </div>
+                    </td>
                     <td class="px-4 py-3 text-gray-600 dark:text-gray-400 hidden md:table-cell" x-show="!editing">{{ $service->description ?? '-' }}</td>
                     <td class="px-4 py-3 text-right text-gray-900 dark:text-white" x-show="!editing">PKR {{ number_format($service->price, 2) }}</td>
                     <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300 hidden sm:table-cell" x-show="!editing">{{ $service->tax_rate }}%</td>
@@ -75,8 +86,9 @@
                             <input type="text" name="description" value="{{ $service->description }}" placeholder="Description" class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1 w-full">
                             <input type="number" name="price" value="{{ $service->price }}" step="0.01" required placeholder="Price" class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1 w-full">
                             <input type="number" name="tax_rate" value="{{ $service->tax_rate }}" step="0.01" placeholder="Tax %" class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1 w-full">
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2 flex-wrap">
                                 <label class="flex items-center gap-1 text-xs"><input type="checkbox" name="is_active" {{ $service->is_active ? 'checked' : '' }} class="rounded"> Active</label>
+                                <label class="flex items-center gap-1 text-xs"><input type="checkbox" name="is_tax_exempt" value="1" {{ $service->is_tax_exempt ? 'checked' : '' }} class="rounded border-gray-300 text-amber-600 focus:ring-amber-500"> Exempt</label>
                                 <button type="submit" class="text-emerald-600 text-xs font-medium hover:underline">Save</button>
                                 <button type="button" @click="editing = false" class="text-gray-500 text-xs hover:underline">Cancel</button>
                             </div>

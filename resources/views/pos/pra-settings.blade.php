@@ -36,6 +36,15 @@
                         </select>
                         <p class="text-xs text-gray-400 mt-1">Select the thermal printer paper size used at your POS terminals.</p>
                     </div>
+                    <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" name="inventory_enabled" value="1" {{ $company->inventory_enabled ? 'checked' : '' }} class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 w-5 h-5">
+                            <div>
+                                <span class="text-sm font-medium text-gray-900 dark:text-white">Enable Inventory Tracking</span>
+                                <p class="text-xs text-gray-400">Track stock quantities for products. When enabled, product quantities will be deducted on each sale.</p>
+                            </div>
+                        </label>
+                    </div>
                     <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
                         <p class="text-xs text-blue-700 dark:text-blue-400">
                             <strong>API Endpoints:</strong><br>

@@ -9,7 +9,7 @@ class PosTransaction extends Model
     protected $fillable = [
         'company_id', 'terminal_id', 'invoice_number', 'customer_name', 'customer_phone',
         'subtotal', 'discount_type', 'discount_value', 'discount_amount',
-        'tax_rate', 'tax_amount', 'total_amount', 'payment_method',
+        'tax_rate', 'tax_amount', 'exempt_amount', 'total_amount', 'payment_method',
         'status', 'locked_by_terminal_id', 'lock_time',
         'pra_invoice_number', 'pra_response_code', 'pra_status', 'submission_hash', 'pra_qr_code', 'created_by',
     ];
@@ -20,6 +20,7 @@ class PosTransaction extends Model
         'discount_amount' => 'decimal:2',
         'tax_rate' => 'decimal:2',
         'tax_amount' => 'decimal:2',
+        'exempt_amount' => 'decimal:2',
         'total_amount' => 'decimal:2',
         'lock_time' => 'datetime',
     ];

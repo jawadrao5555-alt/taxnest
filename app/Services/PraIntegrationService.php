@@ -111,7 +111,8 @@ class PraIntegrationService
                     $saleValuePerUnit = 0.01;
                 }
                 $lineSaleValue = round($saleValuePerUnit * $qty, 2);
-                $taxCharged = round($lineSaleValue * $taxRate / 100, 2);
+                $itemTaxRate = $item->is_tax_exempt ? 0 : ($item->tax_rate ?? $taxRate);
+                $taxCharged = round($lineSaleValue * $itemTaxRate / 100, 2);
                 $totalAmount = round($lineSaleValue + $taxCharged, 2);
 
                 return [
@@ -119,7 +120,7 @@ class PraIntegrationService
                     'ItemName' => preg_replace('/[^a-zA-Z0-9\s]/', '', $item->item_name),
                     'Quantity' => $qty,
                     'PCTCode' => '00000000',
-                    'TaxRate' => $taxRate,
+                    'TaxRate' => $itemTaxRate,
                     'SaleValue' => $saleValuePerUnit,
                     'TotalAmount' => $totalAmount,
                     'TaxCharged' => $taxCharged,

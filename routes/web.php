@@ -431,6 +431,7 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::get('/transactions', [PosController::class, 'transactions'])->name('pos.transactions');
     Route::get('/transaction/{id}', [PosController::class, 'transactionShow'])->name('pos.transaction.show');
     Route::post('/transaction/{id}/retry-pra', [PosController::class, 'retryPra'])->name('pos.transaction.retry-pra');
+    Route::post('/transactions/bulk-retry-pra', [PosController::class, 'bulkRetryPra'])->name('pos.transactions.bulk-retry-pra');
     Route::get('/transaction/{id}/receipt', [PosController::class, 'receipt'])->name('pos.receipt');
     Route::get('/reports', [PosController::class, 'reports'])->name('pos.reports');
     Route::get('/tax-reports', [PosController::class, 'taxReports'])->name('pos.tax-reports');

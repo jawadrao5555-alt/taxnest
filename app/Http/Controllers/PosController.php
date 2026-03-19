@@ -342,6 +342,61 @@ class PosController extends Controller
         }
     }
 
+    public function bulkRetryPra()
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        if (!$company->pra_reporting_enabled) {
+            return back()->with('error', 'PRA reporting is currently disabled. Enable it from PRA Settings first.');
+        }
+
+        $pendingInvoices = PosTransaction::where('company_id', $companyId)
+            ->whereIn('pra_status', ['failed', 'offline', 'pending'])
+            ->whereNull('pra_invoice_number')
+            ->orderBy('id', 'asc')
+            ->get();
+
+        if ($pendingInvoices->isEmpty()) {
+            return back()->with('info', 'No failed or offline invoices to retry.');
+        }
+
+        $praService = new PraIntegrationService($company);
+        $successCount = 0;
+        $failCount = 0;
+        $errors = [];
+
+        foreach ($pendingInvoices as $transaction) {
+            try {
+                $result = $praService->sendInvoice($transaction);
+                if ($result['success']) {
+                    $successCount++;
+                } else {
+                    $failCount++;
+                    $errors[] = $transaction->invoice_number . ': ' . ($result['message'] ?? 'Unknown error');
+                }
+            } catch (\Exception $e) {
+                $failCount++;
+                $transaction->update(['pra_status' => 'offline']);
+                $errors[] = $transaction->invoice_number . ': Connection failed';
+            }
+        }
+
+        $message = '';
+        if ($successCount > 0) {
+            $message = $successCount . ' invoice(s) successfully submitted to PRA.';
+        }
+        if ($failCount > 0) {
+            $errorDetail = $failCount . ' invoice(s) failed.';
+            if ($successCount > 0) {
+                return back()->with('warning', $message . ' ' . $errorDetail);
+            }
+            return back()->with('error', $errorDetail . ' ' . implode(' | ', array_slice($errors, 0, 3)));
+        }
+
+        return back()->with('success', $message);
+    }
+
     public function transactions(Request $request)
     {
         $companyId = app('currentCompanyId');

@@ -1557,6 +1557,7 @@ class PosController extends Controller
                     $itemId = $existing->id;
                     $isExempt = (bool) $existing->is_tax_exempt;
                 } else {
+                    $userExempt = !empty($item['is_tax_exempt']);
                     $newProduct = PosProduct::create([
                         'company_id' => $companyId,
                         'name' => $itemName,
@@ -1564,9 +1565,10 @@ class PosController extends Controller
                         'tax_rate' => 0,
                         'uom' => 'NOS',
                         'is_active' => true,
+                        'is_tax_exempt' => $userExempt,
                     ]);
                     $itemId = $newProduct->id;
-                    $isExempt = false;
+                    $isExempt = $userExempt;
                 }
             }
 

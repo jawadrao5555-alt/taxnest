@@ -214,10 +214,16 @@
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Unit Price</label>
                                 <input type="number" x-model.number="item.unit_price" min="0" step="0.01" @input="recalculate()" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition">
                             </div>
-                            <div class="sm:col-span-1 flex items-center gap-1">
-                                <label class="block sm:hidden text-xs text-gray-500 mb-1 mr-2">Subtotal</label>
-                                <span class="text-sm font-semibold text-gray-800 dark:text-gray-200" x-text="'Rs ' + (item.quantity * item.unit_price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
-                                <span x-show="item.is_tax_exempt" class="inline-flex items-center px-1 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 whitespace-nowrap">TAX FREE</span>
+                            <div class="sm:col-span-1 flex flex-col items-start gap-1">
+                                <div class="flex items-center gap-1">
+                                    <label class="block sm:hidden text-xs text-gray-500 mr-2">Subtotal</label>
+                                    <span class="text-sm font-semibold text-gray-800 dark:text-gray-200" x-text="'Rs ' + (item.quantity * item.unit_price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
+                                </div>
+                                <button type="button" @click="item.is_tax_exempt = !item.is_tax_exempt; recalculate()" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold cursor-pointer transition-all"
+                                    :class="item.is_tax_exempt ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 ring-1 ring-amber-300 dark:ring-amber-600' : 'bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-900/20 dark:hover:text-amber-400'">
+                                    <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" x-show="item.is_tax_exempt" d="M5 13l4 4L19 7"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x-show="!item.is_tax_exempt" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                                    <span x-text="item.is_tax_exempt ? 'EXEMPT' : 'Taxable'"></span>
+                                </button>
                             </div>
                             <div class="sm:col-span-1 flex items-center justify-end">
                                 <button type="button" @click="removeItem(index)" x-show="items.length > 1" class="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition">

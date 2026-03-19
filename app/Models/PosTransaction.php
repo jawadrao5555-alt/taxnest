@@ -12,6 +12,7 @@ class PosTransaction extends Model
         'tax_rate', 'tax_amount', 'exempt_amount', 'total_amount', 'payment_method',
         'status', 'locked_by_terminal_id', 'lock_time',
         'pra_invoice_number', 'pra_response_code', 'pra_status', 'submission_hash', 'pra_qr_code', 'created_by',
+        'share_token', 'share_token_created_at',
     ];
 
     protected $casts = [

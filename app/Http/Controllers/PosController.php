@@ -601,6 +601,62 @@ class PosController extends Controller
         return view($receiptView, compact('transaction', 'company'));
     }
 
+    public function downloadInvoicePdf($id)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $transaction = PosTransaction::where('company_id', $companyId)
+            ->with(['items', 'terminal'])
+            ->findOrFail($id);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.invoice-pdf', compact('transaction', 'company'));
+        $pdf->setPaper('a4', 'portrait');
+
+        return $pdf->download("Invoice-{$transaction->invoice_number}.pdf");
+    }
+
+    public function generateShareLink($id)
+    {
+        $companyId = app('currentCompanyId');
+        $transaction = PosTransaction::where('company_id', $companyId)->findOrFail($id);
+
+        if (!$transaction->share_token) {
+            $transaction->update([
+                'share_token' => bin2hex(random_bytes(32)),
+                'share_token_created_at' => now(),
+            ]);
+        }
+
+        $shareUrl = url("/pos/invoice/share/{$transaction->share_token}");
+
+        return response()->json(['url' => $shareUrl, 'token' => $transaction->share_token]);
+    }
+
+    public function publicInvoicePdf($token)
+    {
+        if (strlen($token) !== 64 || !ctype_xdigit($token)) {
+            abort(404);
+        }
+
+        $transaction = PosTransaction::where('share_token', $token)
+            ->with(['items', 'terminal'])
+            ->firstOrFail();
+
+        if ($transaction->share_token_created_at && $transaction->share_token_created_at < now()->subDays(30)) {
+            abort(410, 'This share link has expired.');
+        }
+
+        $company = Company::find($transaction->company_id);
+        if (!$company) {
+            abort(404);
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.invoice-pdf', compact('transaction', 'company'));
+        $pdf->setPaper('a4', 'portrait');
+
+        return $pdf->stream("Invoice-{$transaction->invoice_number}.pdf");
+    }
+
     public function reports()
     {
         $companyId = app('currentCompanyId');

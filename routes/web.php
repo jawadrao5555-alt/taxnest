@@ -122,6 +122,8 @@ Route::get('/pos/register', [PosAuthController::class, 'showRegister'])->name('p
 Route::post('/pos/register', [PosAuthController::class, 'register']);
 Route::post('/pos/logout', [PosAuthController::class, 'logout'])->name('pos.logout');
 
+Route::get('/pos/invoice/share/{token}', [PosController::class, 'publicInvoicePdf'])->name('pos.invoice.share');
+
 Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])->group(function () {
 
     Route::get('/onboarding', [OnboardingController::class, 'index'])->name('onboarding');
@@ -436,6 +438,8 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::post('/transaction/{id}/retry-pra', [PosController::class, 'retryPra'])->name('pos.transaction.retry-pra');
     Route::post('/transactions/bulk-retry-pra', [PosController::class, 'bulkRetryPra'])->name('pos.transactions.bulk-retry-pra');
     Route::get('/transaction/{id}/receipt', [PosController::class, 'receipt'])->name('pos.receipt');
+    Route::get('/transaction/{id}/pdf', [PosController::class, 'downloadInvoicePdf'])->name('pos.invoice.pdf');
+    Route::post('/transaction/{id}/share-link', [PosController::class, 'generateShareLink'])->name('pos.invoice.share-link');
     Route::get('/reports', [PosController::class, 'reports'])->name('pos.reports');
     Route::get('/tax-reports', [PosController::class, 'taxReports'])->name('pos.tax-reports');
     Route::get('/tax-reports/csv', [PosController::class, 'exportTaxReportCsv'])->name('pos.tax-reports.csv');

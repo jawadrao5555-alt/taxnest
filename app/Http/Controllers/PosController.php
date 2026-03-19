@@ -299,6 +299,178 @@ class PosController extends Controller
             ->with('success', 'Invoice Created Successfully! POS Invoice Number: ' . $invoiceNumber . $praMessage);
     }
 
+    public function editTransaction($id)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $transaction = PosTransaction::where('company_id', $companyId)
+            ->with('items')
+            ->findOrFail($id);
+
+        if ($transaction->pra_invoice_number) {
+            return redirect()->route('pos.transaction.show', $id)
+                ->with('error', 'Cannot edit — this invoice has been submitted to PRA. PRA Fiscal #: ' . $transaction->pra_invoice_number);
+        }
+
+        $products = PosProduct::where('company_id', $companyId)->where('is_active', true)->get();
+        $services = PosService::where('company_id', $companyId)->where('is_active', true)->get();
+        $posCustomers = PosCustomer::where('company_id', $companyId)->where('is_active', true)->orderBy('name')->get();
+        $taxRules = PosTaxRule::where('is_active', true)->get()->keyBy('payment_method');
+        $terminals = PosTerminal::where('company_id', $companyId)->where('is_active', true)->get();
+
+        return view('pos.edit-transaction', compact('company', 'transaction', 'products', 'services', 'taxRules', 'terminals', 'posCustomers'));
+    }
+
+    public function updateTransaction(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $transaction = PosTransaction::where('company_id', $companyId)->findOrFail($id);
+
+        if ($transaction->pra_invoice_number) {
+            return redirect()->route('pos.transaction.show', $id)
+                ->with('error', 'Cannot edit — this invoice has been submitted to PRA.');
+        }
+
+        $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.name' => 'required|string',
+            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.unit_price' => 'required|numeric|min:0',
+            'payment_method' => 'required|in:cash,debit_card,credit_card,qr_payment',
+            'discount_type' => 'required|in:percentage,amount',
+            'discount_value' => 'nullable|numeric|min:0',
+        ]);
+
+        $subtotal = 0;
+        foreach ($request->items as $item) {
+            $subtotal += $item['quantity'] * $item['unit_price'];
+        }
+
+        $discountValue = (float) ($request->discount_value ?? 0);
+        $discountType = $request->discount_type;
+        if ($discountType === 'percentage') {
+            $discountAmount = round($subtotal * $discountValue / 100, 2);
+        } else {
+            $discountAmount = min($discountValue, $subtotal);
+        }
+
+        $afterDiscount = $subtotal - $discountAmount;
+        $taxRate = PosTaxRule::getRateForMethod($request->payment_method);
+        $taxAmount = round($afterDiscount * $taxRate / 100, 2);
+        $totalAmount = round($afterDiscount + $taxAmount, 2);
+
+        DB::beginTransaction();
+        try {
+            $transaction->update([
+                'terminal_id' => $request->terminal_id,
+                'customer_name' => $request->customer_name,
+                'customer_phone' => $request->customer_phone,
+                'subtotal' => $subtotal,
+                'discount_type' => $discountType,
+                'discount_value' => $discountValue,
+                'discount_amount' => $discountAmount,
+                'tax_rate' => $taxRate,
+                'tax_amount' => $taxAmount,
+                'total_amount' => $totalAmount,
+                'payment_method' => $request->payment_method,
+                'pra_status' => $company->pra_reporting_enabled ? 'pending' : ($transaction->pra_status ?? 'local'),
+            ]);
+
+            $transaction->items()->delete();
+
+            foreach ($request->items as $item) {
+                $itemType = $item['type'] ?? 'product';
+                $itemId = $item['item_id'] ?? null;
+                $itemName = trim($item['name'] ?? '');
+                $itemPrice = (float) ($item['unit_price'] ?? 0);
+
+                if ($itemId) {
+                    if ($itemType === 'product') {
+                        $valid = PosProduct::where('company_id', $companyId)->where('id', $itemId)->exists();
+                    } else {
+                        $valid = PosService::where('company_id', $companyId)->where('id', $itemId)->exists();
+                    }
+                    if (!$valid) {
+                        $itemId = null;
+                    }
+                }
+
+                PosTransactionItem::create([
+                    'transaction_id' => $transaction->id,
+                    'item_type' => $itemType,
+                    'item_id' => $itemId,
+                    'item_name' => $itemName,
+                    'quantity' => $item['quantity'],
+                    'unit_price' => $itemPrice,
+                    'subtotal' => round($item['quantity'] * $itemPrice, 2),
+                ]);
+            }
+
+            $transaction->payments()->delete();
+            PosPayment::create([
+                'transaction_id' => $transaction->id,
+                'payment_method' => $request->payment_method,
+                'amount' => $totalAmount,
+                'reference_number' => $request->reference_number,
+            ]);
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withInput()->with('error', 'Failed to update invoice: ' . $e->getMessage());
+        }
+
+        $praMessage = '';
+        if ($company->pra_reporting_enabled) {
+            try {
+                $transaction->update(['pra_status' => 'pending', 'pra_response_code' => null]);
+                $praService = new PraIntegrationService($company);
+                $praResult = $praService->sendInvoice($transaction);
+                $transaction->refresh();
+
+                if ($praResult['success']) {
+                    $praMessage = ' | PRA Fiscal #: ' . ($transaction->pra_invoice_number ?? 'N/A');
+                } else {
+                    $transaction->update(['pra_status' => 'offline']);
+                    $praMessage = ' | Offline: Will sync automatically.';
+                }
+            } catch (\Exception $e) {
+                $transaction->update(['pra_status' => 'offline']);
+                $praMessage = ' | Offline: Will sync automatically.';
+            }
+        }
+
+        return redirect()->route('pos.transaction.show', $transaction->id)
+            ->with('success', 'Invoice updated successfully!' . $praMessage);
+    }
+
+    public function deleteTransaction($id)
+    {
+        $companyId = app('currentCompanyId');
+        $transaction = PosTransaction::where('company_id', $companyId)->findOrFail($id);
+
+        if ($transaction->pra_invoice_number) {
+            return redirect()->route('pos.transaction.show', $id)
+                ->with('error', 'Cannot delete — this invoice has been submitted to PRA. PRA Fiscal #: ' . $transaction->pra_invoice_number);
+        }
+
+        DB::beginTransaction();
+        try {
+            $transaction->items()->delete();
+            $transaction->payments()->delete();
+            $transaction->praLogs()->delete();
+            $transaction->delete();
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to delete invoice: ' . $e->getMessage());
+        }
+
+        return redirect()->route('pos.transactions')
+            ->with('success', 'Invoice ' . $transaction->invoice_number . ' deleted successfully.');
+    }
+
     public function retryPra($id)
     {
         $companyId = app('currentCompanyId');

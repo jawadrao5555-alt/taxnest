@@ -430,6 +430,9 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::post('/invoice/store', [PosController::class, 'storeInvoice'])->name('pos.invoice.store');
     Route::get('/transactions', [PosController::class, 'transactions'])->name('pos.transactions');
     Route::get('/transaction/{id}', [PosController::class, 'transactionShow'])->name('pos.transaction.show');
+    Route::get('/transaction/{id}/edit', [PosController::class, 'editTransaction'])->name('pos.transaction.edit');
+    Route::put('/transaction/{id}', [PosController::class, 'updateTransaction'])->name('pos.transaction.update');
+    Route::delete('/transaction/{id}', [PosController::class, 'deleteTransaction'])->name('pos.transaction.delete');
     Route::post('/transaction/{id}/retry-pra', [PosController::class, 'retryPra'])->name('pos.transaction.retry-pra');
     Route::post('/transactions/bulk-retry-pra', [PosController::class, 'bulkRetryPra'])->name('pos.transactions.bulk-retry-pra');
     Route::get('/transaction/{id}/receipt', [PosController::class, 'receipt'])->name('pos.receipt');

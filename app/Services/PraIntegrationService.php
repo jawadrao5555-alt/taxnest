@@ -95,32 +95,40 @@ class PraIntegrationService
         $totalDiscount = (float) $transaction->discount_amount;
         $taxRate = (float) $transaction->tax_rate;
 
-        $items = $transaction->items->map(function ($item, $index) use ($itemsSubtotal, $totalDiscount, $taxRate) {
-            $qty = (float) $item->quantity;
-            $unitPrice = (float) $item->unit_price;
-            $lineSubtotal = (float) $item->subtotal;
-            $itemDiscount = $itemsSubtotal > 0 ? round($totalDiscount * ($lineSubtotal / $itemsSubtotal), 2) : 0;
-            $perUnitDiscount = $qty > 0 ? round($itemDiscount / $qty, 2) : 0;
-            $saleValuePerUnit = round($unitPrice - $perUnitDiscount, 2);
-            $lineSaleValue = round($saleValuePerUnit * $qty, 2);
-            $taxCharged = round($lineSaleValue * $taxRate / 100, 2);
-            $totalAmount = round($lineSaleValue + $taxCharged, 2);
+        $items = $transaction->items
+            ->filter(function ($item) {
+                return (float) $item->unit_price > 0 && (float) $item->quantity > 0;
+            })
+            ->values()
+            ->map(function ($item, $index) use ($itemsSubtotal, $totalDiscount, $taxRate) {
+                $qty = (float) $item->quantity;
+                $unitPrice = (float) $item->unit_price;
+                $lineSubtotal = (float) $item->subtotal;
+                $itemDiscount = $itemsSubtotal > 0 ? round($totalDiscount * ($lineSubtotal / $itemsSubtotal), 2) : 0;
+                $perUnitDiscount = $qty > 0 ? round($itemDiscount / $qty, 2) : 0;
+                $saleValuePerUnit = round($unitPrice - $perUnitDiscount, 2);
+                if ($saleValuePerUnit <= 0) {
+                    $saleValuePerUnit = 0.01;
+                }
+                $lineSaleValue = round($saleValuePerUnit * $qty, 2);
+                $taxCharged = round($lineSaleValue * $taxRate / 100, 2);
+                $totalAmount = round($lineSaleValue + $taxCharged, 2);
 
-            return [
-                'ItemCode' => $item->item_id ? sprintf('%04d', $item->item_id) : sprintf('IT_%04d', $index + 1),
-                'ItemName' => preg_replace('/[^a-zA-Z0-9\s]/', '', $item->item_name),
-                'Quantity' => $qty,
-                'PCTCode' => '00000000',
-                'TaxRate' => $taxRate,
-                'SaleValue' => $saleValuePerUnit,
-                'TotalAmount' => $totalAmount,
-                'TaxCharged' => $taxCharged,
-                'Discount' => 0.0,
-                'FurtherTax' => 0.0,
-                'InvoiceType' => 1,
-                'RefUSIN' => null,
-            ];
-        })->toArray();
+                return [
+                    'ItemCode' => $item->item_id ? sprintf('%04d', $item->item_id) : sprintf('IT_%04d', $index + 1),
+                    'ItemName' => preg_replace('/[^a-zA-Z0-9\s]/', '', $item->item_name),
+                    'Quantity' => $qty,
+                    'PCTCode' => '00000000',
+                    'TaxRate' => $taxRate,
+                    'SaleValue' => $saleValuePerUnit,
+                    'TotalAmount' => $totalAmount,
+                    'TaxCharged' => $taxCharged,
+                    'Discount' => 0.0,
+                    'FurtherTax' => 0.0,
+                    'InvoiceType' => 1,
+                    'RefUSIN' => null,
+                ];
+            })->toArray();
 
         $paymentMode = self::PAYMENT_MODE_MAP[$transaction->payment_method] ?? 1;
 
@@ -138,7 +146,7 @@ class PraIntegrationService
             'BuyerCNIC' => '',
             'BuyerPhoneNumber' => $transaction->customer_phone ?? '',
             'TotalSaleValue' => $totalSaleValue,
-            'TotalQuantity' => (float) $transaction->items->sum('quantity'),
+            'TotalQuantity' => array_sum(array_column($items, 'Quantity')),
             'TotalTaxCharged' => $totalTaxCharged,
             'Discount' => 0.0,
             'FurtherTax' => 0.0,

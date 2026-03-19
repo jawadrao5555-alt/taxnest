@@ -52,6 +52,7 @@
                         <th class="px-4 py-3 text-right hidden lg:table-cell">Subtotal</th>
                         <th class="px-4 py-3 text-right hidden lg:table-cell">Tax</th>
                         <th class="px-4 py-3 text-right">Total</th>
+                        <th class="px-4 py-3 hidden lg:table-cell">PRA Fiscal #</th>
                         <th class="px-4 py-3 hidden sm:table-cell">PRA Status</th>
                         <th class="px-4 py-3 hidden md:table-cell">Date</th>
                         <th class="px-4 py-3">Actions</th>
@@ -73,6 +74,13 @@
                         <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300 hidden lg:table-cell">{{ number_format($txn->subtotal) }}</td>
                         <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300 hidden lg:table-cell">{{ number_format($txn->tax_amount) }}</td>
                         <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">PKR {{ number_format($txn->total_amount) }}</td>
+                        <td class="px-4 py-3 hidden lg:table-cell">
+                            @if($txn->pra_invoice_number)
+                                <span class="text-xs font-mono text-purple-700 dark:text-purple-400">{{ $txn->pra_invoice_number }}</span>
+                            @else
+                                <span class="text-xs text-gray-400">—</span>
+                            @endif
+                        </td>
                         <td class="px-4 py-3 hidden sm:table-cell">
                             @if($txn->pra_status === 'submitted')
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">Submitted</span>
@@ -104,7 +112,7 @@
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="9" class="px-4 py-12 text-center text-gray-400">No transactions found</td></tr>
+                    <tr><td colspan="10" class="px-4 py-12 text-center text-gray-400">No transactions found</td></tr>
                     @endforelse
                 </tbody>
             </table>

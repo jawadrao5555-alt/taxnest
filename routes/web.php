@@ -447,6 +447,7 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::get('/tax-reports/pdf', [PosController::class, 'exportTaxReportPdf'])->name('pos.tax-reports.pdf');
     Route::get('/api/tax-rate', [PosController::class, 'getTaxRate'])->name('pos.api.tax-rate');
     Route::post('/api/draft/save', [PosController::class, 'saveDraft'])->name('pos.api.draft.save');
+    Route::get('/csrf-token', function () { return response()->json(['token' => csrf_token()]); })->name('pos.csrf-token');
     Route::get('/api/draft/list', [PosController::class, 'getDrafts'])->name('pos.api.draft.list');
     Route::delete('/api/draft/{id}', [PosController::class, 'deleteDraft'])->name('pos.api.draft.delete');
     Route::post('/api/invoice/{id}/lock', [PosController::class, 'lockInvoice'])->name('pos.api.invoice.lock');

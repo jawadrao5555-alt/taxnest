@@ -556,6 +556,12 @@
                             })
                         });
 
+                        if (response.status === 419) {
+                            await this.refreshCsrfToken();
+                            this.autoSaveStatus = 'Session refreshed';
+                            return;
+                        }
+
                         const result = await response.json();
                         if (result.success && result.draft_id) {
                             this.draftId = result.draft_id;
@@ -638,7 +644,25 @@
                     this.total = Math.round((this.afterDiscount + this.taxAmount) * 100) / 100;
                 },
 
-                submitForm(event) {
+                async refreshCsrfToken() {
+                    try {
+                        const resp = await fetch('/pos/csrf-token', {
+                            method: 'GET',
+                            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                            credentials: 'same-origin'
+                        });
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            if (data.token) {
+                                document.querySelector('meta[name="csrf-token"]')?.setAttribute('content', data.token);
+                                const hiddenInput = document.querySelector('input[name="_token"]');
+                                if (hiddenInput) hiddenInput.value = data.token;
+                            }
+                        }
+                    } catch (e) {}
+                },
+
+                async submitForm(event) {
                     if (this.items.length === 0) return;
                     this.submitting = true;
 
@@ -647,6 +671,8 @@
                     }
 
                     localStorage.removeItem('pos_draft_invoice');
+
+                    await this.refreshCsrfToken();
 
                     this.$nextTick(() => {
                         event.target.submit();

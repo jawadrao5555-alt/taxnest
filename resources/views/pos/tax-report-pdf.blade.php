@@ -60,6 +60,11 @@
                     <th>Date</th>
                     <th>Customer</th>
                     <th>Payment</th>
+                    @if($taxRateFilter ?? false)
+                    <th class="right">{{ $taxRateLabel }} Value</th>
+                    <th class="right">{{ $taxRateLabel }} Tax</th>
+                    <th class="right">{{ $taxRateLabel }} Total</th>
+                    @else
                     <th class="right">Subtotal</th>
                     <th class="right">Discount</th>
                     <th class="right">Taxable</th>
@@ -67,12 +72,19 @@
                     <th class="right">Tax %</th>
                     <th class="right">Tax Amt</th>
                     <th class="right">Total</th>
+                    @endif
                     <th>Terminal</th>
                     <th>PRA Status</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($transactions as $t)
+                @php
+                    $iv = ($taxRateFilter ?? false) ? ($itemValues[$t->id] ?? null) : null;
+                @endphp
+                @if(($taxRateFilter ?? false) && !$iv)
+                    @continue
+                @endif
                 <tr>
                     <td style="font-weight:bold;">{{ $t->invoice_number }}</td>
                     <td>{{ $t->pra_invoice_number ?? '—' }}</td>
@@ -83,6 +95,11 @@
                             {{ ucwords(str_replace('_', ' ', $t->payment_method)) }}
                         </span>
                     </td>
+                    @if($taxRateFilter ?? false)
+                    <td class="right" style="color:#059669;font-weight:bold;">{{ number_format((float)($iv['item_subtotal'] ?? 0), 2) }}</td>
+                    <td class="right" style="color:#7c3aed;font-weight:bold;">{{ number_format((float)($iv['item_tax'] ?? 0), 2) }}</td>
+                    <td class="right" style="font-weight:bold;">{{ number_format((float)($iv['item_subtotal'] ?? 0) + (float)($iv['item_tax'] ?? 0), 2) }}</td>
+                    @else
                     <td class="right">{{ number_format($t->subtotal, 2) }}</td>
                     <td class="right" style="color:#dc2626;">{{ number_format($t->discount_amount, 2) }}</td>
                     <td class="right">{{ number_format($t->subtotal - $t->discount_amount - ($t->exempt_amount ?? 0), 2) }}</td>
@@ -90,6 +107,7 @@
                     <td class="right" style="font-weight:bold;">{{ number_format($t->tax_rate, 0) }}%</td>
                     <td class="right" style="color:#7c3aed;font-weight:bold;">{{ number_format($t->tax_amount, 2) }}</td>
                     <td class="right" style="font-weight:bold;">{{ number_format($t->total_amount, 2) }}</td>
+                    @endif
                     <td>{{ $t->terminal?->terminal_name ?? '—' }}</td>
                     <td>
                         @php
@@ -106,6 +124,13 @@
                 </tr>
                 @endforeach
                 <tr class="total-row">
+                    @if($taxRateFilter ?? false)
+                    <td colspan="5" style="font-size:9px;">{{ $taxRateLabel }} TOTALS ({{ $summary->total_invoices }} invoices)</td>
+                    <td class="right" style="color:#059669;">{{ number_format($summary->total_sales, 2) }}</td>
+                    <td class="right" style="color:#7c3aed;">{{ number_format($summary->total_tax, 2) }}</td>
+                    <td class="right">{{ number_format($summary->total_sales + $summary->total_tax, 2) }}</td>
+                    <td colspan="2"></td>
+                    @else
                     <td colspan="5" style="font-size:9px;">TOTALS ({{ $summary->total_invoices }} invoices)</td>
                     <td class="right">—</td>
                     <td class="right" style="color:#dc2626;">{{ number_format($summary->total_discount, 2) }}</td>
@@ -115,17 +140,32 @@
                     <td class="right" style="color:#7c3aed;">{{ number_format($summary->total_tax, 2) }}</td>
                     <td class="right" style="color:#059669;">{{ number_format($summary->total_sales, 2) }}</td>
                     <td colspan="2"></td>
+                    @endif
                 </tr>
             </tbody>
         </table>
 
         <div class="summary-box">
-            <div class="summary-title">Report Summary</div>
+            <div class="summary-title">Report Summary &mdash; {{ $taxRateLabel }}</div>
             <div class="summary-grid">
                 <div class="summary-item">
-                    <div class="summary-label">Total Invoices</div>
+                    <div class="summary-label">Invoices</div>
                     <div class="summary-value">{{ number_format($summary->total_invoices) }}</div>
                 </div>
+                @if($taxRateFilter ?? false)
+                <div class="summary-item">
+                    <div class="summary-label">{{ $taxRateLabel }} Value</div>
+                    <div class="summary-value green">PKR {{ number_format($summary->total_sales, 2) }}</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">{{ $taxRateLabel }} Tax</div>
+                    <div class="summary-value purple">PKR {{ number_format($summary->total_tax, 2) }}</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">{{ $taxRateLabel }} Total</div>
+                    <div class="summary-value">PKR {{ number_format($summary->total_sales + $summary->total_tax, 2) }}</div>
+                </div>
+                @else
                 <div class="summary-item">
                     <div class="summary-label">Total Sales Amount</div>
                     <div class="summary-value green">PKR {{ number_format($summary->total_sales, 2) }}</div>
@@ -146,6 +186,7 @@
                     <div class="summary-label">Total Tax Collected</div>
                     <div class="summary-value purple">PKR {{ number_format($summary->total_tax, 2) }}</div>
                 </div>
+                @endif
             </div>
         </div>
     </div>

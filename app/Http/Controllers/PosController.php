@@ -883,7 +883,7 @@ class PosController extends Controller
         return response()->stream($callback, 200, $headers);
     }
 
-    private function buildTaxReportQuery(Request $request, $tab = 'pra')
+    private function buildTaxReportQuery(Request $request, $tab = 'pra', $skipTaxRateFilter = false)
     {
         $companyId = app('currentCompanyId');
         $query = PosTransaction::where('company_id', $companyId)
@@ -896,12 +896,25 @@ class PosController extends Controller
             $query->where(function ($q) { $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode'); });
         }
 
-        if ($request->filled('tax_rate')) {
+        if (!$skipTaxRateFilter && $request->filled('tax_rate')) {
             if ($request->tax_rate === 'exempt') {
                 $query->where('exempt_amount', '>', 0);
             } else {
                 $rate = (float) $request->tax_rate;
                 $query->where('tax_rate', $rate);
+            }
+        }
+
+        if ($skipTaxRateFilter && $request->filled('tax_rate')) {
+            if ($request->tax_rate === 'exempt') {
+                $query->whereHas('items', function ($q) {
+                    $q->where('is_tax_exempt', true);
+                });
+            } else {
+                $rate = (float) $request->tax_rate;
+                $query->whereHas('items', function ($q) use ($rate) {
+                    $q->where('is_tax_exempt', false)->where('tax_rate', $rate);
+                });
             }
         }
 
@@ -960,6 +973,51 @@ class PosController extends Controller
         return 'All Time';
     }
 
+    private function buildItemLevelSummary($transactionIds, $taxRateFilter)
+    {
+        $itemQuery = \App\Models\PosTransactionItem::whereIn('transaction_id', $transactionIds);
+
+        if ($taxRateFilter === 'exempt') {
+            $itemQuery->where('is_tax_exempt', true);
+        } elseif ($taxRateFilter !== null && $taxRateFilter !== '') {
+            $rate = (float) $taxRateFilter;
+            $itemQuery->where('is_tax_exempt', false)->where('tax_rate', $rate);
+        }
+
+        return $itemQuery->selectRaw('
+            COUNT(DISTINCT transaction_id) as total_invoices,
+            COALESCE(SUM(subtotal), 0) as total_sales,
+            COALESCE(SUM(tax_amount), 0) as total_tax,
+            COALESCE(SUM(CASE WHEN is_tax_exempt = true THEN subtotal ELSE 0 END), 0) as total_exempt,
+            COALESCE(SUM(CASE WHEN is_tax_exempt = false THEN subtotal ELSE 0 END), 0) as total_taxable
+        ')->first();
+    }
+
+    private function getItemLevelValuesForTransactions($transactions, $taxRateFilter)
+    {
+        $transactionIds = $transactions->pluck('id')->toArray();
+        if (empty($transactionIds)) return [];
+
+        $itemQuery = \App\Models\PosTransactionItem::whereIn('transaction_id', $transactionIds);
+
+        if ($taxRateFilter === 'exempt') {
+            $itemQuery->where('is_tax_exempt', true);
+        } elseif ($taxRateFilter !== null && $taxRateFilter !== '') {
+            $rate = (float) $taxRateFilter;
+            $itemQuery->where('is_tax_exempt', false)->where('tax_rate', $rate);
+        } else {
+            return [];
+        }
+
+        return $itemQuery->selectRaw('
+            transaction_id,
+            COALESCE(SUM(subtotal), 0) as item_subtotal,
+            COALESCE(SUM(tax_amount), 0) as item_tax,
+            COALESCE(SUM(CASE WHEN is_tax_exempt = true THEN subtotal ELSE 0 END), 0) as item_exempt,
+            COALESCE(SUM(CASE WHEN is_tax_exempt = false THEN subtotal ELSE 0 END), 0) as item_taxable
+        ')->groupBy('transaction_id')->get()->keyBy('transaction_id')->toArray();
+    }
+
     public function taxReports(Request $request)
     {
         $companyId = app('currentCompanyId');
@@ -969,31 +1027,44 @@ class PosController extends Controller
         $pinRedirect = $this->requirePinForLocalTab($tab, $company);
         if ($pinRedirect) return $pinRedirect;
 
-        $query = $this->buildTaxReportQuery($request, $tab);
-        $transactions = $query->paginate(50)->appends($request->all());
+        $taxRateFilter = $request->filled('tax_rate') ? $request->tax_rate : null;
 
-        $summaryQuery = $this->buildTaxReportQuery($request, $tab);
-        $summary = $summaryQuery->reorder()->selectRaw('
-            COUNT(*) as total_invoices,
-            COALESCE(SUM(total_amount), 0) as total_sales,
-            COALESCE(SUM(discount_amount), 0) as total_discount,
-            COALESCE(SUM(subtotal - discount_amount - COALESCE(exempt_amount, 0)), 0) as total_taxable,
-            COALESCE(SUM(tax_amount), 0) as total_tax,
-            COALESCE(SUM(exempt_amount), 0) as total_exempt
-        ')->first();
+        $baseQuery = $this->buildTaxReportQuery($request, $tab, true);
+        $transactions = $baseQuery->paginate(50)->appends($request->all());
+
+        $itemValues = [];
+        if ($taxRateFilter) {
+            $allIdsQuery = $this->buildTaxReportQuery($request, $tab, true);
+            $allIds = $allIdsQuery->pluck('id')->toArray();
+
+            $summary = $this->buildItemLevelSummary($allIds, $taxRateFilter);
+            $summary->total_discount = 0;
+
+            $itemValues = $this->getItemLevelValuesForTransactions($transactions, $taxRateFilter);
+        } else {
+            $summaryQuery = $this->buildTaxReportQuery($request, $tab, true);
+            $summary = $summaryQuery->reorder()->selectRaw('
+                COUNT(*) as total_invoices,
+                COALESCE(SUM(total_amount), 0) as total_sales,
+                COALESCE(SUM(discount_amount), 0) as total_discount,
+                COALESCE(SUM(subtotal - discount_amount - COALESCE(exempt_amount, 0)), 0) as total_taxable,
+                COALESCE(SUM(tax_amount), 0) as total_tax,
+                COALESCE(SUM(exempt_amount), 0) as total_exempt
+            ')->first();
+        }
 
         $dateLabel = $this->getReportDateLabel($request);
 
         $taxRateLabel = 'All Taxes';
-        if ($request->filled('tax_rate')) {
-            $taxRateLabel = $request->tax_rate === 'exempt' ? 'Exempt Items Only' : $request->tax_rate . '% Tax Only';
+        if ($taxRateFilter) {
+            $taxRateLabel = $taxRateFilter === 'exempt' ? 'Exempt Items Only' : $taxRateFilter . '% Tax Only';
         }
 
         $hasPinSet = !empty($company->confidential_pin);
         $localCount = PosTransaction::where('company_id', $companyId)->where('status', 'completed')->where('invoice_mode', 'local')->count();
         $user = auth('pos')->user();
 
-        return view('pos.tax-reports', compact('company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel', 'tab', 'hasPinSet', 'localCount', 'user'));
+        return view('pos.tax-reports', compact('company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel', 'tab', 'hasPinSet', 'localCount', 'user', 'itemValues', 'taxRateFilter'));
     }
 
     public function exportTaxReportCsv(Request $request)
@@ -1005,13 +1076,20 @@ class PosController extends Controller
         $pinRedirect = $this->requirePinForLocalTab($tab, $company);
         if ($pinRedirect) return $pinRedirect;
 
-        $query = $this->buildTaxReportQuery($request, $tab);
+        $taxRateFilter = $request->filled('tax_rate') ? $request->tax_rate : null;
+
+        $query = $this->buildTaxReportQuery($request, $tab, (bool)$taxRateFilter);
         $transactions = $query->get();
 
         $dateLabel = $this->getReportDateLabel($request);
         $taxRateLabel = 'All Taxes';
-        if ($request->filled('tax_rate')) {
-            $taxRateLabel = $request->tax_rate === 'exempt' ? 'Exempt Items' : $request->tax_rate . '% Tax';
+        if ($taxRateFilter) {
+            $taxRateLabel = $taxRateFilter === 'exempt' ? 'Exempt Items' : $taxRateFilter . '% Tax';
+        }
+
+        $itemValues = [];
+        if ($taxRateFilter) {
+            $itemValues = $this->getItemLevelValuesForTransactions($transactions, $taxRateFilter);
         }
 
         $filename = 'NestPOS_Tax_Report_' . str_replace([' ', '/', '(', ')'], '_', $taxRateLabel) . '_' . now()->format('Ymd_His') . '.csv';
@@ -1021,54 +1099,106 @@ class PosController extends Controller
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         ];
 
-        $callback = function () use ($transactions) {
+        $callback = function () use ($transactions, $taxRateFilter, $itemValues, $taxRateLabel) {
             $file = fopen('php://output', 'w');
             fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
 
-            fputcsv($file, [
-                'POS Invoice Number',
-                'PRA Fiscal Invoice Number',
-                'Invoice Date',
-                'Customer Name',
-                'Payment Method',
-                'Subtotal (PKR)',
-                'Discount Amount (PKR)',
-                'Taxable Amount (PKR)',
-                'Tax Exempt Amount (PKR)',
-                'Tax Rate (%)',
-                'Tax Amount (PKR)',
-                'Total Amount (PKR)',
-                'Terminal Name',
-                'PRA Status',
-            ]);
-
-            foreach ($transactions as $t) {
+            if ($taxRateFilter) {
                 fputcsv($file, [
-                    $t->invoice_number,
-                    $t->pra_invoice_number ?? 'N/A',
-                    $t->created_at->format('d/m/Y H:i'),
-                    $t->customer_name ?? 'Walk-in',
-                    ucwords(str_replace('_', ' ', $t->payment_method)),
-                    number_format($t->subtotal, 2, '.', ''),
-                    number_format($t->discount_amount, 2, '.', ''),
-                    number_format($t->subtotal - $t->discount_amount - ($t->exempt_amount ?? 0), 2, '.', ''),
-                    number_format($t->exempt_amount ?? 0, 2, '.', ''),
-                    number_format($t->tax_rate, 2, '.', ''),
-                    number_format($t->tax_amount, 2, '.', ''),
-                    number_format($t->total_amount, 2, '.', ''),
-                    $t->terminal?->terminal_name ?? 'N/A',
-                    strtoupper($t->pra_status ?? 'N/A'),
+                    'POS Invoice Number',
+                    'PRA Fiscal Invoice Number',
+                    'Invoice Date',
+                    'Customer Name',
+                    'Payment Method',
+                    $taxRateLabel . ' Value (PKR)',
+                    $taxRateLabel . ' Tax Amount (PKR)',
+                    $taxRateLabel . ' Total (PKR)',
+                    'Terminal Name',
+                    'PRA Status',
                 ]);
-            }
 
-            fputcsv($file, []);
-            fputcsv($file, ['SUMMARY']);
-            fputcsv($file, ['Total Invoices', $transactions->count()]);
-            fputcsv($file, ['Total Sales Amount (PKR)', number_format($transactions->sum('total_amount'), 2, '.', '')]);
-            fputcsv($file, ['Total Discount Amount (PKR)', number_format($transactions->sum('discount_amount'), 2, '.', '')]);
-            fputcsv($file, ['Total Taxable Amount (PKR)', number_format($transactions->sum(fn($t) => $t->subtotal - $t->discount_amount - ($t->exempt_amount ?? 0)), 2, '.', '')]);
-            fputcsv($file, ['Total Tax Exempt Amount (PKR)', number_format($transactions->sum('exempt_amount'), 2, '.', '')]);
-            fputcsv($file, ['Total Tax Amount (PKR)', number_format($transactions->sum('tax_amount'), 2, '.', '')]);
+                $totalValue = 0;
+                $totalTax = 0;
+                $totalWithTax = 0;
+
+                foreach ($transactions as $t) {
+                    $iv = $itemValues[$t->id] ?? null;
+                    if (!$iv) continue;
+
+                    $itemSub = (float)($iv['item_subtotal'] ?? 0);
+                    $itemTax = (float)($iv['item_tax'] ?? 0);
+                    $itemTotal = $itemSub + $itemTax;
+
+                    $totalValue += $itemSub;
+                    $totalTax += $itemTax;
+                    $totalWithTax += $itemTotal;
+
+                    fputcsv($file, [
+                        $t->invoice_number,
+                        $t->pra_invoice_number ?? 'N/A',
+                        $t->created_at->format('d/m/Y H:i'),
+                        $t->customer_name ?? 'Walk-in',
+                        ucwords(str_replace('_', ' ', $t->payment_method)),
+                        number_format($itemSub, 2, '.', ''),
+                        number_format($itemTax, 2, '.', ''),
+                        number_format($itemTotal, 2, '.', ''),
+                        $t->terminal?->terminal_name ?? 'N/A',
+                        strtoupper($t->pra_status ?? 'N/A'),
+                    ]);
+                }
+
+                fputcsv($file, []);
+                fputcsv($file, ['SUMMARY — ' . $taxRateLabel]);
+                fputcsv($file, ['Invoices with ' . $taxRateLabel . ' items', count(array_filter($itemValues, fn($v) => ($v['item_subtotal'] ?? 0) > 0))]);
+                fputcsv($file, [$taxRateLabel . ' Value (PKR)', number_format($totalValue, 2, '.', '')]);
+                fputcsv($file, [$taxRateLabel . ' Tax Amount (PKR)', number_format($totalTax, 2, '.', '')]);
+                fputcsv($file, [$taxRateLabel . ' Total (PKR)', number_format($totalWithTax, 2, '.', '')]);
+            } else {
+                fputcsv($file, [
+                    'POS Invoice Number',
+                    'PRA Fiscal Invoice Number',
+                    'Invoice Date',
+                    'Customer Name',
+                    'Payment Method',
+                    'Subtotal (PKR)',
+                    'Discount Amount (PKR)',
+                    'Taxable Amount (PKR)',
+                    'Tax Exempt Amount (PKR)',
+                    'Tax Rate (%)',
+                    'Tax Amount (PKR)',
+                    'Total Amount (PKR)',
+                    'Terminal Name',
+                    'PRA Status',
+                ]);
+
+                foreach ($transactions as $t) {
+                    fputcsv($file, [
+                        $t->invoice_number,
+                        $t->pra_invoice_number ?? 'N/A',
+                        $t->created_at->format('d/m/Y H:i'),
+                        $t->customer_name ?? 'Walk-in',
+                        ucwords(str_replace('_', ' ', $t->payment_method)),
+                        number_format($t->subtotal, 2, '.', ''),
+                        number_format($t->discount_amount, 2, '.', ''),
+                        number_format($t->subtotal - $t->discount_amount - ($t->exempt_amount ?? 0), 2, '.', ''),
+                        number_format($t->exempt_amount ?? 0, 2, '.', ''),
+                        number_format($t->tax_rate, 2, '.', ''),
+                        number_format($t->tax_amount, 2, '.', ''),
+                        number_format($t->total_amount, 2, '.', ''),
+                        $t->terminal?->terminal_name ?? 'N/A',
+                        strtoupper($t->pra_status ?? 'N/A'),
+                    ]);
+                }
+
+                fputcsv($file, []);
+                fputcsv($file, ['SUMMARY']);
+                fputcsv($file, ['Total Invoices', $transactions->count()]);
+                fputcsv($file, ['Total Sales Amount (PKR)', number_format($transactions->sum('total_amount'), 2, '.', '')]);
+                fputcsv($file, ['Total Discount Amount (PKR)', number_format($transactions->sum('discount_amount'), 2, '.', '')]);
+                fputcsv($file, ['Total Taxable Amount (PKR)', number_format($transactions->sum(fn($t) => $t->subtotal - $t->discount_amount - ($t->exempt_amount ?? 0)), 2, '.', '')]);
+                fputcsv($file, ['Total Tax Exempt Amount (PKR)', number_format($transactions->sum('exempt_amount'), 2, '.', '')]);
+                fputcsv($file, ['Total Tax Amount (PKR)', number_format($transactions->sum('tax_amount'), 2, '.', '')]);
+            }
 
             fclose($file);
         };
@@ -1085,27 +1215,37 @@ class PosController extends Controller
         $pinRedirect = $this->requirePinForLocalTab($tab, $company);
         if ($pinRedirect) return $pinRedirect;
 
-        $query = $this->buildTaxReportQuery($request, $tab);
+        $taxRateFilter = $request->filled('tax_rate') ? $request->tax_rate : null;
+
+        $query = $this->buildTaxReportQuery($request, $tab, (bool)$taxRateFilter);
         $transactions = $query->get();
 
-        $summaryQuery = $this->buildTaxReportQuery($request, $tab);
-        $summary = $summaryQuery->reorder()->selectRaw('
-            COUNT(*) as total_invoices,
-            COALESCE(SUM(total_amount), 0) as total_sales,
-            COALESCE(SUM(discount_amount), 0) as total_discount,
-            COALESCE(SUM(subtotal - discount_amount - COALESCE(exempt_amount, 0)), 0) as total_taxable,
-            COALESCE(SUM(tax_amount), 0) as total_tax,
-            COALESCE(SUM(exempt_amount), 0) as total_exempt
-        ')->first();
+        $itemValues = [];
+        if ($taxRateFilter) {
+            $allIds = $transactions->pluck('id')->toArray();
+            $summary = $this->buildItemLevelSummary($allIds, $taxRateFilter);
+            $summary->total_discount = 0;
+            $itemValues = $this->getItemLevelValuesForTransactions($transactions, $taxRateFilter);
+        } else {
+            $summaryQuery = $this->buildTaxReportQuery($request, $tab, false);
+            $summary = $summaryQuery->reorder()->selectRaw('
+                COUNT(*) as total_invoices,
+                COALESCE(SUM(total_amount), 0) as total_sales,
+                COALESCE(SUM(discount_amount), 0) as total_discount,
+                COALESCE(SUM(subtotal - discount_amount - COALESCE(exempt_amount, 0)), 0) as total_taxable,
+                COALESCE(SUM(tax_amount), 0) as total_tax,
+                COALESCE(SUM(exempt_amount), 0) as total_exempt
+            ')->first();
+        }
 
         $dateLabel = $this->getReportDateLabel($request);
         $taxRateLabel = 'All Taxes';
-        if ($request->filled('tax_rate')) {
-            $taxRateLabel = $request->tax_rate === 'exempt' ? 'Exempt Items Only' : $request->tax_rate . '% Tax Only';
+        if ($taxRateFilter) {
+            $taxRateLabel = $taxRateFilter === 'exempt' ? 'Exempt Items Only' : $taxRateFilter . '% Tax Only';
         }
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.tax-report-pdf', compact(
-            'company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel'
+            'company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel', 'taxRateFilter', 'itemValues'
         ));
 
         $pdf->setPaper('a4', 'landscape');

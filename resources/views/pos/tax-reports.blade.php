@@ -80,6 +80,26 @@
         </form>
     </div>
 
+    @if($taxRateFilter ?? false)
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Invoices</p>
+            <p class="text-xl font-bold text-gray-900 dark:text-white">{{ number_format($summary->total_invoices) }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ $taxRateLabel }} Value</p>
+            <p class="text-xl font-bold text-emerald-600">PKR {{ number_format($summary->total_sales, 2) }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ $taxRateLabel }} Tax</p>
+            <p class="text-xl font-bold text-purple-600">PKR {{ number_format($summary->total_tax, 2) }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ $taxRateLabel }} Total</p>
+            <p class="text-xl font-bold text-gray-900 dark:text-white">PKR {{ number_format($summary->total_sales + $summary->total_tax, 2) }}</p>
+        </div>
+    </div>
+    @else
     <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Invoices</p>
@@ -106,6 +126,7 @@
             <p class="text-xl font-bold text-purple-600">PKR {{ number_format($summary->total_tax, 2) }}</p>
         </div>
     </div>
+    @endif
 
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md overflow-hidden">
         <div class="overflow-x-auto">
@@ -117,6 +138,11 @@
                         <th class="px-4 py-3">Date</th>
                         <th class="px-4 py-3">Customer</th>
                         <th class="px-4 py-3">Payment</th>
+                        @if($taxRateFilter ?? false)
+                        <th class="px-4 py-3 text-right">{{ $taxRateLabel }} Value</th>
+                        <th class="px-4 py-3 text-right">{{ $taxRateLabel }} Tax</th>
+                        <th class="px-4 py-3 text-right">{{ $taxRateLabel }} Total</th>
+                        @else
                         <th class="px-4 py-3 text-right">Subtotal</th>
                         <th class="px-4 py-3 text-right">Discount</th>
                         <th class="px-4 py-3 text-right">Taxable</th>
@@ -124,12 +150,19 @@
                         <th class="px-4 py-3 text-right">Tax %</th>
                         <th class="px-4 py-3 text-right">Tax Amt</th>
                         <th class="px-4 py-3 text-right">Total</th>
+                        @endif
                         <th class="px-4 py-3">Terminal</th>
                         <th class="px-4 py-3">PRA</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     @forelse($transactions as $t)
+                    @php
+                        $iv = ($taxRateFilter ?? false) ? ($itemValues[$t->id] ?? null) : null;
+                    @endphp
+                    @if(($taxRateFilter ?? false) && !$iv)
+                        @continue
+                    @endif
                     <tr class="{{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }} hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
                         <td class="px-4 py-3 font-medium text-gray-900 dark:text-white whitespace-nowrap">
                             <a href="{{ route('pos.transaction.show', $t->id) }}" class="text-purple-600 hover:text-purple-800 dark:text-purple-400 hover:underline">{{ $t->invoice_number }}</a>
@@ -142,6 +175,11 @@
                                 {{ ucwords(str_replace('_', ' ', $t->payment_method)) }}
                             </span>
                         </td>
+                        @if($taxRateFilter ?? false)
+                        <td class="px-4 py-3 text-right text-emerald-600 font-medium whitespace-nowrap">{{ number_format((float)($iv['item_subtotal'] ?? 0), 2) }}</td>
+                        <td class="px-4 py-3 text-right text-purple-600 font-medium whitespace-nowrap">{{ number_format((float)($iv['item_tax'] ?? 0), 2) }}</td>
+                        <td class="px-4 py-3 text-right font-bold text-gray-900 dark:text-white whitespace-nowrap">{{ number_format((float)($iv['item_subtotal'] ?? 0) + (float)($iv['item_tax'] ?? 0), 2) }}</td>
+                        @else
                         <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ number_format($t->subtotal, 2) }}</td>
                         <td class="px-4 py-3 text-right text-red-500 whitespace-nowrap">{{ number_format($t->discount_amount, 2) }}</td>
                         <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ number_format($t->subtotal - $t->discount_amount - ($t->exempt_amount ?? 0), 2) }}</td>
@@ -155,6 +193,7 @@
                         <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white whitespace-nowrap">{{ number_format($t->tax_rate, 0) }}%</td>
                         <td class="px-4 py-3 text-right text-purple-600 dark:text-purple-400 font-medium whitespace-nowrap">{{ number_format($t->tax_amount, 2) }}</td>
                         <td class="px-4 py-3 text-right font-bold text-gray-900 dark:text-white whitespace-nowrap">{{ number_format($t->total_amount, 2) }}</td>
+                        @endif
                         <td class="px-4 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">{{ $t->terminal?->terminal_name ?? '—' }}</td>
                         <td class="px-4 py-3 whitespace-nowrap">
                             @php
@@ -173,7 +212,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="13" class="px-4 py-12 text-center text-gray-400 dark:text-gray-500">
+                        <td colspan="{{ ($taxRateFilter ?? false) ? 10 : 14 }}" class="px-4 py-12 text-center text-gray-400 dark:text-gray-500">
                             <svg class="w-10 h-10 mx-auto mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                             <p class="text-sm">No transactions found for the selected filters.</p>
                         </td>
@@ -182,6 +221,15 @@
                 </tbody>
                 @if($transactions->count() > 0)
                 <tfoot>
+                    @if($taxRateFilter ?? false)
+                    <tr class="bg-gray-50 dark:bg-gray-800/50 border-t-2 border-gray-300 dark:border-gray-600 font-bold text-sm">
+                        <td class="px-4 py-3 text-gray-900 dark:text-white" colspan="5">{{ $taxRateLabel }} Totals ({{ $summary->total_invoices }} invoices)</td>
+                        <td class="px-4 py-3 text-right text-emerald-600">PKR {{ number_format($summary->total_sales, 2) }}</td>
+                        <td class="px-4 py-3 text-right text-purple-600">PKR {{ number_format($summary->total_tax, 2) }}</td>
+                        <td class="px-4 py-3 text-right text-gray-900 dark:text-white">PKR {{ number_format($summary->total_sales + $summary->total_tax, 2) }}</td>
+                        <td class="px-4 py-3" colspan="2"></td>
+                    </tr>
+                    @else
                     <tr class="bg-gray-50 dark:bg-gray-800/50 border-t-2 border-gray-300 dark:border-gray-600 font-bold text-sm">
                         <td class="px-4 py-3 text-gray-900 dark:text-white" colspan="5">Filtered Totals ({{ $summary->total_invoices }} invoices)</td>
                         <td class="px-4 py-3 text-right text-gray-900 dark:text-white">—</td>
@@ -193,6 +241,7 @@
                         <td class="px-4 py-3 text-right text-emerald-600">PKR {{ number_format($summary->total_sales, 2) }}</td>
                         <td class="px-4 py-3" colspan="2"></td>
                     </tr>
+                    @endif
                 </tfoot>
                 @endif
             </table>

@@ -1273,12 +1273,20 @@ class PosController extends Controller
                 'receipt_printer_size' => 'nullable|in:80mm,58mm',
             ]);
 
-            $company->update([
+            $updateData = [
                 'pra_environment' => $request->pra_environment,
-                'pra_pos_id' => $request->pra_pos_id,
-                'pra_production_token' => $request->pra_production_token,
                 'receipt_printer_size' => $request->receipt_printer_size ?? '80mm',
-            ]);
+            ];
+
+            if ($request->filled('pra_pos_id')) {
+                $updateData['pra_pos_id'] = $request->pra_pos_id;
+            }
+
+            if ($request->filled('pra_production_token')) {
+                $updateData['pra_production_token'] = $request->pra_production_token;
+            }
+
+            $company->update($updateData);
 
             if ($request->filled('confidential_pin')) {
                 $request->validate([

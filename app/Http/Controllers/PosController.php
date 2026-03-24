@@ -60,8 +60,11 @@ class PosController extends Controller
             ->take(20)
             ->get();
 
+        $user = auth('pos')->user();
+        $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
+
         return view('pos.dashboard', compact(
-            'company', 'todayStats', 'monthStats', 'recentTransactions', 'paymentBreakdown', 'praStatus', 'drafts'
+            'company', 'todayStats', 'monthStats', 'recentTransactions', 'paymentBreakdown', 'praStatus', 'drafts', 'isCashier'
         ));
     }
 
@@ -563,9 +566,21 @@ class PosController extends Controller
     private function requirePinForLocalTab(string $tab, Company $company)
     {
         if ($tab !== 'local') return null;
-        if (!empty($company->confidential_pin) && !$this->verifyPinSession()) {
+
+        $user = auth('pos')->user();
+        $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
+
+        if ($isCashier) {
+            if (empty($company->confidential_pin)) {
+                return redirect()->back()->with('error', 'Local data access is restricted. Admin must set a PIN first.');
+            }
+            if (!$this->verifyPinSession()) {
+                return redirect()->back()->with('error', 'PIN verification required to access local data.');
+            }
+        } elseif (!empty($company->confidential_pin) && !$this->verifyPinSession()) {
             return redirect()->back()->with('error', 'PIN verification required to access local data.');
         }
+
         return null;
     }
 

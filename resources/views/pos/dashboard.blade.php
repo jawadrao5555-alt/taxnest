@@ -6,6 +6,7 @@
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Point of Sale Overview</p>
         </div>
         <div class="flex items-center gap-3">
+            @if(!($isCashier ?? false))
             <div x-data="{ praEnabled: {{ $praStatus ? 'true' : 'false' }}, loading: false }" class="flex items-center gap-2">
                 <span class="text-sm text-gray-600 dark:text-gray-400">PRA Reporting</span>
                 <button @click="loading=true; fetch('{{ route('pos.api.toggle-pra') }}', {method:'POST', headers:{'X-CSRF-TOKEN':'{{ csrf_token() }}','Content-Type':'application/json'}}).then(r=>r.json()).then(d=>{praEnabled=d.enabled; loading=false;})" :class="praEnabled ? 'bg-emerald-600' : 'bg-gray-300 dark:bg-gray-600'" class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out" :disabled="loading">
@@ -13,6 +14,12 @@
                 </button>
                 <span x-text="praEnabled ? 'ON' : 'OFF'" :class="praEnabled ? 'text-emerald-600 font-semibold' : 'text-red-500 font-semibold'" class="text-xs"></span>
             </div>
+            @else
+            <div class="flex items-center gap-2">
+                <span class="text-sm text-gray-600 dark:text-gray-400">PRA Reporting</span>
+                <span class="{{ $praStatus ? 'text-emerald-600' : 'text-red-500' }} text-xs font-semibold">{{ $praStatus ? 'ON' : 'OFF' }}</span>
+            </div>
+            @endif
             <a href="{{ route('pos.invoice.create') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                 New Invoice

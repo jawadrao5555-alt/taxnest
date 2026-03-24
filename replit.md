@@ -3,6 +3,11 @@
 ## Overview
 TaxNest is a multi-company SaaS platform designed for comprehensive tax and invoice management in Pakistan, ensuring strict compliance with FBR regulations. It offers smart invoicing, configurable governance, an enterprise API, PDF generation, and a demo mode. The "Heavy Enterprise" version extends functionality with a Company Approval System, Customer Ledger, Multi-Branch support, FBR Token Health Monitor, Advanced Admin View, Immutable Audit Logs, Enterprise Analytics, and enhanced security. The project aims to capture a high-volume market with competitive pricing and a 14-day free trial, focusing on robust compliance, scalability, and an intuitive user experience for businesses operating in Pakistan.
 
+## GitHub Repository
+- **Repo URL:** https://github.com/jawadrao5555-alt/taxnest
+- **Push command:** Use GitHub integration token with `git push -u origin main --force`
+- **Note:** Never ask user for GitHub URL again — always use the above.
+
 ## User Preferences
 - ZIA CORPORATION is a REAL production account (not demo/internal) - NTN: 3620291786117, Owner: ZIA UR REHMAN (Digital Invoice ONLY, NO POS data)
 - NestPOS Enterprise Store (company_id 11) is the dedicated POS company — completely separate from Digital Invoice

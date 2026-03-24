@@ -32,7 +32,6 @@ class PosAuthController extends Controller
         $throttleKey = Str::transliterate(Str::lower($request->input('login')) . '|' . $request->ip());
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
             $seconds = RateLimiter::availableIn($throttleKey);
-            \Log::info('POS LOGIN: Rate limited', ['login' => $request->login, 'seconds' => $seconds]);
             return back()->withErrors([
                 'login' => "Too many login attempts. Please try again in {$seconds} seconds.",
             ])->withInput($request->only('login'));
@@ -56,20 +55,11 @@ class PosAuthController extends Controller
             $user = User::where('username', $login)->first();
         }
 
-        \Log::info('POS LOGIN: Attempt', [
-            'login' => $login,
-            'user_found' => $user ? $user->id : null,
-            'password_ok' => $user ? Hash::check($request->password, $user->password) : false,
-            'ip' => $request->ip(),
-            'throttle_attempts' => RateLimiter::attempts($throttleKey),
-        ]);
-
         if ($user && Hash::check($request->password, $user->password)) {
             RateLimiter::clear($throttleKey);
             Auth::guard('pos')->login($user, $request->boolean('remember'));
             $request->session()->regenerate();
             $request->session()->forget('url.intended');
-            \Log::info('POS LOGIN: Success', ['user_id' => $user->id, 'redirect' => '/pos/dashboard']);
             return redirect('/pos/dashboard');
         }
 

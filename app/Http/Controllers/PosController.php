@@ -313,7 +313,15 @@ class PosController extends Controller
         $taxRules = PosTaxRule::where('is_active', true)->get()->keyBy('payment_method');
         $terminals = PosTerminal::where('company_id', $companyId)->where('is_active', true)->get();
 
-        return view('pos.edit-transaction', compact('company', 'transaction', 'products', 'services', 'taxRules', 'terminals', 'posCustomers'));
+        $transactionItems = $transaction->items->map(fn($item) => [
+            'type' => $item->item_type ?? 'product',
+            'item_id' => $item->item_id ?? '',
+            'name' => $item->item_name ?? '',
+            'quantity' => (float) $item->quantity,
+            'unit_price' => (float) $item->unit_price,
+        ])->values();
+
+        return view('pos.edit-transaction', compact('company', 'transaction', 'transactionItems', 'products', 'services', 'taxRules', 'terminals', 'posCustomers'));
     }
 
     public function updateTransaction(Request $request, $id)

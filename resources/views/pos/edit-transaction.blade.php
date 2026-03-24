@@ -291,13 +291,7 @@
                 customerPhone: @json($transaction->customer_phone ?? ''),
                 terminalId: @json($transaction->terminal_id ?? ''),
 
-                items: @json($transaction->items->map(fn($item) => [
-                    'type' => $item->item_type ?? 'product',
-                    'item_id' => $item->item_id ?? '',
-                    'name' => $item->item_name ?? '',
-                    'quantity' => (float) $item->quantity,
-                    'unit_price' => (float) $item->unit_price,
-                ])->values()),
+                items: @json($transactionItems),
 
                 discountType: @json($transaction->discount_type ?? 'percentage'),
                 discountValue: {{ (float) ($transaction->discount_value ?? 0) }},

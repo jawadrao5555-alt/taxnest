@@ -31,6 +31,7 @@
                         <option value="">All Taxes</option>
                         <option value="5" {{ request('tax_rate') == '5' ? 'selected' : '' }}>5% Tax Only</option>
                         <option value="16" {{ request('tax_rate') == '16' ? 'selected' : '' }}>16% Tax Only</option>
+                        <option value="exempt" {{ request('tax_rate') == 'exempt' ? 'selected' : '' }}>Exempt Items Only</option>
                     </select>
                 </div>
                 <div>

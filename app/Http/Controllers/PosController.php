@@ -889,8 +889,12 @@ class PosController extends Controller
         }
 
         if ($request->filled('tax_rate')) {
-            $rate = (float) $request->tax_rate;
-            $query->where('tax_rate', $rate);
+            if ($request->tax_rate === 'exempt') {
+                $query->where('exempt_amount', '>', 0);
+            } else {
+                $rate = (float) $request->tax_rate;
+                $query->where('tax_rate', $rate);
+            }
         }
 
         if ($request->filled('payment_method')) {
@@ -974,7 +978,7 @@ class PosController extends Controller
 
         $taxRateLabel = 'All Taxes';
         if ($request->filled('tax_rate')) {
-            $taxRateLabel = $request->tax_rate . '% Tax Only';
+            $taxRateLabel = $request->tax_rate === 'exempt' ? 'Exempt Items Only' : $request->tax_rate . '% Tax Only';
         }
 
         $hasPinSet = !empty($company->confidential_pin);
@@ -997,7 +1001,10 @@ class PosController extends Controller
         $transactions = $query->get();
 
         $dateLabel = $this->getReportDateLabel($request);
-        $taxRateLabel = $request->filled('tax_rate') ? $request->tax_rate . '% Tax' : 'All Taxes';
+        $taxRateLabel = 'All Taxes';
+        if ($request->filled('tax_rate')) {
+            $taxRateLabel = $request->tax_rate === 'exempt' ? 'Exempt Items' : $request->tax_rate . '% Tax';
+        }
 
         $filename = 'NestPOS_Tax_Report_' . str_replace([' ', '/', '(', ')'], '_', $taxRateLabel) . '_' . now()->format('Ymd_His') . '.csv';
 
@@ -1084,7 +1091,10 @@ class PosController extends Controller
         ')->first();
 
         $dateLabel = $this->getReportDateLabel($request);
-        $taxRateLabel = $request->filled('tax_rate') ? $request->tax_rate . '% Tax Only' : 'All Taxes';
+        $taxRateLabel = 'All Taxes';
+        if ($request->filled('tax_rate')) {
+            $taxRateLabel = $request->tax_rate === 'exempt' ? 'Exempt Items Only' : $request->tax_rate . '% Tax Only';
+        }
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.tax-report-pdf', compact(
             'company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel'

@@ -452,6 +452,7 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::post('/api/invoice/{id}/unlock', [PosController::class, 'unlockInvoice'])->name('pos.api.invoice.unlock');
     Route::post('/api/verify-pin', [PosController::class, 'verifyPin'])->name('pos.api.verify-pin');
     Route::get('/api/check-pin-session', [PosController::class, 'checkPinSession'])->name('pos.api.check-pin-session');
+    Route::post('/api/toggle-pra', [PosController::class, 'togglePra'])->name('pos.api.toggle-pra');
     Route::match(['get', 'post'], '/my-profile', [PosController::class, 'userProfile'])->name('pos.user-profile');
     Route::get('/products', [PosController::class, 'products'])->name('pos.products');
 
@@ -464,7 +465,6 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
         Route::post('/terminals', [PosController::class, 'storeTerminal'])->name('pos.terminals.store');
         Route::put('/terminals/{id}', [PosController::class, 'updateTerminal'])->name('pos.terminals.update');
         Route::delete('/terminals/{id}', [PosController::class, 'deleteTerminal'])->name('pos.terminals.delete');
-        Route::post('/api/toggle-pra', [PosController::class, 'togglePra'])->name('pos.api.toggle-pra');
         Route::match(['get', 'post'], '/pra-settings', [PosController::class, 'praSettings'])->name('pos.pra-settings');
         Route::get('/billing', [PosController::class, 'billing'])->name('pos.billing');
         Route::match(['get', 'post'], '/business-profile', [PosController::class, 'businessProfile'])->name('pos.business-profile');

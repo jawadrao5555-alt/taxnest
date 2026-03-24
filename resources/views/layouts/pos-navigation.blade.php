@@ -33,8 +33,12 @@
         Tax Reports
     </a>
 
-    @php $inventoryEnabled = \App\Models\Company::find(app('currentCompanyId'))?->inventory_enabled ?? false; @endphp
-    @if($inventoryEnabled)
+    @php
+        $inventoryEnabled = \App\Models\Company::find(app('currentCompanyId'))?->inventory_enabled ?? false;
+        $posUserNav = auth('pos')->user();
+        $isCashierNav = $posUserNav && $posUserNav->isPosCashier();
+    @endphp
+    @if($inventoryEnabled && !$isCashierNav)
     <div class="pt-4 pb-1 px-4">
         <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Inventory</p>
     </div>

@@ -116,6 +116,7 @@ class PosAuthController extends Controller
             'password' => Hash::make($request->password),
             'company_id' => $company->id,
             'role' => 'company_admin',
+            'pos_role' => 'pos_admin',
             'is_active' => true,
         ]);
 

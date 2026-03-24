@@ -134,6 +134,12 @@
                     <div class="info-value">{{ $transaction->terminal->terminal_name }}</div>
                 </div>
                 @endif
+                @if($transaction->creator)
+                <div style="margin-top:8px;">
+                    <div class="info-label">Cashier</div>
+                    <div class="info-value">{{ $transaction->creator->name }}</div>
+                </div>
+                @endif
             </div>
         </div>
 

@@ -679,7 +679,7 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $transaction = PosTransaction::where('company_id', $companyId)
-            ->with(['items', 'terminal'])
+            ->with(['items', 'terminal', 'creator'])
             ->findOrFail($id);
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.invoice-pdf', compact('transaction', 'company'));
@@ -712,7 +712,7 @@ class PosController extends Controller
         }
 
         $transaction = PosTransaction::where('share_token', $token)
-            ->with(['items', 'terminal'])
+            ->with(['items', 'terminal', 'creator'])
             ->firstOrFail();
 
         if ($transaction->share_token_created_at && $transaction->share_token_created_at < now()->subDays(30)) {

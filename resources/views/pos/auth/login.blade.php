@@ -56,7 +56,7 @@
                         <form method="POST" action="/pos/login" class="px-6 pb-6 pt-4 space-y-4">
                             @csrf
                             <div>
-                                <label for="login" class="block text-sm font-medium text-purple-100/70 mb-1.5">Email / Phone / Username / NTN</label>
+                                <label for="login" class="block text-sm font-medium text-purple-100/70 mb-1.5">Email / Phone / Username / NTN / CNIC</label>
                                 <input id="login" type="text" name="login" value="{{ old('login') }}" required autofocus autocomplete="username" placeholder="Enter your credential" class="w-full rounded-xl text-sm text-white placeholder-purple-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(139,92,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
                                 @error('login')
                                 <p class="text-sm text-red-400 mt-1.5">{{ $message }}</p>

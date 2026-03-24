@@ -109,15 +109,15 @@
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Total Invoices</p>
                 </div>
                 <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-5 text-center">
-                    <p class="text-2xl font-bold text-gray-900 dark:text-white">Rs. {{ number_format($totals['total_value'], 2) }}</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white">PKR {{ number_format($totals['total_value'], 2) }}</p>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Total Value (Excl ST)</p>
                 </div>
                 <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-5 text-center">
-                    <p class="text-2xl font-bold text-amber-600 dark:text-amber-400">Rs. {{ number_format($totals['total_wht'], 2) }}</p>
+                    <p class="text-2xl font-bold text-amber-600 dark:text-amber-400">PKR {{ number_format($totals['total_wht'], 2) }}</p>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Total WHT Collected</p>
                 </div>
                 <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-5 text-center">
-                    <p class="text-2xl font-bold text-blue-700 dark:text-blue-400">Rs. {{ number_format($totals['total_net_receivable'], 2) }}</p>
+                    <p class="text-2xl font-bold text-blue-700 dark:text-blue-400">PKR {{ number_format($totals['total_net_receivable'], 2) }}</p>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Net Receivable</p>
                 </div>
             </div>
@@ -147,13 +147,13 @@
                                 <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 font-mono">{{ $row->buyer_ntn ?? '-' }}</td>
                                 <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 font-mono">{{ $row->buyer_cnic ?? '-' }}</td>
                                 <td class="px-4 py-3 text-sm text-center text-gray-700 dark:text-gray-300 font-semibold">{{ $row->invoice_count }}</td>
-                                <td class="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">Rs. {{ number_format($row->total_value, 2) }}</td>
-                                <td class="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">Rs. {{ number_format($row->total_sales_tax, 2) }}</td>
+                                <td class="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">PKR {{ number_format($row->total_value, 2) }}</td>
+                                <td class="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">PKR {{ number_format($row->total_sales_tax, 2) }}</td>
                                 <td class="px-4 py-3 text-sm text-center">
                                     <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">{{ number_format($row->avg_wht_rate, 1) }}%</span>
                                 </td>
-                                <td class="px-4 py-3 text-sm text-right font-semibold text-amber-700 dark:text-amber-400">Rs. {{ number_format($row->total_wht, 2) }}</td>
-                                <td class="px-4 py-3 text-sm text-right font-semibold text-gray-900 dark:text-white">Rs. {{ number_format($row->total_net_receivable, 2) }}</td>
+                                <td class="px-4 py-3 text-sm text-right font-semibold text-amber-700 dark:text-amber-400">PKR {{ number_format($row->total_wht, 2) }}</td>
+                                <td class="px-4 py-3 text-sm text-right font-semibold text-gray-900 dark:text-white">PKR {{ number_format($row->total_net_receivable, 2) }}</td>
                             </tr>
                             @empty
                             <tr>
@@ -170,11 +170,11 @@
                             <tr class="font-bold">
                                 <td class="px-4 py-3 text-sm text-emerald-800 dark:text-emerald-300" colspan="4">Grand Total</td>
                                 <td class="px-4 py-3 text-sm text-center text-emerald-800 dark:text-emerald-300">{{ number_format($totals['invoice_count']) }}</td>
-                                <td class="px-4 py-3 text-sm text-right text-emerald-800 dark:text-emerald-300">Rs. {{ number_format($totals['total_value'], 2) }}</td>
-                                <td class="px-4 py-3 text-sm text-right text-emerald-800 dark:text-emerald-300">Rs. {{ number_format($totals['total_sales_tax'], 2) }}</td>
+                                <td class="px-4 py-3 text-sm text-right text-emerald-800 dark:text-emerald-300">PKR {{ number_format($totals['total_value'], 2) }}</td>
+                                <td class="px-4 py-3 text-sm text-right text-emerald-800 dark:text-emerald-300">PKR {{ number_format($totals['total_sales_tax'], 2) }}</td>
                                 <td class="px-4 py-3 text-sm text-center text-emerald-800 dark:text-emerald-300">-</td>
-                                <td class="px-4 py-3 text-sm text-right text-emerald-800 dark:text-emerald-300">Rs. {{ number_format($totals['total_wht'], 2) }}</td>
-                                <td class="px-4 py-3 text-sm text-right text-emerald-800 dark:text-emerald-300">Rs. {{ number_format($totals['total_net_receivable'], 2) }}</td>
+                                <td class="px-4 py-3 text-sm text-right text-emerald-800 dark:text-emerald-300">PKR {{ number_format($totals['total_wht'], 2) }}</td>
+                                <td class="px-4 py-3 text-sm text-right text-emerald-800 dark:text-emerald-300">PKR {{ number_format($totals['total_net_receivable'], 2) }}</td>
                             </tr>
                         </tfoot>
                         @endif

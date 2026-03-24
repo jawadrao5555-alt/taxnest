@@ -115,19 +115,19 @@
                             <div class="space-y-2 text-sm">
                                 <div class="flex justify-between text-gray-600 dark:text-gray-400">
                                     <span>Invoices</span>
-                                    <span class="font-medium text-gray-800 dark:text-gray-200">Rs. <span x-text="pricing?.breakdown?.invoices?.toLocaleString()"></span></span>
+                                    <span class="font-medium text-gray-800 dark:text-gray-200">PKR <span x-text="pricing?.breakdown?.invoices?.toLocaleString()"></span></span>
                                 </div>
                                 <div class="flex justify-between text-gray-600 dark:text-gray-400">
                                     <span>Users</span>
-                                    <span class="font-medium text-gray-800 dark:text-gray-200">Rs. <span x-text="pricing?.breakdown?.users?.toLocaleString()"></span></span>
+                                    <span class="font-medium text-gray-800 dark:text-gray-200">PKR <span x-text="pricing?.breakdown?.users?.toLocaleString()"></span></span>
                                 </div>
                                 <div class="flex justify-between text-gray-600 dark:text-gray-400">
                                     <span>Branches</span>
-                                    <span class="font-medium text-gray-800 dark:text-gray-200">Rs. <span x-text="pricing?.breakdown?.branches?.toLocaleString()"></span></span>
+                                    <span class="font-medium text-gray-800 dark:text-gray-200">PKR <span x-text="pricing?.breakdown?.branches?.toLocaleString()"></span></span>
                                 </div>
                                 <div class="border-t border-gray-200 dark:border-gray-600 pt-2 flex justify-between font-medium text-gray-700 dark:text-gray-300">
                                     <span>Base Rate/mo</span>
-                                    <span>Rs. <span x-text="pricing?.base_rate_monthly?.toLocaleString()"></span></span>
+                                    <span>PKR <span x-text="pricing?.base_rate_monthly?.toLocaleString()"></span></span>
                                 </div>
                             </div>
 
@@ -138,21 +138,21 @@
                                 </div>
                                 <div class="flex justify-between text-gray-600 dark:text-gray-400">
                                     <span>Subtotal</span>
-                                    <span class="font-medium">Rs. <span x-text="pricing?.total_before_discount?.toLocaleString()"></span></span>
+                                    <span class="font-medium">PKR <span x-text="pricing?.total_before_discount?.toLocaleString()"></span></span>
                                 </div>
                                 <div x-show="pricing?.discount_percent > 0" class="flex justify-between text-emerald-600 dark:text-emerald-400">
                                     <span>Discount (<span x-text="pricing?.discount_percent"></span>%)</span>
-                                    <span class="font-medium">- Rs. <span x-text="pricing?.discount_amount?.toLocaleString()"></span></span>
+                                    <span class="font-medium">- PKR <span x-text="pricing?.discount_amount?.toLocaleString()"></span></span>
                                 </div>
                             </div>
 
                             <div class="border-t border-gray-200 dark:border-gray-600 pt-3">
                                 <div class="flex justify-between items-center">
                                     <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">Total</span>
-                                    <span class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">Rs. <span x-text="pricing?.final_price?.toLocaleString()"></span></span>
+                                    <span class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">PKR <span x-text="pricing?.final_price?.toLocaleString()"></span></span>
                                 </div>
                                 <p class="text-xs text-gray-500 dark:text-gray-400 text-right mt-1">
-                                    Effective: Rs. <span x-text="pricing?.monthly_effective?.toLocaleString()"></span>/mo
+                                    Effective: PKR <span x-text="pricing?.monthly_effective?.toLocaleString()"></span>/mo
                                 </p>
                             </div>
 

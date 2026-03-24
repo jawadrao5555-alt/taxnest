@@ -71,14 +71,14 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Price (Rs.) <span class="text-red-500">*</span></label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Price (PKR) <span class="text-red-500">*</span></label>
                             <input type="number" step="0.01" min="0" name="default_price" x-model="price" @input="calcTax()" required
                                 class="w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
                                 placeholder="0.00">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                MRP / Retail Price (Rs.)
+                                MRP / Retail Price (PKR)
                                 <span x-show="requiresMrp" class="text-red-500">*</span>
                                 <span x-show="!requiresMrp" class="text-gray-400 text-xs">(Optional)</span>
                             </label>
@@ -164,7 +164,7 @@
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                             <div class="text-center p-2 bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-700">
                                 <p class="text-xs text-gray-500 mb-1">Price</p>
-                                <p class="text-sm font-bold text-gray-800 dark:text-gray-200">Rs. <span x-text="formatNum(price)">0.00</span></p>
+                                <p class="text-sm font-bold text-gray-800 dark:text-gray-200">PKR <span x-text="formatNum(price)">0.00</span></p>
                             </div>
                             <div class="text-center p-2 bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-700">
                                 <p class="text-xs text-gray-500 mb-1">Tax Rate</p>
@@ -172,17 +172,17 @@
                             </div>
                             <div class="text-center p-2 bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-700">
                                 <p class="text-xs text-gray-500 mb-1">Tax Amount</p>
-                                <p class="text-sm font-bold text-red-600">Rs. <span x-text="formatNum(taxAmount)">0.00</span></p>
+                                <p class="text-sm font-bold text-red-600">PKR <span x-text="formatNum(taxAmount)">0.00</span></p>
                             </div>
                             <div class="text-center p-2 rounded-lg border-2" :class="taxAmount > 0 ? 'bg-emerald-100 dark:bg-emerald-900/40 border-emerald-300 dark:border-emerald-600' : 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-700'">
                                 <p class="text-xs text-gray-500 mb-1">Total (incl. Tax)</p>
-                                <p class="text-sm font-bold text-emerald-700 dark:text-emerald-400">Rs. <span x-text="formatNum(totalWithTax)">0.00</span></p>
+                                <p class="text-sm font-bold text-emerald-700 dark:text-emerald-400">PKR <span x-text="formatNum(totalWithTax)">0.00</span></p>
                             </div>
                         </div>
                         <div x-show="parseFloat(mrp) > 0" x-transition class="mt-3 p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700" style="display:none">
                             <div class="flex justify-between items-center">
                                 <span class="text-xs text-purple-600 dark:text-purple-400">MRP / Retail Price</span>
-                                <span class="text-sm font-bold text-purple-700 dark:text-purple-300">Rs. <span x-text="formatNum(mrp)">0.00</span></span>
+                                <span class="text-sm font-bold text-purple-700 dark:text-purple-300">PKR <span x-text="formatNum(mrp)">0.00</span></span>
                             </div>
                         </div>
                     </div>

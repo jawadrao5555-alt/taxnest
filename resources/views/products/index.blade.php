@@ -69,12 +69,12 @@
                                     @endif
                                 </td>
                                 <td class="px-4 py-3 whitespace-nowrap text-sm font-medium {{ $product->default_tax_rate > 0 ? 'text-amber-600' : 'text-gray-600' }}">{{ intval($product->default_tax_rate) }}%</td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">Rs. {{ number_format($product->default_price, 2) }}</td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm text-red-600 font-medium">Rs. {{ number_format($taxAmt, 2) }}</td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm text-emerald-700 dark:text-emerald-400 font-bold">Rs. {{ number_format($totalWithTax, 2) }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">PKR {{ number_format($product->default_price, 2) }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-red-600 font-medium">PKR {{ number_format($taxAmt, 2) }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-emerald-700 dark:text-emerald-400 font-bold">PKR {{ number_format($totalWithTax, 2) }}</td>
                                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                                     @if($product->mrp)
-                                        <span class="text-purple-700 font-medium">Rs. {{ number_format($product->mrp, 2) }}</span>
+                                        <span class="text-purple-700 font-medium">PKR {{ number_format($product->mrp, 2) }}</span>
                                     @else
                                         <span class="text-gray-400">-</span>
                                     @endif

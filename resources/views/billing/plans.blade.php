@@ -135,13 +135,13 @@
                             <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">{{ $plan->name }}</h3>
                             <div class="mt-4">
                                 <div x-show="cycle === 'monthly'">
-                                    <span class="text-3xl font-bold text-gray-900 dark:text-gray-100">Rs. {{ number_format($plan->price) }}</span>
+                                    <span class="text-3xl font-bold text-gray-900 dark:text-gray-100">PKR {{ number_format($plan->price) }}</span>
                                     <span class="text-gray-500 text-sm">/mo</span>
                                 </div>
                                 <div x-show="cycle !== 'monthly'">
-                                    <span class="text-3xl font-bold text-gray-900 dark:text-gray-100">Rs. <span x-text="calcMonthly({{ $plan->price }}).toLocaleString()"></span></span>
+                                    <span class="text-3xl font-bold text-gray-900 dark:text-gray-100">PKR <span x-text="calcMonthly({{ $plan->price }}).toLocaleString()"></span></span>
                                     <span class="text-gray-500 text-sm">/mo</span>
-                                    <p class="text-xs text-gray-400 mt-1">Rs. <span x-text="calcPrice({{ $plan->price }}).toLocaleString()"></span> total</p>
+                                    <p class="text-xs text-gray-400 mt-1">PKR <span x-text="calcPrice({{ $plan->price }}).toLocaleString()"></span> total</p>
                                 </div>
                             </div>
                             <ul class="mt-5 space-y-2.5">
@@ -223,7 +223,7 @@
                                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
                                     <td class="py-3 px-4 text-sm text-gray-600">Monthly Price</td>
                                     @foreach($plans as $plan)
-                                    <td class="py-3 px-4 text-center text-sm font-semibold">Rs. {{ number_format($plan->price) }}</td>
+                                    <td class="py-3 px-4 text-center text-sm font-semibold">PKR {{ number_format($plan->price) }}</td>
                                     @endforeach
                                 </tr>
                                 <tr class="bg-gray-50 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition">

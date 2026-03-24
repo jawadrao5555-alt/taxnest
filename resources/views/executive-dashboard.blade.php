@@ -21,7 +21,7 @@
                 </div>
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
                     <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Revenue</p>
-                    <p class="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">Rs. {{ number_format($totalRevenue) }}</p>
+                    <p class="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">PKR {{ number_format($totalRevenue) }}</p>
                 </div>
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
                     <p class="text-sm font-medium text-gray-500 dark:text-gray-400">FBR Locked</p>
@@ -106,7 +106,7 @@
                             <td class="px-6 py-3 text-sm text-gray-900 dark:text-gray-100">{{ $cust->buyer_name }}</td>
                             <td class="px-6 py-3 text-sm text-gray-500 dark:text-gray-400 font-mono">{{ $cust->buyer_ntn }}</td>
                             <td class="px-6 py-3 text-sm text-right text-gray-900 dark:text-gray-100">{{ $cust->invoice_count }}</td>
-                            <td class="px-6 py-3 text-sm text-right font-semibold text-gray-900 dark:text-gray-100">Rs. {{ number_format($cust->total_amount) }}</td>
+                            <td class="px-6 py-3 text-sm text-right font-semibold text-gray-900 dark:text-gray-100">PKR {{ number_format($cust->total_amount) }}</td>
                         </tr>
                         @endforeach
                     </tbody>
@@ -169,7 +169,7 @@
             data: {
                 labels: taxData.map(d => d.month),
                 datasets: [{
-                    label: 'Tax Collected (Rs.)',
+                    label: 'Tax Collected (PKR)',
                     data: taxData.map(d => d.amount),
                     borderColor: '#8b5cf6',
                     backgroundColor: 'rgba(139, 92, 246, 0.1)',

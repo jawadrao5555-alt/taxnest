@@ -28,10 +28,10 @@
                                 <a href="/customers/{{ $customer->customer_ntn }}/ledger">{{ $customer->customer_name }}</a>
                             </td>
                             <td class="px-6 py-4 text-sm font-mono text-gray-600">{{ $customer->customer_ntn }}</td>
-                            <td class="px-6 py-4 text-sm font-semibold text-gray-900 text-right">Rs. {{ number_format($customer->total_invoiced, 2) }}</td>
-                            <td class="px-6 py-4 text-sm font-semibold text-green-600 text-right">Rs. {{ number_format($customer->total_received, 2) }}</td>
+                            <td class="px-6 py-4 text-sm font-semibold text-gray-900 text-right">PKR {{ number_format($customer->total_invoiced, 2) }}</td>
+                            <td class="px-6 py-4 text-sm font-semibold text-green-600 text-right">PKR {{ number_format($customer->total_received, 2) }}</td>
                             <td class="px-6 py-4 text-sm font-bold text-right {{ $customer->outstanding > 0 ? 'text-red-600' : 'text-green-600' }}">
-                                Rs. {{ number_format($customer->outstanding, 2) }}
+                                PKR {{ number_format($customer->outstanding, 2) }}
                             </td>
                         </tr>
                         @empty

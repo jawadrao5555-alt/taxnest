@@ -220,9 +220,9 @@
                     <td>{{ $item->description }}</td>
                     <td>{{ $item->default_uom ?? 'PCS' }}</td>
                     <td class="text-right">{{ number_format($item->quantity, 0) }}</td>
-                    <td class="text-right">Rs. {{ number_format($item->price, 4) }}</td>
-                    <td class="text-right">Rs. {{ number_format($item->price * $item->quantity, 2) }}</td>
-                    <td class="text-right">Rs. {{ number_format($item->discount ?? 0, 2) }}</td>
+                    <td class="text-right">PKR {{ number_format($item->price, 4) }}</td>
+                    <td class="text-right">PKR {{ number_format($item->price * $item->quantity, 2) }}</td>
+                    <td class="text-right">PKR {{ number_format($item->discount ?? 0, 2) }}</td>
                 </tr>
                 @endforeach
             </tbody>
@@ -238,28 +238,28 @@
                             <table>
                                 <tr>
                                     <td class="label">Sub Total:</td>
-                                    <td class="value">Rs. {{ number_format($subtotal, 2) }}</td>
+                                    <td class="value">PKR {{ number_format($subtotal, 2) }}</td>
                                 </tr>
                                 <tr>
                                     <td class="label">GST:</td>
-                                    <td class="value">Rs. {{ number_format($totalTax, 2) }}</td>
+                                    <td class="value">PKR {{ number_format($totalTax, 2) }}</td>
                                 </tr>
                                 @php $totalFurtherTax = $invoice->items->sum('further_tax'); @endphp
                                 @if($totalFurtherTax > 0)
                                 <tr>
                                     <td class="label">Further Tax (4%):</td>
-                                    <td class="value" style="color: #ea580c;">Rs. {{ number_format($totalFurtherTax, 2) }}</td>
+                                    <td class="value" style="color: #ea580c;">PKR {{ number_format($totalFurtherTax, 2) }}</td>
                                 </tr>
                                 @endif
                                 @if(($wht_rate ?? 0) > 0)
                                 <tr>
                                     <td class="label">WHT ({{ $wht_rate }}%):</td>
-                                    <td class="value">Rs. {{ number_format($wht_amount ?? 0, 2) }}</td>
+                                    <td class="value">PKR {{ number_format($wht_amount ?? 0, 2) }}</td>
                                 </tr>
                                 @endif
                                 <tr class="grand-total">
                                     <td class="label" style="font-size: 13px;">Total:</td>
-                                    <td class="value">Rs. {{ number_format(($wht_rate ?? 0) > 0 ? ($net_receivable ?? $invoice->total_amount) : $invoice->total_amount, 2) }}</td>
+                                    <td class="value">PKR {{ number_format(($wht_rate ?? 0) > 0 ? ($net_receivable ?? $invoice->total_amount) : $invoice->total_amount, 2) }}</td>
                                 </tr>
                             </table>
                         </div>

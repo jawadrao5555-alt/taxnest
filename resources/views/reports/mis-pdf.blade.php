@@ -17,19 +17,19 @@
                 </td>
                 <td style="width:25%; padding:4px;">
                     <div class="summary-card">
-                        <div class="value">Rs. {{ number_format($invoices->sum('total_amount'), 2) }}</div>
+                        <div class="value">PKR {{ number_format($invoices->sum('total_amount'), 2) }}</div>
                         <div class="label">Total Revenue</div>
                     </div>
                 </td>
                 <td style="width:25%; padding:4px;">
                     <div class="summary-card highlight">
-                        <div class="value">Rs. {{ number_format($invoices->sum('total_sales_tax'), 2) }}</div>
+                        <div class="value">PKR {{ number_format($invoices->sum('total_sales_tax'), 2) }}</div>
                         <div class="label">Sales Tax</div>
                     </div>
                 </td>
                 <td style="width:25%; padding:4px;">
                     <div class="summary-card warning">
-                        <div class="value">Rs. {{ number_format($invoices->sum('wht_amount'), 2) }}</div>
+                        <div class="value">PKR {{ number_format($invoices->sum('wht_amount'), 2) }}</div>
                         <div class="label">WHT</div>
                     </div>
                 </td>
@@ -40,7 +40,7 @@
             @foreach($partyGroups as $party => $rows)
             <div class="party-header">
                 <h3>{{ $party }}</h3>
-                <div class="detail">Invoices: {{ count($rows) }} | Total: Rs. {{ number_format($rows->sum('total_amount'), 2) }}</div>
+                <div class="detail">Invoices: {{ count($rows) }} | Total: PKR {{ number_format($rows->sum('total_amount'), 2) }}</div>
             </div>
             <table class="data-table">
                 <thead>
@@ -61,10 +61,10 @@
                         <td class="bold">{{ $inv->internal_invoice_number ?? $inv->invoice_number }}</td>
                         <td>{{ $inv->invoice_date }}</td>
                         <td>{{ $inv->buyer_ntn ?? '-' }}</td>
-                        <td class="right">Rs. {{ number_format($inv->total_value_excluding_st ?? ($inv->total_amount - $inv->total_sales_tax), 2) }}</td>
-                        <td class="right green">Rs. {{ number_format($inv->total_sales_tax, 2) }}</td>
-                        <td class="right amber">Rs. {{ number_format($inv->wht_amount, 2) }}</td>
-                        <td class="right bold">Rs. {{ number_format($inv->total_amount, 2) }}</td>
+                        <td class="right">PKR {{ number_format($inv->total_value_excluding_st ?? ($inv->total_amount - $inv->total_sales_tax), 2) }}</td>
+                        <td class="right green">PKR {{ number_format($inv->total_sales_tax, 2) }}</td>
+                        <td class="right amber">PKR {{ number_format($inv->wht_amount, 2) }}</td>
+                        <td class="right bold">PKR {{ number_format($inv->total_amount, 2) }}</td>
                         <td class="center"><span class="badge {{ $inv->status === 'locked' ? 'badge-green' : ($inv->status === 'draft' ? 'badge-amber' : 'badge-red') }}">{{ $inv->status === 'locked' ? 'Production' : ucfirst($inv->status) }}</span></td>
                     </tr>
                     @endforeach
@@ -72,10 +72,10 @@
                 <tfoot>
                     <tr>
                         <td colspan="3">Subtotal</td>
-                        <td class="right">Rs. {{ number_format($rows->sum(fn($i) => $i->total_value_excluding_st ?? ($i->total_amount - $i->total_sales_tax)), 2) }}</td>
-                        <td class="right">Rs. {{ number_format($rows->sum('total_sales_tax'), 2) }}</td>
-                        <td class="right">Rs. {{ number_format($rows->sum('wht_amount'), 2) }}</td>
-                        <td class="right">Rs. {{ number_format($rows->sum('total_amount'), 2) }}</td>
+                        <td class="right">PKR {{ number_format($rows->sum(fn($i) => $i->total_value_excluding_st ?? ($i->total_amount - $i->total_sales_tax)), 2) }}</td>
+                        <td class="right">PKR {{ number_format($rows->sum('total_sales_tax'), 2) }}</td>
+                        <td class="right">PKR {{ number_format($rows->sum('wht_amount'), 2) }}</td>
+                        <td class="right">PKR {{ number_format($rows->sum('total_amount'), 2) }}</td>
                         <td></td>
                     </tr>
                 </tfoot>
@@ -103,10 +103,10 @@
                         <td>{{ $inv->invoice_date }}</td>
                         <td>{{ $inv->buyer_name }}</td>
                         <td>{{ $inv->buyer_ntn ?? '-' }}</td>
-                        <td class="right">Rs. {{ number_format($inv->total_value_excluding_st ?? ($inv->total_amount - $inv->total_sales_tax), 2) }}</td>
-                        <td class="right green">Rs. {{ number_format($inv->total_sales_tax, 2) }}</td>
-                        <td class="right amber">Rs. {{ number_format($inv->wht_amount, 2) }}</td>
-                        <td class="right bold">Rs. {{ number_format($inv->total_amount, 2) }}</td>
+                        <td class="right">PKR {{ number_format($inv->total_value_excluding_st ?? ($inv->total_amount - $inv->total_sales_tax), 2) }}</td>
+                        <td class="right green">PKR {{ number_format($inv->total_sales_tax, 2) }}</td>
+                        <td class="right amber">PKR {{ number_format($inv->wht_amount, 2) }}</td>
+                        <td class="right bold">PKR {{ number_format($inv->total_amount, 2) }}</td>
                         <td class="center"><span class="badge {{ $inv->status === 'locked' ? 'badge-green' : ($inv->status === 'draft' ? 'badge-amber' : 'badge-red') }}">{{ $inv->status === 'locked' ? 'Production' : ucfirst($inv->status) }}</span></td>
                     </tr>
                     @empty
@@ -117,10 +117,10 @@
                 <tfoot>
                     <tr>
                         <td colspan="4">Grand Total</td>
-                        <td class="right">Rs. {{ number_format($invoices->sum(fn($i) => $i->total_value_excluding_st ?? ($i->total_amount - $i->total_sales_tax)), 2) }}</td>
-                        <td class="right">Rs. {{ number_format($invoices->sum('total_sales_tax'), 2) }}</td>
-                        <td class="right">Rs. {{ number_format($invoices->sum('wht_amount'), 2) }}</td>
-                        <td class="right">Rs. {{ number_format($invoices->sum('total_amount'), 2) }}</td>
+                        <td class="right">PKR {{ number_format($invoices->sum(fn($i) => $i->total_value_excluding_st ?? ($i->total_amount - $i->total_sales_tax)), 2) }}</td>
+                        <td class="right">PKR {{ number_format($invoices->sum('total_sales_tax'), 2) }}</td>
+                        <td class="right">PKR {{ number_format($invoices->sum('wht_amount'), 2) }}</td>
+                        <td class="right">PKR {{ number_format($invoices->sum('total_amount'), 2) }}</td>
                         <td></td>
                     </tr>
                 </tfoot>
@@ -142,8 +142,8 @@
                 @foreach($taxSummary as $row)
                 <tr>
                     <td class="bold">{{ $row['month'] }}</td>
-                    <td class="right green bold">Rs. {{ number_format($row['tax_collected'], 2) }}</td>
-                    <td class="right">Rs. {{ number_format($row['subtotal'], 2) }}</td>
+                    <td class="right green bold">PKR {{ number_format($row['tax_collected'], 2) }}</td>
+                    <td class="right">PKR {{ number_format($row['subtotal'], 2) }}</td>
                     <td class="center"><span class="badge badge-green">{{ $row['effective_rate'] }}%</span></td>
                 </tr>
                 @endforeach
@@ -151,8 +151,8 @@
             <tfoot>
                 <tr>
                     <td>Total</td>
-                    <td class="right">Rs. {{ number_format(collect($taxSummary)->sum('tax_collected'), 2) }}</td>
-                    <td class="right">Rs. {{ number_format(collect($taxSummary)->sum('subtotal'), 2) }}</td>
+                    <td class="right">PKR {{ number_format(collect($taxSummary)->sum('tax_collected'), 2) }}</td>
+                    <td class="right">PKR {{ number_format(collect($taxSummary)->sum('subtotal'), 2) }}</td>
                     <td class="center">-</td>
                 </tr>
             </tfoot>
@@ -174,8 +174,8 @@
                 <tr>
                     <td class="bold">{{ $hs->hs_prefix }}</td>
                     <td class="center">{{ $hs->item_count }}</td>
-                    <td class="right">Rs. {{ number_format($hs->total_value, 2) }}</td>
-                    <td class="right green bold">Rs. {{ number_format($hs->total_tax, 2) }}</td>
+                    <td class="right">PKR {{ number_format($hs->total_value, 2) }}</td>
+                    <td class="right green bold">PKR {{ number_format($hs->total_tax, 2) }}</td>
                     <td class="center"><span class="badge badge-green">{{ $hs->total_value > 0 ? number_format(($hs->total_tax / $hs->total_value) * 100, 1) : 0 }}%</span></td>
                 </tr>
                 @endforeach
@@ -184,8 +184,8 @@
                 <tr>
                     <td>Total</td>
                     <td class="center">{{ $hsData->sum('item_count') }}</td>
-                    <td class="right">Rs. {{ number_format($hsData->sum('total_value'), 2) }}</td>
-                    <td class="right">Rs. {{ number_format($hsData->sum('total_tax'), 2) }}</td>
+                    <td class="right">PKR {{ number_format($hsData->sum('total_value'), 2) }}</td>
+                    <td class="right">PKR {{ number_format($hsData->sum('total_tax'), 2) }}</td>
                     <td class="center">-</td>
                 </tr>
             </tfoot>

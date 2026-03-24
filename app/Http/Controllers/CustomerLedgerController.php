@@ -78,7 +78,7 @@ class CustomerLedgerController extends Controller
             'notes' => $request->notes,
         ]);
 
-        return redirect('/customers/' . $request->customer_ntn . '/ledger')->with('success', 'Payment of Rs. ' . number_format($request->amount, 2) . ' recorded successfully.');
+        return redirect('/customers/' . $request->customer_ntn . '/ledger')->with('success', 'Payment of PKR ' . number_format($request->amount, 2) . ' recorded successfully.');
     }
 
     public function addAdjustment(Request $request)

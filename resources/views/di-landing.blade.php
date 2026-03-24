@@ -325,7 +325,7 @@
                     <div class="{{ $isPopular ? 'bg-gradient-to-b from-emerald-50/50 to-white border-emerald-400/30 border-t-0 rounded-b-xl' : 'bg-white border-gray-200 rounded-xl' }} border p-5">
                         <h3 class="text-lg font-bold text-gray-900">{{ $plan->name }}</h3>
                         <div class="mt-3 mb-1">
-                            <span class="text-3xl font-black text-gray-900">Rs. {{ number_format($plan->price, 0) }}</span>
+                            <span class="text-3xl font-black text-gray-900">PKR {{ number_format($plan->price, 0) }}</span>
                             <span class="text-gray-400 text-sm">/mo</span>
                         </div>
                         <p class="text-xs text-emerald-600 font-medium">Save up to 6% on annual billing</p>

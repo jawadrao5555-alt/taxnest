@@ -129,7 +129,7 @@
                                                         <tr>
                                                             <td class="px-3 py-1 font-mono text-xs" x-text="inv.invoice_number"></td>
                                                             <td class="px-3 py-1" x-text="inv.buyer_name"></td>
-                                                            <td class="px-3 py-1" x-text="'Rs. ' + Number(inv.total_amount).toLocaleString()"></td>
+                                                            <td class="px-3 py-1" x-text="'PKR ' + Number(inv.total_amount).toLocaleString()"></td>
                                                             <td class="px-3 py-1 text-center" x-text="inv.items_count"></td>
                                                         </tr>
                                                     </template>
@@ -214,7 +214,7 @@
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{{ $invoice->buyer_name }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $invoice->buyer_ntn }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $invoice->branch->name ?? '—' }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">Rs. {{ number_format($invoice->total_amount, 2) }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">PKR {{ number_format($invoice->total_amount, 2) }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $invoice->items->count() }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold

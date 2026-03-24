@@ -40,7 +40,7 @@
                         </div>
                         <div>
                             <p class="text-xs font-medium text-emerald-100 uppercase tracking-wider">Today's Revenue</p>
-                            <p class="text-2xl font-bold text-white">Rs. {{ number_format($todayRevenue) }}</p>
+                            <p class="text-2xl font-bold text-white">PKR {{ number_format($todayRevenue) }}</p>
                         </div>
                     </div>
                     <div class="flex items-center space-x-3">
@@ -102,7 +102,7 @@
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm font-medium text-gray-500">Total Revenue</p>
-                            <p class="text-3xl font-bold text-gray-900 mt-1">Rs. {{ number_format($totalRevenue) }}</p>
+                            <p class="text-3xl font-bold text-gray-900 mt-1">PKR {{ number_format($totalRevenue) }}</p>
                         </div>
                         <div class="p-3 bg-orange-50 rounded-lg">
                             <svg class="w-6 h-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -157,7 +157,7 @@
                                 <tr class="hover:bg-gray-50">
                                     <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ $invoice->invoice_number ?? 'INV-' . $invoice->id }}</td>
                                     <td class="px-4 py-3 text-sm text-gray-600">{{ $invoice->company->name ?? 'N/A' }}</td>
-                                    <td class="px-4 py-3 text-sm text-gray-900">Rs. {{ number_format($invoice->total_amount) }}</td>
+                                    <td class="px-4 py-3 text-sm text-gray-900">PKR {{ number_format($invoice->total_amount) }}</td>
                                     <td class="px-4 py-3">
                                         <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium
                                             @if($invoice->status === 'draft') bg-yellow-100 text-yellow-800
@@ -198,7 +198,7 @@
                                     <td class="px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{{ $index + 1 }}</td>
                                     <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ $tc->name }}</td>
                                     <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{{ $tc->invoices_count }}</td>
-                                    <td class="px-4 py-3 text-sm font-bold text-emerald-700 dark:text-emerald-400 text-right">Rs. {{ number_format($tc->company_revenue) }}</td>
+                                    <td class="px-4 py-3 text-sm font-bold text-emerald-700 dark:text-emerald-400 text-right">PKR {{ number_format($tc->company_revenue) }}</td>
                                 </tr>
                                 @empty
                                 <tr><td colspan="4" class="px-4 py-6 text-center text-gray-400">No revenue data yet</td></tr>
@@ -229,7 +229,7 @@
                             data: {
                                 labels: {!! json_encode($monthlyRevenue->map(function($m) { return \Carbon\Carbon::parse($m->month . '-01')->format('M Y'); })->values()) !!},
                                 datasets: [{
-                                    label: 'Revenue (Rs.)',
+                                    label: 'Revenue (PKR)',
                                     data: {!! json_encode($monthlyRevenue->pluck('revenue')->values()) !!},
                                     backgroundColor: 'rgba(59, 130, 246, 0.7)',
                                     borderColor: 'rgba(59, 130, 246, 1)',
@@ -246,7 +246,7 @@
                                     tooltip: {
                                         callbacks: {
                                             label: function(context) {
-                                                return 'Rs. ' + Number(context.raw).toLocaleString();
+                                                return 'PKR ' + Number(context.raw).toLocaleString();
                                             }
                                         }
                                     }
@@ -256,7 +256,7 @@
                                         beginAtZero: true,
                                         ticks: {
                                             callback: function(value) {
-                                                return 'Rs. ' + Number(value).toLocaleString();
+                                                return 'PKR ' + Number(value).toLocaleString();
                                             }
                                         },
                                         grid: { color: 'rgba(0,0,0,0.05)' }

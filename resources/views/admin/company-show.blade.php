@@ -90,7 +90,7 @@
                             @csrf
                             <select name="pricing_plan_id" class="text-sm rounded-lg border-gray-300">
                                 @foreach($plans as $plan)
-                                <option value="{{ $plan->id }}">{{ $plan->name }} (Rs. {{ number_format($plan->price) }})</option>
+                                <option value="{{ $plan->id }}">{{ $plan->name }} (PKR {{ number_format($plan->price) }})</option>
                                 @endforeach
                             </select>
                             <button type="submit" class="px-3 py-2 bg-emerald-600 text-white text-sm rounded-lg font-medium hover:bg-emerald-700">Apply</button>
@@ -187,17 +187,17 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Total Invoiced Amount</p>
-                        <p class="text-3xl font-extrabold text-emerald-600">Rs. {{ number_format($financial['total_invoiced'], 2) }}</p>
+                        <p class="text-3xl font-extrabold text-emerald-600">PKR {{ number_format($financial['total_invoiced'], 2) }}</p>
                     </div>
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Total Tax Collected</p>
-                        <p class="text-3xl font-extrabold text-orange-600">Rs. {{ number_format($financial['total_tax'], 2) }}</p>
+                        <p class="text-3xl font-extrabold text-orange-600">PKR {{ number_format($financial['total_tax'], 2) }}</p>
                         @if($financial['tax_rate_summary']->count() > 0)
                         <div class="mt-3 space-y-1">
                             @foreach($financial['tax_rate_summary'] as $item)
                             <div class="flex justify-between text-xs">
                                 <span class="text-gray-500">Rate {{ $item->tax_rate }}%</span>
-                                <span class="font-medium text-gray-700">{{ $item->count }} items (Rs. {{ number_format($item->total_tax) }})</span>
+                                <span class="font-medium text-gray-700">{{ $item->count }} items (PKR {{ number_format($item->total_tax) }})</span>
                             </div>
                             @endforeach
                         </div>
@@ -207,7 +207,7 @@
                     </div>
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Outstanding Balance</p>
-                        <p class="text-3xl font-extrabold {{ $financial['outstanding'] > 0 ? 'text-red-600' : 'text-gray-900' }}">Rs. {{ number_format($financial['outstanding'], 2) }}</p>
+                        <p class="text-3xl font-extrabold {{ $financial['outstanding'] > 0 ? 'text-red-600' : 'text-gray-900' }}">PKR {{ number_format($financial['outstanding'], 2) }}</p>
                         <p class="text-xs text-gray-400 mt-2">Sum of last customer ledger balances</p>
                     </div>
                 </div>
@@ -230,7 +230,7 @@
                             <tr class="hover:bg-gray-50">
                                 <td class="px-6 py-3 text-sm font-medium text-gray-900">{{ $mr['month'] }}</td>
                                 <td class="px-6 py-3 text-sm text-gray-700 text-right">{{ $mr['count'] }}</td>
-                                <td class="px-6 py-3 text-sm font-semibold text-gray-900 text-right">Rs. {{ number_format($mr['revenue'], 2) }}</td>
+                                <td class="px-6 py-3 text-sm font-semibold text-gray-900 text-right">PKR {{ number_format($mr['revenue'], 2) }}</td>
                             </tr>
                             @endforeach
                         </tbody>

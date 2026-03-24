@@ -214,7 +214,7 @@
                             <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         </div>
                     </div>
-                    <p class="text-2xl font-bold text-gray-900 dark:text-white">Rs. {{ number_format($totalRevenue) }}</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white">PKR {{ number_format($totalRevenue) }}</p>
                     <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider">Total Revenue</p>
                 </div>
 
@@ -358,7 +358,7 @@
                         </h3>
                         <div class="grid grid-cols-3 gap-3">
                             <div class="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
-                                <p class="text-lg font-extrabold text-blue-700 dark:text-blue-400">Rs. {{ number_format($totalRevenue) }}</p>
+                                <p class="text-lg font-extrabold text-blue-700 dark:text-blue-400">PKR {{ number_format($totalRevenue) }}</p>
                                 <p class="text-xs font-medium text-blue-600/70 dark:text-blue-500 mt-1 uppercase tracking-wider">Total Billed</p>
                             </div>
                             <div class="text-center p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-100 dark:border-emerald-800">
@@ -454,7 +454,7 @@
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Avg Invoice</p>
-                            <p class="text-2xl font-extrabold text-gray-900 dark:text-white mt-1">Rs. {{ number_format($kpis['avg_invoice_value']) }}</p>
+                            <p class="text-2xl font-extrabold text-gray-900 dark:text-white mt-1">PKR {{ number_format($kpis['avg_invoice_value']) }}</p>
                             <p class="text-xs text-gray-400 dark:text-gray-500 mt-1 font-medium">Per invoice avg</p>
                         </div>
                         <div class="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
@@ -494,7 +494,7 @@
                         @foreach($topCustomers as $cust)
                         <tr class="hover:bg-gray-50/50 dark:hover:bg-gray-700/20 transition-colors duration-200">
                             <td class="px-5 py-3 text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $cust->buyer_name }}</td>
-                            <td class="px-5 py-3 text-sm font-bold text-emerald-600 dark:text-emerald-400 text-right">Rs. {{ number_format($cust->total_amount) }}</td>
+                            <td class="px-5 py-3 text-sm font-bold text-emerald-600 dark:text-emerald-400 text-right">PKR {{ number_format($cust->total_amount) }}</td>
                             <td class="px-5 py-3 text-sm text-gray-500 dark:text-gray-400 text-right">{{ $cust->invoice_count }}</td>
                         </tr>
                         @endforeach
@@ -521,7 +521,7 @@
                         <tr class="hover:bg-gray-50/50 dark:hover:bg-gray-700/20 transition-colors duration-200">
                             <td class="px-5 py-3 text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $branch->branch_name }}</td>
                             <td class="px-5 py-3 text-sm text-gray-500 dark:text-gray-400 text-right">{{ $branch->invoice_count }}</td>
-                            <td class="px-5 py-3 text-sm font-bold text-emerald-600 dark:text-emerald-400 text-right">Rs. {{ number_format($branch->total_revenue) }}</td>
+                            <td class="px-5 py-3 text-sm font-bold text-emerald-600 dark:text-emerald-400 text-right">PKR {{ number_format($branch->total_revenue) }}</td>
                         </tr>
                         @endforeach
                     </tbody>
@@ -551,7 +551,7 @@
                             </div>
                             <p class="text-sm font-bold text-gray-900 dark:text-gray-100 truncate group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition">{{ $invoice->buyer_name }}</p>
                             <div class="flex items-center justify-between mt-2">
-                                <span class="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">Rs. {{ number_format($invoice->total_amount) }}</span>
+                                <span class="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">PKR {{ number_format($invoice->total_amount) }}</span>
                                 <span class="text-xs text-gray-400 dark:text-gray-500">{{ $invoice->created_at->format('d M') }}</span>
                             </div>
                         </a>

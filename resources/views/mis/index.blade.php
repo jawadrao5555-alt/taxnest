@@ -92,7 +92,7 @@
                 </div>
                 <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <p class="text-sm font-medium text-gray-500">Current Month Revenue</p>
-                    <p class="text-3xl font-bold text-gray-900 mt-1">Rs. {{ number_format($monthlySummary['current_revenue']) }}</p>
+                    <p class="text-3xl font-bold text-gray-900 mt-1">PKR {{ number_format($monthlySummary['current_revenue']) }}</p>
                     <p class="text-sm mt-2 {{ $monthlySummary['growth_revenue'] >= 0 ? 'text-green-600' : 'text-red-600' }}">
                         {{ $monthlySummary['growth_revenue'] >= 0 ? '+' : '' }}{{ $monthlySummary['growth_revenue'] }}% vs last month
                     </p>
@@ -104,7 +104,7 @@
                 </div>
                 <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <p class="text-sm font-medium text-gray-500">Last Month Revenue</p>
-                    <p class="text-3xl font-bold text-gray-900 mt-1">Rs. {{ number_format($monthlySummary['last_revenue']) }}</p>
+                    <p class="text-3xl font-bold text-gray-900 mt-1">PKR {{ number_format($monthlySummary['last_revenue']) }}</p>
                     <p class="text-sm text-gray-400 mt-2">Previous period</p>
                 </div>
             </div>
@@ -128,8 +128,8 @@
                             @foreach($taxSummary as $row)
                             <tr class="hover:bg-gray-50">
                                 <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ $row['month'] }}</td>
-                                <td class="px-4 py-3 text-sm text-right text-gray-700">Rs. {{ number_format($row['tax_collected'], 2) }}</td>
-                                <td class="px-4 py-3 text-sm text-right text-gray-700">Rs. {{ number_format($row['subtotal'], 2) }}</td>
+                                <td class="px-4 py-3 text-sm text-right text-gray-700">PKR {{ number_format($row['tax_collected'], 2) }}</td>
+                                <td class="px-4 py-3 text-sm text-right text-gray-700">PKR {{ number_format($row['subtotal'], 2) }}</td>
                                 <td class="px-4 py-3 text-sm text-right">
                                     <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $row['effective_rate'] > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600' }}">
                                         {{ $row['effective_rate'] }}%
@@ -164,8 +164,8 @@
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">{{ $hs->hs_prefix ?? 'N/A' }}</span>
                                 </td>
                                 <td class="px-4 py-3 text-sm text-right text-gray-700">{{ $hs->item_count }}</td>
-                                <td class="px-4 py-3 text-sm text-right text-gray-700">Rs. {{ number_format($hs->total_value, 2) }}</td>
-                                <td class="px-4 py-3 text-sm text-right text-gray-700">Rs. {{ number_format($hs->total_tax, 2) }}</td>
+                                <td class="px-4 py-3 text-sm text-right text-gray-700">PKR {{ number_format($hs->total_value, 2) }}</td>
+                                <td class="px-4 py-3 text-sm text-right text-gray-700">PKR {{ number_format($hs->total_tax, 2) }}</td>
                             </tr>
                             @empty
                             <tr><td colspan="4" class="px-4 py-6 text-center text-gray-400">No HS code data available</td></tr>

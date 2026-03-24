@@ -228,7 +228,7 @@ class FbrService
             $rate = str_replace('%', '', $item['rate'] ?? '0');
             $valueExclST = floatval($item['valueSalesExcludingST'] ?? 0);
             if (is_numeric($rate) && floatval($rate) == 5 && $valueExclST > 20000) {
-                $errors[] = ['code' => '0079', 'message' => "Item #{$sn}: Value exceeds Rs. 20,000 - 5% rate is not allowed for values above this threshold."];
+                $errors[] = ['code' => '0079', 'message' => "Item #{$sn}: Value exceeds PKR 20,000 - 5% rate is not allowed for values above this threshold."];
             }
 
             $saleType = strtolower($item['saleType'] ?? '');

@@ -191,7 +191,7 @@
                                         <template x-for="product in item.productResults" :key="product.id">
                                             <button type="button" @click="selectProduct(index, product)" class="w-full text-left px-4 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-sm border-b border-gray-100 last:border-0">
                                                 <span class="font-medium text-gray-800 dark:text-gray-100" x-text="product.name"></span>
-                                                <span class="text-gray-500 dark:text-gray-400 text-xs ml-2" x-text="'HS: ' + product.hs_code + ' | ' + (product.schedule_type || 'standard') + ' | Rs. ' + product.default_price"></span>
+                                                <span class="text-gray-500 dark:text-gray-400 text-xs ml-2" x-text="'HS: ' + product.hs_code + ' | ' + (product.schedule_type || 'standard') + ' | PKR ' + product.default_price"></span>
                                             </button>
                                         </template>
                                     </div>
@@ -365,12 +365,12 @@
                                         class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Unit Price (Rs.)</label>
+                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Unit Price (PKR)</label>
                                     <input type="number" step="0.01" min="0" :name="'items[' + index + '][price]'" x-model="item.price" @input="calcTax(index)" required data-field="price"
                                         class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">MRP / Retail Price (Rs.)</label>
+                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">MRP / Retail Price (PKR)</label>
                                     <input type="number" step="0.01" min="0" :name="'items[' + index + '][mrp]'" x-model="item.mrp" @input="item.mrpManual = true" placeholder="0.00"
                                         class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                 </div>
@@ -384,7 +384,7 @@
                                     </label>
                                 </div>
                                 <div x-show="item.show_petroleum_levy">
-                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Petroleum Levy (Rs.)</label>
+                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Petroleum Levy (PKR)</label>
                                     <input type="number" step="0.01" min="0" :name="'items[' + index + '][petroleum_levy]'" x-model="item.petroleum_levy" placeholder="0.00"
                                         class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                 </div>
@@ -392,13 +392,13 @@
                             <input type="hidden" :name="'items[' + index + '][tax]'" :value="item.tax">
                             <input type="hidden" :name="'items[' + index + '][further_tax]'" :value="item.further_tax">
                             <div class="mt-2 flex flex-wrap justify-between text-sm text-gray-500 dark:text-gray-400 gap-1">
-                                <span>Subtotal: <span class="font-medium text-gray-800 dark:text-gray-100" x-text="'Rs. ' + itemSubtotal(index)"></span></span>
-                                <span>Tax (<span x-text="item.tax_rate"></span>%): <span class="font-medium text-gray-800 dark:text-gray-100" x-text="'Rs. ' + parseFloat(item.tax || 0).toFixed(2)"></span></span>
-                                <span x-show="applyFurtherTax" x-cloak class="text-orange-600">Further Tax (4%): <span class="font-medium" x-text="'Rs. ' + parseFloat(item.further_tax || 0).toFixed(2)"></span></span>
-                                <span>Line Total: <span class="font-medium text-gray-800 dark:text-gray-100" x-text="'Rs. ' + itemTotal(index)"></span></span>
+                                <span>Subtotal: <span class="font-medium text-gray-800 dark:text-gray-100" x-text="'PKR ' + itemSubtotal(index)"></span></span>
+                                <span>Tax (<span x-text="item.tax_rate"></span>%): <span class="font-medium text-gray-800 dark:text-gray-100" x-text="'PKR ' + parseFloat(item.tax || 0).toFixed(2)"></span></span>
+                                <span x-show="applyFurtherTax" x-cloak class="text-orange-600">Further Tax (4%): <span class="font-medium" x-text="'PKR ' + parseFloat(item.further_tax || 0).toFixed(2)"></span></span>
+                                <span>Line Total: <span class="font-medium text-gray-800 dark:text-gray-100" x-text="'PKR ' + itemTotal(index)"></span></span>
                             </div>
                             <div class="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                                <span x-text="'FBR Value (qty × price): Rs. ' + itemSubtotal(index) + ' | FBR Tax (value × ' + item.tax_rate + '%): Rs. ' + parseFloat(item.tax || 0).toFixed(2)"></span>
+                                <span x-text="'FBR Value (qty × price): PKR ' + itemSubtotal(index) + ' | FBR Tax (value × ' + item.tax_rate + '%): PKR ' + parseFloat(item.tax || 0).toFixed(2)"></span>
                             </div>
                         </div>
                     </template>
@@ -406,19 +406,19 @@
                     <div class="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-2">
                         <div class="flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
                             <span>Value Excl. ST</span>
-                            <span class="font-medium" x-text="'Rs. ' + totalExclST()"></span>
+                            <span class="font-medium" x-text="'PKR ' + totalExclST()"></span>
                         </div>
                         <div class="flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
                             <span>Total Sales Tax</span>
-                            <span class="font-medium" x-text="'Rs. ' + totalSalesTax()"></span>
+                            <span class="font-medium" x-text="'PKR ' + totalSalesTax()"></span>
                         </div>
                         <div x-show="applyFurtherTax" x-cloak class="flex justify-between items-center text-sm text-orange-600 dark:text-orange-400">
                             <span>Further Tax (4%)</span>
-                            <span class="font-medium" x-text="'Rs. ' + totalFurtherTax()"></span>
+                            <span class="font-medium" x-text="'PKR ' + totalFurtherTax()"></span>
                         </div>
                         <div class="flex justify-between items-center text-sm font-semibold text-gray-700 dark:text-gray-300 border-t border-gray-200 dark:border-gray-600 pt-2">
                             <span>Grand Total</span>
-                            <span class="text-lg text-emerald-600" x-text="'Rs. ' + grandTotal()"></span>
+                            <span class="text-lg text-emerald-600" x-text="'PKR ' + grandTotal()"></span>
                         </div>
                     </div>
                 </div>
@@ -522,19 +522,19 @@
                             <div class="flex items-center space-x-6 text-sm">
                                 <div>
                                     <span class="text-gray-500 dark:text-gray-400">Subtotal</span>
-                                    <p class="font-bold text-gray-900 dark:text-white" x-text="'Rs. ' + Number(subtotal || 0).toLocaleString()"></p>
+                                    <p class="font-bold text-gray-900 dark:text-white" x-text="'PKR ' + Number(subtotal || 0).toLocaleString()"></p>
                                 </div>
                                 <div>
                                     <span class="text-gray-500 dark:text-gray-400">Tax</span>
-                                    <p class="font-bold text-emerald-600 dark:text-emerald-400" x-text="'Rs. ' + Number(totalTax || 0).toLocaleString()"></p>
+                                    <p class="font-bold text-emerald-600 dark:text-emerald-400" x-text="'PKR ' + Number(totalTax || 0).toLocaleString()"></p>
                                 </div>
                                 <div>
                                     <span class="text-gray-500 dark:text-gray-400">WHT</span>
-                                    <p class="font-bold text-amber-600 dark:text-amber-400" x-text="'Rs. ' + Number(whtAmount || 0).toLocaleString()"></p>
+                                    <p class="font-bold text-amber-600 dark:text-amber-400" x-text="'PKR ' + Number(whtAmount || 0).toLocaleString()"></p>
                                 </div>
                                 <div class="pl-4 border-l border-gray-200 dark:border-gray-600">
                                     <span class="text-gray-500 dark:text-gray-400">Grand Total</span>
-                                    <p class="text-lg font-extrabold text-gray-900 dark:text-white" x-text="'Rs. ' + Number(grandTotal || 0).toLocaleString()"></p>
+                                    <p class="text-lg font-extrabold text-gray-900 dark:text-white" x-text="'PKR ' + Number(grandTotal || 0).toLocaleString()"></p>
                                 </div>
                             </div>
                             <button type="submit" class="inline-flex items-center px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 shadow-sm transition">
@@ -555,23 +555,23 @@
                 <div class="flex items-center space-x-4">
                     <div>
                         <span class="text-xs text-gray-400">Subtotal</span>
-                        <p class="font-semibold text-gray-800 dark:text-gray-100" x-text="'Rs. ' + form.totalExclST()"></p>
+                        <p class="font-semibold text-gray-800 dark:text-gray-100" x-text="'PKR ' + form.totalExclST()"></p>
                     </div>
                     <div>
                         <span class="text-xs text-gray-400">Tax</span>
-                        <p class="font-semibold text-emerald-600 dark:text-emerald-400" x-text="'Rs. ' + form.totalSalesTax()"></p>
+                        <p class="font-semibold text-emerald-600 dark:text-emerald-400" x-text="'PKR ' + form.totalSalesTax()"></p>
                     </div>
                     <div x-show="form.applyFurtherTax" x-cloak>
                         <span class="text-xs text-orange-500">Further Tax</span>
-                        <p class="font-semibold text-orange-600 dark:text-orange-400" x-text="'Rs. ' + form.totalFurtherTax()"></p>
+                        <p class="font-semibold text-orange-600 dark:text-orange-400" x-text="'PKR ' + form.totalFurtherTax()"></p>
                     </div>
                     <div>
                         <span class="text-xs text-gray-400">WHT</span>
-                        <p class="font-semibold text-amber-600 dark:text-amber-400" x-text="'Rs. ' + form.whtAmount()"></p>
+                        <p class="font-semibold text-amber-600 dark:text-amber-400" x-text="'PKR ' + form.whtAmount()"></p>
                     </div>
                     <div class="pl-3 border-l border-gray-200 dark:border-gray-700">
                         <span class="text-xs text-gray-400">Grand Total</span>
-                        <p class="font-bold text-base text-gray-900 dark:text-white" x-text="'Rs. ' + form.grandTotal()"></p>
+                        <p class="font-bold text-base text-gray-900 dark:text-white" x-text="'PKR ' + form.grandTotal()"></p>
                     </div>
                 </div>
                 <div class="flex items-center space-x-3">

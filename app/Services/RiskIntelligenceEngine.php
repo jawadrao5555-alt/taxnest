@@ -292,7 +292,7 @@ class RiskIntelligenceEngine
                         'severity' => $deviation > 80 ? 'high' : 'medium',
                         'weight' => $deviation > 80 ? 18 : 10,
                         'item_index' => $index + 1,
-                        'message' => "Item #{$index}: Price Rs. " . number_format($item->price, 2) . " is " . round($deviation) . "% {$direction} avg (Rs. " . number_format($avgPrice, 2) . ") for HS {$hsCode}",
+                        'message' => "Item #{$index}: Price PKR " . number_format($item->price, 2) . " is " . round($deviation) . "% {$direction} avg (PKR " . number_format($avgPrice, 2) . ") for HS {$hsCode}",
                         'details' => [
                             'hs_code' => $hsCode,
                             'current_price' => $item->price,

@@ -62,9 +62,9 @@
                         <td class="px-6 py-3 text-sm text-gray-500">{{ $index + 1 }}</td>
                         <td class="px-6 py-3 text-sm text-gray-700">{{ $item->description }}</td>
                         <td class="px-6 py-3 text-sm text-gray-700 text-right">{{ $item->quantity }}</td>
-                        <td class="px-6 py-3 text-sm text-gray-700 text-right">Rs. {{ number_format($item->price, 2) }}</td>
-                        <td class="px-6 py-3 text-sm text-gray-700 text-right">Rs. {{ number_format($item->tax, 2) }}</td>
-                        <td class="px-6 py-3 text-sm font-semibold text-gray-900 text-right">Rs. {{ number_format(($item->price * $item->quantity) + $item->tax, 2) }}</td>
+                        <td class="px-6 py-3 text-sm text-gray-700 text-right">PKR {{ number_format($item->price, 2) }}</td>
+                        <td class="px-6 py-3 text-sm text-gray-700 text-right">PKR {{ number_format($item->tax, 2) }}</td>
+                        <td class="px-6 py-3 text-sm font-semibold text-gray-900 text-right">PKR {{ number_format(($item->price * $item->quantity) + $item->tax, 2) }}</td>
                     </tr>
                     @endforeach
                 </tbody>
@@ -73,12 +73,12 @@
                     @if($totalFurtherTax > 0)
                     <tr>
                         <td colspan="5" class="px-6 py-3 text-right text-sm font-semibold text-orange-600">Further Tax (4%)</td>
-                        <td class="px-6 py-3 text-right text-sm font-semibold text-orange-600">Rs. {{ number_format($totalFurtherTax, 2) }}</td>
+                        <td class="px-6 py-3 text-right text-sm font-semibold text-orange-600">PKR {{ number_format($totalFurtherTax, 2) }}</td>
                     </tr>
                     @endif
                     <tr>
                         <td colspan="5" class="px-6 py-3 text-right text-sm font-bold text-gray-700">Grand Total</td>
-                        <td class="px-6 py-3 text-right text-lg font-bold text-emerald-600">Rs. {{ number_format($invoice->total_amount, 2) }}</td>
+                        <td class="px-6 py-3 text-right text-lg font-bold text-emerald-600">PKR {{ number_format($invoice->total_amount, 2) }}</td>
                     </tr>
                 </tfoot>
             </table>
@@ -92,7 +92,7 @@
                 <p class="text-gray-500">NTN:</p><p class="font-semibold">{{ $qrInfo['ntn'] ?? '' }}</p>
                 <p class="text-gray-500">FBR ID:</p><p class="font-semibold">{{ $qrInfo['fbr_invoice_id'] ?? '' }}</p>
                 <p class="text-gray-500">Date:</p><p class="font-semibold">{{ $qrInfo['date'] ?? '' }}</p>
-                <p class="text-gray-500">Total:</p><p class="font-semibold">Rs. {{ number_format($qrInfo['total'] ?? 0, 2) }}</p>
+                <p class="text-gray-500">Total:</p><p class="font-semibold">PKR {{ number_format($qrInfo['total'] ?? 0, 2) }}</p>
             </div>
             @if($invoice->qr_image_url)
             <div class="text-center mt-4">

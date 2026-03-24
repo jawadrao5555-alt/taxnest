@@ -26,7 +26,7 @@
         </div>
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
             <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total WHT Amount</p>
-            <p class="text-2xl font-bold text-amber-600 mt-1">Rs. {{ number_format($stats['total_wht_amount'], 2) }}</p>
+            <p class="text-2xl font-bold text-amber-600 mt-1">PKR {{ number_format($stats['total_wht_amount'], 2) }}</p>
         </div>
     </div>
 
@@ -78,14 +78,14 @@
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $invoice->fbr_invoice_number ?? '-' }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 max-w-[200px] truncate">{{ $invoice->buyer_name }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $invoice->created_at->format('d M Y') }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-700 dark:text-gray-300 font-medium">Rs. {{ number_format($invoice->total_amount, 2) }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-700 dark:text-gray-300 font-medium">PKR {{ number_format($invoice->total_amount, 2) }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-center">
                             <span x-text="currentRate + '%'"
                                 :class="currentRate > 0 ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-600 border-gray-200'"
                                 class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border"></span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-medium" :class="currentRate > 0 ? 'text-blue-600' : 'text-gray-400'">
-                            Rs. <span x-text="parseFloat(currentAmount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
+                            PKR <span x-text="parseFloat(currentAmount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-center">
                             @if($invoice->status === 'locked' && $invoice->fbr_status === 'production')

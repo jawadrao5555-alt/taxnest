@@ -126,27 +126,27 @@
                                 <td class="px-6 py-4 text-sm font-mono text-gray-700">{{ $item->hs_code }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-700">{{ $item->description }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-700 text-right">{{ $item->quantity }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-700 text-right">Rs. {{ number_format($item->price, 2) }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-700 text-right">Rs. {{ number_format($itemSubtotal, 2) }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-700 text-right">PKR {{ number_format($item->price, 2) }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-700 text-right">PKR {{ number_format($itemSubtotal, 2) }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-700 text-right">{{ $effectiveRate }}%</td>
-                                <td class="px-6 py-4 text-sm text-gray-700 text-right">Rs. {{ number_format($item->tax, 2) }}</td>
-                                <td class="px-6 py-4 text-sm font-semibold text-gray-900 text-right">Rs. {{ number_format($itemSubtotal + $item->tax, 2) }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-700 text-right">PKR {{ number_format($item->tax, 2) }}</td>
+                                <td class="px-6 py-4 text-sm font-semibold text-gray-900 text-right">PKR {{ number_format($itemSubtotal + $item->tax, 2) }}</td>
                             </tr>
                             @endforeach
                         </tbody>
                         <tfoot class="bg-gray-50">
                             <tr>
                                 <td colspan="5" class="px-6 py-4 text-right text-sm font-medium text-gray-600">Subtotal</td>
-                                <td class="px-6 py-4 text-right text-sm font-bold text-gray-700">Rs. {{ number_format($subtotal, 2) }}</td>
+                                <td class="px-6 py-4 text-right text-sm font-bold text-gray-700">PKR {{ number_format($subtotal, 2) }}</td>
                                 <td></td>
-                                <td class="px-6 py-4 text-right text-sm font-bold text-gray-700">Rs. {{ number_format($totalTax, 2) }}</td>
-                                <td class="px-6 py-4 text-right text-lg font-bold text-emerald-600">Rs. {{ number_format($invoice->total_amount, 2) }}</td>
+                                <td class="px-6 py-4 text-right text-sm font-bold text-gray-700">PKR {{ number_format($totalTax, 2) }}</td>
+                                <td class="px-6 py-4 text-right text-lg font-bold text-emerald-600">PKR {{ number_format($invoice->total_amount, 2) }}</td>
                             </tr>
                             @php $totalFurtherTax = $invoice->items->sum('further_tax'); @endphp
                             @if($totalFurtherTax > 0)
                             <tr>
                                 <td colspan="7" class="px-6 py-3 text-right text-sm font-semibold text-orange-600">Further Tax (4%)</td>
-                                <td colspan="2" class="px-6 py-3 text-right text-sm font-semibold text-orange-600">Rs. {{ number_format($totalFurtherTax, 2) }}</td>
+                                <td colspan="2" class="px-6 py-3 text-right text-sm font-semibold text-orange-600">PKR {{ number_format($totalFurtherTax, 2) }}</td>
                             </tr>
                             @endif
                         </tfoot>
@@ -175,18 +175,18 @@
                                 <tr>
                                     <td class="px-4 py-2 text-sm font-mono text-gray-700">{{ $tb['hs_code'] }}</td>
                                     <td class="px-4 py-2 text-sm text-gray-700">{{ $tb['description'] }}</td>
-                                    <td class="px-4 py-2 text-sm text-gray-700 text-right">Rs. {{ number_format($tb['subtotal'], 2) }}</td>
+                                    <td class="px-4 py-2 text-sm text-gray-700 text-right">PKR {{ number_format($tb['subtotal'], 2) }}</td>
                                     <td class="px-4 py-2 text-sm text-gray-700 text-right">{{ $tb['rate'] }}%</td>
-                                    <td class="px-4 py-2 text-sm font-semibold text-gray-900 text-right">Rs. {{ number_format($tb['tax'], 2) }}</td>
+                                    <td class="px-4 py-2 text-sm font-semibold text-gray-900 text-right">PKR {{ number_format($tb['tax'], 2) }}</td>
                                 </tr>
                                 @endforeach
                             </tbody>
                             <tfoot class="bg-gray-50">
                                 <tr>
                                     <td colspan="2" class="px-4 py-2 text-right text-sm font-bold text-gray-700">Total</td>
-                                    <td class="px-4 py-2 text-right text-sm font-bold text-gray-700">Rs. {{ number_format($subtotal, 2) }}</td>
+                                    <td class="px-4 py-2 text-right text-sm font-bold text-gray-700">PKR {{ number_format($subtotal, 2) }}</td>
                                     <td></td>
-                                    <td class="px-4 py-2 text-right text-sm font-bold text-emerald-600">Rs. {{ number_format($totalTax, 2) }}</td>
+                                    <td class="px-4 py-2 text-right text-sm font-bold text-emerald-600">PKR {{ number_format($totalTax, 2) }}</td>
                                 </tr>
                             </tfoot>
                         </table>

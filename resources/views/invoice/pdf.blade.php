@@ -125,9 +125,9 @@
                 <td>{{ $item->description }}</td>
                 <td style="font-family: monospace; font-size: 11px;">{{ $item->hs_code }}</td>
                 <td class="text-right">{{ $item->quantity }}</td>
-                <td class="text-right">Rs. {{ number_format($item->price, 2) }}</td>
-                <td class="text-right">Rs. {{ number_format($item->tax, 2) }}</td>
-                <td class="text-right" style="font-weight: 600;">Rs. {{ number_format(($item->price * $item->quantity) + $item->tax, 2) }}</td>
+                <td class="text-right">PKR {{ number_format($item->price, 2) }}</td>
+                <td class="text-right">PKR {{ number_format($item->tax, 2) }}</td>
+                <td class="text-right" style="font-weight: 600;">PKR {{ number_format(($item->price * $item->quantity) + $item->tax, 2) }}</td>
             </tr>
             @endforeach
         </tbody>
@@ -136,12 +136,12 @@
             @if($totalFurtherTax > 0)
             <tr>
                 <td colspan="6" class="text-right" style="font-size: 12px; color: #ea580c; font-weight: 600;">Further Tax (4%)</td>
-                <td class="text-right" style="font-size: 12px; color: #ea580c; font-weight: 600;">Rs. {{ number_format($totalFurtherTax, 2) }}</td>
+                <td class="text-right" style="font-size: 12px; color: #ea580c; font-weight: 600;">PKR {{ number_format($totalFurtherTax, 2) }}</td>
             </tr>
             @endif
             <tr class="total-row">
                 <td colspan="6" class="text-right"><strong>Grand Total</strong></td>
-                <td class="text-right">Rs. {{ number_format($invoice->total_amount, 2) }}</td>
+                <td class="text-right">PKR {{ number_format($invoice->total_amount, 2) }}</td>
             </tr>
         </tfoot>
     </table>

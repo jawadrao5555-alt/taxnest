@@ -45,11 +45,11 @@
                         <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ $plan->name }}</h3>
 
                         <div class="mt-4 mb-1">
-                            <span class="text-3xl font-black text-gray-900 dark:text-gray-100">Rs. {{ number_format($yearlyTotal) }}</span>
+                            <span class="text-3xl font-black text-gray-900 dark:text-gray-100">PKR {{ number_format($yearlyTotal) }}</span>
                             <span class="text-gray-400 text-sm">/year</span>
                         </div>
-                        <p class="text-xs text-gray-400">Rs. {{ number_format($perMonth) }}/mo effective</p>
-                        <p class="text-xs text-purple-600 font-medium mt-0.5">Save Rs. {{ number_format($saved) }}</p>
+                        <p class="text-xs text-gray-400">PKR {{ number_format($perMonth) }}/mo effective</p>
+                        <p class="text-xs text-purple-600 font-medium mt-0.5">Save PKR {{ number_format($saved) }}</p>
 
                         <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-2 text-sm text-gray-600 dark:text-gray-400">
                             <div class="flex items-center gap-2">

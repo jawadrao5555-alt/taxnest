@@ -27,15 +27,15 @@
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="bg-blue-50 rounded-xl p-4 text-center">
-                        <p class="text-2xl font-extrabold text-blue-700">Rs. {{ number_format($summary['total_invoiced'], 2) }}</p>
+                        <p class="text-2xl font-extrabold text-blue-700">PKR {{ number_format($summary['total_invoiced'], 2) }}</p>
                         <p class="text-xs font-medium text-blue-600 mt-1">Total Invoiced</p>
                     </div>
                     <div class="bg-green-50 rounded-xl p-4 text-center">
-                        <p class="text-2xl font-extrabold text-green-700">Rs. {{ number_format($summary['total_received'], 2) }}</p>
+                        <p class="text-2xl font-extrabold text-green-700">PKR {{ number_format($summary['total_received'], 2) }}</p>
                         <p class="text-xs font-medium text-green-600 mt-1">Total Received</p>
                     </div>
                     <div class="rounded-xl p-4 text-center {{ $summary['outstanding'] > 0 ? 'bg-red-50' : 'bg-emerald-50' }}">
-                        <p class="text-2xl font-extrabold {{ $summary['outstanding'] > 0 ? 'text-red-700' : 'text-emerald-700' }}">Rs. {{ number_format($summary['outstanding'], 2) }}</p>
+                        <p class="text-2xl font-extrabold {{ $summary['outstanding'] > 0 ? 'text-red-700' : 'text-emerald-700' }}">PKR {{ number_format($summary['outstanding'], 2) }}</p>
                         <p class="text-xs font-medium {{ $summary['outstanding'] > 0 ? 'text-red-600' : 'text-emerald-600' }} mt-1">Outstanding Balance</p>
                     </div>
                 </div>
@@ -77,13 +77,13 @@
                                 @endif
                             </td>
                             <td class="px-6 py-4 text-sm font-semibold text-right {{ $entry->debit > 0 ? 'text-red-600' : 'text-gray-400' }}">
-                                {{ $entry->debit > 0 ? 'Rs. ' . number_format($entry->debit, 2) : '-' }}
+                                {{ $entry->debit > 0 ? 'PKR ' . number_format($entry->debit, 2) : '-' }}
                             </td>
                             <td class="px-6 py-4 text-sm font-semibold text-right {{ $entry->credit > 0 ? 'text-green-600' : 'text-gray-400' }}">
-                                {{ $entry->credit > 0 ? 'Rs. ' . number_format($entry->credit, 2) : '-' }}
+                                {{ $entry->credit > 0 ? 'PKR ' . number_format($entry->credit, 2) : '-' }}
                             </td>
                             <td class="px-6 py-4 text-sm font-bold text-right {{ $entry->balance_after > 0 ? 'text-red-600' : 'text-green-600' }}">
-                                Rs. {{ number_format($entry->balance_after, 2) }}
+                                PKR {{ number_format($entry->balance_after, 2) }}
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-500">{{ $entry->notes ?? '-' }}</td>
                         </tr>
@@ -103,7 +103,7 @@
                         <input type="hidden" name="customer_ntn" value="{{ $summary['customer_ntn'] }}">
                         <div class="space-y-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Amount (Rs.)</label>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Amount (PKR)</label>
                                 <input type="number" name="amount" step="0.01" min="0.01" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm" placeholder="0.00">
                             </div>
                             <div>
@@ -129,7 +129,7 @@
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Amount (Rs.)</label>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Amount (PKR)</label>
                                 <input type="number" name="amount" step="0.01" min="0.01" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm" placeholder="0.00">
                             </div>
                             <div>

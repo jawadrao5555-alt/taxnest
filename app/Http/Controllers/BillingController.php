@@ -126,7 +126,7 @@ class BillingController extends Controller
         ]);
 
         $cycleLabel = Subscription::getCycleLabel($cycle);
-        return redirect('/dashboard')->with('success', "Subscribed to {$plan->name} plan ({$cycleLabel}) for Rs. " . number_format($pricing['final_price']) . "!");
+        return redirect('/dashboard')->with('success', "Subscribed to {$plan->name} plan ({$cycleLabel}) for PKR " . number_format($pricing['final_price']) . "!");
     }
 
     public function calculatePrice(Request $request)
@@ -253,6 +253,6 @@ class BillingController extends Controller
             'final_price' => round($finalPrice, 2),
         ]);
 
-        return redirect('/billing/plans')->with('success', 'Custom plan activated! Rs. ' . number_format($finalPrice) . ' for ' . $months . ' months.');
+        return redirect('/billing/plans')->with('success', 'Custom plan activated! PKR ' . number_format($finalPrice) . ' for ' . $months . ' months.');
     }
 }

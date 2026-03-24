@@ -262,10 +262,10 @@
                     <div class="bg-white border {{ $isPopular ? 'border-purple-500 border-t-0 rounded-b-xl backdrop-blur-xl' : 'border-gray-200 rounded-xl' }} p-6 relative">
                         <h3 class="text-xl font-bold text-gray-900">{{ $plan->name }}</h3>
                         <div class="mt-4 mb-1">
-                            <span class="text-3xl font-black text-gray-900">Rs. {{ number_format($plan->price) }}</span>
+                            <span class="text-3xl font-black text-gray-900">PKR {{ number_format($plan->price) }}</span>
                             <span class="text-gray-600 text-sm font-medium">/year</span>
                         </div>
-                        <p class="text-sm text-gray-600">Rs. {{ number_format($perMonth) }}/mo effective</p>
+                        <p class="text-sm text-gray-600">PKR {{ number_format($perMonth) }}/mo effective</p>
 
                         <div class="mt-5 pt-5 border-t border-gray-100 space-y-3">
                             @if(!empty($features))

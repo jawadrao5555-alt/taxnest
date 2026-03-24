@@ -558,14 +558,20 @@ class PosController extends Controller
 
     private function verifyPinSession(): bool
     {
-        $verified = session('confidential_pin_verified', false);
-        $verifiedAt = session('confidential_pin_verified_at', 0);
-        return $verified && (now()->timestamp - $verifiedAt) < 1800;
+        return session('confidential_pin_verified', false) === true;
+    }
+
+    private function clearPinSession(): void
+    {
+        session()->forget(['confidential_pin_verified', 'confidential_pin_verified_at']);
     }
 
     private function requirePinForLocalTab(string $tab, Company $company)
     {
-        if ($tab !== 'local') return null;
+        if ($tab !== 'local') {
+            $this->clearPinSession();
+            return null;
+        }
 
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
@@ -580,6 +586,8 @@ class PosController extends Controller
         } elseif (!empty($company->confidential_pin) && !$this->verifyPinSession()) {
             return redirect()->back()->with('error', 'PIN verification required to access local data.');
         }
+
+        $this->clearPinSession();
 
         return null;
     }

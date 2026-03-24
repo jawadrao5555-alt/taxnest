@@ -178,12 +178,6 @@
             <td class="tot-value">-PKR {{ number_format($transaction->discount_amount, 2) }}</td>
         </tr>
         @endif
-        @if(($transaction->exempt_amount ?? 0) > 0)
-        <tr>
-            <td class="tot-label">Tax Exempt:</td>
-            <td class="tot-value">PKR {{ number_format($transaction->exempt_amount, 2) }}</td>
-        </tr>
-        @endif
         <tr>
             <td class="tot-label">Tax ({{ number_format($transaction->tax_rate, 0) }}%):</td>
             <td class="tot-value">PKR {{ number_format($transaction->tax_amount, 2) }}</td>

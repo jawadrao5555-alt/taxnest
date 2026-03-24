@@ -442,6 +442,7 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::post('/transaction/{id}/share-link', [PosController::class, 'generateShareLink'])->name('pos.invoice.share-link');
     Route::get('/reports', [PosController::class, 'reports'])->name('pos.reports');
     Route::get('/tax-reports', [PosController::class, 'taxReports'])->name('pos.tax-reports');
+    Route::get('/reports/csv', [PosController::class, 'exportReportCsv'])->name('pos.reports.csv');
     Route::get('/tax-reports/csv', [PosController::class, 'exportTaxReportCsv'])->name('pos.tax-reports.csv');
     Route::get('/tax-reports/pdf', [PosController::class, 'exportTaxReportPdf'])->name('pos.tax-reports.pdf');
     Route::get('/api/tax-rate', [PosController::class, 'getTaxRate'])->name('pos.api.tax-rate');

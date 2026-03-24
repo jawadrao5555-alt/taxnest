@@ -719,6 +719,23 @@ class PosController extends Controller
         return $pdf->stream("Invoice-{$transaction->invoice_number}.pdf");
     }
 
+    private function applyReportFilters($query, $tab, $cashierFilter = null)
+    {
+        if ($tab === 'local') {
+            $query->where('invoice_mode', 'local');
+        } else {
+            $query->where(function ($sub) {
+                $sub->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+            });
+        }
+
+        if ($cashierFilter && $cashierFilter !== 'all') {
+            $query->where('created_by', $cashierFilter);
+        }
+
+        return $query;
+    }
+
     public function reports(Request $request)
     {
         $companyId = app('currentCompanyId');
@@ -728,14 +745,22 @@ class PosController extends Controller
         $pinRedirect = $this->requirePinForLocalTab($tab, $company);
         if ($pinRedirect) return $pinRedirect;
 
-        $modeFilter = function ($q) use ($tab) {
-            if ($tab === 'local') {
-                $q->where('invoice_mode', 'local');
-            } else {
-                $q->where(function ($sub) {
-                    $sub->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
-                });
-            }
+        $user = auth('pos')->user();
+        $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
+        $cashierFilter = $request->get('cashier', 'all');
+
+        if ($isCashier && $cashierFilter !== 'all' && $cashierFilter != $user->id) {
+            $cashierFilter = $user->id;
+        }
+
+        $teamMembers = User::where('company_id', $companyId)
+            ->whereNotNull('pos_role')
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'pos_role']);
+
+        $modeFilter = function ($q) use ($tab, $cashierFilter) {
+            $this->applyReportFilters($q, $tab, $cashierFilter);
         };
 
         $dailySales = PosTransaction::where('company_id', $companyId)
@@ -755,13 +780,9 @@ class PosController extends Controller
             ->groupBy('payment_method')
             ->get();
 
-        $topItems = PosTransactionItem::whereHas('transaction', function ($q) use ($companyId, $tab) {
+        $topItems = PosTransactionItem::whereHas('transaction', function ($q) use ($companyId, $tab, $cashierFilter) {
             $q->where('company_id', $companyId)->where('status', 'completed')->where('created_at', '>=', now()->startOfMonth());
-            if ($tab === 'local') {
-                $q->where('invoice_mode', 'local');
-            } else {
-                $q->where(function ($sub) { $sub->where('invoice_mode', 'pra')->orWhereNull('invoice_mode'); });
-            }
+            $this->applyReportFilters($q, $tab, $cashierFilter);
         })
             ->selectRaw("item_name, SUM(quantity) as total_qty, SUM(subtotal) as total_revenue")
             ->groupBy('item_name')
@@ -780,9 +801,75 @@ class PosController extends Controller
 
         $hasPinSet = !empty($company->confidential_pin);
         $localCount = PosTransaction::where('company_id', $companyId)->where('status', 'completed')->where('invoice_mode', 'local')->count();
-        $user = auth('pos')->user();
+        $selectedCashier = $cashierFilter;
 
-        return view('pos.reports', compact('dailySales', 'paymentSummary', 'topItems', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user'));
+        return view('pos.reports', compact('dailySales', 'paymentSummary', 'topItems', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user', 'teamMembers', 'isCashier', 'selectedCashier'));
+    }
+
+    public function exportReportCsv(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $tab = $request->get('tab', 'pra');
+
+        $pinRedirect = $this->requirePinForLocalTab($tab, $company);
+        if ($pinRedirect) return $pinRedirect;
+
+        $user = auth('pos')->user();
+        $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
+        $cashierFilter = $request->get('cashier', 'all');
+
+        if ($isCashier && $cashierFilter !== 'all' && $cashierFilter != $user->id) {
+            $cashierFilter = $user->id;
+        }
+
+        $transactions = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->where('created_at', '>=', now()->subDays(30))
+            ->when($tab === 'local', fn($q) => $q->where('invoice_mode', 'local'))
+            ->when($tab !== 'local', fn($q) => $q->where(function ($s) { $s->where('invoice_mode', 'pra')->orWhereNull('invoice_mode'); }))
+            ->when($cashierFilter && $cashierFilter !== 'all', fn($q) => $q->where('created_by', $cashierFilter))
+            ->with('creator')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $filterLabel = $cashierFilter === 'all' ? 'All Staff' : ($transactions->first()?->creator?->name ?? 'Staff #' . $cashierFilter);
+        $filename = 'POS_Report_' . ($cashierFilter === 'all' ? 'AllStaff' : 'Staff') . '_' . now()->format('Ymd_His') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+
+        $callback = function () use ($transactions, $filterLabel, $tab, $company) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, ['POS Sales Report — ' . $company->name]);
+            fputcsv($file, ['Mode: ' . strtoupper($tab), 'Filter: ' . $filterLabel, 'Generated: ' . now()->format('d M Y H:i')]);
+            fputcsv($file, []);
+            fputcsv($file, ['Date', 'Invoice #', 'Customer', 'Payment Method', 'Subtotal', 'Tax', 'Total', 'Staff']);
+
+            foreach ($transactions as $t) {
+                fputcsv($file, [
+                    $t->created_at->format('d M Y H:i'),
+                    $t->invoice_number,
+                    $t->customer_name ?: 'Walk-in',
+                    ucwords(str_replace('_', ' ', $t->payment_method)),
+                    number_format($t->subtotal, 2),
+                    number_format($t->tax_amount, 2),
+                    number_format($t->total_amount, 2),
+                    $t->creator?->name ?? '-',
+                ]);
+            }
+
+            $totalRevenue = $transactions->sum('total_amount');
+            $totalTax = $transactions->sum('tax_amount');
+            fputcsv($file, []);
+            fputcsv($file, ['', '', '', 'TOTALS', '', number_format($totalTax, 2), number_format($totalRevenue, 2), '']);
+            fputcsv($file, ['Total Transactions: ' . $transactions->count()]);
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 
     private function buildTaxReportQuery(Request $request, $tab = 'pra')

@@ -1,10 +1,49 @@
 <x-pos-layout>
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-        {{ ($tab ?? 'pra') === 'local' ? 'Local Reports' : 'POS Reports' }}
-    </h1>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+            {{ ($tab ?? 'pra') === 'local' ? 'Local Reports' : 'POS Reports' }}
+        </h1>
+        <a href="{{ route('pos.reports.csv', ['tab' => $tab, 'cashier' => $selectedCashier]) }}" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Download CSV
+        </a>
+    </div>
 
     @include('pos.partials.mode-tabs', ['baseUrl' => route('pos.reports')])
+
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 mb-6">
+        <form method="GET" action="{{ route('pos.reports') }}" class="flex flex-col sm:flex-row items-start sm:items-end gap-3">
+            <input type="hidden" name="tab" value="{{ $tab }}">
+            <div class="w-full sm:w-auto">
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">View Sales By</label>
+                <select name="cashier" onchange="this.form.submit()" class="w-full sm:w-56 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500 transition">
+                    <option value="all" {{ $selectedCashier === 'all' ? 'selected' : '' }}>All Company Sales</option>
+                    @if($isCashier)
+                    <option value="{{ $user->id }}" {{ $selectedCashier == $user->id ? 'selected' : '' }}>My Sales Only</option>
+                    @else
+                    @foreach($teamMembers as $member)
+                    <option value="{{ $member->id }}" {{ $selectedCashier == $member->id ? 'selected' : '' }}>
+                        {{ $member->name }} ({{ $member->pos_role === 'pos_admin' ? 'Admin' : 'Cashier' }})
+                    </option>
+                    @endforeach
+                    @endif
+                </select>
+            </div>
+            @if($selectedCashier !== 'all')
+            <div class="flex items-center gap-2">
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                    @if($isCashier && $selectedCashier == $user->id)
+                        Showing: My Sales
+                    @else
+                        Showing: {{ $teamMembers->firstWhere('id', $selectedCashier)?->name ?? 'Staff' }}
+                    @endif
+                </span>
+                <a href="{{ route('pos.reports', ['tab' => $tab, 'cashier' => 'all']) }}" class="text-xs text-gray-500 hover:text-purple-600 underline">Clear</a>
+            </div>
+            @endif
+        </form>
+    </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">

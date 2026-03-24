@@ -22,7 +22,7 @@
     @include('pos.partials.mode-tabs', ['baseUrl' => route('pos.tax-reports')])
 
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
-        <form method="GET" action="{{ route('pos.tax-reports') }}" class="space-y-4">
+        <form method="GET" action="{{ route('pos.tax-reports') }}" class="space-y-4" id="taxReportForm">
             <input type="hidden" name="tab" value="{{ $tab ?? 'pra' }}">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
@@ -36,11 +36,13 @@
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Period</label>
-                    <select name="period" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
+                    <select name="period" id="periodSelect" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
                         <option value="">All Time</option>
                         <option value="today" {{ request('period') == 'today' ? 'selected' : '' }}>Today</option>
+                        <option value="yesterday" {{ request('period') == 'yesterday' ? 'selected' : '' }}>Yesterday</option>
                         <option value="weekly" {{ request('period') == 'weekly' ? 'selected' : '' }}>This Week</option>
                         <option value="monthly" {{ request('period') == 'monthly' ? 'selected' : '' }}>This Month</option>
+                        <option value="last_month" {{ request('period') == 'last_month' ? 'selected' : '' }}>Last Month</option>
                     </select>
                 </div>
                 <div>
@@ -61,24 +63,46 @@
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Date From</label>
-                    <input type="date" name="date_from" value="{{ request('date_from') }}" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
+                    <input type="date" name="date_from" id="dateFrom" value="{{ request('date_from') }}" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Date To</label>
-                    <input type="date" name="date_to" value="{{ request('date_to') }}" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
+                    <input type="date" name="date_to" id="dateTo" value="{{ request('date_to') }}" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
                 </div>
                 <div class="flex items-end gap-2">
                     <button type="submit" class="flex-1 inline-flex items-center justify-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-lg transition shadow-sm">
                         <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
                         Apply Filters
                     </button>
-                    <a href="{{ route('pos.tax-reports') }}" class="inline-flex items-center justify-center px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-semibold rounded-lg transition">
+                    <a href="{{ route('pos.tax-reports', ['tab' => $tab ?? 'pra']) }}" class="inline-flex items-center justify-center px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-semibold rounded-lg transition">
                         Clear
                     </a>
                 </div>
             </div>
         </form>
     </div>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var periodSelect = document.getElementById('periodSelect');
+        var dateFrom = document.getElementById('dateFrom');
+        var dateTo = document.getElementById('dateTo');
+
+        periodSelect.addEventListener('change', function() {
+            if (this.value) {
+                dateFrom.value = '';
+                dateTo.value = '';
+            }
+        });
+
+        dateFrom.addEventListener('change', function() {
+            if (this.value) periodSelect.value = '';
+        });
+
+        dateTo.addEventListener('change', function() {
+            if (this.value) periodSelect.value = '';
+        });
+    });
+    </script>
 
     @if($taxRateFilter ?? false)
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">

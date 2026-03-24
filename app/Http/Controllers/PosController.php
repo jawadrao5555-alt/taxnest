@@ -926,10 +926,25 @@ class PosController extends Controller
             $query->where('customer_name', 'ilike', '%' . $request->customer . '%');
         }
 
-        if ($request->filled('period')) {
+        $hasDateRange = $request->filled('date_from') || $request->filled('date_to');
+
+        if ($hasDateRange) {
+            if ($request->filled('date_from')) {
+                $fromDate = \Carbon\Carbon::parse($request->date_from)->startOfDay();
+                $query->where('created_at', '>=', $fromDate);
+            }
+            if ($request->filled('date_to')) {
+                $toDate = \Carbon\Carbon::parse($request->date_to)->endOfDay();
+                $query->where('created_at', '<=', $toDate);
+            }
+        } elseif ($request->filled('period')) {
             switch ($request->period) {
                 case 'today':
                     $query->where('created_at', '>=', now()->startOfDay());
+                    break;
+                case 'yesterday':
+                    $query->where('created_at', '>=', now()->subDay()->startOfDay())
+                          ->where('created_at', '<=', now()->subDay()->endOfDay());
                     break;
                 case 'weekly':
                     $query->where('created_at', '>=', now()->startOfWeek());
@@ -937,14 +952,11 @@ class PosController extends Controller
                 case 'monthly':
                     $query->where('created_at', '>=', now()->startOfMonth());
                     break;
+                case 'last_month':
+                    $query->where('created_at', '>=', now()->subMonth()->startOfMonth())
+                          ->where('created_at', '<=', now()->subMonth()->endOfMonth());
+                    break;
             }
-        }
-
-        if ($request->filled('date_from')) {
-            $query->where('created_at', '>=', $request->date_from . ' 00:00:00');
-        }
-        if ($request->filled('date_to')) {
-            $query->where('created_at', '<=', $request->date_to . ' 23:59:59');
         }
 
         $query->orderBy('created_at', 'desc');
@@ -953,20 +965,29 @@ class PosController extends Controller
 
     private function getReportDateLabel(Request $request): string
     {
-        if ($request->filled('date_from') && $request->filled('date_to')) {
-            return $request->date_from . ' to ' . $request->date_to;
+        $hasDateRange = $request->filled('date_from') || $request->filled('date_to');
+
+        if ($hasDateRange) {
+            if ($request->filled('date_from') && $request->filled('date_to')) {
+                $from = \Carbon\Carbon::parse($request->date_from)->format('d M Y');
+                $to = \Carbon\Carbon::parse($request->date_to)->format('d M Y');
+                return $from . ' to ' . $to;
+            }
+            if ($request->filled('date_from')) {
+                return \Carbon\Carbon::parse($request->date_from)->format('d M Y') . ' to Present';
+            }
+            if ($request->filled('date_to')) {
+                return 'Up to ' . \Carbon\Carbon::parse($request->date_to)->format('d M Y');
+            }
         }
-        if ($request->filled('date_from')) {
-            return $request->date_from . ' to Present';
-        }
-        if ($request->filled('date_to')) {
-            return 'Up to ' . $request->date_to;
-        }
+
         if ($request->filled('period')) {
             return match ($request->period) {
                 'today' => 'Today (' . now()->format('d M Y') . ')',
+                'yesterday' => 'Yesterday (' . now()->subDay()->format('d M Y') . ')',
                 'weekly' => 'This Week (' . now()->startOfWeek()->format('d M') . ' - ' . now()->endOfWeek()->format('d M Y') . ')',
                 'monthly' => 'This Month (' . now()->format('M Y') . ')',
+                'last_month' => 'Last Month (' . now()->subMonth()->format('M Y') . ')',
                 default => 'All Time',
             };
         }

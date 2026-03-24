@@ -1162,7 +1162,6 @@ class PosController extends Controller
                 'pra_pos_id' => $request->pra_pos_id,
                 'pra_production_token' => $request->pra_production_token,
                 'receipt_printer_size' => $request->receipt_printer_size ?? '80mm',
-                'inventory_enabled' => $request->has('inventory_enabled'),
             ]);
 
             if ($request->filled('confidential_pin')) {
@@ -1944,6 +1943,7 @@ class PosController extends Controller
             $request->validate($rules);
 
             $data = $request->only(['name', 'owner_name', 'ntn', 'email', 'phone', 'mobile', 'address', 'city', 'business_activity', 'website']);
+            $data['inventory_enabled'] = $request->has('inventory_enabled');
 
             if ($request->hasFile('logo')) {
                 if ($company->logo_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($company->logo_path)) {

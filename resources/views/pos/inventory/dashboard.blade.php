@@ -1,11 +1,27 @@
 <x-pos-layout>
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Inventory Dashboard</h1>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Inventory Dashboard</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Overview of stock levels, movements, and alerts</p>
+        </div>
         <a href="{{ route('pos.inventory.adjust') }}" class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-lg transition shadow-md">
             <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             Adjust Stock
         </a>
+    </div>
+
+    <div class="flex flex-wrap gap-2 mb-6">
+        <a href="{{ route('pos.inventory.dashboard') }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-600 text-white">Dashboard</a>
+        <a href="{{ route('pos.inventory.stock') }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition">Stock Levels</a>
+        <a href="{{ route('pos.inventory.movements') }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition">Movements</a>
+        <a href="{{ route('pos.inventory.low-stock') }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition {{ $lowStockItems->count() > 0 ? 'relative' : '' }}">
+            Low Stock Alerts
+            @if($lowStockItems->count() > 0)
+            <span class="ml-1 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold bg-red-500 text-white rounded-full">{{ $lowStockItems->count() }}</span>
+            @endif
+        </a>
+        <a href="{{ route('pos.inventory.adjust') }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition">Adjust Stock</a>
     </div>
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

@@ -1,11 +1,19 @@
 <x-pos-layout>
 <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    <div class="flex items-center space-x-3 mb-6">
+    <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Adjust Stock</h1>
         <a href="{{ route('pos.inventory.stock') }}" class="inline-flex items-center text-gray-500 hover:text-purple-600 transition text-sm">
             <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-            Back
+            Back to Stock
         </a>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Adjust Stock</h1>
+    </div>
+
+    <div class="flex flex-wrap gap-2 mb-6">
+        <a href="{{ route('pos.inventory.dashboard') }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition">Dashboard</a>
+        <a href="{{ route('pos.inventory.stock') }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition">Stock Levels</a>
+        <a href="{{ route('pos.inventory.movements') }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition">Movements</a>
+        <a href="{{ route('pos.inventory.low-stock') }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition">Low Stock Alerts</a>
+        <a href="{{ route('pos.inventory.adjust') }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-600 text-white">Adjust Stock</a>
     </div>
 
     @if(session('error'))
@@ -56,9 +64,16 @@
                 </div>
             </div>
 
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Quantity</label>
-                <input type="number" name="quantity" value="{{ old('quantity') }}" min="0.01" step="0.01" required placeholder="Enter quantity" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500 transition">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Quantity</label>
+                    <input type="number" name="quantity" value="{{ old('quantity') }}" min="0.01" step="0.01" required placeholder="Enter quantity" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500 transition">
+                </div>
+                <div x-show="type === 'add'" x-transition>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Purchase Price per Unit <span class="text-gray-400">(Optional)</span></label>
+                    <input type="number" name="purchase_price" value="{{ old('purchase_price') }}" min="0" step="0.01" placeholder="PKR 0.00" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500 transition">
+                    <p class="text-xs text-gray-400 mt-1">Updates the average purchase cost for stock value calculations.</p>
+                </div>
             </div>
 
             <div>

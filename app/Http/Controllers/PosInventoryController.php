@@ -148,6 +148,7 @@ class PosInventoryController extends Controller
             'quantity' => 'required|numeric|min:0.01',
             'reason' => 'required|string|max:255',
             'notes' => 'nullable|string|max:500',
+            'purchase_price' => 'nullable|numeric|min:0',
         ]);
 
         $product = Product::where('company_id', $companyId)->findOrFail($request->product_id);
@@ -174,7 +175,21 @@ class PosInventoryController extends Controller
                     : InventoryMovement::TYPE_ADJUSTMENT_OUT;
             }
 
-            $stock->update(['quantity' => $newQty]);
+            $stockUpdate = ['quantity' => $newQty];
+
+            if ($request->type === 'add' && $request->filled('purchase_price') && $request->purchase_price > 0) {
+                $purchasePrice = (float) $request->purchase_price;
+                if ($previousQty > 0 && $stock->avg_purchase_price > 0) {
+                    $totalOldValue = $previousQty * $stock->avg_purchase_price;
+                    $totalNewValue = $request->quantity * $purchasePrice;
+                    $stockUpdate['avg_purchase_price'] = round(($totalOldValue + $totalNewValue) / $newQty, 2);
+                } else {
+                    $stockUpdate['avg_purchase_price'] = $purchasePrice;
+                }
+                $stockUpdate['last_purchase_price'] = $purchasePrice;
+            }
+
+            $stock->update($stockUpdate);
 
             InventoryMovement::create([
                 'company_id' => $companyId,

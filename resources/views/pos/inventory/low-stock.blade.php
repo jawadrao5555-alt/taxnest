@@ -1,6 +1,14 @@
 <x-pos-layout>
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Low Stock Alerts</h1>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">Low Stock Alerts</h1>
+
+    <div class="flex flex-wrap gap-2 mb-6">
+        <a href="{{ route('pos.inventory.dashboard') }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition">Dashboard</a>
+        <a href="{{ route('pos.inventory.stock') }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition">Stock Levels</a>
+        <a href="{{ route('pos.inventory.movements') }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition">Movements</a>
+        <a href="{{ route('pos.inventory.low-stock') }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-600 text-white">Low Stock Alerts</a>
+        <a href="{{ route('pos.inventory.adjust') }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition">Adjust Stock</a>
+    </div>
 
     @if($outOfStock->count() > 0)
     <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-xl p-5 mb-6">

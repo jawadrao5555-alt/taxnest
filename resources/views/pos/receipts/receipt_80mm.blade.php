@@ -153,7 +153,7 @@
         <tbody>
             @foreach($transaction->items as $item)
             <tr>
-                <td class="col-item">{{ $item->item_name }}@if($item->is_tax_exempt) <span class="exempt-tag">[E]</span>@endif</td>
+                <td class="col-item">{{ $item->item_name }}</td>
                 <td class="col-qty">{{ $item->quantity }}</td>
                 <td class="col-price">{{ number_format($item->unit_price, 0) }}</td>
                 <td class="col-total">{{ number_format($item->subtotal, 0) }}</td>

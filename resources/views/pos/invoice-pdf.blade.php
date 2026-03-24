@@ -69,6 +69,11 @@
     <div class="page">
         <div class="header">
             <div class="header-left">
+                @if($company->logo_path)
+                <div style="margin-bottom: 8px;">
+                    <img src="{{ public_path('storage/' . $company->logo_path) }}" alt="{{ $company->name }}" style="max-width: 160px; max-height: 60px; object-fit: contain;">
+                </div>
+                @endif
                 <div class="company-name">{{ $company->name }}</div>
                 <div class="company-info">
                     @if($company->address){{ $company->address }}<br>@endif
@@ -147,12 +152,7 @@
                 @foreach($transaction->items as $i => $item)
                 <tr>
                     <td>{{ $i + 1 }}</td>
-                    <td>
-                        {{ $item->item_name }}
-                        @if($item->is_tax_exempt)
-                            <span class="exempt-badge">EXEMPT</span>
-                        @endif
-                    </td>
+                    <td>{{ $item->item_name }}</td>
                     <td>{{ ucfirst($item->item_type) }}</td>
                     <td class="right">{{ $item->quantity }}</td>
                     <td class="right">{{ number_format($item->unit_price, 2) }}</td>

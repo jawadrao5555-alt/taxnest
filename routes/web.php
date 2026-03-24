@@ -456,6 +456,8 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::post('/api/toggle-pra', [PosController::class, 'togglePra'])->name('pos.api.toggle-pra');
     Route::match(['get', 'post'], '/my-profile', [PosController::class, 'userProfile'])->name('pos.user-profile');
     Route::get('/products', [PosController::class, 'products'])->name('pos.products');
+    Route::get('/customers', [PosController::class, 'customers'])->name('pos.customers');
+    Route::post('/customers', [PosController::class, 'storeCustomer'])->name('pos.customers.store');
 
     Route::middleware([\App\Http\Middleware\PosAdminOnly::class])->group(function () {
         Route::get('/services', [PosController::class, 'services'])->name('pos.services');
@@ -475,8 +477,6 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
         Route::put('/products/{id}', [PosController::class, 'updateProduct'])->name('pos.products.update');
         Route::delete('/products/{id}', [PosController::class, 'deleteProduct'])->name('pos.products.delete');
         Route::post('/products/{id}/toggle', [PosController::class, 'toggleProduct'])->name('pos.products.toggle');
-        Route::get('/customers', [PosController::class, 'customers'])->name('pos.customers');
-        Route::post('/customers', [PosController::class, 'storeCustomer'])->name('pos.customers.store');
         Route::put('/customers/{id}', [PosController::class, 'updateCustomer'])->name('pos.customers.update');
         Route::delete('/customers/{id}', [PosController::class, 'deleteCustomer'])->name('pos.customers.delete');
         Route::post('/customers/{id}/toggle', [PosController::class, 'toggleCustomer'])->name('pos.customers.toggle');

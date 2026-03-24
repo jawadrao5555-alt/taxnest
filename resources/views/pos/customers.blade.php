@@ -68,7 +68,9 @@
                         <th class="px-4 py-3 hidden md:table-cell">City</th>
                         <th class="px-4 py-3 text-center hidden sm:table-cell">Type</th>
                         <th class="px-4 py-3 text-center hidden sm:table-cell">Status</th>
+                        @if(!($isCashier ?? false))
                         <th class="px-4 py-3 text-center">Actions</th>
+                        @endif
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -82,13 +84,20 @@
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $customer->type === 'registered' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' }}">{{ ucfirst($customer->type) }}</span>
                         </td>
                         <td class="px-4 py-3 text-center hidden sm:table-cell">
+                            @if(!($isCashier ?? false))
                             <form method="POST" action="{{ route('pos.customers.toggle', $customer->id) }}" class="inline">
                                 @csrf
                                 <button type="submit" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $customer->is_active ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' }}">
                                     {{ $customer->is_active ? 'Active' : 'Inactive' }}
                                 </button>
                             </form>
+                            @else
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $customer->is_active ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' }}">
+                                {{ $customer->is_active ? 'Active' : 'Inactive' }}
+                            </span>
+                            @endif
                         </td>
+                        @if(!($isCashier ?? false))
                         <td class="px-4 py-3 text-center">
                             <div class="flex items-center justify-center gap-1">
                                 <button @click="editing = !editing" class="text-xs text-purple-600 hover:text-purple-700 px-2 py-1">Edit</button>
@@ -98,7 +107,9 @@
                                 </form>
                             </div>
                         </td>
+                        @endif
                     </tr>
+                    @if(!($isCashier ?? false))
                     <tr x-show="editing" class="bg-purple-50/50 dark:bg-purple-900/10">
                         <td colspan="7" class="px-4 py-3">
                             <form method="POST" action="{{ route('pos.customers.update', $customer->id) }}" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 items-end">
@@ -120,6 +131,7 @@
                             </form>
                         </td>
                     </tr>
+                    @endif
                     @empty
                     <tr><td colspan="7" class="px-4 py-12 text-center text-gray-500">No customers yet. Click "+ Add Customer" to add your first POS customer.</td></tr>
                     @endforelse

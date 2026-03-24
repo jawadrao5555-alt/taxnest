@@ -39,6 +39,9 @@ class PosController extends Controller
 
         $recentTransactions = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
+            ->where(function ($q) {
+                $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+            })
             ->with('creator')
             ->orderBy('created_at', 'desc')
             ->take(10)
@@ -1668,7 +1671,9 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $customers = PosCustomer::where('company_id', $companyId)->orderBy('name')->get();
-        return view('pos.customers', compact('customers'));
+        $user = auth('pos')->user();
+        $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
+        return view('pos.customers', compact('customers', 'isCashier'));
     }
 
     public function storeCustomer(Request $request)

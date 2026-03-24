@@ -51,6 +51,8 @@ class Company extends Model
         'pra_access_code',
         'pra_production_token',
         'receipt_printer_size',
+        'confidential_pin',
+        'next_local_invoice_number',
         'logo_path',
         'status',
         'franchise_id',
@@ -71,6 +73,7 @@ class Company extends Model
     protected $hidden = [
         'fbr_sandbox_token',
         'fbr_production_token',
+        'confidential_pin',
     ];
 
     public function isSuspended()

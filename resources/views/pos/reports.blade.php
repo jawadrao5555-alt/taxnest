@@ -1,6 +1,10 @@
 <x-pos-layout>
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">POS Reports</h1>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+        {{ ($tab ?? 'pra') === 'local' ? 'Local Reports' : 'POS Reports' }}
+    </h1>
+
+    @include('pos.partials.mode-tabs', ['baseUrl' => route('pos.reports')])
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
@@ -99,4 +103,7 @@
         </div>
     </div>
 </div>
+@if($hasPinSet ?? false)
+@include('pos.partials.pin-modal')
+@endif
 </x-pos-layout>

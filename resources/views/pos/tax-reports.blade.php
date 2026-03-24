@@ -1,8 +1,10 @@
 <x-pos-layout>
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Tax Reports</h1>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+                {{ ($tab ?? 'pra') === 'local' ? 'Local Tax Reports' : 'Tax Reports' }}
+            </h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ $dateLabel }} &mdash; {{ $taxRateLabel }}</p>
         </div>
         <div class="flex items-center gap-2 mt-3 sm:mt-0">
@@ -17,8 +19,11 @@
         </div>
     </div>
 
+    @include('pos.partials.mode-tabs', ['baseUrl' => route('pos.tax-reports')])
+
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <form method="GET" action="{{ route('pos.tax-reports') }}" class="space-y-4">
+            <input type="hidden" name="tab" value="{{ $tab ?? 'pra' }}">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tax Rate</label>
@@ -199,4 +204,7 @@
     </div>
     @endif
 </div>
+@if($hasPinSet ?? false)
+@include('pos.partials.pin-modal')
+@endif
 </x-pos-layout>

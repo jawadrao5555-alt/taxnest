@@ -55,6 +55,36 @@
                     <button type="submit" class="px-6 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition">Save Settings</button>
                 </form>
             </div>
+
+            @if(!auth('pos')->user()->isPosCashier())
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">Confidential PIN</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Set a 4-6 digit PIN to protect access to local (non-PRA) invoice data. Required for cashiers to view local transactions.</p>
+
+                @if($hasPinSet)
+                <div class="flex items-center gap-2 mb-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20">
+                    <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    <span class="text-sm font-medium text-emerald-700 dark:text-emerald-400">PIN is set and active</span>
+                </div>
+                @endif
+
+                <form method="POST" action="{{ route('pos.pra-settings') }}" class="space-y-3">
+                    @csrf
+                    <input type="hidden" name="pra_environment" value="{{ $company->pra_environment }}">
+                    <input type="hidden" name="receipt_printer_size" value="{{ $company->receipt_printer_size ?? '80mm' }}">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ $hasPinSet ? 'Change PIN' : 'Set PIN' }} (4-6 digits)</label>
+                        <input type="password" name="confidential_pin" maxlength="6" pattern="\d{4,6}" placeholder="Enter 4-6 digit PIN" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="submit" class="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition">{{ $hasPinSet ? 'Update PIN' : 'Set PIN' }}</button>
+                        @if($hasPinSet)
+                        <button type="submit" name="remove_pin" value="1" onclick="return confirm('Remove the confidential PIN? Local data will be accessible without verification.')" class="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition">Remove PIN</button>
+                        @endif
+                    </div>
+                </form>
+            </div>
+            @endif
         </div>
 
         <div class="space-y-6">

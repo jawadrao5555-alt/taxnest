@@ -18,6 +18,7 @@ class User extends Authenticatable
         'password',
         'company_id',
         'role',
+        'pos_role',
         'is_active',
         'dark_mode',
     ];
@@ -40,6 +41,16 @@ class User extends Authenticatable
     public function isViewer()
     {
         return $this->role === 'viewer';
+    }
+
+    public function isPosAdmin()
+    {
+        return $this->pos_role === 'pos_admin' || $this->role === 'company_admin';
+    }
+
+    public function isPosCashier()
+    {
+        return $this->pos_role === 'pos_cashier';
     }
 
     public function company()

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Models\User;
 use App\Models\PosProduct;
 use App\Models\PosCustomer;
 use App\Models\PosService;
@@ -151,6 +152,7 @@ class PosController extends Controller
         }
 
         $praEnabled = (bool) $company->pra_reporting_enabled;
+        $invoiceMode = $praEnabled ? 'pra' : 'local';
         $initialPraStatus = $praEnabled ? 'pending' : 'local';
 
         DB::beginTransaction();
@@ -192,13 +194,16 @@ class PosController extends Controller
 
                 $transaction->items()->delete();
             } else {
-                $invoiceNumber = $this->generateInvoiceNumber($companyId);
+                $invoiceNumber = $invoiceMode === 'local'
+                    ? $this->generateLocalInvoiceNumber($companyId)
+                    : $this->generateInvoiceNumber($companyId);
                 $submissionHash = hash('sha256', $companyId . '|' . $invoiceNumber . '|' . $totalAmount . '|' . now()->timestamp);
 
                 $transaction = PosTransaction::create([
                     'company_id' => $companyId,
                     'terminal_id' => $request->terminal_id,
                     'invoice_number' => $invoiceNumber,
+                    'invoice_mode' => $invoiceMode,
                     'customer_name' => $request->customer_name,
                     'customer_phone' => $request->customer_phone,
                     'subtotal' => $subtotal,
@@ -548,10 +553,40 @@ class PosController extends Controller
         return back()->with('success', $message);
     }
 
+    private function verifyPinSession(): bool
+    {
+        $verified = session('confidential_pin_verified', false);
+        $verifiedAt = session('confidential_pin_verified_at', 0);
+        return $verified && (now()->timestamp - $verifiedAt) < 1800;
+    }
+
+    private function requirePinForLocalTab(string $tab, Company $company)
+    {
+        if ($tab !== 'local') return null;
+        if (!empty($company->confidential_pin) && !$this->verifyPinSession()) {
+            return redirect()->back()->with('error', 'PIN verification required to access local data.');
+        }
+        return null;
+    }
+
     public function transactions(Request $request)
     {
         $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $tab = $request->get('tab', 'pra');
+
+        $pinRedirect = $this->requirePinForLocalTab($tab, $company);
+        if ($pinRedirect) return $pinRedirect;
+
         $query = PosTransaction::where('company_id', $companyId)->where('status', 'completed')->with('creator');
+
+        if ($tab === 'local') {
+            $query->where('invoice_mode', 'local');
+        } else {
+            $query->where(function ($q) {
+                $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+            });
+        }
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -574,7 +609,11 @@ class PosController extends Controller
 
         $transactions = $query->orderBy('created_at', 'desc')->paginate(20);
 
-        return view('pos.transactions', compact('transactions'));
+        $hasPinSet = !empty($company->confidential_pin);
+        $localCount = PosTransaction::where('company_id', $companyId)->where('status', 'completed')->where('invoice_mode', 'local')->count();
+        $user = auth('pos')->user();
+
+        return view('pos.transactions', compact('transactions', 'tab', 'hasPinSet', 'localCount', 'user'));
     }
 
     public function transactionShow($id)
@@ -657,13 +696,29 @@ class PosController extends Controller
         return $pdf->stream("Invoice-{$transaction->invoice_number}.pdf");
     }
 
-    public function reports()
+    public function reports(Request $request)
     {
         $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $tab = $request->get('tab', 'pra');
+
+        $pinRedirect = $this->requirePinForLocalTab($tab, $company);
+        if ($pinRedirect) return $pinRedirect;
+
+        $modeFilter = function ($q) use ($tab) {
+            if ($tab === 'local') {
+                $q->where('invoice_mode', 'local');
+            } else {
+                $q->where(function ($sub) {
+                    $sub->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+                });
+            }
+        };
 
         $dailySales = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->where('created_at', '>=', now()->subDays(30))
+            ->tap($modeFilter)
             ->selectRaw("DATE(created_at) as date, COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue")
             ->groupByRaw('DATE(created_at)')
             ->orderBy('date', 'desc')
@@ -672,12 +727,18 @@ class PosController extends Controller
         $paymentSummary = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->where('created_at', '>=', now()->startOfMonth())
+            ->tap($modeFilter)
             ->selectRaw("payment_method, COUNT(*) as count, COALESCE(SUM(total_amount),0) as total, COALESCE(SUM(tax_amount),0) as tax")
             ->groupBy('payment_method')
             ->get();
 
-        $topItems = PosTransactionItem::whereHas('transaction', function ($q) use ($companyId) {
+        $topItems = PosTransactionItem::whereHas('transaction', function ($q) use ($companyId, $tab) {
             $q->where('company_id', $companyId)->where('status', 'completed')->where('created_at', '>=', now()->startOfMonth());
+            if ($tab === 'local') {
+                $q->where('invoice_mode', 'local');
+            } else {
+                $q->where(function ($sub) { $sub->where('invoice_mode', 'pra')->orWhereNull('invoice_mode'); });
+            }
         })
             ->selectRaw("item_name, SUM(quantity) as total_qty, SUM(subtotal) as total_revenue")
             ->groupBy('item_name')
@@ -688,20 +749,31 @@ class PosController extends Controller
         $monthlyTrend = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->where('created_at', '>=', now()->subMonths(6)->startOfMonth())
+            ->tap($modeFilter)
             ->selectRaw("TO_CHAR(created_at, 'YYYY-MM') as month, COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue")
             ->groupByRaw("TO_CHAR(created_at, 'YYYY-MM')")
             ->orderBy('month')
             ->get();
 
-        return view('pos.reports', compact('dailySales', 'paymentSummary', 'topItems', 'monthlyTrend'));
+        $hasPinSet = !empty($company->confidential_pin);
+        $localCount = PosTransaction::where('company_id', $companyId)->where('status', 'completed')->where('invoice_mode', 'local')->count();
+        $user = auth('pos')->user();
+
+        return view('pos.reports', compact('dailySales', 'paymentSummary', 'topItems', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user'));
     }
 
-    private function buildTaxReportQuery(Request $request)
+    private function buildTaxReportQuery(Request $request, $tab = 'pra')
     {
         $companyId = app('currentCompanyId');
         $query = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->with('terminal');
+
+        if ($tab === 'local') {
+            $query->where('invoice_mode', 'local');
+        } else {
+            $query->where(function ($q) { $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode'); });
+        }
 
         if ($request->filled('tax_rate')) {
             $rate = (float) $request->tax_rate;
@@ -767,10 +839,15 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        $query = $this->buildTaxReportQuery($request);
+        $tab = $request->get('tab', 'pra');
+
+        $pinRedirect = $this->requirePinForLocalTab($tab, $company);
+        if ($pinRedirect) return $pinRedirect;
+
+        $query = $this->buildTaxReportQuery($request, $tab);
         $transactions = $query->paginate(50)->appends($request->all());
 
-        $summaryQuery = $this->buildTaxReportQuery($request);
+        $summaryQuery = $this->buildTaxReportQuery($request, $tab);
         $summary = $summaryQuery->reorder()->selectRaw('
             COUNT(*) as total_invoices,
             COALESCE(SUM(total_amount), 0) as total_sales,
@@ -787,12 +864,23 @@ class PosController extends Controller
             $taxRateLabel = $request->tax_rate . '% Tax Only';
         }
 
-        return view('pos.tax-reports', compact('company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel'));
+        $hasPinSet = !empty($company->confidential_pin);
+        $localCount = PosTransaction::where('company_id', $companyId)->where('status', 'completed')->where('invoice_mode', 'local')->count();
+        $user = auth('pos')->user();
+
+        return view('pos.tax-reports', compact('company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel', 'tab', 'hasPinSet', 'localCount', 'user'));
     }
 
     public function exportTaxReportCsv(Request $request)
     {
-        $query = $this->buildTaxReportQuery($request);
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $tab = $request->get('tab', 'pra');
+
+        $pinRedirect = $this->requirePinForLocalTab($tab, $company);
+        if ($pinRedirect) return $pinRedirect;
+
+        $query = $this->buildTaxReportQuery($request, $tab);
         $transactions = $query->get();
 
         $dateLabel = $this->getReportDateLabel($request);
@@ -864,10 +952,15 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        $query = $this->buildTaxReportQuery($request);
+        $tab = $request->get('tab', 'pra');
+
+        $pinRedirect = $this->requirePinForLocalTab($tab, $company);
+        if ($pinRedirect) return $pinRedirect;
+
+        $query = $this->buildTaxReportQuery($request, $tab);
         $transactions = $query->get();
 
-        $summaryQuery = $this->buildTaxReportQuery($request);
+        $summaryQuery = $this->buildTaxReportQuery($request, $tab);
         $summary = $summaryQuery->reorder()->selectRaw('
             COUNT(*) as total_invoices,
             COALESCE(SUM(total_amount), 0) as total_sales,
@@ -1035,8 +1128,13 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
+        $user = auth('pos')->user();
 
         if ($request->isMethod('post')) {
+            if ($user->isPosCashier()) {
+                return back()->with('error', 'Only company admin can change settings.');
+            }
+
             $request->validate([
                 'pra_environment' => 'required|in:sandbox,production',
                 'pra_pos_id' => 'nullable|string',
@@ -1052,12 +1150,178 @@ class PosController extends Controller
                 'inventory_enabled' => $request->has('inventory_enabled'),
             ]);
 
+            if ($request->filled('confidential_pin')) {
+                $request->validate([
+                    'confidential_pin' => 'string|min:4|max:6|regex:/^\d+$/',
+                ]);
+                $company->update([
+                    'confidential_pin' => bcrypt($request->confidential_pin),
+                ]);
+                return back()->with('success', 'Settings & Confidential PIN updated.');
+            }
+
+            if ($request->has('remove_pin') && $request->remove_pin) {
+                $company->update(['confidential_pin' => null]);
+                return back()->with('success', 'Settings updated. Confidential PIN removed.');
+            }
+
             return back()->with('success', 'PRA settings updated successfully.');
         }
 
         $praLogs = PraLog::where('company_id', $companyId)->orderBy('created_at', 'desc')->take(20)->get();
         $proxyEnabled = !empty(env('PRA_PROXY_URL'));
-        return view('pos.pra-settings', compact('company', 'praLogs', 'proxyEnabled'));
+        $hasPinSet = !empty($company->confidential_pin);
+        return view('pos.pra-settings', compact('company', 'praLogs', 'proxyEnabled', 'hasPinSet'));
+    }
+
+    public function verifyPin(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        $lockKey = 'pin_lockout_' . $companyId;
+        $attemptsKey = 'pin_attempts_' . $companyId;
+
+        if (cache()->get($lockKey)) {
+            $remaining = cache()->get($lockKey) - now()->timestamp;
+            return response()->json([
+                'success' => false,
+                'message' => 'Too many wrong attempts. Try again in ' . ceil($remaining / 60) . ' minutes.',
+                'locked' => true,
+            ], 429);
+        }
+
+        if (empty($company->confidential_pin)) {
+            return response()->json(['success' => false, 'message' => 'Confidential PIN not set. Admin must set it from Settings.'], 400);
+        }
+
+        $pin = $request->input('pin', '');
+        if (\Hash::check($pin, $company->confidential_pin)) {
+            cache()->forget($attemptsKey);
+            session(['confidential_pin_verified' => true, 'confidential_pin_verified_at' => now()->timestamp]);
+            return response()->json(['success' => true, 'message' => 'PIN verified.']);
+        }
+
+        $attempts = (int) cache()->get($attemptsKey, 0) + 1;
+        cache()->put($attemptsKey, $attempts, 900);
+
+        if ($attempts >= 5) {
+            cache()->put($lockKey, now()->addMinutes(15)->timestamp, 900);
+            cache()->forget($attemptsKey);
+            return response()->json([
+                'success' => false,
+                'message' => 'Too many wrong attempts. Locked for 15 minutes.',
+                'locked' => true,
+            ], 429);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Wrong PIN. ' . (5 - $attempts) . ' attempts remaining.',
+            'remaining' => 5 - $attempts,
+        ], 401);
+    }
+
+    public function checkPinSession()
+    {
+        $verified = session('confidential_pin_verified', false);
+        $verifiedAt = session('confidential_pin_verified_at', 0);
+        $isValid = $verified && (now()->timestamp - $verifiedAt) < 1800;
+
+        return response()->json(['verified' => $isValid]);
+    }
+
+    public function posTeam(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $user = auth('pos')->user();
+
+        if ($user->isPosCashier()) {
+            return redirect()->route('pos.dashboard')->with('error', 'Access denied.');
+        }
+
+        $team = User::where('company_id', $companyId)
+            ->whereIn('pos_role', ['pos_admin', 'pos_cashier'])
+            ->orderByRaw("CASE WHEN pos_role = 'pos_admin' THEN 0 ELSE 1 END")
+            ->orderBy('name')
+            ->get();
+
+        return view('pos.team', compact('team'));
+    }
+
+    public function storeCashier(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $user = auth('pos')->user();
+
+        if ($user->isPosCashier()) {
+            return back()->with('error', 'Access denied.');
+        }
+
+        $request->validate([
+            'name' => 'required|string|max:100',
+            'email' => 'required|email|unique:users,email',
+            'phone' => 'nullable|string|max:20',
+            'password' => 'required|string|min:6',
+        ]);
+
+        User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'phone' => $request->phone,
+            'password' => bcrypt($request->password),
+            'company_id' => $companyId,
+            'role' => 'employee',
+            'pos_role' => 'pos_cashier',
+            'is_active' => true,
+        ]);
+
+        return back()->with('success', 'Cashier account created successfully.');
+    }
+
+    public function updateCashier(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $user = auth('pos')->user();
+
+        if ($user->isPosCashier()) {
+            return back()->with('error', 'Access denied.');
+        }
+
+        $cashier = User::where('company_id', $companyId)->where('pos_role', 'pos_cashier')->findOrFail($id);
+
+        $request->validate([
+            'name' => 'required|string|max:100',
+            'email' => 'required|email|unique:users,email,' . $cashier->id,
+            'phone' => 'nullable|string|max:20',
+        ]);
+
+        $cashier->update([
+            'name' => $request->name,
+            'email' => $request->email,
+            'phone' => $request->phone,
+        ]);
+
+        if ($request->filled('password')) {
+            $cashier->update(['password' => bcrypt($request->password)]);
+        }
+
+        return back()->with('success', 'Cashier updated.');
+    }
+
+    public function toggleCashier($id)
+    {
+        $companyId = app('currentCompanyId');
+        $user = auth('pos')->user();
+
+        if ($user->isPosCashier()) {
+            return back()->with('error', 'Access denied.');
+        }
+
+        $cashier = User::where('company_id', $companyId)->where('pos_role', 'pos_cashier')->findOrFail($id);
+        $cashier->update(['is_active' => !$cashier->is_active]);
+
+        return back()->with('success', $cashier->is_active ? 'Cashier activated.' : 'Cashier deactivated.');
     }
 
     public function products()
@@ -1410,12 +1674,18 @@ class PosController extends Controller
 
         DB::beginTransaction();
         try {
-            $invoiceNumber = $this->generateInvoiceNumber($companyId);
+            $company = Company::find($companyId);
+            $praEnabled = (bool) $company->pra_reporting_enabled;
+            $invoiceMode = $praEnabled ? 'pra' : 'local';
+            $invoiceNumber = $invoiceMode === 'local'
+                ? $this->generateLocalInvoiceNumber($companyId)
+                : $this->generateInvoiceNumber($companyId);
 
             $draft = PosTransaction::create([
                 'company_id' => $companyId,
                 'terminal_id' => $draftData['terminal_id'] ?? null,
                 'invoice_number' => $invoiceNumber,
+                'invoice_mode' => $invoiceMode,
                 'customer_name' => $draftData['customer_name'] ?? null,
                 'customer_phone' => $draftData['customer_phone'] ?? null,
                 'subtotal' => $draftData['subtotal'] ?? 0,
@@ -1427,7 +1697,7 @@ class PosController extends Controller
                 'total_amount' => $draftData['total_amount'] ?? 0,
                 'payment_method' => $draftData['payment_method'] ?? 'cash',
                 'status' => 'draft',
-                'pra_status' => 'local',
+                'pra_status' => $praEnabled ? 'pending' : 'local',
                 'created_by' => auth('pos')->id(),
                 'locked_by_terminal_id' => $draftData['terminal_id'] ?? null,
                 'lock_time' => now(),
@@ -1602,6 +1872,25 @@ class PosController extends Controller
         }
 
         return 'POS-' . $year . '-' . str_pad($next, 5, '0', STR_PAD_LEFT);
+    }
+
+    private function generateLocalInvoiceNumber(int $companyId): string
+    {
+        $year = now()->format('Y');
+
+        $lastTransaction = PosTransaction::where('company_id', $companyId)
+            ->where('invoice_number', 'like', "LOCAL-{$year}-%")
+            ->orderBy('id', 'desc')
+            ->lockForUpdate()
+            ->first();
+
+        if ($lastTransaction && preg_match('/LOCAL-\d{4}-(\d+)/', $lastTransaction->invoice_number, $matches)) {
+            $next = (int) $matches[1] + 1;
+        } else {
+            $next = 1;
+        }
+
+        return 'LOCAL-' . $year . '-' . str_pad($next, 5, '0', STR_PAD_LEFT);
     }
 
     public function billing()

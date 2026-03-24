@@ -1,7 +1,9 @@
 <x-pos-layout>
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">POS Transactions</h1>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+            {{ ($tab ?? 'pra') === 'local' ? 'Local Transactions' : 'POS Transactions' }}
+        </h1>
         <div class="flex items-center gap-3">
             @php
                 $failedCount = \App\Models\PosTransaction::where('company_id', app('currentCompanyId'))
@@ -25,8 +27,11 @@
         </div>
     </div>
 
+    @include('pos.partials.mode-tabs', ['baseUrl' => route('pos.transactions')])
+
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <input type="hidden" name="tab" value="{{ $tab ?? 'pra' }}">
             <input type="text" name="search" value="{{ request('search') }}" placeholder="Search invoice # or customer..." class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
             <select name="payment_method" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
                 <option value="">All Payment Methods</option>
@@ -136,4 +141,7 @@
         @endif
     </div>
 </div>
+@if($hasPinSet ?? false)
+@include('pos.partials.pin-modal')
+@endif
 </x-pos-layout>

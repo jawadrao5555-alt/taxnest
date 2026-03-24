@@ -18,6 +18,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
         $middleware->prepend(\App\Http\Middleware\ForceHttps::class);
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+        $middleware->validateCsrfTokens(except: [
+            'pos/invoice/store',
+            'pos/api/draft/save',
+            'pos/api/invoice/*/lock',
+            'pos/api/invoice/*/unlock',
+        ]);
         $middleware->alias([
             'company' => \App\Http\Middleware\CompanyIsolation::class,
             'role' => \App\Http\Middleware\RoleMiddleware::class,

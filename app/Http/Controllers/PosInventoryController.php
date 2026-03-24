@@ -270,48 +270,57 @@ class PosInventoryController extends Controller
             $qty = (float) ($item['quantity'] ?? 0);
             if ($qty <= 0) continue;
 
-            $stock = InventoryStock::where('company_id', $companyId)
-                ->where('product_id', $productId)
-                ->where('branch_id', null)
-                ->lockForUpdate()
-                ->first();
+            try {
+                $stock = InventoryStock::where('company_id', $companyId)
+                    ->where('product_id', $productId)
+                    ->where('branch_id', null)
+                    ->lockForUpdate()
+                    ->first();
 
-            if (!$stock) {
-                $stock = InventoryStock::create([
+                if (!$stock) {
+                    $posProduct = \App\Models\PosProduct::find($productId);
+                    if (!$posProduct) continue;
+
+                    $stock = InventoryStock::create([
+                        'company_id' => $companyId,
+                        'product_id' => $productId,
+                        'branch_id' => null,
+                        'quantity' => 0,
+                        'min_stock_level' => 0,
+                        'avg_purchase_price' => 0,
+                        'last_purchase_price' => 0,
+                    ]);
+                }
+
+                $previousQty = $stock->quantity;
+                $newQty = $stock->quantity - $qty;
+
+                if ($newQty < 0) {
+                    $productName = \App\Models\PosProduct::find($productId)?->name ?? 'Unknown';
+                    $warnings[] = "Low stock warning: {$productName} (Available: {$previousQty}, Sold: {$qty})";
+                }
+
+                $stock->update(['quantity' => $newQty]);
+
+                InventoryMovement::create([
                     'company_id' => $companyId,
                     'product_id' => $productId,
-                    'branch_id' => null,
-                    'quantity' => 0,
-                    'min_stock_level' => 0,
-                    'avg_purchase_price' => 0,
-                    'last_purchase_price' => 0,
+                    'type' => InventoryMovement::TYPE_SALE,
+                    'quantity' => $qty,
+                    'unit_price' => (float) ($item['unit_price'] ?? 0),
+                    'total_price' => round($qty * (float) ($item['unit_price'] ?? 0), 2),
+                    'balance_after' => $newQty,
+                    'reference_type' => 'pos_transaction',
+                    'reference_id' => $transactionId,
+                    'reference_number' => $invoiceNumber,
+                    'notes' => 'POS sale deduction',
+                    'created_by' => $userId,
                 ]);
+            } catch (\Exception $e) {
+                $productName = \App\Models\PosProduct::find($productId)?->name ?? "Product #{$productId}";
+                $warnings[] = "Inventory update skipped for {$productName}: " . $e->getMessage();
+                continue;
             }
-
-            $previousQty = $stock->quantity;
-            $newQty = $stock->quantity - $qty;
-
-            if ($newQty < 0) {
-                $productName = Product::find($productId)?->name ?? 'Unknown';
-                $warnings[] = "Low stock warning: {$productName} (Available: {$previousQty}, Sold: {$qty})";
-            }
-
-            $stock->update(['quantity' => $newQty]);
-
-            InventoryMovement::create([
-                'company_id' => $companyId,
-                'product_id' => $productId,
-                'type' => InventoryMovement::TYPE_SALE,
-                'quantity' => $qty,
-                'unit_price' => (float) ($item['unit_price'] ?? 0),
-                'total_price' => round($qty * (float) ($item['unit_price'] ?? 0), 2),
-                'balance_after' => $newQty,
-                'reference_type' => 'pos_transaction',
-                'reference_id' => $transactionId,
-                'reference_number' => $invoiceNumber,
-                'notes' => 'POS sale deduction',
-                'created_by' => $userId,
-            ]);
         }
 
         return ['skipped' => false, 'warnings' => $warnings];

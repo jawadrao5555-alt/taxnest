@@ -35,7 +35,7 @@
                     <p class="text-purple-200/60 text-sm mt-1">Enterprise Point of Sale</p>
                 </div>
 
-                <div class="animate-float rounded-2xl overflow-hidden" style="background: rgba(255,255,255,0.07); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 25px 60px -12px rgba(0,0,0,0.5), 0 0 0 1px rgba(139, 92, 246, 0.1);">
+                <div class="rounded-2xl overflow-hidden" style="background: rgba(255,255,255,0.07); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 25px 60px -12px rgba(0,0,0,0.5), 0 0 0 1px rgba(139, 92, 246, 0.1);">
                     @if($errors->any())
                     <div class="px-6 pt-5">
                         <div class="font-medium text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">

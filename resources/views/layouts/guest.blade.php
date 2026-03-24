@@ -16,7 +16,6 @@
                 0%, 100% { transform: translateY(0px); }
                 50% { transform: translateY(-6px); }
             }
-            .animate-float { animation: float 6s ease-in-out infinite; }
         </style>
     </head>
     <body class="font-sans text-gray-900 antialiased">
@@ -33,7 +32,7 @@
             </div>
             <p class="mt-3 text-lg font-bold text-gray-800 tracking-tight">TaxNest</p>
 
-            <div class="w-full sm:max-w-md mt-6 px-6 py-6 bg-white/80 backdrop-blur-xl shadow-2xl shadow-emerald-500/10 overflow-hidden rounded-2xl border border-white/50 animate-float">
+            <div class="w-full sm:max-w-md mt-6 px-6 py-6 bg-white/80 backdrop-blur-xl shadow-2xl shadow-emerald-500/10 overflow-hidden rounded-2xl border border-white/50 ">
                 {{ $slot }}
             </div>
         </div>

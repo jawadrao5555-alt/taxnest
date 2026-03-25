@@ -1,5 +1,6 @@
 -- TaxNest Complete Data Export for MySQL (cPanel)
--- Generated: 2026-03-25 11:43:37
+-- Generated: 2026-03-25 11:49:04
+-- This export is MySQL-compatible and matches migration schema
 SET FOREIGN_KEY_CHECKS=0;
 
 -- Table: admin_users (1 rows)

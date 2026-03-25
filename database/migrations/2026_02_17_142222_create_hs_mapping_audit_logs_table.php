@@ -16,7 +16,7 @@ return new class extends Migration
             $table->text('old_value')->nullable();
             $table->text('new_value')->nullable();
             $table->unsignedBigInteger('changed_by')->nullable();
-            $table->jsonb('snapshot')->nullable();
+            $table->json('snapshot')->nullable();
             $table->timestamps();
 
             $table->index('hs_code_mapping_id');

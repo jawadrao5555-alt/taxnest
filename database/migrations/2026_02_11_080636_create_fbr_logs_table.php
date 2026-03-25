@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('fbr_logs', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('invoice_id')->constrained()->onDelete('cascade')->index();
+            $table->foreignId('invoice_id')->constrained()->onDelete('cascade');
             $table->text('request_payload');
             $table->text('response_payload')->nullable();
             $table->string('status')->default('pending')->index(); // pending, success, failed

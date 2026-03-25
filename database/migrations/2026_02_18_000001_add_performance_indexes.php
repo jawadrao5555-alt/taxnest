@@ -58,10 +58,12 @@ return new class extends Migration
 
     private function hasIndex(string $table, string $indexName): bool
     {
-        return collect(\Illuminate\Support\Facades\DB::select(
-            "SELECT indexname FROM pg_indexes WHERE tablename = ? AND indexname = ?",
-            [$table, $indexName]
-        ))->isNotEmpty();
+        try {
+            $results = \Illuminate\Support\Facades\DB::select("SHOW INDEX FROM {$table} WHERE Key_name = ?", [$indexName]);
+            return count($results) > 0;
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 
     public function down(): void

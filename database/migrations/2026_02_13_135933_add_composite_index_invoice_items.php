@@ -25,6 +25,11 @@ return new class extends Migration
 
     private function indexExists(string $table, string $indexName): bool
     {
-        return DB::select("SELECT 1 FROM pg_indexes WHERE tablename = ? AND indexname = ?", [$table, $indexName]) ? true : false;
+        try {
+            $results = DB::select("SHOW INDEX FROM {$table} WHERE Key_name = ?", [$indexName]);
+            return count($results) > 0;
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 };

@@ -1,0 +1,41 @@
+public/build/manifest.json         cd ~/public_html/taxnest && git fetch origin && git reset --hard origin/main && mysql -u taxnestc_jawadrao5555 -p'
+N2fFzzBVmSZM1KjLZwCj' taxnestc_db < deployment/production_data.sqlin && git reset --hard origin/main && mysql -u taxnestc_jawadrao5555 -p'N2fFzzBVmSZremote: Enumerating objects: 6, done.
+remote: Counting objects: 100% (6/6), done.
+remote: Compressing objects: 100% (2/2), done.
+remote: Total 4 (delta 2), reused 4 (delta 2), pack-reused 0 (from 0)
+Unpacking objects: 100% (4/4), 89.44 KiB | 1.12 MiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+   3e88a87..782ea48  main       -> origin/main
+HEAD is now at 782ea48 data: fresh production data export for cPanel MySQL import
+--------------
+INSERT INTO `invoice_items` (`id`, `invoice_id`, `hs_code`, `description`, `quantity`, `price`, `tax`, `created_at`, `updated_at`, `schedule_type`, `pct_code`, `tax_rate`, `sro_schedule_no`, `serial_no`, `mrp`, `default_uom`, `sale_type`, `st_withheld_at_source`, `petroleum_levy`, `further_tax`) VALUES (1, 1, '8471.3010', 'Professional Tax Consultation', '1.00', '12000.00', '3000.00', '2026-02-11 10:22:41', '2026-02-11 10:22:41', 'standard', NULL, '18.00', NULL, NULL, NULL, 'Numbers, pieces, units', 'Goods at standard rate (default)', 0, NULL, '0.00')
+--------------
+
+ERROR 1054 (42S22) at line 1419: Unknown column 'further_tax' in 'INSERT INTO'
+[taxnestc@eu1 taxnest]$ ^C         mysql -u taxnestc_jawadrao5555 -p'N2fFzzBVmSZM1KjLZwCj' taxnestc_db -e "ALTER TABLE invoice_items ADD COLUMN furth
+er_tax DECIMAL(10,2) DEFAULT '0.00';"estc_jawadrao5555 -p'N2fFzzBVmSZM1KjLZwCj' taxnestc_db -e "ALTER TAmysql -u taxnestc_jawadrao5555 -p'N2fFzzBVmSZM1KjLZwCj' taxnestc_db -e "DESCRIBE invoice_items;"555 -p'N2fFzzBVmSZM1KjLZwCj' taxnestc_db -e "DESCRIBE invoice_items;"
++-----------------------+---------------------+------+-----+----------------------------------+----------------+
+| Field                 | Type                | Null | Key | Default                          | Extra          |
++-----------------------+---------------------+------+-----+----------------------------------+----------------+
+| id                    | bigint(20) unsigned | NO   | PRI | NULL                             | auto_increment |
+| invoice_id            | bigint(20) unsigned | NO   | MUL | NULL                             |                |
+| hs_code               | varchar(255)        | NO   | MUL | NULL                             |                |
+| schedule_type         | varchar(50)         | NO   |     | standard                         |                |
+| pct_code              | varchar(50)         | YES  |     | NULL                             |                |
+| tax_rate              | decimal(8,2)        | NO   |     | 18.00                            |                |
+| sro_schedule_no       | varchar(100)        | YES  |     | NULL                             |                |
+| serial_no             | varchar(100)        | YES  |     | NULL                             |                |
+| mrp                   | decimal(15,2)       | YES  |     | NULL                             |                |
+| default_uom           | varchar(255)        | NO   |     | Numbers, pieces, units           |                |
+| sale_type             | varchar(255)        | NO   |     | Goods at standard rate (default) |                |
+| st_withheld_at_source | tinyint(1)          | NO   |     | 0                                |                |
+| petroleum_levy        | decimal(18,2)       | YES  |     | NULL                             |                |
+| description           | varchar(255)        | NO   |     | NULL                             |                |
+| quantity              | decimal(10,2)       | NO   |     | NULL                             |                |
+| price                 | decimal(15,2)       | NO   |     | NULL                             |                |
+| tax                   | decimal(15,2)       | NO   |     | NULL                             |                |
+| created_at            | timestamp           | YES  |     | NULL                             |                |
+| updated_at            | timestamp           | YES  |     | NULL                             |                |
+| further_tax           | decimal(10,2)       | YES  |     | 0.00                             |                |
++-----------------------+---------------------+------+-----+----------------------------------+----------------+
+[taxnestc@eu1 taxnest]$

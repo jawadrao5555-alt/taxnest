@@ -1,0 +1,65 @@
+
+[taxnestc@eu1 taxnest]$ cat > ~/public_html/.htaccess << 'EOF'
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Stop rewrite loops for already-rewritten paths
+    RewriteRule ^taxnest/public/ - [L]
+
+    # Serve static files from taxnest/public if they exist
+    RewriteCond %{DOCUMENT_ROOT}/taxnest/public%{REQUEST_URI} -f
+    RewriteRule ^(.+)$ /taxnest/public/$1 [L]
+
+    # Everything else goes to Laravel via custom index.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>
+EOF
+[taxnestc@eu1 taxnest]$ cat > ~/public_html/index.php << 'PHPEOF'
+<?php
+
+define('LARAVEL_START', microtime(true));
+
+require __DIR__.'/taxnest/vendor/autoload.php';
+
+$app = require_once __DIR__.'/taxnest/bootstrap/app.php';
+
+// Tell Laravel the public path is public_html
+$app->usePublicPath(__DIR__);
+
+$kernel = $app->make(Illuminate\Contracts\Http\Kernel::class);
+
+$response = $kernel->handle(
+    $request = Illuminate\Http\Request::capture()
+);
+
+$response->send();
+
+$kernel->terminate($request, $response);
+PHPEOF
+[taxnestc@eu1 taxnest]$ cat > ~/public_html/index.php << 'PHPEOF'
+<?php
+
+define('LARAVEL_START', microtime(true));
+
+$uri = urldecode(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
+
+// Serve static files from taxnest/public if they exist
+if ($uri !== '/' && file_exists(__DIR__.'/taxnest/public'.$uri)) {
+    $filePath = __DIR__.'/taxnest/public'.$uri;
+    $ext = pathinfo($filePath, PATHINFO_EXTENSION);
+    $mimeTypes = [
+        'css' => 'text/css',
+        'js' => 'application/javascript',
+        'json' => 'application/json',
+        'png' => 'image/png',
+        'jpg' => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'gif' => 'image/gif',
+        'svg' => 'image/svg+xml',
+        'ico' => 'image/x-icon',
+        'woff' => 'font/woff',
+        'woff2' => 'font/woff2',
+        'ttf' => 'font/ttf',
+PHPEOFl->terminate($request, $response);capture()rnel::class);

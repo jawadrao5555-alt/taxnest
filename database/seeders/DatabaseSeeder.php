@@ -19,7 +19,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(PricingPlanSeeder::class);
-        $professionalPlan = PricingPlan::where('name', 'Professional')->first();
+        $professionalPlan = PricingPlan::where('name', 'Business')->first();
 
         User::updateOrCreate(
             ['email' => 'admin@test.com'],

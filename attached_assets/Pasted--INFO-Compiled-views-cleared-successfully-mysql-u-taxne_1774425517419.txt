@@ -1,0 +1,56 @@
+  INFO  Compiled views cleared successfully.
+                        mysql -u taxnestc_jawadrao5555 -p'N2fFzzBVmSZM1KjLZwCj' taxnestc_db -e "SELECT id, email, role, company_id FROM users WHERE e
+mail IN ('admin@taxnest.com', 'admin@test.com', '8612580zur@gmail.com');"LZwCj' taxnestc_db -e "SELECT id, email, role, company_id FROM users WHERE e+----+----------------------+---------------+------------+r@gmail.com');"
+| id | email                | role          | company_id |
++----+----------------------+---------------+------------+
+| 10 | 8612580zur@gmail.com | company_admin |          7 |
+|  1 | admin@test.com       | super_admin   |       NULL |
++----+----------------------+------mysql -u taxnestc_jawadrao5555 -p'N2fFzzBVmSZM1KjLZwCj' taxnestc_db -e "SELECT id, email, LEFT(password, 30) as pw
+d_prefix FROM users WHERE email='8612580zur@gmail.com';"p'N2fFzzBVmSZM1KjLZwCj' taxnestc_db -e "SELECT id, email, LEFT(password, 30) as pwd_prefix FR+----+----------------------+--------------------------------+
+| id | email                | pwd_prefix                     |
++----+----------------------+--------------------------------+
+| 10 | 8612580zur@gmail.com | $2y$12$V5J.Zqjhp1CXTjAIsLZYJ.B |
++----+----------------------+--------------------------------+
+[taxnestc@eu1 taxnest]$ tail -20 ~/public_html/taxnest/storage/logs/laravel.log
+#43 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#44 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Http\\Middleware\\ValidatePostSize->handle()
+#45 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(109):Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#46 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle()
+#47 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(61): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#48 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Http\\Middleware\\HandleCors->handle()
+#49 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#50 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Http\\Middleware\\TrustProxies->handle()
+#51 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#52 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks->handle()
+#53 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePathEncoding.php(26): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#54 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Http\\Middleware\\ValidatePathEncoding->handle()
+#55 /home/taxnestc/public_html/taxnest/app/Http/Middleware/ForceHttps.php(17): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#56 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): App\\Http\\Middleware\\ForceHttps->handle()
+#57 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#58 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(175): Illuminate\\Pipeline\\Pipeline->then()
+#59 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(144): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter()
+#60 /home/taxnestc/public_html/index.php(48): Illuminate\\Foundation\\Http\\Kernel->handle()
+#61 {main}
+"}                                                                                                      grep "ERROR" ~/public_html/taxnest/storage/lo
+gs/laravel.log | tail -5grep "ERROR" ~/public_html/taxnest/storage/logs/laravel.log | tail -5
+[2026-03-25 12:36:29] production.ERROR: Vite manifest not found at: /home/taxnestc/public_html/build/manifest.json (View: /home/taxnestc/public_html/taxnest/resources/views/pos/landing.blade.php) {"exception":"[object] (Illuminate\\View\\ViewException(code: 0): Vite manifest not found at: /home/taxnestc/public_html/build/manifest.json (View: /home/taxnestc/public_html/taxnest/resources/views/pos/landing.blade.php) at /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Vite.php:946)
+[2026-03-25 12:36:31] production.ERROR: Vite manifest not found at: /home/taxnestc/public_html/build/manifest.json (View: /home/taxnestc/public_html/taxnest/resources/views/pos/landing.blade.php) {"exception":"[object] (Illuminate\\View\\ViewException(code: 0): Vite manifest not found at: /home/taxnestc/public_html/build/manifest.json (View: /home/taxnestc/public_html/taxnest/resources/views/pos/landing.blade.php) at /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Vite.php:946)
+[2026-03-25 12:36:33] production.ERROR: Vite manifest not found at: /home/taxnestc/public_html/build/manifest.json (View: /home/taxnestc/public_html/taxnest/resources/views/pos/auth/login.blade.php) {"exception":"[object] (Illuminate\\View\\ViewException(code: 0): Vite manifest not found at: /home/taxnestc/public_html/build/manifest.json (View: /home/taxnestc/public_html/taxnest/resources/views/pos/auth/login.blade.php) at /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Vite.php:946)
+[2026-03-25 12:36:37] production.ERROR: Vite manifest not found at: /home/taxnestc/public_html/build/manifest.json (View: /home/taxnestc/public_html/taxnest/resources/views/landing.blade.php) {"exception":"[object] (Illuminate\\View\\ViewException(code: 0): Vite manifest not found at: /home/taxnestc/public_html/build/manifest.json (View: /home/taxnestc/public_html/taxnest/resources/views/landing.blade.php) at /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Vite.php:946)
+[2026-03-25 12:39:02] production.ERROR: Vite manifest not found at: /home/taxnestc/public_html/taxnest/public/build/manifest.json (View: /home/taxnestc/public_html/taxnest/resources/views/landing.blade.php) {"exception":"[object] (Illuminate\\View\\ViewException(code: 0): Vite manifest not found at: /home/taxnestc/public_html/taxnest/public/build/manifest.json (View: /home/taxnestc/public_html/taxnest/resources/views/landing.blade.php) at /home/taxnestc/public_html/tgrep "SESSION" ~/public_html/taxnest/.env && echo "---" && ls -la ~/public_html/taxnest/storage/framework/sessions/ | head -5
+ && echo "---" && > ~/public_html/taxnest/storage/logs/laravel.log && echo "Log cleared"a ~/public_html/taxnest/storage/framework/sessions/ | head -5SESSION_DRIVER=file
+SESSION_LIFETIME=120
+SESSION_ENCRYPT=false
+SESSION_PATH=/
+SESSION_DOMAIN=null
+---
+total 36
+drwxrwxr-x 2 taxnestc taxnestc 4096 Mar 25 12:56 .
+drwxrwxr-x 6 taxnestc taxnestc 4096 Mar 25 10:38 ..
+-rw-r--r-- 1 taxnestc taxnestc   14 Mar 25 10:38 .gitignore
+-rw-r--r-- 1 taxnestc taxnestc  227 Mar 25 12:02 hwIu5itl4oJdW76MxuUxY8Dfve7EpPSPIUjPDrSR
+---
+Log cleared
+[taxnestc@eu1 taxnest]$ cat ~/public_html/taxnest/storage/logs/laravel.log
+[taxnestc@eu1 taxnest]$ cat ~/public_html/taxnest/storage/logs/laravel.log
+[taxnestc@eu1 taxnest]$

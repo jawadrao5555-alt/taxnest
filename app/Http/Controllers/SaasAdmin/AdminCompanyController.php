@@ -10,10 +10,130 @@ use App\Models\Invoice;
 use App\Models\PosTransaction;
 use App\Models\User;
 use App\Models\Subscription;
+use App\Models\Franchise;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\Request;
 
 class AdminCompanyController extends Controller
 {
+    public function create()
+    {
+        $franchises = Franchise::where('status', 'active')->get();
+        return view('saas-admin.companies.create', compact('franchises'));
+    }
+
+    public function store(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'owner_name' => 'required|string|max:255',
+            'product_type' => 'required|in:di,pos',
+            'email' => 'required|email|max:255',
+            'ntn' => 'nullable|string|max:50',
+            'cnic' => 'nullable|string|max:20',
+            'phone' => 'nullable|string|max:20',
+            'mobile' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:500',
+            'city' => 'nullable|string|max:100',
+            'province' => 'nullable|string|max:100',
+            'business_activity' => 'nullable|string|max:255',
+            'website' => 'nullable|string|max:255',
+            'status' => 'required|in:approved,pending',
+            'franchise_id' => 'nullable|exists:franchises,id',
+            'admin_email' => 'required|email|unique:users,email',
+            'admin_password' => 'required|string|min:6',
+            'admin_name' => 'required|string|max:255',
+        ]);
+
+        $company = Company::create([
+            'name' => $request->name,
+            'owner_name' => $request->owner_name,
+            'product_type' => $request->product_type,
+            'email' => $request->email,
+            'ntn' => $request->ntn,
+            'cnic' => $request->cnic,
+            'phone' => $request->phone,
+            'mobile' => $request->mobile,
+            'address' => $request->address,
+            'city' => $request->city,
+            'province' => $request->province,
+            'business_activity' => $request->business_activity,
+            'website' => $request->website,
+            'status' => $request->status,
+            'franchise_id' => $request->franchise_id,
+            'company_status' => 'active',
+            'standard_tax_rate' => $request->product_type === 'di' ? 18.00 : 16.00,
+        ]);
+
+        User::create([
+            'name' => $request->admin_name,
+            'email' => $request->admin_email,
+            'password' => Hash::make($request->admin_password),
+            'company_id' => $company->id,
+            'role' => 'company_admin',
+            'pos_role' => $request->product_type === 'pos' ? 'pos_admin' : null,
+        ]);
+
+        AdminAuditLog::log(auth('admin')->id(), 'Company created', 'Company', $company->id, [
+            'name' => $company->name,
+            'type' => $request->product_type,
+            'admin_email' => $request->admin_email,
+        ]);
+
+        return redirect()->route('saas.admin.companies.show', $company->id)->with('success', "Company '{$company->name}' created successfully with admin account.");
+    }
+
+    public function edit($id)
+    {
+        $company = Company::findOrFail($id);
+        $franchises = Franchise::where('status', 'active')->get();
+        return view('saas-admin.companies.edit', compact('company', 'franchises'));
+    }
+
+    public function update(Request $request, $id)
+    {
+        $company = Company::findOrFail($id);
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'owner_name' => 'nullable|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'ntn' => 'nullable|string|max:50',
+            'cnic' => 'nullable|string|max:20',
+            'phone' => 'nullable|string|max:20',
+            'mobile' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:500',
+            'city' => 'nullable|string|max:100',
+            'province' => 'nullable|string|max:100',
+            'business_activity' => 'nullable|string|max:255',
+            'website' => 'nullable|string|max:255',
+            'franchise_id' => 'nullable|exists:franchises,id',
+            'standard_tax_rate' => 'nullable|numeric|min:0|max:100',
+            'invoice_number_prefix' => 'nullable|string|max:20',
+            'fbr_environment' => 'nullable|in:sandbox,production',
+            'fbr_registration_no' => 'nullable|string|max:100',
+            'fbr_business_name' => 'nullable|string|max:255',
+            'pra_environment' => 'nullable|string|max:50',
+            'pra_pos_id' => 'nullable|string|max:100',
+        ]);
+
+        $fields = [
+            'name', 'owner_name', 'email', 'ntn', 'cnic', 'phone', 'mobile',
+            'address', 'city', 'province', 'business_activity', 'website',
+            'franchise_id', 'standard_tax_rate', 'invoice_number_prefix',
+        ];
+
+        if ($company->product_type === 'di') {
+            $fields = array_merge($fields, ['fbr_environment', 'fbr_registration_no', 'fbr_business_name']);
+        } else {
+            $fields = array_merge($fields, ['pra_environment', 'pra_pos_id']);
+        }
+
+        $company->update($request->only($fields));
+
+        AdminAuditLog::log(auth('admin')->id(), 'Company profile updated', 'Company', $id, ['name' => $company->name]);
+        return redirect()->route('saas.admin.companies.show', $id)->with('success', "Company '{$company->name}' updated successfully.");
+    }
+
     public function index(Request $request)
     {
         $query = Company::query()->with(['franchise', 'activeSubscription']);

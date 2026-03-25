@@ -514,7 +514,11 @@ Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admi
 Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('saas.admin.dashboard');
     Route::get('/companies', [AdminCompanyController::class, 'index'])->name('saas.admin.companies');
+    Route::get('/companies/create', [AdminCompanyController::class, 'create'])->name('saas.admin.companies.create');
+    Route::post('/companies', [AdminCompanyController::class, 'store'])->name('saas.admin.companies.store');
     Route::get('/companies/{id}', [AdminCompanyController::class, 'show'])->name('saas.admin.companies.show');
+    Route::get('/companies/{id}/edit', [AdminCompanyController::class, 'edit'])->name('saas.admin.companies.edit');
+    Route::put('/companies/{id}', [AdminCompanyController::class, 'update'])->name('saas.admin.companies.update');
     Route::post('/companies/{id}/approve', [AdminCompanyController::class, 'approve'])->name('saas.admin.companies.approve');
     Route::post('/companies/{id}/reject', [AdminCompanyController::class, 'reject'])->name('saas.admin.companies.reject');
     Route::post('/companies/{id}/suspend', [AdminCompanyController::class, 'suspend'])->name('saas.admin.companies.suspend');

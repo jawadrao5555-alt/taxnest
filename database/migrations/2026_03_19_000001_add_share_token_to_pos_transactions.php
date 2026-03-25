@@ -10,10 +10,10 @@ return new class extends Migration
     {
         Schema::table('pos_transactions', function (Blueprint $table) {
             if (!Schema::hasColumn('pos_transactions', 'share_token')) {
-                $table->string('share_token', 64)->nullable()->unique()->after('exempt_amount');
+                $table->string('share_token', 64)->nullable()->unique();
             }
             if (!Schema::hasColumn('pos_transactions', 'share_token_created_at')) {
-                $table->timestamp('share_token_created_at')->nullable()->after('share_token');
+                $table->timestamp('share_token_created_at')->nullable();
             }
         });
     }

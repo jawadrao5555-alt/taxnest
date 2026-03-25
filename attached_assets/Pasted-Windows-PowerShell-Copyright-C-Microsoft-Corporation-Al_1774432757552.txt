@@ -1,0 +1,70 @@
+Windows PowerShell
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+Try the new cross-platform PowerShell https://aka.ms/pscore6
+
+PS C:\Windows\system32> Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+Execution Policy Change
+The execution policy helps protect you from scripts that you do not trust. Changing the execution policy might expose
+you to the security risks described in the about_Execution_Policies help topic at
+https:/go.microsoft.com/fwlink/?LinkID=135170. Do you want to change the execution policy?
+[Y] Yes  [A] Yes to All  [N] No  [L] No to All  [S] Suspend  [?] Help (default is "N"): powershell -Command "
+[Y] Yes  [A] Yes to All  [N] No  [L] No to All  [S] Suspend  [?] Help (default is "N"): $port = 8787
+[Y] Yes  [A] Yes to All  [N] No  [L] No to All  [S] Suspend  [?] Help (default is "N"): [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls11
+[Y] Yes  [A] Yes to All  [N] No  [L] No to All  [S] Suspend  [?] Help (default is "N"): $listener = New-Object System.Net.HttpListener
+[Y] Yes  [A] Yes to All  [N] No  [L] No to All  [S] Suspend  [?] Help (default is "N"): $listener.Prefixes.Add('http://+:8787/')
+[Y] Yes  [A] Yes to All  [N] No  [L] No to All  [S] Suspend  [?] Help (default is "N"): try { $listener.Start() } catch { $listener = New-Object System.Net.HttpListener; $listener.Prefixes.Add('http://localhost:8787/'); $listener.Start() }
+[Y] Yes  [A] Yes to All  [N] No  [L] No to All  [S] Suspend  [?] Help (default is "N"): Write-Host 'Proxy running on port 8787' -ForegroundColor Green
+[Y] Yes  [A] Yes to All  [N] No  [L] No to All  [S] Suspend  [?] Help (default is "N"): while ($true) { $ctx = $listener.GetContext(); $req = $ctx.Request; $res = $ctx.Response; $res.Headers.Add('Access-Control-Allow-Origin','*'); if ($req.HttpMethod -eq 'OPTIONS') { $res.StatusCode=200; $res.Close(); continue }; $auth=$req.Headers['X-Proxy-Auth']; if ($auth -ne 'TaxNestPraProxy2026Secret') { $b=[Text.Encoding]::UTF8.GetBytes('{\"error\":\"Unauthorized\"}'); $res.StatusCode=403; $res.ContentType='application/json'; $res.OutputStream.Write($b,0,$b.Length); $res.Close(); continue }; $praUrl=$req.Headers['X-Pra-Url']; if(-not $praUrl){$praUrl='https://ims.pral.com.pk/ims/production/api/Live/PostData'}; $praToken=$req.Headers['X-Pra-Token']; $sr=New-Object IO.StreamReader($req.InputStream); $body=$sr.ReadToEnd(); $sr.Close(); Write-Host \"Request to: $praUrl\"; try { $h=@{'Content-Type'='application/json';'Accept'='application/json'}; if($praToken){$h['Authorization']=\"Bearer $praToken\"}; $pr=Invoke-RestMethod -Uri $praUrl -Method POST -Body $body -Headers $h -ContentType 'application/json' -TimeoutSec 30; $jr=$pr|ConvertTo-Json -Depth 10; $rb=[Text.Encoding]::UTF8.GetBytes($jr); $res.StatusCode=200; $res.ContentType='application/json'; $res.OutputStream.Write($rb,0,$rb.Length); Write-Host \"PRA OK: $jr\" -ForegroundColor Green } catch { $em=$_.Exception.Message; $ej='{\"Code\":\"500\",\"Response\":\"'+$em+'\"}'; $eb=[Text.Encoding]::UTF8.GetBytes($ej); $res.StatusCode=502; $res.ContentType='application/json'; $res.OutputStream.Write($eb,0,$eb.Length); Write-Host \"PRA Error: $em\" -ForegroundColor Red }; $res.Close() }
+[Y] Yes  [A] Yes to All  [N] No  [L] No to All  [S] Suspend  [?] Help (default is "N"): "
+[Y] Yes  [A] Yes to All  [N] No  [L] No to All  [S] Suspend  [?] Help (default is "N"): Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+[Y] Yes  [A] Yes to All  [N] No  [L] No to All  [S] Suspend  [?] Help (default is "N"):
+PS C:\Windows\system32> $port = 8787
+PS C:\Windows\system32> Write-Host "TaxNest PRA Proxy Starting on port $port..." -ForegroundColor Cyan
+TaxNest PRA Proxy Starting on port 8787...
+PS C:\Windows\system32> [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+PS C:\Windows\system32> $listener = New-Object System.Net.HttpListener
+PS C:\Windows\system32> $listener.Prefixes.Add("http://+:$port/")
+PS C:\Windows\system32> try { $listener.Start() } catch { $listener = New-Object System.Net.HttpListener; $listener.Prefixes.Add("http://localhost:$port/"); $listener.Start() }
+PS C:\Windows\system32> Write-Host "PROXY READY on port $port" -ForegroundColor Green
+PROXY READY on port 8787
+PS C:\Windows\system32>
+PS C:\Windows\system32> while($true) {
+>>     $ctx = $listener.GetContext()
+>>     $req = $ctx.Request; $res = $ctx.Response
+>>     $res.Headers.Add("Access-Control-Allow-Origin","*")
+>>     $res.Headers.Add("Access-Control-Allow-Headers","Content-Type,X-Proxy-Auth,X-Pra-Url,X-Pra-Token")
+>>     if($req.HttpMethod -eq "OPTIONS"){$res.StatusCode=200;$res.Close();continue}
+>>     $auth=$req.Headers["X-Proxy-Auth"]
+>>     if($auth -ne "TaxNestPraProxy2026Secret"){
+>>         $b=[Text.Encoding]::UTF8.GetBytes('{"error":"Unauthorized"}')
+>>         $res.StatusCode=403;$res.ContentType="application/json"
+>>         $res.OutputStream.Write($b,0,$b.Length);$res.Close()
+>>         Write-Host "BLOCKED - bad auth" -ForegroundColor Red; continue
+>>     }
+>>     $praUrl=$req.Headers["X-Pra-Url"]
+>>     if(-not $praUrl){$praUrl="https://ims.pral.com.pk/ims/production/api/Live/PostData"}
+>>     $praToken=$req.Headers["X-Pra-Token"]
+>>     $sr=New-Object IO.StreamReader($req.InputStream);$body=$sr.ReadToEnd();$sr.Close()
+>>     Write-Host "$(Get-Date -Format 'HH:mm:ss') >> PRA Request" -ForegroundColor Cyan
+>>     try {
+>>         $h=@{"Content-Type"="application/json";"Accept"="application/json"}
+>>         if($praToken){$h["Authorization"]="Bearer $praToken"}
+>>         $pr=Invoke-RestMethod -Uri $praUrl -Method POST -Body $body -Headers $h -ContentType "application/json" -TimeoutSec 30
+>>         $jr=$pr|ConvertTo-Json -Depth 10
+>>         $rb=[Text.Encoding]::UTF8.GetBytes($jr)
+>>         $res.StatusCode=200;$res.ContentType="application/json"
+>>         $res.OutputStream.Write($rb,0,$rb.Length)
+>>         Write-Host "$(Get-Date -Format 'HH:mm:ss') << PRA OK: $jr" -ForegroundColor Green
+>>     } catch {
+>>         $em=$_.Exception.Message
+>>         $ej='{"Code":"500","Response":"'+$em+'"}'
+>>         $eb=[Text.Encoding]::UTF8.GetBytes($ej)
+>>         $res.StatusCode=502;$res.ContentType="application/json"
+>>         $res.OutputStream.Write($eb,0,$eb.Length)
+>>         Write-Host "$(Get-Date -Format 'HH:mm:ss') !! ERROR: $em" -ForegroundColor Red
+>>     }
+>>     $res.Close()
+>> }Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass; $port=8787; Write-Host "Starting proxy..." -ForegroundColor Cyan; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $l=New-Object System.Net.HttpListener; $l.Prefixes.Add("http://+:$port/"); try{$l.Start()}catch{$l=New-Object System.Net.HttpListener;$l.Prefixes.Add("http://localhost:$port/");$l.Start()}; Write-Host "PROXY READY on port $port" -ForegroundColor Green; while($true){$ctx=$l.GetContext();$req=$ctx.Request;$res=$ctx.Response;$res.Headers.Add("Access-Control-Allow-Origin","*");$res.Headers.Add("Access-Control-Allow-Headers","Content-Type,X-Proxy-Auth,X-Pra-Url,X-Pra-Token");if($req.HttpMethod -eq "OPTIONS"){$res.StatusCode=200;$res.Close();continue};$auth=$req.Headers["X-Proxy-Auth"];if($auth -ne "TaxNestPraProxy2026Secret"){$b=[Text.Encoding]::UTF8.GetBytes('{"error":"Unauthorized"}');$res.StatusCode=403;$res.ContentType="application/json";$res.OutputStream.Write($b,0,$b.Length);$res.Close();Write-Host "BLOCKED" -ForegroundColor Red;continue};$praUrl=$req.Headers["X-Pra-Url"];if(-not $praUrl){$praUrl="https://ims.pral.com.pk/ims/production/api/Live/PostData"};$praToken=$req.Headers["X-Pra-Token"];$sr=New-Object IO.StreamReader($req.InputStream);$body=$sr.ReadToEnd();$sr.Close();Write-Host ">> PRA Request" -ForegroundColor Cyan;try{$h=@{"Content-Type"="application/json";"Accept"="application/json"};if($praToken){$h["Authorization"]="Bearer $praToken"};$pr=Invoke-RestMethod -Uri $praUrl -Method POST -Body $body -Headers $h -ContentType "application/json" -TimeoutSec 30;$jr=$pr|ConvertTo-Json -Depth 10;$rb=[Text.Encoding]::UTF8.GetBytes($jr);$res.StatusCode=200;$res.ContentType="application/json";$res.OutputStream.Write($rb,0,$rb.Length);Write-Host "<< PRA OK: $jr" -ForegroundColor Green}catch{$em=$_.Exception.Message;$ej='{"Code":"500","Response":"'+$em+'"}';$eb=[Text.Encoding]::UTF8.GetBytes($ej);$res.StatusCode=502;$res.ContentType="application/json";$res.OutputStream.Write($eb,0,$eb.Length);Write-Host "!! ERROR: $em" -ForegroundColor Red};$res.Close()}
+

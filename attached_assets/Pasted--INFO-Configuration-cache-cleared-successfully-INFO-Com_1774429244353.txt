@@ -1,0 +1,30 @@
+ INFO  Configuration cache cleared successfully.
+
+
+   INFO  Compiled views cleared successfully.
+                        cd ~/public_html/taxnest && git log --oneline -1 && sed -n '175,185p' app/Services/PraIntegrationService.php
+8762624 (HEAD -> main, origin/main, origin/HEAD) Improve invoice submission by directly handling cURL requestsIntegrationService.php
+            $apiUrl = $this->getApiUrl();
+            $token = $this->getToken();
+            $jsonPayload = json_encode($payload);
+
+            $ch = curl_init($apiUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $jsonPayload,
+                CURLOPT_cd ~/public_html/taxnest && php artisan tinker --execute="
+\$company = \App\Models\Company::where('product_type', 'pos')->first();
+echo 'Company: ' . \$company->name . PHP_EOL;
+echo 'PRA Env: ' . \$company->pra_environment . PHP_EOL;artisan tinker --execute="
+echo 'POS ID: ' . \$company->pra_pos_id . PHP_EOL;pe', 'pos')->first();
+\$ch = curl_init('https://ims.pral.com.pk/ims/sandbox/api/Live/PostData');
+curl_setopt_array(\$ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_SSL_VERIFYHOST => 0, CURLOPT
+_SSLVERSION => CURL_SSLVERSION_TLSv1_2, CURLOPT_SSL_CIPHER_LIST => 'DEFAULT:!DH']);
+curl_exec(\$ch);('https://ims.pral.com.pk/ims/sandbox/api/Live/PostData');
+echo 'cURL Error: ' . curl_error(\$ch) . PHP_EOL;> true, CURLOPT_TIMEOUT => 15, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_SSL_VERIFYHOST => 0, CURLOPTecho 'SSL Verify Result: ' . curl_getinfo(\$ch, CURLINFO_SSL_VERIFYRESULT) . PHP_EOL;
+echo 'HTTP Code: ' . curl_getinfo(\$ch, CURLINFO_HTTP_CODE) . PHP_EOL;
+curl_close(\$ch); ' . curl_error(\$ch) . PHP_EOL;
+"cho 'SSL Verify Result: ' . curl_getinfo(\$ch, CURLINFO_cd ~/public_html/taxnest && php -r "\$ch = curl_init('https://ims.pral.com.pk/ims/sandbox/ap
+i/Live/PostData'); curl_setopt(\$ch, CURLOPT_RETURNTRANSFER, true); curl_setopt(\$ch, CURLOPT_TIMEOUT, 15); curl_setopt(\$ch, CURLOPT_SSL_VERIFYPEER,
+ false); curl_setopt(\$ch, CURLOPT_SSL_VERIFYHOST, 0); curl_setopt(\$ch, CURLOPT_SSLVERSION, 6); curl_exec(\$ch); echo curl_error(\$ch) . PHP_EOL; ec
+ho curl_getinfo(\$ch, CURLINFO_HTTP_CODE) . PHP_EOL; curl_close(\$ch);"_init('https://ims.pral.com.pk/ims/sandbox/api/Live/PostData'); curl_setopt(\$TLS connect error: error:0A000126:SSL routines::unexpected eof while readingurl_setopt(\$ch, CURLOPT_SSL_VERIFYPEER, false); curl_setopt(\$ch, CURLOP0_SSL_VERIFYHOST, 0); curl_setopt(\$ch, CURLOPT_SSLVERSION, 6); curl_exec(\$ch); echo curl_error(\$ch) . PHP_EOL; echo curl_getinfo(\$ch, CURLINFO_HT[taxnestc@eu1 taxnest]$ _close(\$ch);"

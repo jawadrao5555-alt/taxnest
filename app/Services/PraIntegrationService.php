@@ -182,15 +182,20 @@ class PraIntegrationService
                 CURLOPT_POSTFIELDS => $jsonPayload,
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_TIMEOUT => 30,
+                CURLOPT_CONNECTTIMEOUT => 15,
                 CURLOPT_HTTPHEADER => [
                     'Content-Type: application/json',
                     'Accept: application/json',
                     'Authorization: Bearer ' . $token,
+                    'Connection: close',
                 ],
                 CURLOPT_SSL_VERIFYPEER => false,
                 CURLOPT_SSL_VERIFYHOST => 0,
                 CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
-                CURLOPT_SSL_CIPHER_LIST => 'DEFAULT:!DH:!ECDHE+SHA:!AES128-SHA',
+                CURLOPT_SSL_CIPHER_LIST => 'AES256-GCM-SHA384:AES128-GCM-SHA256:AES256-SHA256:AES128-SHA256',
+                CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                CURLOPT_FORBID_REUSE => true,
+                CURLOPT_FRESH_CONNECT => true,
             ]);
 
             $responseBody = curl_exec($ch);

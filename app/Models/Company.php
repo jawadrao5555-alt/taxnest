@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Company extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'name',
         'owner_name',
@@ -55,7 +58,9 @@ class Company extends Model
         'next_local_invoice_number',
         'logo_path',
         'status',
+        'product_type',
         'franchise_id',
+        'deleted_reason',
     ];
 
     protected $casts = [

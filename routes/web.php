@@ -519,6 +519,12 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/companies/{id}/reject', [AdminCompanyController::class, 'reject'])->name('saas.admin.companies.reject');
     Route::post('/companies/{id}/suspend', [AdminCompanyController::class, 'suspend'])->name('saas.admin.companies.suspend');
     Route::post('/companies/{id}/activate', [AdminCompanyController::class, 'activate'])->name('saas.admin.companies.activate');
+    Route::post('/companies/{id}/limits', [AdminCompanyController::class, 'updateLimits'])->name('saas.admin.companies.limits');
+    Route::post('/companies/{id}/delete', [AdminCompanyController::class, 'softDelete'])->name('saas.admin.companies.delete');
+    Route::post('/companies/{id}/change-type', [AdminCompanyController::class, 'changeProductType'])->name('saas.admin.companies.changeType');
+    Route::get('/bin', [AdminCompanyController::class, 'bin'])->name('saas.admin.companies.bin');
+    Route::post('/bin/{id}/restore', [AdminCompanyController::class, 'restore'])->name('saas.admin.companies.restore');
+    Route::delete('/bin/{id}/destroy', [AdminCompanyController::class, 'forceDelete'])->name('saas.admin.companies.destroy');
     Route::get('/plans', [AdminPlanController::class, 'index'])->name('saas.admin.plans');
     Route::post('/plans', [AdminPlanController::class, 'store'])->name('saas.admin.plans.store');
     Route::put('/plans/{id}', [AdminPlanController::class, 'update'])->name('saas.admin.plans.update');

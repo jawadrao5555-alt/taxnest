@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SaasAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\User;
+use App\Models\Invoice;
 use App\Models\Subscription;
 use App\Models\Franchise;
 use App\Models\PosTransaction;
@@ -16,29 +17,59 @@ class AdminDashboardController extends Controller
 {
     public function index()
     {
+        $diCompanies = Company::where('product_type', 'di')->get();
+        $posCompanies = Company::where('product_type', 'pos')->get();
+
         $stats = [
             'total_companies' => Company::count(),
+            'di_companies' => $diCompanies->count(),
+            'pos_companies' => $posCompanies->count(),
             'pending_companies' => Company::where('status', 'pending')->count(),
+            'suspended_companies' => Company::where('status', 'suspended')->count(),
+            'binned_companies' => Company::onlyTrashed()->count(),
             'active_subscriptions' => Subscription::where('active', true)->count(),
             'total_users' => User::count(),
             'total_franchises' => Franchise::count(),
-            'total_pos_transactions' => PosTransaction::where('status', 'completed')->count(),
-            'total_pos_revenue' => PosTransaction::where('status', 'completed')->sum('total_amount'),
+
+            'di_invoices' => Invoice::count(),
+            'di_revenue' => Invoice::where('fbr_status', 'locked')->sum('total_amount'),
+
+            'pos_transactions' => PosTransaction::where('status', 'completed')->count(),
+            'pos_revenue' => PosTransaction::where('status', 'completed')->sum('total_amount'),
             'today_pos_transactions' => PosTransaction::where('status', 'completed')
                 ->whereDate('created_at', today())->count(),
         ];
 
-        $recentCompanies = Company::orderBy('created_at', 'desc')->take(5)->get();
+        $diCompaniesList = Company::where('product_type', 'di')
+            ->with(['activeSubscription', 'franchise'])
+            ->withCount(['users', 'invoices'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $posCompaniesList = Company::where('product_type', 'pos')
+            ->with(['activeSubscription', 'franchise'])
+            ->withCount('users')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        foreach ($posCompaniesList as $pc) {
+            $pc->pos_transaction_count = PosTransaction::where('company_id', $pc->id)
+                ->where('status', 'completed')->count();
+            $pc->pos_revenue = PosTransaction::where('company_id', $pc->id)
+                ->where('status', 'completed')->sum('total_amount');
+        }
+
+        foreach ($diCompaniesList as $dc) {
+            $dc->di_revenue = Invoice::where('company_id', $dc->id)
+                ->where('fbr_status', 'locked')->sum('total_amount');
+        }
+
         $recentAuditLogs = AdminAuditLog::with('admin')->orderBy('created_at', 'desc')->take(10)->get();
         $systemControls = SystemControl::all();
 
-        $monthlyRevenue = PosTransaction::where('status', 'completed')
-            ->where('created_at', '>=', now()->subMonths(6))
-            ->selectRaw(\App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM') . " as month, SUM(total_amount) as revenue, COUNT(*) as count")
-            ->groupByRaw(\App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM'))
-            ->orderBy('month')
-            ->get();
-
-        return view('saas-admin.dashboard', compact('stats', 'recentCompanies', 'recentAuditLogs', 'systemControls', 'monthlyRevenue'));
+        return view('saas-admin.dashboard', compact(
+            'stats', 'diCompaniesList', 'posCompaniesList',
+            'recentAuditLogs', 'systemControls'
+        ));
     }
 }

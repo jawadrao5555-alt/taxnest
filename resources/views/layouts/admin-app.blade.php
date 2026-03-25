@@ -29,9 +29,14 @@
 
                 <p class="text-[10px] font-bold uppercase tracking-widest text-gray-600 pt-4 pb-1 px-3">Management</p>
 
-                <a href="{{ route('saas.admin.companies') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm {{ str_starts_with($current, 'saas.admin.companies') ? 'bg-indigo-600/20 text-indigo-400 font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200' }} transition">
+                <a href="{{ route('saas.admin.companies') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm {{ str_starts_with($current, 'saas.admin.companies') && $current !== 'saas.admin.companies.bin' ? 'bg-indigo-600/20 text-indigo-400 font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200' }} transition">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                     Companies
+                </a>
+
+                <a href="{{ route('saas.admin.companies.bin') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm {{ $current === 'saas.admin.companies.bin' ? 'bg-indigo-600/20 text-indigo-400 font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200' }} transition">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    Bin
                 </a>
 
                 <a href="{{ route('saas.admin.plans') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm {{ $current === 'saas.admin.plans' ? 'bg-indigo-600/20 text-indigo-400 font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200' }} transition">

@@ -1,0 +1,28 @@
+
+   INFO  Configuration cache cleared successfully.
+                        cd ~/public_html/taxnest && php -r "\$ch = curl_init('https://ims.pral.com.pk/ims/sandbox/api/Live/PostData'); curl_setopt(\$
+ch, CURLOPT_RETURNTRANSFER, true); curl_setopt(\$ch, CURLOPT_TIMEOUT, 15); curl_setopt(\$ch, CURLOPT_SSL_VERIFYPEER, false); curl_setopt(\$ch, CURLOP
+T_SSL_VERIFYHOST, 0); curl_setopt(\$ch, CURLOPT_SSLVERSION, 6); curl_setopt(\$ch, CURLOPT_SSL_CIPHER_LIST, 'AES256-GCM-SHA384:AES128-GCM-SHA256:AES25
+6-SHA256:AES128-SHA256'); curl_setopt(\$ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1); curl_setopt(\$ch, CURLOPT_HTTPHEADER, ['Connection: close']
+); curl_setopt(\$ch, CURLOPT_FRESH_CONNECT, true); curl_exec(\$ch); echo curl_error(\$ch) . PHP_EOL; echo curl_getinfo(\$ch, CURLINFO_HTTP_CODE) . PHP_EOL; curl_close(\$ch);"R, true); curl_setopt(\$ch, CURLOPT_TIMEOUT, 15); curl_setopt(\$ch, CURLOPT_SSL_VERIFYPEER, false); curl_setopt(\$ch, CURLOPTLS connect error: errorphp -r "\$ch = curl_init('https://ims.pral.com.pk'); curl_setopt(\$ch, CURLOPT_RETURNTRANSFER, true); curl_setopt(\$ch, CURLOPT_TIMEOUT, 10); curl_setopt(\$ch, CURLOPT_SSL_VERIFYPEER, false); curl_setopt(\$ch, CURLOPT_SSL_VERIFYHOST, 0); curl_setopt(\$ch, CURLOPT_SSLVERSION, 0); curl_exec(\$ch); echo '1: ' . curl_error(\$ch) . PHP_EOL; curl_close(\$ch);"setopt(\$ch, CURLOPT_RETURNTRANSFER, true); curl_setopt(\$ch, CURLO1: OpenSSL SSL_read: Opephp -r "\$ch = curl_init('https://ims.pral.com.pk'); curl_setopt(\$ch, CURLOPT_RETURNTRANSFER, true); curl_setopt(\$ch, CURLOPT_TIMEOUT, 10); curl_setopt(\$ch, CURLOPT_SSL_VERIFYPEER, false); curl_setopt(\$ch, CURLOPT_SSL_VERIFYHOST, 0); curl_setopt(\$ch, CURLOPT_SSLVERSION
+, 0); curl_exec(\$ch); echo '1: ' . curl_error(\$ch) . PHP_EOL; curl_close(\$ch);"setopt(\$ch, CURLOPT_RETURNTRANSFER, true); curl_setopt(\$ch, CURLOPT_TIMEOUT, 10); curl_setopt(\$ch, CURLOPT_SSL_VERIFYPEER, false); curl_setopt(\$ch, CURLOPT_SSL_VERIFYHOST, 0); curl_setopt(\$ch, CURLOPT_SSLVERSION1: TLS connect error: error:0A000126:SSL routines::unexpected eof while reading);"
+[taxnestc@eu1 taxnest]$ php -r "echo 'OpenSSL: ' . OPENSSL_VERSION_TEXT . PHP_EOL; echo 'cURL: ' . curl_version()['ssl_version'] . PHP_EOL;"
+OpenSSL: OpenSSL 3.2.2 4 Jun 2024cho 'OpenSSL: ' . OPENSSL_VERSION_TEXT . PHP_EOL; echo 'cURL: ' . curl_version()['ssl_version'] . PHP_EOL;"
+cURL: OpenSSL/3.5.1
+[taxnestc@eu1 taxnest]$ curl -k -v https://ims.pral.com.pk 2>&1 | head -20
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0*   Trying 103.125.60.124:443...
+* Connected to ims.pral.com.pk (103.125.60.124) port 443 (#0)
+* ALPN, offering h2
+* ALPN, offering http/1.1
+*  CAfile: /etc/pki/tls/certs/ca-bundle.crt
+* TLSv1.0 (OUT), TLS header, Certificate Status (22):
+} [5 bytes data]
+* TLSv1.3 (OUT), TLS handshake, Client hello (1):
+} [512 bytes data]
+* OpenSSL SSL_connect: SSL_ERROR_ZERO_RETURN in connection to ims.pral.com.pk:443
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0                                                php -r "\$ch = curl_ini
+t('https://ims.pral.com.pk'); curl_setopt(\$ch, CURLOPT_RETURNTRANSFER, true); curl_setopt(\$ch, CURLOPT_TIMEOUT, 10); curl_setopt(\$ch, CURLOPT_SSL_
+VERIFYPEER, false); curl_setopt(\$ch, CURLOPT_SSL_VERIFYHOST, 0); curl_setopt(\$ch, CURLOPT_SSLVERSION, 0); curl_setopt(\$ch, CURLOPT_SSL_CIPHER_LIST
+, 'DEFAULT@SECLEVEL=0'); curl_exec(\$ch); echo curl_error(\$ch) . PHP_EOL; curl_close(\$ch);", CURLOPT_RETURNTRANSFER, true); curl_setopt(\$ch, CURLOTLS connect error: error:0A000126:SSL routines::unexpected eof while readingpt(\$ch, CURLOPT_SSL_VERIFYHOST, 0); curl_setopt(\$ch, CURLOPT_SSLVERSION[taxnestc@eu1 taxnest]$ CURLOPT_SSL_CIPHER_LIST, 'DEFAULT@SECLEVEL=0'); curl_exec(\$ch); echo curl_error(\$ch) . PHP_EOL; curl_close(\$ch);"

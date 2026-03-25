@@ -24,7 +24,13 @@ return new class extends Migration
             $table->foreign('company_id')->references('id')->on('companies')->onDelete('cascade');
         });
 
-        \Illuminate\Support\Facades\DB::statement('CREATE UNIQUE INDEX customer_profiles_company_ntn_not_null ON customer_profiles (company_id, ntn) WHERE ntn IS NOT NULL');
+        if (config('database.default') === 'pgsql') {
+            \Illuminate\Support\Facades\DB::statement('CREATE UNIQUE INDEX customer_profiles_company_ntn_not_null ON customer_profiles (company_id, ntn) WHERE ntn IS NOT NULL');
+        } else {
+            Schema::table('customer_profiles', function (Blueprint $table) {
+                $table->unique(['company_id', 'ntn'], 'customer_profiles_company_ntn_unique');
+            });
+        }
     }
 
     public function down(): void

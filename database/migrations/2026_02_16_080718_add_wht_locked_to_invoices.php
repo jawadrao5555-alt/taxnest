@@ -12,7 +12,7 @@ return new class extends Migration
             $table->boolean('wht_locked')->default(false)->after('wht_amount');
         });
 
-        DB::statement("UPDATE invoices SET wht_locked = true WHERE status = 'locked' AND fbr_status = 'production'");
+        \Illuminate\Support\Facades\DB::statement("UPDATE invoices SET wht_locked = 1 WHERE status = 'locked' AND fbr_status = 'production'");
     }
 
     public function down(): void

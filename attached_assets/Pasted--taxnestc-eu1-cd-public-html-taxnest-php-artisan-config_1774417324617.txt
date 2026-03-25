@@ -1,0 +1,231 @@
+[taxnestc@eu1 ~]$ cd ~/public_html/taxnest && php artisan config:clear && php artisan migrate --focd ~/public_html/taxnest && php artisan config:clear && php artisan migrate --force
+
+   INFO  Configuration cache cleared successfully.
+
+
+   INFO  Preparing database.
+
+  Creating migration table ....................................... 5.70ms DONE
+
+   INFO  Running migrations.
+
+  0000_01_01_000000_create_companies_table ....................... 6.31ms DONE
+  0001_01_01_000000_create_users_table .......................... 12.03ms DONE
+  0001_01_01_000001_create_cache_table ........................... 4.92ms DONE
+  0001_01_01_000002_create_jobs_table ............................ 6.70ms DONE
+  2026_02_11_075345_create_invoices_table ........................ 2.69ms FAIL
+
+In Connection.php line 838:
+
+  SQLSTATE[HY000]: General error: 1005 Can't create table `taxnestc_db`.`invo
+  ices` (errno: 121 "Duplicate key on write or update") (Connection: mysql, H  ost: localhost, Port: 3306, Database: taxnestc_db, SQL: alter table `invoic  es` add constraint `1` foreign key (`company_id`) references `companies` (`
+  id`) on delete cascade)
+
+
+In Connection.php line 584:
+
+  SQLSTATE[HY000]: General error: 1005 Can't create table `taxnestc_db`.`invo
+  ices` (errno: 121 "Duplicate key on write or update")
+
+                                                                                                        cd ~/public_html/taxnest && php artisan db:wi
+pe --force && php artisan migrate --forcetaxnest && php artisan db:wipe --force && php artisan migrate --force
+
+   INFO  Dropped all tables successfully.
+
+
+   INFO  Preparing database.
+
+  Creating migration table ....................................... 3.61ms DONE
+
+   INFO  Running migrations.
+
+  0000_01_01_000000_create_companies_table ....................... 3.88ms DONE
+  0001_01_01_000000_create_users_table .......................... 10.15ms DONE
+  0001_01_01_000001_create_cache_table ........................... 4.14ms DONE
+  0001_01_01_000002_create_jobs_table ........................... 13.90ms DONE
+  2026_02_11_075345_create_invoices_table ........................ 3.06ms FAIL
+
+In Connection.php line 838:
+
+  SQLSTATE[HY000]: General error: 1005 Can't create table `taxnestc_db`.`invo
+  ices` (errno: 121 "Duplicate key on write or update") (Connection: mysql, H
+  ost: localhost, Port: 3306, Database: taxnestc_db, SQL: alter table `invoic
+  es` add constraint `1` foreign key (`company_id`) references `companies` (`
+  id`) on delete cascade)
+
+
+In Connection.php line 584:
+
+  SQLSTATE[HY000]: General error: 1005 Can't create table `taxnestc_db`.`invo
+  ices` (errno: 121 "Duplicate key on write or update")
+
+                        cd ~/public_html/taxnest && sed -i "s/->constrained()->onDelete('cascade')->index()/->constrained()->onDelete('cascade')/" da
+tabase/migrations/2026_02_11_075345_create_invoices_table.php/->constrained()->onDelete('cascade')->index()/->constrained()->onDelete('cascade')/" da[taxnestc@eu1 taxnest]$ cd ~/public_html/taxnest && sed -i "s/->constrained()->onDelete('cascade')->index()/->constrained()->onDelete('cascade')/" da
+tabase/migrations/2026_02_11_080636_create_fbr_logs_table.php/->constrained()->onDelete('cascade')->index()/->constrained()->onDelete('cascade')/" da[taxnestc@eu1 taxnest]$ 2_11_080636_create_fbr_logs_table.php
+[taxnestc@eu1 taxnest]$ cd ~/public_html/taxnest && git pull origin main
+remote: Enumerating objects: 60, done.
+remote: Counting objects: 100% (60/60), done.
+remote: Compressing objects: 100% (46/46), done.
+remote: Total 49 (delta 35), reused 10 (delta 3), pack-reused 0 (from 0)
+Unpacking objects: 100% (49/49), 7.06 KiB | 35.00 KiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+   03261bc..4fd7c64  main       -> origin/main
+Updating 03261bc..4fd7c64
+error: Your local changes to the following files would be overwritten by merge:
+        config/database.php
+        database/migrations/2026_02_11_075345_create_invoices_table.php
+        database/migrations/2026_02_11_080636_create_fbr_logs_table.php
+Please commit your changes or stash them before you merge.
+Aborting                                                                                                cd ~/public_html/taxnest && git stash && git
+pull origin mainxnest]$ cd ~/public_html/taxnest && git stash && git pull origin main
+Saved working directory and index state WIP on main: 03261bc Add database backup
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+Updating 03261bc..4fd7c64
+Fast-forward
+ .cpanel.yml                                        |  13 +++
+ .env.cpanel                                        |  47 +++++++++
+ .htaccess                                          |   4 +
+ CPANEL_SETUP.md                                    | 117 +++++++++++++++++++++
+ config/database.php                                |   2 +-
+ .../0001_01_01_000000_create_users_table.php       |   2 +-
+ .../2026_02_11_075345_create_invoices_table.php    |   2 +-
+ .../2026_02_11_080636_create_fbr_logs_table.php    |   2 +-
+ ..._13_134414_add_production_stability_phase_a.php |   7 +-
+ ...13_135933_add_composite_index_invoice_items.php |   7 +-
+ ...7_142222_create_hs_mapping_audit_logs_table.php |   2 +-
+ .../2026_02_18_000001_add_performance_indexes.php  |  10 +-
+ 12 files changed, 204 insertions(+), 11 deletions(-)
+ create mode 100644 .cpanel.yml
+ create mode 100644 .env.cpanel
+ create mode 100644 .htaccess
+ create mode 100644 CPANcd ~/public_html/taxnest && php artisan db:wipe --force && php artisan config:clear && php artisan migrate --force
+[taxnestc@eu1 taxnest]$ cd ~/public_html/taxnest && php artisan db:wipe --force && php artisan config:clear && php artisan migrate --force
+   INFO  Dropped all tables successfully.
+
+
+   INFO  Configuration cache cleared successfully.
+
+
+   INFO  Preparing database.
+
+  Creating migration table ....................................... 3.16ms DONE
+
+   INFO  Running migrations.
+
+  0000_01_01_000000_create_companies_table ....................... 6.08ms DONE
+  0001_01_01_000000_create_users_table .......................... 13.33ms DONE
+  0001_01_01_000001_create_cache_table ........................... 4.06ms DONE
+  0001_01_01_000002_create_jobs_table ........................... 17.81ms DONE
+  2026_02_11_075345_create_invoices_table ........................ 9.56ms DONE
+  2026_02_11_075346_create_invoice_items_table ................... 5.06ms DONE
+  2026_02_11_080636_create_fbr_logs_table ........................ 5.10ms DONE
+  2026_02_11_081004_add_role_to_users_table ...................... 3.85ms DONE
+  2026_02_11_081526_create_pricing_plans_table ................... 0.95ms DONE
+  2026_02_11_081526_create_subscriptions_table ................... 4.90ms DONE
+  2026_02_11_101444_add_integrity_hash_to_invoices ............... 3.77ms DONE
+  2026_02_11_101445_create_invoice_activity_logs_table ........... 8.96ms DONE
+  2026_02_11_101446_add_fields_to_fbr_logs ....................... 7.85ms DONE
+  2026_02_11_101447_add_compliance_score_to_companies ............ 1.45ms DONE
+  2026_02_11_101448_create_security_logs_table ................... 3.17ms DONE
+  2026_02_11_121849_add_schedule_fields_to_invoice_items_table ... 8.36ms DONE
+  2026_02_11_133730_add_pricing_plan_limits_and_billing_cycle .... 0.03ms DONE
+  2026_02_11_133750_add_pricing_limits_and_billing_cycle ........ 15.58ms DONE
+  2026_02_11_155459_add_uom_and_compliance_fields_to_invoice_items_table  3.83ms DONE
+  2026_02_12_000001_add_internal_account_and_onboarding .......... 3.72ms DONE
+  2026_02_12_000001_add_token_expires_at_to_companies ............ 2.31ms DONE
+  2026_02_12_000002_create_notifications_table ................... 9.60ms DONE
+  2026_02_12_000003_create_compliance_scores_table .............. 33.61ms DONE
+  2026_02_12_000004_create_anomaly_logs_table ................... 14.23ms DONE
+  2026_02_12_000005_add_trial_ends_at_to_subscriptions ........... 1.79ms DONE
+  2026_02_12_022826_add_applicability_flags_to_global_hs_master .. 0.60ms FAIL
+
+In Connection.php line 838:
+
+  SQLSTATE[42S02]: Base table or view not found: 1146 Table 'taxnestc_db.glob
+  al_hs_master' doesn't exist (Connection: mysql, Host: localhost, Port: 3306
+  , Database: taxnestc_db, SQL: alter table `global_hs_master` add `st_withhe
+  ld_applicable` tinyint(1) not null default '0')
+
+
+In Connection.php line 584:
+
+  SQLSTATE[42S02]: Base table or view not found: 1146 Table 'taxnestc_db.glob
+  al_hs_master' doesn't exist
+
+
+[taxnestc@eu1 taxnest]$ cd ~/public_html/taxnest && git pull origin main
+remote: Enumerating objects: 9, done.
+remote: Counting objects: 100% (9/9), done.
+remote: Compressing objects: 100% (5/5), done.
+remote: Total 5 (delta 4), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (5/5), 522 bytes | 522.00 KiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+   4fd7c64..463b081  main       -> origin/main
+Updating 4fd7c64..463b081
+Fast-forward
+ ...6_02_12_022826_add_applicability_flags_to_global_hs_master.php | 8 ++++++++
+ 1 file changed, 8 insertions(+)                                                                        cd ~/public_html/taxnest && php artisan db:wi
+pe --force && php artisan migrate --forcetaxnest && php artisan db:wipe --force && php artisan migrate --force
+
+   INFO  Dropped all tables successfully.
+
+
+   INFO  Preparing database.
+
+  Creating migration table ....................................... 4.32ms DONE
+
+   INFO  Running migrations.
+
+  0000_01_01_000000_create_companies_table ....................... 7.08ms DONE
+  0001_01_01_000000_create_users_table .......................... 19.99ms DONE
+  0001_01_01_000001_create_cache_table ........................... 7.31ms DONE
+  0001_01_01_000002_create_jobs_table ........................... 24.82ms DONE
+  2026_02_11_075345_create_invoices_table ....................... 10.88ms DONE
+  2026_02_11_075346_create_invoice_items_table ................... 5.10ms DONE
+  2026_02_11_080636_create_fbr_logs_table ........................ 9.16ms DONE
+  2026_02_11_081004_add_role_to_users_table ...................... 7.27ms DONE
+  2026_02_11_081526_create_pricing_plans_table ................... 1.18ms DONE
+  2026_02_11_081526_create_subscriptions_table ................... 8.75ms DONE
+  2026_02_11_101444_add_integrity_hash_to_invoices ............... 1.86ms DONE
+  2026_02_11_101445_create_invoice_activity_logs_table .......... 11.35ms DONE
+  2026_02_11_101446_add_fields_to_fbr_logs ....................... 5.05ms DONE
+  2026_02_11_101447_add_compliance_score_to_companies ............ 1.97ms DONE
+  2026_02_11_101448_create_security_logs_table ................... 6.47ms DONE
+  2026_02_11_121849_add_schedule_fields_to_invoice_items_table .. 23.09ms DONE
+  2026_02_11_133730_add_pricing_plan_limits_and_billing_cycle .... 0.05ms DONE
+  2026_02_11_133750_add_pricing_limits_and_billing_cycle ........ 16.08ms DONE
+  2026_02_11_155459_add_uom_and_compliance_fields_to_invoice_items_table  2.34ms DONE
+  2026_02_12_000001_add_internal_account_and_onboarding .......... 2.43ms DONE
+  2026_02_12_000001_add_token_expires_at_to_companies ............ 1.27ms DONE
+  2026_02_12_000002_create_notifications_table ................... 7.45ms DONE
+  2026_02_12_000003_create_compliance_scores_table .............. 16.12ms DONE
+  2026_02_12_000004_create_anomaly_logs_table ................... 14.50ms DONE
+  2026_02_12_000005_add_trial_ends_at_to_subscriptions ........... 1.60ms DONE
+  2026_02_12_022826_add_applicability_flags_to_global_hs_master .. 0.22ms DONE
+  2026_02_12_034341_create_hs_master_global_table ............... 24.25ms DONE
+  2026_02_12_034342_create_hs_unmapped_queue_table .............. 11.12ms DONE
+  2026_02_12_044217_create_hs_intelligence_logs_table ............ 8.87ms DONE
+  2026_02_12_044222_create_hs_rejection_history_table ............ 3.09ms DONE
+  2026_02_12_045732_add_fbr_rejection_fields_to_hs_rejection_history  7.92ms DONE
+  2026_02_12_061545_add_fbr_urls_to_companies .................... 2.97ms DONE
+  2026_02_12_063330_add_phone_and_username_to_users_table ........ 8.87ms DONE
+  2026_02_12_070000_create_customer_profiles_table ............... 4.83ms FAIL
+
+In Connection.php line 838:
+
+  SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error i
+  n your SQL syntax; check the manual that corresponds to your MariaDB server
+   version for the right syntax to use near 'WHERE ntn IS NOT NULL' at line 1
+   (Connection: mysql, Host: localhost, Port: 3306, Database: taxnestc_db, SQ
+  L: CREATE UNIQUE INDEX customer_profiles_company_ntn_not_null ON customer_p
+  rofiles (company_id, ntn) WHERE ntn IS NOT NULL)
+
+
+In Connection.php line 578:
+
+  SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error i
+  n your SQL syntax; check the manual that corresponds to your MariaDB server
+   version for the right syntax to use near 'WHERE ntn IS NOT NULL' at line 1

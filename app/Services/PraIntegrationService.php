@@ -175,8 +175,12 @@ class PraIntegrationService
             $response = Http::timeout(30)
                 ->withToken($this->getToken())
                 ->withOptions([
+                    'verify' => false,
                     'curl' => [
                         CURLOPT_SSL_CIPHER_LIST => 'DEFAULT:!DH',
+                        CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
+                        CURLOPT_SSL_VERIFYPEER => false,
+                        CURLOPT_SSL_VERIFYHOST => 0,
                     ],
                 ])
                 ->post($this->getApiUrl(), $payload);

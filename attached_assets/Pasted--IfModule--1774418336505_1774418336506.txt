@@ -1,0 +1,50 @@
+</IfModule>                                                                                             cd ~/public_html/taxnest && php artisan route
+:list --path="/" 2>&1 | head -10lic_html/taxnest && php artisan route:list --path="/" 2>&1 | head -10
+
+  GET|HEAD  / .................................... generated::FnyGeoFyRk2piP4e
+  GET|HEAD  admin/announcements admin.announcements › AnnouncementController@…
+  POST      admin/announcements admin.announcements.store › AnnouncementContr…
+  DELETE    admin/announcements/{id}/delete admin.announcements.destroy › Ann…
+  POST      admin/announcements/{id}/toggle admin.announcements.toggle › Anno…
+  GET|HEAD  admin/anomalies ...... admin.anomalies › AdminController@anomalies
+  GET|HEAD  admin/audit-logs saas.admin.audit › SaasAdmin\AdminAuditControlle…
+  GET|HEAD  admin/audit/export admin.audit.export › AdminController@auditExpo…
+  GET|HEAD  admin/compancurl -I http://localhost/taxnest/public/ 2>/dev/null; echo "---"; ls -la ~/public_html/taxnest/public/index.php
+HTTP/1.1 404 Not Found$ curl -I http://localhost/taxnest/public/ 2>/dev/null; echo "---"; ls -la ~/public_html/taxnest/public/index.php
+Connection: Keep-Alive
+Keep-Alive: timeout=5, max=100
+content-type: text/html
+date: Wed, 25 Mar 2026 05:57:28 GMT
+server: LiteSpeed
+
+---
+-rw-r--r-- 1 taxnestc taxnestc 543 Mar 24 18:54 /home/taxnestc/public_html/taxnest/public/index.php     cd ~/public_html && mv index.php index.php.ba
+k && rm -f .htaccesst]$ cd ~/public_html && mv index.php index.php.bak && rm -f .htaccess
+[taxnestc@eu1 public_html]$ cat > ~/public_html/.htaccess << 'EOF'
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+    RewriteCond %{REQUEST_URI} !^/taxnest/public
+    RewriteRule ^(.*)$ /taxnest/public/$1 [L]
+</IfModule>
+EOF
+[taxnestc@eu1 public_html]$ cat > ~/public_html/index.php << 'PHPEOF'
+<?php
+
+define('LARAVEL_START', microtime(true));
+
+require __DIR__.'/taxnest/vendor/autoload.php';
+
+$app = require_once __DIR__.'/taxnest/bootstrap/app.php';
+
+$kernel = $app->make(Illuminate\Contracts\Http\Kernel::class);
+
+$response = $kernel->handle(
+    $request = Illuminate\Http\Request::capture()
+);
+
+$response->send();
+
+$kernel->terminate($request, $response);
+PHPEOF
+[taxnestc@eu1 public_html]$

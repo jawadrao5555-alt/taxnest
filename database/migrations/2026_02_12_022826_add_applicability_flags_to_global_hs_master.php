@@ -9,6 +9,14 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (!Schema::hasTable('global_hs_master')) {
+            return;
+        }
+
+        if (Schema::hasColumn('global_hs_master', 'st_withheld_applicable')) {
+            return;
+        }
+
         Schema::table('global_hs_master', function (Blueprint $table) {
             $table->boolean('st_withheld_applicable')->default(false);
             $table->boolean('petroleum_levy_applicable')->default(false);

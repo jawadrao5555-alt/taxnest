@@ -41,7 +41,7 @@ require __DIR__.'/taxnest/vendor/autoload.php';
 
 $app = require_once __DIR__.'/taxnest/bootstrap/app.php';
 
-$app->usePublicPath(__DIR__);
+$app->usePublicPath(__DIR__.'/taxnest/public');
 
 $kernel = $app->make(Illuminate\Contracts\Http\Kernel::class);
 

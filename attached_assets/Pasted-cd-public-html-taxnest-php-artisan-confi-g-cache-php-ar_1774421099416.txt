@@ -1,0 +1,40 @@
+cd ~/public_html/taxnest && php artisan confi
+g:cache && php artisan route:cache && php artisan view:clearsan config:cache && php artisan route:cache && php artisan view:clear
+
+   INFO  Configuration cached successfully.
+
+
+   INFO  Routes cached successfully.
+
+
+   INFO  Compiled views cleared successfully.
+                                                                               ~
+bash: $'\E[200~cd': command not foundublic_html/taxnest && git pull origin main~
+[taxnestc@eu1 taxnest]$ cd ~/public_html/taxnest && git pull origin main
+remote: Enumerating objects: 7, done.
+remote: Counting objects: 100% (7/7), done.
+remote: Compressing objects: 100% (4/4), done.
+remote: Total 4 (delta 2), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (4/4), 15.16 KiB | 485.00 KiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+   99d7bbf..45f14df  main       -> origin/main
+Updating 99d7bbf..45f14df
+Fast-forward
+ deployment/complete_data_export.sql | 3746 +++++++++++++++++------------------
+ 1 file changed, 1873 insertions(+), 1873 deletions(-)
+[taxnestc@eu1 taxnest]$ mysql -u taxnestc_jawadrao5555 -p'N2fFzzBVmSZM1KjLZwCj' taxnestc_db < ~/public_html/taxnest/deployment/complete_data_export.sql
+--------------
+INSERT INTO `companies` (`id`,`name`,`ntn`,`email`,`phone`,`address`,`fbr_token`,`created_at`,`updated_at`,`compliance_score`,`token_expires_at`,`fbr_environment`,`fbr_sandbox_token`,`fbr_production_token`,`fbr_registration_no`,`fbr_business_name`,`suspended_at`,`company_status`,`token_expiry_date`,`last_successful_submission`,`fbr_connection_status`,`is_internal_account`,`onboarding_completed`,`standard_tax_rate`,`sector_type`,`province`,`invoice_number_prefix`,`next_invoice_number`,`fbr_sandbox_url`,`fbr_production_url`,`cnic`,`business_activity`,`owner_name`,`invoice_limit_override`,`user_limit_override`,`branch_limit_override`,`registration_no`,`mobile`,`city`,`website`,`inventory_enabled`,`pra_reporting_enabled`,`pra_environment`,`pra_pos_id`,`pra_production_token`,`receipt_printer_size`,`status`,`franchise_id`,`logo_path`,`pra_access_code`,`confidential_pin`,`next_local_invoice_number`) VALUES (3,'Test Corp Pvt Ltd','9999999-1','testowner@example.com',NULL,NULL,NULL,'2026-02-11 12:32:48','2026-02-11 14:17:25',100,NULL,'sandbox',NULL,NULL,NULL,NULL,NULL,'active',NULL,NULL,'unknown',0,1,'18.00','Retail',NULL,NULL,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0,0,'sandbox',NULL,NULL,'80mm','approved',NULL,NULL,NULL,NULL,1)
+--------------
+
+ERROR 1054 (42S22) at line 11: Unknown column 'pra_access_code' in 'INSERT INTO'                        cd ~/public_html/taxnest && php artisan confi
+g:cache && php artisan route:cache && php artisan view:clearsan config:cache && php artisan route:cache && php artisan view:clear
+
+   INFO  Configuration cached successfully.
+
+
+   INFO  Routes cached successfully.
+
+
+   INFO  Compiled views cleared successfully.

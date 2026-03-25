@@ -23,20 +23,13 @@
                     <svg class="w-7 h-7 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                 </div>
                 <h2 class="text-xl font-bold text-white">Set New Password</h2>
-                <p class="text-sm text-emerald-200/50 mt-2">Create a strong password for your account</p>
+                <p class="text-sm text-emerald-200/50 mt-2">Create a strong password for <span class="text-emerald-300 font-medium">{{ $email }}</span></p>
             </div>
 
             <form method="POST" action="{{ route('password.store') }}" class="space-y-4">
                 @csrf
-                <input type="hidden" name="token" value="{{ $request->route('token') }}">
-
-                <div>
-                    <label class="block text-sm font-medium text-emerald-100/70 mb-1.5">Email Address</label>
-                    <input type="email" name="email" value="{{ old('email', $request->email) }}" required autofocus class="w-full px-4 py-2.5 rounded-xl text-sm text-white placeholder-emerald-300/30 transition" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); outline: none;" onfocus="this.style.borderColor='rgba(52,211,153,0.5)'; this.style.boxShadow='0 0 0 3px rgba(52,211,153,0.12)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
-                    @error('email')
-                    <p class="text-sm text-red-400 mt-1">{{ $message }}</p>
-                    @enderror
-                </div>
+                <input type="hidden" name="token" value="{{ $token }}">
+                <input type="hidden" name="email" value="{{ $email }}">
 
                 <div>
                     <label class="block text-sm font-medium text-emerald-100/70 mb-1.5">New Password</label>

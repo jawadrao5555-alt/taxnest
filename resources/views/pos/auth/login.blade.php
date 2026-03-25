@@ -71,9 +71,12 @@
                                 @enderror
                             </div>
 
-                            <div class="flex items-center">
-                                <input id="remember_me" type="checkbox" name="remember" class="rounded border-purple-300/30 bg-white/5 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 w-4 h-4">
-                                <label for="remember_me" class="ml-2 text-sm text-purple-200/50">Remember me</label>
+                            <div class="flex items-center justify-between">
+                                <label class="flex items-center">
+                                    <input id="remember_me" type="checkbox" name="remember" class="rounded border-purple-300/30 bg-white/5 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 w-4 h-4">
+                                    <span class="ml-2 text-sm text-purple-200/50">Remember me</span>
+                                </label>
+                                <a href="{{ route('password.request') }}" class="text-sm text-purple-300/70 hover:text-purple-200 transition">Forgot Password?</a>
                             </div>
 
                             <button type="submit" class="w-full py-3 rounded-xl text-sm font-bold text-white transition-all duration-200" style="background: linear-gradient(135deg, #7c3aed, #a855f7); box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4);" onmouseover="this.style.boxShadow='0 6px 28px rgba(124, 58, 237, 0.55)'; this.style.transform='translateY(-1px)';" onmouseout="this.style.boxShadow='0 4px 20px rgba(124, 58, 237, 0.4)'; this.style.transform='translateY(0)';">

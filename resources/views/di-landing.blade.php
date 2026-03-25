@@ -104,9 +104,12 @@
                     <label class="block text-sm font-medium text-emerald-100/70 mb-1.5">Password</label>
                     <input type="password" name="password" required autocomplete="current-password" class="w-full px-4 py-2.5 rounded-xl text-sm text-white placeholder-emerald-300/30 transition" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); outline: none;" placeholder="Enter your password" onfocus="this.style.borderColor='rgba(52,211,153,0.5)'; this.style.boxShadow='0 0 0 3px rgba(52,211,153,0.12)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
                 </div>
-                <div class="flex items-center">
-                    <input type="checkbox" name="remember" class="rounded bg-white/5 border-white/10 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0 mr-2 w-4 h-4">
-                    <span class="text-sm text-emerald-200/40">Remember me</span>
+                <div class="flex items-center justify-between">
+                    <label class="flex items-center">
+                        <input type="checkbox" name="remember" class="rounded bg-white/5 border-white/10 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0 mr-2 w-4 h-4">
+                        <span class="text-sm text-emerald-200/40">Remember me</span>
+                    </label>
+                    <a href="{{ route('password.request') }}" class="text-sm text-emerald-300/70 hover:text-emerald-200 transition">Forgot Password?</a>
                 </div>
                 @if($errors->any())
                 <div class="bg-red-500/10 border border-red-500/20 rounded-lg p-3">

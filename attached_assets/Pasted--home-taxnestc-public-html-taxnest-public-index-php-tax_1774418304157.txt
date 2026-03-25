@@ -1,0 +1,80 @@
+---
+/home/taxnestc/public_html/taxnest/public/index.php
+[taxnestc@eu1 taxnest]$ cat > ~/public_html/.htaccess << 'EOF'
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(.*)$ taxnest/public/$1 [L]
+</IfModule>
+EOF                                                                            g
+[taxnestc@eu1 taxnest]$ cd ~/public_html/taxnest && cat storage/logs/laravel.log
+[taxnestc@eu1 taxnest]$ tail -30 ~/logs/taxnest.com.pk.error.log 2>/dev/null; tail -30 ../stderr.log 2>/dev/null; tail -30 ~/logs/error.log 2>/dev/null                                                                                                      cd ~/public_html/taxnest && php artisan confi
+g:cache && php artisan route:cachec_html/taxnest && php artisan config:cache && php artisan route:cache
+
+   INFO  Configuration cached successfully.
+
+
+   INFO  Routes cached successfully.
+
+[taxnestc@eu1 taxnest]$ cat > ~/public_html/.htaccess << 'EOF'
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_URI} !^/taxnest/public/
+    RewriteRule ^(.*)$ taxnest/public/$1 [L]
+</IfModule>
+EOF
+[taxnestc@eu1 taxnest]$ cat ~/public_html/taxnest/public/.htaccess
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    RewriteEngine On
+
+    # Handle Authorization Header
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Handle X-XSRF-Token Header
+    RewriteCond %{HTTP:x-xsrf-token} .
+    RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
+
+    # Redirect Trailing Slashes If Not A Folder...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ %1 [L,R=301]
+
+    # Send Requests To Front Controller...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>                                                                                             cd ~/public_html/taxnest && php artisan route
+:list --path="/" 2>&1 | head -10lic_html/taxnest && php artisan route:list --path="/" 2>&1 | head -10
+
+  GET|HEAD  / .................................... generated::FnyGeoFyRk2piP4e
+  GET|HEAD  admin/announcements admin.announcements › AnnouncementController@…
+  POST      admin/announcements admin.announcements.store › AnnouncementContr…
+  DELETE    admin/announcements/{id}/delete admin.announcements.destroy › Ann…
+  POST      admin/announcements/{id}/toggle admin.announcements.toggle › Anno…
+  GET|HEAD  admin/anomalies ...... admin.anomalies › AdminController@anomalies
+  GET|HEAD  admin/audit-logs saas.admin.audit › SaasAdmin\AdminAuditControlle…
+  GET|HEAD  admin/audit/export admin.audit.export › AdminController@auditExpo…
+  GET|HEAD  admin/compancurl -I http://localhost/taxnest/public/ 2>/dev/null; echo "---"; ls -la ~/public_html/taxnest/public/index.php
+HTTP/1.1 404 Not Found$ curl -I http://localhost/taxnest/public/ 2>/dev/null; echo "---"; ls -la ~/public_html/taxnest/public/index.php
+Connection: Keep-Alive
+Keep-Alive: timeout=5, max=100
+content-type: text/html
+date: Wed, 25 Mar 2026 05:57:28 GMT
+server: LiteSpeed
+
+---
+-rw-r--r-- 1 taxnestc taxnestc 543 Mar 24 18:54 /home/taxnestc/public_html/taxnest/public/index.php     cd ~/public_html && mv index.php index.php.ba
+k && rm -f .htaccesst]$ cd ~/public_html && mv index.php index.php.bak && rm -f .htaccess
+[taxnestc@eu1 public_html]$ cat > ~/public_html/.htaccess << 'EOF'
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+    RewriteCond %{REQUEST_URI} !^/taxnest/public
+    RewriteRule ^(.*)$ /taxnest/public/$1 [L]
+</IfModule>
+EOF
+[taxnestc@eu1 public_html]$

@@ -1,0 +1,11 @@
+taxnest]$ mysql -u taxnestc_jawadrao5555 -p'N2fFzzBVmSZM1KjLZwCj' taxnestc_db < ~/public_html/taxnest/deployment/production_data.sql
+INSERT INTO `pos_transactions` (`id`, `company_id`, `terminal_id`, `invoice_number`, `customer_name`, `customer_phone`, `subtotal`, `discount_type`,`discount_value`, `discount_amount`, `tax_rate`, `tax_amount`, `total_amount`, `payment_method`, `pra_invoice_number`, `pra_response_code`, `pra_status`, `created_by`, `created_at`, `updated_at`, `submission_hash`, `pra_qr_code`, `status`, `locked_by_terminal_id`, `lock_time`, `exempt_amount`, `share_token`, `share_token_created_at`, `invoice_mode`) VALUES (24, 11, NULL, 'POS-2026-00001', NULL, NULL, '0.00', 'percentage', '0.00', '0.00', '16.00', '0.00', '0.00', 'cash', NULL, NULL, 'local', 11, '2026-03-19 10:40:13', '2026-03-19 10:40:13', NULL, NULL, 'draft', NULL, '2026-03-19 10:40:13','0.00', NULL, NULL, 'pra')
+--------------
+
+ERROR 1062 (23000) at limysql -u taxnestc_jawadrao5555 -p'N2fFzzBVmSZM1KjLZwCj' taxnestc_db < ~/public_html/taxnest/deployment/production_data.sql
+--------------taxnest]$ mysql -u taxnestc_jawadrao5555 -p'N2fFzzBVmSZM1KjLZwCj' taxnestc_db < ~/public_html/taxnest/deployment/production_data.sql
+INSERT INTO `pos_transactions` (`id`, `company_id`, `terminal_id`, `invoice_number`, `customer_name`, `customer_phone`, `subtotal`, `discount_type`,`discount_value`, `discount_amount`, `tax_rate`, `tax_amount`, `total_amount`, `payment_method`, `pra_invoice_number`, `pra_response_code`, `pra_status`, `created_by`, `created_at`, `updated_at`, `submission_hash`, `pra_qr_code`, `status`, `locked_by_terminal_id`, `lock_time`, `exempt_amount`, `share_token`, `share_token_created_at`, `invoice_mode`) VALUES (24, 11, NULL, 'POS-2026-00001', NULL, NULL, '0.00', 'percentage', '0.00', '0.00', '16.00', '0.00', '0.00', 'cash', NULL, NULL, 'local', 11, '2026-03-19 10:40:13', '2026-03-19 10:40:13', NULL, NULL, 'draft', NULL, '2026-03-19 10:40:13','0.00', NULL, NULL, 'pra')
+--------------
+
+ERROR 1062 (23000) at line 1564: Duplicate entry 'POS-2026-00001' for key 'pos_transactions_invoice_number_unique'
+[taxnestc@eu1 taxnest]$

@@ -1,0 +1,104 @@
+ cd ~/public_html/taxnest && git pull origin main && php artisan db:wipe --force && php artisan migrate --force
+remote: Enumerating objects: 9, done.
+remote: Counting objects: 100% (9/9), done.
+remote: Compressing objects: 100% (5/5), done.
+remote: Total 5 (delta 4), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (5/5), 435 bytes | 48.00 KiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+   269b39d..e1afd50  main       -> origin/main
+Updating 269b39d..e1afd50
+Fast-forward
+ .../2026_03_19_000001_add_share_token_to_pos_transactions.php         | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+   INFO  Dropped all tables successfully.
+
+
+   INFO  Preparing database.
+
+  Creating migration table ....................................... 4.87ms DONE
+
+   INFO  Running migrations.
+
+  0000_01_01_000000_create_companies_table ....................... 6.72ms DONE
+  0001_01_01_000000_create_users_table .......................... 15.50ms DONE
+  0001_01_01_000001_create_cache_table .......................... 12.91ms DONE
+  0001_01_01_000002_create_jobs_table ........................... 12.20ms DONE
+  2026_02_11_075345_create_invoices_table ....................... 26.76ms DONE
+  2026_02_11_075346_create_invoice_items_table ................... 9.62ms DONE
+  2026_02_11_080636_create_fbr_logs_table ........................ 8.98ms DONE
+  2026_02_11_081004_add_role_to_users_table ...................... 4.18ms DONE
+  2026_02_11_081526_create_pricing_plans_table ................... 2.81ms DONE
+  2026_02_11_081526_create_subscriptions_table ................... 9.35ms DONE
+  2026_02_11_101444_add_integrity_hash_to_invoices ............... 2.99ms DONE
+  2026_02_11_101445_create_invoice_activity_logs_table .......... 16.25ms DONE
+  2026_02_11_101446_add_fields_to_fbr_logs ....................... 4.98ms DONE
+  2026_02_11_101447_add_compliance_score_to_companies ............ 2.30ms DONE
+  2026_02_11_101448_create_security_logs_table .................. 18.19ms DONE
+  2026_02_11_121849_add_schedule_fields_to_invoice_items_table .. 29.26ms DONE
+  2026_02_11_133730_add_pricing_plan_limits_and_billing_cycle .... 0.04ms DONE
+  2026_02_11_133750_add_pricing_limits_and_billing_cycle ........ 22.37ms DONE
+  2026_02_11_155459_add_uom_and_compliance_fields_to_invoice_items_table  4.80ms DONE
+  2026_02_12_000001_add_internal_account_and_onboarding .......... 5.58ms DONE
+  2026_02_12_000001_add_token_expires_at_to_companies ............ 2.68ms DONE
+  2026_02_12_000002_create_notifications_table .................. 10.25ms DONE
+  2026_02_12_000003_create_compliance_scores_table .............. 32.61ms DONE
+  2026_02_12_000004_create_anomaly_logs_table ................... 17.39ms DONE
+  2026_02_12_000005_add_trial_ends_at_to_subscriptions ........... 2.38ms DONE
+  2026_02_12_022826_add_applicability_flags_to_global_hs_master .. 0.26ms DONE
+  2026_02_12_034341_create_hs_master_global_table ............... 11.25ms DONE
+  2026_02_12_034342_create_hs_unmapped_queue_table ............... 8.06ms DONE
+  2026_02_12_044217_create_hs_intelligence_logs_table ............ 6.39ms DONE
+  2026_02_12_044222_create_hs_rejection_history_table ............ 3.03ms DONE
+  2026_02_12_045732_add_fbr_rejection_fields_to_hs_rejection_history  9.76ms DONE
+  2026_02_12_061545_add_fbr_urls_to_companies .................... 2.31ms DONE
+  2026_02_12_063330_add_phone_and_username_to_users_table ....... 25.40ms DONE
+  2026_02_12_070000_create_customer_profiles_table .............. 20.73ms DONE
+  2026_02_12_091036_add_province_to_customer_profiles_table ...... 3.02ms DONE
+  2026_02_12_100000_add_buyer_cnic_address_to_invoices ........... 5.45ms DONE
+  2026_02_12_100001_add_dual_invoice_numbers .................... 10.09ms DONE
+  2026_02_12_100001_create_compliance_reports_table ............. 21.63ms DONE
+  2026_02_12_100002_create_vendor_risk_profiles_table ........... 29.92ms DONE
+  2026_02_12_200001_create_products_table ........................ 9.12ms DONE
+  2026_02_12_200002_create_system_settings_table ................. 5.61ms DONE
+  2026_02_12_200003_add_override_and_qr_to_invoices .............. 9.10ms DONE
+  2026_02_12_200004_create_override_logs_table ................... 9.99ms DONE
+  2026_02_12_300001_add_share_uuid_to_invoices ................... 3.25ms DONE
+  2026_02_12_400001_add_governance_fields ....................... 14.96ms DONE
+  2026_02_12_500001_add_enterprise_heavy_fields ................. 61.59ms DONE
+  2026_02_12_600001_add_multi_layer_tax_intelligence ............ 96.43ms DONE
+  2026_02_12_700001_fbr_pral_alignment_upgrade .................. 88.48ms DONE
+  2026_02_12_800001_enterprise_intelligence_layer ................ 9.33ms DONE
+  2026_02_12_900001_create_global_hs_intelligence ............... 31.20ms DONE
+  2026_02_13_050955_add_cnic_and_business_activity_to_companies_table  5.35ms DONE
+  2026_02_13_052940_add_limit_overrides_to_companies_table ....... 8.53ms DONE
+  2026_02_13_100001_production_safety_hardening ................. 50.16ms DONE
+  2026_02_13_113626_create_hs_usage_patterns_table ............... 7.72ms DONE
+  2026_02_13_134414_add_production_stability_phase_a ............ 45.87ms DONE
+  2026_02_13_135933_add_composite_index_invoice_items ............ 7.97ms DONE
+  2026_02_14_060613_add_profile_fields_to_companies_table ....... 20.76ms DONE
+  2026_02_14_091147_add_serial_number_and_mrp_to_products_table .. 4.90ms DONE
+  2026_02_15_154349_add_fbr_idempotency_shield .................. 12.89ms DONE
+  2026_02_15_174833_enterprise_ux_simplification_remove_submitted_status  4.98ms DONE
+  2026_02_15_180700_enterprise_idempotency_scoped_implementation  15.97ms DONE
+  2026_02_16_064335_add_is_fbr_validated_to_compliance_reports ... 6.81ms DONE
+  2026_02_16_080718_add_wht_locked_to_invoices ................... 2.49ms DONE
+  2026_02_17_120000_create_hs_code_mappings_tables .............. 13.53ms DONE
+  2026_02_17_142222_create_hs_mapping_audit_logs_table .......... 30.72ms DONE
+  2026_02_17_150000_create_inventory_module .................... 191.55ms DONE
+  2026_02_17_160000_create_admin_announcements_table ............ 34.28ms DONE
+  2026_02_18_000001_add_performance_indexes ..................... 20.91ms DONE
+  2026_03_05_000001_create_nestpos_module ...................... 189.43ms DONE
+  2026_03_05_000002_add_pra_fields_to_companies ................. 11.84ms DONE
+  2026_03_05_174212_add_submission_hash_to_pos_transactions ...... 3.06ms DONE
+  2026_03_05_180739_add_pra_qr_and_receipt_settings .............. 6.44ms DONE
+  2026_03_05_200001_add_pos_draft_and_lock_fields ............... 50.52ms DONE
+  2026_03_06_000001_create_inventory_adjustments_table .......... 29.66ms DONE
+  2026_03_06_100001_create_saas_layer_tables ................... 257.26ms DONE
+  2026_03_06_160258_add_logo_to_companies_table .................. 3.53ms DONE
+  2026_03_06_200001_create_pos_products_and_customers ........... 33.73ms DONE
+  2026_03_07_175512_add_product_type_to_pricing_plans_table ...... 2.33ms DONE
+  2026_03_19_000001_add_share_token_to_pos_transactions .......... 4.95ms DONE
+  2026_03_19_102849_add_tax_exempt_to_pos_tables ................. 7.01ms DONE
+  2026_03_24_080259_add_dual_mode_and_cashier_support ........... 19.22ms DONE

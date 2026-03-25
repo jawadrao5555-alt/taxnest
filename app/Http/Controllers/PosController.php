@@ -1469,9 +1469,8 @@ class PosController extends Controller
         }
 
         $praLogs = PraLog::where('company_id', $companyId)->orderBy('created_at', 'desc')->take(20)->get();
-        $proxyEnabled = !empty(env('PRA_PROXY_URL'));
         $hasPinSet = !empty($company->confidential_pin);
-        return view('pos.pra-settings', compact('company', 'praLogs', 'proxyEnabled', 'hasPinSet'));
+        return view('pos.pra-settings', compact('company', 'praLogs', 'hasPinSet'));
     }
 
     public function verifyPin(Request $request)

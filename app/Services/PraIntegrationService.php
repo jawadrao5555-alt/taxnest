@@ -22,7 +22,6 @@ class PraIntegrationService
 
     private const SANDBOX_URL = 'https://ims.pral.com.pk/ims/sandbox/api/Live/PostData';
     private const PRODUCTION_URL = 'https://ims.pral.com.pk/ims/production/api/Live/PostData';
-    private const LOCAL_FISCAL_ENDPOINT = '/api/IMSFiscal/GetInvoiceNumberByModel';
     private const SANDBOX_TOKEN = '24d8fab3-f2e9-398f-ae17-b387125ec4a2';
 
     public function __construct(Company $company)
@@ -33,33 +32,6 @@ class PraIntegrationService
     public function isEnabled(): bool
     {
         return (bool) $this->company->pra_reporting_enabled;
-    }
-
-    public function getLocalFiscalUrl(): string
-    {
-        $url = env('PRA_LOCAL_FISCAL_URL') ?: (isset($_ENV['PRA_LOCAL_FISCAL_URL']) ? $_ENV['PRA_LOCAL_FISCAL_URL'] : (getenv('PRA_LOCAL_FISCAL_URL') ?: ''));
-        return $url;
-    }
-
-    public function useLocalFiscal(): bool
-    {
-        return !empty($this->getLocalFiscalUrl());
-    }
-
-    public function useProxy(): bool
-    {
-        $url = env('PRA_PROXY_URL') ?: (isset($_ENV['PRA_PROXY_URL']) ? $_ENV['PRA_PROXY_URL'] : getenv('PRA_PROXY_URL'));
-        return !empty($url);
-    }
-
-    public function getProxyUrl(): string
-    {
-        return env('PRA_PROXY_URL') ?: (isset($_ENV['PRA_PROXY_URL']) ? $_ENV['PRA_PROXY_URL'] : (getenv('PRA_PROXY_URL') ?: ''));
-    }
-
-    public function getProxySecret(): string
-    {
-        return env('PRA_PROXY_SECRET') ?: (isset($_ENV['PRA_PROXY_SECRET']) ? $_ENV['PRA_PROXY_SECRET'] : (getenv('PRA_PROXY_SECRET') ?: ''));
     }
 
     public function getApiUrl(): string
@@ -192,102 +164,22 @@ class PraIntegrationService
             'status' => 'pending',
         ]);
 
-        $mode = 'direct';
-        if ($this->useLocalFiscal()) {
-            $mode = 'local_fiscal';
-        } elseif ($this->useProxy()) {
-            $mode = 'proxy';
-        }
-
-        $response = null;
-
         try {
-            if ($mode === 'local_fiscal') {
-                $localUrl = rtrim($this->getLocalFiscalUrl(), '/') . self::LOCAL_FISCAL_ENDPOINT;
+            Log::info('PRA Direct: Submitting invoice to PRAL IMS', [
+                'transaction_id' => $transaction->id,
+                'url' => $this->getApiUrl(),
+                'pos_id' => $payload['POSID'],
+                'environment' => $this->company->pra_environment ?? 'sandbox',
+            ]);
 
-                Log::info('PRA Local Fiscal: Submitting invoice', [
-                    'transaction_id' => $transaction->id,
-                    'url' => $localUrl,
-                    'pos_id' => $payload['POSID'],
-                ]);
-
-                $response = Http::timeout(30)
-                    ->withHeaders([
-                        'Content-Type' => 'application/json',
-                        'ngrok-skip-browser-warning' => 'true',
-                    ])
-                    ->post($localUrl, $payload);
-
-                $responseData = $response->json();
-
-                if ($response->status() === 404 || $response->status() === 502 || $response->status() === 503) {
-                    Log::warning('PRA Local Fiscal unavailable, trying proxy/direct', [
-                        'transaction_id' => $transaction->id,
-                        'status' => $response->status(),
-                    ]);
-                    $mode = $this->useProxy() ? 'proxy' : 'direct';
-                    $response = null;
-                } else {
-                    $responseCode = $responseData['Code'] ?? (string) $response->status();
-                    $praInvoiceNumber = $responseData['InvoiceNumber'] ?? null;
-                    $success = $responseCode === '100';
-
-                    if ($praInvoiceNumber === 'Not Available') {
-                        $praInvoiceNumber = null;
-                        $success = false;
-                    }
-
-                    $this->storePraResponse($praLog, $transaction, $responseData, $responseCode, $success, $praInvoiceNumber);
-
-                    return [
-                        'success' => $success,
-                        'response_code' => $responseCode,
-                        'data' => $responseData,
-                        'pra_invoice_number' => $praInvoiceNumber,
-                        'message' => $responseData['Response'] ?? ($responseData['Errors'] ?? 'No response message'),
-                    ];
-                }
-            }
-
-            if ($mode === 'proxy') {
-                $proxyPayload = [
-                    'pra_url' => $this->getApiUrl(),
-                    'pra_token' => $this->getToken(),
-                    'invoice_data' => $payload,
-                ];
-
-                $proxyRequest = Http::timeout(45);
-
-                $proxySecret = $this->getProxySecret();
-                if ($proxySecret) {
-                    $proxyRequest = $proxyRequest->withHeaders([
-                        'X-Proxy-Secret' => $proxySecret,
-                    ]);
-                }
-
-                $response = $proxyRequest->post($this->getProxyUrl(), $proxyPayload);
-
-                if ($response->status() === 404 || $response->status() === 502 || $response->status() === 503) {
-                    Log::warning('PRA Proxy unavailable, attempting direct connection', [
-                        'transaction_id' => $transaction->id,
-                        'proxy_url' => $this->getProxyUrl(),
-                        'proxy_status' => $response->status(),
-                    ]);
-                    $mode = 'direct_fallback';
-                    $response = null;
-                }
-            }
-
-            if ($response === null) {
-                $response = Http::timeout(30)
-                    ->withToken($this->getToken())
-                    ->withOptions([
-                        'curl' => [
-                            CURLOPT_SSL_CIPHER_LIST => 'DEFAULT:!DH',
-                        ],
-                    ])
-                    ->post($this->getApiUrl(), $payload);
-            }
+            $response = Http::timeout(30)
+                ->withToken($this->getToken())
+                ->withOptions([
+                    'curl' => [
+                        CURLOPT_SSL_CIPHER_LIST => 'DEFAULT:!DH',
+                    ],
+                ])
+                ->post($this->getApiUrl(), $payload);
 
             $responseData = $response->json();
             $responseCode = $responseData['Code'] ?? (string) $response->status();
@@ -298,6 +190,13 @@ class PraIntegrationService
                 $praInvoiceNumber = null;
                 $success = false;
             }
+
+            Log::info('PRA Direct: Response received', [
+                'transaction_id' => $transaction->id,
+                'response_code' => $responseCode,
+                'success' => $success,
+                'pra_invoice_number' => $praInvoiceNumber,
+            ]);
 
             $this->storePraResponse($praLog, $transaction, $responseData, $responseCode, $success, $praInvoiceNumber);
 
@@ -313,7 +212,7 @@ class PraIntegrationService
             $userMessage = 'PRA API connection failed.';
 
             if (str_contains($errorMsg, 'TLS connect error') || str_contains($errorMsg, 'SSL')) {
-                $userMessage = 'PRA server blocked connection (IP not whitelisted). Invoice saved offline — will sync when Pakistani proxy server is configured.';
+                $userMessage = 'PRA server SSL connection failed. Please check your PRA settings and try again.';
             } elseif (str_contains($errorMsg, 'Connection refused') || str_contains($errorMsg, 'timed out')) {
                 $userMessage = 'PRA server not reachable. Invoice saved offline — will auto-retry later.';
             }
@@ -321,7 +220,7 @@ class PraIntegrationService
             Log::error('PRA Integration Error', [
                 'transaction_id' => $transaction->id,
                 'error' => $errorMsg,
-                'mode' => $mode,
+                'url' => $this->getApiUrl(),
             ]);
 
             $this->storePraResponse($praLog, $transaction, ['error' => $errorMsg], '500', false, null);

@@ -1,0 +1,87 @@
+ INFO  Configuration cache cleared successfully.
+
+
+   INFO  Compiled views cleared successfully.
+
+[taxnestc@eu1 taxnest]$ cd ~/public_html/taxnest && git fetch origin && git reset --hard origin/main && php artisan config:clear && php artisan view:clear
+remote: Enumerating objects: 49, done.
+remote: Counting objects: 100% (49/49), done.
+remote: Compressing objects: 100% (8/8), done.
+remote: Total 32 (delta 24), reused 32 (delta 24), pack-reused 0 (from 0)
+Unpacking objects: 100% (32/32), 17.95 MiB | 17.46 MiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+   2a5f044..e703139  main       -> origin/main
+Updating files: 100% (12/12), done.
+HEAD is now at e703139 Improve PRA invoice submission by adjusting SSL settings
+
+   INFO  Configuration cache cleared successfully.
+
+
+   INFO  Compiled views cleared successfully.
+                        cd ~/public_html/taxnest && cat > /tmp/pra_fix.patch << 'PATCHEOF'
+--- a/app/Services/PraIntegrationService.phpnest && cat > /tmp/pra_fix.patch << 'PATCHEOF'
++++ b/app/Services/PraIncd ~/public_html/taxnest
+php -r "p/Services/PraIntegrationService.php
+\$file = file_get_contents('app/Services/PraIntegrationService.php');
+\$old = <<<'OLD'
+            \$response = Http::timeout(30)raIntegrationService.php');
+                ->withToken(\$this->getToken())
+                ->withOptions([timeout(30)
+                    'verify' => false,tToken())
+                    'curl' => [
+                        CURLOPT_SSL_CIPHER_LIST => 'DEFAULT:!DH',
+                        CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
+                        CURLOPT_SSL_VERIFYPEER => false,ULT:!DH',
+                        CURLOPT_SSL_VERIFYHOST => 0,SLVERSION_TLSv1_2,
+                    ],  CURLOPT_SSL_VERIFYPEER => false,
+                ])      CURLOPT_SSL_VERIFYHOST => 0,
+                ->post(\$this->getApiUrl(), \$payload);
+                ])
+            \$responseData = \$response->json();yload);
+            \$responseCode = \$responseData['Code'] ?? (string) \$response->status();
+OLD;        \$responseData = \$response->json();
+echo str_contains(\$file, 'withToken') ? 'FOUND - needs fix' : 'Already fixed or different';
+"LD;
+Unsuccessful stat on filename containing newline at /var/cpanel/ea4/ea_php_cli.pm line 87.';                             cd ~/public_html/taxnest &&
+sed -n '175,186p' app/Services/PraIntegrationService.phpl/taxnest && sed -n '175,186p' app/Services/PraIntegrationService.php
+            $response = Http::timeout(30)
+                ->withToken($this->getToken())
+                ->withOptions([
+                    'verify' => false,
+                    'curl' => [
+                        CURLOPT_SSL_CIPHER_LIST => 'DEFAULT:!DH',
+                        CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
+                        CURLOPT_SSL_VERIFYPEER => false,
+                        CURLOPT_SSL_VERIFYHOST => 0,
+                    ],
+                ])
+                ->post($this->getApcd ~/public_html/taxnest && curl -s https://raw.githubusercontent.com/jawadrao5555-alt/taxnest/main/app/Services/P
+raIntegrationService.php | head -5c_html/taxnest && curl -s https://raw.githubusercontent.com/jawadrao5555-alt/taxnest/main/app/Services/PraIntegrati<?phpvice.php | head -5
+
+namespace App\Services;
+
+use App\Models\Company;
+[taxnestc@eu1 taxnest]$ cd ~/public_html/taxnest
+sed -i '175,189d' app/Services/PraIntegrationService.php
+sed -i '174a\
+            $apiUrl = $this->getApiUrl();\
+            $token = $this->getToken();\
+            $jsonPayload = json_encode($payload);\
+\
+            $ch = curl_init($apiUrl);\
+            curl_setopt_array($ch, [\
+                CURLOPT_POST => true,\
+                CURLOPT_POSTFIELDS => $jsonPayload,\
+                CURLOPT_RETURNTRANSFER => true,\
+                CURLOPT_TIMEOUT => 30,\
+                CURLOPT_HTTPHEADER => [\
+                    '"'"'Content-Type: application/json'"'"',\
+                    '"'"'Accept: application/json'"'"',\
+                    '"'"'Authorization: Bearer '"'"' . $token,\
+                ],\
+                CURLOPT_SSL_VERIFYPEER => false,\
+                CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,\
+                CURLOPT_SSL_CIPHER_LIST => '"'"'DEFAULT:!DH:!ECDHE+SHA:!AES128-SHA'"'"',\
+            ]);\CURLOPT_SSL_CIPHER_LIST => '"'"'DEFAULT:!DH:!ECDHE+SHA:!AES128-SHA'"'"',\
+' app/Services/PraIntegrationService.phpa['"'"'Code'"'"'] ?? (string) $httpCode;
+[taxnestc@eu1 taxnest]$ ationService.phpa['"'"'Code'"'"'] ?? (string) $httpCode;

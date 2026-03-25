@@ -42,7 +42,7 @@
         .inv-table { width: 100%; border-collapse: collapse; }
         .inv-table td { font-size: 10px; padding: 1px 0; vertical-align: top; }
         .inv-table .inv-label { font-weight: bold; white-space: nowrap; width: 35%; }
-        .inv-table .inv-value { text-align: right; word-wrap: break-word; font-family: 'Courier New', monospace; }
+        .inv-table .inv-value { text-align: right; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; font-family: 'Courier New', monospace; font-size: 9px; }
 
         .items-table { width: 100%; margin: 4px 0; border-collapse: collapse; table-layout: fixed; }
         .items-table th { font-size: 10px; text-transform: uppercase; border-bottom: 1px solid #000; padding: 2px 1px; text-align: left; }
@@ -61,12 +61,12 @@
         .totals-table .tot-value { text-align: right; white-space: nowrap; }
         .totals-table .grand-total td { font-size: 15px; font-weight: bold; padding-top: 4px; }
 
-        .pra-badge { border: 2px solid #000; padding: 6px; margin: 6px 0; text-align: center; font-size: 10px; }
+        .pra-badge { border: 2px solid #000; padding: 6px; margin: 6px 0; text-align: center; font-size: 10px; overflow: hidden; }
         .pra-badge .pra-title { font-size: 12px; font-weight: bold; margin-bottom: 3px; }
-        .pra-badge .pra-number { font-size: 10px; font-weight: bold; letter-spacing: 0.3px; word-wrap: break-word; }
+        .pra-badge .pra-number { font-size: 9px; font-weight: bold; letter-spacing: 0; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; max-width: 100%; display: block; }
         .local-badge { border: 1px dashed #666; padding: 5px; margin: 6px 0; text-align: center; font-size: 10px; color: #666; }
         .qr-code { text-align: center; margin: 6px 0; }
-        .qr-code img { width: 110px; height: 110px; }
+        .qr-code img { width: 100px; height: 100px; }
         .qr-code p { font-size: 8px; margin-top: 2px; }
 
         .footer { margin-top: 8px; font-size: 9px; line-height: 1.5; }

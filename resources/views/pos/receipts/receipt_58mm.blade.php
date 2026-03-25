@@ -42,7 +42,7 @@
         .inv-table { width: 100%; border-collapse: collapse; }
         .inv-table td { font-size: 9px; padding: 1px 0; vertical-align: top; }
         .inv-table .inv-label { font-weight: bold; white-space: nowrap; width: 30%; }
-        .inv-table .inv-value { text-align: right; word-wrap: break-word; font-family: 'Courier New', monospace; font-size: 8px; }
+        .inv-table .inv-value { text-align: right; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; font-family: 'Courier New', monospace; font-size: 7px; }
 
         .items-table { width: 100%; margin: 3px 0; border-collapse: collapse; table-layout: fixed; }
         .items-table th { font-size: 8px; text-transform: uppercase; border-bottom: 1px solid #000; padding: 2px 1px; text-align: left; }
@@ -60,12 +60,12 @@
         .totals-table .tot-value { text-align: right; white-space: nowrap; }
         .totals-table .grand-total td { font-size: 13px; font-weight: bold; padding-top: 3px; }
 
-        .pra-badge { border: 1px solid #000; padding: 4px; margin: 5px 0; text-align: center; font-size: 9px; }
+        .pra-badge { border: 1px solid #000; padding: 4px; margin: 5px 0; text-align: center; font-size: 9px; overflow: hidden; }
         .pra-badge .pra-title { font-size: 10px; font-weight: bold; margin-bottom: 2px; }
-        .pra-badge .pra-number { font-size: 8px; font-weight: bold; word-wrap: break-word; }
+        .pra-badge .pra-number { font-size: 7px; font-weight: bold; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; max-width: 100%; display: block; }
         .local-badge { border: 1px dashed #666; padding: 4px; margin: 5px 0; text-align: center; font-size: 8px; color: #666; }
         .qr-code { text-align: center; margin: 5px 0; }
-        .qr-code img { width: 85px; height: 85px; }
+        .qr-code img { width: 75px; height: 75px; }
         .qr-code p { font-size: 7px; margin-top: 1px; }
 
         .footer { margin-top: 6px; font-size: 8px; line-height: 1.4; }

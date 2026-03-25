@@ -1,0 +1,37 @@
+ cd ~/public_html/taxnest && git pull origin m
+ain && php artisan migrate --forcec_html/taxnest && git pull origin main && php artisan migrate --force
+remote: Enumerating objects: 8, done.
+remote: Counting objects: 100% (8/8), done.
+remote: Compressing objects: 100% (5/5), done.
+remote: Total 5 (delta 3), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (5/5), 694 bytes | 694.00 KiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+   45f14df..f6f456d  main       -> origin/main
+Updating 45f14df..f6f456d
+Fast-forward
+ ...26_03_25_000001_add_missing_pra_access_code.php | 24 ++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 database/migrations/2026_03_25_000001_add_missing_pra_access_code.php
+
+   INFO  Running migrations.
+
+  2026_03_25_000001_add_missing_pra_access_code .................. 7.48ms DONE
+
+[taxnestc@eu1 taxnest]$ mysql -u taxnestc_jawadrao5555 -p'N2fFzzBVmSZM1KjLZwCj' taxnestc_db < ~/public_html/taxnest/deployment/complete_data_export.sql
+--------------
+INSERT INTO `global_hs_master` (`id`,`hs_code`,`description`,`pct_code`,`schedule_type`,`tax_rate`,`default_uom`,`sro_required`,`sro_number`,`sro_item_serial_no`,`mrp_required`,`sector_tag`,`risk_weight`,`mapping_status`,`created_by`,`updated_by`,`created_at`,`updated_at`,`st_withheld_applicable`,`petroleum_levy_applicable`) VALUES (5,'87032100',NULL,'8703.2100','3rd_schedule','17.00',NULL,1,NULL,NULL,1,NULL,'0.00','Mapped',NULL,NULL,'2026-02-11 18:23:06','2026-02-11 18:23:06',0,0)
+--------------
+
+ERROR 1054 (42S22) at line 77: Unknown column 'st_withheld_applicable' in 'INSERT INTO'                 cd ~/public_html/taxnest && php artisan confi
+g:cache && php artisan route:cache && php artisan view:clearsan config:cache && php artisan route:cache && php artisan view:clear
+
+   INFO  Configuration cached successfully.
+
+
+   INFO  Routes cached successfully.
+
+
+   INFO  Compiled views cleared successfully.
+
+[taxnestc@eu1 taxnest]$

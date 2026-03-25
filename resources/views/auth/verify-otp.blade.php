@@ -23,7 +23,7 @@
                     <svg class="w-7 h-7 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                 </div>
                 <h2 class="text-xl font-bold text-white">Check Your Email</h2>
-                <p class="text-sm text-emerald-200/50 mt-2">We sent a 6-digit code to <span class="text-emerald-300 font-medium">{{ $email }}</span></p>
+                <p class="text-sm text-emerald-200/50 mt-2">We sent a 6-digit code and reset link to<br><span class="text-emerald-300 font-medium">{{ $email }}</span></p>
             </div>
 
             @if (session('status'))
@@ -31,6 +31,10 @@
                 <p class="text-sm text-emerald-300">{{ session('status') }}</p>
             </div>
             @endif
+
+            <div class="mb-4 p-3 rounded-lg" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);">
+                <p class="text-xs text-emerald-200/60 text-center">You can either <strong class="text-emerald-300">click the link</strong> in the email or enter the <strong class="text-emerald-300">6-digit code</strong> below</p>
+            </div>
 
             <form method="POST" action="{{ route('password.verify.otp.submit') }}" class="space-y-4">
                 @csrf
@@ -63,7 +67,7 @@
             </div>
 
             <div class="mt-4 text-center">
-                <p class="text-xs text-emerald-200/30">Code expires in 15 minutes</p>
+                <p class="text-xs text-emerald-200/30">Code and link expire in 15 minutes</p>
             </div>
         </div>
     </div>

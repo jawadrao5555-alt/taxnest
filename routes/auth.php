@@ -34,6 +34,9 @@ Route::middleware('guest')->group(function () {
     Route::post('verify-otp', [PasswordResetLinkController::class, 'verifyOtp'])
         ->name('password.verify.otp.submit');
 
+    Route::get('reset-password-link', [PasswordResetLinkController::class, 'resetViaLink'])
+        ->name('password.reset.link');
+
     Route::get('reset-password', [NewPasswordController::class, 'create'])
         ->name('password.reset.form');
 

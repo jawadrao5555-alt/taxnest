@@ -176,41 +176,82 @@ class PraIntegrationService
             $token = $this->getToken();
             $jsonPayload = json_encode($payload);
 
-            $ch = curl_init($apiUrl);
-            curl_setopt_array($ch, [
-                CURLOPT_POST => true,
-                CURLOPT_POSTFIELDS => $jsonPayload,
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 30,
-                CURLOPT_CONNECTTIMEOUT => 15,
-                CURLOPT_HTTPHEADER => [
-                    'Content-Type: application/json',
-                    'Accept: application/json',
-                    'Authorization: Bearer ' . $token,
-                    'Connection: close',
+            $responseBody = null;
+            $httpCode = 0;
+            $method = 'unknown';
+
+            $sslContext = stream_context_create([
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false,
+                    'allow_self_signed' => true,
+                    'crypto_method' => STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT,
                 ],
-                CURLOPT_SSL_VERIFYPEER => false,
-                CURLOPT_SSL_VERIFYHOST => 0,
-                CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
-                CURLOPT_SSL_CIPHER_LIST => 'AES256-GCM-SHA384:AES128-GCM-SHA256:AES256-SHA256:AES128-SHA256',
-                CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-                CURLOPT_FORBID_REUSE => true,
-                CURLOPT_FRESH_CONNECT => true,
+                'http' => [
+                    'method' => 'POST',
+                    'header' => "Content-Type: application/json\r\nAccept: application/json\r\nAuthorization: Bearer {$token}\r\nConnection: close\r\n",
+                    'content' => $jsonPayload,
+                    'timeout' => 30,
+                    'ignore_errors' => true,
+                ],
             ]);
 
-            $responseBody = curl_exec($ch);
-            $curlError = curl_error($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
+            $streamResult = @file_get_contents($apiUrl, false, $sslContext);
 
-            if ($responseBody === false || $curlError) {
-                throw new \Exception('cURL error: ' . ($curlError ?: 'No response from PRA server'));
+            if ($streamResult !== false) {
+                $method = 'stream';
+                $responseBody = $streamResult;
+                $httpCode = 200;
+                if (isset($http_response_header)) {
+                    foreach ($http_response_header as $hdr) {
+                        if (preg_match('/HTTP\/\d\.\d\s+(\d+)/', $hdr, $m)) {
+                            $httpCode = (int) $m[1];
+                        }
+                    }
+                }
+            }
+
+            if ($responseBody === null) {
+                $method = 'curl';
+                $ch = curl_init($apiUrl);
+                curl_setopt_array($ch, [
+                    CURLOPT_POST => true,
+                    CURLOPT_POSTFIELDS => $jsonPayload,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 30,
+                    CURLOPT_CONNECTTIMEOUT => 15,
+                    CURLOPT_HTTPHEADER => [
+                        'Content-Type: application/json',
+                        'Accept: application/json',
+                        'Authorization: Bearer ' . $token,
+                        'Connection: close',
+                    ],
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_SSL_VERIFYHOST => 0,
+                    CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
+                    CURLOPT_SSL_CIPHER_LIST => 'DEFAULT@SECLEVEL=0',
+                    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                    CURLOPT_FORBID_REUSE => true,
+                    CURLOPT_FRESH_CONNECT => true,
+                ]);
+
+                $curlResult = curl_exec($ch);
+                $curlError = curl_error($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+
+                if ($curlResult !== false && !$curlError) {
+                    $responseBody = $curlResult;
+                } else {
+                    throw new \Exception('PRA connection failed (stream+curl): ' . ($curlError ?: 'No response'));
+                }
             }
 
             Log::info('PRA Direct: Raw response', [
                 'transaction_id' => $transaction->id,
                 'http_code' => $httpCode,
-                'body_length' => strlen($responseBody),
+                'method' => $method,
+                'body_length' => strlen($responseBody ?? ''),
             ]);
 
             $responseData = json_decode($responseBody, true) ?? [];

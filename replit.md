@@ -3,11 +3,6 @@
 ## Overview
 TaxNest is a multi-company SaaS platform designed for comprehensive tax and invoice management in Pakistan, ensuring strict compliance with FBR regulations. It offers smart invoicing, configurable governance, an enterprise API, PDF generation, and a demo mode. The "Heavy Enterprise" version extends functionality with a Company Approval System, Customer Ledger, Multi-Branch support, FBR Token Health Monitor, Advanced Admin View, Immutable Audit Logs, Enterprise Analytics, and enhanced security. The project aims to capture a high-volume market with competitive pricing and a 14-day free trial, focusing on robust compliance, scalability, and an intuitive user experience for businesses operating in Pakistan.
 
-## GitHub Repository
-- **Repo URL:** https://github.com/jawadrao5555-alt/taxnest
-- **Push command:** Use GitHub integration token with `git push -u origin main --force`
-- **Note:** Never ask user for GitHub URL again — always use the above.
-
 ## User Preferences
 - ZIA CORPORATION is a REAL production account (not demo/internal) - NTN: 3620291786117, Owner: ZIA UR REHMAN (Digital Invoice ONLY, NO POS data)
 - NestPOS Enterprise Store (company_id 11) is the dedicated POS company — completely separate from Digital Invoice
@@ -49,26 +44,20 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **Admin Revenue Dashboard:** Provides financial oversight, trial warnings, and activity feeds.
 - **Admin Invoice Override:** Super admin functionality to manually manage invoice status.
 - **Dashboard Quick Actions:** Shortcut grid for common user tasks.
-- **NestPOS Module:** A completely isolated Point of Sale system with PRA integration, separate authentication, layouts, and data models. Supports offline billing with auto-sync, dual invoice numbering (POS and PRA Fiscal), comprehensive tax reporting with CSV/PDF export, business profile management with logo upload (printed on receipts), user profile with password change, per-item tax exemption support (exempt items get 0% tax, non-exempt get payment-method-based rate), and inventory enable/disable toggle in POS settings.
-- **Dual Invoice Mode:** PRA ON → `POS-YYYY-XXXXX` prefix, PRA OFF → `LOCAL-YYYY-XXXXX` prefix. `invoice_mode` column on `pos_transactions` tracks mode (`pra` or `local`). Separate number sequences. Drafts also respect the mode.
-- **Confidential PIN System:** Company admin sets 4-6 digit PIN in PRA Settings (bcrypt-hashed in `companies.confidential_pin`). PIN required to access local data tabs. PIN is single-use per visit — cleared immediately after access, so every navigation to local tab requires fresh PIN entry. 5 wrong attempts = 15 min lockout (cache-based). Server-side enforcement via `requirePinForLocalTab()` helper.
-- **Cashier Account Management:** `users.pos_role` column (`pos_admin` or `pos_cashier`). Admin manages cashiers at `/pos/team` — create, edit, activate/deactivate. Cashiers auto-linked to invoices via `created_by`. `PosAdminOnly` middleware protects admin-only routes server-side.
-- **Local Tabs:** Transactions, Reports, and Tax Reports pages have PRA/Local mode tabs. Local tab is PIN-protected. Tab selection persists through filters via hidden `tab` input. Mode tabs partial at `resources/views/pos/partials/mode-tabs.blade.php`.
-- **Role-based Sidebar Navigation:** Cashiers see limited sidebar: Dashboard, New Sale, Transactions, Reports, Tax Reports, Products (view), Customers (view + add), My Profile. Admin sees full sidebar including Services, Terminals, Customers (full CRUD), Team, Business Profile, PRA Settings, Billing, Inventory. Inventory section is completely hidden from cashiers.
-- **Dashboard Data Isolation:** Recent Transactions on dashboard only shows PRA invoices. Local invoices are completely hidden and only accessible through the Local tab after PIN verification. Dashboard aggregate stats (today/month totals) include all invoices.
-- **Reports Cashier Filter:** Reports page has "View Sales By" dropdown. Admin sees all team members, cashier sees "All Company Sales" and "My Sales Only". CSV export respects active filter. All reports data (daily sales, payment summary, top items, monthly trend) filtered by selected staff member.
-- **Invoice Social Share:** POS invoices can be shared as PDF via WhatsApp, Email, SMS, or copy link. Uses secure share tokens for public access. Professional A4 invoice PDF with company branding, item details, PRA verification, and QR code. Share dropdown on transaction detail page with toast notifications.
-- **Tax Exempt Items:** Products and services can be marked as tax-exempt. Exempt items show amber EXEMPT badges throughout UI. Invoice creation uses server-authoritative exemption resolution from DB — `resolveItemExemptions()` helper ensures client cannot manipulate tax liability. Tax reports show exempt amounts in summary cards, table columns, CSV/PDF exports. PRA payload uses per-item `TaxRate` (0 for exempt items). `pos_transaction_items` stores `is_tax_exempt`, `tax_rate`, `tax_amount` per line. `pos_transactions.exempt_amount` tracks total exempt value per invoice.
-- **SaaS Management Layer:** A fully separated admin and franchise management system with distinct authentication, layouts, subscription plan builders, company approval workflows, and usage monitoring.
-- **Dynamic Landing Pages:** Three separate landing pages with product-isolated login:
-  - `/` — Main TaxNest landing (product overview, features, pricing overview, FAQ, contact — NO login buttons in nav)
-  - `/digital-invoice` — Dedicated DI landing page (FBR features, billing cycles, pricing plans, login modal, sign up)
-  - `/pos` — Dedicated NestPOS landing page (PRA features, annual pricing, login modal, POS sign up)
-  - `/di` — Redirects to `/digital-invoice`
-  - `/login` — Renders DI landing with login modal auto-open (Laravel auth redirect target)
-  - Navigation flow: Main landing nav has flat links (Digital Invoice→/digital-invoice, PRA POS→/pos, Pricing, Features, Contact); each product page has its own login modal + sign up + "< Home" back link
-- **Admin Plan Management:** SaaS admin can edit all plan details inline (name, price, limits, features) at `/admin/plans`. Changes auto-reflect on all landing and billing pages since they read from `pricing_plans` table.
-- **Product-Type Plan Separation:** `pricing_plans` table has a `product_type` column (`di` or `pos`). DI landing (`/digital-invoice`) shows only `product_type='di'` plans (Retail, Business, Industrial, Enterprise with monthly prices). POS landing (`/pos`) shows only `product_type='pos'` plans (Starter Rs 9,999/yr, Business Rs 14,999/yr, Pro Rs 24,999/yr with annual prices stored directly in `price` field).
+- **NestPOS Module:** A completely isolated Point of Sale system with PRA integration, separate authentication, layouts, and data models. Supports offline billing with auto-sync, dual invoice numbering (POS and PRA Fiscal), comprehensive tax reporting, business profile management, user profile, per-item tax exemption, and inventory enable/disable.
+- **Dual Invoice Mode:** PRA ON → `POS-YYYY-XXXXX` prefix, PRA OFF → `LOCAL-YYYY-XXXXX` prefix.
+- **Confidential PIN System:** Company admin sets 4-6 digit PIN (bcrypt-hashed). PIN required to access local data tabs. Single-use per visit, 5 wrong attempts = 15 min lockout. Server-side enforced.
+- **Cashier Account Management:** `users.pos_role` column (`pos_admin` or `pos_cashier`). Admin manages cashiers at `/pos/team`. `PosAdminOnly` middleware protects admin-only routes.
+- **Local Tabs:** Transactions, Reports, and Tax Reports pages have PRA/Local mode tabs, with Local tab being PIN-protected.
+- **Role-based Sidebar Navigation:** Cashiers see limited sidebar, Admins see full sidebar.
+- **Dashboard Data Isolation:** Recent Transactions on dashboard only shows PRA invoices. Local invoices are hidden and only accessible through Local tab after PIN verification. Aggregate stats include all invoices.
+- **Reports Cashier Filter:** Reports page has "View Sales By" dropdown. Admin sees all team members, cashier sees "All Company Sales" and "My Sales Only".
+- **Invoice Social Share:** POS invoices can be shared as PDF via WhatsApp, Email, SMS, or copy link. Uses secure share tokens.
+- **Tax Exempt Items:** Products and services can be marked as tax-exempt. Server-authoritative exemption resolution. Tax reports show exempt amounts.
+- **SaaS Management Layer:** Separated admin and franchise management with distinct authentication, layouts, subscription plan builders, company approval workflows, and usage monitoring.
+- **Dynamic Landing Pages:** Three separate landing pages with product-isolated login: `/` (Main TaxNest), `/digital-invoice` (Dedicated DI), `/pos` (Dedicated NestPOS).
+- **Admin Plan Management:** SaaS admin can edit all plan details inline.
+- **Product-Type Plan Separation:** `pricing_plans` table has a `product_type` column (`di` or `pos`) to display relevant plans on landing pages.
 
 **Key Features:**
 - **Smart Invoice Builder:** Guided invoice creation with compliance scoring.
@@ -85,16 +74,16 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 **UI/UX Design:**
 - **Layout:** Responsive sidebar with a single scrollable content area.
 - **Styling:** Consistent use of dark/light modes, standardized components, and an emerald-600 primary color palette.
-- **Design System:** Unified SaaS-grade design: Cards use `rounded-xl shadow-md` with `hover:-translate-y-1 hover:shadow-xl transition-all duration-300`. Buttons use `rounded-lg font-semibold` with gradient fills. Section padding `py-24 lg:py-28` minimum.
-- **Product Visual Separation:** Digital Invoice uses emerald theme (`from-emerald-500 to-emerald-700`), NestPOS uses purple theme (`from-purple-500 to-purple-700`). Gradient CTA buttons with `shadow-md hover:shadow-lg`.
-- **Navigation:** All landing pages use visible wrapping nav (NO hamburger menu). Nav items wrap into multiple lines on mobile using `flex-wrap`. Text scales down on smallest screens (`text-[10px] sm:text-[13px]`).
+- **Design System:** Unified SaaS-grade design: Cards use `rounded-xl shadow-md` with hover effects. Buttons use `rounded-lg font-semibold` with gradient fills. Consistent section padding.
+- **Product Visual Separation:** Digital Invoice uses emerald theme, NestPOS uses purple theme.
+- **Navigation:** All landing pages use visible wrapping nav (NO hamburger menu).
 - **PWA Enhancements:** Install prompts, offline badges, update banners, and manifest shortcuts.
-- **Mobile Responsiveness:** Fully responsive at 320px+. `overflow-x-hidden` on `<html>` and `<body>` prevents horizontal scroll. Landing pages stack cards vertically on mobile. POS sidebar uses slide-out drawer. All data tables use progressive column hiding (`hidden sm/md/lg:table-cell`) for essential-first display. Inline edit forms use responsive grids (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`) instead of fixed widths. All tables have `overflow-x-auto`. Header rows stack on mobile with `flex-col sm:flex-row`. Buttons use `w-full sm:w-auto` for full-width on mobile. Section padding uses `px-3 sm:px-5 md:px-8`.
+- **Mobile Responsiveness:** Fully responsive at 320px+. `overflow-x-hidden` on `<html>` and `<body>`. Landing pages stack cards vertically. POS sidebar uses slide-out drawer. Data tables use progressive column hiding. Inline edit forms use responsive grids. All tables have `overflow-x-auto`. Header rows stack on mobile. Buttons use `w-full sm:w-auto`. Consistent section padding.
 - **Enterprise UX Engine:** Includes toast notifications, loading spinners, page transitions, and auto-scrolling to errors.
 - **Keyboard Shortcuts:** Implemented for invoice creation.
 - **Intelligent Autofocus:** Automatically advances input fields.
 - **Sticky Bottom Summary:** Displays financial totals and FBR environment badge.
-- **CSS Build:** Tailwind CSS is pre-compiled via Vite. After any blade template changes that use new Tailwind classes, must run `npx vite build` to regenerate `public/build/assets/app-*.css`.
+- **CSS Build:** Tailwind CSS is pre-compiled via Vite.
 
 ## External Dependencies
 - **PostgreSQL:** Primary database.
@@ -104,4 +93,5 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **Alpine.js:** Interactive frontend components.
 - **Chart.js:** Data visualization.
 - **PRA (Punjab Revenue Authority):** POS fiscal device integration via PRAL IMS API v1.2.
-- **PRA Proxy Support:** `PraIntegrationService` supports proxy routing via `PRA_PROXY_URL` and `PRA_PROXY_SECRET` env vars. When set, PRA API calls route through a Pakistani proxy server (required because PRA's `ims.pral.com.pk` blocks non-Pakistani IPs). Proxy script at `pra-proxy/index.php` is ready to deploy on any Pakistani VPS. `pos_transactions` table uses composite unique `(company_id, invoice_number)` instead of global unique on `invoice_number`.
+- **PRA Direct Connection:** `PraIntegrationService` connects directly to PRA's `ims.pral.com.pk`.
+- **Cross-Database Compatibility:** `App\Helpers\DbCompat` helper class provides `like()`, `dateFormat()`, `extractYear()`, `extractMonth()`, `jsonExtract()` methods for MySQL vs PostgreSQL compatibility.

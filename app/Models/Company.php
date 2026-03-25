@@ -53,6 +53,7 @@ class Company extends Model
         'pra_pos_id',
         'pra_access_code',
         'pra_production_token',
+        'pra_proxy_url',
         'receipt_printer_size',
         'confidential_pin',
         'next_local_invoice_number',

@@ -1,0 +1,49 @@
+TaxNest PRA Proxy - Setup Guide
+=================================
+
+Yeh proxy aapke Windows PC pe chalega aur TaxNest se PRA ke beech bridge ka kaam karega.
+Windows ka native TLS (SChannel) use hoga - same jaise PRAL ka official software karta hai.
+
+STEP 1: Ngrok Install Karo
+---------------------------
+1. https://ngrok.com pe jao
+2. Sign up / Login karo
+3. Windows ka ngrok download karo
+4. Extract karo (ngrok.exe milega)
+5. CMD open karo, jahan ngrok.exe hai wahan jao
+6. Run karo: ngrok config add-authtoken YOUR_AUTH_TOKEN
+   (auth token ngrok dashboard se copy karo)
+
+STEP 2: Proxy Start Karo
+-------------------------
+1. PowerShell open karo (Run as Administrator)
+2. Run karo:
+   Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+3. Phir run karo:
+   .\start-proxy.ps1
+4. "Proxy running on http://localhost:8787" message aayega
+
+STEP 3: Ngrok Tunnel Start Karo
+-------------------------------
+1. Naya CMD window open karo
+2. Run karo: ngrok http 8787
+3. Ngrok aapko ek URL dega jaise:
+   https://xxxx-xxxx-xxxx.ngrok-free.app
+4. Yeh URL copy karo
+
+STEP 4: TaxNest Mein URL Set Karo
+----------------------------------
+Mujhe (Replit agent ko) yeh ngrok URL do, main TaxNest code mein set kar dunga.
+PRA requests us URL se forward hongi.
+
+TESTING
+-------
+Proxy start hone ke baad, aap test kar sakte ho:
+CMD mein run karo:
+curl -X POST http://localhost:8787 -H "Content-Type: application/json" -H "X-Proxy-Auth: TaxNestPraProxy2026Secret" -H "X-Pra-Url: https://ims.pral.com.pk/ims/production/api/Live/PostData" -H "X-Pra-Token: YOUR_PRA_TOKEN" -d "{\"test\":true}"
+
+NOTES
+-----
+- Proxy aur ngrok dono chalte rehne chahiye jab tak invoicing karni ho
+- Ngrok free plan mein URL har restart pe change hota hai
+- Paid ngrok plan mein fixed domain mil sakta hai

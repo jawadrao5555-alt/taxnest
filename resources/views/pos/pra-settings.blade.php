@@ -28,6 +28,11 @@
                         <input type="text" name="pra_production_token" value="{{ $company->pra_production_token }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500" placeholder="Token from PRA POS registration">
                         <p class="text-xs text-gray-400 mt-1">Sandbox uses default test token. Production token is available on PRA registration screen.</p>
                     </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">PRA Proxy URL (Optional - for SSL bypass)</label>
+                        <input type="url" name="pra_proxy_url" value="{{ $company->pra_proxy_url }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500" placeholder="e.g. https://xxxx.ngrok-free.app">
+                        <p class="text-xs text-gray-400 mt-1">Ngrok proxy URL for routing PRA requests through Windows PC. Leave empty for direct connection.</p>
+                    </div>
                     <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Receipt Printer Size</label>
                         <select name="receipt_printer_size" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">

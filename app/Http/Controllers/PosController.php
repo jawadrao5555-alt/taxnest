@@ -1432,6 +1432,7 @@ class PosController extends Controller
                 'pra_environment' => 'required|in:sandbox,production',
                 'pra_pos_id' => 'nullable|string',
                 'pra_production_token' => 'nullable|string',
+                'pra_proxy_url' => 'nullable|url',
                 'receipt_printer_size' => 'nullable|in:80mm,58mm',
             ]);
 
@@ -1447,6 +1448,8 @@ class PosController extends Controller
             if ($request->filled('pra_production_token')) {
                 $updateData['pra_production_token'] = $request->pra_production_token;
             }
+
+            $updateData['pra_proxy_url'] = $request->pra_proxy_url ?: null;
 
             $company->update($updateData);
 

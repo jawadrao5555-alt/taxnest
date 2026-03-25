@@ -13,7 +13,7 @@ class AdminAuditController extends Controller
         $query = AdminAuditLog::with('admin')->orderBy('created_at', 'desc');
 
         if ($request->filled('action')) {
-            $query->where('action', 'ilike', "%{$request->action}%");
+            $query->where('action', \App\Helpers\DbCompat::like(), "%{$request->action}%");
         }
         if ($request->filled('date_from')) {
             $query->where('created_at', '>=', $request->date_from . ' 00:00:00');

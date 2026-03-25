@@ -84,8 +84,8 @@ class DashboardController extends Controller
         ];
 
         $monthlyData = Invoice::where('company_id', $companyId)
-            ->selectRaw("TO_CHAR(created_at, 'Mon') as month_label, EXTRACT(MONTH FROM created_at) as month_num, COUNT(*) as count, SUM(total_amount) as total")
-            ->groupBy('month_label', 'month_num')
+            ->selectRaw(\App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM') . " as month_label, " . \App\Helpers\DbCompat::extractMonth('created_at') . " as month_num, COUNT(*) as count, SUM(total_amount) as total")
+            ->groupByRaw(\App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM') . ", " . \App\Helpers\DbCompat::extractMonth('created_at'))
             ->orderBy('month_num')
             ->get();
 
@@ -134,13 +134,13 @@ class DashboardController extends Controller
 
         $reportAvgs = ComplianceReport::where('company_id', $companyId)
             ->where('created_at', '>=', $sixMonthsAgo)
-            ->selectRaw("TO_CHAR(created_at, 'YYYY-MM') as ym, ROUND(AVG(final_score)) as avg_score")
-            ->groupByRaw("TO_CHAR(created_at, 'YYYY-MM')")
+            ->selectRaw(\App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM') . " as ym, ROUND(AVG(final_score)) as avg_score")
+            ->groupByRaw(\App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM'))
             ->pluck('avg_score', 'ym');
 
         $scoreAvgs = ComplianceScore::where('company_id', $companyId)
             ->where('calculated_date', '>=', $sixMonthsAgo)
-            ->selectRaw("TO_CHAR(calculated_date, 'YYYY-MM') as ym, score")
+            ->selectRaw(\App\Helpers\DbCompat::dateFormat('calculated_date', 'YYYY-MM') . " as ym, score")
             ->orderBy('calculated_date', 'desc')
             ->get()
             ->groupBy('ym')
@@ -239,8 +239,8 @@ class DashboardController extends Controller
 
         $monthlyStats = Invoice::where('company_id', $companyId)
             ->where('created_at', '>=', $execSixMonthsAgo)
-            ->selectRaw("TO_CHAR(created_at, 'YYYY-MM') as ym, COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue, COALESCE(SUM(total_sales_tax),0) as tax_collected")
-            ->groupByRaw("TO_CHAR(created_at, 'YYYY-MM')")
+            ->selectRaw(\App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM') . " as ym, COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue, COALESCE(SUM(total_sales_tax),0) as tax_collected")
+            ->groupByRaw(\App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM'))
             ->get()
             ->keyBy('ym');
 
@@ -248,15 +248,15 @@ class DashboardController extends Controller
             ->join('invoices', 'fbr_logs.invoice_id', '=', 'invoices.id')
             ->where('invoices.company_id', $companyId)
             ->where('invoices.created_at', '>=', $execSixMonthsAgo)
-            ->selectRaw("TO_CHAR(invoices.created_at, 'YYYY-MM') as ym, COUNT(*) as total, SUM(CASE WHEN fbr_logs.status = 'failed' THEN 1 ELSE 0 END) as failed")
-            ->groupByRaw("TO_CHAR(invoices.created_at, 'YYYY-MM')")
+            ->selectRaw(\App\Helpers\DbCompat::dateFormat('invoices.created_at', 'YYYY-MM') . " as ym, COUNT(*) as total, SUM(CASE WHEN fbr_logs.status = 'failed' THEN 1 ELSE 0 END) as failed")
+            ->groupByRaw(\App\Helpers\DbCompat::dateFormat('invoices.created_at', 'YYYY-MM'))
             ->get()
             ->keyBy('ym');
 
         $complianceAvgs = ComplianceReport::where('company_id', $companyId)
             ->where('created_at', '>=', $execSixMonthsAgo)
-            ->selectRaw("TO_CHAR(created_at, 'YYYY-MM') as ym, AVG(final_score) as avg_score")
-            ->groupByRaw("TO_CHAR(created_at, 'YYYY-MM')")
+            ->selectRaw(\App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM') . " as ym, AVG(final_score) as avg_score")
+            ->groupByRaw(\App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM'))
             ->pluck('avg_score', 'ym');
 
         $monthlyVolume = [];

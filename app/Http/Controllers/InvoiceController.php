@@ -65,14 +65,15 @@ class InvoiceController extends Controller
         $query = $baseQuery;
 
         if ($search = $request->get('search')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('internal_invoice_number', 'ilike', "%{$search}%")
-                  ->orWhere('fbr_invoice_number', 'ilike', "%{$search}%")
-                  ->orWhere('invoice_number', 'ilike', "%{$search}%")
-                  ->orWhere('buyer_name', 'ilike', "%{$search}%")
-                  ->orWhere('buyer_ntn', 'ilike', "%{$search}%")
-                  ->orWhereHas('items', function ($iq) use ($search) {
-                      $iq->where('hs_code', 'ilike', "%{$search}%");
+            $like = \App\Helpers\DbCompat::like();
+            $query->where(function ($q) use ($search, $like) {
+                $q->where('internal_invoice_number', $like, "%{$search}%")
+                  ->orWhere('fbr_invoice_number', $like, "%{$search}%")
+                  ->orWhere('invoice_number', $like, "%{$search}%")
+                  ->orWhere('buyer_name', $like, "%{$search}%")
+                  ->orWhere('buyer_ntn', $like, "%{$search}%")
+                  ->orWhereHas('items', function ($iq) use ($search, $like) {
+                      $iq->where('hs_code', $like, "%{$search}%");
                   });
             });
         }
@@ -1562,11 +1563,12 @@ class InvoiceController extends Controller
 
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('buyer_name', 'ilike', "%{$search}%")
-                  ->orWhere('internal_invoice_number', 'ilike', "%{$search}%")
-                  ->orWhere('fbr_invoice_number', 'ilike', "%{$search}%")
-                  ->orWhere('invoice_number', 'ilike', "%{$search}%");
+            $like = \App\Helpers\DbCompat::like();
+            $query->where(function($q) use ($search, $like) {
+                $q->where('buyer_name', $like, "%{$search}%")
+                  ->orWhere('internal_invoice_number', $like, "%{$search}%")
+                  ->orWhere('fbr_invoice_number', $like, "%{$search}%")
+                  ->orWhere('invoice_number', $like, "%{$search}%");
             });
         }
 

@@ -22,11 +22,12 @@ class SupplierController extends Controller
         $query = Supplier::where('company_id', $companyId);
 
         if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'ilike', "%{$search}%")
-                  ->orWhere('ntn', 'ilike', "%{$search}%")
-                  ->orWhere('phone', 'ilike', "%{$search}%")
-                  ->orWhere('city', 'ilike', "%{$search}%");
+            $like = \App\Helpers\DbCompat::like();
+            $query->where(function ($q) use ($search, $like) {
+                $q->where('name', $like, "%{$search}%")
+                  ->orWhere('ntn', $like, "%{$search}%")
+                  ->orWhere('phone', $like, "%{$search}%")
+                  ->orWhere('city', $like, "%{$search}%");
             });
         }
 
@@ -102,10 +103,11 @@ class SupplierController extends Controller
             ->where('company_id', $companyId);
 
         if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('po_number', 'ilike', "%{$search}%")
-                  ->orWhereHas('supplier', function ($sq) use ($search) {
-                      $sq->where('name', 'ilike', "%{$search}%");
+            $like = \App\Helpers\DbCompat::like();
+            $query->where(function ($q) use ($search, $like) {
+                $q->where('po_number', $like, "%{$search}%")
+                  ->orWhereHas('supplier', function ($sq) use ($search, $like) {
+                      $sq->where('name', $like, "%{$search}%");
                   });
             });
         }

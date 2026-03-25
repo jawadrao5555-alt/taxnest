@@ -20,11 +20,12 @@ class HsCodeMappingController extends Controller
         $query = HsCodeMapping::query();
 
         if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('hs_code', 'ilike', "%{$search}%")
-                  ->orWhere('label', 'ilike', "%{$search}%")
-                  ->orWhere('sro_number', 'ilike', "%{$search}%")
-                  ->orWhere('pct_code', 'ilike', "%{$search}%");
+            $like = \App\Helpers\DbCompat::like();
+            $query->where(function ($q) use ($search, $like) {
+                $q->where('hs_code', $like, "%{$search}%")
+                  ->orWhere('label', $like, "%{$search}%")
+                  ->orWhere('sro_number', $like, "%{$search}%")
+                  ->orWhere('pct_code', $like, "%{$search}%");
             });
         }
 
@@ -494,7 +495,7 @@ class HsCodeMappingController extends Controller
 
         $hsFilter = $request->get('history_hs', '');
         if ($hsFilter) {
-            $mappingIds = HsCodeMapping::where('hs_code', 'ilike', "%{$hsFilter}%")->pluck('id');
+            $mappingIds = HsCodeMapping::where('hs_code', \App\Helpers\DbCompat::like(), "%{$hsFilter}%")->pluck('id');
             $query->whereIn('hs_mapping_audit_logs.hs_code_mapping_id', $mappingIds);
         }
 

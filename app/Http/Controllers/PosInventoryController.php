@@ -71,7 +71,7 @@ class PosInventoryController extends Controller
         if ($request->filled('search')) {
             $search = $request->search;
             $query->whereHas('product', function ($q) use ($search) {
-                $q->where('name', 'ilike', "%{$search}%");
+                $q->where('name', \App\Helpers\DbCompat::like(), "%{$search}%");
             });
         }
 

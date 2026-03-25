@@ -379,7 +379,7 @@ class TaxOverrideController extends Controller
             });
 
         $trend = OverrideUsageLog::select(
-                DB::raw("TO_CHAR(created_at, 'YYYY-MM') as month"),
+                DB::raw(\App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM') . " as month"),
                 DB::raw('count(*) as count')
             )
             ->where('created_at', '>=', now()->subMonths(12))

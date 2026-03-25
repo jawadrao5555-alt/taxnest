@@ -11,6 +11,38 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class WhtReportController extends Controller
 {
+    private function isMySQL(): bool
+    {
+        return config('database.default') === 'mysql';
+    }
+
+    private function dbDateFormat(string $column, string $format): string
+    {
+        if ($this->isMySQL()) {
+            $mysqlFormats = [
+                'YYYY-MM' => '%Y-%m',
+                'YYYY' => '%Y',
+            ];
+            return "DATE_FORMAT({$column}, '{$mysqlFormats[$format]}')";
+        }
+        return "TO_CHAR({$column}::date, '{$format}')";
+    }
+
+    private function dbExtractYear(string $column): string
+    {
+        return $this->isMySQL() ? "YEAR({$column})" : "EXTRACT(YEAR FROM {$column}::date)";
+    }
+
+    private function dbExtractMonth(string $column): string
+    {
+        return $this->isMySQL() ? "MONTH({$column})" : "EXTRACT(MONTH FROM {$column}::date)";
+    }
+
+    private function dbLike(): string
+    {
+        return $this->isMySQL() ? 'like' : 'ilike';
+    }
+
     private function resolveDbStatus($status)
     {
         $map = ['production' => 'locked', 'draft' => 'draft'];
@@ -20,16 +52,17 @@ class WhtReportController extends Controller
     private function getWhtQuery($companyId, $fromDate, $toDate, $partyFilter = null, $status = 'production')
     {
         $dbStatus = $this->resolveDbStatus($status);
+        $like = $this->dbLike();
         $query = Invoice::where('company_id', $companyId)
             ->where('status', $dbStatus)
             ->where('wht_rate', '>', 0)
             ->whereBetween('invoice_date', [$fromDate, $toDate]);
 
         if ($partyFilter) {
-            $query->where(function ($q) use ($partyFilter) {
-                $q->where('buyer_name', 'ilike', "%{$partyFilter}%")
-                  ->orWhere('buyer_cnic', 'ilike', "%{$partyFilter}%")
-                  ->orWhere('buyer_ntn', 'ilike', "%{$partyFilter}%");
+            $query->where(function ($q) use ($partyFilter, $like) {
+                $q->where('buyer_name', $like, "%{$partyFilter}%")
+                  ->orWhere('buyer_cnic', $like, "%{$partyFilter}%")
+                  ->orWhere('buyer_ntn', $like, "%{$partyFilter}%");
             });
         }
 
@@ -51,11 +84,13 @@ class WhtReportController extends Controller
         ];
 
         if ($period === 'monthly') {
-            $selectColumns[] = DB::raw("TO_CHAR(invoice_date::date, 'YYYY-MM') as period_label");
-            $groupBy = ['buyer_name', 'buyer_ntn', 'buyer_cnic', DB::raw("TO_CHAR(invoice_date::date, 'YYYY-MM')")];
+            $dateExpr = $this->dbDateFormat('invoice_date', 'YYYY-MM');
+            $selectColumns[] = DB::raw("{$dateExpr} as period_label");
+            $groupBy = ['buyer_name', 'buyer_ntn', 'buyer_cnic', DB::raw($dateExpr)];
         } elseif ($period === 'yearly') {
-            $selectColumns[] = DB::raw("TO_CHAR(invoice_date::date, 'YYYY') as period_label");
-            $groupBy = ['buyer_name', 'buyer_ntn', 'buyer_cnic', DB::raw("TO_CHAR(invoice_date::date, 'YYYY')")];
+            $dateExpr = $this->dbDateFormat('invoice_date', 'YYYY');
+            $selectColumns[] = DB::raw("{$dateExpr} as period_label");
+            $groupBy = ['buyer_name', 'buyer_ntn', 'buyer_cnic', DB::raw($dateExpr)];
         } else {
             $selectColumns[] = DB::raw("invoice_date as period_label");
             $groupBy = ['buyer_name', 'buyer_ntn', 'buyer_cnic', 'invoice_date'];
@@ -131,28 +166,32 @@ class WhtReportController extends Controller
         $partyFilter = $request->get('party');
         $status = $request->get('status', 'production');
         $dbStatus = $this->resolveDbStatus($status);
+        $like = $this->dbLike();
+        $yearExpr = $this->dbExtractYear('invoice_date');
+        $monthLabelExpr = $this->dbDateFormat('invoice_date', 'YYYY-MM');
+        $monthNumExpr = $this->dbExtractMonth('invoice_date');
 
         $query = Invoice::where('company_id', $companyId)
             ->where('status', $dbStatus)
-            ->whereRaw("EXTRACT(YEAR FROM invoice_date::date) = ?", [$year]);
+            ->whereRaw("{$yearExpr} = ?", [$year]);
 
         if ($partyFilter) {
-            $query->where(function ($q) use ($partyFilter) {
-                $q->where('buyer_name', 'ilike', "%{$partyFilter}%")
-                  ->orWhere('buyer_ntn', 'ilike', "%{$partyFilter}%");
+            $query->where(function ($q) use ($partyFilter, $like) {
+                $q->where('buyer_name', $like, "%{$partyFilter}%")
+                  ->orWhere('buyer_ntn', $like, "%{$partyFilter}%");
             });
         }
 
         $monthly = $query->select([
-                DB::raw("TO_CHAR(invoice_date::date, 'YYYY-MM') as month_label"),
-                DB::raw("EXTRACT(MONTH FROM invoice_date::date) as month_num"),
+                DB::raw("{$monthLabelExpr} as month_label"),
+                DB::raw("{$monthNumExpr} as month_num"),
                 DB::raw('COUNT(*) as invoice_count'),
                 DB::raw('SUM(total_amount) as total_billed'),
                 DB::raw('SUM(total_sales_tax) as total_sales_tax'),
                 DB::raw('SUM(wht_amount) as total_wht'),
                 DB::raw('SUM(net_receivable) as total_net'),
             ])
-            ->groupBy(DB::raw("TO_CHAR(invoice_date::date, 'YYYY-MM')"), DB::raw("EXTRACT(MONTH FROM invoice_date::date)"))
+            ->groupBy(DB::raw($monthLabelExpr), DB::raw($monthNumExpr))
             ->orderBy('month_num')
             ->get();
 
@@ -166,7 +205,7 @@ class WhtReportController extends Controller
 
         $availableYears = Invoice::where('company_id', $companyId)
             ->where('status', $dbStatus)
-            ->selectRaw("DISTINCT EXTRACT(YEAR FROM invoice_date::date) as yr")
+            ->selectRaw("DISTINCT {$yearExpr} as yr")
             ->orderByDesc('yr')
             ->pluck('yr')
             ->map(fn($y) => (int)$y)
@@ -190,6 +229,10 @@ class WhtReportController extends Controller
         $viewType = $request->get('view', 'whole');
         $status = $request->get('status', 'production');
         $dbStatus = $this->resolveDbStatus($status);
+        $like = $this->dbLike();
+        $yearExpr = $this->dbExtractYear('invoice_date');
+        $monthLabelExpr = $this->dbDateFormat('invoice_date', 'YYYY-MM');
+        $monthNumExpr = $this->dbExtractMonth('invoice_date');
 
         $statusLabel = ucfirst($status);
         $title = 'Tax Collection Summary (' . $statusLabel . ')';
@@ -197,24 +240,24 @@ class WhtReportController extends Controller
         if ($viewType === 'partywise') {
             $monthly = Invoice::where('company_id', $companyId)
                 ->where('status', $dbStatus)
-                ->whereRaw("EXTRACT(YEAR FROM invoice_date::date) = ?", [$year])
-                ->when($partyFilter, function ($q) use ($partyFilter) {
-                    $q->where(function ($qq) use ($partyFilter) {
-                        $qq->where('buyer_name', 'ilike', "%{$partyFilter}%")
-                           ->orWhere('buyer_ntn', 'ilike', "%{$partyFilter}%");
+                ->whereRaw("{$yearExpr} = ?", [$year])
+                ->when($partyFilter, function ($q) use ($partyFilter, $like) {
+                    $q->where(function ($qq) use ($partyFilter, $like) {
+                        $qq->where('buyer_name', $like, "%{$partyFilter}%")
+                           ->orWhere('buyer_ntn', $like, "%{$partyFilter}%");
                     });
                 })
                 ->select([
                     'buyer_name',
-                    DB::raw("TO_CHAR(invoice_date::date, 'YYYY-MM') as month_label"),
-                    DB::raw("EXTRACT(MONTH FROM invoice_date::date) as month_num"),
+                    DB::raw("{$monthLabelExpr} as month_label"),
+                    DB::raw("{$monthNumExpr} as month_num"),
                     DB::raw('COUNT(*) as invoice_count'),
                     DB::raw('SUM(total_amount) as total_billed'),
                     DB::raw('SUM(total_sales_tax) as total_sales_tax'),
                     DB::raw('SUM(wht_amount) as total_wht'),
                     DB::raw('SUM(net_receivable) as total_net'),
                 ])
-                ->groupBy('buyer_name', DB::raw("TO_CHAR(invoice_date::date, 'YYYY-MM')"), DB::raw("EXTRACT(MONTH FROM invoice_date::date)"))
+                ->groupBy('buyer_name', DB::raw($monthLabelExpr), DB::raw($monthNumExpr))
                 ->orderBy('buyer_name')
                 ->orderBy('month_num')
                 ->get();
@@ -236,25 +279,25 @@ class WhtReportController extends Controller
 
         $query = Invoice::where('company_id', $companyId)
             ->where('status', $dbStatus)
-            ->whereRaw("EXTRACT(YEAR FROM invoice_date::date) = ?", [$year]);
+            ->whereRaw("{$yearExpr} = ?", [$year]);
 
         if ($partyFilter) {
-            $query->where(function ($q) use ($partyFilter) {
-                $q->where('buyer_name', 'ilike', "%{$partyFilter}%")
-                  ->orWhere('buyer_ntn', 'ilike', "%{$partyFilter}%");
+            $query->where(function ($q) use ($partyFilter, $like) {
+                $q->where('buyer_name', $like, "%{$partyFilter}%")
+                  ->orWhere('buyer_ntn', $like, "%{$partyFilter}%");
             });
         }
 
         $monthly = $query->select([
-                DB::raw("TO_CHAR(invoice_date::date, 'YYYY-MM') as month_label"),
-                DB::raw("EXTRACT(MONTH FROM invoice_date::date) as month_num"),
+                DB::raw("{$monthLabelExpr} as month_label"),
+                DB::raw("{$monthNumExpr} as month_num"),
                 DB::raw('COUNT(*) as invoice_count'),
                 DB::raw('SUM(total_amount) as total_billed'),
                 DB::raw('SUM(total_sales_tax) as total_sales_tax'),
                 DB::raw('SUM(wht_amount) as total_wht'),
                 DB::raw('SUM(net_receivable) as total_net'),
             ])
-            ->groupBy(DB::raw("TO_CHAR(invoice_date::date, 'YYYY-MM')"), DB::raw("EXTRACT(MONTH FROM invoice_date::date)"))
+            ->groupBy(DB::raw($monthLabelExpr), DB::raw($monthNumExpr))
             ->orderBy('month_num')
             ->get();
 
@@ -354,29 +397,32 @@ class WhtReportController extends Controller
         $viewType = $request->get('view', 'whole');
         $status = $request->get('status', 'production');
         $dbStatus = $this->resolveDbStatus($status);
+        $like = $this->dbLike();
+        $yearExpr = $this->dbExtractYear('invoice_date');
+        $monthLabelExpr = $this->dbDateFormat('invoice_date', 'YYYY-MM');
 
         $query = Invoice::where('company_id', $companyId)
             ->where('status', $dbStatus)
-            ->whereRaw("EXTRACT(YEAR FROM invoice_date::date) = ?", [$year]);
+            ->whereRaw("{$yearExpr} = ?", [$year]);
 
         if ($partyFilter) {
-            $query->where(function ($q) use ($partyFilter) {
-                $q->where('buyer_name', 'ilike', "%{$partyFilter}%")
-                  ->orWhere('buyer_ntn', 'ilike', "%{$partyFilter}%");
+            $query->where(function ($q) use ($partyFilter, $like) {
+                $q->where('buyer_name', $like, "%{$partyFilter}%")
+                  ->orWhere('buyer_ntn', $like, "%{$partyFilter}%");
             });
         }
 
         if ($viewType === 'partywise') {
             $monthly = $query->select([
                     'buyer_name',
-                    DB::raw("TO_CHAR(invoice_date::date, 'YYYY-MM') as month_label"),
+                    DB::raw("{$monthLabelExpr} as month_label"),
                     DB::raw('COUNT(*) as invoice_count'),
                     DB::raw('SUM(total_amount) as total_billed'),
                     DB::raw('SUM(total_sales_tax) as total_sales_tax'),
                     DB::raw('SUM(wht_amount) as total_wht'),
                     DB::raw('SUM(net_receivable) as total_net'),
                 ])
-                ->groupBy('buyer_name', DB::raw("TO_CHAR(invoice_date::date, 'YYYY-MM')"))
+                ->groupBy('buyer_name', DB::raw($monthLabelExpr))
                 ->orderBy('buyer_name')
                 ->orderBy('month_label')
                 ->get();
@@ -393,14 +439,14 @@ class WhtReportController extends Controller
             }
         } else {
             $monthly = $query->select([
-                    DB::raw("TO_CHAR(invoice_date::date, 'YYYY-MM') as month_label"),
+                    DB::raw("{$monthLabelExpr} as month_label"),
                     DB::raw('COUNT(*) as invoice_count'),
                     DB::raw('SUM(total_amount) as total_billed'),
                     DB::raw('SUM(total_sales_tax) as total_sales_tax'),
                     DB::raw('SUM(wht_amount) as total_wht'),
                     DB::raw('SUM(net_receivable) as total_net'),
                 ])
-                ->groupBy(DB::raw("TO_CHAR(invoice_date::date, 'YYYY-MM')"))
+                ->groupBy(DB::raw($monthLabelExpr))
                 ->orderBy('month_label')
                 ->get();
 

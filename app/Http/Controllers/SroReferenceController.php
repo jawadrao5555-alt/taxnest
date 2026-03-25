@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Services\ScheduleEngine;
 use App\Models\HsUsagePattern;
+use App\Helpers\DbCompat;
 
 class SroReferenceController extends Controller
 {
@@ -14,14 +15,15 @@ class SroReferenceController extends Controller
         $tab = $request->get('tab', 'sro');
         $search = $request->get('search', '');
         $scheduleFilter = $request->get('schedule_type', '');
+        $like = DbCompat::like();
 
         $sroRules = DB::table('special_sro_rules')
-            ->when($search, function ($q) use ($search) {
-                $q->where(function ($q2) use ($search) {
-                    $q2->where('sro_number', 'ilike', "%{$search}%")
-                        ->orWhere('serial_no', 'ilike', "%{$search}%")
-                        ->orWhere('hs_code', 'ilike', "%{$search}%")
-                        ->orWhere('description', 'ilike', "%{$search}%");
+            ->when($search, function ($q) use ($search, $like) {
+                $q->where(function ($q2) use ($search, $like) {
+                    $q2->where('sro_number', $like, "%{$search}%")
+                        ->orWhere('serial_no', $like, "%{$search}%")
+                        ->orWhere('hs_code', $like, "%{$search}%")
+                        ->orWhere('description', $like, "%{$search}%");
                 });
             })
             ->when($scheduleFilter, fn($q) => $q->where('schedule_type', $scheduleFilter))
@@ -38,12 +40,12 @@ class SroReferenceController extends Controller
                     ->orWhere('serial_required', true)
                     ->orWhereNotNull('default_sro_number');
             })
-            ->when($search, function ($q) use ($search) {
-                $q->where(function ($q2) use ($search) {
-                    $q2->where('hs_code', 'ilike', "%{$search}%")
-                        ->orWhere('description', 'ilike', "%{$search}%")
-                        ->orWhere('default_sro_number', 'ilike', "%{$search}%")
-                        ->orWhere('schedule_type', 'ilike', "%{$search}%");
+            ->when($search, function ($q) use ($search, $like) {
+                $q->where(function ($q2) use ($search, $like) {
+                    $q2->where('hs_code', $like, "%{$search}%")
+                        ->orWhere('description', $like, "%{$search}%")
+                        ->orWhere('default_sro_number', $like, "%{$search}%")
+                        ->orWhere('schedule_type', $like, "%{$search}%");
                 });
             })
             ->when($scheduleFilter, fn($q) => $q->where('schedule_type', $scheduleFilter))
@@ -60,12 +62,12 @@ class SroReferenceController extends Controller
                 $q->where('admin_status', 'approved')
                   ->orWhere('admin_status', 'auto');
             })
-            ->when($search, function ($q) use ($search) {
-                $q->where(function ($q2) use ($search) {
-                    $q2->where('hs_code', 'ilike', "%{$search}%")
-                        ->orWhere('sro_schedule_no', 'ilike', "%{$search}%")
-                        ->orWhere('sro_item_serial_no', 'ilike', "%{$search}%")
-                        ->orWhere('schedule_type', 'ilike', "%{$search}%");
+            ->when($search, function ($q) use ($search, $like) {
+                $q->where(function ($q2) use ($search, $like) {
+                    $q2->where('hs_code', $like, "%{$search}%")
+                        ->orWhere('sro_schedule_no', $like, "%{$search}%")
+                        ->orWhere('sro_item_serial_no', $like, "%{$search}%")
+                        ->orWhere('schedule_type', $like, "%{$search}%");
                 });
             })
             ->when($scheduleFilter, fn($q) => $q->where('schedule_type', $scheduleFilter))
@@ -95,6 +97,7 @@ class SroReferenceController extends Controller
         $search = $request->get('q', '');
         $scheduleType = $request->get('schedule_type', '');
         $hsCode = $request->get('hs_code', '');
+        $like = DbCompat::like();
 
         $learnedPatterns = $this->getLearnedPatterns($search, $scheduleType, $hsCode);
 
@@ -104,12 +107,12 @@ class SroReferenceController extends Controller
 
         $sroResults = DB::table('special_sro_rules')
             ->where('is_active', true)
-            ->when($search, function ($q) use ($search) {
-                $q->where(function ($q2) use ($search) {
-                    $q2->where('sro_number', 'ilike', "%{$search}%")
-                        ->orWhere('serial_no', 'ilike', "%{$search}%")
-                        ->orWhere('hs_code', 'ilike', "%{$search}%")
-                        ->orWhere('description', 'ilike', "%{$search}%");
+            ->when($search, function ($q) use ($search, $like) {
+                $q->where(function ($q2) use ($search, $like) {
+                    $q2->where('sro_number', $like, "%{$search}%")
+                        ->orWhere('serial_no', $like, "%{$search}%")
+                        ->orWhere('hs_code', $like, "%{$search}%")
+                        ->orWhere('description', $like, "%{$search}%");
                 });
             })
             ->when($scheduleType, fn($q) => $q->where('schedule_type', $scheduleType))
@@ -124,11 +127,11 @@ class SroReferenceController extends Controller
                     ->orWhere('serial_required', true)
                     ->orWhereNotNull('default_sro_number');
             })
-            ->when($search, function ($q) use ($search) {
-                $q->where(function ($q2) use ($search) {
-                    $q2->where('hs_code', 'ilike', "%{$search}%")
-                        ->orWhere('description', 'ilike', "%{$search}%")
-                        ->orWhere('default_sro_number', 'ilike', "%{$search}%");
+            ->when($search, function ($q) use ($search, $like) {
+                $q->where(function ($q2) use ($search, $like) {
+                    $q2->where('hs_code', $like, "%{$search}%")
+                        ->orWhere('description', $like, "%{$search}%")
+                        ->orWhere('default_sro_number', $like, "%{$search}%");
                 });
             })
             ->when($scheduleType, fn($q) => $q->where('schedule_type', $scheduleType))
@@ -145,6 +148,8 @@ class SroReferenceController extends Controller
 
     private function getLearnedPatterns(string $search, string $scheduleType, string $hsCode = ''): array
     {
+        $like = DbCompat::like();
+
         return HsUsagePattern::whereNotNull('sro_schedule_no')
             ->where('sro_schedule_no', '!=', '')
             ->where('success_count', '>=', 3)
@@ -152,16 +157,16 @@ class SroReferenceController extends Controller
                 $q->where('admin_status', 'approved')
                   ->orWhere('admin_status', 'auto');
             })
-            ->when($hsCode, function ($q) use ($hsCode) {
+            ->when($hsCode, function ($q) use ($hsCode, $like) {
                 $cleanHs = preg_replace('/[^0-9.]/', '', $hsCode);
-                $q->where('hs_code', 'ilike', $cleanHs . '%');
+                $q->where('hs_code', $like, $cleanHs . '%');
             })
-            ->when($search && !$hsCode, function ($q) use ($search) {
-                $q->where(function ($q2) use ($search) {
-                    $q2->where('hs_code', 'ilike', "%{$search}%")
-                        ->orWhere('sro_schedule_no', 'ilike', "%{$search}%")
-                        ->orWhere('sro_item_serial_no', 'ilike', "%{$search}%")
-                        ->orWhere('schedule_type', 'ilike', "%{$search}%");
+            ->when($search && !$hsCode, function ($q) use ($search, $like) {
+                $q->where(function ($q2) use ($search, $like) {
+                    $q2->where('hs_code', $like, "%{$search}%")
+                        ->orWhere('sro_schedule_no', $like, "%{$search}%")
+                        ->orWhere('sro_item_serial_no', $like, "%{$search}%")
+                        ->orWhere('schedule_type', $like, "%{$search}%");
                 });
             })
             ->when($scheduleType, fn($q) => $q->where('schedule_type', $scheduleType))

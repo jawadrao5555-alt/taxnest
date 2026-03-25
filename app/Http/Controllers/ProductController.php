@@ -15,11 +15,12 @@ class ProductController extends Controller
         $query = Product::where('company_id', $companyId);
 
         if ($search) {
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'ilike', "%{$search}%")
-                  ->orWhere('hs_code', 'ilike', "%{$search}%")
-                  ->orWhere('pct_code', 'ilike', "%{$search}%")
-                  ->orWhere('schedule_type', 'ilike', "%{$search}%");
+            $like = \App\Helpers\DbCompat::like();
+            $query->where(function($q) use ($search, $like) {
+                $q->where('name', $like, "%{$search}%")
+                  ->orWhere('hs_code', $like, "%{$search}%")
+                  ->orWhere('pct_code', $like, "%{$search}%")
+                  ->orWhere('schedule_type', $like, "%{$search}%");
             });
         }
 
@@ -157,8 +158,9 @@ class ProductController extends Controller
         $products = Product::where('company_id', $companyId)
             ->where('is_active', true)
             ->where(function($q) use ($query) {
-                $q->where('name', 'ilike', "%{$query}%")
-                  ->orWhere('hs_code', 'ilike', "%{$query}%");
+                $like = \App\Helpers\DbCompat::like();
+                $q->where('name', $like, "%{$query}%")
+                  ->orWhere('hs_code', $like, "%{$query}%");
             })
             ->take(20)
             ->get(['id', 'name', 'hs_code', 'pct_code', 'default_tax_rate', 'uom', 'default_price', 'schedule_type', 'sro_reference', 'serial_number', 'mrp']);

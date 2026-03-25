@@ -131,9 +131,9 @@ class AdminController extends Controller
         });
 
         $monthlyRevenue = Cache::remember('admin_monthly_revenue', 300, function () {
-            return Invoice::selectRaw("TO_CHAR(created_at, 'YYYY-MM') as month, SUM(total_amount) as revenue, COUNT(*) as count")
+            return Invoice::selectRaw(\App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM') . " as month, SUM(total_amount) as revenue, COUNT(*) as count")
                 ->where('created_at', '>=', now()->subMonths(6)->startOfMonth())
-                ->groupByRaw("TO_CHAR(created_at, 'YYYY-MM')")
+                ->groupByRaw(\App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM'))
                 ->orderBy('month')
                 ->get();
         });
@@ -713,10 +713,11 @@ class AdminController extends Controller
             $q = $request->q;
             $invoices = Invoice::with('company')
                 ->where(function ($query) use ($q) {
-                    $query->where('invoice_number', 'ilike', "%{$q}%")
-                        ->orWhere('fbr_invoice_number', 'ilike', "%{$q}%")
-                        ->orWhereHas('company', function ($cq) use ($q) {
-                            $cq->where('name', 'ilike', "%{$q}%");
+                    $like = \App\Helpers\DbCompat::like();
+                    $query->where('invoice_number', $like, "%{$q}%")
+                        ->orWhere('fbr_invoice_number', $like, "%{$q}%")
+                        ->orWhereHas('company', function ($cq) use ($q, $like) {
+                            $cq->where('name', $like, "%{$q}%");
                         });
 
                     if (is_numeric($q)) {

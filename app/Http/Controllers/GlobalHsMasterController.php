@@ -41,7 +41,7 @@ class GlobalHsMasterController extends Controller
             ->orderByDesc('total_frequency');
 
         if ($search) {
-            $unmappedQuery->where('hs_unmapped_log.hs_code', 'ilike', "%{$search}%");
+            $unmappedQuery->where('hs_unmapped_log.hs_code', \App\Helpers\DbCompat::like(), "%{$search}%");
         }
 
         $unmappedHs = $unmappedQuery->paginate(25, ['*'], 'unmapped_page')->appends($request->query());
@@ -314,13 +314,14 @@ class GlobalHsMasterController extends Controller
         $query = GlobalHsMaster::query();
 
         if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('hs_code', 'ilike', "%{$search}%")
-                  ->orWhere('description', 'ilike', "%{$search}%")
-                  ->orWhere('schedule_type', 'ilike', "%{$search}%")
-                  ->orWhere('sector_tag', 'ilike', "%{$search}%")
-                  ->orWhere('sro_number', 'ilike', "%{$search}%")
-                  ->orWhere('pct_code', 'ilike', "%{$search}%");
+            $like = \App\Helpers\DbCompat::like();
+            $query->where(function ($q) use ($search, $like) {
+                $q->where('hs_code', $like, "%{$search}%")
+                  ->orWhere('description', $like, "%{$search}%")
+                  ->orWhere('schedule_type', $like, "%{$search}%")
+                  ->orWhere('sector_tag', $like, "%{$search}%")
+                  ->orWhere('sro_number', $like, "%{$search}%")
+                  ->orWhere('pct_code', $like, "%{$search}%");
             });
         }
 

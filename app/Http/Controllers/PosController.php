@@ -625,8 +625,9 @@ class PosController extends Controller
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('invoice_number', 'ilike', "%{$search}%")
-                    ->orWhere('customer_name', 'ilike', "%{$search}%");
+                $like = \App\Helpers\DbCompat::like();
+                $q->where('invoice_number', $like, "%{$search}%")
+                    ->orWhere('customer_name', $like, "%{$search}%");
             });
         }
 
@@ -805,8 +806,8 @@ class PosController extends Controller
             ->where('status', 'completed')
             ->where('created_at', '>=', now()->subMonths(6)->startOfMonth())
             ->tap($modeFilter)
-            ->selectRaw("TO_CHAR(created_at, 'YYYY-MM') as month, COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue")
-            ->groupByRaw("TO_CHAR(created_at, 'YYYY-MM')")
+            ->selectRaw(\App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM') . " as month, COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue")
+            ->groupByRaw(\App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM'))
             ->orderBy('month')
             ->get();
 
@@ -923,7 +924,7 @@ class PosController extends Controller
         }
 
         if ($request->filled('customer')) {
-            $query->where('customer_name', 'ilike', '%' . $request->customer . '%');
+            $query->where('customer_name', \App\Helpers\DbCompat::like(), '%' . $request->customer . '%');
         }
 
         $hasDateRange = $request->filled('date_from') || $request->filled('date_to');

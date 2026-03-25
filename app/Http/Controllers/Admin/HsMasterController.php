@@ -16,9 +16,10 @@ class HsMasterController extends Controller
         $query = HsMasterGlobal::query();
 
         if ($search = $request->input('search')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('hs_code', 'ilike', "%{$search}%")
-                  ->orWhere('description', 'ilike', "%{$search}%");
+            $like = \App\Helpers\DbCompat::like();
+            $query->where(function ($q) use ($search, $like) {
+                $q->where('hs_code', $like, "%{$search}%")
+                  ->orWhere('description', $like, "%{$search}%");
             });
         }
 

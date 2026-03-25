@@ -61,8 +61,8 @@ class FranchiseDashboardController extends Controller
         $monthlyRevenue = PosTransaction::whereIn('company_id', $companyIds)
             ->where('status', 'completed')
             ->where('created_at', '>=', now()->subMonths(12))
-            ->selectRaw("TO_CHAR(created_at, 'YYYY-MM') as month, SUM(total_amount) as revenue, COUNT(*) as count")
-            ->groupByRaw("TO_CHAR(created_at, 'YYYY-MM')")
+            ->selectRaw(\App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM') . " as month, SUM(total_amount) as revenue, COUNT(*) as count")
+            ->groupByRaw(\App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM'))
             ->orderBy('month')
             ->get();
 

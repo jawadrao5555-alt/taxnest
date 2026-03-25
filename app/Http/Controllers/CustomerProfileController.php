@@ -15,11 +15,12 @@ class CustomerProfileController extends Controller
         $query = CustomerProfile::where('company_id', $companyId);
 
         if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'ilike', "%{$search}%")
-                  ->orWhere('ntn', 'ilike', "%{$search}%")
-                  ->orWhere('cnic', 'ilike', "%{$search}%")
-                  ->orWhere('phone', 'ilike', "%{$search}%");
+            $like = \App\Helpers\DbCompat::like();
+            $query->where(function ($q) use ($search, $like) {
+                $q->where('name', $like, "%{$search}%")
+                  ->orWhere('ntn', $like, "%{$search}%")
+                  ->orWhere('cnic', $like, "%{$search}%")
+                  ->orWhere('phone', $like, "%{$search}%");
             });
         }
 
@@ -139,9 +140,10 @@ class CustomerProfileController extends Controller
         $customers = CustomerProfile::where('company_id', $companyId)
             ->where('is_active', true)
             ->where(function ($q) use ($query) {
-                $q->where('name', 'ilike', "%{$query}%")
-                  ->orWhere('ntn', 'ilike', "%{$query}%")
-                  ->orWhere('cnic', 'ilike', "%{$query}%");
+                $like = \App\Helpers\DbCompat::like();
+                $q->where('name', $like, "%{$query}%")
+                  ->orWhere('ntn', $like, "%{$query}%")
+                  ->orWhere('cnic', $like, "%{$query}%");
             })
             ->take(20)
             ->get(['id', 'name', 'ntn', 'cnic', 'address', 'province', 'phone', 'email', 'registration_type']);

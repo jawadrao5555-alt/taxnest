@@ -28,13 +28,14 @@ class GlobalHsMaster extends Model
     public function scopeSearch($query, ?string $search)
     {
         if (empty($search)) return $query;
-        return $query->where(function ($q) use ($search) {
-            $q->where('hs_code', 'ilike', "%{$search}%")
-              ->orWhere('description', 'ilike', "%{$search}%")
-              ->orWhere('schedule_type', 'ilike', "%{$search}%")
-              ->orWhere('sector_tag', 'ilike', "%{$search}%")
-              ->orWhere('sro_number', 'ilike', "%{$search}%")
-              ->orWhere('pct_code', 'ilike', "%{$search}%");
+        $like = \App\Helpers\DbCompat::like();
+        return $query->where(function ($q) use ($search, $like) {
+            $q->where('hs_code', $like, "%{$search}%")
+              ->orWhere('description', $like, "%{$search}%")
+              ->orWhere('schedule_type', $like, "%{$search}%")
+              ->orWhere('sector_tag', $like, "%{$search}%")
+              ->orWhere('sro_number', $like, "%{$search}%")
+              ->orWhere('pct_code', $like, "%{$search}%");
         });
     }
 

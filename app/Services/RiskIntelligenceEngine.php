@@ -360,7 +360,12 @@ class RiskIntelligenceEngine
         $existing = AnomalyLog::where('company_id', $companyId)
             ->where('type', $risk['type'])
             ->where('resolved', false)
-            ->whereRaw("(metadata->>'invoice_id')::text = ?", [(string)$invoiceId])
+            ->whereRaw(
+                config('database.default') === 'pgsql'
+                    ? "(metadata->>'invoice_id')::text = ?"
+                    : "JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.invoice_id')) = ?",
+                [(string)$invoiceId]
+            )
             ->first();
 
         if (!$existing) {

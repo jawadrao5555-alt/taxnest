@@ -25,8 +25,9 @@ class InventoryController extends Controller
         if ($search) {
             $productIds = Product::where('company_id', $companyId)
                 ->where(function ($q) use ($search) {
-                    $q->where('name', 'ilike', "%{$search}%")
-                      ->orWhere('hs_code', 'ilike', "%{$search}%");
+                    $like = \App\Helpers\DbCompat::like();
+                    $q->where('name', $like, "%{$search}%")
+                      ->orWhere('hs_code', $like, "%{$search}%");
                 })->pluck('id');
             $query->whereIn('product_id', $productIds);
         }
@@ -71,11 +72,12 @@ class InventoryController extends Controller
 
         if ($search) {
             $productIds = Product::where('company_id', $companyId)
-                ->where('name', 'ilike', "%{$search}%")->pluck('id');
-            $query->where(function ($q) use ($productIds, $search) {
+                ->where('name', \App\Helpers\DbCompat::like(), "%{$search}%")->pluck('id');
+            $like = \App\Helpers\DbCompat::like();
+            $query->where(function ($q) use ($productIds, $search, $like) {
                 $q->whereIn('product_id', $productIds)
-                  ->orWhere('reference_number', 'ilike', "%{$search}%")
-                  ->orWhere('notes', 'ilike', "%{$search}%");
+                  ->orWhere('reference_number', $like, "%{$search}%")
+                  ->orWhere('notes', $like, "%{$search}%");
             });
         }
 

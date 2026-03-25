@@ -172,21 +172,44 @@ class PraIntegrationService
                 'environment' => $this->company->pra_environment ?? 'sandbox',
             ]);
 
-            $response = Http::timeout(30)
-                ->withToken($this->getToken())
-                ->withOptions([
-                    'verify' => false,
-                    'curl' => [
-                        CURLOPT_SSL_CIPHER_LIST => 'DEFAULT:!DH',
-                        CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
-                        CURLOPT_SSL_VERIFYPEER => false,
-                        CURLOPT_SSL_VERIFYHOST => 0,
-                    ],
-                ])
-                ->post($this->getApiUrl(), $payload);
+            $apiUrl = $this->getApiUrl();
+            $token = $this->getToken();
+            $jsonPayload = json_encode($payload);
 
-            $responseData = $response->json();
-            $responseCode = $responseData['Code'] ?? (string) $response->status();
+            $ch = curl_init($apiUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $jsonPayload,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'Accept: application/json',
+                    'Authorization: Bearer ' . $token,
+                ],
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => 0,
+                CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
+                CURLOPT_SSL_CIPHER_LIST => 'DEFAULT:!DH:!ECDHE+SHA:!AES128-SHA',
+            ]);
+
+            $responseBody = curl_exec($ch);
+            $curlError = curl_error($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($responseBody === false || $curlError) {
+                throw new \Exception('cURL error: ' . ($curlError ?: 'No response from PRA server'));
+            }
+
+            Log::info('PRA Direct: Raw response', [
+                'transaction_id' => $transaction->id,
+                'http_code' => $httpCode,
+                'body_length' => strlen($responseBody),
+            ]);
+
+            $responseData = json_decode($responseBody, true) ?? [];
+            $responseCode = $responseData['Code'] ?? (string) $httpCode;
             $praInvoiceNumber = $responseData['InvoiceNumber'] ?? null;
             $success = $responseCode === '100';
 

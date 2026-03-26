@@ -20,7 +20,8 @@
             <select name="product_type" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-4 py-2 focus:ring-2 focus:ring-indigo-500">
                 <option value="">All Types</option>
                 <option value="di" {{ request('product_type') === 'di' ? 'selected' : '' }}>Digital Invoice</option>
-                <option value="pos" {{ request('product_type') === 'pos' ? 'selected' : '' }}>NestPOS</option>
+                <option value="pos" {{ request('product_type') === 'pos' ? 'selected' : '' }}>PRA POS</option>
+                <option value="fbrpos" {{ request('product_type') === 'fbrpos' ? 'selected' : '' }}>FBR POS</option>
             </select>
             <select name="status" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-4 py-2 focus:ring-2 focus:ring-indigo-500">
                 <option value="">All Statuses</option>
@@ -50,7 +51,7 @@
                     @forelse($companies as $company)
                     @php
                         $statusColors = ['approved' => 'bg-emerald-900/30 text-emerald-400', 'active' => 'bg-emerald-900/30 text-emerald-400', 'pending' => 'bg-amber-900/30 text-amber-400', 'suspended' => 'bg-red-900/30 text-red-400', 'rejected' => 'bg-gray-800 text-gray-400'];
-                        $typeColors = ['di' => 'bg-emerald-900/30 text-emerald-400', 'pos' => 'bg-purple-900/30 text-purple-400'];
+                        $typeColors = ['di' => 'bg-emerald-900/30 text-emerald-400', 'pos' => 'bg-purple-900/30 text-purple-400', 'fbrpos' => 'bg-blue-900/30 text-blue-400'];
                     @endphp
                     <tr class="hover:bg-gray-800/50">
                         <td class="px-4 py-3">

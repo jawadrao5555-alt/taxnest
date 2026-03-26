@@ -9,6 +9,7 @@ use App\Models\Invoice;
 use App\Models\Subscription;
 use App\Models\Franchise;
 use App\Models\PosTransaction;
+use App\Models\FbrPosTransaction;
 use App\Models\AdminAuditLog;
 use App\Models\SystemControl;
 use Illuminate\Support\Facades\DB;
@@ -19,11 +20,13 @@ class AdminDashboardController extends Controller
     {
         $diCompanies = Company::where('product_type', 'di')->get();
         $posCompanies = Company::where('product_type', 'pos')->get();
+        $fbrposCompanies = Company::where('product_type', 'fbrpos')->get();
 
         $stats = [
             'total_companies' => Company::count(),
             'di_companies' => $diCompanies->count(),
             'pos_companies' => $posCompanies->count(),
+            'fbrpos_companies' => $fbrposCompanies->count(),
             'pending_companies' => Company::where('status', 'pending')->count(),
             'suspended_companies' => Company::where('status', 'suspended')->count(),
             'binned_companies' => Company::onlyTrashed()->count(),
@@ -38,6 +41,10 @@ class AdminDashboardController extends Controller
             'pos_revenue' => PosTransaction::where('status', 'completed')->sum('total_amount'),
             'today_pos_transactions' => PosTransaction::where('status', 'completed')
                 ->whereDate('created_at', today())->count(),
+
+            'fbrpos_transactions' => FbrPosTransaction::count(),
+            'fbrpos_revenue' => FbrPosTransaction::sum('total_amount'),
+            'today_fbrpos_transactions' => FbrPosTransaction::whereDate('created_at', today())->count(),
         ];
 
         $diCompaniesList = Company::where('product_type', 'di')
@@ -52,11 +59,22 @@ class AdminDashboardController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        $fbrposCompaniesList = Company::where('product_type', 'fbrpos')
+            ->with(['activeSubscription', 'franchise'])
+            ->withCount('users')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
         foreach ($posCompaniesList as $pc) {
             $pc->pos_transaction_count = PosTransaction::where('company_id', $pc->id)
                 ->where('status', 'completed')->count();
             $pc->pos_revenue = PosTransaction::where('company_id', $pc->id)
                 ->where('status', 'completed')->sum('total_amount');
+        }
+
+        foreach ($fbrposCompaniesList as $fc) {
+            $fc->fbrpos_transaction_count = FbrPosTransaction::where('company_id', $fc->id)->count();
+            $fc->fbrpos_revenue = FbrPosTransaction::where('company_id', $fc->id)->sum('total_amount');
         }
 
         foreach ($diCompaniesList as $dc) {
@@ -68,7 +86,7 @@ class AdminDashboardController extends Controller
         $systemControls = SystemControl::all();
 
         return view('saas-admin.dashboard', compact(
-            'stats', 'diCompaniesList', 'posCompaniesList',
+            'stats', 'diCompaniesList', 'posCompaniesList', 'fbrposCompaniesList',
             'recentAuditLogs', 'systemControls'
         ));
     }

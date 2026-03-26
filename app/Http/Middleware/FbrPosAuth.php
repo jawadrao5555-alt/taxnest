@@ -27,6 +27,11 @@ class FbrPosAuth
             return redirect('/fbr-pos/login')->with('error', 'FBR POS is not enabled for your company.');
         }
 
+        if ($company->product_type !== 'fbrpos') {
+            Auth::guard('fbrpos')->logout();
+            return redirect('/fbr-pos/login')->with('error', 'This company is not registered as an FBR POS company.');
+        }
+
         app()->instance('currentCompanyId', $user->company_id);
 
         return $next($request);

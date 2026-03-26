@@ -18,7 +18,7 @@
 
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-white mb-4">Company Type</h3>
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-3 gap-3">
                 <label :class="productType === 'di' ? 'border-emerald-500 bg-emerald-900/20' : 'border-gray-700 hover:border-gray-600'" class="relative flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition">
                     <input type="radio" name="product_type" value="di" x-model="productType" class="hidden">
                     <div :class="productType === 'di' ? 'bg-emerald-600' : 'bg-gray-700'" class="w-10 h-10 rounded-lg flex items-center justify-center transition">
@@ -35,8 +35,18 @@
                         <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                     </div>
                     <div>
-                        <p class="text-sm font-semibold text-white">NestPOS</p>
+                        <p class="text-sm font-semibold text-white">PRA POS</p>
                         <p class="text-[10px] text-gray-500 dark:text-gray-400">PRA integrated POS</p>
+                    </div>
+                </label>
+                <label :class="productType === 'fbrpos' ? 'border-blue-500 bg-blue-900/20' : 'border-gray-700 hover:border-gray-600'" class="relative flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition">
+                    <input type="radio" name="product_type" value="fbrpos" x-model="productType" class="hidden">
+                    <div :class="productType === 'fbrpos' ? 'bg-blue-600' : 'bg-gray-700'" class="w-10 h-10 rounded-lg flex items-center justify-center transition">
+                        <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                    </div>
+                    <div>
+                        <p class="text-sm font-semibold text-white">FBR POS</p>
+                        <p class="text-[10px] text-gray-500 dark:text-gray-400">FBR integrated POS</p>
                     </div>
                 </label>
             </div>

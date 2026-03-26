@@ -27,7 +27,7 @@ class AdminCompanyController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'owner_name' => 'required|string|max:255',
-            'product_type' => 'required|in:di,pos',
+            'product_type' => 'required|in:di,pos,fbrpos',
             'email' => 'required|email|max:255',
             'ntn' => 'nullable|string|max:50',
             'cnic' => 'nullable|string|max:20',
@@ -63,6 +63,9 @@ class AdminCompanyController extends Controller
             'franchise_id' => $request->franchise_id,
             'company_status' => 'active',
             'standard_tax_rate' => $request->product_type === 'di' ? 18.00 : 16.00,
+            'fbr_pos_enabled' => $request->product_type === 'fbrpos',
+            'fbr_pos_environment' => $request->product_type === 'fbrpos' ? 'sandbox' : null,
+            'fbr_reporting_enabled' => $request->product_type === 'fbrpos',
         ]);
 
         User::create([
@@ -71,7 +74,7 @@ class AdminCompanyController extends Controller
             'password' => Hash::make($request->admin_password),
             'company_id' => $company->id,
             'role' => 'company_admin',
-            'pos_role' => $request->product_type === 'pos' ? 'pos_admin' : null,
+            'pos_role' => in_array($request->product_type, ['pos', 'fbrpos']) ? 'pos_admin' : null,
         ]);
 
         AdminAuditLog::log(auth('admin')->id(), 'Company created', 'Company', $company->id, [

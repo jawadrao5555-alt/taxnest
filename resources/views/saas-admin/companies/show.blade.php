@@ -5,10 +5,11 @@
         <h1 class="text-2xl font-bold text-white truncate">{{ $company->name }}</h1>
         @php
             $sc = ['approved' => 'bg-emerald-900/30 text-emerald-400', 'active' => 'bg-emerald-900/30 text-emerald-400', 'pending' => 'bg-amber-900/30 text-amber-400', 'suspended' => 'bg-red-900/30 text-red-400', 'rejected' => 'bg-gray-800 text-gray-400'];
-            $tc = ['di' => 'bg-emerald-900/30 text-emerald-400', 'pos' => 'bg-purple-900/30 text-purple-400'];
+            $tc = ['di' => 'bg-emerald-900/30 text-emerald-400', 'pos' => 'bg-purple-900/30 text-purple-400', 'fbrpos' => 'bg-blue-900/30 text-blue-400'];
+            $typeLabels = ['di' => 'Digital Invoice', 'pos' => 'PRA POS', 'fbrpos' => 'FBR POS'];
         @endphp
         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $sc[$company->status] ?? 'bg-gray-800 text-gray-400' }}">{{ $company->status }}</span>
-        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ $tc[$company->product_type] ?? 'bg-gray-800 text-gray-400' }}">{{ $company->product_type === 'di' ? 'Digital Invoice' : 'NestPOS' }}</span>
+        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ $tc[$company->product_type] ?? 'bg-gray-800 text-gray-400' }}">{{ $typeLabels[$company->product_type] ?? $company->product_type }}</span>
         @if(!$company->trashed())
         <a href="{{ route('saas.admin.companies.edit', $company->id) }}" class="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 text-xs font-medium rounded-lg transition border border-indigo-800">
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
@@ -37,7 +38,10 @@
 
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-white mb-3">
-                {{ $company->product_type === 'di' ? 'FBR Integration' : 'PRA Integration' }}
+                @if($company->product_type === 'di') FBR Integration
+                @elseif($company->product_type === 'fbrpos') FBR POS Integration
+                @else PRA Integration
+                @endif
             </h3>
             <div class="space-y-2 text-sm">
                 @if($company->product_type === 'di')
@@ -51,6 +55,15 @@
                 <div class="flex justify-between"><span class="text-gray-400">Last Submission</span><span class="text-white">{{ $company->last_successful_submission ? $company->last_successful_submission->format('d M Y h:i A') : '—' }}</span></div>
                 <div class="flex justify-between"><span class="text-gray-400">Invoice Prefix</span><span class="text-white">{{ $company->invoice_number_prefix ?? '—' }}</span></div>
                 <div class="flex justify-between"><span class="text-gray-400">Compliance Score</span><span class="text-white">{{ $company->compliance_score ?? '—' }}%</span></div>
+                @elseif($company->product_type === 'fbrpos')
+                <div class="flex justify-between"><span class="text-gray-400">FBR POS Environment</span><span class="text-white">{{ ucfirst($company->fbr_pos_environment ?? 'N/A') }}</span></div>
+                <div class="flex justify-between"><span class="text-gray-400">FBR POS ID</span><span class="text-white">{{ $company->fbr_pos_id ?? '—' }}</span></div>
+                <div class="flex justify-between"><span class="text-gray-400">FBR Reporting</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs {{ $company->fbr_reporting_enabled ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">{{ $company->fbr_reporting_enabled ? 'Enabled' : 'Disabled' }}</span>
+                </div>
+                <div class="flex justify-between"><span class="text-gray-400">FBR POS Module</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs {{ $company->fbr_pos_enabled ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">{{ $company->fbr_pos_enabled ? 'Enabled' : 'Disabled' }}</span>
+                </div>
                 @else
                 <div class="flex justify-between"><span class="text-gray-400">PRA Environment</span><span class="text-white">{{ ucfirst($company->pra_environment ?? 'N/A') }}</span></div>
                 <div class="flex justify-between"><span class="text-gray-400">POS ID</span><span class="text-white">{{ $company->pra_pos_id ?? '—' }}</span></div>

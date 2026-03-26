@@ -564,7 +564,7 @@ Route::prefix('franchise')->middleware(['franchise.auth'])->group(function () {
 });
 
 Route::get('/fbr-pos-landing', function () {
-    $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'di')->orderBy('price')->get();
+    $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'fbrpos')->orderBy('price')->get();
     return view('fbr-pos.landing', ['plans' => $plans]);
 })->name('fbrpos.landing');
 
@@ -586,6 +586,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth'])->group(function () {
     Route::post('/api/toggle-fbr-reporting', [FbrPosController::class, 'toggleFbrReporting'])->name('fbrpos.api.toggle-fbr-reporting');
     Route::post('/api/verify-pin', [FbrPosController::class, 'verifyPin'])->name('fbrpos.api.verify-pin');
     Route::get('/api/check-pin-session', [FbrPosController::class, 'checkPinSession'])->name('fbrpos.api.check-pin-session');
+    Route::get('/billing', [FbrPosController::class, 'billing'])->name('fbrpos.billing');
 });
 
 require __DIR__.'/auth.php';

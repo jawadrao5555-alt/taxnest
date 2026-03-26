@@ -102,6 +102,7 @@ class FbrPosAuthController extends Controller
             'email' => $request->email,
             'phone' => $request->phone,
             'company_status' => 'pending',
+            'product_type' => 'fbrpos',
             'fbr_pos_enabled' => true,
             'fbr_pos_environment' => 'sandbox',
             'fbr_reporting_enabled' => true,

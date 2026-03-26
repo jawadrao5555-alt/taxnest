@@ -16,11 +16,11 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">FBR Registration No</label>
-                            <input type="text" x-model="form.fbr_registration_no" placeholder="e.g. 1234567890123" class="w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <input type="text" x-model="form.fbr_registration_no" placeholder="e.g. 1234567890123" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">FBR Business Name</label>
-                            <input type="text" x-model="form.fbr_business_name" class="w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <input type="text" x-model="form.fbr_business_name" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                         </div>
                     </div>
                 </div>
@@ -52,7 +52,7 @@
                             <p class="text-sm text-red-700 font-medium mb-2">Switching to Production requires confirmation</p>
                             <p class="text-xs text-red-600 mb-3">All invoices will be submitted to the live FBR PRAL system. This action cannot be undone for submitted invoices.</p>
                             <label class="block text-sm font-medium text-red-700 mb-1">Type CONFIRM to proceed</label>
-                            <input type="text" x-model="confirmText" placeholder="Type CONFIRM" class="w-full rounded-lg border-red-300 shadow-sm focus:ring-red-500 focus:border-red-500">
+                            <input type="text" x-model="confirmText" placeholder="Type CONFIRM" class="w-full rounded-lg border-red-300 dark:border-red-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-red-500 focus:border-red-500">
                         </div>
                     </template>
                 </div>
@@ -67,7 +67,7 @@
                         <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sandbox API Endpoint</label>
                             <div class="flex items-center gap-2">
-                                <input type="text" x-model="form.fbr_sandbox_url" class="flex-1 rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-amber-500 focus:border-amber-500 text-sm font-mono" placeholder="https://gw.fbr.gov.pk/...">
+                                <input type="text" x-model="form.fbr_sandbox_url" class="flex-1 rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-amber-500 focus:border-amber-500 text-sm font-mono" placeholder="https://gw.fbr.gov.pk/...">
                                 <span class="text-xs text-gray-400 whitespace-nowrap">POST URL</span>
                             </div>
                             <p class="text-xs text-gray-400 mt-1">Default: https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata_sb</p>
@@ -75,7 +75,7 @@
 
                         <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sandbox Token</label>
-                            <input type="password" x-model="form.fbr_sandbox_token" placeholder="Enter sandbox API token" class="w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-amber-500 focus:border-amber-500">
+                            <input type="password" x-model="form.fbr_sandbox_token" placeholder="Enter sandbox API token" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-amber-500 focus:border-amber-500">
                         </div>
 
                         <div class="p-3 rounded-lg" :class="hasSandboxToken ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'">
@@ -95,7 +95,7 @@
                         <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Production API Endpoint</label>
                             <div class="flex items-center gap-2">
-                                <input type="text" x-model="form.fbr_production_url" class="flex-1 rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-red-500 focus:border-red-500 text-sm font-mono" placeholder="https://gw.fbr.gov.pk/...">
+                                <input type="text" x-model="form.fbr_production_url" class="flex-1 rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-red-500 focus:border-red-500 text-sm font-mono" placeholder="https://gw.fbr.gov.pk/...">
                                 <span class="text-xs text-gray-400 whitespace-nowrap">POST URL</span>
                             </div>
                             <p class="text-xs text-gray-400 mt-1">Default: https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata</p>
@@ -103,7 +103,7 @@
 
                         <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Production Token</label>
-                            <input type="password" x-model="form.fbr_production_token" placeholder="Enter production API token" class="w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-red-500 focus:border-red-500">
+                            <input type="password" x-model="form.fbr_production_token" placeholder="Enter production API token" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-red-500 focus:border-red-500">
                         </div>
 
                         <div class="p-3 rounded-lg" :class="hasProductionToken ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'">

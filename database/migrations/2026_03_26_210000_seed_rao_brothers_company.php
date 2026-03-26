@@ -25,6 +25,7 @@ return new class extends Migration
             'province' => 'Punjab',
             'business_activity' => 'Non-specialized wholesale trade',
             'company_status' => 'active',
+            'status' => 'approved',
             'fbr_environment' => 'production',
             'fbr_registration_no' => '3620344337269',
             'fbr_business_name' => 'RAO BROTHERS',

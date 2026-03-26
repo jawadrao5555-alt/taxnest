@@ -64,6 +64,7 @@ class Company extends Model
         'deleted_reason',
         'force_watermark',
         'fbr_pos_enabled',
+        'fbr_reporting_enabled',
         'fbr_pos_id',
         'fbr_pos_token',
         'fbr_pos_environment',
@@ -81,6 +82,7 @@ class Company extends Model
         'force_watermark' => 'boolean',
         'pra_reporting_enabled' => 'boolean',
         'fbr_pos_enabled' => 'boolean',
+        'fbr_reporting_enabled' => 'boolean',
     ];
 
     protected $hidden = [

@@ -45,7 +45,11 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **Admin Invoice Override:** Super admin functionality to manually manage invoice status.
 - **Dashboard Quick Actions:** Shortcut grid for common user tasks.
 - **NestPOS Module:** A completely isolated Point of Sale system with PRA integration, separate authentication, layouts, and data models. Supports offline billing with auto-sync, dual invoice numbering (POS and PRA Fiscal), comprehensive tax reporting, business profile management, user profile, per-item tax exemption, and inventory enable/disable.
-- **Dual Invoice Mode:** PRA ON → `POS-YYYY-XXXXX` prefix, PRA OFF → `LOCAL-YYYY-XXXXX` prefix.
+- **Dual Invoice Mode (PRA POS):** PRA ON → `POS-YYYY-XXXXX` prefix, PRA OFF → `LOCAL-YYYY-XXXXX` prefix.
+- **FBR POS Module:** Isolated FBR-integrated POS at `/fbr-pos` with direct FBR API submission, separate from PRA POS. Includes dashboard, invoice creation, transactions, settings, and FBR retry.
+- **FBR Reporting Toggle:** Dashboard toggle (admin-only) controls FBR reporting ON/OFF. FBR ON → `FPOS-YYYY-XXXXX` prefix with FBR submission. FBR OFF → `FLOCAL-YYYY-XXXXX` prefix, saved locally without FBR submission. Same pattern as PRA Reporting toggle.
+- **FBR POS Local Tabs:** Transactions page has FBR/Local mode tabs with PIN-protected Local tab (server-side enforced). Local invoice detail pages also require PIN verification.
+- **Dual Invoice Mode (FBR POS):** FBR ON → `FPOS-YYYY-XXXXX` prefix, FBR OFF → `FLOCAL-YYYY-XXXXX` prefix.
 - **Confidential PIN System:** Company admin sets 4-6 digit PIN (bcrypt-hashed). PIN required to access local data tabs. Single-use per visit, 5 wrong attempts = 15 min lockout. Server-side enforced.
 - **Cashier Account Management:** `users.pos_role` column (`pos_admin` or `pos_cashier`). Admin manages cashiers at `/pos/team`. `PosAdminOnly` middleware protects admin-only routes.
 - **Local Tabs:** Transactions, Reports, and Tax Reports pages have PRA/Local mode tabs, with Local tab being PIN-protected.

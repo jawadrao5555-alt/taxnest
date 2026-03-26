@@ -32,22 +32,29 @@ class FbrPosController extends Controller
             ->first();
 
         $fbrSubmitted = FbrPosTransaction::where('company_id', $companyId)
+            ->where('invoice_mode', 'fbr')
             ->whereNotNull('fbr_invoice_number')
             ->count();
 
         $fbrPending = FbrPosTransaction::where('company_id', $companyId)
+            ->where('invoice_mode', 'fbr')
             ->where('fbr_status', 'pending')
             ->count();
 
         $recentTransactions = FbrPosTransaction::where('company_id', $companyId)
+            ->where(function ($q) {
+                $q->where('invoice_mode', 'fbr')->orWhereNull('invoice_mode');
+            })
             ->with('creator')
             ->latest()
             ->take(10)
             ->get();
 
+        $fbrReportingStatus = (bool) $company->fbr_reporting_enabled;
+
         return view('fbr-pos.dashboard', compact(
             'company', 'todayStats', 'monthStats',
-            'fbrSubmitted', 'fbrPending', 'recentTransactions'
+            'fbrSubmitted', 'fbrPending', 'recentTransactions', 'fbrReportingStatus'
         ));
     }
 
@@ -56,8 +63,9 @@ class FbrPosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $products = Product::where('company_id', $companyId)->where('is_active', true)->orderBy('name')->get();
+        $fbrReportingEnabled = (bool) $company->fbr_reporting_enabled;
 
-        return view('fbr-pos.create', compact('company', 'products'));
+        return view('fbr-pos.create', compact('company', 'products', 'fbrReportingEnabled'));
     }
 
     public function store(Request $request)
@@ -81,8 +89,11 @@ class FbrPosController extends Controller
             'discount_value' => 'nullable|numeric|min:0',
         ]);
 
+        $fbrEnabled = (bool) $company->fbr_reporting_enabled;
+        $invoiceMode = $fbrEnabled ? 'fbr' : 'local';
+
         try {
-            $transaction = DB::transaction(function () use ($request, $companyId, $company) {
+            $transaction = DB::transaction(function () use ($request, $companyId, $company, $invoiceMode) {
                 $subtotal = 0;
                 $totalTax = 0;
                 $itemsData = [];
@@ -127,11 +138,14 @@ class FbrPosController extends Controller
 
                 $totalAmount = round($subtotal - $discountAmount + $totalTax, 2);
 
-                $invoiceNumber = $this->generateInvoiceNumber($companyId);
+                $invoiceNumber = $invoiceMode === 'local'
+                    ? $this->generateLocalInvoiceNumber($companyId)
+                    : $this->generateInvoiceNumber($companyId);
 
                 $transaction = FbrPosTransaction::create([
                     'company_id' => $companyId,
                     'invoice_number' => $invoiceNumber,
+                    'invoice_mode' => $invoiceMode,
                     'customer_name' => $request->customer_name,
                     'customer_phone' => $request->customer_phone,
                     'customer_ntn' => $request->customer_ntn,
@@ -144,7 +158,7 @@ class FbrPosController extends Controller
                     'total_amount' => $totalAmount,
                     'payment_method' => $request->payment_method,
                     'status' => 'completed',
-                    'fbr_status' => 'pending',
+                    'fbr_status' => $invoiceMode === 'local' ? 'local' : 'pending',
                     'created_by' => auth()->id(),
                 ]);
 
@@ -154,6 +168,11 @@ class FbrPosController extends Controller
 
                 return $transaction;
             });
+
+            if ($invoiceMode === 'local') {
+                return redirect()->route('fbrpos.show', $transaction->id)
+                    ->with('success', "Local sale #{$transaction->invoice_number} created (PKR " . number_format($transaction->total_amount, 2) . "). FBR Reporting is OFF — invoice saved locally.");
+            }
 
             $transaction->load(['items', 'company']);
             $fbrService = new FbrService();
@@ -178,8 +197,22 @@ class FbrPosController extends Controller
     public function transactions(Request $request)
     {
         $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $tab = $request->get('tab', 'fbr');
 
         $query = FbrPosTransaction::where('company_id', $companyId)->with('creator');
+
+        if ($tab === 'local') {
+            if (!empty($company->confidential_pin) && !$this->isPinSessionValid()) {
+                return redirect()->route('fbrpos.transactions', ['tab' => 'fbr'])
+                    ->with('error', 'PIN verification required to access local invoices.');
+            }
+            $query->where('invoice_mode', 'local');
+        } else {
+            $query->where(function ($q) {
+                $q->where('invoice_mode', 'fbr')->orWhereNull('invoice_mode');
+            });
+        }
 
         if ($request->search) {
             $search = $request->search;
@@ -204,6 +237,13 @@ class FbrPosController extends Controller
         $transactions = $query->latest()->paginate(20)->withQueryString();
 
         $stats = FbrPosTransaction::where('company_id', $companyId)
+            ->where(function ($q) use ($tab) {
+                if ($tab === 'local') {
+                    $q->where('invoice_mode', 'local');
+                } else {
+                    $q->where('invoice_mode', 'fbr')->orWhereNull('invoice_mode');
+                }
+            })
             ->selectRaw("
                 COUNT(*) as total,
                 SUM(CASE WHEN fbr_status = 'submitted' THEN 1 ELSE 0 END) as submitted,
@@ -212,7 +252,20 @@ class FbrPosController extends Controller
             ")
             ->first();
 
-        return view('fbr-pos.transactions', compact('transactions', 'stats'));
+        $localCount = FbrPosTransaction::where('company_id', $companyId)
+            ->where('invoice_mode', 'local')
+            ->count();
+
+        $localRevenue = 0;
+        if ($tab === 'local') {
+            $localRevenue = FbrPosTransaction::where('company_id', $companyId)
+                ->where('invoice_mode', 'local')
+                ->sum('total_amount');
+        }
+
+        $hasPinSet = !empty($company->confidential_pin);
+
+        return view('fbr-pos.transactions', compact('transactions', 'stats', 'tab', 'localCount', 'localRevenue', 'hasPinSet', 'company'));
     }
 
     public function show($id)
@@ -221,6 +274,14 @@ class FbrPosController extends Controller
         $transaction = FbrPosTransaction::where('company_id', $companyId)
             ->with(['items', 'creator', 'fbrLogs'])
             ->findOrFail($id);
+
+        if ($transaction->invoice_mode === 'local') {
+            $company = Company::find($companyId);
+            if (!empty($company->confidential_pin) && !$this->isPinSessionValid()) {
+                return redirect()->route('fbrpos.transactions')
+                    ->with('error', 'PIN verification required to view local invoices.');
+            }
+        }
 
         return view('fbr-pos.show', compact('transaction'));
     }
@@ -370,10 +431,108 @@ class FbrPosController extends Controller
         }
     }
 
+    public function toggleFbrReporting()
+    {
+        if (auth()->user()->role !== 'company_admin') {
+            return response()->json(['success' => false, 'message' => 'Only company admin can toggle FBR reporting.'], 403);
+        }
+
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $company->fbr_reporting_enabled = !$company->fbr_reporting_enabled;
+        $company->save();
+
+        return response()->json([
+            'success' => true,
+            'enabled' => $company->fbr_reporting_enabled,
+            'message' => $company->fbr_reporting_enabled ? 'FBR Reporting enabled' : 'FBR Reporting disabled',
+        ]);
+    }
+
+    public function verifyPin(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        if (empty($company->confidential_pin)) {
+            session(['fbr_pos_pin_verified' => true, 'fbr_pos_pin_verified_at' => now()->timestamp]);
+            return response()->json(['success' => true, 'message' => 'No PIN set — access granted.']);
+        }
+
+        $cacheKey = "fbrpos_pin_lockout_{$companyId}";
+        $attemptsKey = "fbrpos_pin_attempts_{$companyId}";
+
+        if (cache()->get($cacheKey)) {
+            $remaining = (int) ceil((cache()->get($cacheKey) - now()->timestamp) / 60);
+            return response()->json([
+                'success' => false,
+                'message' => "Account locked. Try again in {$remaining} minute(s).",
+            ], 429);
+        }
+
+        $pin = $request->input('pin', '');
+
+        if (!\Hash::check($pin, $company->confidential_pin)) {
+            $attempts = (int) cache()->get($attemptsKey, 0) + 1;
+            cache()->put($attemptsKey, $attempts, 900);
+
+            if ($attempts >= 5) {
+                cache()->put($cacheKey, now()->addMinutes(15)->timestamp, 900);
+                cache()->forget($attemptsKey);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Too many failed attempts. Locked for 15 minutes.',
+                ], 429);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Incorrect PIN. ' . (5 - $attempts) . ' attempt(s) remaining.',
+            ]);
+        }
+
+        cache()->forget($attemptsKey);
+        session(['fbr_pos_pin_verified' => true, 'fbr_pos_pin_verified_at' => now()->timestamp]);
+
+        return response()->json(['success' => true, 'message' => 'PIN verified.']);
+    }
+
+    public function checkPinSession()
+    {
+        return response()->json(['verified' => $this->isPinSessionValid()]);
+    }
+
+    private function isPinSessionValid(): bool
+    {
+        $verified = session('fbr_pos_pin_verified', false);
+        $verifiedAt = session('fbr_pos_pin_verified_at', 0);
+        return $verified && (now()->timestamp - $verifiedAt) < 1800;
+    }
+
     private function generateInvoiceNumber(int $companyId): string
     {
         $year = now()->format('Y');
         $prefix = "FPOS-{$year}-";
+
+        $lastInvoice = FbrPosTransaction::where('company_id', $companyId)
+            ->where('invoice_number', 'like', "{$prefix}%")
+            ->orderByDesc('id')
+            ->value('invoice_number');
+
+        if ($lastInvoice) {
+            $lastNum = (int) str_replace($prefix, '', $lastInvoice);
+            $nextNum = $lastNum + 1;
+        } else {
+            $nextNum = 1;
+        }
+
+        return $prefix . str_pad($nextNum, 5, '0', STR_PAD_LEFT);
+    }
+
+    private function generateLocalInvoiceNumber(int $companyId): string
+    {
+        $year = now()->format('Y');
+        $prefix = "FLOCAL-{$year}-";
 
         $lastInvoice = FbrPosTransaction::where('company_id', $companyId)
             ->where('invoice_number', 'like', "{$prefix}%")

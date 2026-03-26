@@ -5,10 +5,26 @@
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">New FBR POS Sale</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Create a new point of sale transaction</p>
         </div>
-        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold {{ $company->fbr_pos_environment === 'production' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' }}">
-            {{ strtoupper($company->fbr_pos_environment ?? 'sandbox') }}
-        </span>
+        <div class="flex items-center gap-2">
+            @if(!$fbrReportingEnabled)
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                LOCAL MODE
+            </span>
+            @endif
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold {{ $company->fbr_pos_environment === 'production' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' }}">
+                {{ strtoupper($company->fbr_pos_environment ?? 'sandbox') }}
+            </span>
+        </div>
     </div>
+
+    @if(!$fbrReportingEnabled)
+    <div class="mb-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 px-4 py-3 rounded-lg">
+        <div class="flex items-center gap-2">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+            <span class="text-sm font-medium">FBR Reporting is OFF — this invoice will be saved locally as <strong>FLOCAL-xxxx</strong> and will NOT be submitted to FBR.</span>
+        </div>
+    </div>
+    @endif
 
     @if($errors->any())
     <div class="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">

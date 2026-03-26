@@ -306,7 +306,7 @@
                 </form>
                 @endif
                 @if($invoice->share_uuid)
-                <a href="https://wa.me/?text={{ urlencode('Invoice ' . $invoice->display_invoice_number . ': ' . url('/share/invoice/' . $invoice->share_uuid)) }}" target="_blank" class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition">WhatsApp</a>
+                <a href="https://wa.me/?text={{ urlencode('Invoice ' . $invoice->display_invoice_number . "\nDownload PDF: " . url('/share/invoice/' . $invoice->share_uuid . '/pdf')) }}" target="_blank" class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition">WhatsApp</a>
                 @endif
                 @elseif($invoice->status === 'failed')
                 {{-- FAILED: Edit & Fix, Retry Submit, Validate, Delete, Duplicate --}}

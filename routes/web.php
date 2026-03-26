@@ -33,6 +33,7 @@ use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\AnnouncementController;
 
 Route::get('/share/invoice/{uuid}', [ShareController::class, 'show']);
+Route::get('/share/invoice/{uuid}/pdf', [ShareController::class, 'pdf'])->name('share.invoice.pdf');
 
 Route::get('/demo-login/{role}', [\App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'demoLogin'])
     ->where('role', 'super_admin|company_admin|demo');

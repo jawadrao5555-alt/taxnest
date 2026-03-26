@@ -4,64 +4,64 @@
     <meta charset="UTF-8">
     <title>Invoice {{ $transaction->invoice_number }}</title>
     <style>
-        @page { margin: 12mm 18mm; }
+        @page { margin: 10mm 15mm; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'DejaVu Sans', Arial, Helvetica, sans-serif;
-            font-size: 11px;
+            font-size: 10px;
             color: #111827;
-            line-height: 1.5;
+            line-height: 1.4;
             background: #fff;
         }
         .receipt {
-            max-width: 420px;
+            max-width: 100%;
             margin: 0 auto;
         }
 
         .header-bar {
             background-color: #1e1b4b;
-            padding: 20px 22px 16px;
+            padding: 14px 18px 12px;
             text-align: center;
-            margin-bottom: 14px;
+            margin-bottom: 10px;
         }
-        .header-bar .logo { margin-bottom: 8px; }
-        .header-bar .logo img { max-width: 130px; max-height: 48px; object-fit: contain; }
-        .header-bar h1 { font-size: 18px; font-weight: bold; color: #ffffff; margin-bottom: 4px; letter-spacing: 1.5px; text-transform: uppercase; }
-        .header-bar p { font-size: 10px; color: #d1d5db; line-height: 1.6; }
+        .header-bar .logo { margin-bottom: 6px; }
+        .header-bar .logo img { max-width: 110px; max-height: 40px; object-fit: contain; }
+        .header-bar h1 { font-size: 15px; font-weight: bold; color: #ffffff; margin-bottom: 3px; letter-spacing: 1.5px; text-transform: uppercase; }
+        .header-bar p { font-size: 9px; color: #d1d5db; line-height: 1.5; }
 
         .invoice-box {
-            border: 2px solid #111827;
-            padding: 8px 14px;
-            margin: 0 0 12px;
+            border: 1.5px solid #111827;
+            padding: 6px 12px;
+            margin: 0 0 8px;
         }
         .invoice-row { display: table; width: 100%; }
-        .invoice-row .lbl { display: table-cell; width: 36%; font-size: 11px; font-weight: bold; padding: 2px 0; color: #111827; }
-        .invoice-row .val { display: table-cell; width: 64%; font-size: 11px; text-align: right; padding: 2px 0; font-weight: bold; color: #111827; letter-spacing: 0.3px; }
+        .invoice-row .lbl { display: table-cell; width: 36%; font-size: 10px; font-weight: bold; padding: 2px 0; color: #111827; }
+        .invoice-row .val { display: table-cell; width: 64%; font-size: 10px; text-align: right; padding: 2px 0; font-weight: bold; color: #111827; letter-spacing: 0.3px; }
 
         .info-section {
-            padding: 6px 0;
-            margin-bottom: 10px;
+            padding: 4px 0;
+            margin-bottom: 6px;
             border-bottom: 1px solid #d1d5db;
         }
         .info-row { display: table; width: 100%; }
-        .info-row .lbl { display: table-cell; width: 28%; font-size: 10px; font-weight: bold; padding: 3px 0; color: #374151; text-transform: uppercase; letter-spacing: 0.3px; }
-        .info-row .val { display: table-cell; width: 72%; font-size: 10.5px; text-align: right; padding: 3px 0; color: #111827; }
+        .info-row .lbl { display: table-cell; width: 28%; font-size: 9px; font-weight: bold; padding: 2px 0; color: #374151; text-transform: uppercase; letter-spacing: 0.3px; }
+        .info-row .val { display: table-cell; width: 72%; font-size: 9.5px; text-align: right; padding: 2px 0; color: #111827; }
 
         .section-label {
-            font-size: 9px;
+            font-size: 8px;
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 1px;
             color: #374151;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
         }
 
-        table.items { width: 100%; border-collapse: collapse; margin: 6px 0; }
+        table.items { width: 100%; border-collapse: collapse; margin: 4px 0; }
         table.items thead th {
-            font-size: 9.5px;
+            font-size: 8.5px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            padding: 7px 5px;
+            padding: 5px 4px;
             text-align: left;
             font-weight: bold;
             color: #ffffff;
@@ -69,8 +69,8 @@
         }
         table.items thead th.r { text-align: right; }
         table.items tbody td {
-            font-size: 10.5px;
-            padding: 6px 5px;
+            font-size: 9.5px;
+            padding: 4px 4px;
             vertical-align: top;
             border-bottom: 1px solid #e5e7eb;
             color: #111827;
@@ -78,29 +78,29 @@
         table.items tbody tr:nth-child(even) { background-color: #f9fafb; }
         table.items tbody td.r { text-align: right; white-space: nowrap; font-weight: 600; }
         table.items tbody tr:last-child td { border-bottom: none; }
-        .exempt-tag { font-size: 7.5px; font-weight: bold; color: #92400e; background: #fef3c7; padding: 1px 4px; border-radius: 2px; }
+        .exempt-tag { font-size: 7px; font-weight: bold; color: #92400e; background: #fef3c7; padding: 1px 3px; border-radius: 2px; }
 
         .totals-box {
-            border-top: 2px solid #111827;
-            padding: 8px 0;
-            margin: 8px 0;
+            border-top: 1.5px solid #111827;
+            padding: 5px 0;
+            margin: 5px 0;
         }
         .total-row { display: table; width: 100%; }
-        .total-row .lbl { display: table-cell; text-align: left; font-size: 10.5px; padding: 3px 0; color: #374151; }
-        .total-row .val { display: table-cell; text-align: right; font-size: 10.5px; padding: 3px 0; white-space: nowrap; color: #111827; font-weight: 600; }
+        .total-row .lbl { display: table-cell; text-align: left; font-size: 9.5px; padding: 2px 0; color: #374151; }
+        .total-row .val { display: table-cell; text-align: right; font-size: 9.5px; padding: 2px 0; white-space: nowrap; color: #111827; font-weight: 600; }
         .total-row.discount .val { color: #dc2626; }
 
         .grand-total-box {
             background-color: #111827;
-            padding: 12px 16px;
-            margin: 4px 0 12px;
+            padding: 8px 14px;
+            margin: 3px 0 8px;
             display: table;
             width: 100%;
         }
         .grand-total-box .lbl {
             display: table-cell;
             text-align: left;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: bold;
             color: #ffffff;
             vertical-align: middle;
@@ -108,41 +108,41 @@
         .grand-total-box .val {
             display: table-cell;
             text-align: right;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: bold;
             color: #ffffff;
             vertical-align: middle;
         }
 
         .pra-box {
-            border: 2px solid #111827;
-            padding: 10px;
-            margin: 8px 0;
+            border: 1.5px solid #111827;
+            padding: 6px;
+            margin: 5px 0;
             text-align: center;
         }
-        .pra-box .title { font-size: 11px; font-weight: bold; color: #111827; margin-bottom: 3px; letter-spacing: 0.5px; text-transform: uppercase; }
-        .pra-box .num { font-size: 10.5px; font-weight: bold; color: #111827; }
-        .pra-box div { color: #374151; font-size: 9.5px; }
+        .pra-box .title { font-size: 10px; font-weight: bold; color: #111827; margin-bottom: 2px; letter-spacing: 0.5px; text-transform: uppercase; }
+        .pra-box .num { font-size: 9.5px; font-weight: bold; color: #111827; }
+        .pra-box div { color: #374151; font-size: 9px; }
         .local-box {
-            border: 1.5px dashed #6b7280;
-            padding: 8px;
-            margin: 8px 0;
+            border: 1px dashed #6b7280;
+            padding: 5px;
+            margin: 5px 0;
             text-align: center;
-            font-size: 10px;
+            font-size: 9px;
             color: #6b7280;
         }
-        .qr-section { text-align: center; margin: 8px 0; }
-        .qr-section img { width: 100px; height: 100px; }
-        .qr-section p { font-size: 8px; margin-top: 2px; color: #9ca3af; }
+        .qr-section { text-align: center; margin: 5px 0; }
+        .qr-section img { width: 80px; height: 80px; }
+        .qr-section p { font-size: 7px; margin-top: 1px; color: #9ca3af; }
 
         .footer {
-            margin-top: 14px;
+            margin-top: 8px;
             text-align: center;
-            padding-top: 10px;
+            padding-top: 6px;
             border-top: 1px solid #d1d5db;
         }
-        .footer p { font-size: 9px; color: #9ca3af; line-height: 1.6; }
-        .footer .brand { font-size: 10px; font-weight: bold; color: #111827; margin-top: 3px; }
+        .footer p { font-size: 8px; color: #9ca3af; line-height: 1.5; }
+        .footer .brand { font-size: 9px; font-weight: bold; color: #111827; margin-top: 2px; }
     </style>
 </head>
 <body>
@@ -270,14 +270,12 @@
         @endif
         @elseif($transaction->pra_status === 'offline')
         <div class="local-box">
-            OFFLINE INVOICE<br>
-            Will sync to PRA automatically<br>
+            OFFLINE INVOICE — Will sync to PRA automatically<br>
             {{ $transaction->invoice_number }}
         </div>
         @else
         <div class="local-box">
-            LOCAL INVOICE<br>
-            (Not reported to PRA)<br>
+            LOCAL INVOICE (Not reported to PRA)<br>
             {{ $transaction->invoice_number }}
         </div>
         @endif

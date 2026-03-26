@@ -46,6 +46,7 @@ return new class extends Migration
                 'company_id' => $companyId,
                 'role' => 'company_admin',
                 'is_active' => true,
+                'email_verified_at' => now(),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

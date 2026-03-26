@@ -8,7 +8,7 @@ use App\Models\Company;
 
 class ComplianceEngine
 {
-    private const RATE_TOLERANCE = 2.0;
+    private const RATE_TOLERANCE = 5.0;
 
     private const DEDUCTION_RATE_MISMATCH = 15;
     private const DEDUCTION_BUYER_RISK = 20;
@@ -44,8 +44,13 @@ class ComplianceEngine
             $subtotal = $item->price * $item->quantity;
             if ($subtotal <= 0) continue;
 
-            $effectiveRate = ($item->tax / $subtotal) * 100;
-            $expectedRate = self::getExpectedRateForHsCode($item->hs_code, $standardTaxRate);
+            if (($item->is_tax_exempt ?? false) || ($item->tax_exempt ?? false)) {
+                continue;
+            }
+
+            $itemTax = $item->tax ?? 0;
+            $effectiveRate = ($itemTax / $subtotal) * 100;
+            $expectedRate = self::getExpectedRateForHsCode($item->hs_code ?? '', $standardTaxRate);
 
             if (abs($effectiveRate - $expectedRate) > self::RATE_TOLERANCE) {
                 return true;
@@ -56,17 +61,17 @@ class ComplianceEngine
 
     private static function checkBuyerRisk(Invoice $invoice): bool
     {
-        if (empty($invoice->buyer_ntn) || trim($invoice->buyer_ntn) === '') {
+        if (empty($invoice->buyer_name) || strlen(trim($invoice->buyer_name)) < 3) {
             return true;
         }
 
-        $ntn = trim($invoice->buyer_ntn);
+        $ntn = trim($invoice->buyer_ntn ?? '');
+
+        if ($ntn === '') {
+            return false;
+        }
 
         if (!preg_match('/^\d{7}-?\d{1}$/', $ntn) && !preg_match('/^\d{13}$/', $ntn)) {
-            return true;
-        }
-
-        if (empty($invoice->buyer_name) || strlen(trim($invoice->buyer_name)) < 3) {
             return true;
         }
 
@@ -78,12 +83,8 @@ class ComplianceEngine
         $threshold = 50000;
 
         if ($invoice->total_amount > $threshold) {
-            if (empty($invoice->buyer_ntn) || trim($invoice->buyer_ntn) === '') {
-                return true;
-            }
-
-            $ntn = trim($invoice->buyer_ntn);
-            if (!preg_match('/^\d{7}-?\d{1}$/', $ntn)) {
+            $ntn = trim($invoice->buyer_ntn ?? '');
+            if ($ntn !== '' && !preg_match('/^\d{7}-?\d{1}$/', $ntn) && !preg_match('/^\d{13}$/', $ntn)) {
                 return true;
             }
         }
@@ -95,7 +96,6 @@ class ComplianceEngine
     {
         if (empty($invoice->invoice_number)) return true;
         if (empty($invoice->buyer_name)) return true;
-        if (empty($invoice->buyer_ntn)) return true;
         if ($invoice->total_amount <= 0) return true;
 
         if ($invoice->items->isEmpty()) return true;

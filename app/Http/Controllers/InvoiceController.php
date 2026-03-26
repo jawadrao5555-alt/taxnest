@@ -658,16 +658,12 @@ class InvoiceController extends Controller
 
         if ($riskAnalysis['should_block'] && !$isInternalCompany) {
             $riskMessages = array_map(fn($r) => $r['message'], $riskAnalysis['risks']);
-            InvoiceActivityService::log($invoice->id, $invoice->company_id, 'intelligence_blocked', [
+            InvoiceActivityService::log($invoice->id, $invoice->company_id, 'intelligence_warning', [
                 'risk_score' => $riskAnalysis['risk_score'],
                 'risk_level' => $riskAnalysis['risk_level'],
                 'risks' => $riskMessages,
+                'note' => 'Proceeding with submission despite risk warning',
             ]);
-            $message = 'FBR submission blocked - CRITICAL intelligence risk (Score: ' . $riskAnalysis['risk_score'] . '/100). Issues: ' . implode(' | ', array_slice($riskMessages, 0, 3)) . '. Please resolve and resubmit.';
-            if ($request->expectsJson() || $request->ajax()) {
-                return response()->json(['status' => 'error', 'message' => 'Submission blocked', 'error_details' => $message], 422);
-            }
-            return redirect('/invoice/' . $invoice->id)->with('error', $message);
         }
 
         IntelligenceProcessingJob::dispatch($invoice->id);
@@ -776,23 +772,11 @@ class InvoiceController extends Controller
         $scoreResult = HybridComplianceScorer::score($invoice);
 
         if ($scoreResult['risk_level'] === 'CRITICAL') {
-            InvoiceActivityService::log($invoice->id, $invoice->company_id, 'blocked', [
-                'reason' => 'CRITICAL risk level',
+            InvoiceActivityService::log($invoice->id, $invoice->company_id, 'compliance_warning', [
+                'reason' => 'CRITICAL risk level (proceeding with submission)',
                 'score' => $scoreResult['final_score'],
                 'rule_flags' => $scoreResult['rule_result']['flags'],
             ]);
-
-            $flagMessages = [];
-            if ($scoreResult['rule_result']['flags']['RATE_MISMATCH'] ?? false) $flagMessages[] = 'Tax rate mismatch detected';
-            if ($scoreResult['rule_result']['flags']['BUYER_RISK'] ?? false) $flagMessages[] = 'Buyer NTN risk (Section 23)';
-            if ($scoreResult['rule_result']['flags']['BANKING_RISK'] ?? false) $flagMessages[] = 'Banking violation (Section 73)';
-            if ($scoreResult['rule_result']['flags']['STRUCTURE_ERROR'] ?? false) $flagMessages[] = 'Invoice structure error';
-
-            $message = 'FBR submission blocked - CRITICAL compliance risk (Score: ' . $scoreResult['final_score'] . '). Issues: ' . implode(', ', $flagMessages) . '. Please fix and resubmit.';
-            if ($request->expectsJson() || $request->ajax()) {
-                return response()->json(['status' => 'error', 'message' => 'Compliance blocked', 'error_details' => $message], 422);
-            }
-            return redirect('/invoice/' . $invoice->id)->with('error', $message);
         }
 
         $locked = DB::transaction(function () use ($invoice, $scoreResult) {
@@ -1681,7 +1665,7 @@ class InvoiceController extends Controller
         ];
 
         if ($scoreResult['risk_level'] === 'CRITICAL') {
-            $validationResult['fbr_status'] = 'blocked';
+            $validationResult['fbr_status'] = 'warning';
         }
 
         return redirect('/invoice/' . $invoice->id . '/preview')

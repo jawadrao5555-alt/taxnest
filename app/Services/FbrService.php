@@ -1300,9 +1300,11 @@ class FbrService
             $hsCode = $item->hs_code ?? '';
             $uomCode = $this->getUomByHsCode($hsCode, 'U');
 
-            $saleType = $isExempt
-                ? ($env === 'production' ? 'Exempt goods' : 'Exempt')
-                : ($env === 'production' ? 'Goods at standard rate (default)' : 'Goods at standard rate');
+            if ($isExempt) {
+                $saleType = ($env === 'production') ? 'Exempt goods' : 'Exempt';
+            } else {
+                $saleType = 'Goods at standard rate (default)';
+            }
 
             $items[] = [
                 'uoM' => $uomCode,
@@ -1346,7 +1348,9 @@ class FbrService
         ];
 
         if ($env === 'sandbox') {
-            $payload['scenarioId'] = 'SN001';
+            $buyerNtn = trim($transaction->customer_ntn ?? '');
+            $isRegistered = !empty($buyerNtn) && (strlen(preg_replace('/[^0-9]/', '', $buyerNtn)) === 7 || strlen(preg_replace('/[^0-9]/', '', $buyerNtn)) === 13);
+            $payload['scenarioId'] = $isRegistered ? 'SN001' : 'SN006';
         }
 
         return $payload;
@@ -1364,7 +1368,23 @@ class FbrService
             }
         }
 
-        return $this->getApiToken($company);
+        $encryptedToken = '';
+        if ($env === 'production') {
+            $encryptedToken = $company->fbr_production_token ?? '';
+        } else {
+            $encryptedToken = $company->fbr_sandbox_token ?? '';
+        }
+
+        if (empty($encryptedToken)) {
+            Log::warning("FBR POS: No token found for company #{$company->id} in {$env} environment");
+            return '';
+        }
+
+        try {
+            return Crypt::decryptString($encryptedToken);
+        } catch (\Exception $e) {
+            return $encryptedToken;
+        }
     }
 
     private function getFbrPosUrl($company): string
@@ -1405,8 +1425,19 @@ class FbrService
 
         $payload = $this->buildFbrPosPayload($transaction);
 
+        $posEnv = $company->fbr_pos_environment ?? $company->fbr_environment ?? 'sandbox';
         $token = $this->getFbrPosToken($company);
         $url = $this->getFbrPosUrl($company);
+        $tokenSource = !empty($company->fbr_pos_token) ? 'dedicated_pos_token' : "di_{$posEnv}_token";
+
+        Log::info("FBR POS Auth: Company #{$company->id}", [
+            'pos_environment' => $posEnv,
+            'di_environment' => $company->fbr_environment,
+            'token_source' => $tokenSource,
+            'token_present' => !empty($token),
+            'token_preview' => !empty($token) ? substr($token, 0, 8) . '...' . substr($token, -4) : 'NONE',
+            'api_url' => $url,
+        ]);
 
         if (empty($token)) {
             $clearHashOnFailure();

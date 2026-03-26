@@ -277,9 +277,16 @@
                 this.saveMessage = '';
                 this.testMessage = '';
                 try {
+                    var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                    if (!csrfMeta) {
+                        this.saving = false;
+                        this.saveMessage = 'Session error: CSRF token not found. Please refresh the page.';
+                        this.saveSuccess = false;
+                        return;
+                    }
                     let headers = {
                         'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'X-CSRF-TOKEN': csrfMeta.content,
                         'Accept': 'application/json'
                     };
                     let res = await fetch('/company/fbr-settings-ajax', {
@@ -287,6 +294,19 @@
                         headers: headers,
                         body: JSON.stringify(this.form)
                     });
+                    if (res.status === 419) {
+                        this.saving = false;
+                        this.saveMessage = 'Session expired. Please refresh the page and try again.';
+                        this.saveSuccess = false;
+                        return;
+                    }
+                    if (res.status === 302 || res.redirected) {
+                        this.saving = false;
+                        this.saveMessage = 'Session expired. Please login again.';
+                        this.saveSuccess = false;
+                        window.location.reload();
+                        return;
+                    }
                     let data = await res.json();
                     if (!data.success) {
                         this.saving = false;

@@ -137,6 +137,10 @@ class CompanySettingsController extends Controller
     public function updateFbrSettingsAjax(Request $request)
     {
         try {
+            if (!auth()->check()) {
+                return response()->json(['success' => false, 'message' => 'Session expired. Please login again.'], 401);
+            }
+
             $company = Company::find(auth()->user()->company_id);
             if (!$company) {
                 return response()->json(['success' => false, 'message' => 'Company not found.']);
@@ -182,6 +186,11 @@ class CompanySettingsController extends Controller
                 'message' => 'FBR settings saved! Environment: ' . ucfirst($env),
             ]);
         } catch (\Exception $e) {
+            \Log::error('FBR settings save error', [
+                'error' => $e->getMessage(),
+                'company_id' => auth()->check() ? auth()->user()->company_id : null,
+                'trace' => $e->getTraceAsString(),
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Error saving settings: ' . $e->getMessage(),

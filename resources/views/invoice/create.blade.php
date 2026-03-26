@@ -41,7 +41,7 @@
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Branch</h3>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Branch (Optional)</label>
-                        <select name="branch_id" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                        <select name="branch_id" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             <option value="">— Select Branch —</option>
                             @foreach($branches as $branch)
                             <option value="{{ $branch->id }}" {{ old('branch_id') == $branch->id ? 'selected' : '' }}>
@@ -59,7 +59,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Document Type</label>
-                            <select name="document_type" x-model="document_type" @change="onDocTypeChange()" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <select name="document_type" x-model="document_type" @change="onDocTypeChange()" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 <option value="Sale Invoice">Sale Invoice</option>
                                 <option value="Credit Note">Credit Note</option>
                                 <option value="Debit Note">Debit Note</option>
@@ -111,13 +111,13 @@
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer Name *</label>
                             <input type="text" name="buyer_name" x-model="buyer_name" required autofocus
                                 placeholder="Leave empty for Walk-in Customer"
-                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             @error('buyer_name') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer NTN</label>
                             <input type="text" name="buyer_ntn" x-model="buyer_ntn" value="{{ old('buyer_ntn') }}" placeholder="Optional for unregistered"
-                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             @error('buyer_ntn') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                             <p class="text-xs mt-1 font-medium" :class="buyerRegType === 'Registered' ? 'text-emerald-600' : 'text-amber-600'">
                                 <span x-text="buyerRegType === 'Registered' ? '&#9989; FBR Registered' : '&#9888; Unregistered Buyer'"></span>
@@ -128,7 +128,7 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer CNIC</label>
                             <input type="text" name="buyer_cnic" x-model="buyer_cnic" value="{{ old('buyer_cnic') }}" maxlength="15" placeholder="xxxxx-xxxxxxx-x"
-                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             @error('buyer_cnic') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                     </div>
@@ -137,12 +137,12 @@
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer Address *</label>
                             <textarea name="buyer_address" x-model="buyer_address" required rows="2"
                                 placeholder="Auto-filled from company address"
-                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500"></textarea>
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500"></textarea>
                             @error('buyer_address') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Destination Province *</label>
-                            <select name="destination_province" x-model="destination_province" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <select name="destination_province" x-model="destination_province" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 @foreach($provinces as $prov)
                                 <option value="{{ $prov }}" {{ old('destination_province', 'Punjab') === $prov ? 'selected' : '' }}>{{ $prov }}</option>
                                 @endforeach

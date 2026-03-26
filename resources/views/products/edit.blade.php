@@ -1,8 +1,8 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h2 class="font-bold text-xl text-gray-800 leading-tight">Edit Product: {{ $product->name }}</h2>
-            <a href="/products" class="text-sm text-gray-600 hover:text-gray-800">Back to Products</a>
+            <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Edit Product: {{ $product->name }}</h2>
+            <a href="/products" class="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-100">Back to Products</a>
         </div>
     </x-slot>
 
@@ -28,7 +28,7 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Name <span class="text-red-500">*</span></label>
                             <input type="text" name="name" value="{{ old('name', $product->name) }}" required
-                                class="w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                         </div>
                     </div>
                 </div>
@@ -39,13 +39,13 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">HS Code <span class="text-red-500">*</span></label>
                             <input type="text" name="hs_code" value="{{ old('hs_code', $product->hs_code) }}" required placeholder="25232900"
-                                class="w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                            <p class="text-gray-500 text-xs mt-2">e.g., 25232900 for Cement</p>
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <p class="text-gray-500 dark:text-gray-400 text-xs mt-2">e.g., 25232900 for Cement</p>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">PCT Code <span class="text-gray-400 text-xs">(Optional)</span></label>
                             <input type="text" name="pct_code" value="{{ old('pct_code', $product->pct_code) }}"
-                                class="w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                         </div>
                     </div>
 
@@ -53,7 +53,7 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Schedule Type <span class="text-red-500">*</span></label>
                             <select name="schedule_type" required x-model="scheduleType" @change="updateRules()"
-                                class="w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 <option value="">Select Schedule Type</option>
                                 <option value="standard">Standard</option>
                                 <option value="reduced">Reduced</option>
@@ -65,7 +65,7 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Tax Rate (%) <span class="text-red-500">*</span></label>
                             <input type="number" step="1" min="0" max="100" name="default_tax_rate" x-model="taxRate" @input="updateRules()" required
-                                class="w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                         </div>
                     </div>
 
@@ -73,7 +73,7 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Price (PKR) <span class="text-red-500">*</span></label>
                             <input type="number" step="0.01" min="0" name="default_price" x-model="price" @input="calcTax()" required
-                                class="w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
                                 placeholder="0.00">
                         </div>
                         <div>
@@ -83,7 +83,7 @@
                                 <span x-show="!requiresMrp" class="text-gray-400 text-xs">(Optional)</span>
                             </label>
                             <input type="number" step="0.01" min="0" name="mrp" x-model="mrp" @input="mrpManual = true"
-                                class="w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
                                 placeholder="0.00">
                             <p x-show="!mrpManual && parseFloat(mrp) > 0" class="text-xs text-gray-400 mt-1">Auto-filled from price</p>
                             @error('mrp') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
@@ -96,8 +96,8 @@
                             </label>
                             <div class="flex gap-2">
                                 <input type="text" name="sro_reference" x-model="sroReference" placeholder="SRO 1125(I)/2011"
-                                    class="flex-1 rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                                <button type="button" @click="sroLookupOpen = !sroLookupOpen" class="px-2.5 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-500 hover:text-emerald-600 hover:border-emerald-400 transition" title="SRO Lookup">
+                                    class="flex-1 rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                <button type="button" @click="sroLookupOpen = !sroLookupOpen" class="px-2.5 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 hover:text-emerald-600 hover:border-emerald-400 transition" title="SRO Lookup">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                                 </button>
                             </div>
@@ -110,16 +110,16 @@
                                 <span x-show="!requiresSerial" class="text-gray-400 text-xs">(Optional)</span>
                             </label>
                             <input type="text" name="serial_number" x-model="serialNumber" placeholder="e.g., 1, 2, 3..."
-                                class="w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             @error('serial_number') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                     </div>
 
                     <div x-show="sroLookupOpen" x-transition class="mb-6 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 p-3" style="display:none">
                         <div class="flex gap-2 mb-2">
-                            <input type="text" x-model="sroSearch" @keydown.enter.prevent="searchSro()" placeholder="Search SRO rules..." class="flex-1 rounded-lg border-gray-300 dark:border-gray-700 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <input type="text" x-model="sroSearch" @keydown.enter.prevent="searchSro()" placeholder="Search SRO rules..." class="flex-1 rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                             <button type="button" @click="searchSro()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700">Search</button>
-                            <button type="button" @click="sroLookupOpen = false" class="px-2 py-1.5 text-gray-400 hover:text-gray-600">
+                            <button type="button" @click="sroLookupOpen = false" class="px-2 py-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-400">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
                         </div>
@@ -146,7 +146,7 @@
                                 $currentUom = old('uom', $product->uom);
                                 $currentUom = $oldUomMap[$currentUom] ?? $currentUom;
                             @endphp
-                            <select name="uom" required class="w-full rounded-lg border-gray-300 dark:border-gray-700 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <select name="uom" required class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 <option value="">Select UOM</option>
                                 @foreach($uomOptions as $val => $label)
                                     <option value="{{ $val }}" {{ $currentUom === $val ? 'selected' : '' }}>{{ $label }}</option>
@@ -163,19 +163,19 @@
                         <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Tax Calculation Preview (per unit)</h4>
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                             <div class="text-center p-2 bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-700">
-                                <p class="text-xs text-gray-500 mb-1">Price</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Price</p>
                                 <p class="text-sm font-bold text-gray-800 dark:text-gray-200">PKR <span x-text="formatNum(price)">0.00</span></p>
                             </div>
                             <div class="text-center p-2 bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-700">
-                                <p class="text-xs text-gray-500 mb-1">Tax Rate</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Tax Rate</p>
                                 <p class="text-sm font-bold" :class="parseFloat(taxRate) > 0 ? 'text-amber-600' : 'text-gray-800 dark:text-gray-200'"><span x-text="taxRate">0</span>%</p>
                             </div>
                             <div class="text-center p-2 bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-700">
-                                <p class="text-xs text-gray-500 mb-1">Tax Amount</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Tax Amount</p>
                                 <p class="text-sm font-bold text-red-600">PKR <span x-text="formatNum(taxAmount)">0.00</span></p>
                             </div>
                             <div class="text-center p-2 rounded-lg border-2" :class="taxAmount > 0 ? 'bg-emerald-100 dark:bg-emerald-900/40 border-emerald-300 dark:border-emerald-600' : 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-700'">
-                                <p class="text-xs text-gray-500 mb-1">Total (incl. Tax)</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Total (incl. Tax)</p>
                                 <p class="text-sm font-bold text-emerald-700 dark:text-emerald-400">PKR <span x-text="formatNum(totalWithTax)">0.00</span></p>
                             </div>
                         </div>
@@ -189,7 +189,7 @@
                 </div>
 
                 <div class="flex justify-end space-x-3">
-                    <a href="/products" class="px-6 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition">Cancel</a>
+                    <a href="/products" class="px-6 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-800 transition">Cancel</a>
                     <button type="submit" class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition">
                         Update Product
                     </button>
@@ -285,27 +285,27 @@
                 const q = this.sroSearch;
                 const st = this.scheduleType;
                 if (q.length < 2 && !st) {
-                    this.sroResults = '<p class="text-xs text-gray-500">Type at least 2 characters</p>';
+                    this.sroResults = '<p class="text-xs text-gray-500 dark:text-gray-400">Type at least 2 characters</p>';
                     return;
                 }
-                this.sroResults = '<p class="text-xs text-gray-500">Searching...</p>';
+                this.sroResults = '<p class="text-xs text-gray-500 dark:text-gray-400">Searching...</p>';
                 let url = '/api/sro-reference/search?q=' + encodeURIComponent(q);
                 if (st) url += '&schedule_type=' + encodeURIComponent(st);
                 fetch(url).then(r => r.json()).then(data => {
                     const rules = data.sro_rules || [];
                     if (rules.length === 0) {
-                        this.sroResults = '<p class="text-xs text-gray-500">No results found</p>';
+                        this.sroResults = '<p class="text-xs text-gray-500 dark:text-gray-400">No results found</p>';
                         return;
                     }
                     let html = '';
                     rules.forEach(r => {
-                        const badge = {exempt:'bg-green-100 text-green-700', zero_rated:'bg-blue-100 text-blue-700', '3rd_schedule':'bg-purple-100 text-purple-700', reduced:'bg-amber-100 text-amber-700'}[r.schedule_type] || 'bg-gray-100 text-gray-700';
-                        html += '<div class="p-2 bg-white border border-gray-200 rounded cursor-pointer hover:bg-emerald-50 transition" onclick="document.querySelector(\'[x-data]\')._x_dataStack[0].selectSro(\'' + (r.sro_number || '').replace(/'/g, "\\'") + '\')">' +
+                        const badge = {exempt:'bg-green-100 text-green-700', zero_rated:'bg-blue-100 text-blue-700', '3rd_schedule':'bg-purple-100 text-purple-700', reduced:'bg-amber-100 text-amber-700'}[r.schedule_type] || 'bg-gray-100 text-gray-700 dark:text-gray-300';
+                        html += '<div class="p-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded cursor-pointer hover:bg-emerald-50 transition" onclick="document.querySelector(\'[x-data]\')._x_dataStack[0].selectSro(\'' + (r.sro_number || '').replace(/'/g, "\\'") + '\')">' +
                             '<div class="flex items-center justify-between">' +
-                            '<span class="text-sm font-medium text-gray-800">' + (r.sro_number || '') + '</span>' +
+                            '<span class="text-sm font-medium text-gray-800 dark:text-gray-100">' + (r.sro_number || '') + '</span>' +
                             '<span class="text-xs px-1.5 py-0.5 rounded ' + badge + '">' + (r.schedule_type || '').replace('_', ' ') + '</span>' +
                             '</div>' +
-                            '<p class="text-xs text-gray-500 mt-0.5">' + (r.description || '') + '</p>' +
+                            '<p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">' + (r.description || '') + '</p>' +
                             (r.serial_no ? '<p class="text-xs text-gray-400">Serial: ' + r.serial_no + '</p>' : '') +
                             '</div>';
                     });

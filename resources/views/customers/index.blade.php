@@ -14,20 +14,20 @@
                 <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead class="bg-gray-50 dark:bg-gray-800">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer Name</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">NTN</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Invoiced</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Received</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Outstanding</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Customer Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">NTN</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Invoiced</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Received</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Outstanding</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                         @forelse($customers as $customer)
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition" onclick="window.location='/customers/{{ $customer->customer_ntn }}/ledger'">
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-800 cursor-pointer transition" onclick="window.location='/customers/{{ $customer->customer_ntn }}/ledger'">
                             <td class="px-6 py-4 text-sm font-medium text-emerald-700 hover:text-emerald-900">
                                 <a href="/customers/{{ $customer->customer_ntn }}/ledger">{{ $customer->customer_name }}</a>
                             </td>
-                            <td class="px-6 py-4 text-sm font-mono text-gray-600">{{ $customer->customer_ntn }}</td>
+                            <td class="px-6 py-4 text-sm font-mono text-gray-600 dark:text-gray-400">{{ $customer->customer_ntn }}</td>
                             <td class="px-6 py-4 text-sm font-semibold text-gray-900 text-right">PKR {{ number_format($customer->total_invoiced, 2) }}</td>
                             <td class="px-6 py-4 text-sm font-semibold text-green-600 text-right">PKR {{ number_format($customer->total_received, 2) }}</td>
                             <td class="px-6 py-4 text-sm font-bold text-right {{ $customer->outstanding > 0 ? 'text-red-600' : 'text-green-600' }}">

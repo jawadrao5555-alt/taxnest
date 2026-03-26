@@ -92,7 +92,7 @@
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
                             @forelse($sroRules as $rule)
-                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition cursor-pointer" x-data="{ expanded: false }" @click="expanded = !expanded">
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700/50 transition cursor-pointer" x-data="{ expanded: false }" @click="expanded = !expanded">
                                 <td class="px-4 py-3">
                                     <span class="font-mono text-sm font-semibold text-emerald-700 dark:text-emerald-400">{{ $rule->sro_number }}</span>
                                 </td>
@@ -160,7 +160,7 @@
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
                             @forelse($hsWithSro as $hs)
-                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700/50 transition">
                                 <td class="px-4 py-3">
                                     <span class="font-mono text-sm font-semibold text-blue-600 dark:text-blue-400">{{ $hs->hs_code }}</span>
                                 </td>
@@ -259,7 +259,7 @@
                                             'standard' => 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
                                         ];
                                     @endphp
-                                    <span class="px-2 py-1 rounded-full text-xs font-medium {{ $colors[$pattern->schedule_type] ?? 'bg-gray-100 text-gray-800' }}">{{ str_replace('_', ' ', $pattern->schedule_type) }}</span>
+                                    <span class="px-2 py-1 rounded-full text-xs font-medium {{ $colors[$pattern->schedule_type] ?? 'bg-gray-100 text-gray-800 dark:text-gray-100' }}">{{ str_replace('_', ' ', $pattern->schedule_type) }}</span>
                                 </td>
                                 <td class="px-4 py-3">
                                     <span class="text-sm text-gray-700 dark:text-gray-300">{{ $pattern->tax_rate }}%</span>
@@ -276,7 +276,7 @@
                                         <div class="w-16 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                                             <div class="h-full rounded-full {{ $conf >= 70 ? 'bg-green-500' : ($conf >= 40 ? 'bg-yellow-500' : 'bg-red-500') }}" style="width: {{ min(100, $conf) }}%"></div>
                                         </div>
-                                        <span class="text-xs text-gray-500">{{ $conf }}%</span>
+                                        <span class="text-xs text-gray-500 dark:text-gray-400">{{ $conf }}%</span>
                                     </div>
                                 </td>
                             </tr>

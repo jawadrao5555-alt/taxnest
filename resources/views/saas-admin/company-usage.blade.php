@@ -6,7 +6,7 @@
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
-                    <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-800 bg-gray-800/50">
+                    <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-800 bg-gray-800/50">
                         <th class="px-4 py-3">Company</th>
                         <th class="px-4 py-3 text-right">POS Transactions</th>
                         <th class="px-4 py-3 text-right">Total Sales (PKR)</th>
@@ -27,10 +27,10 @@
                         <td class="px-4 py-3 text-right text-gray-300">{{ $stat->active_terminals }}</td>
                         <td class="px-4 py-3 text-right text-gray-300">{{ $stat->active_users }}</td>
                         <td class="px-4 py-3 text-right text-gray-300">{{ $stat->inventory_items }}</td>
-                        <td class="px-4 py-3 text-gray-500 text-xs">{{ $stat->last_activity_at?->diffForHumans() ?? '—' }}</td>
+                        <td class="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{{ $stat->last_activity_at?->diffForHumans() ?? '—' }}</td>
                     </tr>
                     @empty
-                    <tr><td colspan="7" class="px-4 py-12 text-center text-gray-500">No usage data yet.</td></tr>
+                    <tr><td colspan="7" class="px-4 py-12 text-center text-gray-500 dark:text-gray-400">No usage data yet.</td></tr>
                     @endforelse
                 </tbody>
             </table>

@@ -6,7 +6,7 @@
             </div>
         </div>
         <h2 class="text-xl font-bold" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Create Your Account</h2>
-        <p class="text-sm text-gray-500 mt-1">Register your company and become its admin</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Register your company and become its admin</p>
     </div>
 
     <form method="POST" action="{{ route('register') }}">
@@ -24,7 +24,7 @@
             <x-input-error :messages="$errors->get('company_ntn')" class="mt-2" />
         </div>
 
-        <hr class="my-4 border-gray-200/60">
+        <hr class="my-4 border-gray-200 dark:border-gray-700/60">
 
         <div>
             <x-input-label for="name" :value="__('Your Name')" />
@@ -71,7 +71,7 @@
         </div>
 
         <div class="mt-5 text-center">
-            <p class="text-sm text-gray-500">
+            <p class="text-sm text-gray-500 dark:text-gray-400">
                 Already have an account?
                 <a href="{{ route('login') }}" class="font-semibold text-emerald-600 hover:text-emerald-700 transition">Log In</a>
             </p>

@@ -9,7 +9,7 @@
     </div>
 
     <div x-show="!editing">
-        <div class="text-2xl font-bold text-{{ $color }}-400 mb-3">PKR {{ number_format($plan->price, 0) }}<span class="text-sm text-gray-500 font-normal">{{ $plan->product_type === 'pos' ? '/yr' : '/mo' }}</span></div>
+        <div class="text-2xl font-bold text-{{ $color }}-400 mb-3">PKR {{ number_format($plan->price, 0) }}<span class="text-sm text-gray-500 dark:text-gray-400 font-normal">{{ $plan->product_type === 'pos' ? '/yr' : '/mo' }}</span></div>
         <div class="space-y-1.5 text-sm">
             <div class="flex justify-between"><span class="text-gray-400">Invoices{{ $plan->product_type === 'pos' ? '' : '/mo' }}</span><span class="text-white">{{ $plan->invoice_limit > 0 ? number_format($plan->invoice_limit) : ($plan->invoice_limit == -1 ? 'Unlimited' : '0') }}</span></div>
             <div class="flex justify-between"><span class="text-gray-400">Users</span><span class="text-white">{{ ($plan->max_users ?? 0) == -1 ? 'Unlimited' : ($plan->max_users ?? ($plan->user_limit ?? 'N/A')) }}</span></div>
@@ -20,7 +20,7 @@
         </div>
         @if($plan->features && is_array($plan->features) && count($plan->features))
         <div class="mt-3 pt-3 border-t border-gray-800">
-            <p class="text-[10px] text-gray-500 uppercase mb-1.5">Landing Page Features</p>
+            <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase mb-1.5">Landing Page Features</p>
             <div class="space-y-1">
                 @foreach($plan->features as $feature)
                 <div class="flex items-center gap-1.5 text-xs text-gray-300">
@@ -38,34 +38,34 @@
         @method('PUT')
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
-                <label class="text-[10px] text-gray-500 uppercase">Name</label>
+                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Name</label>
                 <input type="text" name="name" value="{{ $plan->name }}" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
             </div>
             <div>
-                <label class="text-[10px] text-gray-500 uppercase">Product Type</label>
+                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Product Type</label>
                 <select name="product_type" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
                     <option value="di" {{ $plan->product_type === 'di' ? 'selected' : '' }}>Digital Invoice</option>
                     <option value="pos" {{ $plan->product_type === 'pos' ? 'selected' : '' }}>POS</option>
                 </select>
             </div>
             <div>
-                <label class="text-[10px] text-gray-500 uppercase">Price (PKR{{ $plan->product_type === 'pos' ? '/yr' : '/mo' }})</label>
+                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Price (PKR{{ $plan->product_type === 'pos' ? '/yr' : '/mo' }})</label>
                 <input type="number" name="price" value="{{ intval($plan->price) }}" step="1" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
             </div>
             <div>
-                <label class="text-[10px] text-gray-500 uppercase">Invoice Limit</label>
+                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Invoice Limit</label>
                 <input type="number" name="invoice_limit" value="{{ $plan->invoice_limit }}" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
             </div>
             <div>
-                <label class="text-[10px] text-gray-500 uppercase">Max Terminals</label>
+                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Max Terminals</label>
                 <input type="number" name="max_terminals" value="{{ $plan->max_terminals }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
             </div>
             <div>
-                <label class="text-[10px] text-gray-500 uppercase">Max Users</label>
+                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Max Users</label>
                 <input type="number" name="max_users" value="{{ $plan->max_users }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
             </div>
             <div>
-                <label class="text-[10px] text-gray-500 uppercase">Max Products</label>
+                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Max Products</label>
                 <input type="number" name="max_products" value="{{ $plan->max_products }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
             </div>
             <div class="flex items-center gap-4 pt-4">
@@ -74,7 +74,7 @@
             </div>
         </div>
         <div>
-            <label class="text-[10px] text-gray-500 uppercase mb-1 block">Features (one per line — shown on landing page)</label>
+            <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase mb-1 block">Features (one per line — shown on landing page)</label>
             <textarea name="features_text" rows="4" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">{{ $plan->features && is_array($plan->features) ? implode("\n", $plan->features) : '' }}</textarea>
         </div>
         <button type="submit" class="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Save Changes</button>

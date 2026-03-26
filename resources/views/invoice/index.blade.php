@@ -21,7 +21,7 @@
                             <div @click.away="closeModal()" class="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800 w-full max-w-4xl max-h-[90vh] overflow-y-auto mx-4">
                                 <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
                                     <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100">Import Invoices from CSV</h3>
-                                    <button @click="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+                                    <button @click="closeModal()" class="text-gray-400 hover:text-gray-600 dark:text-gray-400 text-2xl leading-none">&times;</button>
                                 </div>
 
                                 <div class="p-6">
@@ -37,7 +37,7 @@
                                         <div class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center">
                                             <input type="file" accept=".csv,.txt" @change="handleFileUpload($event)" class="hidden" x-ref="csvInput">
                                             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                                            <p class="mt-2 text-sm text-gray-500">Select a CSV file to upload</p>
+                                            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Select a CSV file to upload</p>
                                             <button @click="$refs.csvInput.click()" class="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition" :disabled="uploading">
                                                 <span x-show="!uploading">Choose File</span>
                                                 <span x-show="uploading">Uploading...</span>
@@ -52,12 +52,12 @@
                                     <div x-show="step === 'preview'" class="space-y-4">
                                         <div class="flex items-center justify-between">
                                             <div class="flex gap-3">
-                                                <span class="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700">Total: <span x-text="totalRows"></span></span>
+                                                <span class="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700 dark:text-gray-300">Total: <span x-text="totalRows"></span></span>
                                                 <span class="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Valid: <span x-text="validCount"></span></span>
                                                 <span x-show="errorCount > 0" class="px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">Errors: <span x-text="errorCount"></span></span>
                                             </div>
                                             <div class="flex gap-2">
-                                                <button @click="resetUpload()" class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-300 transition">Upload Different File</button>
+                                                <button @click="resetUpload()" class="px-3 py-1.5 bg-gray-200 text-gray-700 dark:text-gray-300 rounded-lg text-xs font-medium hover:bg-gray-300 transition">Upload Different File</button>
                                                 <button @click="processCsv()" :disabled="processing || validCount === 0" class="px-4 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
                                                     <span x-show="!processing">Create <span x-text="validCount"></span> Draft(s)</span>
                                                     <span x-show="processing">Processing...</span>
@@ -81,17 +81,17 @@
                                             <table class="min-w-full text-xs">
                                                 <thead class="bg-gray-50 dark:bg-gray-800">
                                                     <tr>
-                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">Row</th>
-                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">Status</th>
-                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">Buyer</th>
-                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">NTN</th>
-                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">Province</th>
-                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">Doc Type</th>
-                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">HS Code</th>
-                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">Description</th>
-                                                        <th class="px-3 py-2 text-right font-medium text-gray-500">Qty</th>
-                                                        <th class="px-3 py-2 text-right font-medium text-gray-500">Price</th>
-                                                        <th class="px-3 py-2 text-right font-medium text-gray-500">Tax</th>
+                                                        <th class="px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">Row</th>
+                                                        <th class="px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">Status</th>
+                                                        <th class="px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">Buyer</th>
+                                                        <th class="px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">NTN</th>
+                                                        <th class="px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">Province</th>
+                                                        <th class="px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">Doc Type</th>
+                                                        <th class="px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">HS Code</th>
+                                                        <th class="px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">Description</th>
+                                                        <th class="px-3 py-2 text-right font-medium text-gray-500 dark:text-gray-400">Qty</th>
+                                                        <th class="px-3 py-2 text-right font-medium text-gray-500 dark:text-gray-400">Price</th>
+                                                        <th class="px-3 py-2 text-right font-medium text-gray-500 dark:text-gray-400">Tax</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -123,7 +123,7 @@
                                         <p class="mt-3 text-lg font-bold text-gray-800 dark:text-gray-100" x-text="resultMessage"></p>
                                         <div x-show="createdInvoices.length > 0" class="mt-4 max-h-48 overflow-y-auto">
                                             <table class="mx-auto text-sm text-left">
-                                                <thead><tr><th class="px-3 py-1 text-gray-500">Invoice #</th><th class="px-3 py-1 text-gray-500">Buyer</th><th class="px-3 py-1 text-gray-500">Amount</th><th class="px-3 py-1 text-gray-500">Items</th></tr></thead>
+                                                <thead><tr><th class="px-3 py-1 text-gray-500 dark:text-gray-400">Invoice #</th><th class="px-3 py-1 text-gray-500 dark:text-gray-400">Buyer</th><th class="px-3 py-1 text-gray-500 dark:text-gray-400">Amount</th><th class="px-3 py-1 text-gray-500 dark:text-gray-400">Items</th></tr></thead>
                                                 <tbody>
                                                     <template x-for="inv in createdInvoices" :key="inv.id">
                                                         <tr>
@@ -170,7 +170,7 @@
                     <input type="hidden" name="tab" value="{{ $tab }}">
                     <button type="submit" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">Search</button>
                     @if(request('search'))
-                    <a href="/invoices?tab={{ $tab }}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">Clear</a>
+                    <a href="/invoices?tab={{ $tab }}" class="px-4 py-2 bg-gray-200 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-300 transition">Clear</a>
                     @endif
                 </form>
             </div>
@@ -191,7 +191,7 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-200">
+                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                             @forelse($invoices as $invoice)
                             <tr class="even:bg-gray-50/50 dark:even:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
                                 <td class="px-6 py-4 whitespace-nowrap">
@@ -208,17 +208,17 @@
                                     @elseif($invoice->document_type === 'Debit Note')
                                         <span class="px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-medium">DN</span>
                                     @else
-                                        <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-600 font-medium">INV</span>
+                                        <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-600 dark:text-gray-400 font-medium">INV</span>
                                     @endif
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{{ $invoice->buyer_name }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $invoice->buyer_ntn }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $invoice->branch->name ?? '—' }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ $invoice->buyer_name }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $invoice->buyer_ntn }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $invoice->branch->name ?? '—' }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">PKR {{ number_format($invoice->total_amount, 2) }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $invoice->items->count() }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $invoice->items->count() }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold
-                                        @if($invoice->status === 'draft') bg-gray-200 text-gray-700
+                                        @if($invoice->status === 'draft') bg-gray-200 text-gray-700 dark:text-gray-300
                                         @elseif($invoice->status === 'failed') bg-red-100 text-red-800
                                         @elseif($invoice->status === 'locked') bg-green-100 text-green-800
                                         @elseif($invoice->status === 'pending_verification') bg-amber-100 text-amber-800
@@ -231,7 +231,7 @@
                                         @elseif($invoice->fbr_status === 'validated') bg-emerald-100 text-emerald-700
                                         @elseif($invoice->fbr_status === 'failed' || $invoice->fbr_status === 'validation_failed') bg-red-100 text-red-700
                                         @elseif($invoice->fbr_status === 'sandbox') bg-amber-100 text-amber-700
-                                        @else bg-gray-100 text-gray-700
+                                        @else bg-gray-100 text-gray-700 dark:text-gray-300
                                         @endif">
                                         {{ $invoice->fbr_status === 'production' ? 'Production' : ($invoice->fbr_status === 'validation_failed' ? 'Val. Failed' : ucfirst($invoice->fbr_status)) }}
                                     </span>
@@ -267,7 +267,7 @@
                                     </div>
                                     @endif
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $invoice->created_at->format('d M Y') }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $invoice->created_at->format('d M Y') }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm space-x-2">
                                     <a href="/invoice/{{ $invoice->id }}" class="text-emerald-600 hover:text-emerald-800 font-medium">View</a>
                                     @if($tab === 'draft')
@@ -285,42 +285,42 @@
                                         @endif
                                         <div x-data="{ showWhtModal: false, pdfWhtRate: {{ $invoice->wht_rate ?? 0 }}, whtLocked: {{ $invoice->wht_locked ? 'true' : 'false' }}, saving: false }" class="inline-block">
                                             <template x-if="whtLocked">
-                                                <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="text-gray-600 hover:text-gray-800 font-medium">Download</a>
+                                                <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="text-gray-600 hover:text-gray-800 dark:text-gray-100 font-medium">Download</a>
                                             </template>
                                             <template x-if="!whtLocked">
-                                                <button @click="showWhtModal = true" class="text-gray-600 hover:text-gray-800 font-medium">Download</button>
+                                                <button @click="showWhtModal = true" class="text-gray-600 hover:text-gray-800 dark:text-gray-100 font-medium">Download</button>
                                             </template>
                                             <div x-show="showWhtModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background-color: rgba(0,0,0,0.4);">
                                                 <div @click.away="showWhtModal = false" class="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800 p-6 w-80 max-w-[90vw]">
                                                     <div class="flex items-center justify-between mb-4">
-                                                        <p class="text-base font-bold text-gray-800">Withholding Tax Rate</p>
-                                                        <button @click="showWhtModal = false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                                                        <p class="text-base font-bold text-gray-800 dark:text-gray-100">Withholding Tax Rate</p>
+                                                        <button @click="showWhtModal = false" class="text-gray-400 hover:text-gray-600 dark:text-gray-400 text-xl leading-none">&times;</button>
                                                     </div>
                                                     <div class="space-y-2 mb-4">
                                                         <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                                            :class="pdfWhtRate == 0 ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 hover:bg-gray-50'">
+                                                            :class="pdfWhtRate == 0 ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50'">
                                                             <input type="radio" value="0" x-model.number="pdfWhtRate" class="text-emerald-500">
-                                                            <span class="text-sm font-semibold text-gray-800">No WHT (0%)</span>
+                                                            <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">No WHT (0%)</span>
                                                         </label>
                                                         <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                                            :class="pdfWhtRate == 0.5 ? 'border-amber-400 bg-amber-50' : 'border-gray-200 hover:bg-gray-50'">
+                                                            :class="pdfWhtRate == 0.5 ? 'border-amber-400 bg-amber-50' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50'">
                                                             <input type="radio" value="0.5" x-model.number="pdfWhtRate" class="text-amber-500">
-                                                            <span class="text-sm font-semibold text-gray-800">WHT 0.5%</span>
+                                                            <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">WHT 0.5%</span>
                                                         </label>
                                                         <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                                            :class="pdfWhtRate == 1 ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'">
+                                                            :class="pdfWhtRate == 1 ? 'border-blue-400 bg-blue-50' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50'">
                                                             <input type="radio" value="1" x-model.number="pdfWhtRate" class="text-blue-500">
-                                                            <span class="text-sm font-semibold text-gray-800">WHT 1%</span>
+                                                            <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">WHT 1%</span>
                                                         </label>
                                                         <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                                            :class="pdfWhtRate == 2 ? 'border-orange-400 bg-orange-50' : 'border-gray-200 hover:bg-gray-50'">
+                                                            :class="pdfWhtRate == 2 ? 'border-orange-400 bg-orange-50' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50'">
                                                             <input type="radio" value="2" x-model.number="pdfWhtRate" class="text-orange-500">
-                                                            <span class="text-sm font-semibold text-gray-800">WHT 2%</span>
+                                                            <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">WHT 2%</span>
                                                         </label>
                                                         <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                                            :class="pdfWhtRate == 2.5 ? 'border-red-400 bg-red-50' : 'border-gray-200 hover:bg-gray-50'">
+                                                            :class="pdfWhtRate == 2.5 ? 'border-red-400 bg-red-50' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50'">
                                                             <input type="radio" value="2.5" x-model.number="pdfWhtRate" class="text-red-500">
-                                                            <span class="text-sm font-semibold text-gray-800">WHT 2.5%</span>
+                                                            <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">WHT 2.5%</span>
                                                         </label>
                                                     </div>
                                                     <button @click="
@@ -353,7 +353,7 @@
                             <tr>
                                 <td colspan="10" class="px-6 py-12 text-center">
                                     <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                                    <p class="mt-2 text-gray-500">No invoices yet</p>
+                                    <p class="mt-2 text-gray-500 dark:text-gray-400">No invoices yet</p>
                                     <a href="/invoice/create" class="mt-3 inline-block text-emerald-600 hover:text-emerald-700 font-medium">Create your first invoice</a>
                                 </td>
                             </tr>

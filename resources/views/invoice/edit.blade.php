@@ -12,7 +12,7 @@
                     <span class="text-gray-600 dark:text-gray-300 font-medium">Edit</span>
                 </nav>
                 <div class="flex items-center space-x-3">
-                    <a href="/invoice/{{ $invoice->id }}" class="inline-flex items-center text-gray-500 hover:text-emerald-600 transition text-sm">
+                    <a href="/invoice/{{ $invoice->id }}" class="inline-flex items-center text-gray-500 dark:text-gray-400 hover:text-emerald-600 transition text-sm">
                         <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                         Back to Invoice
                     </a>
@@ -214,7 +214,7 @@
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">PCT Code</label>
                                     <input type="text" :name="'items[' + index + '][pct_code]'" x-model="item.pct_code" placeholder="Auto from HS/Product"
-                                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm bg-gray-50 dark:bg-gray-600 dark:text-gray-300 focus:ring-emerald-500 focus:border-emerald-500" readonly>
+                                        class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm text-sm bg-gray-50 dark:bg-gray-600 dark:text-gray-300 focus:ring-emerald-500 focus:border-emerald-500" readonly>
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tax Rate (%)</label>
@@ -226,7 +226,7 @@
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3" x-show="item.requires_sro || item.requires_serial || item.optional_sro" x-cloak>
                                 <div x-show="item.requires_sro || item.optional_sro">
                                     <div class="flex items-center justify-between mb-1">
-                                        <label class="block text-xs font-medium" :class="item.requires_sro ? 'text-amber-600' : 'text-gray-500'" x-text="item.requires_sro ? 'SRO Schedule No *' : 'SRO Schedule No (optional)'"></label>
+                                        <label class="block text-xs font-medium" :class="item.requires_sro ? 'text-amber-600' : 'text-gray-500 dark:text-gray-400'" x-text="item.requires_sro ? 'SRO Schedule No *' : 'SRO Schedule No (optional)'"></label>
                                         <button type="button" @click="$dispatch('open-sro-modal', { itemIndex: index })" class="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 font-medium flex items-center gap-1">
                                             <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                                             SRO Reference
@@ -237,7 +237,7 @@
                                         class="w-full rounded-lg shadow-sm text-sm">
                                 </div>
                                 <div x-show="item.requires_serial || item.optional_serial">
-                                    <label class="block text-xs font-medium mb-1" :class="item.requires_serial ? 'text-amber-600' : 'text-gray-500'" x-text="item.requires_serial ? 'SRO Item Serial No *' : 'SRO Item Serial No (optional)'"></label>
+                                    <label class="block text-xs font-medium mb-1" :class="item.requires_serial ? 'text-amber-600' : 'text-gray-500 dark:text-gray-400'" x-text="item.requires_serial ? 'SRO Item Serial No *' : 'SRO Item Serial No (optional)'"></label>
                                     <input type="text" :name="'items[' + index + '][serial_no]'" x-model="item.serial_no" placeholder="e.g. 42"
                                         :class="item.requires_serial ? 'border-amber-300 bg-amber-50 focus:ring-amber-500 focus:border-amber-500' : 'border-gray-300 focus:ring-emerald-500 focus:border-emerald-500'"
                                         class="w-full rounded-lg shadow-sm text-sm">
@@ -383,7 +383,7 @@
                 </div>
 
                 <div class="flex justify-end space-x-3">
-                    <a href="/invoice/{{ $invoice->id }}" class="px-6 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition">Cancel</a>
+                    <a href="/invoice/{{ $invoice->id }}" class="px-6 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700 transition">Cancel</a>
                     <button type="submit" class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition">Update Invoice</button>
                 </div>
             </form>
@@ -773,7 +773,7 @@
                             <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100">SRO & Serial Reference</h3>
                             <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Search and select SRO numbers for your invoice items</p>
                         </div>
-                        <button @click="isOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                        <button @click="isOpen = false" class="text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                     </div>
@@ -819,7 +819,7 @@
                                                         'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400': rule.schedule_type === 'reduced',
                                                         'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300': rule.schedule_type === 'standard',
                                                     }" x-text="rule.schedule_type.replace('_', ' ')"></span>
-                                                <span x-show="rule.concessionary_rate !== null" class="text-xs text-gray-500" x-text="rule.concessionary_rate + '%'"></span>
+                                                <span x-show="rule.concessionary_rate !== null" class="text-xs text-gray-500 dark:text-gray-400" x-text="rule.concessionary_rate + '%'"></span>
                                             </div>
                                         </div>
                                         <span class="text-xs text-emerald-600 dark:text-emerald-400 opacity-0 group-hover:opacity-100 transition font-medium">Use</span>
@@ -843,7 +843,7 @@
                                             <p class="text-xs text-gray-600 dark:text-gray-300" x-text="hs.description"></p>
                                             <div class="flex items-center gap-2 mt-1.5">
                                                 <span x-show="hs.default_sro_number" class="font-mono text-xs text-emerald-700 dark:text-emerald-400" x-text="'SRO: ' + hs.default_sro_number"></span>
-                                                <span x-show="hs.default_tax_rate !== null" class="text-xs text-gray-500" x-text="hs.default_tax_rate + '%'"></span>
+                                                <span x-show="hs.default_tax_rate !== null" class="text-xs text-gray-500 dark:text-gray-400" x-text="hs.default_tax_rate + '%'"></span>
                                             </div>
                                         </div>
                                         <span class="text-xs text-emerald-600 dark:text-emerald-400 opacity-0 group-hover:opacity-100 transition font-medium">Use</span>

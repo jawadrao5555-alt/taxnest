@@ -63,29 +63,29 @@
                 <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead class="bg-gray-50 dark:bg-gray-800">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Username / Phone</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Joined</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Email</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Username / Phone</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Role</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Joined</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                         @forelse($users as $user)
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-800 transition">
                             <td class="px-6 py-4 text-sm font-medium text-gray-900">
                                 {{ $user->name }}
                                 @if($user->id === auth()->id())
                                 <span class="text-xs text-emerald-600 font-normal">(You)</span>
                                 @endif
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-600">{{ $user->email }}</td>
-                            <td class="px-6 py-4 text-sm text-gray-600">
-                                @if($user->username)<span class="text-gray-800">{{ $user->username }}</span>@endif
+                            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ $user->email }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                                @if($user->username)<span class="text-gray-800 dark:text-gray-100">{{ $user->username }}</span>@endif
                                 @if($user->username && $user->phone) <br> @endif
-                                @if($user->phone)<span class="text-gray-500">{{ $user->phone }}</span>@endif
+                                @if($user->phone)<span class="text-gray-500 dark:text-gray-400">{{ $user->phone }}</span>@endif
                                 @if(!$user->username && !$user->phone)<span class="text-gray-400">-</span>@endif
                             </td>
                             <td class="px-6 py-4">
@@ -93,7 +93,7 @@
                                     <span x-show="!editing" class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium
                                         @if($user->role === 'company_admin') bg-blue-100 text-blue-800
                                         @elseif($user->role === 'employee') bg-green-100 text-green-800
-                                        @else bg-gray-100 text-gray-800
+                                        @else bg-gray-100 text-gray-800 dark:text-gray-100
                                         @endif">
                                         {{ ucfirst(str_replace('_', ' ', $user->role)) }}
                                     </span>
@@ -108,7 +108,7 @@
                                             <option value="viewer" {{ $user->role === 'viewer' ? 'selected' : '' }}>Viewer</option>
                                         </select>
                                         <button type="submit" class="text-xs text-emerald-600 hover:text-emerald-800 font-medium">Save</button>
-                                        <button type="button" @click="editing = false" class="text-xs text-gray-500">Cancel</button>
+                                        <button type="button" @click="editing = false" class="text-xs text-gray-500 dark:text-gray-400">Cancel</button>
                                     </form>
                                     @endif
                                 </div>
@@ -120,7 +120,7 @@
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Inactive</span>
                                 @endif
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-500">{{ $user->created_at->format('d M Y') }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{{ $user->created_at->format('d M Y') }}</td>
                             <td class="px-6 py-4 text-sm">
                                 @if($user->id !== auth()->id())
                                 <div class="flex items-center gap-2">

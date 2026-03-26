@@ -7,25 +7,25 @@
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-800 dark:text-white">WHT Manager</h1>
-            <p class="text-sm text-gray-500 mt-1">View and correct Withholding Tax rates on all locked invoices</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">View and correct Withholding Tax rates on all locked invoices</p>
         </div>
     </div>
 
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Locked</p>
+            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Locked</p>
             <p class="text-2xl font-bold text-gray-800 dark:text-white mt-1">{{ $stats['total_locked'] }}</p>
         </div>
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">With WHT</p>
+            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">With WHT</p>
             <p class="text-2xl font-bold text-blue-600 mt-1">{{ $stats['with_wht'] }}</p>
         </div>
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">No WHT (0%)</p>
+            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">No WHT (0%)</p>
             <p class="text-2xl font-bold text-emerald-600 mt-1">{{ $stats['no_wht'] }}</p>
         </div>
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total WHT Amount</p>
+            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total WHT Amount</p>
             <p class="text-2xl font-bold text-amber-600 mt-1">PKR {{ number_format($stats['total_wht_amount'], 2) }}</p>
         </div>
     </div>
@@ -55,33 +55,33 @@
             <table class="min-w-full">
                 <thead>
                     <tr class="bg-gray-50 dark:bg-gray-800">
-                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Invoice #</th>
-                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">FBR #</th>
-                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Buyer</th>
-                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Date</th>
-                        <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Total</th>
-                        <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">WHT Rate</th>
-                        <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">WHT Amount</th>
-                        <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Invoice #</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">FBR #</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Buyer</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                        <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
+                        <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">WHT Rate</th>
+                        <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">WHT Amount</th>
+                        <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     @forelse($invoices as $invoice)
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition {{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-900/50' : '' }}"
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:hover:bg-gray-800/50 transition {{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-900/50' : '' }}"
                         x-data="whtRow_{{ $invoice->id }}()" id="whtRow{{ $invoice->id }}">
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-white">
                             <a href="/invoice/{{ $invoice->id }}" class="text-emerald-600 hover:text-emerald-700 hover:underline">
                                 {{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? '#'.$invoice->id }}
                             </a>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $invoice->fbr_invoice_number ?? '-' }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $invoice->fbr_invoice_number ?? '-' }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 max-w-[200px] truncate">{{ $invoice->buyer_name }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $invoice->created_at->format('d M Y') }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $invoice->created_at->format('d M Y') }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-700 dark:text-gray-300 font-medium">PKR {{ number_format($invoice->total_amount, 2) }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-center">
                             <span x-text="currentRate + '%'"
-                                :class="currentRate > 0 ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-600 border-gray-200'"
+                                :class="currentRate > 0 ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700'"
                                 class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border"></span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-medium" :class="currentRate > 0 ? 'text-blue-600' : 'text-gray-400'">
@@ -93,7 +93,7 @@
                             @elseif($invoice->status === 'draft')
                             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">Draft</span>
                             @else
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">{{ ucfirst($invoice->status) }}</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700">{{ ucfirst($invoice->status) }}</span>
                             @endif
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-center">
@@ -102,7 +102,7 @@
                                     <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                     Correct
                                 </button>
-                                <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center px-3 py-1.5 bg-gray-50 border border-gray-200 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-100 transition">
+                                <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center px-3 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 rounded-lg text-xs font-medium hover:bg-gray-100 transition">
                                     <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                     PDF
                                 </a>
@@ -113,37 +113,37 @@
                                     <div class="flex items-center justify-between mb-4">
                                         <div>
                                             <p class="text-base font-bold text-gray-800 dark:text-white">Correct WHT Rate</p>
-                                            <p class="text-xs text-gray-500 mt-0.5">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number }} - {{ $invoice->buyer_name }}</p>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number }} - {{ $invoice->buyer_name }}</p>
                                         </div>
-                                        <button @click="showModal = false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                                        <button @click="showModal = false" class="text-gray-400 hover:text-gray-600 dark:text-gray-400 text-xl leading-none">&times;</button>
                                     </div>
-                                    <p class="text-xs text-gray-500 mb-1">Current: <span class="font-bold" x-text="currentRate + '%'"></span></p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Current: <span class="font-bold" x-text="currentRate + '%'"></span></p>
                                     <p class="text-xs text-amber-600 mb-3">Invoice and PDF will update with the new rate.</p>
                                     <div class="space-y-2 mb-4">
                                         <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                            :class="newRate == 0 ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 hover:bg-gray-50'">
+                                            :class="newRate == 0 ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50'">
                                             <input type="radio" value="0" x-model.number="newRate" class="text-emerald-500">
-                                            <span class="text-sm font-semibold text-gray-800">No WHT (0%)</span>
+                                            <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">No WHT (0%)</span>
                                         </label>
                                         <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                            :class="newRate == 0.5 ? 'border-amber-400 bg-amber-50' : 'border-gray-200 hover:bg-gray-50'">
+                                            :class="newRate == 0.5 ? 'border-amber-400 bg-amber-50' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50'">
                                             <input type="radio" value="0.5" x-model.number="newRate" class="text-amber-500">
-                                            <span class="text-sm font-semibold text-gray-800">WHT 0.5%</span>
+                                            <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">WHT 0.5%</span>
                                         </label>
                                         <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                            :class="newRate == 1 ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'">
+                                            :class="newRate == 1 ? 'border-blue-400 bg-blue-50' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50'">
                                             <input type="radio" value="1" x-model.number="newRate" class="text-blue-500">
-                                            <span class="text-sm font-semibold text-gray-800">WHT 1%</span>
+                                            <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">WHT 1%</span>
                                         </label>
                                         <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                            :class="newRate == 2 ? 'border-orange-400 bg-orange-50' : 'border-gray-200 hover:bg-gray-50'">
+                                            :class="newRate == 2 ? 'border-orange-400 bg-orange-50' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50'">
                                             <input type="radio" value="2" x-model.number="newRate" class="text-orange-500">
-                                            <span class="text-sm font-semibold text-gray-800">WHT 2%</span>
+                                            <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">WHT 2%</span>
                                         </label>
                                         <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
-                                            :class="newRate == 2.5 ? 'border-red-400 bg-red-50' : 'border-gray-200 hover:bg-gray-50'">
+                                            :class="newRate == 2.5 ? 'border-red-400 bg-red-50' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50'">
                                             <input type="radio" value="2.5" x-model.number="newRate" class="text-red-500">
-                                            <span class="text-sm font-semibold text-gray-800">WHT 2.5%</span>
+                                            <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">WHT 2.5%</span>
                                         </label>
                                     </div>
                                     <button @click="saveCorrection()" :disabled="saving || newRate == currentRate" class="w-full px-4 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-bold hover:bg-amber-700 transition disabled:opacity-50">
@@ -199,7 +199,7 @@
                     <tr>
                         <td colspan="9" class="px-6 py-12 text-center">
                             <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                            <p class="mt-2 text-gray-500">No WHT-locked invoices found</p>
+                            <p class="mt-2 text-gray-500 dark:text-gray-400">No WHT-locked invoices found</p>
                             <p class="text-xs text-gray-400 mt-1">Invoices will appear here after WHT rate is locked</p>
                         </td>
                     </tr>

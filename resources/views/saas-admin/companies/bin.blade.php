@@ -1,9 +1,9 @@
 <x-admin-layout>
 <div class="p-4 sm:p-6 max-w-7xl mx-auto" x-data="{ deleteId: null, deleteName: '' }">
     <div class="flex items-center gap-3 mb-6">
-        <a href="{{ route('saas.admin.companies') }}" class="text-gray-500 hover:text-indigo-400 transition text-sm">&larr; Back to Companies</a>
+        <a href="{{ route('saas.admin.companies') }}" class="text-gray-500 dark:text-gray-400 hover:text-indigo-400 transition text-sm">&larr; Back to Companies</a>
         <h1 class="text-2xl font-bold text-white">Bin</h1>
-        <span class="text-xs text-gray-500">({{ $companies->total() }} deleted)</span>
+        <span class="text-xs text-gray-500 dark:text-gray-400">({{ $companies->total() }} deleted)</span>
     </div>
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
@@ -17,7 +17,7 @@
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
-                    <tr class="text-left text-[10px] text-gray-500 uppercase border-b border-gray-800 bg-gray-800/50">
+                    <tr class="text-left text-[10px] text-gray-500 dark:text-gray-400 uppercase border-b border-gray-800 bg-gray-800/50">
                         <th class="px-4 py-3">Company</th>
                         <th class="px-4 py-3 text-center">Type</th>
                         <th class="px-4 py-3 hidden sm:table-cell">Reason</th>
@@ -31,13 +31,13 @@
                     <tr class="hover:bg-gray-800/50">
                         <td class="px-4 py-3">
                             <span class="text-white font-medium">{{ $company->name }}</span>
-                            <p class="text-[10px] text-gray-600">{{ $company->ntn ?? '' }} &middot; {{ $company->owner_name ?? '' }}</p>
+                            <p class="text-[10px] text-gray-600 dark:text-gray-400">{{ $company->ntn ?? '' }} &middot; {{ $company->owner_name ?? '' }}</p>
                         </td>
                         <td class="px-4 py-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ $tc[$company->product_type] ?? 'bg-gray-800 text-gray-400' }}">{{ $company->product_type }}</span>
                         </td>
                         <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ $company->deleted_reason ?? '—' }}</td>
-                        <td class="px-4 py-3 text-gray-500 text-xs hidden sm:table-cell">{{ $company->deleted_at->format('d M Y, h:i A') }}</td>
+                        <td class="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs hidden sm:table-cell">{{ $company->deleted_at->format('d M Y, h:i A') }}</td>
                         <td class="px-4 py-3 text-center">
                             <div class="flex items-center justify-center gap-1">
                                 <form method="POST" action="{{ route('saas.admin.companies.restore', $company->id) }}" class="inline">
@@ -51,8 +51,8 @@
                     @empty
                     <tr>
                         <td colspan="5" class="px-4 py-12 text-center">
-                            <svg class="w-12 h-12 mx-auto text-gray-700 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                            <p class="text-gray-500">Bin is empty</p>
+                            <svg class="w-12 h-12 mx-auto text-gray-700 dark:text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            <p class="text-gray-500 dark:text-gray-400">Bin is empty</p>
                         </td>
                     </tr>
                     @endforelse

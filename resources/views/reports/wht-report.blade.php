@@ -141,7 +141,7 @@
                         </thead>
                         <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                             @forelse($results as $row)
-                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-800 transition">
                                 <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 font-mono">{{ $row->period_label }}</td>
                                 <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{{ $row->buyer_name }}</td>
                                 <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 font-mono">{{ $row->buyer_ntn ?? '-' }}</td>

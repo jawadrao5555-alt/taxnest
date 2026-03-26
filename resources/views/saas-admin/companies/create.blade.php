@@ -1,7 +1,7 @@
 <x-admin-layout>
 <div class="p-4 sm:p-6 max-w-4xl mx-auto">
     <div class="flex items-center gap-3 mb-6">
-        <a href="{{ route('saas.admin.companies') }}" class="text-gray-500 hover:text-indigo-400 transition text-sm">&larr; Back</a>
+        <a href="{{ route('saas.admin.companies') }}" class="text-gray-500 dark:text-gray-400 hover:text-indigo-400 transition text-sm">&larr; Back</a>
         <h1 class="text-2xl font-bold text-white">Create New Company</h1>
     </div>
 
@@ -26,7 +26,7 @@
                     </div>
                     <div>
                         <p class="text-sm font-semibold text-white">Digital Invoice</p>
-                        <p class="text-[10px] text-gray-500">FBR integrated invoicing</p>
+                        <p class="text-[10px] text-gray-500 dark:text-gray-400">FBR integrated invoicing</p>
                     </div>
                 </label>
                 <label :class="productType === 'pos' ? 'border-purple-500 bg-purple-900/20' : 'border-gray-700 hover:border-gray-600'" class="relative flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition">
@@ -36,7 +36,7 @@
                     </div>
                     <div>
                         <p class="text-sm font-semibold text-white">NestPOS</p>
-                        <p class="text-[10px] text-gray-500">PRA integrated POS</p>
+                        <p class="text-[10px] text-gray-500 dark:text-gray-400">PRA integrated POS</p>
                     </div>
                 </label>
             </div>
@@ -123,7 +123,7 @@
 
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-white mb-1">Company Admin Account</h3>
-            <p class="text-xs text-gray-500 mb-4">This user will be the company administrator.</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">This user will be the company administrator.</p>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                     <label class="text-xs text-gray-400 mb-1 block">Admin Name <span class="text-red-400">*</span></label>

@@ -15,7 +15,7 @@
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
-                    <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-800 bg-gray-800/50">
+                    <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-800 bg-gray-800/50">
                         <th class="px-4 py-3">Date</th>
                         <th class="px-4 py-3">Admin</th>
                         <th class="px-4 py-3">Action</th>
@@ -30,14 +30,14 @@
                         <td class="px-4 py-3 text-gray-300">{{ $log->admin->name ?? 'System' }}</td>
                         <td class="px-4 py-3 text-white font-medium">{{ $log->action }}</td>
                         <td class="px-4 py-3 text-gray-400 text-xs">{{ $log->target_type ? $log->target_type . ' #' . $log->target_id : '—' }}</td>
-                        <td class="px-4 py-3 text-gray-500 text-xs max-w-[200px] truncate">
+                        <td class="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs max-w-[200px] truncate">
                             @if($log->metadata)
                             {{ collect($log->metadata)->map(fn($v, $k) => "$k: $v")->implode(', ') }}
                             @else — @endif
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="5" class="px-4 py-12 text-center text-gray-500">No audit logs found.</td></tr>
+                    <tr><td colspan="5" class="px-4 py-12 text-center text-gray-500 dark:text-gray-400">No audit logs found.</td></tr>
                     @endforelse
                 </tbody>
             </table>

@@ -70,7 +70,7 @@
         }
     </style>
 </head>
-<body class="antialiased text-gray-800 overflow-x-hidden" style="scroll-behavior: smooth;" x-data="{ showLoginModal: {{ isset($showLogin) && $showLogin ? 'true' : 'false' }} }">
+<body class="antialiased text-gray-800 dark:text-gray-100 overflow-x-hidden" style="scroll-behavior: smooth;" x-data="{ showLoginModal: {{ isset($showLogin) && $showLogin ? 'true' : 'false' }} }">
 
     <div x-show="showLoginModal" x-cloak x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4" @click.self="showLoginModal = false" @keydown.escape.window="showLoginModal = false">
         <div x-show="showLoginModal" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95 translate-y-4" x-transition:enter-end="opacity-100 scale-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="w-full max-w-md relative overflow-hidden rounded-2xl" style="background: linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%); box-shadow: 0 25px 60px -12px rgba(0,0,0,0.5);">
@@ -128,7 +128,7 @@
         </div>
     </div>
 
-    <nav class="fixed top-0 w-full z-50 bg-white/95 backdrop-blur-2xl border-b border-gray-200/60 shadow-sm">
+    <nav class="fixed top-0 w-full z-50 bg-white/95 backdrop-blur-2xl border-b border-gray-200 dark:border-gray-700/60 shadow-sm">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex flex-wrap items-center justify-between gap-y-2 py-3">
                 <div class="flex items-center space-x-3">
@@ -149,16 +149,16 @@
                 </div>
 
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-                    <a href="#features" class="text-sm font-medium text-gray-500 hover:text-emerald-600 transition">Features</a>
-                    <a href="#pricing" class="text-sm font-medium text-gray-500 hover:text-emerald-600 transition">Pricing</a>
-                    <a href="#how-it-works" class="text-sm font-medium text-gray-500 hover:text-emerald-600 transition">How It Works</a>
+                    <a href="#features" class="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-emerald-600 transition">Features</a>
+                    <a href="#pricing" class="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-emerald-600 transition">Pricing</a>
+                    <a href="#how-it-works" class="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-emerald-600 transition">How It Works</a>
                     <a href="/pos" class="group flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg hover:bg-purple-50 transition">
                         <div class="w-6 h-6 rounded-md bg-purple-100 group-hover:bg-purple-200 flex items-center justify-center transition">
                             <svg class="w-3.5 h-3.5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                         </div>
                         <span class="text-sm font-semibold text-gray-900">POS</span>
                     </a>
-                    <button @click="showLoginModal = true" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition">Log in</button>
+                    <button @click="showLoginModal = true" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:text-gray-900 transition">Log in</button>
                     <a href="/register" class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition shadow-md shadow-emerald-600/20">Sign Up Free</a>
                 </div>
             </div>
@@ -184,100 +184,100 @@
                     Enterprise-grade FBR digital invoicing. Real-time synchronous submission via PRAL API v1.12, HS Intelligence, compliance scoring, risk detection, and immutable audit logs.
                 </p>
                 <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <a href="/register" class="w-full sm:w-auto px-8 py-3.5 bg-white text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-50 transition shadow-2xl shadow-white/20 text-center">Start 14-Day Free Trial</a>
+                    <a href="/register" class="w-full sm:w-auto px-8 py-3.5 bg-white dark:bg-gray-900 text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-50 transition shadow-2xl shadow-white/20 text-center">Start 14-Day Free Trial</a>
                     <button @click="showLoginModal = true" class="w-full sm:w-auto px-8 py-3.5 border border-white/30 bg-white/5 backdrop-blur-sm text-white rounded-xl text-sm font-bold hover:bg-white/15 hover:border-white/50 transition">Login to Dashboard</button>
                 </div>
             </div>
         </div>
     </section>
 
-    <section id="features" class="py-24 lg:py-28 bg-white">
+    <section id="features" class="py-24 lg:py-28 bg-white dark:bg-gray-900">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-16">
                 <h2 class="text-3xl font-bold text-gray-900">Everything You Need for FBR Compliance</h2>
-                <p class="mt-4 text-gray-600 max-w-2xl mx-auto">Purpose-built for Pakistan's Federal Board of Revenue regulations with enterprise-grade infrastructure.</p>
+                <p class="mt-4 text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">Purpose-built for Pakistan's Federal Board of Revenue regulations with enterprise-grade infrastructure.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <div class="di-card-accent bg-white rounded-xl shadow-md p-6 border border-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                <div class="di-card-accent bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
                     <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Real-time FBR Submission</h3>
-                    <p class="text-sm text-gray-600">Direct synchronous submission to FBR via PRAL API v1.12. Instant confirmation, automatic invoice locking, and QR code generation.</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Direct synchronous submission to FBR via PRAL API v1.12. Instant confirmation, automatic invoice locking, and QR code generation.</p>
                 </div>
-                <div class="di-card-accent bg-white rounded-xl shadow-md p-6 border border-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                <div class="di-card-accent bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
                     <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">HS Intelligence Engine</h3>
-                    <p class="text-sm text-gray-600">AI-powered HS code suggestions with confidence scoring. Auto-suggests tax rates, SRO numbers, and learns from every submission.</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">AI-powered HS code suggestions with confidence scoring. Auto-suggests tax rates, SRO numbers, and learns from every submission.</p>
                 </div>
-                <div class="di-card-accent bg-white rounded-xl shadow-md p-6 border border-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                <div class="di-card-accent bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
                     <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Risk Detection Engine</h3>
-                    <p class="text-sm text-gray-600">Pre-submission risk analysis with anomaly scoring. Blocks problematic invoices before they reach FBR.</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Pre-submission risk analysis with anomaly scoring. Blocks problematic invoices before they reach FBR.</p>
                 </div>
-                <div class="di-card-accent bg-white rounded-xl shadow-md p-6 border border-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                <div class="di-card-accent bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
                     <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Compliance Scoring</h3>
-                    <p class="text-sm text-gray-600">Formula-based scoring system rates every invoice before submission. Ensures maximum compliance with FBR regulations.</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Formula-based scoring system rates every invoice before submission. Ensures maximum compliance with FBR regulations.</p>
                 </div>
-                <div class="di-card-accent bg-white rounded-xl shadow-md p-6 border border-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                <div class="di-card-accent bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
                     <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">PDF + QR Generation</h3>
-                    <p class="text-sm text-gray-600">FBR-compliant PDF invoices with watermarks, QR codes, and dual invoice numbering (internal + FBR).</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">FBR-compliant PDF invoices with watermarks, QR codes, and dual invoice numbering (internal + FBR).</p>
                 </div>
-                <div class="di-card-accent bg-white rounded-xl shadow-md p-6 border border-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                <div class="di-card-accent bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
                     <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Immutable Audit Logs</h3>
-                    <p class="text-sm text-gray-600">SHA-256 signed audit trail with integrity verification. Tamper-proof activity tracking for compliance.</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">SHA-256 signed audit trail with integrity verification. Tamper-proof activity tracking for compliance.</p>
                 </div>
-                <div class="di-card-accent bg-white rounded-xl shadow-md p-6 border border-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                <div class="di-card-accent bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
                     <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Multi-Branch Support</h3>
-                    <p class="text-sm text-gray-600">Manage multiple business branches with centralized invoicing, customer ledger, and role-based access control.</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Manage multiple business branches with centralized invoicing, customer ledger, and role-based access control.</p>
                 </div>
-                <div class="di-card-accent bg-white rounded-xl shadow-md p-6 border border-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                <div class="di-card-accent bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
                     <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Enterprise Analytics</h3>
-                    <p class="text-sm text-gray-600">KPIs, compliance metrics, customer ledger analytics, and detailed MIS dashboards for business intelligence.</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">KPIs, compliance metrics, customer ledger analytics, and detailed MIS dashboards for business intelligence.</p>
                 </div>
-                <div class="di-card-accent bg-white rounded-xl shadow-md p-6 border border-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                <div class="di-card-accent bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
                     <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">6 Login Methods</h3>
-                    <p class="text-sm text-gray-600">Email, Phone, Username, CNIC, NTN, or FBR Registration number. Maximum flexibility for all business types.</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Email, Phone, Username, CNIC, NTN, or FBR Registration number. Maximum flexibility for all business types.</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <section id="pricing" class="py-24 lg:py-28 bg-gray-50">
+    <section id="pricing" class="py-24 lg:py-28 bg-gray-50 dark:bg-gray-800">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
                 <h2 class="text-3xl font-bold text-gray-900">Digital Invoice Plans</h2>
-                <p class="mt-4 text-gray-600 max-w-2xl mx-auto">Flexible billing cycles with savings on longer commitments</p>
+                <p class="mt-4 text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">Flexible billing cycles with savings on longer commitments</p>
             </div>
 
             <div class="flex justify-center mb-8 overflow-x-auto" x-data="{ cycle: 'monthly' }">
-                <div class="inline-flex bg-white rounded-xl p-1 border border-gray-200 shadow-sm flex-shrink-0">
-                    <button @click="cycle = 'monthly'" :class="cycle === 'monthly' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Monthly</button>
-                    <button @click="cycle = 'quarterly'" :class="cycle === 'quarterly' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Quarterly <span class="text-[10px] opacity-75">-1%</span></button>
-                    <button @click="cycle = 'semi_annual'" :class="cycle === 'semi_annual' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Semi-Annual <span class="text-[10px] opacity-75">-3%</span></button>
-                    <button @click="cycle = 'annual'" :class="cycle === 'annual' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Annual <span class="text-[10px] opacity-75">-6%</span></button>
+                <div class="inline-flex bg-white dark:bg-gray-900 rounded-xl p-1 border border-gray-200 dark:border-gray-700 shadow-sm flex-shrink-0">
+                    <button @click="cycle = 'monthly'" :class="cycle === 'monthly' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Monthly</button>
+                    <button @click="cycle = 'quarterly'" :class="cycle === 'quarterly' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Quarterly <span class="text-[10px] opacity-75">-1%</span></button>
+                    <button @click="cycle = 'semi_annual'" :class="cycle === 'semi_annual' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Semi-Annual <span class="text-[10px] opacity-75">-3%</span></button>
+                    <button @click="cycle = 'annual'" :class="cycle === 'annual' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Annual <span class="text-[10px] opacity-75">-6%</span></button>
                 </div>
 
                 @if(isset($plans) && $plans->count())
@@ -325,7 +325,7 @@
                         <span class="text-white text-xs font-bold tracking-wide">BEST VALUE</span>
                     </div>
                     @endif
-                    <div class="{{ $isPopular ? 'bg-gradient-to-b from-emerald-50/50 to-white border-emerald-400/30 border-t-0 rounded-b-xl' : 'bg-white border-gray-200 rounded-xl' }} border p-5">
+                    <div class="{{ $isPopular ? 'bg-gradient-to-b from-emerald-50/50 to-white border-emerald-400/30 border-t-0 rounded-b-xl' : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-xl' }} border p-5">
                         <h3 class="text-lg font-bold text-gray-900">{{ $plan->name }}</h3>
                         <div class="mt-3 mb-1">
                             <span class="text-3xl font-black text-gray-900">PKR {{ number_format($plan->price, 0) }}</span>
@@ -336,7 +336,7 @@
                         @php
                             $diFeatures = is_array($plan->features) ? $plan->features : (is_string($plan->features) ? json_decode($plan->features, true) : []);
                         @endphp
-                        <div class="mt-4 pt-4 border-t border-gray-100 space-y-2 text-sm text-gray-600">
+                        <div class="mt-4 pt-4 border-t border-gray-100 space-y-2 text-sm text-gray-600 dark:text-gray-400">
                             @if(!empty($diFeatures))
                                 @foreach($diFeatures as $feature)
                                 <div class="flex items-center gap-2">
@@ -384,37 +384,37 @@
         </div>
     </section>
 
-    <section id="how-it-works" class="py-24 lg:py-28 bg-white">
+    <section id="how-it-works" class="py-24 lg:py-28 bg-white dark:bg-gray-900">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
                 <h2 class="text-3xl font-bold text-gray-900">How Digital Invoice Works</h2>
-                <p class="mt-4 text-gray-600">Simple 5-step process from invoice creation to FBR submission</p>
+                <p class="mt-4 text-gray-600 dark:text-gray-400">Simple 5-step process from invoice creation to FBR submission</p>
             </div>
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-6">
                 <div class="text-center di-step-connector">
                     <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 text-white flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-lg shadow-emerald-500/25">1</div>
                     <h4 class="font-bold text-gray-900 mb-2">Create Invoice</h4>
-                    <p class="text-xs text-gray-600">Add buyer details, line items, HS codes, and tax rates using the smart invoice builder</p>
+                    <p class="text-xs text-gray-600 dark:text-gray-400">Add buyer details, line items, HS codes, and tax rates using the smart invoice builder</p>
                 </div>
                 <div class="text-center di-step-connector">
                     <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 text-white flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-lg shadow-emerald-500/25">2</div>
                     <h4 class="font-bold text-gray-900 mb-2">AI Validation</h4>
-                    <p class="text-xs text-gray-600">HS Intelligence auto-suggests codes, risk engine checks for anomalies, compliance score calculated</p>
+                    <p class="text-xs text-gray-600 dark:text-gray-400">HS Intelligence auto-suggests codes, risk engine checks for anomalies, compliance score calculated</p>
                 </div>
                 <div class="text-center di-step-connector">
                     <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 text-white flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-lg shadow-emerald-500/25">3</div>
                     <h4 class="font-bold text-gray-900 mb-2">Submit to FBR</h4>
-                    <p class="text-xs text-gray-600">One-click real-time submission to FBR via PRAL API. Idempotency shield prevents duplicates</p>
+                    <p class="text-xs text-gray-600 dark:text-gray-400">One-click real-time submission to FBR via PRAL API. Idempotency shield prevents duplicates</p>
                 </div>
                 <div class="text-center di-step-connector">
                     <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 text-white flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-lg shadow-emerald-500/25">4</div>
                     <h4 class="font-bold text-gray-900 mb-2">FBR Confirmation</h4>
-                    <p class="text-xs text-gray-600">Receive FBR invoice number, QR code, and confirmation. Invoice auto-locked for compliance</p>
+                    <p class="text-xs text-gray-600 dark:text-gray-400">Receive FBR invoice number, QR code, and confirmation. Invoice auto-locked for compliance</p>
                 </div>
                 <div class="text-center di-step-connector">
                     <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 text-white flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-lg shadow-emerald-500/25">5</div>
                     <h4 class="font-bold text-gray-900 mb-2">Download PDF</h4>
-                    <p class="text-xs text-gray-600">Generate FBR-compliant PDF with watermarks, QR codes, and dual invoice numbering</p>
+                    <p class="text-xs text-gray-600 dark:text-gray-400">Generate FBR-compliant PDF with watermarks, QR codes, and dual invoice numbering</p>
                 </div>
             </div>
         </div>
@@ -428,7 +428,7 @@
             <h2 class="text-3xl font-bold text-white mb-4 di-hero-heading">Ready to Get FBR Compliant?</h2>
             <p class="text-emerald-100/80 mb-8">Start your 14-day free trial. No credit card required.</p>
             <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <a href="/register" class="w-full sm:w-auto px-8 py-3.5 bg-white text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-50 transition shadow-2xl shadow-white/15 text-center">Create Free Account</a>
+                <a href="/register" class="w-full sm:w-auto px-8 py-3.5 bg-white dark:bg-gray-900 text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-50 transition shadow-2xl shadow-white/15 text-center">Create Free Account</a>
                 <button @click="showLoginModal = true" class="w-full sm:w-auto px-8 py-3.5 border border-white/30 bg-white/5 backdrop-blur-sm text-white rounded-xl text-sm font-bold hover:bg-white/15 hover:border-white/50 transition">Login to Dashboard</button>
             </div>
         </div>
@@ -436,8 +436,8 @@
 
     <div class="bg-gray-900 py-4 border-t border-gradient-to-r" style="border-image: linear-gradient(90deg, #10b981, #14b8a6, #059669) 1;">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
-            <p class="text-xs text-gray-500">&copy; {{ date('Y') }} TaxNest. All rights reserved.</p>
-            <span class="text-xs text-gray-500 flex items-center"><svg class="w-3.5 h-3.5 mr-1 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>FBR API v1.12 Integrated</span>
+            <p class="text-xs text-gray-500 dark:text-gray-400">&copy; {{ date('Y') }} TaxNest. All rights reserved.</p>
+            <span class="text-xs text-gray-500 dark:text-gray-400 flex items-center"><svg class="w-3.5 h-3.5 mr-1 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>FBR API v1.12 Integrated</span>
         </div>
     </div>
 

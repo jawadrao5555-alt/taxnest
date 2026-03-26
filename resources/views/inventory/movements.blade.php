@@ -63,10 +63,10 @@
                                         'transfer_in' => ['Transfer In', 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300'],
                                         'transfer_out' => ['Transfer Out', 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300'],
                                     ];
-                                    $typeInfo = $typeLabels[$mv->type] ?? [ucfirst(str_replace('_', ' ', $mv->type)), 'bg-gray-100 text-gray-700'];
+                                    $typeInfo = $typeLabels[$mv->type] ?? [ucfirst(str_replace('_', ' ', $mv->type)), 'bg-gray-100 text-gray-700 dark:text-gray-300'];
                                 @endphp
                                 <tr class="{{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/50' : '' }}">
-                                    <td class="px-4 py-3 text-xs text-gray-500">{{ $mv->created_at->format('d M Y H:i') }}</td>
+                                    <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{{ $mv->created_at->format('d M Y H:i') }}</td>
                                     <td class="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{{ $mv->product->name ?? 'Unknown' }}</td>
                                     <td class="px-4 py-3">
                                         <span class="px-2 py-0.5 text-xs font-medium rounded-full {{ $typeInfo[1] }}">{{ $typeInfo[0] }}</span>
@@ -78,8 +78,8 @@
                                     <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-400">Rs {{ number_format($mv->unit_price, 2) }}</td>
                                     <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300">Rs {{ number_format($mv->total_price, 0) }}</td>
                                     <td class="px-4 py-3 text-right font-medium text-gray-900 dark:text-gray-100">{{ number_format($mv->balance_after, $mv->balance_after == intval($mv->balance_after) ? 0 : 2) }}</td>
-                                    <td class="px-4 py-3 text-xs text-gray-500">{{ $mv->reference_number ?: ($mv->notes ? \Illuminate\Support\Str::limit($mv->notes, 30) : '-') }}</td>
-                                    <td class="px-4 py-3 text-xs text-gray-500">{{ $mv->creator->name ?? '-' }}</td>
+                                    <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{{ $mv->reference_number ?: ($mv->notes ? \Illuminate\Support\Str::limit($mv->notes, 30) : '-') }}</td>
+                                    <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{{ $mv->creator->name ?? '-' }}</td>
                                 </tr>
                             @empty
                                 <tr><td colspan="10" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No stock movements recorded yet.</td></tr>

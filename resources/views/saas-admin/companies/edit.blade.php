@@ -1,7 +1,7 @@
 <x-admin-layout>
 <div class="p-4 sm:p-6 max-w-4xl mx-auto">
     <div class="flex items-center gap-3 mb-6">
-        <a href="{{ route('saas.admin.companies.show', $company->id) }}" class="text-gray-500 hover:text-indigo-400 transition text-sm">&larr; Back</a>
+        <a href="{{ route('saas.admin.companies.show', $company->id) }}" class="text-gray-500 dark:text-gray-400 hover:text-indigo-400 transition text-sm">&larr; Back</a>
         <h1 class="text-2xl font-bold text-white">Edit: {{ $company->name }}</h1>
         @php $tc = ['di' => 'bg-emerald-900/30 text-emerald-400', 'pos' => 'bg-purple-900/30 text-purple-400']; @endphp
         <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ $tc[$company->product_type] ?? '' }}">{{ $company->product_type === 'di' ? 'Digital Invoice' : 'NestPOS' }}</span>

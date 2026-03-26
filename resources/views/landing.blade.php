@@ -63,7 +63,7 @@
         }
     </style>
 </head>
-<body class="antialiased text-gray-700 scroll-smooth bg-white overflow-x-hidden">
+<body class="antialiased text-gray-700 scroll-smooth bg-white dark:bg-gray-900 overflow-x-hidden">
 
     <nav class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-2xl border-b border-gray-100/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
@@ -78,9 +78,9 @@
                 <div class="flex items-center flex-wrap justify-end gap-1 sm:gap-2">
                     <a href="/digital-invoice" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-emerald-600 rounded-full hover:bg-emerald-700 transition shadow-sm">Digital Invoice</a>
                     <a href="/pos" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-purple-600 rounded-full hover:bg-purple-700 transition shadow-sm">PRA POS</a>
-                    <a href="#pricing" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Pricing</a>
-                    <a href="#features" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Docs</a>
-                    <a href="#contact" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition">Contact</a>
+                    <a href="#pricing" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition">Pricing</a>
+                    <a href="#features" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition">Docs</a>
+                    <a href="#contact" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition">Contact</a>
                 </div>
             </div>
         </div>
@@ -186,7 +186,7 @@
         </div>
     </div>
 
-    <section id="products" class="py-24 lg:py-28 bg-white">
+    <section id="products" class="py-24 lg:py-28 bg-white dark:bg-gray-900">
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="text-center mb-16 fade-up">
                 <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Two Products, One Platform</p>
@@ -195,7 +195,7 @@
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl mx-auto">
-                <div class="card-hover bg-white rounded-xl shadow-md ring-1 ring-gray-200/50 overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300 gradient-border-top">
+                <div class="card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300 gradient-border-top">
                     <div class="p-8">
                         <div class="flex items-center space-x-4 mb-6">
                             <div class="w-16 h-16 rounded-[14px] bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center shadow-md">
@@ -221,7 +221,7 @@
                     </div>
                 </div>
 
-                <div class="card-hover bg-white rounded-xl shadow-md ring-1 ring-gray-200/50 overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300 gradient-border-top-purple">
+                <div class="card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300 gradient-border-top-purple">
                     <div class="p-8">
                         <div class="flex items-center space-x-4 mb-6">
                             <div class="w-16 h-16 rounded-[14px] bg-gradient-to-br from-purple-50 to-violet-50 flex items-center justify-center shadow-md">
@@ -280,7 +280,7 @@
                 ];
                 @endphp
                 @foreach($features as $f)
-                <div class="group card-hover bg-white rounded-xl shadow-md p-6 ring-1 ring-gray-100 hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+                <div class="group card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 ring-1 ring-gray-100 hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
                     <div class="w-12 h-12 bg-{{ $f[3] }}-50 group-hover:bg-gradient-to-br group-hover:from-{{ $f[3] }}-50 group-hover:to-{{ $f[3] }}-100 rounded-xl flex items-center justify-center mb-4 shadow-sm transition-all duration-300">
                         <svg class="w-6 h-6 text-{{ $f[3] }}-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $f[2] }}"/></svg>
                     </div>
@@ -327,7 +327,7 @@
         </div>
     </section>
 
-    <section class="py-24 lg:py-28 bg-white">
+    <section class="py-24 lg:py-28 bg-white dark:bg-gray-900">
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="text-center mb-16 fade-up">
                 <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Comparison</p>
@@ -335,7 +335,7 @@
                 <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto">See how TaxNest compares to generic accounting tools</p>
             </div>
 
-            <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden max-w-4xl mx-auto fade-up">
+            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-md border border-gray-200 overflow-hidden max-w-4xl mx-auto fade-up">
                 <div class="overflow-x-auto">
                     <table class="w-full">
                         <thead>
@@ -398,7 +398,7 @@
                 <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">Each product has its own plans. Visit the product page for details and start your 14-day free trial.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto fade-up">
-                <div class="relative card-hover bg-white rounded-xl shadow-md ring-1 ring-gray-200/50 p-8 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+                <div class="relative card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 p-8 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
                     <div class="absolute inset-0 rounded-xl bg-gradient-to-br from-emerald-500/5 to-teal-500/5 pointer-events-none"></div>
                     <div class="relative">
                         <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center mx-auto mb-5 shadow-sm">
@@ -412,7 +412,7 @@
                         </a>
                     </div>
                 </div>
-                <div class="relative card-hover bg-white rounded-xl shadow-md ring-1 ring-gray-200/50 p-8 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+                <div class="relative card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 p-8 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
                     <div class="absolute inset-0 rounded-xl bg-gradient-to-br from-purple-500/5 to-violet-500/5 pointer-events-none"></div>
                     <div class="relative">
                         <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-50 to-violet-50 flex items-center justify-center mx-auto mb-5 shadow-sm">
@@ -430,7 +430,7 @@
         </div>
     </section>
 
-    <section id="faq" class="py-24 lg:py-28 bg-white">
+    <section id="faq" class="py-24 lg:py-28 bg-white dark:bg-gray-900">
         <div class="max-w-3xl mx-auto px-5 sm:px-8">
             <div class="text-center mb-12 fade-up">
                 <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">FAQ</p>
@@ -448,7 +448,7 @@
                 ];
                 @endphp
                 @foreach($faqs as $i => $faq)
-                <div class="bg-white rounded-xl border border-gray-200/80 overflow-hidden transition-shadow duration-300" :class="open === {{ $i+1 }} ? 'shadow-lg ring-1 ring-emerald-100' : 'shadow-sm'">
+                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200/80 overflow-hidden transition-shadow duration-300" :class="open === {{ $i+1 }} ? 'shadow-lg ring-1 ring-emerald-100' : 'shadow-sm'">
                     <button @click="open = open === {{ $i+1 }} ? null : {{ $i+1 }}" class="w-full flex items-center justify-between p-5 text-left">
                         <span class="text-[14px] font-semibold text-gray-900 pr-4">{{ $faq[0] }}</span>
                         <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0" :class="open === {{ $i+1 }} ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -470,21 +470,21 @@
                 <p class="mt-4 text-[17px] text-gray-500">Have questions? We're here to help you choose the right solution.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-5 fade-up">
-                <div class="card-hover bg-white rounded-xl shadow-md ring-1 ring-gray-200/50 p-6 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+                <div class="card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 p-6 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
                     <div class="w-11 h-11 bg-gradient-to-br from-emerald-400/20 to-teal-400/20 rounded-xl flex items-center justify-center mx-auto mb-4">
                         <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     </div>
                     <h3 class="text-[14px] font-semibold text-gray-900 mb-1">Email</h3>
                     <p class="text-[13px] text-gray-500">support@taxnest.com</p>
                 </div>
-                <div class="card-hover bg-white rounded-xl shadow-md ring-1 ring-gray-200/50 p-6 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+                <div class="card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 p-6 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
                     <div class="w-11 h-11 bg-gradient-to-br from-blue-400/20 to-indigo-400/20 rounded-xl flex items-center justify-center mx-auto mb-4">
                         <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
                     </div>
                     <h3 class="text-[14px] font-semibold text-gray-900 mb-1">Phone</h3>
                     <p class="text-[13px] text-gray-500">+92-XXX-XXXXXXX</p>
                 </div>
-                <div class="card-hover bg-white rounded-xl shadow-md ring-1 ring-gray-200/50 p-6 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+                <div class="card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 p-6 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
                     <div class="w-11 h-11 bg-gradient-to-br from-purple-400/20 to-violet-400/20 rounded-xl flex items-center justify-center mx-auto mb-4">
                         <svg class="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     </div>

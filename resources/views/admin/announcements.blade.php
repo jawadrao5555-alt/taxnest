@@ -48,7 +48,7 @@
                                 <tr class="{{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/50' : '' }}">
                                     <td class="px-4 py-3">
                                         <p class="font-medium text-gray-900 dark:text-gray-100">{{ $ann->title }}</p>
-                                        <p class="text-xs text-gray-500 mt-0.5 line-clamp-1">{{ Str::limit($ann->message, 80) }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">{{ Str::limit($ann->message, 80) }}</p>
                                     </td>
                                     <td class="px-4 py-3">
                                         <span class="px-2 py-0.5 text-xs font-medium rounded-full {{ $typeColors[$ann->type] ?? '' }}">{{ ucfirst($ann->type) }}</span>
@@ -69,13 +69,13 @@
                                             <span class="text-xs text-gray-400">Inactive</span>
                                         @endif
                                     </td>
-                                    <td class="px-4 py-3 text-xs text-gray-500">{{ $ann->expires_at ? $ann->expires_at->format('d M Y H:i') : 'Never' }}</td>
-                                    <td class="px-4 py-3 text-xs text-gray-500">{{ $ann->created_at->format('d M Y') }}<br>by {{ $ann->creator->name ?? '-' }}</td>
+                                    <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{{ $ann->expires_at ? $ann->expires_at->format('d M Y H:i') : 'Never' }}</td>
+                                    <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{{ $ann->created_at->format('d M Y') }}<br>by {{ $ann->creator->name ?? '-' }}</td>
                                     <td class="px-4 py-3">
                                         <div class="flex items-center gap-1.5">
                                             <form method="POST" action="/admin/announcements/{{ $ann->id }}/toggle" class="inline">
                                                 @csrf
-                                                <button type="submit" class="text-xs px-2 py-1 rounded {{ $ann->is_active ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' }} transition" title="{{ $ann->is_active ? 'Deactivate' : 'Activate' }}">
+                                                <button type="submit" class="text-xs px-2 py-1 rounded {{ $ann->is_active ? 'bg-gray-200 text-gray-700 dark:text-gray-300 hover:bg-gray-300' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' }} transition" title="{{ $ann->is_active ? 'Deactivate' : 'Activate' }}">
                                                     {{ $ann->is_active ? 'Deactivate' : 'Activate' }}
                                                 </button>
                                             </form>
@@ -89,7 +89,7 @@
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">No announcements yet.</td></tr>
+                                <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No announcements yet.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -107,7 +107,7 @@
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-lg w-full relative z-10">
                 <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                     <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">New Announcement</h3>
-                    <button onclick="document.getElementById('addAnnouncementModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                    <button onclick="document.getElementById('addAnnouncementModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 dark:text-gray-400"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                 </div>
                 <form method="POST" action="/admin/announcements" class="p-6 space-y-4" x-data="{ target: 'all' }">
                     @csrf

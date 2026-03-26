@@ -4,7 +4,7 @@
 
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <p class="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Total Companies</p>
+            <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Total Companies</p>
             <p class="text-xl font-bold text-white">{{ $stats['total_companies'] }}</p>
         </div>
         <div class="bg-gray-900 border border-emerald-900/50 rounded-xl p-4">
@@ -17,15 +17,15 @@
         </div>
         <div class="bg-gray-900 border border-amber-900/50 rounded-xl p-4">
             <p class="text-[10px] text-amber-500 uppercase tracking-wide mb-1">Pending</p>
-            <p class="text-xl font-bold {{ $stats['pending_companies'] > 0 ? 'text-amber-400' : 'text-gray-500' }}">{{ $stats['pending_companies'] }}</p>
+            <p class="text-xl font-bold {{ $stats['pending_companies'] > 0 ? 'text-amber-400' : 'text-gray-500 dark:text-gray-400' }}">{{ $stats['pending_companies'] }}</p>
         </div>
         <div class="bg-gray-900 border border-red-900/50 rounded-xl p-4">
             <p class="text-[10px] text-red-500 uppercase tracking-wide mb-1">Suspended</p>
-            <p class="text-xl font-bold {{ $stats['suspended_companies'] > 0 ? 'text-red-400' : 'text-gray-500' }}">{{ $stats['suspended_companies'] }}</p>
+            <p class="text-xl font-bold {{ $stats['suspended_companies'] > 0 ? 'text-red-400' : 'text-gray-500 dark:text-gray-400' }}">{{ $stats['suspended_companies'] }}</p>
         </div>
         <div class="bg-gray-900 border border-gray-700 rounded-xl p-4">
-            <p class="text-[10px] text-gray-500 uppercase tracking-wide mb-1">In Bin</p>
-            <p class="text-xl font-bold {{ $stats['binned_companies'] > 0 ? 'text-gray-300' : 'text-gray-500' }}">{{ $stats['binned_companies'] }}</p>
+            <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">In Bin</p>
+            <p class="text-xl font-bold {{ $stats['binned_companies'] > 0 ? 'text-gray-300' : 'text-gray-500 dark:text-gray-400' }}">{{ $stats['binned_companies'] }}</p>
             @if($stats['binned_companies'] > 0)
             <a href="{{ route('saas.admin.companies.bin') }}" class="text-[10px] text-indigo-400 hover:underline">View Bin</a>
             @endif
@@ -34,32 +34,32 @@
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <p class="text-[10px] text-gray-500 uppercase tracking-wide mb-1">DI Invoices</p>
+            <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">DI Invoices</p>
             <p class="text-xl font-bold text-emerald-400">{{ number_format($stats['di_invoices']) }}</p>
-            <p class="text-xs text-gray-500 mt-0.5">PKR {{ number_format($stats['di_revenue'], 0) }} revenue</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">PKR {{ number_format($stats['di_revenue'], 0) }} revenue</p>
         </div>
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <p class="text-[10px] text-gray-500 uppercase tracking-wide mb-1">POS Transactions</p>
+            <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">POS Transactions</p>
             <p class="text-xl font-bold text-purple-400">{{ number_format($stats['pos_transactions']) }}</p>
-            <p class="text-xs text-gray-500 mt-0.5">PKR {{ number_format($stats['pos_revenue'], 0) }} revenue</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">PKR {{ number_format($stats['pos_revenue'], 0) }} revenue</p>
         </div>
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <p class="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Active Subscriptions</p>
+            <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Active Subscriptions</p>
             <p class="text-xl font-bold text-indigo-400">{{ $stats['active_subscriptions'] }}</p>
         </div>
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <p class="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Total Users</p>
+            <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Total Users</p>
             <p class="text-xl font-bold text-white">{{ $stats['total_users'] }}</p>
         </div>
     </div>
 
     <div class="mb-8">
         <div class="flex border-b border-gray-800 mb-0">
-            <button @click="activeTab = 'di'" :class="activeTab === 'di' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-300'" class="flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition">
+            <button @click="activeTab = 'di'" :class="activeTab === 'di' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-300'" class="flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 Digital Invoice ({{ $diCompaniesList->count() }})
             </button>
-            <button @click="activeTab = 'pos'" :class="activeTab === 'pos' ? 'border-purple-500 text-purple-400' : 'border-transparent text-gray-500 hover:text-gray-300'" class="flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition">
+            <button @click="activeTab = 'pos'" :class="activeTab === 'pos' ? 'border-purple-500 text-purple-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-300'" class="flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                 NestPOS ({{ $posCompaniesList->count() }})
             </button>
@@ -69,7 +69,7 @@
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
-                        <tr class="text-left text-[10px] text-gray-500 uppercase border-b border-gray-800 bg-gray-800/30">
+                        <tr class="text-left text-[10px] text-gray-500 dark:text-gray-400 uppercase border-b border-gray-800 bg-gray-800/30">
                             <th class="px-4 py-3">Company</th>
                             <th class="px-4 py-3 hidden sm:table-cell">NTN</th>
                             <th class="px-4 py-3 hidden md:table-cell">Owner</th>
@@ -86,7 +86,7 @@
                         <tr class="hover:bg-gray-800/30">
                             <td class="px-4 py-3">
                                 <a href="{{ route('saas.admin.companies.show', $company->id) }}" class="text-white font-medium hover:text-emerald-400 transition">{{ $company->name }}</a>
-                                <p class="text-[10px] text-gray-600">{{ $company->email ?? '' }}</p>
+                                <p class="text-[10px] text-gray-600 dark:text-gray-400">{{ $company->email ?? '' }}</p>
                             </td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ $company->ntn ?? '—' }}</td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">{{ $company->owner_name ?? '—' }}</td>
@@ -101,7 +101,7 @@
                             </td>
                         </tr>
                         @empty
-                        <tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">No Digital Invoice companies found.</td></tr>
+                        <tr><td colspan="8" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No Digital Invoice companies found.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -112,7 +112,7 @@
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
-                        <tr class="text-left text-[10px] text-gray-500 uppercase border-b border-gray-800 bg-gray-800/30">
+                        <tr class="text-left text-[10px] text-gray-500 dark:text-gray-400 uppercase border-b border-gray-800 bg-gray-800/30">
                             <th class="px-4 py-3">Company</th>
                             <th class="px-4 py-3 hidden sm:table-cell">POS ID</th>
                             <th class="px-4 py-3 hidden md:table-cell">Owner</th>
@@ -129,7 +129,7 @@
                         <tr class="hover:bg-gray-800/30">
                             <td class="px-4 py-3">
                                 <a href="{{ route('saas.admin.companies.show', $company->id) }}" class="text-white font-medium hover:text-purple-400 transition">{{ $company->name }}</a>
-                                <p class="text-[10px] text-gray-600">{{ $company->email ?? '' }}</p>
+                                <p class="text-[10px] text-gray-600 dark:text-gray-400">{{ $company->email ?? '' }}</p>
                             </td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ $company->pra_pos_id ?? '—' }}</td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">{{ $company->owner_name ?? '—' }}</td>
@@ -144,7 +144,7 @@
                             </td>
                         </tr>
                         @empty
-                        <tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">No NestPOS companies found.</td></tr>
+                        <tr><td colspan="8" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No NestPOS companies found.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -180,11 +180,11 @@
         <div class="space-y-2">
             @forelse($recentAuditLogs as $log)
             <div class="flex items-center justify-between text-sm border-b border-gray-800 pb-2">
-                <div><span class="text-gray-300">{{ $log->action }}</span>@if($log->target_type)<span class="text-gray-600"> - {{ $log->target_type }} #{{ $log->target_id }}</span>@endif</div>
-                <span class="text-xs text-gray-500 whitespace-nowrap">{{ $log->created_at->diffForHumans() }}</span>
+                <div><span class="text-gray-300">{{ $log->action }}</span>@if($log->target_type)<span class="text-gray-600 dark:text-gray-400"> - {{ $log->target_type }} #{{ $log->target_id }}</span>@endif</div>
+                <span class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{{ $log->created_at->diffForHumans() }}</span>
             </div>
             @empty
-            <p class="text-sm text-gray-500 text-center py-4">No audit logs yet</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400 text-center py-4">No audit logs yet</p>
             @endforelse
         </div>
     </div>

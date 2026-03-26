@@ -143,7 +143,7 @@
                         </thead>
                         <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                             @forelse($monthly as $row)
-                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-800 transition">
                                 <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
                                     {{ \Carbon\Carbon::createFromFormat('Y-m', $row->month_label)->format('F Y') }}
                                 </td>

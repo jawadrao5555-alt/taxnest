@@ -1,9 +1,9 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h2 class="font-bold text-xl text-gray-800 leading-tight">Invoice Preview — {{ $invoice->display_invoice_number }}</h2>
+            <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Invoice Preview — {{ $invoice->display_invoice_number }}</h2>
             <div class="flex items-center space-x-3">
-                <a href="/invoice/{{ $invoice->id }}" class="text-sm text-gray-600 hover:text-gray-800">Back to Invoice</a>
+                <a href="/invoice/{{ $invoice->id }}" class="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-100">Back to Invoice</a>
             </div>
         </div>
     </x-slot>
@@ -14,14 +14,14 @@
             @if(session('validation_result'))
             @php $vr = session('validation_result'); @endphp
             @php $vrBadge = \App\Services\HybridComplianceScorer::getRiskBadge($vr['risk_level']); @endphp
-            <div x-show="showValidation" class="bg-white rounded-xl shadow-sm border {{ $vr['risk_level'] === 'CRITICAL' ? 'border-red-300' : 'border-emerald-200' }} overflow-hidden mb-8">
+            <div x-show="showValidation" class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border {{ $vr['risk_level'] === 'CRITICAL' ? 'border-red-300' : 'border-emerald-200' }} overflow-hidden mb-8">
                 <div class="px-6 py-4 border-b {{ $vr['risk_level'] === 'CRITICAL' ? 'border-red-200 bg-red-50' : 'border-emerald-100 bg-emerald-50' }} flex items-center justify-between">
                     <h3 class="text-lg font-semibold {{ $vr['risk_level'] === 'CRITICAL' ? 'text-red-800' : 'text-emerald-800' }}">Validation Result</h3>
                     <div class="flex items-center space-x-3">
                         <span class="inline-flex px-3 py-1 rounded-full text-xs font-bold {{ $vrBadge['bg'] }} {{ $vrBadge['text'] }}">
                             Score: {{ $vr['score'] }} — {{ $vr['risk_level'] }}
                         </span>
-                        <button type="button" @click="showValidation = false" class="text-gray-400 hover:text-gray-600">
+                        <button type="button" @click="showValidation = false" class="text-gray-400 hover:text-gray-600 dark:text-gray-400">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                         </button>
                     </div>
@@ -62,16 +62,16 @@
             </div>
             @endif
 
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-8">
+            <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden mb-8">
                 <div class="p-6 border-b border-gray-100">
                     <div class="flex items-center justify-between mb-6">
                         <div>
                             <h3 class="text-2xl font-bold text-gray-900">{{ $invoice->company->name ?? 'Company' }}</h3>
-                            <p class="text-sm text-gray-500 mt-1">NTN: {{ $invoice->company->ntn ?? 'N/A' }}</p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">NTN: {{ $invoice->company->ntn ?? 'N/A' }}</p>
                         </div>
                         <div class="text-right">
                             <span class="inline-flex px-3 py-1 rounded-full text-sm font-bold
-                                @if($invoice->status === 'draft') bg-gray-200 text-gray-700
+                                @if($invoice->status === 'draft') bg-gray-200 text-gray-700 dark:text-gray-300
                                 @elseif($invoice->status === 'locked') bg-green-100 text-green-800
                                 @elseif($invoice->status === 'pending_verification') bg-amber-100 text-amber-800
                                 @endif">
@@ -81,65 +81,65 @@
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="bg-gray-50 rounded-lg p-4">
-                            <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Buyer Details</h4>
+                        <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                            <h4 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Buyer Details</h4>
                             <p class="text-sm font-semibold text-gray-900">{{ $invoice->buyer_name }}</p>
-                            <p class="text-sm text-gray-600">NTN: {{ $invoice->buyer_ntn }}</p>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">NTN: {{ $invoice->buyer_ntn }}</p>
                         </div>
-                        <div class="bg-gray-50 rounded-lg p-4">
-                            <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Invoice Details</h4>
-                            <p class="text-sm text-gray-600">Internal #: <span class="font-semibold text-gray-900">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</span></p>
+                        <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                            <h4 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Invoice Details</h4>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Internal #: <span class="font-semibold text-gray-900">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</span></p>
 @if($invoice->fbr_invoice_number)
-<p class="text-sm text-gray-600">FBR #: <span class="font-semibold text-emerald-700">{{ $invoice->fbr_invoice_number }}</span></p>
+<p class="text-sm text-gray-600 dark:text-gray-400">FBR #: <span class="font-semibold text-emerald-700">{{ $invoice->fbr_invoice_number }}</span></p>
 @endif
-                            <p class="text-sm text-gray-600">Date: <span class="font-semibold text-gray-900">{{ $invoice->created_at->format('d M Y') }}</span></p>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Date: <span class="font-semibold text-gray-900">{{ $invoice->created_at->format('d M Y') }}</span></p>
                             @if($invoice->branch)
-                            <p class="text-sm text-gray-600">Branch: <span class="font-semibold text-gray-900">{{ $invoice->branch->name }}</span></p>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Branch: <span class="font-semibold text-gray-900">{{ $invoice->branch->name }}</span></p>
                             @endif
                         </div>
                     </div>
                 </div>
 
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead class="bg-gray-50 dark:bg-gray-800">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">HS Code</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qty</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Price</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Subtotal</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tax Rate</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tax</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">#</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">HS Code</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Description</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Qty</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Price</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Subtotal</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Tax Rate</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Tax</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-200">
+                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                             @foreach($invoice->items as $index => $item)
                             @php
                                 $itemSubtotal = $item->price * $item->quantity;
                                 $effectiveRate = $itemSubtotal > 0 ? round(($item->tax / $itemSubtotal) * 100, 2) : 0;
                             @endphp
                             <tr>
-                                <td class="px-6 py-4 text-sm text-gray-500">{{ $index + 1 }}</td>
-                                <td class="px-6 py-4 text-sm font-mono text-gray-700">{{ $item->hs_code }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-700">{{ $item->description }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-700 text-right">{{ $item->quantity }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-700 text-right">PKR {{ number_format($item->price, 2) }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-700 text-right">PKR {{ number_format($itemSubtotal, 2) }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-700 text-right">{{ $effectiveRate }}%</td>
-                                <td class="px-6 py-4 text-sm text-gray-700 text-right">PKR {{ number_format($item->tax, 2) }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{{ $index + 1 }}</td>
+                                <td class="px-6 py-4 text-sm font-mono text-gray-700 dark:text-gray-300">{{ $item->hs_code }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{{ $item->description }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 text-right">{{ $item->quantity }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 text-right">PKR {{ number_format($item->price, 2) }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 text-right">PKR {{ number_format($itemSubtotal, 2) }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 text-right">{{ $effectiveRate }}%</td>
+                                <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 text-right">PKR {{ number_format($item->tax, 2) }}</td>
                                 <td class="px-6 py-4 text-sm font-semibold text-gray-900 text-right">PKR {{ number_format($itemSubtotal + $item->tax, 2) }}</td>
                             </tr>
                             @endforeach
                         </tbody>
-                        <tfoot class="bg-gray-50">
+                        <tfoot class="bg-gray-50 dark:bg-gray-800">
                             <tr>
-                                <td colspan="5" class="px-6 py-4 text-right text-sm font-medium text-gray-600">Subtotal</td>
-                                <td class="px-6 py-4 text-right text-sm font-bold text-gray-700">PKR {{ number_format($subtotal, 2) }}</td>
+                                <td colspan="5" class="px-6 py-4 text-right text-sm font-medium text-gray-600 dark:text-gray-400">Subtotal</td>
+                                <td class="px-6 py-4 text-right text-sm font-bold text-gray-700 dark:text-gray-300">PKR {{ number_format($subtotal, 2) }}</td>
                                 <td></td>
-                                <td class="px-6 py-4 text-right text-sm font-bold text-gray-700">PKR {{ number_format($totalTax, 2) }}</td>
+                                <td class="px-6 py-4 text-right text-sm font-bold text-gray-700 dark:text-gray-300">PKR {{ number_format($totalTax, 2) }}</td>
                                 <td class="px-6 py-4 text-right text-lg font-bold text-emerald-600">PKR {{ number_format($invoice->total_amount, 2) }}</td>
                             </tr>
                             @php $totalFurtherTax = $invoice->items->sum('further_tax'); @endphp
@@ -154,37 +154,37 @@
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-8">
+            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden mb-8">
                 <div class="px-6 py-4 border-b border-gray-100">
-                    <h3 class="text-lg font-semibold text-gray-800">Tax Breakdown</h3>
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Tax Breakdown</h3>
                 </div>
                 <div class="p-6">
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead class="bg-gray-50 dark:bg-gray-800">
                                 <tr>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">HS Code</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Subtotal</th>
-                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Tax Rate</th>
-                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Tax Amount</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">HS Code</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Description</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Subtotal</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Tax Rate</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Tax Amount</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-gray-200">
+                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                                 @foreach($taxBreakdown as $tb)
                                 <tr>
-                                    <td class="px-4 py-2 text-sm font-mono text-gray-700">{{ $tb['hs_code'] }}</td>
-                                    <td class="px-4 py-2 text-sm text-gray-700">{{ $tb['description'] }}</td>
-                                    <td class="px-4 py-2 text-sm text-gray-700 text-right">PKR {{ number_format($tb['subtotal'], 2) }}</td>
-                                    <td class="px-4 py-2 text-sm text-gray-700 text-right">{{ $tb['rate'] }}%</td>
+                                    <td class="px-4 py-2 text-sm font-mono text-gray-700 dark:text-gray-300">{{ $tb['hs_code'] }}</td>
+                                    <td class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">{{ $tb['description'] }}</td>
+                                    <td class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 text-right">PKR {{ number_format($tb['subtotal'], 2) }}</td>
+                                    <td class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 text-right">{{ $tb['rate'] }}%</td>
                                     <td class="px-4 py-2 text-sm font-semibold text-gray-900 text-right">PKR {{ number_format($tb['tax'], 2) }}</td>
                                 </tr>
                                 @endforeach
                             </tbody>
-                            <tfoot class="bg-gray-50">
+                            <tfoot class="bg-gray-50 dark:bg-gray-800">
                                 <tr>
-                                    <td colspan="2" class="px-4 py-2 text-right text-sm font-bold text-gray-700">Total</td>
-                                    <td class="px-4 py-2 text-right text-sm font-bold text-gray-700">PKR {{ number_format($subtotal, 2) }}</td>
+                                    <td colspan="2" class="px-4 py-2 text-right text-sm font-bold text-gray-700 dark:text-gray-300">Total</td>
+                                    <td class="px-4 py-2 text-right text-sm font-bold text-gray-700 dark:text-gray-300">PKR {{ number_format($subtotal, 2) }}</td>
                                     <td></td>
                                     <td class="px-4 py-2 text-right text-sm font-bold text-emerald-600">PKR {{ number_format($totalTax, 2) }}</td>
                                 </tr>
@@ -195,9 +195,9 @@
             </div>
 
             @if(!empty($complianceReport))
-            <div class="bg-white rounded-xl shadow-sm border {{ $complianceReport->risk_level === 'CRITICAL' ? 'border-red-200' : ($complianceReport->risk_level === 'HIGH' ? 'border-orange-200' : 'border-gray-100') }} overflow-hidden mb-8">
-                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                    <h3 class="text-lg font-semibold text-gray-800 flex items-center space-x-2">
+            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border {{ $complianceReport->risk_level === 'CRITICAL' ? 'border-red-200' : ($complianceReport->risk_level === 'HIGH' ? 'border-orange-200' : 'border-gray-100') }} overflow-hidden mb-8">
+                <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
                         <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
                         <span>Compliance Analysis</span>
                     </h3>
@@ -230,9 +230,9 @@
             </div>
             @endif
 
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-8">
+            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden mb-8">
                 <div class="px-6 py-4 border-b border-gray-100">
-                    <h3 class="text-lg font-semibold text-gray-800">QR Code</h3>
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">QR Code</h3>
                 </div>
                 <div class="p-6">
                     @if($invoice->qr_data)
@@ -251,7 +251,7 @@
             </div>
 
             <div class="flex items-center justify-between">
-                <a href="/invoice/{{ $invoice->id }}" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-xl text-gray-700 text-sm font-medium hover:bg-gray-50 transition shadow-sm">Back to Invoice</a>
+                <a href="/invoice/{{ $invoice->id }}" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-xl text-gray-700 dark:text-gray-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 transition shadow-sm">Back to Invoice</a>
                 <div class="flex items-center space-x-3">
                     @if($invoice->status === 'draft')
                     <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-500 text-white rounded-xl text-sm font-medium hover:bg-gray-600 transition shadow-sm">

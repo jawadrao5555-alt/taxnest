@@ -66,7 +66,7 @@
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
                             @forelse($records as $r)
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700/50 transition">
                                     <td class="px-4 py-3 font-mono font-semibold text-emerald-700 dark:text-emerald-400">{{ $r->hs_code }}</td>
                                     <td class="px-4 py-3 text-gray-700 dark:text-gray-300 max-w-xs truncate">{{ $r->description ?? '—' }}</td>
                                     <td class="px-4 py-3">

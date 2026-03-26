@@ -42,7 +42,7 @@
                 </div>
             </div>
             <div>
-                <label class="text-[10px] text-gray-500 uppercase mb-1 block">Features (one per line — shown on landing page)</label>
+                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase mb-1 block">Features (one per line — shown on landing page)</label>
                 <textarea name="features_text" rows="4" placeholder="e.g. POS Billing&#10;Thermal Receipt&#10;PRA Integration" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></textarea>
             </div>
             <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Create Plan</button>
@@ -53,7 +53,7 @@
         <div class="flex items-center gap-2 mb-4">
             <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
             <h2 class="text-lg font-bold text-white">Digital Invoice Plans</h2>
-            <span class="text-xs text-gray-500">({{ $diPlans->count() }} plans — prices are monthly)</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400">({{ $diPlans->count() }} plans — prices are monthly)</span>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             @foreach($diPlans as $plan)
@@ -66,7 +66,7 @@
         <div class="flex items-center gap-2 mb-4">
             <div class="w-2 h-2 rounded-full bg-purple-500"></div>
             <h2 class="text-lg font-bold text-white">POS Plans</h2>
-            <span class="text-xs text-gray-500">({{ $posPlans->count() }} plans — prices are annual)</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400">({{ $posPlans->count() }} plans — prices are annual)</span>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             @foreach($posPlans as $plan)

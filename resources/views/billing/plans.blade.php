@@ -45,8 +45,8 @@
                 <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 mb-8">
                     <div class="flex items-center justify-between mb-4">
                         <div>
-                            <h3 class="text-lg font-semibold text-gray-800">Current Plan: {{ $currentSubscription->pricingPlan->name }}</h3>
-                            <p class="text-sm text-gray-500 mt-1">
+                            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Current Plan: {{ $currentSubscription->pricingPlan->name }}</h3>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                 {{ \App\Models\Subscription::getCycleLabel($usageData['billing_cycle']) }} billing
                                 @if($usageData['discount_percent'] > 0) &middot; {{ $usageData['discount_percent'] }}% discount @endif
                                 &middot; Active until {{ \Carbon\Carbon::parse($currentSubscription->end_date)->format('d M Y') }}
@@ -56,26 +56,26 @@
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <p class="text-sm text-gray-500 mb-1">Invoices</p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Invoices</p>
                             <div class="flex items-center space-x-3">
                                 @if($usageData['invoice_limit'] === -1)
-                                    <span class="text-sm font-medium text-gray-700">{{ $usageData['invoice_count'] }} / Unlimited</span>
+                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ $usageData['invoice_count'] }} / Unlimited</span>
                                 @else
                                     <div class="flex-1 bg-gray-200 rounded-full h-3">
                                         <div class="h-3 rounded-full transition-all {{ $usageData['usage_percent'] > 80 ? 'bg-red-500' : 'bg-emerald-500' }}"
                                             style="width: {{ $usageData['usage_percent'] }}%"></div>
                                     </div>
-                                    <span class="text-sm font-medium text-gray-700">{{ $usageData['invoice_count'] }}/{{ $usageData['invoice_limit'] }}</span>
+                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ $usageData['invoice_count'] }}/{{ $usageData['invoice_limit'] }}</span>
                                 @endif
                             </div>
                         </div>
                         <div>
-                            <p class="text-sm text-gray-500 mb-1">Users</p>
-                            <span class="text-sm font-medium text-gray-700">{{ $usageData['user_count'] }} / {{ $usageData['user_limit_display'] }}</span>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Users</p>
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ $usageData['user_count'] }} / {{ $usageData['user_limit_display'] }}</span>
                         </div>
                         <div>
-                            <p class="text-sm text-gray-500 mb-1">Branches</p>
-                            <span class="text-sm font-medium text-gray-700">{{ $usageData['branch_count'] }} / {{ $usageData['branch_limit_display'] }}</span>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Branches</p>
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ $usageData['branch_count'] }} / {{ $usageData['branch_limit_display'] }}</span>
                         </div>
                     </div>
                 </div>
@@ -83,7 +83,7 @@
 
             <div class="text-center mb-8">
                 <h3 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Choose Your Plan</h3>
-                <p class="text-gray-500 mt-2">Aggressive pricing for high-volume businesses. All plans include FBR compliance.</p>
+                <p class="text-gray-500 dark:text-gray-400 mt-2">Aggressive pricing for high-volume businesses. All plans include FBR compliance.</p>
             </div>
 
             <div x-data="{
@@ -136,32 +136,32 @@
                             <div class="mt-4">
                                 <div x-show="cycle === 'monthly'">
                                     <span class="text-3xl font-bold text-gray-900 dark:text-gray-100">PKR {{ number_format($plan->price) }}</span>
-                                    <span class="text-gray-500 text-sm">/mo</span>
+                                    <span class="text-gray-500 dark:text-gray-400 text-sm">/mo</span>
                                 </div>
                                 <div x-show="cycle !== 'monthly'">
                                     <span class="text-3xl font-bold text-gray-900 dark:text-gray-100">PKR <span x-text="calcMonthly({{ $plan->price }}).toLocaleString()"></span></span>
-                                    <span class="text-gray-500 text-sm">/mo</span>
+                                    <span class="text-gray-500 dark:text-gray-400 text-sm">/mo</span>
                                     <p class="text-xs text-gray-400 mt-1">PKR <span x-text="calcPrice({{ $plan->price }}).toLocaleString()"></span> total</p>
                                 </div>
                             </div>
                             <ul class="mt-5 space-y-2.5">
-                                <li class="flex items-center text-sm text-gray-600">
+                                <li class="flex items-center text-sm text-gray-600 dark:text-gray-400">
                                     <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                     {{ $plan->getInvoiceLimitDisplay() }} invoices/mo
                                 </li>
-                                <li class="flex items-center text-sm text-gray-600">
+                                <li class="flex items-center text-sm text-gray-600 dark:text-gray-400">
                                     <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                     {{ $plan->getUserLimitDisplay() }} users
                                 </li>
-                                <li class="flex items-center text-sm text-gray-600">
+                                <li class="flex items-center text-sm text-gray-600 dark:text-gray-400">
                                     <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                     {{ $plan->getBranchLimitDisplay() }} {{ $plan->branch_limit === -1 ? 'branches' : ($plan->branch_limit === 1 ? 'branch' : 'branches') }}
                                 </li>
-                                <li class="flex items-center text-sm text-gray-600">
+                                <li class="flex items-center text-sm text-gray-600 dark:text-gray-400">
                                     <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                     FBR Integration
                                 </li>
-                                <li class="flex items-center text-sm text-gray-600">
+                                <li class="flex items-center text-sm text-gray-600 dark:text-gray-400">
                                     <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                     Compliance Scoring
                                 </li>
@@ -213,33 +213,33 @@
                         <table class="w-full">
                             <thead>
                                 <tr class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-                                    <th class="text-left py-3 px-4 text-sm font-medium text-gray-500 w-1/5">Feature</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 w-1/5">Feature</th>
                                     @foreach($plans as $plan)
                                     <th class="text-center py-3 px-4 text-sm font-bold text-gray-900 dark:text-gray-100">{{ $plan->name }}</th>
                                     @endforeach
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
-                                    <td class="py-3 px-4 text-sm text-gray-600">Monthly Price</td>
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-800 transition">
+                                    <td class="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">Monthly Price</td>
                                     @foreach($plans as $plan)
                                     <td class="py-3 px-4 text-center text-sm font-semibold">PKR {{ number_format($plan->price) }}</td>
                                     @endforeach
                                 </tr>
-                                <tr class="bg-gray-50 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
-                                    <td class="py-3 px-4 text-sm text-gray-600">Invoices</td>
+                                <tr class="bg-gray-50 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 dark:hover:bg-gray-800 transition">
+                                    <td class="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">Invoices</td>
                                     @foreach($plans as $plan)
                                     <td class="py-3 px-4 text-center text-sm font-semibold">{{ $plan->getInvoiceLimitDisplay() }}</td>
                                     @endforeach
                                 </tr>
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
-                                    <td class="py-3 px-4 text-sm text-gray-600">Users</td>
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-800 transition">
+                                    <td class="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">Users</td>
                                     @foreach($plans as $plan)
                                     <td class="py-3 px-4 text-center text-sm font-semibold">{{ $plan->getUserLimitDisplay() }}</td>
                                     @endforeach
                                 </tr>
-                                <tr class="bg-gray-50 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
-                                    <td class="py-3 px-4 text-sm text-gray-600">Branches</td>
+                                <tr class="bg-gray-50 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 dark:hover:bg-gray-800 transition">
+                                    <td class="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">Branches</td>
                                     @foreach($plans as $plan)
                                     <td class="py-3 px-4 text-center text-sm font-semibold">{{ $plan->getBranchLimitDisplay() }}</td>
                                     @endforeach
@@ -257,8 +257,8 @@
                                 ];
                                 @endphp
                                 @foreach($features as $feature => $availability)
-                                <tr class="{{ $loop->even ? 'bg-gray-50 dark:bg-gray-800' : '' }} hover:bg-gray-50 dark:hover:bg-gray-800 transition">
-                                    <td class="py-3 px-4 text-sm text-gray-600">{{ $feature }}</td>
+                                <tr class="{{ $loop->even ? 'bg-gray-50 dark:bg-gray-800' : '' }} hover:bg-gray-50 dark:hover:bg-gray-800 dark:hover:bg-gray-800 transition">
+                                    <td class="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">{{ $feature }}</td>
                                     @foreach($availability as $avail)
                                     <td class="py-3 px-4 text-center">
                                         @if($avail)

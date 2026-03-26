@@ -30,7 +30,7 @@
                     </div>
                 </a>
             </div>
-            <p class="mt-3 text-lg font-bold text-gray-800 tracking-tight">TaxNest</p>
+            <p class="mt-3 text-lg font-bold text-gray-800 dark:text-gray-100 tracking-tight">TaxNest</p>
 
             <div class="w-full sm:max-w-md mt-6 px-6 py-6 bg-white/80 backdrop-blur-xl shadow-2xl shadow-emerald-500/10 overflow-hidden rounded-2xl border border-white/50 ">
                 {{ $slot }}

@@ -27,14 +27,14 @@
 
                 <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">Active Environment</h3>
-                    <p class="text-sm text-gray-500 mb-4">Select which environment to use for FBR submissions.</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Select which environment to use for FBR submissions.</p>
                     <div class="flex gap-4">
                         <label class="flex-1 flex items-center gap-3 px-4 py-3 rounded-lg border-2 cursor-pointer transition"
                             :class="form.fbr_environment === 'sandbox' ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'">
                             <input type="radio" value="sandbox" x-model="form.fbr_environment" class="text-amber-500 focus:ring-amber-500">
                             <div>
                                 <span class="font-medium text-gray-800 dark:text-gray-200">Sandbox</span>
-                                <p class="text-xs text-gray-500">Test environment</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Test environment</p>
                             </div>
                         </label>
                         <label class="flex-1 flex items-center gap-3 px-4 py-3 rounded-lg border-2 cursor-pointer transition"
@@ -42,7 +42,7 @@
                             <input type="radio" value="production" x-model="form.fbr_environment" class="text-red-500 focus:ring-red-500">
                             <div>
                                 <span class="font-medium text-gray-800 dark:text-gray-200">Production</span>
-                                <p class="text-xs text-gray-500">Live FBR PRAL</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Live FBR PRAL</p>
                             </div>
                         </label>
                     </div>
@@ -78,10 +78,10 @@
                             <input type="password" x-model="form.fbr_sandbox_token" placeholder="Enter sandbox API token" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-amber-500 focus:border-amber-500">
                         </div>
 
-                        <div class="p-3 rounded-lg" :class="hasSandboxToken ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'">
+                        <div class="p-3 rounded-lg" :class="hasSandboxToken ? 'bg-green-50 border border-green-200' : 'bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700'">
                             <div class="flex items-center gap-2">
                                 <span class="w-2.5 h-2.5 rounded-full" :class="hasSandboxToken ? 'bg-green-500' : 'bg-gray-400'"></span>
-                                <span class="text-sm font-medium" :class="hasSandboxToken ? 'text-green-700' : 'text-gray-600'" x-text="hasSandboxToken ? 'Token Configured' : 'No Token Set'"></span>
+                                <span class="text-sm font-medium" :class="hasSandboxToken ? 'text-green-700' : 'text-gray-600 dark:text-gray-400'" x-text="hasSandboxToken ? 'Token Configured' : 'No Token Set'"></span>
                             </div>
                         </div>
                     </div>
@@ -106,10 +106,10 @@
                             <input type="password" x-model="form.fbr_production_token" placeholder="Enter production API token" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-red-500 focus:border-red-500">
                         </div>
 
-                        <div class="p-3 rounded-lg" :class="hasProductionToken ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'">
+                        <div class="p-3 rounded-lg" :class="hasProductionToken ? 'bg-green-50 border border-green-200' : 'bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700'">
                             <div class="flex items-center gap-2">
                                 <span class="w-2.5 h-2.5 rounded-full" :class="hasProductionToken ? 'bg-green-500' : 'bg-gray-400'"></span>
-                                <span class="text-sm font-medium" :class="hasProductionToken ? 'text-green-700' : 'text-gray-600'" x-text="hasProductionToken ? 'Token Configured' : 'No Token Set'"></span>
+                                <span class="text-sm font-medium" :class="hasProductionToken ? 'text-green-700' : 'text-gray-600 dark:text-gray-400'" x-text="hasProductionToken ? 'Token Configured' : 'No Token Set'"></span>
                             </div>
                         </div>
                     </div>
@@ -124,7 +124,7 @@
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Last Successful Submission</p>
+                            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Last Successful Submission</p>
                             <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
                                 @if($company->last_successful_submission)
                                     {{ \Carbon\Carbon::parse($company->last_successful_submission)->format('d M Y, h:i A') }}
@@ -134,7 +134,7 @@
                             </p>
                         </div>
                         <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Connection Status</p>
+                            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Connection Status</p>
                             <div class="flex items-center space-x-2">
                                 <span class="inline-block w-3 h-3 rounded-full"
                                     :class="{
@@ -169,27 +169,27 @@
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <button type="button" @click="runSandboxTest('ping')" :disabled="sandboxRunning" class="p-3 border border-emerald-200 rounded-lg bg-white dark:bg-gray-800 hover:bg-emerald-50 text-left transition">
                                 <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-400">Ping Endpoint</p>
-                                <p class="text-xs text-gray-500">Check if FBR API is reachable</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Check if FBR API is reachable</p>
                             </button>
                             <button type="button" @click="runSandboxTest('token')" :disabled="sandboxRunning" class="p-3 border border-emerald-200 rounded-lg bg-white dark:bg-gray-800 hover:bg-emerald-50 text-left transition">
                                 <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-400">Validate Token</p>
-                                <p class="text-xs text-gray-500">Verify token is valid</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Verify token is valid</p>
                             </button>
                             <button type="button" @click="runSandboxTest('payload')" :disabled="sandboxRunning" class="p-3 border border-emerald-200 rounded-lg bg-white dark:bg-gray-800 hover:bg-emerald-50 text-left transition">
                                 <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-400">Test Payload</p>
-                                <p class="text-xs text-gray-500">Validate sample payload format</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Validate sample payload format</p>
                             </button>
                             <button type="button" @click="runSandboxTest('config')" :disabled="sandboxRunning" class="p-3 border border-emerald-200 rounded-lg bg-white dark:bg-gray-800 hover:bg-emerald-50 text-left transition">
                                 <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-400">Check Config</p>
-                                <p class="text-xs text-gray-500">Verify company settings</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Verify company settings</p>
                             </button>
                             <button type="button" @click="runSandboxTest('dryrun')" :disabled="sandboxRunning" class="p-3 border border-emerald-200 rounded-lg bg-white dark:bg-gray-800 hover:bg-emerald-50 text-left transition">
                                 <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-400">Dry Run</p>
-                                <p class="text-xs text-gray-500">Test invoice submission</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Test invoice submission</p>
                             </button>
                             <button type="button" @click="runSandboxTest('provinces')" :disabled="sandboxRunning" class="p-3 border border-emerald-200 rounded-lg bg-white dark:bg-gray-800 hover:bg-emerald-50 text-left transition">
                                 <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-400">Province Mapping</p>
-                                <p class="text-xs text-gray-500">Verify province codes</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Verify province codes</p>
                             </button>
                         </div>
                     </template>
@@ -204,7 +204,7 @@
                         <p class="font-semibold" x-text="sandboxResult?.title"></p>
                         <p class="mt-1 text-xs" x-text="sandboxResult?.message"></p>
                         <template x-if="sandboxResult?.details">
-                            <pre class="mt-2 text-xs bg-white p-2 rounded border overflow-x-auto" x-text="JSON.stringify(sandboxResult?.details, null, 2)"></pre>
+                            <pre class="mt-2 text-xs bg-white dark:bg-gray-900 p-2 rounded border overflow-x-auto" x-text="JSON.stringify(sandboxResult?.details, null, 2)"></pre>
                         </template>
                     </div>
                 </div>

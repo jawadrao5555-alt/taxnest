@@ -16,7 +16,7 @@
         <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class="fixed lg:static lg:translate-x-0 z-40 w-64 h-full bg-gray-900 border-r border-gray-800 flex flex-col transition-transform duration-200">
             <div class="px-5 py-5 border-b border-gray-800">
                 <h1 class="text-lg font-bold text-indigo-400">TaxNest Admin</h1>
-                <p class="text-xs text-gray-500 mt-0.5">SaaS Management Panel</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">SaaS Management Panel</p>
             </div>
 
             <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
@@ -27,7 +27,7 @@
                     Dashboard
                 </a>
 
-                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-600 pt-4 pb-1 px-3">Management</p>
+                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-600 dark:text-gray-400 pt-4 pb-1 px-3">Management</p>
 
                 <a href="{{ route('saas.admin.companies') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm {{ str_starts_with($current, 'saas.admin.companies') && $current !== 'saas.admin.companies.bin' ? 'bg-indigo-600/20 text-indigo-400 font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200' }} transition">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
@@ -54,7 +54,7 @@
                     Franchises
                 </a>
 
-                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-600 pt-4 pb-1 px-3">Monitoring</p>
+                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-600 dark:text-gray-400 pt-4 pb-1 px-3">Monitoring</p>
 
                 <a href="{{ route('saas.admin.usage') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm {{ $current === 'saas.admin.usage' ? 'bg-indigo-600/20 text-indigo-400 font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200' }} transition">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
@@ -76,11 +76,11 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm font-medium text-gray-300">{{ auth('admin')->user()->name }}</p>
-                        <p class="text-xs text-gray-500">{{ auth('admin')->user()->email }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ auth('admin')->user()->email }}</p>
                     </div>
                     <form method="POST" action="{{ route('admin.logout') }}">
                         @csrf
-                        <button type="submit" class="text-gray-500 hover:text-red-400 transition">
+                        <button type="submit" class="text-gray-500 dark:text-gray-400 hover:text-red-400 transition">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
                         </button>
                     </form>

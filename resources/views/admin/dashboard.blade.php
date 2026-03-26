@@ -1,6 +1,6 @@
 <x-admin-layout>
     <x-slot name="header">
-        <h2 class="font-bold text-xl text-gray-800 leading-tight">Super Admin Dashboard</h2>
+        <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Super Admin Dashboard</h2>
     </x-slot>
 
     <div class="py-8">
@@ -56,23 +56,23 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-sm font-medium text-gray-500">Companies</p>
+                            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Companies</p>
                             <p class="text-3xl font-bold text-gray-900 mt-1">{{ $totalCompanies }}</p>
                         </div>
                         <div class="p-3 bg-blue-50 rounded-lg">
                             <svg class="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                         </div>
                     </div>
-                    <p class="mt-2 text-sm text-gray-500">{{ $activeSubscriptions }} active subscriptions</p>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ $activeSubscriptions }} active subscriptions</p>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-sm font-medium text-gray-500">Users</p>
+                            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Users</p>
                             <p class="text-3xl font-bold text-gray-900 mt-1">{{ $totalUsers }}</p>
                         </div>
                         <div class="p-3 bg-emerald-50 rounded-lg">
@@ -81,10 +81,10 @@
                     </div>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-sm font-medium text-gray-500">Total Invoices</p>
+                            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Invoices</p>
                             <p class="text-3xl font-bold text-gray-900 mt-1">{{ $totalInvoices }}</p>
                         </div>
                         <div class="p-3 bg-purple-50 rounded-lg">
@@ -98,10 +98,10 @@
                     </div>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-sm font-medium text-gray-500">Total Revenue</p>
+                            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Revenue</p>
                             <p class="text-3xl font-bold text-gray-900 mt-1">PKR {{ number_format($totalRevenue) }}</p>
                         </div>
                         <div class="p-3 bg-orange-50 rounded-lg">
@@ -115,9 +115,9 @@
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
+                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
                     <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
-                        <h3 class="text-lg font-semibold text-gray-800">Recent Companies</h3>
+                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Recent Companies</h3>
                         <a href="/admin/companies" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View All</a>
                     </div>
                     <div class="p-6">
@@ -125,11 +125,11 @@
                         <div class="flex items-center justify-between py-3 {{ !$loop->last ? 'border-b border-gray-200 dark:border-gray-800' : '' }}">
                             <div>
                                 <p class="font-medium text-gray-900">{{ $company->name }}</p>
-                                <p class="text-sm text-gray-500">NTN: {{ $company->ntn }}</p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">NTN: {{ $company->ntn }}</p>
                             </div>
                             <div class="text-right text-sm">
-                                <p class="text-gray-700">{{ $company->invoices_count }} invoices</p>
-                                <p class="text-gray-500">{{ $company->users_count }} users</p>
+                                <p class="text-gray-700 dark:text-gray-300">{{ $company->invoices_count }} invoices</p>
+                                <p class="text-gray-500 dark:text-gray-400">{{ $company->users_count }} users</p>
                             </div>
                         </div>
                         @empty
@@ -138,25 +138,25 @@
                     </div>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
+                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
                     <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
-                        <h3 class="text-lg font-semibold text-gray-800">Recent Invoices (All Companies)</h3>
+                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Recent Invoices (All Companies)</h3>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead class="bg-gray-50 dark:bg-gray-800">
                                 <tr>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Invoice</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Company</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-gray-200">
+                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                                 @forelse($recentInvoices as $invoice)
-                                <tr class="hover:bg-gray-50">
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800">
                                     <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ $invoice->invoice_number ?? 'INV-' . $invoice->id }}</td>
-                                    <td class="px-4 py-3 text-sm text-gray-600">{{ $invoice->company->name ?? 'N/A' }}</td>
+                                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{{ $invoice->company->name ?? 'N/A' }}</td>
                                     <td class="px-4 py-3 text-sm text-gray-900">PKR {{ number_format($invoice->total_amount) }}</td>
                                     <td class="px-4 py-3">
                                         <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium
@@ -194,7 +194,7 @@
                             </thead>
                             <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                                 @forelse($topCompanies as $index => $tc)
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800">
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-800">
                                     <td class="px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400">{{ $index + 1 }}</td>
                                     <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ $tc->name }}</td>
                                     <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{{ $tc->invoices_count }}</td>
@@ -311,7 +311,7 @@
                 </h3>
                 <div class="space-y-1 max-h-96 overflow-y-auto">
                     @forelse($activityFeed as $activity)
-                    <div class="flex items-start space-x-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition">
+                    <div class="flex items-start space-x-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-800 rounded-lg transition">
                         <div class="flex-shrink-0 mt-0.5">
                             @if(str_contains(strtolower($activity->action ?? ''), 'create'))
                                 <span class="inline-flex w-7 h-7 rounded-full bg-green-100 dark:bg-green-900/50 items-center justify-center"><svg class="w-3.5 h-3.5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></span>
@@ -350,9 +350,9 @@
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl shadow-sm border border-cyan-100 p-6 mb-8">
+            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-cyan-100 p-6 mb-8">
                 <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-gray-800 flex items-center space-x-2">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
                         <svg class="w-5 h-5 text-cyan-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
                         <span>Tax Override Intelligence</span>
                     </h3>
@@ -388,9 +388,9 @@
 
             @if(auth('admin')->check() || (auth()->check() && auth()->user()->role === 'super_admin'))
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                <div class="bg-white rounded-xl shadow-sm border border-rose-100 p-6">
+                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-rose-100 p-6">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-semibold text-gray-800 flex items-center space-x-2">
+                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
                             <svg class="w-5 h-5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
                             <span>Top Rejected HS Codes (Last 30 Days)</span>
                         </h3>
@@ -404,12 +404,12 @@
                         @endphp
                         <div class="flex items-center justify-between p-3 bg-rose-50 rounded-lg">
                             <div class="flex items-center space-x-3">
-                                <span class="font-mono text-sm font-bold text-gray-800">{{ $rejected->hs_code }}</span>
+                                <span class="font-mono text-sm font-bold text-gray-800 dark:text-gray-100">{{ $rejected->hs_code }}</span>
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-{{ $badge['color'] }}-100 text-{{ $badge['color'] }}-800">{{ $badge['label'] }}</span>
                             </div>
                             <div class="text-right">
                                 <span class="text-sm font-bold text-rose-700">{{ $rejected->rejection_count }}x</span>
-                                <p class="text-xs text-gray-500">{{ $rejected->last_rejected_at ? $rejected->last_rejected_at->diffForHumans() : ($rejected->last_seen_at ? $rejected->last_seen_at->diffForHumans() : 'N/A') }}</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ $rejected->last_rejected_at ? $rejected->last_rejected_at->diffForHumans() : ($rejected->last_seen_at ? $rejected->last_seen_at->diffForHumans() : 'N/A') }}</p>
                             </div>
                         </div>
                         @endforeach
@@ -419,9 +419,9 @@
                     @endif
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-indigo-100 p-6">
+                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-indigo-100 p-6">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-semibold text-gray-800 flex items-center space-x-2">
+                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
                             <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
                             <span>HS Intelligence Summary</span>
                         </h3>
@@ -450,7 +450,7 @@
             @endif
 
             @if($recentAnomalies->count() > 0)
-            <div class="bg-white rounded-xl shadow-sm border border-red-100 p-6 mb-8">
+            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-red-100 p-6 mb-8">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold text-red-800 flex items-center space-x-2">
                         <svg class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
@@ -465,9 +465,9 @@
                             <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $anomaly->type === 'invoice_spike' ? 'bg-orange-100 text-orange-800' : 'bg-red-100 text-red-800' }}">
                                 {{ str_replace('_', ' ', ucfirst($anomaly->type)) }}
                             </span>
-                            <span class="text-sm text-gray-700">{{ $anomaly->company->name ?? 'N/A' }} - {{ $anomaly->description }}</span>
+                            <span class="text-sm text-gray-700 dark:text-gray-300">{{ $anomaly->company->name ?? 'N/A' }} - {{ $anomaly->description }}</span>
                         </div>
-                        <span class="text-xs text-gray-500">{{ $anomaly->created_at->diffForHumans() }}</span>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">{{ $anomaly->created_at->diffForHumans() }}</span>
                     </div>
                     @endforeach
                 </div>
@@ -514,7 +514,7 @@
                             </thead>
                             <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
                                 @foreach($atRiskCompanies as $riskCompany)
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800">
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-800">
                                     <td class="px-4 py-3 text-sm">
                                         <a href="/admin/companies/{{ $riskCompany->id }}" class="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">{{ $riskCompany->name }}</a>
                                     </td>

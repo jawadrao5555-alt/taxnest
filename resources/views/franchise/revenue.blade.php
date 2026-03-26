@@ -4,15 +4,15 @@
 
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-            <p class="text-xs text-gray-500 mb-1">Total Revenue</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Revenue</p>
             <p class="text-2xl font-bold text-emerald-600">PKR {{ number_format($totalRevenue, 0) }}</p>
         </div>
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-            <p class="text-xs text-gray-500 mb-1">Commission Rate</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Commission Rate</p>
             <p class="text-2xl font-bold text-teal-600">{{ $commissionRate }}%</p>
         </div>
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-            <p class="text-xs text-gray-500 mb-1">Total Commission</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Commission</p>
             <p class="text-2xl font-bold text-indigo-600">PKR {{ number_format($totalCommission, 0) }}</p>
         </div>
     </div>
@@ -45,7 +45,7 @@
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
-                    <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                    <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                         <th class="px-4 py-3">Month</th>
                         <th class="px-4 py-3 text-right">Transactions</th>
                         <th class="px-4 py-3 text-right">Revenue (PKR)</th>
@@ -67,7 +67,7 @@
     </div>
     @else
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-12 text-center">
-        <p class="text-gray-500">No revenue data yet.</p>
+        <p class="text-gray-500 dark:text-gray-400">No revenue data yet.</p>
     </div>
     @endif
 </div>

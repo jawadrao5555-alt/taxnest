@@ -1,30 +1,30 @@
 <x-admin-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h2 class="font-bold text-xl text-gray-800 leading-tight">FBR Submission Logs</h2>
-            <a href="/admin/dashboard" class="text-sm text-gray-600 hover:text-gray-800">Back to Admin</a>
+            <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">FBR Submission Logs</h2>
+            <a href="/admin/dashboard" class="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-100">Back to Admin</a>
         </div>
     </x-slot>
 
     <div class="py-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
                 <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-800">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Response</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Invoice</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Company</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Response</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200">
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                         @forelse($logs as $log)
-                        <tr class="hover:bg-gray-50">
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800">
                             <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $log->invoice->invoice_number ?? 'INV-' . $log->invoice_id }}</td>
-                            <td class="px-6 py-4 text-sm text-gray-600">{{ $log->invoice->company->name ?? 'N/A' }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ $log->invoice->company->name ?? 'N/A' }}</td>
                             <td class="px-6 py-4">
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium
                                     @if($log->status === 'success') bg-green-100 text-green-800
@@ -34,8 +34,8 @@
                                     {{ ucfirst($log->status) }}
                                 </span>
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-500">{{ $log->created_at->format('d M Y H:i') }}</td>
-                            <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">{{ \Illuminate\Support\Str::limit($log->response_payload, 60) }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{{ $log->created_at->format('d M Y H:i') }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate">{{ \Illuminate\Support\Str::limit($log->response_payload, 60) }}</td>
                         </tr>
                         @empty
                         <tr><td colspan="5" class="px-6 py-8 text-center text-gray-400">No FBR logs yet</td></tr>

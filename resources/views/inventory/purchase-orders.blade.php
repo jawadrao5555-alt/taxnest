@@ -63,11 +63,11 @@
                                     <td class="px-4 py-3 font-mono font-medium text-gray-900 dark:text-gray-100">{{ $po->po_number }}</td>
                                     <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ $po->supplier->name ?? '-' }}</td>
                                     <td class="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">{{ $po->branch->name ?? 'Main' }}</td>
-                                    <td class="px-4 py-3 text-xs text-gray-500">{{ $po->order_date->format('d M Y') }}</td>
+                                    <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{{ $po->order_date->format('d M Y') }}</td>
                                     <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ $po->items->count() }}</td>
                                     <td class="px-4 py-3 text-right font-medium text-gray-700 dark:text-gray-300">Rs {{ number_format($po->total_amount, 0) }}</td>
                                     <td class="px-4 py-3">
-                                        <span class="px-2 py-0.5 text-xs font-medium rounded-full {{ $statusColors[$po->status] ?? 'bg-gray-100 text-gray-700' }}">
+                                        <span class="px-2 py-0.5 text-xs font-medium rounded-full {{ $statusColors[$po->status] ?? 'bg-gray-100 text-gray-700 dark:text-gray-300' }}">
                                             {{ ucfirst($po->status) }}
                                         </span>
                                     </td>
@@ -111,7 +111,7 @@
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full relative z-10 max-h-[90vh] overflow-y-auto">
                 <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center sticky top-0 bg-white dark:bg-gray-800 z-10">
                     <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">New Purchase Order</h3>
-                    <button onclick="document.getElementById('addPOModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                    <button onclick="document.getElementById('addPOModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 dark:text-gray-400"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                 </div>
                 <form method="POST" action="{{ route('purchase-orders.store') }}" class="p-6 space-y-4" id="poForm">
                     @csrf

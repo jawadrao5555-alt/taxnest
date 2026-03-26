@@ -37,7 +37,7 @@
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
-                    <tr class="text-left text-[10px] text-gray-500 uppercase border-b border-gray-800 bg-gray-800/50">
+                    <tr class="text-left text-[10px] text-gray-500 dark:text-gray-400 uppercase border-b border-gray-800 bg-gray-800/50">
                         <th class="px-4 py-3">Company</th>
                         <th class="px-4 py-3 hidden sm:table-cell">NTN</th>
                         <th class="px-4 py-3 text-center">Type</th>
@@ -55,7 +55,7 @@
                     <tr class="hover:bg-gray-800/50">
                         <td class="px-4 py-3">
                             <a href="{{ route('saas.admin.companies.show', $company->id) }}" class="text-white font-medium hover:text-indigo-400 transition">{{ $company->name }}</a>
-                            <p class="text-[10px] text-gray-600">{{ $company->owner_name ?? '' }}</p>
+                            <p class="text-[10px] text-gray-600 dark:text-gray-400">{{ $company->owner_name ?? '' }}</p>
                         </td>
                         <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ $company->ntn ?? '—' }}</td>
                         <td class="px-4 py-3 text-center">
@@ -64,7 +64,7 @@
                         <td class="px-4 py-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium {{ $statusColors[$company->status] ?? 'bg-gray-800 text-gray-400' }}">{{ $company->status }}</span>
                         </td>
-                        <td class="px-4 py-3 text-gray-500 text-xs hidden sm:table-cell">{{ $company->created_at->format('d M Y') }}</td>
+                        <td class="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs hidden sm:table-cell">{{ $company->created_at->format('d M Y') }}</td>
                         <td class="px-4 py-3 text-center">
                             <div class="flex items-center justify-center gap-1">
                                 @if($company->status === 'pending')
@@ -80,7 +80,7 @@
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="6" class="px-4 py-12 text-center text-gray-500">No companies found.</td></tr>
+                    <tr><td colspan="6" class="px-4 py-12 text-center text-gray-500 dark:text-gray-400">No companies found.</td></tr>
                     @endforelse
                 </tbody>
             </table>

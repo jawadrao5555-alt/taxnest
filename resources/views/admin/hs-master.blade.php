@@ -161,7 +161,7 @@
                                                 @elseif($hs->risk_weight > 30)
                                                     <span class="text-amber-600 dark:text-amber-400">{{ $hs->risk_weight }}</span>
                                                 @else
-                                                    <span class="text-gray-500">{{ $hs->risk_weight }}</span>
+                                                    <span class="text-gray-500 dark:text-gray-400">{{ $hs->risk_weight }}</span>
                                                 @endif
                                             </td>
                                             <td class="py-3">

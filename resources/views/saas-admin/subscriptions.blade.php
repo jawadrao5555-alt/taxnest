@@ -29,7 +29,7 @@
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
-                    <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-800 bg-gray-800/50">
+                    <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-800 bg-gray-800/50">
                         <th class="px-4 py-3">Company</th>
                         <th class="px-4 py-3">Plan</th>
                         <th class="px-4 py-3 hidden sm:table-cell">Cycle</th>
@@ -57,7 +57,7 @@
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="7" class="px-4 py-12 text-center text-gray-500">No subscriptions found.</td></tr>
+                    <tr><td colspan="7" class="px-4 py-12 text-center text-gray-500 dark:text-gray-400">No subscriptions found.</td></tr>
                     @endforelse
                 </tbody>
             </table>

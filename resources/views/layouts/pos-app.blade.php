@@ -60,7 +60,7 @@
         <div class="flex h-full">
             <nav id="sidebarDrawer" class="fixed left-0 top-0 w-64 h-full overflow-y-auto z-40 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 sidebar-scroll -translate-x-full lg:translate-x-0 transition-transform duration-200">
                 <div class="absolute top-3 right-3 z-10 lg:hidden">
-                    <button onclick="closeSidebar()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                    <button onclick="closeSidebar()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>

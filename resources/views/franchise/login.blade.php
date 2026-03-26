@@ -10,7 +10,7 @@
     <div class="w-full max-w-md px-6">
         <div class="text-center mb-8">
             <h1 class="text-3xl font-bold text-teal-600">TaxNest</h1>
-            <p class="text-gray-500 mt-1">Franchise Partner Portal</p>
+            <p class="text-gray-500 dark:text-gray-400 mt-1">Franchise Partner Portal</p>
         </div>
         <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-8 shadow-sm">
             <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-6">Franchise Login</h2>

@@ -132,7 +132,7 @@
                                                 'zero_rated' => 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
                                             ];
                                         @endphp
-                                        <span class="px-2 py-0.5 text-xs font-medium rounded-full {{ $typeColors[$mapping->sale_type] ?? 'bg-gray-100 text-gray-700' }}">
+                                        <span class="px-2 py-0.5 text-xs font-medium rounded-full {{ $typeColors[$mapping->sale_type] ?? 'bg-gray-100 text-gray-700 dark:text-gray-300' }}">
                                             {{ str_replace('_', ' ', ucfirst($mapping->sale_type)) }}
                                         </span>
                                     </td>
@@ -215,7 +215,7 @@
                                             <div class="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-100 dark:border-green-800">
                                                 <div>
                                                     <span class="font-mono text-sm font-medium text-gray-900 dark:text-gray-100">{{ $item->hs_code }}</span>
-                                                    <span class="text-xs text-gray-500 ml-2">{{ $item->label ?: $item->sale_type }}</span>
+                                                    <span class="text-xs text-gray-500 dark:text-gray-400 ml-2">{{ $item->label ?: $item->sale_type }}</span>
                                                 </div>
                                                 <span class="px-2.5 py-1 text-xs font-bold bg-green-600 text-white rounded-full">{{ $item->accept_count }} accepted</span>
                                             </div>
@@ -233,7 +233,7 @@
                                             <div class="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800">
                                                 <div>
                                                     <span class="font-mono text-sm font-medium text-gray-900 dark:text-gray-100">{{ $item->hs_code }}</span>
-                                                    <span class="text-xs text-gray-500 ml-2">{{ $item->label ?: $item->sale_type }}</span>
+                                                    <span class="text-xs text-gray-500 dark:text-gray-400 ml-2">{{ $item->label ?: $item->sale_type }}</span>
                                                 </div>
                                                 <span class="px-2.5 py-1 text-xs font-bold bg-red-600 text-white rounded-full">{{ $item->reject_count }} rejected</span>
                                             </div>
@@ -280,7 +280,7 @@
                                         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
                                             @foreach($analyticsData['recent_responses'] as $resp)
                                                 <tr>
-                                                    <td class="px-3 py-2 text-xs text-gray-500">{{ \Carbon\Carbon::parse($resp->created_at)->diffForHumans() }}</td>
+                                                    <td class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">{{ \Carbon\Carbon::parse($resp->created_at)->diffForHumans() }}</td>
                                                     <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ $resp->company_name }}</td>
                                                     <td class="px-3 py-2 font-mono text-gray-900 dark:text-gray-100">{{ $resp->hs_code }}</td>
                                                     <td class="px-3 py-2 text-gray-600 dark:text-gray-400">{{ $resp->label ?: $resp->sale_type }}</td>
@@ -328,7 +328,7 @@
                                             </span>
                                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Mapping #{{ $log->hs_code_mapping_id }}</span>
                                         </div>
-                                        <div class="flex items-center gap-2 text-xs text-gray-500">
+                                        <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                                             <span>{{ $log->user_name ?? 'System' }}</span>
                                             <span>{{ \Carbon\Carbon::parse($log->created_at)->format('M d, Y H:i') }}</span>
                                         </div>
@@ -366,7 +366,7 @@
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-lg w-full relative z-10">
                 <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                     <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">Import Mappings from CSV</h3>
-                    <button onclick="document.getElementById('importModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+                    <button onclick="document.getElementById('importModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 dark:text-gray-400">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -398,7 +398,7 @@
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full relative z-10 max-h-[90vh] overflow-y-auto">
                 <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center sticky top-0 bg-white dark:bg-gray-800 z-10">
                     <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">Add HS Code Mapping</h3>
-                    <button onclick="document.getElementById('addMappingModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+                    <button onclick="document.getElementById('addMappingModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 dark:text-gray-400">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -495,7 +495,7 @@
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full relative z-10 max-h-[90vh] overflow-y-auto">
                 <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center sticky top-0 bg-white dark:bg-gray-800 z-10">
                     <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">Edit HS Code Mapping</h3>
-                    <button onclick="document.getElementById('editMappingModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+                    <button onclick="document.getElementById('editMappingModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 dark:text-gray-400">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>

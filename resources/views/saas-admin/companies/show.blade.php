@@ -1,7 +1,7 @@
 <x-admin-layout>
 <div class="p-4 sm:p-6 max-w-5xl mx-auto" x-data="{ showDeleteModal: false }">
     <div class="flex flex-wrap items-center gap-3 mb-6">
-        <a href="{{ route('saas.admin.companies') }}" class="text-gray-500 hover:text-indigo-400 transition text-sm">&larr; Back</a>
+        <a href="{{ route('saas.admin.companies') }}" class="text-gray-500 dark:text-gray-400 hover:text-indigo-400 transition text-sm">&larr; Back</a>
         <h1 class="text-2xl font-bold text-white truncate">{{ $company->name }}</h1>
         @php
             $sc = ['approved' => 'bg-emerald-900/30 text-emerald-400', 'active' => 'bg-emerald-900/30 text-emerald-400', 'pending' => 'bg-amber-900/30 text-amber-400', 'suspended' => 'bg-red-900/30 text-red-400', 'rejected' => 'bg-gray-800 text-gray-400'];
@@ -95,7 +95,7 @@
 
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-white mb-3">Limit Overrides</h3>
-            <p class="text-xs text-gray-500 mb-3">Set custom limits. Leave empty to use plan defaults.</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Set custom limits. Leave empty to use plan defaults.</p>
             <form method="POST" action="{{ route('saas.admin.companies.limits', $company->id) }}" class="space-y-3">
                 @csrf
                 <div>
@@ -139,7 +139,7 @@
     @if($company->product_type === 'di')
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
         <h3 class="text-sm font-semibold text-white mb-3">Change Company Type</h3>
-        <p class="text-xs text-gray-500 mb-3">Switch between Digital Invoice and NestPOS.</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Switch between Digital Invoice and NestPOS.</p>
         <form method="POST" action="{{ route('saas.admin.companies.changeType', $company->id) }}" class="flex items-center gap-3">
             @csrf
             <input type="hidden" name="product_type" value="pos">
@@ -149,7 +149,7 @@
     @else
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
         <h3 class="text-sm font-semibold text-white mb-3">Change Company Type</h3>
-        <p class="text-xs text-gray-500 mb-3">Switch between Digital Invoice and NestPOS.</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Switch between Digital Invoice and NestPOS.</p>
         <form method="POST" action="{{ route('saas.admin.companies.changeType', $company->id) }}" class="flex items-center gap-3">
             @csrf
             <input type="hidden" name="product_type" value="di">

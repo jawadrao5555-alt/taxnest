@@ -9,7 +9,7 @@
                 <span class="text-gray-600 dark:text-gray-300 font-medium">Create</span>
             </nav>
             <div class="flex items-center space-x-3">
-                <a href="/invoices" class="inline-flex items-center text-gray-500 hover:text-emerald-600 transition text-sm">
+                <a href="/invoices" class="inline-flex items-center text-gray-500 dark:text-gray-400 hover:text-emerald-600 transition text-sm">
                     <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                     Back to Invoices
                 </a>
@@ -219,14 +219,14 @@
                                             <span class="text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Community Pattern Suggestion</span>
                                             <div class="flex gap-2">
                                                 <button type="button" @click="applySuggestion(index)" class="px-3 py-1 text-xs font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">Apply</button>
-                                                <button type="button" @click="item.hsSuggestion = null" class="px-3 py-1 text-xs font-medium text-gray-500 border border-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition">Ignore</button>
+                                                <button type="button" @click="item.hsSuggestion = null" class="px-3 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 border border-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition">Ignore</button>
                                             </div>
                                         </div>
                                         <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                                             <div><span class="text-gray-500">Schedule:</span> <span class="font-medium text-gray-800 dark:text-gray-200" x-text="item.hsSuggestion?.schedule_type"></span></div>
                                             <div><span class="text-gray-500">Tax Rate:</span> <span class="font-medium text-gray-800 dark:text-gray-200" x-text="(item.hsSuggestion?.tax_rate ?? '') + '%'"></span></div>
                                             <div x-show="item.hsSuggestion?.sro_schedule_no"><span class="text-gray-500">SRO:</span> <span class="font-medium text-gray-800 dark:text-gray-200" x-text="item.hsSuggestion?.sro_schedule_no"></span></div>
-                                            <div x-show="item.hsSuggestion?.mrp_required"><span class="text-gray-500">MRP:</span> <span class="font-medium text-emerald-600">Required</span></div>
+                                            <div x-show="item.hsSuggestion?.mrp_required"><span class="text-gray-500 dark:text-gray-400">MRP:</span> <span class="font-medium text-emerald-600">Required</span></div>
                                         </div>
                                     </div>
                                     <div x-show="item.showMappingPanel && item.adminMappings && item.adminMappings.length > 0" x-cloak class="mt-2 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-lg">
@@ -235,7 +235,7 @@
                                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
                                                 Admin Mapping Suggestions
                                             </span>
-                                            <button type="button" @click="item.showMappingPanel = false" class="px-2 py-1 text-xs font-medium text-gray-500 border border-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition">Close</button>
+                                            <button type="button" @click="item.showMappingPanel = false" class="px-2 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 border border-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition">Close</button>
                                         </div>
                                         <div class="space-y-2">
                                             <template x-for="(mp, mi) in item.adminMappings" :key="mp.id">
@@ -244,13 +244,13 @@
                                                         <div class="flex items-center gap-2">
                                                             <span class="text-xs font-medium text-emerald-700 dark:text-emerald-300" x-text="mp.label || ('Mapping #' + (mi+1))"></span>
                                                             <span class="px-1.5 py-0.5 text-[10px] font-bold rounded-full"
-                                                                :class="mp.confidence === 'high' ? 'bg-green-100 text-green-700' : (mp.confidence === 'medium' ? 'bg-yellow-100 text-yellow-700' : (mp.confidence === 'low' ? 'bg-red-100 text-red-700' : (mp.confidence === 'building' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500')))"
+                                                                :class="mp.confidence === 'high' ? 'bg-green-100 text-green-700' : (mp.confidence === 'medium' ? 'bg-yellow-100 text-yellow-700' : (mp.confidence === 'low' ? 'bg-red-100 text-red-700' : (mp.confidence === 'building' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500 dark:text-gray-400')))"
                                                                 x-text="mp.confidence === 'high' ? 'HIGH' : (mp.confidence === 'medium' ? 'MEDIUM' : (mp.confidence === 'low' ? 'LOW' : (mp.confidence === 'building' ? 'BUILDING' : 'NEW')))"></span>
                                                             <span x-show="mp.accepted_count > 0" class="text-[10px] text-gray-400" x-text="mp.accepted_count + ' used'"></span>
                                                         </div>
                                                         <div class="flex gap-2">
                                                             <button type="button" @click="applyMapping(index, mp)" class="px-3 py-1 text-xs font-medium bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition">Use This</button>
-                                                            <button type="button" @click="dismissMapping(index, mp.id, mp.hs_code)" class="px-2 py-1 text-xs font-medium text-gray-400 hover:text-gray-600 transition">Skip</button>
+                                                            <button type="button" @click="dismissMapping(index, mp.id, mp.hs_code)" class="px-2 py-1 text-xs font-medium text-gray-400 hover:text-gray-600 dark:text-gray-400 transition">Skip</button>
                                                         </div>
                                                     </div>
                                                     <div class="grid grid-cols-2 md:grid-cols-4 gap-1.5 text-xs">
@@ -271,7 +271,7 @@
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">PCT Code</label>
                                     <input type="text" :name="'items[' + index + '][pct_code]'" x-model="item.pct_code" placeholder="Auto from HS/Product"
-                                        class="w-full rounded-lg border-gray-300 shadow-sm text-sm bg-gray-50 dark:bg-gray-600 dark:text-gray-300 focus:ring-emerald-500/50 focus:border-emerald-500" readonly>
+                                        class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm text-sm bg-gray-50 dark:bg-gray-600 dark:text-gray-300 focus:ring-emerald-500/50 focus:border-emerald-500" readonly>
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tax Rate (%)</label>
@@ -283,7 +283,7 @@
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3" x-show="item.requires_sro || item.requires_serial || item.optional_sro" x-cloak>
                                 <div x-show="item.requires_sro || item.optional_sro">
                                     <div class="flex items-center justify-between mb-1">
-                                        <label class="block text-xs font-medium" :class="item.requires_sro ? 'text-amber-600' : 'text-gray-500'" x-text="item.requires_sro ? 'SRO Schedule No *' : 'SRO Schedule No (optional)'"></label>
+                                        <label class="block text-xs font-medium" :class="item.requires_sro ? 'text-amber-600' : 'text-gray-500 dark:text-gray-400'" x-text="item.requires_sro ? 'SRO Schedule No *' : 'SRO Schedule No (optional)'"></label>
                                         <button type="button" @click="$dispatch('open-sro-modal', { itemIndex: index })" class="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 font-medium flex items-center gap-1">
                                             <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                                             SRO Reference
@@ -293,14 +293,14 @@
                                         :class="item.requires_sro ? 'border-amber-300 bg-amber-50 focus:ring-amber-500 focus:border-amber-500' : 'border-gray-300 focus:ring-emerald-500/50 focus:border-emerald-500'"
                                         class="w-full rounded-lg shadow-sm text-sm">
                                     <template x-if="item.sroSuggestion">
-                                        <div class="mt-1 p-1.5 rounded text-xs" :class="item.sroSuggestion.confidence === 'high' ? 'bg-green-50 text-green-700' : (item.sroSuggestion.confidence === 'medium' ? 'bg-yellow-50 text-yellow-700' : 'bg-gray-50 text-gray-600')">
+                                        <div class="mt-1 p-1.5 rounded text-xs" :class="item.sroSuggestion.confidence === 'high' ? 'bg-green-50 text-green-700' : (item.sroSuggestion.confidence === 'medium' ? 'bg-yellow-50 text-yellow-700' : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400')">
                                             <span class="font-medium">Suggested:</span> <span x-text="item.sroSuggestion.sro_schedule_no"></span>
                                             <span class="ml-1 opacity-70" x-text="'(' + item.sroSuggestion.confidence + ' confidence)'"></span>
                                         </div>
                                     </template>
                                 </div>
                                 <div x-show="item.requires_serial || item.optional_serial">
-                                    <label class="block text-xs font-medium mb-1" :class="item.requires_serial ? 'text-amber-600' : 'text-gray-500'" x-text="item.requires_serial ? 'SRO Item Serial No *' : 'SRO Item Serial No (optional)'"></label>
+                                    <label class="block text-xs font-medium mb-1" :class="item.requires_serial ? 'text-amber-600' : 'text-gray-500 dark:text-gray-400'" x-text="item.requires_serial ? 'SRO Item Serial No *' : 'SRO Item Serial No (optional)'"></label>
                                     <input type="text" :name="'items[' + index + '][serial_no]'" x-model="item.serial_no" placeholder="e.g. 42"
                                         :class="item.requires_serial ? 'border-amber-300 bg-amber-50 focus:ring-amber-500 focus:border-amber-500' : 'border-gray-300 focus:ring-emerald-500/50 focus:border-emerald-500'"
                                         class="w-full rounded-lg shadow-sm text-sm">
@@ -510,7 +510,7 @@
                 </div>
 
                 <div class="flex justify-end space-x-3">
-                    <a href="/invoices" class="px-6 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition">Cancel</a>
+                    <a href="/invoices" class="px-6 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700 transition">Cancel</a>
                     <button type="submit" class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition">
                         Create Invoice
                     </button>
@@ -1176,22 +1176,22 @@
                 <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">Quick Product Create</h3>
                 <div class="space-y-3">
                     <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Product Name *</label>
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Product Name *</label>
                         <input id="quickProductNameInput" type="text" x-model="form.quickProductName" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:ring-emerald-500/50 focus:border-emerald-500" placeholder="Product name">
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1">HS Code *</label>
+                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">HS Code *</label>
                             <input type="text" x-model="form.quickProductHs" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:ring-emerald-500/50 focus:border-emerald-500" placeholder="e.g. 12345678">
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1">Default Price</label>
+                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Default Price</label>
                             <input type="number" step="0.01" x-model="form.quickProductPrice" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:ring-emerald-500/50 focus:border-emerald-500" placeholder="0.00">
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1">Schedule Type</label>
+                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Schedule Type</label>
                             <select x-model="form.quickProductSchedule" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                                 <option value="standard">Standard</option>
                                 <option value="reduced">Reduced</option>
@@ -1201,12 +1201,12 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1">Tax Rate (%)</label>
+                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tax Rate (%)</label>
                             <input type="number" step="0.01" x-model="form.quickProductTaxRate" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                         </div>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">UOM</label>
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">UOM</label>
                         <input type="text" x-model="form.quickProductUom" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:ring-emerald-500/50 focus:border-emerald-500">
                     </div>
                 </div>
@@ -1231,7 +1231,7 @@
                             <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100">SRO & Serial Reference</h3>
                             <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Search and select SRO numbers for your invoice items</p>
                         </div>
-                        <button @click="isOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                        <button @click="isOpen = false" class="text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                     </div>
@@ -1285,7 +1285,7 @@
                                                         'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400': rule.schedule_type === 'reduced',
                                                         'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300': rule.schedule_type === 'standard',
                                                     }" x-text="rule.schedule_type.replace('_', ' ')"></span>
-                                                <span x-show="rule.concessionary_rate !== null" class="text-xs text-gray-500" x-text="rule.concessionary_rate + '%'"></span>
+                                                <span x-show="rule.concessionary_rate !== null" class="text-xs text-gray-500 dark:text-gray-400" x-text="rule.concessionary_rate + '%'"></span>
                                             </div>
                                         </div>
                                         <span class="text-xs text-emerald-600 dark:text-emerald-400 opacity-0 group-hover:opacity-100 transition font-medium">Use</span>
@@ -1312,7 +1312,7 @@
                                             <div class="flex items-center gap-2 mt-1.5">
                                                 <span x-show="hs.default_sro_number" class="font-mono text-xs text-emerald-700 dark:text-emerald-400" x-text="'SRO: ' + hs.default_sro_number"></span>
                                                 <span x-show="hs.default_serial_no" class="font-mono text-xs text-blue-600 dark:text-blue-400" x-text="'Serial: ' + hs.default_serial_no"></span>
-                                                <span x-show="hs.default_tax_rate !== null" class="text-xs text-gray-500" x-text="hs.default_tax_rate + '%'"></span>
+                                                <span x-show="hs.default_tax_rate !== null" class="text-xs text-gray-500 dark:text-gray-400" x-text="hs.default_tax_rate + '%'"></span>
                                             </div>
                                         </div>
                                         <span class="text-xs text-emerald-600 dark:text-emerald-400 opacity-0 group-hover:opacity-100 transition font-medium">Use</span>
@@ -1351,7 +1351,7 @@
                                                         'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400': learned.schedule_type === 'reduced',
                                                         'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300': learned.schedule_type === 'standard',
                                                     }" x-text="learned.schedule_type.replace('_', ' ')"></span>
-                                                <span x-show="learned.tax_rate" class="text-xs text-gray-500" x-text="learned.tax_rate + '%'"></span>
+                                                <span x-show="learned.tax_rate" class="text-xs text-gray-500 dark:text-gray-400" x-text="learned.tax_rate + '%'"></span>
                                             </div>
                                         </div>
                                         <span class="text-xs text-blue-600 dark:text-blue-400 opacity-0 group-hover:opacity-100 transition font-medium">Use</span>

@@ -58,7 +58,7 @@
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
                             @foreach($records as $index => $record)
-                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700/50 transition">
                                 <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ $index + 1 }}</td>
                                 <td class="px-4 py-3 text-sm font-mono font-semibold text-gray-900 dark:text-gray-100">{{ $record['hsCode'] }}</td>
                                 <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 max-w-xs truncate">{{ $record['description'] }}</td>
@@ -72,7 +72,7 @@
                                             'zero_rated' => 'bg-gray-100 text-gray-700 dark:bg-gray-600 dark:text-gray-200',
                                             'reduced' => 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
                                         ];
-                                        $color = $badgeColors[$record['scheduleType']] ?? 'bg-gray-100 text-gray-700';
+                                        $color = $badgeColors[$record['scheduleType']] ?? 'bg-gray-100 text-gray-700 dark:text-gray-300';
                                     @endphp
                                     <span class="inline-flex px-2 py-0.5 rounded text-xs font-semibold {{ $color }}">{{ ucwords(str_replace('_', ' ', $record['scheduleType'])) }}</span>
                                 </td>

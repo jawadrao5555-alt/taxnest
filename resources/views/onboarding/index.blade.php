@@ -1,10 +1,10 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h2 class="font-bold text-xl text-gray-800 leading-tight">Welcome to TaxNest</h2>
+            <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Welcome to TaxNest</h2>
             <form method="POST" action="/onboarding/skip">
                 @csrf
-                <button type="submit" class="text-sm text-gray-500 hover:text-gray-700 underline">Skip Setup</button>
+                <button type="submit" class="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-300 underline">Skip Setup</button>
             </form>
         </div>
     </x-slot>
@@ -14,7 +14,7 @@
 
             <div class="text-center mb-8">
                 <h3 class="text-2xl font-bold text-gray-900">Let's set up your account</h3>
-                <p class="text-gray-500 mt-2">Complete these steps to start using TaxNest for your business.</p>
+                <p class="text-gray-500 dark:text-gray-400 mt-2">Complete these steps to start using TaxNest for your business.</p>
             </div>
 
             <div class="flex items-center justify-between mb-10 px-8">
@@ -29,7 +29,7 @@
                 @foreach($steps as $i => $step)
                     <div class="flex flex-col items-center {{ $i < count($steps) - 1 ? 'flex-1' : '' }}">
                         <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold
-                            {{ $progress[$step['key']] ? 'bg-emerald-500 text-white' : ($currentStep == $step['num'] ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500') }}">
+                            {{ $progress[$step['key']] ? 'bg-emerald-500 text-white' : ($currentStep == $step['num'] ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500 dark:text-gray-400') }}">
                             @if($progress[$step['key']])
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                             @else
@@ -45,7 +45,7 @@
             </div>
 
             <div class="space-y-4">
-                <a href="/branches/create" class="block bg-white rounded-xl shadow-sm border {{ $progress['branch'] ? 'border-emerald-200 bg-emerald-50' : ($currentStep == 1 ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-200') }} p-6 hover:shadow-md transition">
+                <a href="/branches/create" class="block bg-white dark:bg-gray-900 rounded-xl shadow-sm border {{ $progress['branch'] ? 'border-emerald-200 bg-emerald-50' : ($currentStep == 1 ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-200 dark:border-gray-700') }} p-6 hover:shadow-md transition">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-4">
                             <div class="p-3 rounded-lg {{ $progress['branch'] ? 'bg-emerald-100' : 'bg-blue-50' }}">
@@ -53,7 +53,7 @@
                             </div>
                             <div>
                                 <h4 class="text-lg font-semibold text-gray-900">Step 1: Add Your First Branch</h4>
-                                <p class="text-sm text-gray-500">Set up your head office or primary branch location.</p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Set up your head office or primary branch location.</p>
                             </div>
                         </div>
                         @if($progress['branch'])
@@ -64,7 +64,7 @@
                     </div>
                 </a>
 
-                <a href="/company/fbr-settings" class="block bg-white rounded-xl shadow-sm border {{ $progress['fbr_token'] ? 'border-emerald-200 bg-emerald-50' : ($currentStep == 2 ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-200') }} p-6 hover:shadow-md transition">
+                <a href="/company/fbr-settings" class="block bg-white dark:bg-gray-900 rounded-xl shadow-sm border {{ $progress['fbr_token'] ? 'border-emerald-200 bg-emerald-50' : ($currentStep == 2 ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-200 dark:border-gray-700') }} p-6 hover:shadow-md transition">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-4">
                             <div class="p-3 rounded-lg {{ $progress['fbr_token'] ? 'bg-emerald-100' : 'bg-blue-50' }}">
@@ -72,7 +72,7 @@
                             </div>
                             <div>
                                 <h4 class="text-lg font-semibold text-gray-900">Step 2: Configure FBR Token</h4>
-                                <p class="text-sm text-gray-500">Connect your FBR/PRAL API credentials for invoice submissions.</p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Connect your FBR/PRAL API credentials for invoice submissions.</p>
                             </div>
                         </div>
                         @if($progress['fbr_token'])
@@ -83,7 +83,7 @@
                     </div>
                 </a>
 
-                <a href="/products/create" class="block bg-white rounded-xl shadow-sm border {{ $progress['product'] ? 'border-emerald-200 bg-emerald-50' : ($currentStep == 3 ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-200') }} p-6 hover:shadow-md transition">
+                <a href="/products/create" class="block bg-white dark:bg-gray-900 rounded-xl shadow-sm border {{ $progress['product'] ? 'border-emerald-200 bg-emerald-50' : ($currentStep == 3 ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-200 dark:border-gray-700') }} p-6 hover:shadow-md transition">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-4">
                             <div class="p-3 rounded-lg {{ $progress['product'] ? 'bg-emerald-100' : 'bg-blue-50' }}">
@@ -91,7 +91,7 @@
                             </div>
                             <div>
                                 <h4 class="text-lg font-semibold text-gray-900">Step 3: Add Your First Product</h4>
-                                <p class="text-sm text-gray-500">Define a product with HS code and tax schedule for invoicing.</p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Define a product with HS code and tax schedule for invoicing.</p>
                             </div>
                         </div>
                         @if($progress['product'])
@@ -102,7 +102,7 @@
                     </div>
                 </a>
 
-                <a href="/invoice/create" class="block bg-white rounded-xl shadow-sm border {{ $progress['invoice'] ? 'border-emerald-200 bg-emerald-50' : ($currentStep == 4 ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-200') }} p-6 hover:shadow-md transition">
+                <a href="/invoice/create" class="block bg-white dark:bg-gray-900 rounded-xl shadow-sm border {{ $progress['invoice'] ? 'border-emerald-200 bg-emerald-50' : ($currentStep == 4 ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-200 dark:border-gray-700') }} p-6 hover:shadow-md transition">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-4">
                             <div class="p-3 rounded-lg {{ $progress['invoice'] ? 'bg-emerald-100' : 'bg-blue-50' }}">
@@ -110,7 +110,7 @@
                             </div>
                             <div>
                                 <h4 class="text-lg font-semibold text-gray-900">Step 4: Create First Invoice</h4>
-                                <p class="text-sm text-gray-500">Create your first tax invoice and test the system.</p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Create your first tax invoice and test the system.</p>
                             </div>
                         </div>
                         @if($progress['invoice'])

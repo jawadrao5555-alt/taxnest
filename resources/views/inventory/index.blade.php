@@ -91,7 +91,7 @@
                                     <td class="px-4 py-3 text-right font-bold {{ $stock->quantity <= 0 ? 'text-red-600' : ($stock->isLowStock() ? 'text-amber-600' : 'text-gray-900 dark:text-gray-100') }}">
                                         {{ number_format($stock->quantity, $stock->quantity == intval($stock->quantity) ? 0 : 2) }}
                                     </td>
-                                    <td class="px-4 py-3 text-right text-gray-500 text-xs">{{ $stock->min_stock_level > 0 ? number_format($stock->min_stock_level, 0) : '-' }}</td>
+                                    <td class="px-4 py-3 text-right text-gray-500 dark:text-gray-400 text-xs">{{ $stock->min_stock_level > 0 ? number_format($stock->min_stock_level, 0) : '-' }}</td>
                                     <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-400">Rs {{ number_format($stock->avg_purchase_price, 2) }}</td>
                                     <td class="px-4 py-3 text-right font-medium text-gray-700 dark:text-gray-300">Rs {{ number_format($stock->quantity * $stock->avg_purchase_price, 0) }}</td>
                                     <td class="px-4 py-3">
@@ -140,7 +140,7 @@
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-lg w-full relative z-10">
                 <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                     <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">Stock Adjustment</h3>
-                    <button onclick="document.getElementById('adjustModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+                    <button onclick="document.getElementById('adjustModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 dark:text-gray-400">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -207,7 +207,7 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Minimum Stock Level</label>
                         <input type="number" name="min_stock_level" id="minStockInput" step="0.01" min="0" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm">
-                        <p class="text-xs text-gray-500 mt-1">Alert when stock goes below this level</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Alert when stock goes below this level</p>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Maximum Stock Level</label>

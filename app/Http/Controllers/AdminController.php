@@ -249,6 +249,17 @@ class AdminController extends Controller
         return redirect('/admin/company/' . $company->id)->with('success', "Company {$action} successfully.");
     }
 
+    public function toggleWatermark(Company $company)
+    {
+        $company->update(['force_watermark' => !$company->force_watermark]);
+
+        $status = $company->force_watermark ? 'enabled' : 'removed';
+        SecurityLogService::log("watermark_{$status}", auth()->id(), ['company_id' => $company->id]);
+        AuditLogService::log("watermark_{$status}", 'Company', $company->id, null, ['force_watermark' => $company->force_watermark]);
+
+        return redirect('/admin/company/' . $company->id)->with('success', "Invoice watermark {$status} successfully.");
+    }
+
     public function pendingCompanies()
     {
         $companies = Company::where('company_status', 'pending')->withCount('invoices', 'users')->paginate(15);

@@ -1313,10 +1313,8 @@ class InvoiceController extends Controller
         $showWatermark = false;
         $isDraft = $invoice->status === 'draft';
 
-        $subscription = Subscription::where('company_id', $invoice->company_id)
-            ->where('active', true)
-            ->first();
-        if (!$subscription || $subscription->isExpired()) {
+        $company = $invoice->company ?? \App\Models\Company::find($invoice->company_id);
+        if ($company && ($company->force_watermark ?? false)) {
             $showWatermark = true;
         }
 

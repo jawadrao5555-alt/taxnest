@@ -357,6 +357,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         Route::post('/admin/company/{company}/suspend', [AdminController::class, 'suspendCompany']);
         Route::post('/admin/company/{company}/approve', [AdminController::class, 'approveCompany']);
         Route::post('/admin/company/{company}/reject', [AdminController::class, 'rejectCompany']);
+        Route::post('/admin/company/{company}/toggle-watermark', [AdminController::class, 'toggleWatermark']);
         Route::get('/admin/companies/pending', [AdminController::class, 'pendingCompanies']);
         Route::post('/admin/company/{company}/change-plan', [AdminController::class, 'changePlan']);
         Route::post('/admin/company/{company}/toggle-internal', [AdminController::class, 'toggleInternalAccount']);

@@ -62,6 +62,7 @@ class Company extends Model
         'product_type',
         'franchise_id',
         'deleted_reason',
+        'force_watermark',
     ];
 
     protected $casts = [
@@ -73,6 +74,7 @@ class Company extends Model
         'onboarding_completed' => 'boolean',
         'standard_tax_rate' => 'float',
         'inventory_enabled' => 'boolean',
+        'force_watermark' => 'boolean',
         'pra_reporting_enabled' => 'boolean',
     ];
 

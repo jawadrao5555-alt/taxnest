@@ -39,6 +39,19 @@
                 </div>
                 @endif
 
+                <div class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-between">
+                    <div>
+                        <span class="text-sm text-gray-700 font-medium">Invoice Watermark</span>
+                        <p class="text-xs text-gray-500 mt-0.5">{{ $company->force_watermark ? 'Watermark is enabled on invoices' : 'No watermark on invoices' }}</p>
+                    </div>
+                    <form method="POST" action="/admin/company/{{ $company->id }}/toggle-watermark">
+                        @csrf
+                        <button type="submit" class="text-xs px-3 py-1 {{ $company->force_watermark ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-600 hover:bg-gray-700' }} text-white rounded-lg font-medium transition">
+                            {{ $company->force_watermark ? 'Remove Watermark' : 'Add Watermark' }}
+                        </button>
+                    </form>
+                </div>
+
                 <div class="grid grid-cols-2 md:grid-cols-5 gap-6">
                     <div>
                         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Company Name</p>

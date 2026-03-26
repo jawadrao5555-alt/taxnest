@@ -79,7 +79,7 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **Layout:** Responsive sidebar with a single scrollable content area.
 - **Styling:** Consistent use of dark/light modes, standardized components, and an emerald-600 primary color palette.
 - **Design System:** Unified SaaS-grade design: Cards use `rounded-xl shadow-md` with hover effects. Buttons use `rounded-lg font-semibold` with gradient fills. Consistent section padding.
-- **Product Visual Separation:** Digital Invoice uses emerald theme, NestPOS uses purple theme.
+- **Product Visual Separation:** Digital Invoice uses emerald theme, NestPOS uses purple theme, FBR POS uses blue theme.
 - **Navigation:** All landing pages use visible wrapping nav (NO hamburger menu).
 - **PWA Enhancements:** Install prompts, offline badges, update banners, and manifest shortcuts.
 - **Mobile Responsiveness:** Fully responsive at 320px+. `overflow-x-hidden` on `<html>` and `<body>`. Landing pages stack cards vertically. POS sidebar uses slide-out drawer. Data tables use progressive column hiding. Inline edit forms use responsive grids. All tables have `overflow-x-auto`. Header rows stack on mobile. Buttons use `w-full sm:w-auto`. Consistent section padding.

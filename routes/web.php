@@ -562,6 +562,11 @@ Route::prefix('franchise')->middleware(['franchise.auth'])->group(function () {
     Route::get('/revenue', [FranchiseDashboardController::class, 'revenue'])->name('franchise.revenue');
 });
 
+Route::get('/fbr-pos-landing', function () {
+    $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'di')->orderBy('price')->get();
+    return view('fbr-pos.landing', ['plans' => $plans]);
+})->name('fbrpos.landing');
+
 Route::prefix('fbr-pos')->middleware(['auth', 'fbrpos.auth'])->group(function () {
     Route::get('/dashboard', [FbrPosController::class, 'dashboard'])->name('fbrpos.dashboard');
     Route::get('/create', [FbrPosController::class, 'create'])->name('fbrpos.create');

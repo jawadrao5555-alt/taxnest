@@ -141,6 +141,10 @@
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                         <span>Digital Invoice</span>
                     </a>
+                    <a href="/fbr-pos-landing" class="group flex items-center space-x-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700 transition">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                        <span>FBR POS</span>
+                    </a>
                     <button @click="showLoginModal = true" class="text-sm font-semibold text-gray-700 hover:text-gray-900 transition">Log in</button>
                     <a href="/pos/register" class="inline-flex items-center px-5 py-2 bg-gradient-to-r from-purple-500 to-purple-700 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition shadow-md">POS Sign Up</a>
                 </div>

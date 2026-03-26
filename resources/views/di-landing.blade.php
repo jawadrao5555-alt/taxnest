@@ -156,7 +156,13 @@
                         <div class="w-6 h-6 rounded-md bg-purple-100 group-hover:bg-purple-200 flex items-center justify-center transition">
                             <svg class="w-3.5 h-3.5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                         </div>
-                        <span class="text-sm font-semibold text-gray-900">POS</span>
+                        <span class="text-sm font-semibold text-gray-900">PRA POS</span>
+                    </a>
+                    <a href="/fbr-pos-landing" class="group flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg hover:bg-blue-50 transition">
+                        <div class="w-6 h-6 rounded-md bg-blue-100 group-hover:bg-blue-200 flex items-center justify-center transition">
+                            <svg class="w-3.5 h-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                        </div>
+                        <span class="text-sm font-semibold text-gray-900">FBR POS</span>
                     </a>
                     <button @click="showLoginModal = true" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:text-gray-900 transition">Log in</button>
                     <a href="/register" class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition shadow-md shadow-emerald-600/20">Sign Up Free</a>

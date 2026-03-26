@@ -78,6 +78,7 @@
                 <div class="flex items-center flex-wrap justify-end gap-1 sm:gap-2">
                     <a href="/digital-invoice" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-emerald-600 rounded-full hover:bg-emerald-700 transition shadow-sm">Digital Invoice</a>
                     <a href="/pos" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-purple-600 rounded-full hover:bg-purple-700 transition shadow-sm">PRA POS</a>
+                    <a href="/fbr-pos-landing" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-blue-600 rounded-full hover:bg-blue-700 transition shadow-sm">FBR POS</a>
                     <a href="#pricing" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition">Pricing</a>
                     <a href="#features" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition">Docs</a>
                     <a href="#contact" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition">Contact</a>
@@ -194,55 +195,81 @@
                 <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">Both products are 100% isolated — separate data, separate logins, separate dashboards.</p>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl mx-auto">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
                 <div class="card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300 gradient-border-top">
-                    <div class="p-8">
-                        <div class="flex items-center space-x-4 mb-6">
-                            <div class="w-16 h-16 rounded-[14px] bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center shadow-md">
-                                <svg class="w-8 h-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                    <div class="p-6">
+                        <div class="flex items-center space-x-3 mb-5">
+                            <div class="w-14 h-14 rounded-[12px] bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center shadow-md">
+                                <svg class="w-7 h-7 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                             </div>
                             <div>
-                                <h3 class="text-xl font-bold text-gray-900">Digital Invoice</h3>
-                                <p class="text-[13px] text-emerald-600 font-semibold">FBR Compliance System</p>
+                                <h3 class="text-lg font-bold text-gray-900">Digital Invoice</h3>
+                                <p class="text-[12px] text-emerald-600 font-semibold">FBR Compliance System</p>
                             </div>
                         </div>
-                        <p class="text-[15px] text-gray-600 leading-relaxed mb-6">Enterprise-grade FBR digital invoicing with PRAL API v1.12 integration, real-time synchronous submission, and intelligent compliance scoring.</p>
-                        <div class="grid grid-cols-2 gap-2.5 mb-8">
-                            @foreach(['FBR API v1.12', 'HS Intelligence AI', 'Risk Detection', 'Idempotency Shield', 'PDF + QR Codes', 'MIS Analytics', 'Customer Ledger', 'Multi-Branch'] as $feature)
-                            <div class="flex items-center text-[13px] text-gray-700">
-                                <svg class="w-4 h-4 text-emerald-600 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <p class="text-[14px] text-gray-600 leading-relaxed mb-5">Enterprise-grade FBR digital invoicing with PRAL API v1.12 integration, real-time submission, and compliance scoring.</p>
+                        <div class="grid grid-cols-2 gap-2 mb-6">
+                            @foreach(['FBR API v1.12', 'HS Intelligence AI', 'Risk Detection', 'PDF + QR Codes', 'MIS Analytics', 'Multi-Branch'] as $feature)
+                            <div class="flex items-center text-[12px] text-gray-700">
+                                <svg class="w-3.5 h-3.5 text-emerald-600 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                 {{ $feature }}
                             </div>
                             @endforeach
                         </div>
-                        <a href="/digital-invoice" class="btn-glow block w-full py-3 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white rounded-[10px] text-[14px] font-semibold hover:from-emerald-600 hover:to-emerald-800 shadow-md hover:shadow-lg text-center">
+                        <a href="/digital-invoice" class="btn-glow block w-full py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white rounded-[10px] text-[13px] font-semibold hover:from-emerald-600 hover:to-emerald-800 shadow-md hover:shadow-lg text-center">
                             Explore Digital Invoice
                         </a>
                     </div>
                 </div>
 
                 <div class="card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300 gradient-border-top-purple">
-                    <div class="p-8">
-                        <div class="flex items-center space-x-4 mb-6">
-                            <div class="w-16 h-16 rounded-[14px] bg-gradient-to-br from-purple-50 to-violet-50 flex items-center justify-center shadow-md">
-                                <svg class="w-8 h-8 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    <div class="p-6">
+                        <div class="flex items-center space-x-3 mb-5">
+                            <div class="w-14 h-14 rounded-[12px] bg-gradient-to-br from-purple-50 to-violet-50 flex items-center justify-center shadow-md">
+                                <svg class="w-7 h-7 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                             </div>
                             <div>
-                                <h3 class="text-xl font-bold text-gray-900">NestPOS</h3>
-                                <p class="text-[13px] text-purple-600 font-semibold">Point of Sale System</p>
+                                <h3 class="text-lg font-bold text-gray-900">PRA POS</h3>
+                                <p class="text-[12px] text-purple-600 font-semibold">PRA Point of Sale</p>
                             </div>
                         </div>
-                        <p class="text-[15px] text-gray-600 leading-relaxed mb-6">Complete POS billing system with PRA fiscal device integration via PRAL IMS API v1.2, thermal receipts, and real-time tax calculations.</p>
-                        <div class="grid grid-cols-2 gap-2.5 mb-8">
-                            @foreach(['PRA IMS v1.2', 'Thermal Receipts', 'Multi-Terminal', 'Smart Billing', 'Cash/Card/QR Tax', 'POS Reports', 'Fiscal QR Codes', 'Offline Billing'] as $feature)
-                            <div class="flex items-center text-[13px] text-gray-700">
-                                <svg class="w-4 h-4 text-purple-600 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <p class="text-[14px] text-gray-600 leading-relaxed mb-5">Complete POS billing with PRA fiscal device integration via PRAL IMS API v1.2, thermal receipts, and real-time tax calculations.</p>
+                        <div class="grid grid-cols-2 gap-2 mb-6">
+                            @foreach(['PRA IMS v1.2', 'Thermal Receipts', 'Multi-Terminal', 'Smart Billing', 'Cash/Card/QR Tax', 'Offline Billing'] as $feature)
+                            <div class="flex items-center text-[12px] text-gray-700">
+                                <svg class="w-3.5 h-3.5 text-purple-600 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                 {{ $feature }}
                             </div>
                             @endforeach
                         </div>
-                        <a href="/pos" class="btn-glow-purple block w-full py-3 bg-gradient-to-r from-purple-500 to-purple-700 text-white rounded-[10px] text-[14px] font-semibold hover:from-purple-600 hover:to-purple-800 shadow-md hover:shadow-lg text-center">
-                            Explore NestPOS
+                        <a href="/pos" class="btn-glow-purple block w-full py-2.5 bg-gradient-to-r from-purple-500 to-purple-700 text-white rounded-[10px] text-[13px] font-semibold hover:from-purple-600 hover:to-purple-800 shadow-md hover:shadow-lg text-center">
+                            Explore PRA POS
+                        </a>
+                    </div>
+                </div>
+
+                <div class="card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300" style="border-top: 4px solid; border-image: linear-gradient(to right, #2563eb, #3b82f6) 1;">
+                    <div class="p-6">
+                        <div class="flex items-center space-x-3 mb-5">
+                            <div class="w-14 h-14 rounded-[12px] bg-gradient-to-br from-blue-50 to-sky-50 flex items-center justify-center shadow-md">
+                                <svg class="w-7 h-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-900">FBR POS</h3>
+                                <p class="text-[12px] text-blue-600 font-semibold">FBR Point of Sale</p>
+                            </div>
+                        </div>
+                        <p class="text-[14px] text-gray-600 leading-relaxed mb-5">FBR-integrated POS billing with direct API submission, dual invoice numbering, FBR reporting toggle, and PIN-protected local data.</p>
+                        <div class="grid grid-cols-2 gap-2 mb-6">
+                            @foreach(['FBR Direct API', 'Dual Numbering', 'FBR Toggle', 'PIN Protection', 'Retry System', 'Tax Reports'] as $feature)
+                            <div class="flex items-center text-[12px] text-gray-700">
+                                <svg class="w-3.5 h-3.5 text-blue-600 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                {{ $feature }}
+                            </div>
+                            @endforeach
+                        </div>
+                        <a href="/fbr-pos-landing" class="block w-full py-2.5 bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-[10px] text-[13px] font-semibold hover:from-blue-600 hover:to-blue-800 shadow-md hover:shadow-lg text-center transition">
+                            Explore FBR POS
                         </a>
                     </div>
                 </div>
@@ -503,13 +530,17 @@
             <h2 class="text-[28px] sm:text-[32px] font-bold text-white tracking-tight mb-4">Ready to Get Compliant?</h2>
             <p class="text-gray-400 mb-8 text-[17px]">Choose a product to explore features, pricing, and get started.</p>
             <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
-                <a href="/digital-invoice" class="btn-glow px-7 py-3.5 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-[10px] text-[15px] font-semibold hover:from-emerald-500 hover:to-teal-600 w-full sm:w-auto flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                <a href="/digital-invoice" class="btn-glow px-6 py-3 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-[10px] text-[14px] font-semibold hover:from-emerald-500 hover:to-teal-600 w-full sm:w-auto flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                     Digital Invoice
                 </a>
-                <a href="/pos" class="btn-glow-purple px-7 py-3.5 bg-gradient-to-r from-purple-500 to-violet-600 text-white border border-purple-400/20 rounded-[10px] text-[15px] font-semibold hover:from-purple-600 hover:to-violet-700 transition w-full sm:w-auto flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                <a href="/pos" class="btn-glow-purple px-6 py-3 bg-gradient-to-r from-purple-500 to-violet-600 text-white border border-purple-400/20 rounded-[10px] text-[14px] font-semibold hover:from-purple-600 hover:to-violet-700 transition w-full sm:w-auto flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     PRA POS
+                </a>
+                <a href="/fbr-pos-landing" class="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white border border-blue-400/20 rounded-[10px] text-[14px] font-semibold hover:from-blue-600 hover:to-blue-700 transition w-full sm:w-auto flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                    FBR POS
                 </a>
             </div>
         </div>
@@ -533,6 +564,7 @@
                     <div class="space-y-2.5">
                         <a href="/digital-invoice" class="block text-[13px] text-gray-500 hover:text-emerald-400 transition">Digital Invoice</a>
                         <a href="/pos" class="block text-[13px] text-gray-500 hover:text-purple-400 transition">PRA POS</a>
+                        <a href="/fbr-pos-landing" class="block text-[13px] text-gray-500 hover:text-blue-400 transition">FBR POS</a>
                     </div>
                 </div>
                 <div>

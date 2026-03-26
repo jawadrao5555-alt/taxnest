@@ -63,6 +63,10 @@ class Company extends Model
         'franchise_id',
         'deleted_reason',
         'force_watermark',
+        'fbr_pos_enabled',
+        'fbr_pos_id',
+        'fbr_pos_token',
+        'fbr_pos_environment',
     ];
 
     protected $casts = [
@@ -76,6 +80,7 @@ class Company extends Model
         'inventory_enabled' => 'boolean',
         'force_watermark' => 'boolean',
         'pra_reporting_enabled' => 'boolean',
+        'fbr_pos_enabled' => 'boolean',
     ];
 
     protected $hidden = [

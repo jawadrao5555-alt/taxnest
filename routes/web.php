@@ -28,6 +28,7 @@ use App\Http\Controllers\TaxOverrideController;
 use App\Http\Controllers\CustomerProfileController;
 use App\Http\Controllers\WhtReportController;
 use App\Http\Controllers\CsvImportController;
+use App\Http\Controllers\FbrPosController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\AnnouncementController;
@@ -558,6 +559,14 @@ Route::prefix('franchise')->middleware(['franchise.auth'])->group(function () {
     Route::get('/companies', [FranchiseDashboardController::class, 'companies'])->name('franchise.companies');
     Route::get('/subscriptions', [FranchiseDashboardController::class, 'subscriptions'])->name('franchise.subscriptions');
     Route::get('/revenue', [FranchiseDashboardController::class, 'revenue'])->name('franchise.revenue');
+});
+
+Route::prefix('fbr-pos')->middleware(['auth', 'fbrpos.auth'])->group(function () {
+    Route::get('/dashboard', [FbrPosController::class, 'dashboard'])->name('fbrpos.dashboard');
+    Route::get('/create', [FbrPosController::class, 'create'])->name('fbrpos.create');
+    Route::post('/store', [FbrPosController::class, 'store'])->name('fbrpos.store');
+    Route::get('/transactions', [FbrPosController::class, 'transactions'])->name('fbrpos.transactions');
+    Route::get('/transactions/{id}', [FbrPosController::class, 'show'])->name('fbrpos.show');
 });
 
 require __DIR__.'/auth.php';

@@ -1,4 +1,4 @@
-<x-app-layout>
+<x-admin-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between flex-wrap gap-3">
             <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Announcements</h2>
@@ -158,4 +158,4 @@
             </div>
         </div>
     </div>
-</x-app-layout>
+</x-admin-layout>

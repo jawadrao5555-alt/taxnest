@@ -1,4 +1,4 @@
-<x-app-layout>
+<x-admin-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
             <div class="flex items-center space-x-3">
@@ -426,4 +426,4 @@
 
         </div>
     </div>
-</x-app-layout>
+</x-admin-layout>

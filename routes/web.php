@@ -338,64 +338,6 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         Route::delete('/tax-overrides/sro/{id}', [TaxOverrideController::class, 'deleteSroRule'])->name('tax-overrides.sro.delete');
         Route::get('/tax-overrides/analytics', [TaxOverrideController::class, 'overrideAnalytics'])->name('tax-overrides.analytics');
 
-        Route::get('/admin/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
-        Route::get('/admin/companies', [AdminController::class, 'companies']);
-        Route::get('/admin/companies/create', [AdminController::class, 'createCompany']);
-        Route::post('/admin/companies', [AdminController::class, 'storeCompany']);
-        Route::get('/admin/users', [AdminController::class, 'users']);
-        Route::post('/admin/users', [AdminController::class, 'storeUser']);
-        Route::get('/admin/fbr-logs', [AdminController::class, 'fbrLogs']);
-        Route::get('/admin/system-health', [AdminController::class, 'systemHealth']);
-        Route::get('/admin/security-logs', [AdminController::class, 'securityLogs']);
-        Route::get('/admin/audit/export', [AdminController::class, 'auditExport'])->name('admin.audit.export');
-        Route::get('/admin/audit-logs', [AdminController::class, 'auditLogs'])->name('admin.audit-logs');
-        Route::get('/admin/anomalies', [AdminController::class, 'anomalies'])->name('admin.anomalies');
-        Route::get('/admin/risk-settings', [AdminController::class, 'riskSettings']);
-        Route::post('/admin/risk-settings', [AdminController::class, 'updateRiskSettings']);
-        Route::get('/admin/override-logs', [AdminController::class, 'overrideLogs']);
-        Route::get('/admin/company/{company}', [AdminController::class, 'companyShow']);
-        Route::post('/admin/company/{company}/suspend', [AdminController::class, 'suspendCompany']);
-        Route::post('/admin/company/{company}/approve', [AdminController::class, 'approveCompany']);
-        Route::post('/admin/company/{company}/reject', [AdminController::class, 'rejectCompany']);
-        Route::post('/admin/company/{company}/toggle-watermark', [AdminController::class, 'toggleWatermark']);
-        Route::get('/admin/companies/pending', [AdminController::class, 'pendingCompanies']);
-        Route::post('/admin/company/{company}/change-plan', [AdminController::class, 'changePlan']);
-        Route::post('/admin/company/{company}/toggle-internal', [AdminController::class, 'toggleInternalAccount']);
-        Route::post('/admin/company/{company}/toggle-inventory', [AdminController::class, 'toggleInventory']);
-        Route::post('/admin/company/{company}/update-limits', [AdminController::class, 'updateCompanyLimits']);
-        Route::post('/admin/company/{company}/reset-limits', [AdminController::class, 'resetCompanyLimits']);
-        Route::get('/admin/announcements', [AnnouncementController::class, 'index'])->name('admin.announcements');
-        Route::post('/admin/announcements', [AnnouncementController::class, 'store'])->name('admin.announcements.store');
-        Route::post('/admin/announcements/{id}/toggle', [AnnouncementController::class, 'toggle'])->name('admin.announcements.toggle');
-        Route::delete('/admin/announcements/{id}/delete', [AnnouncementController::class, 'destroy'])->name('admin.announcements.destroy');
-
-        Route::get('/admin/invoice-override', [AdminController::class, 'invoiceSearch'])->name('admin.invoice-override');
-        Route::post('/admin/invoice-override/{id}', [AdminController::class, 'invoiceOverride'])->name('admin.invoice-override.action');
-
-        Route::get('/admin/hs-master-export', [HsMasterExportController::class, 'index'])->name('admin.hs-master-export');
-
-        Route::get('/admin/hs-master', [GlobalHsMasterController::class, 'index'])->name('admin.hs-master');
-        Route::post('/admin/hs-master', [GlobalHsMasterController::class, 'store'])->name('admin.hs-master.store');
-        Route::put('/admin/hs-master/{id}', [GlobalHsMasterController::class, 'update'])->name('admin.hs-master.update');
-        Route::post('/admin/hs-master/seed', [GlobalHsMasterController::class, 'seed'])->name('admin.hs-master.seed');
-        Route::post('/admin/hs-master/map-unmapped', [GlobalHsMasterController::class, 'mapUnmapped'])->name('admin.hs-master.map-unmapped');
-
-        Route::get('/admin/hs-master-global', [HsMasterController::class, 'index'])->name('admin.hs-master-global.index');
-        Route::get('/admin/hs-master-global/{id}/edit', [HsMasterController::class, 'edit'])->name('admin.hs-master-global.edit');
-        Route::post('/admin/hs-master-global/{id}', [HsMasterController::class, 'update'])->name('admin.hs-master-global.update');
-        Route::get('/admin/hs-unmapped', [HsMasterController::class, 'unmapped'])->name('admin.hs-master-global.unmapped');
-        Route::post('/admin/hs-unmapped/{id}/map', [HsMasterController::class, 'mapFromQueue'])->name('admin.hs-master-global.map');
-        Route::post('/admin/hs-unmapped/{id}/reject', [HsMasterController::class, 'rejectSuggestion'])->name('admin.hs-master-global.reject');
-        Route::post('/admin/hs-unmapped/{id}/regenerate', [HsMasterController::class, 'regenerateSuggestion'])->name('admin.hs-master-global.regenerate');
-
-        Route::get('/admin/hs-mapping-engine', [HsCodeMappingController::class, 'index'])->name('admin.hs-mapping-engine');
-        Route::get('/admin/hs-mapping-engine/export', [HsCodeMappingController::class, 'exportCsv'])->name('admin.hs-mapping-engine.export');
-        Route::post('/admin/hs-mapping-engine/import', [HsCodeMappingController::class, 'importCsv'])->name('admin.hs-mapping-engine.import');
-        Route::post('/admin/hs-mapping-engine', [HsCodeMappingController::class, 'store'])->name('admin.hs-mapping-engine.store');
-        Route::put('/admin/hs-mapping-engine/{id}', [HsCodeMappingController::class, 'update'])->name('admin.hs-mapping-engine.update');
-        Route::delete('/admin/hs-mapping-engine/{id}', [HsCodeMappingController::class, 'destroy'])->name('admin.hs-mapping-engine.destroy');
-        Route::post('/admin/hs-mapping-engine/{id}/clone', [HsCodeMappingController::class, 'duplicate'])->name('admin.hs-mapping-engine.clone');
-        Route::get('/api/hs-mapping-autofill/{hsCode}', [HsCodeMappingController::class, 'apiHsAutoFill']);
     });
 });
 
@@ -514,6 +456,66 @@ Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admi
 
 Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('saas.admin.dashboard');
+
+    Route::get('/old-dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
+    Route::get('/di-companies', [AdminController::class, 'companies']);
+    Route::get('/di-companies/create', [AdminController::class, 'createCompany']);
+    Route::post('/di-companies/store', [AdminController::class, 'storeCompany']);
+    Route::get('/all-users', [AdminController::class, 'users']);
+    Route::post('/all-users', [AdminController::class, 'storeUser']);
+    Route::get('/fbr-logs', [AdminController::class, 'fbrLogs']);
+    Route::get('/system-health', [AdminController::class, 'systemHealth']);
+    Route::get('/security-logs', [AdminController::class, 'securityLogs']);
+    Route::get('/audit/export', [AdminController::class, 'auditExport'])->name('admin.audit.export');
+    Route::get('/old-audit-logs', [AdminController::class, 'auditLogs'])->name('admin.audit-logs');
+    Route::get('/anomalies', [AdminController::class, 'anomalies'])->name('admin.anomalies');
+    Route::get('/override-logs', [AdminController::class, 'overrideLogs']);
+    Route::get('/company/{company}', [AdminController::class, 'companyShow']);
+    Route::post('/company/{company}/suspend', [AdminController::class, 'suspendCompany']);
+    Route::post('/company/{company}/approve', [AdminController::class, 'approveCompany']);
+    Route::post('/company/{company}/reject', [AdminController::class, 'rejectCompany']);
+    Route::post('/company/{company}/toggle-watermark', [AdminController::class, 'toggleWatermark']);
+    Route::get('/di-companies/pending', [AdminController::class, 'pendingCompanies']);
+    Route::post('/company/{company}/change-plan', [AdminController::class, 'changePlan']);
+    Route::post('/company/{company}/toggle-internal', [AdminController::class, 'toggleInternalAccount']);
+    Route::post('/company/{company}/toggle-inventory', [AdminController::class, 'toggleInventory']);
+    Route::post('/company/{company}/update-limits', [AdminController::class, 'updateCompanyLimits']);
+    Route::post('/company/{company}/reset-limits', [AdminController::class, 'resetCompanyLimits']);
+
+    Route::get('/risk-settings', [AdminController::class, 'riskSettings']);
+    Route::post('/risk-settings', [AdminController::class, 'updateRiskSettings']);
+    Route::get('/announcements', [AnnouncementController::class, 'index'])->name('admin.announcements');
+    Route::post('/announcements', [AnnouncementController::class, 'store'])->name('admin.announcements.store');
+    Route::post('/announcements/{id}/toggle', [AnnouncementController::class, 'toggle'])->name('admin.announcements.toggle');
+    Route::delete('/announcements/{id}/delete', [AnnouncementController::class, 'destroy'])->name('admin.announcements.destroy');
+
+    Route::get('/invoice-override', [AdminController::class, 'invoiceSearch'])->name('admin.invoice-override');
+    Route::post('/invoice-override/{id}', [AdminController::class, 'invoiceOverride'])->name('admin.invoice-override.action');
+
+    Route::get('/hs-master-export', [HsMasterExportController::class, 'index'])->name('admin.hs-master-export');
+
+    Route::get('/hs-master', [GlobalHsMasterController::class, 'index'])->name('admin.hs-master');
+    Route::post('/hs-master', [GlobalHsMasterController::class, 'store'])->name('admin.hs-master.store');
+    Route::put('/hs-master/{id}', [GlobalHsMasterController::class, 'update'])->name('admin.hs-master.update');
+    Route::post('/hs-master/seed', [GlobalHsMasterController::class, 'seed'])->name('admin.hs-master.seed');
+    Route::post('/hs-master/map-unmapped', [GlobalHsMasterController::class, 'mapUnmapped'])->name('admin.hs-master.map-unmapped');
+
+    Route::get('/hs-master-global', [HsMasterController::class, 'index'])->name('admin.hs-master-global.index');
+    Route::get('/hs-master-global/{id}/edit', [HsMasterController::class, 'edit'])->name('admin.hs-master-global.edit');
+    Route::post('/hs-master-global/{id}', [HsMasterController::class, 'update'])->name('admin.hs-master-global.update');
+    Route::get('/hs-unmapped', [HsMasterController::class, 'unmapped'])->name('admin.hs-master-global.unmapped');
+    Route::post('/hs-unmapped/{id}/map', [HsMasterController::class, 'mapFromQueue'])->name('admin.hs-master-global.map');
+    Route::post('/hs-unmapped/{id}/reject', [HsMasterController::class, 'rejectSuggestion'])->name('admin.hs-master-global.reject');
+    Route::post('/hs-unmapped/{id}/regenerate', [HsMasterController::class, 'regenerateSuggestion'])->name('admin.hs-master-global.regenerate');
+
+    Route::get('/hs-mapping-engine', [HsCodeMappingController::class, 'index'])->name('admin.hs-mapping-engine');
+    Route::get('/hs-mapping-engine/export', [HsCodeMappingController::class, 'exportCsv'])->name('admin.hs-mapping-engine.export');
+    Route::post('/hs-mapping-engine/import', [HsCodeMappingController::class, 'importCsv'])->name('admin.hs-mapping-engine.import');
+    Route::post('/hs-mapping-engine', [HsCodeMappingController::class, 'store'])->name('admin.hs-mapping-engine.store');
+    Route::put('/hs-mapping-engine/{id}', [HsCodeMappingController::class, 'update'])->name('admin.hs-mapping-engine.update');
+    Route::delete('/hs-mapping-engine/{id}', [HsCodeMappingController::class, 'destroy'])->name('admin.hs-mapping-engine.destroy');
+    Route::post('/hs-mapping-engine/{id}/clone', [HsCodeMappingController::class, 'duplicate'])->name('admin.hs-mapping-engine.clone');
+
     Route::get('/companies', [AdminCompanyController::class, 'index'])->name('saas.admin.companies');
     Route::get('/companies/create', [AdminCompanyController::class, 'create'])->name('saas.admin.companies.create');
     Route::post('/companies', [AdminCompanyController::class, 'store'])->name('saas.admin.companies.store');

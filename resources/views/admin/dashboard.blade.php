@@ -1,4 +1,4 @@
-<x-app-layout>
+<x-admin-layout>
     <x-slot name="header">
         <h2 class="font-bold text-xl text-gray-800 leading-tight">Super Admin Dashboard</h2>
     </x-slot>
@@ -8,7 +8,7 @@
 
             @if($pendingCompanies > 0)
             <div class="mb-8">
-                <a href="/admin/companies/pending" class="block bg-amber-50 rounded-xl shadow-sm border-2 border-amber-300 p-6 hover:bg-amber-100 transition">
+                <a href="/admin/di-companies/pending" class="block bg-amber-50 rounded-xl shadow-sm border-2 border-amber-300 p-6 hover:bg-amber-100 transition">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm font-bold text-amber-700 uppercase tracking-wider">Pending Approvals</p>
@@ -386,7 +386,7 @@
                 </div>
             </div>
 
-            @if(auth()->user()->role === 'super_admin')
+            @if(auth('admin')->check() || (auth()->check() && auth()->user()->role === 'super_admin'))
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <div class="bg-white rounded-xl shadow-sm border border-rose-100 p-6">
                     <div class="flex items-center justify-between mb-4">
@@ -557,7 +557,7 @@
 
             <div class="flex flex-wrap gap-3">
                 <a href="/admin/companies" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 transition">Manage Companies</a>
-                <a href="/admin/users" class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg font-medium text-sm hover:bg-purple-700 transition">Manage Users</a>
+                <a href="/admin/all-users" class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg font-medium text-sm hover:bg-purple-700 transition">Manage Users</a>
                 <a href="/admin/fbr-logs" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg font-medium text-sm hover:bg-gray-700 transition">FBR Logs</a>
                 <a href="/admin/system-health" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium text-sm hover:bg-emerald-700 transition">System Health</a>
                 <a href="/admin/security-logs" class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg font-medium text-sm hover:bg-red-700 transition">Security Logs</a>
@@ -569,4 +569,4 @@
             </div>
         </div>
     </div>
-</x-app-layout>
+</x-admin-layout>

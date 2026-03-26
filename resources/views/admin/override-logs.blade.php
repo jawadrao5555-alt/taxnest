@@ -1,4 +1,4 @@
-<x-app-layout>
+<x-admin-layout>
     <x-slot name="header">
         <h2 class="font-bold text-xl text-gray-800 leading-tight">Override & Tax Intelligence Logs</h2>
     </x-slot>
@@ -158,4 +158,4 @@
             </div>
         </div>
     </div>
-</x-app-layout>
+</x-admin-layout>

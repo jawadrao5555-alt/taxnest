@@ -97,6 +97,11 @@
             </header>
 
             <main class="flex-1 overflow-y-auto">
+                @if(isset($header))
+                <div class="bg-gray-900 border-b border-gray-800 px-6 py-4 hidden lg:block">
+                    {{ $header }}
+                </div>
+                @endif
                 @if(session('success'))
                 <div class="mx-4 mt-4 bg-emerald-900/30 border border-emerald-700 text-emerald-300 rounded-lg px-4 py-3 text-sm">{{ session('success') }}</div>
                 @endif

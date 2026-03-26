@@ -1,4 +1,4 @@
-<x-app-layout>
+<x-admin-layout>
     <x-slot name="header">
         <h2 class="font-bold text-xl text-gray-800 leading-tight">Invoice Override</h2>
     </x-slot>
@@ -191,4 +191,4 @@
             .catch(() => showMessage('An error occurred. Please try again.', true));
         }
     </script>
-</x-app-layout>
+</x-admin-layout>

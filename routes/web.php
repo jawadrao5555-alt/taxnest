@@ -481,6 +481,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/company/{company}/change-plan', [AdminController::class, 'changePlan']);
     Route::post('/company/{company}/toggle-internal', [AdminController::class, 'toggleInternalAccount']);
     Route::post('/company/{company}/toggle-inventory', [AdminController::class, 'toggleInventory']);
+    Route::post('/company/{company}/toggle-fbr-pos', [AdminController::class, 'toggleFbrPos']);
     Route::post('/company/{company}/update-limits', [AdminController::class, 'updateCompanyLimits']);
     Route::post('/company/{company}/reset-limits', [AdminController::class, 'resetCompanyLimits']);
 
@@ -568,6 +569,8 @@ Route::prefix('fbr-pos')->middleware(['auth', 'fbrpos.auth'])->group(function ()
     Route::get('/transactions', [FbrPosController::class, 'transactions'])->name('fbrpos.transactions');
     Route::get('/transactions/{id}', [FbrPosController::class, 'show'])->name('fbrpos.show');
     Route::post('/transactions/{id}/retry-fbr', [FbrPosController::class, 'retryFbr'])->name('fbrpos.retryFbr');
+    Route::match(['get', 'post'], '/settings', [FbrPosController::class, 'fbrSettings'])->name('fbrpos.settings');
+    Route::post('/test-connection', [FbrPosController::class, 'testConnection'])->name('fbrpos.testConnection');
 });
 
 require __DIR__.'/auth.php';

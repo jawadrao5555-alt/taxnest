@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Models\FbrPosLog;
 use App\Models\FbrPosTransaction;
 use App\Models\FbrPosTransactionItem;
 use App\Models\Product;
 use App\Services\FbrService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -247,6 +249,125 @@ class FbrPosController extends Controller
         $fbrErrors = implode(', ', $fbrResult['errors'] ?? ['Unknown error']);
         return redirect()->route('fbrpos.show', $id)
             ->with('error', "FBR retry failed: {$fbrErrors}");
+    }
+
+    public function fbrSettings(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $user = auth()->user();
+
+        if ($user->role !== 'company_admin') {
+            return back()->with('error', 'Only company admin can access FBR settings.');
+        }
+
+        if ($request->isMethod('post')) {
+            $request->validate([
+                'fbr_pos_environment' => 'required|in:sandbox,production',
+                'fbr_pos_id' => 'nullable|string|max:100',
+                'fbr_pos_token' => 'nullable|string|max:255',
+            ]);
+
+            $updateData = [
+                'fbr_pos_environment' => $request->fbr_pos_environment,
+            ];
+
+            if ($request->filled('fbr_pos_id')) {
+                $updateData['fbr_pos_id'] = $request->fbr_pos_id;
+            }
+
+            if ($request->filled('fbr_pos_token')) {
+                $updateData['fbr_pos_token'] = Crypt::encryptString($request->fbr_pos_token);
+            }
+
+            $company->update($updateData);
+
+            return back()->with('success', 'FBR POS settings updated successfully.');
+        }
+
+        $fbrLogs = FbrPosLog::where('company_id', $companyId)->orderBy('created_at', 'desc')->take(20)->get();
+
+        $posToken = '';
+        if ($company->fbr_pos_token) {
+            try { $posToken = Crypt::decryptString($company->fbr_pos_token); } catch (\Exception $e) { $posToken = $company->fbr_pos_token; }
+        }
+        $maskedPosToken = $posToken ? substr($posToken, 0, 8) . '****' . substr($posToken, -4) : '';
+
+        $hasSandboxFallback = !empty($company->fbr_sandbox_token);
+        $hasProductionFallback = !empty($company->fbr_production_token);
+
+        return view('fbr-pos.settings', compact('company', 'fbrLogs', 'maskedPosToken', 'hasSandboxFallback', 'hasProductionFallback'));
+    }
+
+    public function testConnection()
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        if (auth()->user()->role !== 'company_admin') {
+            return response()->json(['success' => false, 'message' => 'Only company admin can test connection.']);
+        }
+
+        $env = $company->fbr_pos_environment ?? 'sandbox';
+        $fbrService = new FbrService();
+
+        $ref = new \ReflectionMethod($fbrService, 'getFbrPosToken');
+        $ref->setAccessible(true);
+        $token = $ref->invoke($fbrService, $company);
+
+        if (empty($token)) {
+            return response()->json([
+                'success' => false,
+                'message' => "No {$env} token configured. Please set your FBR token first.",
+            ]);
+        }
+
+        $urlRef = new \ReflectionMethod($fbrService, 'getFbrPosUrl');
+        $urlRef->setAccessible(true);
+        $url = $urlRef->invoke($fbrService, $company);
+
+        try {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, '{}');
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $token,
+            ]);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+
+            if ($curlError) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Connection failed: {$curlError}",
+                ]);
+            }
+
+            if ($httpCode === 401) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Authentication failed (401). Token may be invalid or expired for {$env} environment.",
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Connected to FBR {$env} server successfully (HTTP {$httpCode}). Token is valid.",
+                'environment' => $env,
+                'http_code' => $httpCode,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Connection error: ' . $e->getMessage(),
+            ]);
+        }
     }
 
     private function generateInvoiceNumber(int $companyId): string

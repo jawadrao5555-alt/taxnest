@@ -678,6 +678,21 @@ class AdminController extends Controller
         return redirect('/admin/company/' . $company->id)->with('success', 'Inventory module ' . ($company->inventory_enabled ? 'enabled' : 'disabled') . '.');
     }
 
+    public function toggleFbrPos(Request $request, Company $company)
+    {
+        $company->update(['fbr_pos_enabled' => !$company->fbr_pos_enabled]);
+        AuditLogService::log(
+            $company->fbr_pos_enabled ? 'fbr_pos_enabled' : 'fbr_pos_disabled',
+            'Company', $company->id, null,
+            ['fbr_pos_enabled' => $company->fbr_pos_enabled]
+        );
+        SecurityLogService::log('fbr_pos_toggled', auth()->id(), [
+            'company_id' => $company->id,
+            'fbr_pos_enabled' => $company->fbr_pos_enabled,
+        ]);
+        return redirect('/admin/company/' . $company->id)->with('success', 'FBR POS module ' . ($company->fbr_pos_enabled ? 'enabled' : 'disabled') . '.');
+    }
+
     public function updateCompanyLimits(Request $request, Company $company)
     {
         $request->validate([

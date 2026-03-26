@@ -157,6 +157,13 @@
                         <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">FBR Environment</p>
                         <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $company->fbr_environment === 'production' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800' }}">{{ ucfirst($company->fbr_environment ?? 'sandbox') }}</span>
                     </div>
+                    <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-4">
+                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">FBR POS Module</p>
+                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $company->fbr_pos_enabled ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600' }}">{{ $company->fbr_pos_enabled ? 'Enabled' : 'Disabled' }}</span>
+                        @if($company->fbr_pos_enabled)
+                        <span class="ml-1 inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ ($company->fbr_pos_environment ?? 'sandbox') === 'production' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800' }}">{{ ucfirst($company->fbr_pos_environment ?? 'sandbox') }}</span>
+                        @endif
+                    </div>
                 </div>
 
                 <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
@@ -423,6 +430,43 @@
                     </div>
                 </div>
             </div>
+
+            @if($company->product_type === 'di')
+            <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+                    <h4 class="text-sm font-bold text-gray-800 dark:text-gray-100">FBR POS Module</h4>
+                </div>
+                <div class="p-6">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <span class="inline-block w-3 h-3 rounded-full {{ $company->fbr_pos_enabled ? 'bg-emerald-500' : 'bg-gray-400' }}"></span>
+                            <span class="text-sm font-semibold {{ $company->fbr_pos_enabled ? 'text-emerald-800' : 'text-gray-700 dark:text-gray-300' }}">{{ $company->fbr_pos_enabled ? 'FBR POS Active' : 'FBR POS Disabled' }}</span>
+                            @if($company->fbr_pos_enabled)
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ ($company->fbr_pos_environment ?? 'sandbox') === 'production' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800' }}">{{ ucfirst($company->fbr_pos_environment ?? 'sandbox') }}</span>
+                            @endif
+                        </div>
+                        <form method="POST" action="/admin/company/{{ $company->id }}/toggle-fbr-pos" onsubmit="return confirm('{{ $company->fbr_pos_enabled ? 'Disable FBR POS module for this company?' : 'Enable FBR POS module? This allows the company to submit POS invoices to FBR.' }}')">
+                            @csrf
+                            <button type="submit" class="px-4 py-2 {{ $company->fbr_pos_enabled ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700' }} text-white text-sm rounded-lg font-medium transition">
+                                {{ $company->fbr_pos_enabled ? 'Disable FBR POS' : 'Enable FBR POS' }}
+                            </button>
+                        </form>
+                    </div>
+                    @if($company->fbr_pos_enabled)
+                    <div class="mt-4 grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <span class="text-gray-500">POS ID:</span>
+                            <span class="ml-2 text-gray-900 dark:text-white">{{ $company->fbr_pos_id ?? 'Not Set' }}</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">Environment:</span>
+                            <span class="ml-2 text-gray-900 dark:text-white">{{ ucfirst($company->fbr_pos_environment ?? 'sandbox') }}</span>
+                        </div>
+                    </div>
+                    @endif
+                </div>
+            </div>
+            @endif
 
         </div>
     </div>

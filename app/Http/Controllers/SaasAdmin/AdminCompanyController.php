@@ -114,6 +114,9 @@ class AdminCompanyController extends Controller
             'fbr_business_name' => 'nullable|string|max:255',
             'pra_environment' => 'nullable|string|max:50',
             'pra_pos_id' => 'nullable|string|max:100',
+            'fbr_pos_enabled' => 'nullable|boolean',
+            'fbr_pos_environment' => 'nullable|in:sandbox,production',
+            'fbr_pos_id' => 'nullable|string|max:100',
         ]);
 
         $fields = [
@@ -123,7 +126,7 @@ class AdminCompanyController extends Controller
         ];
 
         if ($company->product_type === 'di') {
-            $fields = array_merge($fields, ['fbr_environment', 'fbr_registration_no', 'fbr_business_name']);
+            $fields = array_merge($fields, ['fbr_environment', 'fbr_registration_no', 'fbr_business_name', 'fbr_pos_enabled', 'fbr_pos_environment', 'fbr_pos_id']);
         } else {
             $fields = array_merge($fields, ['pra_environment', 'pra_pos_id']);
         }

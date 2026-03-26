@@ -29,6 +29,7 @@ use App\Http\Controllers\CustomerProfileController;
 use App\Http\Controllers\WhtReportController;
 use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\FbrPosController;
+use App\Http\Controllers\FbrPosAuthController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\AnnouncementController;
@@ -567,7 +568,13 @@ Route::get('/fbr-pos-landing', function () {
     return view('fbr-pos.landing', ['plans' => $plans]);
 })->name('fbrpos.landing');
 
-Route::prefix('fbr-pos')->middleware(['auth', 'fbrpos.auth'])->group(function () {
+Route::get('/fbr-pos/login', [FbrPosAuthController::class, 'showLogin'])->name('fbrpos.login');
+Route::post('/fbr-pos/login', [FbrPosAuthController::class, 'login']);
+Route::get('/fbr-pos/register', [FbrPosAuthController::class, 'showRegister'])->name('fbrpos.register');
+Route::post('/fbr-pos/register', [FbrPosAuthController::class, 'register']);
+Route::post('/fbr-pos/logout', [FbrPosAuthController::class, 'logout'])->name('fbrpos.logout');
+
+Route::prefix('fbr-pos')->middleware(['fbrpos.auth'])->group(function () {
     Route::get('/dashboard', [FbrPosController::class, 'dashboard'])->name('fbrpos.dashboard');
     Route::get('/create', [FbrPosController::class, 'create'])->name('fbrpos.create');
     Route::post('/store', [FbrPosController::class, 'store'])->name('fbrpos.store');

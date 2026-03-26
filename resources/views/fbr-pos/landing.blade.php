@@ -97,7 +97,7 @@
                     </button>
                 </div>
             </div>
-            <form method="POST" action="/login" class="relative px-6 pb-6 space-y-4">
+            <form method="POST" action="/fbr-pos/login" class="relative px-6 pb-6 space-y-4">
                 @csrf
                 <div>
                     <label class="block text-sm font-medium text-blue-100/70 mb-1.5">Email, Phone, Username, CNIC or NTN</label>
@@ -125,7 +125,7 @@
                     Sign In
                 </button>
                 <p class="text-center text-sm text-blue-200/40">
-                    Don't have an account? <a href="/register" class="font-semibold text-blue-300 hover:text-white transition">Sign Up Free</a>
+                    Don't have an account? <a href="/fbr-pos/register" class="font-semibold text-blue-300 hover:text-white transition">Sign Up Free</a>
                 </p>
             </form>
         </div>
@@ -164,7 +164,7 @@
                         <span>PRA POS</span>
                     </a>
                     <button @click="showLoginModal = true" class="text-sm font-semibold text-gray-700 hover:text-gray-900 transition">Log in</button>
-                    <a href="/register" class="inline-flex items-center px-5 py-2 bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition shadow-md">Sign Up Free</a>
+                    <a href="/fbr-pos/register" class="inline-flex items-center px-5 py-2 bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition shadow-md">Sign Up Free</a>
                 </div>
             </div>
         </div>
@@ -190,7 +190,7 @@
                     Real-time invoice submission, dual invoice numbering, and full tax compliance reporting.
                 </p>
                 <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <a href="/register" class="w-full sm:w-auto px-8 py-3.5 bg-white text-blue-700 rounded-xl text-sm font-bold hover:bg-blue-50 transition shadow-2xl hover:shadow-blue-500/25 text-center">
+                    <a href="/fbr-pos/register" class="w-full sm:w-auto px-8 py-3.5 bg-white text-blue-700 rounded-xl text-sm font-bold hover:bg-blue-50 transition shadow-2xl hover:shadow-blue-500/25 text-center">
                         Start Free Trial
                     </a>
                     <a href="#how-it-works" class="w-full sm:w-auto px-8 py-3.5 border-2 border-white/30 text-white rounded-xl text-sm font-bold hover:bg-white/15 backdrop-blur-sm transition text-center">
@@ -324,7 +324,7 @@
                         </div>
 
                         <div class="mt-5">
-                            <a href="/register" class="block w-full py-2.5 rounded-lg text-sm font-semibold text-center transition shadow-md hover:shadow-lg {{ $isPopular ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white' : 'bg-gray-900 text-white hover:bg-gray-800' }}">Start Free Trial</a>
+                            <a href="/fbr-pos/register" class="block w-full py-2.5 rounded-lg text-sm font-semibold text-center transition shadow-md hover:shadow-lg {{ $isPopular ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white' : 'bg-gray-900 text-white hover:bg-gray-800' }}">Start Free Trial</a>
                         </div>
                     </div>
                 </div>
@@ -355,7 +355,7 @@
                     </div>
                     <h3 class="text-xl font-bold text-gray-900 mb-2">FBR POS Included Free</h3>
                     <p class="text-gray-600 mb-6">FBR POS module is included with every Digital Invoice subscription. Sign up for Digital Invoice to get started.</p>
-                    <a href="/register" class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-xl text-sm font-bold hover:shadow-lg transition shadow-md">Start Free Trial</a>
+                    <a href="/fbr-pos/register" class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-xl text-sm font-bold hover:shadow-lg transition shadow-md">Start Free Trial</a>
                 </div>
             </div>
             @endif
@@ -403,7 +403,7 @@
             <h2 class="text-3xl font-bold text-white mb-4" style="text-shadow: 0 2px 15px rgba(0,0,0,0.3);">Ready to Get Started?</h2>
             <p class="text-blue-200 mb-8">Start your 14-day free trial. No credit card required.</p>
             <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <a href="/register" class="w-full sm:w-auto px-8 py-3.5 bg-white text-blue-700 rounded-xl text-sm font-bold hover:bg-blue-50 transition shadow-2xl hover:shadow-blue-500/25 text-center">Create Free Account</a>
+                <a href="/fbr-pos/register" class="w-full sm:w-auto px-8 py-3.5 bg-white text-blue-700 rounded-xl text-sm font-bold hover:bg-blue-50 transition shadow-2xl hover:shadow-blue-500/25 text-center">Create Free Account</a>
                 <button @click="showLoginModal = true" class="w-full sm:w-auto px-8 py-3.5 border-2 border-white/30 text-white rounded-xl text-sm font-bold hover:bg-white/15 backdrop-blur-sm transition text-center">Login to FBR POS</button>
             </div>
         </div>

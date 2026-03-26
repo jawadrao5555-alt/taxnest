@@ -9,6 +9,7 @@ use App\Models\FbrPosTransactionItem;
 use App\Models\Product;
 use App\Services\FbrService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -159,7 +160,7 @@ class FbrPosController extends Controller
                     'payment_method' => $request->payment_method,
                     'status' => 'completed',
                     'fbr_status' => $invoiceMode === 'local' ? 'local' : 'pending',
-                    'created_by' => auth()->id(),
+                    'created_by' => Auth::guard('fbrpos')->id(),
                 ]);
 
                 foreach ($itemsData as $itemData) {
@@ -316,7 +317,7 @@ class FbrPosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        $user = auth()->user();
+        $user = Auth::guard('fbrpos')->user();
 
         if ($user->role !== 'company_admin') {
             return back()->with('error', 'Only company admin can access FBR settings.');
@@ -365,7 +366,7 @@ class FbrPosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
-        if (auth()->user()->role !== 'company_admin') {
+        if (Auth::guard('fbrpos')->user()->role !== 'company_admin') {
             return response()->json(['success' => false, 'message' => 'Only company admin can test connection.']);
         }
 
@@ -433,7 +434,7 @@ class FbrPosController extends Controller
 
     public function toggleFbrReporting()
     {
-        if (auth()->user()->role !== 'company_admin') {
+        if (Auth::guard('fbrpos')->user()->role !== 'company_admin') {
             return response()->json(['success' => false, 'message' => 'Only company admin can toggle FBR reporting.'], 403);
         }
 

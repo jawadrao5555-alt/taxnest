@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 @php
-    $isDarkMode = auth()->check() && auth()->user()->dark_mode;
+    $isDarkMode = Auth::guard('fbrpos')->check() && Auth::guard('fbrpos')->user()->dark_mode;
 @endphp
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="{{ $isDarkMode ? 'dark' : '' }}">
     <head>
@@ -120,12 +120,11 @@
                             </span>
                             <div class="relative" x-data="{ open: false }">
                                 <button @click="open = !open" class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
-                                    <span class="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400 text-xs font-bold">{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}</span>
-                                    <span class="hidden sm:inline">{{ auth()->user()->name }}</span>
+                                    <span class="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-700 dark:text-blue-400 text-xs font-bold">{{ strtoupper(substr(Auth::guard('fbrpos')->user()->name, 0, 1)) }}</span>
+                                    <span class="hidden sm:inline">{{ Auth::guard('fbrpos')->user()->name }}</span>
                                 </button>
                                 <div x-show="open" @click.away="open = false" x-cloak class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
-                                    <a href="{{ route('dashboard') }}" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Back to DI</a>
-                                    <form method="POST" action="{{ route('logout') }}">
+                                    <form method="POST" action="{{ route('fbrpos.logout') }}">
                                         @csrf
                                         <button type="submit" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Log Out</button>
                                     </form>

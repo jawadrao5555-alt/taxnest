@@ -84,6 +84,12 @@ return Application::configure(basePath: dirname(__DIR__))
                 }
                 return redirect('/pos/login')->with('error', 'Session expired. Please log in again.');
             }
+            if (str_starts_with($path, 'fbr-pos/') || str_starts_with($path, 'fbr-pos')) {
+                if (auth('fbrpos')->check()) {
+                    return redirect()->back()->with('error', 'Your session expired. Please try again.');
+                }
+                return redirect('/fbr-pos/login')->with('error', 'Session expired. Please log in again.');
+            }
 
             if (auth()->check()) {
                 return redirect()->back()->with('error', 'Your session expired. Please try again.');

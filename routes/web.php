@@ -567,6 +567,7 @@ Route::prefix('fbr-pos')->middleware(['auth', 'fbrpos.auth'])->group(function ()
     Route::post('/store', [FbrPosController::class, 'store'])->name('fbrpos.store');
     Route::get('/transactions', [FbrPosController::class, 'transactions'])->name('fbrpos.transactions');
     Route::get('/transactions/{id}', [FbrPosController::class, 'show'])->name('fbrpos.show');
+    Route::post('/transactions/{id}/retry-fbr', [FbrPosController::class, 'retryFbr'])->name('fbrpos.retryFbr');
 });
 
 require __DIR__.'/auth.php';

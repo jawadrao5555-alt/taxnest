@@ -10,8 +10,22 @@
                 <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">FBR Submitted</span>
             @elseif($transaction->fbr_status === 'failed')
                 <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">FBR Failed</span>
+                <form method="POST" action="{{ route('fbrpos.retryFbr', $transaction->id) }}" class="inline">
+                    @csrf
+                    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 transition">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Retry FBR
+                    </button>
+                </form>
             @else
                 <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">FBR Pending</span>
+                <form method="POST" action="{{ route('fbrpos.retryFbr', $transaction->id) }}" class="inline">
+                    @csrf
+                    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 transition">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Submit to FBR
+                    </button>
+                </form>
             @endif
         </div>
     </div>
@@ -61,14 +75,28 @@
                     <h3 class="font-semibold text-gray-900 dark:text-white">FBR Submission Logs</h3>
                 </div>
                 <div class="divide-y divide-gray-200 dark:divide-gray-700">
-                    @foreach($transaction->fbrLogs as $log)
+                    @foreach($transaction->fbrLogs()->latest()->get() as $log)
                     <div class="px-5 py-3">
                         <div class="flex items-center justify-between">
-                            <span class="text-sm font-medium {{ $log->status === 'success' ? 'text-green-600' : 'text-red-600' }}">{{ ucfirst($log->status) }}</span>
+                            <div class="flex items-center gap-2">
+                                @if($log->status === 'success')
+                                    <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                                    <span class="text-sm font-medium text-green-600">Success</span>
+                                @elseif($log->status === 'pending')
+                                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                                    <span class="text-sm font-medium text-amber-600">Pending</span>
+                                @else
+                                    <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                                    <span class="text-sm font-medium text-red-600">Failed</span>
+                                @endif
+                                @if($log->response_code)
+                                    <span class="text-xs text-gray-400">(Code: {{ $log->response_code }})</span>
+                                @endif
+                            </div>
                             <span class="text-xs text-gray-500 dark:text-gray-400">{{ $log->created_at->format('d M Y h:i A') }}</span>
                         </div>
                         @if($log->error_message)
-                        <p class="text-xs text-red-600 mt-1">{{ $log->error_message }}</p>
+                        <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ $log->error_message }}</p>
                         @endif
                     </div>
                     @endforeach
@@ -133,6 +161,12 @@
                     <div class="flex justify-between">
                         <span class="text-gray-500 dark:text-gray-400">FBR Invoice</span>
                         <span class="text-emerald-600 font-medium">{{ $transaction->fbr_invoice_number }}</span>
+                    </div>
+                    @endif
+                    @if($transaction->fbr_response_code)
+                    <div class="flex justify-between">
+                        <span class="text-gray-500 dark:text-gray-400">FBR Code</span>
+                        <span class="text-gray-900 dark:text-white">{{ $transaction->fbr_response_code }}</span>
                     </div>
                     @endif
                 </div>

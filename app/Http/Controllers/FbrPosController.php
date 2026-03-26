@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\FbrPosTransaction;
 use App\Models\FbrPosTransactionItem;
 use App\Models\Product;
+use App\Services\FbrService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -152,8 +153,19 @@ class FbrPosController extends Controller
                 return $transaction;
             });
 
-            return redirect()->route('fbrpos.transactions')
-                ->with('success', "Sale #{$transaction->invoice_number} created successfully! Total: PKR " . number_format($transaction->total_amount, 2));
+            $transaction->load(['items', 'company']);
+            $fbrService = new FbrService();
+            $fbrResult = $fbrService->submitFbrPosTransaction($transaction);
+
+            if ($fbrResult['status'] === 'success') {
+                return redirect()->route('fbrpos.show', $transaction->id)
+                    ->with('success', "Sale #{$transaction->invoice_number} created and submitted to FBR successfully! FBR Invoice: {$fbrResult['fbr_invoice_number']}");
+            }
+
+            $fbrErrors = implode(', ', $fbrResult['errors'] ?? ['Unknown error']);
+            return redirect()->route('fbrpos.show', $transaction->id)
+                ->with('success', "Sale #{$transaction->invoice_number} created (PKR " . number_format($transaction->total_amount, 2) . ").")
+                ->with('error', "FBR submission failed: {$fbrErrors}. You can retry from the transaction detail page.");
 
         } catch (\Exception $e) {
             Log::error('FBR POS Store Error', ['error' => $e->getMessage()]);
@@ -209,6 +221,32 @@ class FbrPosController extends Controller
             ->findOrFail($id);
 
         return view('fbr-pos.show', compact('transaction'));
+    }
+
+    public function retryFbr($id)
+    {
+        $companyId = app('currentCompanyId');
+        $transaction = FbrPosTransaction::where('company_id', $companyId)->findOrFail($id);
+
+        if ($transaction->fbr_status === 'submitted') {
+            return redirect()->route('fbrpos.show', $id)->with('error', 'This transaction is already submitted to FBR.');
+        }
+
+        $transaction->fbr_submission_hash = null;
+        $transaction->save();
+
+        $transaction->load(['items', 'company']);
+        $fbrService = new FbrService();
+        $fbrResult = $fbrService->submitFbrPosTransaction($transaction);
+
+        if ($fbrResult['status'] === 'success') {
+            return redirect()->route('fbrpos.show', $id)
+                ->with('success', "FBR submission successful! FBR Invoice: {$fbrResult['fbr_invoice_number']}");
+        }
+
+        $fbrErrors = implode(', ', $fbrResult['errors'] ?? ['Unknown error']);
+        return redirect()->route('fbrpos.show', $id)
+            ->with('error', "FBR retry failed: {$fbrErrors}");
     }
 
     private function generateInvoiceNumber(int $companyId): string

@@ -1278,4 +1278,298 @@ class FbrService
 
         return 'payload_error';
     }
+
+    public function buildFbrPosPayload(\App\Models\FbrPosTransaction $transaction): array
+    {
+        $company = $transaction->company;
+        $env = $company->fbr_pos_environment ?? $company->fbr_environment ?? 'sandbox';
+
+        $items = [];
+        foreach ($transaction->items as $item) {
+            $quantity = round(floatval($item->quantity), 4);
+            $unitPrice = floatval($item->unit_price);
+            $isExempt = (bool) $item->is_tax_exempt;
+            $taxRate = $isExempt ? 0 : floatval($item->tax_rate);
+            $valueSalesExcludingST = round($unitPrice * $quantity, 2);
+            $salesTaxApplicable = $isExempt ? 0.00 : round(($valueSalesExcludingST * $taxRate) / 100, 2);
+            $discount = round(floatval($item->discount ?? 0), 2);
+            $totalValues = round($valueSalesExcludingST + $salesTaxApplicable - $discount, 2);
+
+            $rateValue = $isExempt ? '0%' : (($taxRate == intval($taxRate)) ? intval($taxRate) . '%' : round($taxRate, 2) . '%');
+
+            $hsCode = $item->hs_code ?? '';
+            $uomCode = $this->getUomByHsCode($hsCode, 'U');
+
+            $saleType = $isExempt
+                ? ($env === 'production' ? 'Exempt goods' : 'Exempt')
+                : ($env === 'production' ? 'Goods at standard rate (default)' : 'Goods at standard rate');
+
+            $items[] = [
+                'uoM' => $uomCode,
+                'rate' => $rateValue,
+                'hsCode' => $hsCode,
+                'discount' => (float) $discount,
+                'extraTax' => 0.00,
+                'quantity' => (float) round($quantity, 4),
+                'saleType' => $saleType,
+                'fedPayable' => 0.00,
+                'furtherTax' => 0.00,
+                'totalValues' => (float) $totalValues,
+                'productDescription' => $this->sanitizeForFbr($item->item_name),
+                'salesTaxApplicable' => (float) $salesTaxApplicable,
+                'valueSalesExcludingST' => (float) $valueSalesExcludingST,
+                'salesTaxWithheldAtSource' => 0.00,
+                'fixedNotifiedValueOrRetailPrice' => (float) round($unitPrice, 2),
+            ];
+        }
+
+        $regNo = $company->fbr_registration_no ?: ($company->ntn ?? '');
+        $cleanRegNo = preg_replace('/[^0-9]/', '', $regNo);
+        $sellerNtn = strlen($cleanRegNo) === 13 ? $cleanRegNo : (strlen($cleanRegNo) >= 7 ? substr($cleanRegNo, 0, 7) : str_pad($cleanRegNo, 7, '0', STR_PAD_LEFT));
+        $invoiceRefNo = $sellerNtn . 'FPOS' . preg_replace('/[^A-Za-z0-9]/', '', $transaction->invoice_number);
+
+        $payload = [
+            'items' => $items,
+            'invoiceDate' => $transaction->created_at->toDateString(),
+            'invoiceType' => 'Sale Invoice',
+            'documentTypeId' => 1,
+            'buyerAddress' => $this->sanitizeForFbr($transaction->customer_name ? 'CUSTOMER ADDRESS' : 'WALK-IN CUSTOMER'),
+            'invoiceRefNo' => $invoiceRefNo,
+            'buyerProvince' => $this->normalizeProvince($company->province ?? 'Punjab'),
+            'sellerAddress' => $this->sanitizeForFbr($company->address ?? ''),
+            'sellerNTNCNIC' => $this->formatNtnCnic($regNo),
+            'sellerProvince' => $this->normalizeProvince($company->province ?? 'Punjab'),
+            'buyerBusinessName' => $this->sanitizeForFbr($transaction->customer_name ?: 'WALK-IN CUSTOMER'),
+            'sellerBusinessName' => $this->sanitizeForFbr($company->fbr_business_name ?: ($company->name ?? '')),
+            'buyerRegistrationType' => $this->determineBuyerRegistrationType($transaction->customer_ntn),
+            'buyerNTNCNIC' => $this->formatNtnCnic($transaction->customer_ntn ?? ''),
+        ];
+
+        if ($env === 'sandbox') {
+            $payload['scenarioId'] = 'SN001';
+        }
+
+        return $payload;
+    }
+
+    private function getFbrPosToken($company): string
+    {
+        $env = $company->fbr_pos_environment ?? $company->fbr_environment ?? 'sandbox';
+
+        if (!empty($company->fbr_pos_token)) {
+            try {
+                return Crypt::decryptString($company->fbr_pos_token);
+            } catch (\Exception $e) {
+                return $company->fbr_pos_token;
+            }
+        }
+
+        return $this->getApiToken($company);
+    }
+
+    private function getFbrPosUrl($company): string
+    {
+        $env = $company->fbr_pos_environment ?? $company->fbr_environment ?? 'sandbox';
+        if ($env === 'production') {
+            return $company->fbr_production_url ?: self::PRODUCTION_POST_URL;
+        }
+        return $company->fbr_sandbox_url ?: self::SANDBOX_POST_URL;
+    }
+
+    public function submitFbrPosTransaction(\App\Models\FbrPosTransaction $transaction): array
+    {
+        $company = $transaction->company;
+
+        if ($transaction->fbr_invoice_number || $transaction->fbr_status === 'submitted') {
+            return [
+                'status' => 'blocked',
+                'errors' => ['Transaction already submitted to FBR: ' . ($transaction->fbr_invoice_number ?? 'submitted')],
+            ];
+        }
+
+        if (!empty($transaction->fbr_submission_hash)) {
+            return [
+                'status' => 'blocked',
+                'errors' => ['Transaction submission already in progress (hash lock exists).'],
+            ];
+        }
+
+        $submissionHash = hash('sha256', $transaction->id . '|' . $transaction->invoice_number . '|' . now()->timestamp);
+        $transaction->fbr_submission_hash = $submissionHash;
+        $transaction->save();
+
+        $clearHashOnFailure = function () use ($transaction) {
+            $transaction->fbr_submission_hash = null;
+            $transaction->save();
+        };
+
+        $payload = $this->buildFbrPosPayload($transaction);
+
+        $token = $this->getFbrPosToken($company);
+        $url = $this->getFbrPosUrl($company);
+
+        if (empty($token)) {
+            $clearHashOnFailure();
+            \App\Models\FbrPosLog::create([
+                'company_id' => $company->id,
+                'transaction_id' => $transaction->id,
+                'request_payload' => $payload,
+                'status' => 'failed',
+                'error_message' => 'FBR token not configured. Set up FBR credentials in company settings.',
+            ]);
+            $transaction->update(['fbr_status' => 'failed']);
+            return [
+                'status' => 'failed',
+                'errors' => ['FBR token not configured for this company.'],
+            ];
+        }
+
+        $log = \App\Models\FbrPosLog::create([
+            'company_id' => $company->id,
+            'transaction_id' => $transaction->id,
+            'request_payload' => $payload,
+            'status' => 'pending',
+        ]);
+
+        $startTime = microtime(true);
+
+        try {
+            $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
+
+            Log::info("FBR POS Payload for Transaction #{$transaction->id}", [
+                'payload_json' => $jsonBody,
+                'url' => $url,
+            ]);
+
+            $result = $this->sendDirectToFbr($url, $token, $jsonBody, $transaction->id);
+            $responseBody = $result['body'];
+            $httpCode = $result['http_code'];
+            $curlError = $result['curl_error'];
+            $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
+
+            if ($curlError) {
+                $clearHashOnFailure();
+                $log->update([
+                    'status' => 'failed',
+                    'response_payload' => ['curl_error' => $curlError],
+                    'error_message' => 'FBR connection failed: ' . $curlError,
+                    'response_code' => '0',
+                ]);
+                $transaction->update(['fbr_status' => 'failed']);
+                return [
+                    'status' => 'failed',
+                    'errors' => ['FBR connection failed: ' . $curlError],
+                ];
+            }
+
+            $responseData = json_decode($responseBody, true);
+
+            if ($httpCode < 200 || $httpCode >= 300) {
+                $clearHashOnFailure();
+                $errors = is_array($responseData) ? $this->extractErrorsFromResponse($responseBody) : [$responseBody];
+                $log->update([
+                    'status' => 'failed',
+                    'response_payload' => $responseData ?? ['raw' => substr($responseBody, 0, 2000)],
+                    'response_code' => (string) $httpCode,
+                    'error_message' => implode('; ', $errors),
+                ]);
+                $transaction->update(['fbr_status' => 'failed']);
+                return [
+                    'status' => 'failed',
+                    'errors' => $errors,
+                    'http_status' => $httpCode,
+                ];
+            }
+
+            if (!is_array($responseData)) {
+                if ($httpCode === 200 && strlen(trim($responseBody ?? '')) === 0) {
+                    $log->update([
+                        'status' => 'failed',
+                        'response_code' => '200',
+                        'error_message' => 'FBR returned empty 200 response (WAF challenge). Retry later.',
+                    ]);
+                    $clearHashOnFailure();
+                    $transaction->update(['fbr_status' => 'pending']);
+                    return [
+                        'status' => 'retry',
+                        'errors' => ['FBR returned empty response. May need retry.'],
+                    ];
+                }
+                $clearHashOnFailure();
+                $log->update([
+                    'status' => 'failed',
+                    'response_code' => (string) $httpCode,
+                    'error_message' => 'FBR returned non-JSON: ' . substr($responseBody, 0, 500),
+                ]);
+                $transaction->update(['fbr_status' => 'failed']);
+                return [
+                    'status' => 'failed',
+                    'errors' => ['FBR returned unexpected response format.'],
+                ];
+            }
+
+            $fbrResult = $this->parseFbrResponse($responseData);
+
+            if ($fbrResult['valid']) {
+                $fbrInvoiceNumber = $fbrResult['invoiceNumber'];
+                $transaction->update([
+                    'fbr_invoice_number' => $fbrInvoiceNumber,
+                    'fbr_status' => 'submitted',
+                    'fbr_response_code' => '00',
+                    'fbr_response' => $responseData,
+                ]);
+                $log->update([
+                    'status' => 'success',
+                    'response_payload' => $responseData,
+                    'response_code' => '00',
+                ]);
+
+                Log::info("FBR POS Transaction #{$transaction->id} submitted successfully", [
+                    'fbr_invoice_number' => $fbrInvoiceNumber,
+                    'response_time_ms' => $responseTimeMs,
+                ]);
+
+                return [
+                    'status' => 'success',
+                    'fbr_invoice_number' => $fbrInvoiceNumber,
+                    'fbr_response' => $responseData,
+                ];
+            }
+
+            $clearHashOnFailure();
+            $log->update([
+                'status' => 'failed',
+                'response_payload' => $responseData,
+                'response_code' => $responseData['validationResponse']['statusCode'] ?? 'unknown',
+                'error_message' => implode('; ', $fbrResult['errors']),
+            ]);
+            $transaction->update([
+                'fbr_status' => 'failed',
+                'fbr_response' => $responseData,
+            ]);
+
+            return [
+                'status' => 'failed',
+                'errors' => $fbrResult['errors'],
+                'fbr_response' => $responseData,
+            ];
+
+        } catch (\Exception $e) {
+            $clearHashOnFailure();
+            $log->update([
+                'status' => 'failed',
+                'error_message' => $e->getMessage(),
+            ]);
+            $transaction->update(['fbr_status' => 'failed']);
+
+            Log::error("FBR POS submission exception for Transaction #{$transaction->id}", [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'status' => 'failed',
+                'errors' => [$e->getMessage()],
+            ];
+        }
+    }
 }

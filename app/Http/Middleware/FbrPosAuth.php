@@ -16,20 +16,25 @@ class FbrPosAuth
 
         $user = Auth::guard('fbrpos')->user();
 
+        if (!$user->is_active) {
+            Auth::guard('fbrpos')->logout();
+            return redirect('/fbr-pos/login')->with('error', 'Your account has been deactivated.');
+        }
+
         if (!$user->company_id) {
             Auth::guard('fbrpos')->logout();
             return redirect('/fbr-pos/login')->with('error', 'No company associated with your account.');
         }
 
         $company = \App\Models\Company::find($user->company_id);
-        if (!$company || !$company->fbr_pos_enabled) {
+        if (!$company) {
             Auth::guard('fbrpos')->logout();
-            return redirect('/fbr-pos/login')->with('error', 'FBR POS is not enabled for your company.');
+            return redirect('/fbr-pos/login')->with('error', 'Company not found. Please contact admin.');
         }
 
-        if ($company->product_type !== 'fbrpos') {
+        if (!$company->fbr_pos_enabled || $company->product_type !== 'fbrpos') {
             Auth::guard('fbrpos')->logout();
-            return redirect('/fbr-pos/login')->with('error', 'This company is not registered as an FBR POS company.');
+            return redirect('/fbr-pos/login')->with('error', 'FBR POS is not enabled for your company.');
         }
 
         app()->instance('currentCompanyId', $user->company_id);

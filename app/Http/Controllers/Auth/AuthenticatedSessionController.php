@@ -35,11 +35,17 @@ class AuthenticatedSessionController extends Controller
         $user = Auth::user();
         if ($user && $user->company_id) {
             $company = \App\Models\Company::find($user->company_id);
-            if ($company && $company->pra_reporting_enabled && !$company->fbr_production_token && !$company->fbr_sandbox_token) {
+            if ($company && $company->product_type === 'pos') {
                 Auth::guard('web')->logout();
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
                 return redirect('/pos/login')->with('error', 'This is a POS account. Please login from NestPOS portal.');
+            }
+            if ($company && $company->product_type === 'fbrpos') {
+                Auth::guard('web')->logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+                return redirect('/fbr-pos/login')->with('error', 'This is an FBR POS account. Please login from the FBR POS portal.');
             }
         }
 

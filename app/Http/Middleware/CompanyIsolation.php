@@ -51,9 +51,14 @@ class CompanyIsolation
 
             app()->instance('currentCompanyId', $companyId);
 
-            if ($company && $company->pra_reporting_enabled && !$company->fbr_production_token && !$company->fbr_sandbox_token) {
+            if ($company && $company->product_type === 'pos') {
                 auth()->logout();
                 return redirect('/pos/login')->with('error', 'This is a POS account. Please login from NestPOS portal.');
+            }
+
+            if ($company && $company->product_type === 'fbrpos') {
+                auth()->logout();
+                return redirect('/fbr-pos/login')->with('error', 'This is an FBR POS account. Please login from the FBR POS portal.');
             }
 
             if (!$request->is('onboarding*') && !$request->is('billing/*') && !$request->is('api/*')) {

@@ -45,7 +45,7 @@ class AdminCompanyController extends Controller
             'admin_name' => 'required|string|max:255',
         ]);
 
-        $company = Company::create([
+        $companyData = [
             'name' => $request->name,
             'owner_name' => $request->owner_name,
             'product_type' => $request->product_type,
@@ -66,7 +66,14 @@ class AdminCompanyController extends Controller
             'fbr_pos_enabled' => $request->product_type === 'fbrpos',
             'fbr_pos_environment' => $request->product_type === 'fbrpos' ? 'sandbox' : null,
             'fbr_reporting_enabled' => $request->product_type === 'fbrpos',
-        ]);
+        ];
+
+        if ($request->product_type === 'pos') {
+            $companyData['pra_reporting_enabled'] = false;
+            $companyData['pra_environment'] = 'sandbox';
+        }
+
+        $company = Company::create($companyData);
 
         User::create([
             'name' => $request->admin_name,
@@ -74,6 +81,7 @@ class AdminCompanyController extends Controller
             'password' => Hash::make($request->admin_password),
             'company_id' => $company->id,
             'role' => 'company_admin',
+            'is_active' => true,
             'pos_role' => in_array($request->product_type, ['pos', 'fbrpos']) ? 'pos_admin' : null,
         ]);
 

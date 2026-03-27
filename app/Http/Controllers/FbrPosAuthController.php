@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Company;
+use App\Models\AdminUser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -56,7 +57,22 @@ class FbrPosAuthController extends Controller
 
         if ($user && Hash::check($request->password, $user->password)) {
             $company = Company::find($user->company_id);
-            if (!$company || !$company->fbr_pos_enabled) {
+
+            if ($company && $company->product_type === 'di') {
+                RateLimiter::hit($throttleKey);
+                return back()->withErrors([
+                    'login' => 'This is a Digital Invoice account. Please login from the Digital Invoice portal.',
+                ])->withInput($request->only('login'));
+            }
+
+            if ($company && $company->product_type === 'pos') {
+                RateLimiter::hit($throttleKey);
+                return back()->withErrors([
+                    'login' => 'This is a PRA POS account. Please login from the NestPOS portal.',
+                ])->withInput($request->only('login'));
+            }
+
+            if (!$company || !$company->fbr_pos_enabled || $company->product_type !== 'fbrpos') {
                 RateLimiter::hit($throttleKey);
                 return back()->withErrors([
                     'login' => 'FBR POS is not enabled for your company. Please contact admin.',
@@ -68,6 +84,16 @@ class FbrPosAuthController extends Controller
             $request->session()->regenerate();
             $request->session()->forget('url.intended');
             return redirect('/fbr-pos/dashboard');
+        }
+
+        if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
+            $admin = AdminUser::where('email', $login)->first();
+            if ($admin && Hash::check($request->password, $admin->password)) {
+                RateLimiter::clear($throttleKey);
+                Auth::guard('admin')->login($admin, $request->boolean('remember'));
+                $request->session()->regenerate();
+                return redirect('/admin/dashboard');
+            }
         }
 
         RateLimiter::hit($throttleKey);

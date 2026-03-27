@@ -56,6 +56,27 @@ class PosAuthController extends Controller
         }
 
         if ($user && Hash::check($request->password, $user->password)) {
+            $company = $user->company_id ? Company::find($user->company_id) : null;
+
+            if (!$company || $company->product_type !== 'pos') {
+                if ($company && $company->product_type === 'di') {
+                    RateLimiter::hit($throttleKey);
+                    return back()->withErrors([
+                        'login' => 'This is a Digital Invoice account. Please login from the Digital Invoice portal.',
+                    ])->withInput($request->only('login'));
+                }
+                if ($company && $company->product_type === 'fbrpos') {
+                    RateLimiter::hit($throttleKey);
+                    return back()->withErrors([
+                        'login' => 'This is an FBR POS account. Please login from the FBR POS portal.',
+                    ])->withInput($request->only('login'));
+                }
+                RateLimiter::hit($throttleKey);
+                return back()->withErrors([
+                    'login' => 'This account is not registered for NestPOS.',
+                ])->withInput($request->only('login'));
+            }
+
             RateLimiter::clear($throttleKey);
             Auth::guard('pos')->login($user, $request->boolean('remember'));
             $request->session()->regenerate();
@@ -105,6 +126,7 @@ class PosAuthController extends Controller
             'email' => $request->email,
             'phone' => $request->phone,
             'company_status' => 'pending',
+            'product_type' => 'pos',
             'pra_reporting_enabled' => false,
             'pra_environment' => 'sandbox',
         ]);

@@ -39,14 +39,14 @@
                 </button>
             </form>
             @endif
-            <a href="{{ route('pos.receipt', $transaction->id) }}" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition">
+            <button onclick="openReceiptPopup()" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                 Print
-            </a>
-            <a href="{{ route('pos.invoice.pdf', $transaction->id) }}" class="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition">
+            </button>
+            <button onclick="openReceiptPopup()" class="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 PDF
-            </a>
+            </button>
             <div x-data="shareInvoice({{ $transaction->id }})" class="relative">
                 <button @click="toggleMenu()" type="button" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
@@ -350,11 +350,10 @@ function shareInvoice(transactionId) {
 }
 </script>
 
-@if(session('success') && str_contains(session('success'), 'Invoice Created Successfully'))
-<div id="printPopup" style="display:none;" class="fixed inset-0 z-[60] flex items-center justify-center transition-opacity duration-300 opacity-0">
-    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closePrintPopup()"></div>
+<div id="receiptPopup" style="display:none;" class="fixed inset-0 z-[60] flex items-center justify-center transition-opacity duration-300 opacity-0">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeReceiptPopup()"></div>
     <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-6xl mx-4 h-[90vh] flex flex-col overflow-hidden" style="max-height: 90vh;">
-        <button onclick="closePrintPopup()" class="absolute top-4 right-4 z-10 p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition text-gray-500 hover:text-gray-700 dark:text-gray-400">
+        <button onclick="closeReceiptPopup()" class="absolute top-4 right-4 z-10 p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition text-gray-500 hover:text-gray-700 dark:text-gray-400">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
         <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
@@ -364,7 +363,7 @@ function shareInvoice(transactionId) {
                         <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
                     <div>
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800">Invoice Created Successfully</span>
+                        <span id="receiptPopupBadge" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800">Invoice Receipt</span>
                     </div>
                 </div>
                 <div class="sm:ml-auto text-right">
@@ -374,7 +373,7 @@ function shareInvoice(transactionId) {
             </div>
         </div>
         <div class="flex-1 overflow-hidden p-4 min-h-0">
-            <iframe id="posPdfIframe" src="{{ route('pos.receipt', $transaction->id) }}" class="w-full h-full border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800"></iframe>
+            <iframe id="posPdfIframe" src="" class="w-full h-full border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800"></iframe>
         </div>
         <div class="px-6 py-4 border-t border-gray-100 dark:border-gray-800 flex-shrink-0 bg-gray-50 dark:bg-gray-900">
             <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -386,7 +385,7 @@ function shareInvoice(transactionId) {
                     <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                     Download PDF
                 </button>
-                <button onclick="closePrintPopup()" class="inline-flex items-center justify-center px-5 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition sm:ml-auto">
+                <button onclick="closeReceiptPopup()" class="inline-flex items-center justify-center px-5 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition sm:ml-auto">
                     Close
                 </button>
             </div>
@@ -394,14 +393,16 @@ function shareInvoice(transactionId) {
     </div>
 </div>
 <script>
-function openPrintPopup() {
-    const modal = document.getElementById('printPopup');
+function openReceiptPopup() {
+    const modal = document.getElementById('receiptPopup');
+    document.getElementById('posPdfIframe').src = '{{ route('pos.receipt', $transaction->id) }}';
+    document.getElementById('receiptPopupBadge').textContent = 'Invoice Receipt';
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
     requestAnimationFrame(() => { modal.classList.remove('opacity-0'); modal.classList.add('opacity-100'); });
 }
-function closePrintPopup() {
-    const modal = document.getElementById('printPopup');
+function closeReceiptPopup() {
+    const modal = document.getElementById('receiptPopup');
     modal.classList.remove('opacity-100');
     modal.classList.add('opacity-0');
     setTimeout(() => {
@@ -437,13 +438,15 @@ function downloadPosPdf() {
     setTimeout(() => document.body.removeChild(a), 100);
 }
 document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && document.getElementById('printPopup').style.display === 'flex') {
-        closePrintPopup();
+    if (e.key === 'Escape' && document.getElementById('receiptPopup').style.display === 'flex') {
+        closeReceiptPopup();
     }
 });
+@if(session('success') && str_contains(session('success'), 'Invoice Created Successfully'))
 document.addEventListener('DOMContentLoaded', function() {
-    openPrintPopup();
+    document.getElementById('receiptPopupBadge').textContent = 'Invoice Created Successfully';
+    openReceiptPopup();
 });
-</script>
 @endif
+</script>
 </x-pos-layout>

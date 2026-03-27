@@ -307,12 +307,12 @@
                     </div>
                     <div class="p-7">
                         <div class="flex items-center space-x-3 mb-5">
-                            <div class="w-14 h-14 rounded-[14px] bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg shadow-blue-500/20">
-                                <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                            <div class="w-14 h-14 rounded-[14px] flex items-center justify-center shadow-lg shadow-blue-600/30" style="background: linear-gradient(135deg, #1e40af, #2563eb);">
+                                <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                             </div>
                             <div>
                                 <h3 class="text-lg font-bold text-gray-900">FBR POS</h3>
-                                <p class="text-[12px] text-blue-600 font-semibold">FBR Point of Sale</p>
+                                <p class="text-[12px] text-blue-700 font-semibold">FBR Point of Sale</p>
                             </div>
                         </div>
                         <p class="text-[14px] text-gray-600 leading-relaxed mb-5">FBR-integrated POS billing with direct API submission, real-time compliance, automated tax calculation, and comprehensive reports.</p>

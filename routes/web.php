@@ -104,7 +104,39 @@ Route::get('/health', function () {
 });
 
 Route::get('/', function () {
-    return view('landing', ['showLogin' => false]);
+    $topInvoices = \App\Models\Invoice::where('status', 'locked')
+        ->whereNotNull('fbr_invoice_number')
+        ->orderByDesc('total_amount')
+        ->limit(6)
+        ->get(['invoice_number', 'fbr_invoice_number', 'total_amount', 'buyer_name', 'created_at']);
+
+    $topPosTransactions = \App\Models\PosTransaction::where('pra_status', 'success')
+        ->orderByDesc('total_amount')
+        ->limit(3)
+        ->get(['invoice_number', 'total_amount', 'created_at']);
+
+    $topFbrPosTransactions = \App\Models\FbrPosTransaction::where('fbr_status', 'success')
+        ->orderByDesc('total_amount')
+        ->limit(3)
+        ->get(['invoice_number', 'total_amount', 'created_at']);
+
+    $stats = [
+        'total_invoices' => \App\Models\Invoice::where('status', 'locked')->count()
+            + \App\Models\PosTransaction::where('pra_status', 'success')->count()
+            + \App\Models\FbrPosTransaction::where('fbr_status', 'success')->count(),
+        'total_companies' => \App\Models\Company::where('status', 'approved')->count(),
+        'total_revenue' => \App\Models\Invoice::where('status', 'locked')->sum('total_amount')
+            + \App\Models\PosTransaction::where('pra_status', 'success')->sum('total_amount')
+            + \App\Models\FbrPosTransaction::where('fbr_status', 'success')->sum('total_amount'),
+    ];
+
+    return view('landing', [
+        'showLogin' => false,
+        'topInvoices' => $topInvoices,
+        'topPosTransactions' => $topPosTransactions,
+        'topFbrPosTransactions' => $topFbrPosTransactions,
+        'stats' => $stats,
+    ]);
 });
 
 Route::get('/digital-invoice', function () {

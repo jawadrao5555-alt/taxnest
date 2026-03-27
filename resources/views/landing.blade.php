@@ -138,21 +138,21 @@
                     <div class="w-10 h-10 rounded-xl bg-teal-500/20 flex items-center justify-center mx-auto mb-3">
                         <svg class="w-5 h-5 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                     </div>
-                    <p class="text-2xl sm:text-3xl font-bold text-white">50k+</p>
+                    <p class="text-2xl sm:text-3xl font-bold text-white">{{ isset($stats['total_invoices']) && $stats['total_invoices'] > 0 ? number_format($stats['total_invoices']) : '50k+' }}</p>
                     <p class="text-xs text-gray-400 mt-1">Invoices Processed</p>
                 </div>
                 <div class="stat-glass rounded-2xl p-5 text-center">
                     <div class="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center mx-auto mb-3">
                         <svg class="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                     </div>
-                    <p class="text-2xl sm:text-3xl font-bold text-white">500+</p>
+                    <p class="text-2xl sm:text-3xl font-bold text-white">{{ isset($stats['total_companies']) && $stats['total_companies'] > 0 ? number_format($stats['total_companies']) . '+' : '500+' }}</p>
                     <p class="text-xs text-gray-400 mt-1">Companies Trust Us</p>
                 </div>
                 <div class="stat-glass rounded-2xl p-5 text-center">
                     <div class="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center mx-auto mb-3">
                         <svg class="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                     </div>
-                    <p class="text-2xl sm:text-3xl font-bold text-white">2</p>
+                    <p class="text-2xl sm:text-3xl font-bold text-white">3</p>
                     <p class="text-xs text-gray-400 mt-1">Integrated Products</p>
                 </div>
             </div>
@@ -283,6 +283,111 @@
             </div>
         </div>
     </section>
+
+    @if(isset($topInvoices) && ($topInvoices->count() > 0 || (isset($topPosTransactions) && $topPosTransactions->count() > 0) || (isset($topFbrPosTransactions) && $topFbrPosTransactions->count() > 0)))
+    <section class="py-24 lg:py-28 bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
+        <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
+            <div class="text-center mb-16 fade-up">
+                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Live Platform Activity</p>
+                <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Highest Value Successful Invoices</h2>
+                <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">Real transactions processed through TaxNest — auto-updated from live data.</p>
+            </div>
+
+            @if(isset($stats['total_revenue']) && $stats['total_revenue'] > 0)
+            <div class="mb-12 flex flex-col sm:flex-row items-center justify-center gap-6 fade-up">
+                <div class="bg-white rounded-2xl shadow-lg ring-1 ring-gray-100 px-8 py-5 text-center">
+                    <p class="text-[12px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Total Revenue Processed</p>
+                    <p class="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">PKR {{ number_format($stats['total_revenue'], 0) }}</p>
+                </div>
+            </div>
+            @endif
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 fade-up">
+                @if($topInvoices->count() > 0)
+                <div>
+                    <div class="flex items-center gap-2 mb-5">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                        </div>
+                        <h3 class="text-[15px] font-bold text-gray-900">FBR Digital Invoices</h3>
+                    </div>
+                    <div class="space-y-3">
+                        @foreach($topInvoices as $inv)
+                        <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-100 p-4 hover:shadow-md transition">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[12px] font-mono font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">{{ $inv->fbr_invoice_number ?? $inv->invoice_number }}</span>
+                                <span class="text-[11px] text-gray-400">{{ $inv->created_at->format('d M Y') }}</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-[13px] text-gray-600 truncate max-w-[140px]">{{ $inv->buyer_name ?? 'Business Client' }}</span>
+                                <span class="text-[15px] font-bold text-gray-900">PKR {{ number_format($inv->total_amount, 0) }}</span>
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
+
+                @if(isset($topPosTransactions) && $topPosTransactions->count() > 0)
+                <div>
+                    <div class="flex items-center gap-2 mb-5">
+                        <div class="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                        </div>
+                        <h3 class="text-[15px] font-bold text-gray-900">PRA POS Transactions</h3>
+                    </div>
+                    <div class="space-y-3">
+                        @foreach($topPosTransactions as $txn)
+                        <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-100 p-4 hover:shadow-md transition">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[12px] font-mono font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded">{{ $txn->invoice_number }}</span>
+                                <span class="text-[11px] text-gray-400">{{ $txn->created_at->format('d M Y') }}</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-[13px] text-gray-600">PRA Fiscal Sale</span>
+                                <span class="text-[15px] font-bold text-gray-900">PKR {{ number_format($txn->total_amount, 0) }}</span>
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
+
+                @if(isset($topFbrPosTransactions) && $topFbrPosTransactions->count() > 0)
+                <div>
+                    <div class="flex items-center gap-2 mb-5">
+                        <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                        </div>
+                        <h3 class="text-[15px] font-bold text-gray-900">FBR POS Transactions</h3>
+                    </div>
+                    <div class="space-y-3">
+                        @foreach($topFbrPosTransactions as $txn)
+                        <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-100 p-4 hover:shadow-md transition">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[12px] font-mono font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">{{ $txn->invoice_number }}</span>
+                                <span class="text-[11px] text-gray-400">{{ $txn->created_at->format('d M Y') }}</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-[13px] text-gray-600">FBR POS Sale</span>
+                                <span class="text-[15px] font-bold text-gray-900">PKR {{ number_format($txn->total_amount, 0) }}</span>
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
+            </div>
+
+            <div class="mt-10 text-center fade-up">
+                <div class="inline-flex items-center px-4 py-2 bg-emerald-50 border border-emerald-200/60 rounded-xl">
+                    <svg class="w-4 h-4 text-emerald-500 mr-2 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    <span class="text-[13px] font-medium text-emerald-800">Auto-updated from live platform data — every new successful invoice appears here automatically</span>
+                </div>
+            </div>
+        </div>
+    </section>
+    @endif
 
     <section id="features" class="py-24 lg:py-28 bg-gray-50">
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\BillingController;
@@ -587,6 +588,28 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth'])->group(function () {
     Route::post('/api/verify-pin', [FbrPosController::class, 'verifyPin'])->name('fbrpos.api.verify-pin');
     Route::get('/api/check-pin-session', [FbrPosController::class, 'checkPinSession'])->name('fbrpos.api.check-pin-session');
     Route::get('/billing', [FbrPosController::class, 'billing'])->name('fbrpos.billing');
+});
+
+Route::get('/setup-migrate-xK9mP2', function () {
+    try {
+        Artisan::call('migrate', ['--force' => true]);
+        $output = Artisan::output();
+        Artisan::call('config:clear');
+        Artisan::call('view:clear');
+        return '<pre>Migration Output:\n' . $output . '\n\nConfig & View cache cleared.\nDone! Now delete this route from routes/web.php</pre>';
+    } catch (\Exception $e) {
+        return '<pre>Error: ' . $e->getMessage() . '</pre>';
+    }
+});
+
+Route::get('/setup-seed-xK9mP2', function () {
+    try {
+        Artisan::call('db:seed', ['--force' => true]);
+        $output = Artisan::output();
+        return '<pre>Seed Output:\n' . $output . '\nDone!</pre>';
+    } catch (\Exception $e) {
+        return '<pre>Error: ' . $e->getMessage() . '</pre>';
+    }
 });
 
 require __DIR__.'/auth.php';

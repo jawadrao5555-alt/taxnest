@@ -6,3 +6,9 @@ id = "xrJy-_qnx_9C2ydhu3zJg"
 uri = "file://taxnest-deploy.zip"
 type = "unspecified"
 title = "TaxNest Deploy Package (89MB)"
+
+[[outputs]]
+id = "mfqjVWFVWhWep5mFvrjQQ"
+uri = "file://routes-update.zip"
+type = "unspecified"
+title = "Routes Update (44KB) - Upload to cPanel"

@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "xrJy-_qnx_9C2ydhu3zJg"
+uri = "file://taxnest-deploy.zip"
+type = "unspecified"
+title = "TaxNest Deploy Package (89MB)"

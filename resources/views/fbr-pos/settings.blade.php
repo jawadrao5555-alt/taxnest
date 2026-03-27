@@ -3,7 +3,7 @@
     <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">FBR Integration Settings</h1>
 
     @if(session('success'))
-    <div class="mb-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-sm">{{ session('success') }}</div>
+    <div class="mb-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 text-sm">{{ session('success') }}</div>
     @endif
     @if(session('error'))
     <div class="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm">{{ session('error') }}</div>
@@ -17,18 +17,18 @@
                     @csrf
                     <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Environment</label>
-                        <select name="fbr_pos_environment" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                        <select name="fbr_pos_environment" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                             <option value="sandbox" {{ ($company->fbr_pos_environment ?? 'sandbox') === 'sandbox' ? 'selected' : '' }}>Sandbox (Testing)</option>
                             <option value="production" {{ ($company->fbr_pos_environment ?? 'sandbox') === 'production' ? 'selected' : '' }}>Production (Live)</option>
                         </select>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">FBR POS Registration ID</label>
-                        <input type="text" name="fbr_pos_id" value="{{ $company->fbr_pos_id }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500" placeholder="FBR-assigned POS ID">
+                        <input type="text" name="fbr_pos_id" value="{{ $company->fbr_pos_id }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="FBR-assigned POS ID">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">FBR POS Token</label>
-                        <input type="text" name="fbr_pos_token" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500" placeholder="{{ $maskedPosToken ?: 'Enter FBR POS API token' }}">
+                        <input type="text" name="fbr_pos_token" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="{{ $maskedPosToken ?: 'Enter FBR POS API token' }}">
                         @if($maskedPosToken)
                         <p class="text-xs text-gray-400 mt-1">Current: {{ $maskedPosToken }} — leave empty to keep existing token</p>
                         @else
@@ -51,7 +51,7 @@
                         </p>
                     </div>
                     <div class="flex items-center gap-3">
-                        <button type="submit" class="px-6 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition">Save Settings</button>
+                        <button type="submit" class="px-6 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition">Save Settings</button>
                         <button type="button" onclick="testFbrConnection()" id="testBtn" class="px-6 py-2 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700 transition">
                             Test Connection
                         </button>
@@ -92,7 +92,7 @@
                 <div class="space-y-3 text-sm">
                     <div class="flex justify-between">
                         <span class="text-gray-500">FBR POS</span>
-                        <span class="{{ $company->fbr_pos_enabled ? 'text-emerald-600 font-semibold' : 'text-red-500' }}">
+                        <span class="{{ $company->fbr_pos_enabled ? 'text-blue-600 font-semibold' : 'text-red-500' }}">
                             {{ $company->fbr_pos_enabled ? 'Enabled' : 'Disabled' }}
                         </span>
                     </div>
@@ -106,13 +106,13 @@
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-500">POS Token</span>
-                        <span class="{{ $maskedPosToken ? 'text-emerald-600 font-semibold' : ($hasSandboxFallback || $hasProductionFallback ? 'text-amber-500' : 'text-red-500') }}">
+                        <span class="{{ $maskedPosToken ? 'text-blue-600 font-semibold' : ($hasSandboxFallback || $hasProductionFallback ? 'text-amber-500' : 'text-red-500') }}">
                             {{ $maskedPosToken ? 'Configured' : ($hasSandboxFallback || $hasProductionFallback ? 'Using DI Token' : 'Not Set') }}
                         </span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-500">Connection</span>
-                        <span class="text-emerald-600 font-semibold">Direct (FBR Gateway)</span>
+                        <span class="text-blue-600 font-semibold">Direct (FBR Gateway)</span>
                     </div>
                 </div>
             </div>
@@ -122,7 +122,7 @@
                 @forelse($fbrLogs as $log)
                 <div class="border-b border-gray-100 dark:border-gray-800 last:border-0 py-2">
                     <div class="flex items-center justify-between">
-                        <span class="text-xs font-medium {{ $log->status === 'success' ? 'text-emerald-600' : ($log->status === 'failed' ? 'text-red-600' : 'text-amber-600') }}">
+                        <span class="text-xs font-medium {{ $log->status === 'success' ? 'text-blue-600' : ($log->status === 'failed' ? 'text-red-600' : 'text-amber-600') }}">
                             {{ strtoupper($log->status) }}
                         </span>
                         <span class="text-xs text-gray-400">{{ $log->created_at->diffForHumans() }}</span>
@@ -163,7 +163,7 @@ function testFbrConnection() {
     .then(data => {
         resultDiv.classList.remove('hidden');
         if (data.success) {
-            resultContent.className = 'p-3 rounded-lg text-sm bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800';
+            resultContent.className = 'p-3 rounded-lg text-sm bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800';
         } else {
             resultContent.className = 'p-3 rounded-lg text-sm bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800';
         }

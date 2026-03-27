@@ -12,7 +12,7 @@
                 <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">FBR Failed</span>
                 <form method="POST" action="{{ route('fbrpos.retryFbr', $transaction->id) }}" class="inline">
                     @csrf
-                    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 transition">
+                    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition">
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                         Retry FBR
                     </button>
@@ -21,7 +21,7 @@
                 <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">FBR Pending</span>
                 <form method="POST" action="{{ route('fbrpos.retryFbr', $transaction->id) }}" class="inline">
                     @csrf
-                    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 transition">
+                    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition">
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                         Submit to FBR
                     </button>
@@ -125,7 +125,7 @@
                     </div>
                     <div class="flex justify-between font-bold text-lg pt-2 border-t border-gray-200 dark:border-gray-700">
                         <span class="text-gray-900 dark:text-white">Total</span>
-                        <span class="text-emerald-600">PKR {{ number_format($transaction->total_amount, 2) }}</span>
+                        <span class="text-blue-600">PKR {{ number_format($transaction->total_amount, 2) }}</span>
                     </div>
                 </div>
             </div>
@@ -160,7 +160,7 @@
                     @if($transaction->fbr_invoice_number)
                     <div class="flex justify-between">
                         <span class="text-gray-500 dark:text-gray-400">FBR Invoice</span>
-                        <span class="text-emerald-600 font-medium">{{ $transaction->fbr_invoice_number }}</span>
+                        <span class="text-blue-600 font-medium">{{ $transaction->fbr_invoice_number }}</span>
                     </div>
                     @endif
                     @if($transaction->fbr_response_code)

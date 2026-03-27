@@ -8,12 +8,12 @@
         <div class="flex items-center gap-3">
             <div x-data="{ fbrEnabled: {{ $fbrReportingStatus ? 'true' : 'false' }}, loading: false }" class="flex items-center gap-2">
                 <span class="text-sm text-gray-600 dark:text-gray-400">FBR Reporting</span>
-                <button @click="loading=true; fetch('{{ route('fbrpos.api.toggle-fbr-reporting') }}', {method:'POST', headers:{'X-CSRF-TOKEN':'{{ csrf_token() }}','Content-Type':'application/json'}}).then(r=>r.json()).then(d=>{fbrEnabled=d.enabled; loading=false;})" :class="fbrEnabled ? 'bg-emerald-600' : 'bg-gray-300 dark:bg-gray-600'" class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out" :disabled="loading">
+                <button @click="loading=true; fetch('{{ route('fbrpos.api.toggle-fbr-reporting') }}', {method:'POST', headers:{'X-CSRF-TOKEN':'{{ csrf_token() }}','Content-Type':'application/json'}}).then(r=>r.json()).then(d=>{fbrEnabled=d.enabled; loading=false;})" :class="fbrEnabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'" class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out" :disabled="loading">
                     <span :class="fbrEnabled ? 'translate-x-5' : 'translate-x-0'" class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5 ml-0.5"></span>
                 </button>
-                <span x-text="fbrEnabled ? 'ON' : 'OFF'" :class="fbrEnabled ? 'text-emerald-600 font-semibold' : 'text-red-500 font-semibold'" class="text-xs"></span>
+                <span x-text="fbrEnabled ? 'ON' : 'OFF'" :class="fbrEnabled ? 'text-blue-600 font-semibold' : 'text-red-500 font-semibold'" class="text-xs"></span>
             </div>
-            <a href="{{ route('fbrpos.create') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition">
+            <a href="{{ route('fbrpos.create') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                 New Sale
             </a>
@@ -27,8 +27,8 @@
                     <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Today's Sales</p>
                     <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">PKR {{ number_format($todayStats->revenue ?? 0) }}</p>
                 </div>
-                <div class="h-10 w-10 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
-                    <span class="text-sm font-bold text-emerald-600">PKR</span>
+                <div class="h-10 w-10 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                    <span class="text-sm font-bold text-blue-600">PKR</span>
                 </div>
             </div>
         </div>
@@ -49,7 +49,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">FBR Submitted</p>
-                    <p class="text-2xl font-bold text-emerald-600 mt-1">{{ $fbrSubmitted }}</p>
+                    <p class="text-2xl font-bold text-blue-600 mt-1">{{ $fbrSubmitted }}</p>
                 </div>
                 <div class="h-10 w-10 rounded-lg bg-green-50 dark:bg-green-900/30 flex items-center justify-center">
                     <svg class="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -89,7 +89,7 @@
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md overflow-hidden">
         <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <h3 class="font-semibold text-gray-900 dark:text-white">Recent Transactions</h3>
-            <a href="{{ route('fbrpos.transactions') }}" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View All</a>
+            <a href="{{ route('fbrpos.transactions') }}" class="text-sm text-blue-600 hover:text-blue-700 font-medium">View All</a>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -105,7 +105,7 @@
                 <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                     @forelse($recentTransactions as $txn)
                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
-                        <td class="px-4 py-3 text-sm font-medium text-emerald-600">
+                        <td class="px-4 py-3 text-sm font-medium text-blue-600">
                             <a href="{{ route('fbrpos.show', $txn->id) }}">{{ $txn->invoice_number }}</a>
                         </td>
                         <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{{ $txn->customer_name ?? 'Walk-in' }}</td>

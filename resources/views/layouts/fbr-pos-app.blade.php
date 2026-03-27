@@ -8,7 +8,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-        <meta name="theme-color" content="#059669">
+        <meta name="theme-color" content="#2563eb">
         <title>FBR POS — {{ config('app.name', 'TaxNest') }}</title>
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700&display=swap" rel="stylesheet" />
@@ -45,8 +45,8 @@
             .sidebar-link { transition: all 0.15s ease; }
             .sidebar-link:hover { background-color: rgba(249,250,251,0.8); }
             .dark .sidebar-link:hover { background-color: rgba(55,65,81,0.5); }
-            .sidebar-link.active { background: linear-gradient(90deg, rgba(5,150,105,0.08) 0%, transparent 100%); font-weight: 600; border-left: 3px solid #059669; padding-left: 13px; }
-            .dark .sidebar-link.active { background: linear-gradient(90deg, rgba(5,150,105,0.15) 0%, transparent 100%); border-left: 3px solid #059669; padding-left: 13px; }
+            .sidebar-link.active { background: linear-gradient(90deg, rgba(37,99,235,0.08) 0%, transparent 100%); font-weight: 600; border-left: 3px solid #2563eb; padding-left: 13px; color: #2563eb; }
+            .dark .sidebar-link.active { background: linear-gradient(90deg, rgba(59,130,246,0.15) 0%, transparent 100%); border-left: 3px solid #3b82f6; padding-left: 13px; color: #93c5fd; }
             [x-cloak] { display: none !important; }
         </style>
     </head>
@@ -63,7 +63,7 @@
 
                 <div class="p-5 border-b border-gray-200 dark:border-gray-800">
                     <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-lg bg-emerald-600 flex items-center justify-center">
+                        <div class="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center">
                             <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                         </div>
                         <div>
@@ -112,14 +112,14 @@
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                             </button>
                             @if(!request()->routeIs('fbrpos.dashboard'))
-                                <a href="{{ route('fbrpos.dashboard') }}" class="inline-flex items-center text-sm text-gray-500 hover:text-emerald-700 dark:text-gray-400 dark:hover:text-emerald-300 transition">
+                                <a href="{{ route('fbrpos.dashboard') }}" class="inline-flex items-center text-sm text-gray-500 hover:text-blue-700 dark:text-gray-400 dark:hover:text-blue-300 transition">
                                     <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                                     <span class="hidden sm:inline">Dashboard</span>
                                 </a>
                             @endif
                         </div>
                         <div class="flex items-center gap-3">
-                            <span class="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
+                            <span class="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
                                 FBR POS
                             </span>
                             <div class="relative" x-data="{ open: false }">
@@ -178,7 +178,7 @@
         <div x-data="{ toasts: [], init() { const msgs = JSON.parse(this.$el.dataset.messages || '[]'); msgs.forEach(m => this.addToast(m.msg, m.type)); }, addToast(msg, type) { let id = Date.now() + Math.random(); this.toasts.push({id, msg, type}); setTimeout(() => this.toasts = this.toasts.filter(t => t.id !== id), 5000); } }" data-messages="{{ json_encode($toastMessages) }}" class="fixed top-4 right-4 z-50 space-y-2" style="pointer-events: none;">
             <template x-for="toast in toasts" :key="toast.id">
                 <div x-transition class="px-4 py-3 rounded-xl shadow-lg border text-sm font-medium max-w-sm" style="pointer-events: auto;"
-                    :class="toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'">
+                    :class="toast.type === 'success' ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-red-50 border-red-200 text-red-800'">
                     <span x-text="toast.msg"></span>
                 </div>
             </template>

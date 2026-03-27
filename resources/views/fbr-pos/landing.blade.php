@@ -275,18 +275,40 @@
         </div>
     </section>
 
-    <section id="pricing" class="py-24 lg:py-28 bg-gray-50">
+    <section id="pricing" class="py-24 lg:py-28 bg-gray-50" x-data="{ cycle: 'monthly' }">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-12">
+            <div class="text-center mb-8">
                 <h2 class="text-3xl font-bold text-gray-900">FBR POS Plans</h2>
-                <p class="mt-4 text-gray-700 max-w-2xl mx-auto">FBR POS is included with your Digital Invoice subscription</p>
+                <p class="mt-4 text-gray-700 max-w-2xl mx-auto">Low-cost FBR-compliant POS — flexible billing, save more on longer plans</p>
+            </div>
+
+            <div class="flex justify-center mb-8 overflow-x-auto">
+                <div class="inline-flex bg-gray-100 rounded-xl p-1 gap-0.5">
+                    <button @click="cycle = 'monthly'" :class="cycle === 'monthly' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Monthly</button>
+                    <button @click="cycle = 'quarterly'" :class="cycle === 'quarterly' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Quarterly <span class="text-[10px] opacity-75">-1%</span></button>
+                    <button @click="cycle = 'semi_annual'" :class="cycle === 'semi_annual' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Semi-Annual <span class="text-[10px] opacity-75">-3%</span></button>
+                    <button @click="cycle = 'annual'" :class="cycle === 'annual' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Annual <span class="text-[10px] opacity-75">-6%</span></button>
+                </div>
             </div>
 
             @if(isset($plans) && $plans->count())
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
                 @foreach($plans as $plan)
-                @php $isPopular = $plan->name === 'Business'; @endphp
-                <div class="relative rounded-xl shadow-md overflow-hidden transition duration-300 hover:-translate-y-1 hover:shadow-xl {{ $isPopular ? 'ring-2 ring-blue-400/80 shadow-lg shadow-blue-500/10' : '' }}">
+                @php
+                    $isPopular = $plan->name === 'Business';
+                    $planFeatures = is_array($plan->features) ? $plan->features : (is_string($plan->features) ? json_decode($plan->features, true) : []);
+                @endphp
+                <div class="relative rounded-xl shadow-md overflow-hidden transition duration-300 hover:-translate-y-1 hover:shadow-xl {{ $isPopular ? 'ring-2 ring-blue-400/80 shadow-lg shadow-blue-500/10' : '' }}"
+                     x-data="{
+                         basePrice: {{ $plan->price }},
+                         discounts: { monthly: 0, quarterly: 1, semi_annual: 3, annual: 6 },
+                         get discount() { return this.discounts[cycle] || 0; },
+                         get months() { return { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }[cycle] || 1; },
+                         get totalPrice() { return Math.round(this.basePrice * this.months * (1 - this.discount / 100)); },
+                         get perMonth() { return Math.round(this.totalPrice / this.months); },
+                         get saved() { return Math.round(this.basePrice * this.months * this.discount / 100); },
+                         get periodLabel() { return { monthly: '/mo', quarterly: '/quarter', semi_annual: '/6 months', annual: '/year' }[cycle] || '/mo'; }
+                     }">
                     @if($isPopular)
                     <div class="bg-gradient-to-r from-blue-500 to-blue-700 text-center py-1.5">
                         <span class="text-white text-xs font-bold tracking-wide">BEST VALUE</span>
@@ -295,14 +317,19 @@
                     <div class="{{ $isPopular ? 'bg-gradient-to-b from-blue-50/50 to-white border-blue-400/30 border-t-0 rounded-b-xl' : 'bg-white border-gray-200 rounded-xl' }} border p-5">
                         <h3 class="text-lg font-bold text-gray-900">{{ $plan->name }}</h3>
                         <div class="mt-3 mb-1">
-                            <span class="text-3xl font-black text-gray-900">PKR {{ number_format($plan->price, 0) }}</span>
-                            <span class="text-gray-400 text-sm">/mo</span>
+                            <span class="text-3xl font-black text-gray-900">PKR <span x-text="totalPrice.toLocaleString()"></span></span>
+                            <span class="text-gray-400 text-sm" x-text="periodLabel"></span>
                         </div>
-                        <p class="text-xs text-blue-600 font-medium">Includes FBR POS module</p>
+                        <template x-if="cycle !== 'monthly'">
+                            <div>
+                                <p class="text-xs text-gray-400">PKR <span x-text="perMonth.toLocaleString()"></span>/mo effective</p>
+                                <p class="text-xs text-blue-600 font-medium mt-0.5">Save PKR <span x-text="saved.toLocaleString()"></span></p>
+                            </div>
+                        </template>
+                        <template x-if="cycle === 'monthly'">
+                            <p class="text-xs text-blue-600 font-medium">No commitment</p>
+                        </template>
 
-                        @php
-                            $planFeatures = is_array($plan->features) ? $plan->features : (is_string($plan->features) ? json_decode($plan->features, true) : []);
-                        @endphp
                         <div class="mt-4 pt-4 border-t border-gray-100 space-y-2 text-sm text-gray-600">
                             @if(!empty($planFeatures))
                                 @foreach($planFeatures as $feature)
@@ -311,15 +338,6 @@
                                     {{ $feature }}
                                 </div>
                                 @endforeach
-                            @else
-                                <div class="flex items-center gap-2">
-                                    <svg class="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                    FBR POS billing
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <svg class="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                    FBR real-time submission
-                                </div>
                             @endif
                         </div>
 
@@ -338,12 +356,12 @@
                         FBR compliant
                     </span>
                     <span class="flex items-center gap-1.5">
-                        <svg class="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        14-day free trial
+                        <span class="text-xs font-bold text-blue-400">PKR</span>
+                        Save up to 6% annually
                     </span>
                     <span class="flex items-center gap-1.5">
-                        <svg class="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-                        No credit card required
+                        <svg class="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        14-day free trial
                     </span>
                 </div>
             </div>

@@ -187,7 +187,7 @@
                 </h1>
                 <p class="mt-6 text-lg text-blue-100/90 max-w-2xl mx-auto">
                     Complete POS billing system with direct FBR (Federal Board of Revenue) integration.
-                    Real-time invoice submission, dual invoice numbering, and full tax compliance reporting.
+                    Real-time FBR invoice submission, automated tax calculation, and full compliance reporting.
                 </p>
                 <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
                     <a href="/fbr-pos/register" class="w-full sm:w-auto px-8 py-3.5 bg-white text-blue-700 rounded-xl text-sm font-bold hover:bg-blue-50 transition shadow-2xl hover:shadow-blue-500/25 text-center">
@@ -226,29 +226,29 @@
                     <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400/20 to-sky-400/20 group-hover:from-blue-400/30 group-hover:to-sky-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Dual Invoice Numbering</h3>
-                    <p class="text-sm text-gray-700">Automatic FPOS/FLOCAL prefix system. FBR ON generates FPOS-YYYY-XXXXX, FBR OFF generates FLOCAL-YYYY-XXXXX.</p>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Automated Invoice Numbering</h3>
+                    <p class="text-sm text-gray-700">Smart sequential invoice numbering with automatic FBR fiscal number assignment for every transaction.</p>
                 </div>
                 <div class="card-accent-top bg-white rounded-xl shadow-md p-6 ring-1 ring-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
                     <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400/20 to-sky-400/20 group-hover:from-blue-400/30 group-hover:to-sky-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">FBR Reporting Toggle</h3>
-                    <p class="text-sm text-gray-700">Admin-controlled ON/OFF toggle. When OFF, invoices save locally without FBR submission. Switch back anytime.</p>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">FBR Reporting Control</h3>
+                    <p class="text-sm text-gray-700">Admin-controlled FBR reporting management. Full control over your submission workflow with easy configuration.</p>
                 </div>
                 <div class="card-accent-top bg-white rounded-xl shadow-md p-6 ring-1 ring-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
                     <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400/20 to-sky-400/20 group-hover:from-blue-400/30 group-hover:to-sky-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">PIN-Protected Local Data</h3>
-                    <p class="text-sm text-gray-700">Confidential PIN system protects local invoice data. Server-side enforced with lockout protection. Only admin can access.</p>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Enterprise Security</h3>
+                    <p class="text-sm text-gray-700">Role-based access control, admin-only sensitive operations, server-side enforcement with enterprise-grade data protection.</p>
                 </div>
                 <div class="card-accent-top bg-white rounded-xl shadow-md p-6 ring-1 ring-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
                     <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400/20 to-sky-400/20 group-hover:from-blue-400/30 group-hover:to-sky-400/30 flex items-center justify-center mb-4 transition">
                         <svg class="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">FBR POS Reports</h3>
-                    <p class="text-sm text-gray-700">Daily sales trends, FBR submission analytics, tax collected summary, and separated FBR/Local transaction views.</p>
+                    <p class="text-sm text-gray-700">Daily sales trends, FBR submission analytics, tax collected summary, and comprehensive transaction reporting.</p>
                 </div>
                 <div class="card-accent-top bg-white rounded-xl shadow-md p-6 ring-1 ring-gray-200/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
                     <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400/20 to-sky-400/20 group-hover:from-blue-400/30 group-hover:to-sky-400/30 flex items-center justify-center mb-4 transition">

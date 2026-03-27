@@ -259,9 +259,9 @@
                                 <p class="text-[12px] text-blue-600 font-semibold">FBR Point of Sale</p>
                             </div>
                         </div>
-                        <p class="text-[14px] text-gray-600 leading-relaxed mb-5">FBR-integrated POS billing with direct API submission, dual invoice numbering, FBR reporting toggle, and PIN-protected local data.</p>
+                        <p class="text-[14px] text-gray-600 leading-relaxed mb-5">FBR-integrated POS billing with direct API submission, real-time compliance, automated tax calculation, and comprehensive reports.</p>
                         <div class="grid grid-cols-2 gap-2 mb-6">
-                            @foreach(['FBR Direct API', 'Dual Numbering', 'FBR Toggle', 'PIN Protection', 'Retry System', 'Tax Reports'] as $feature)
+                            @foreach(['FBR Direct API', 'Smart Billing', 'Tax Compliance', 'Retry System', 'Tax Reports', 'Multi-User'] as $feature)
                             <div class="flex items-center text-[12px] text-gray-700">
                                 <svg class="w-3.5 h-3.5 text-blue-600 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                 {{ $feature }}

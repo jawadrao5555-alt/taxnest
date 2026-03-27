@@ -1,4 +1,4 @@
-modules = ["php-8.4", "nodejs-20", "postgresql-16", "python-3.11"]
+modules = ["php-8.4", "nodejs-20", "python-3.11", "postgresql-16"]
 [agent]
 expertMode = true
 integrations = ["github:1.0.0"]

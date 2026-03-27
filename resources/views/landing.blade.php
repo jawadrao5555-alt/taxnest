@@ -25,7 +25,8 @@
         .btn-glow:hover { transform: translateY(-1px); box-shadow: 0 8px 24px -4px rgba(16,185,129,0.4); }
         .btn-glow-purple { transition: all 0.25s ease; }
         .btn-glow-purple:hover { transform: translateY(-1px); box-shadow: 0 8px 24px -4px rgba(139,92,246,0.4); }
-        .stat-glass { background: rgba(255,255,255,0.08); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.15); }
+        .stat-glass { background: rgba(255,255,255,0.06); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.1); }
+        .stat-glass:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); transform: translateY(-2px); }
         @keyframes float {
             0%, 100% { transform: translateY(0px) translateX(0px); }
             25% { transform: translateY(-20px) translateX(10px); }
@@ -46,6 +47,9 @@
             0%, 100% { opacity: 0.4; transform: scale(1); }
             50% { opacity: 0.7; transform: scale(1.05); }
         }
+        @keyframes countUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideInLeft { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
         .orb-1 { animation: float 8s ease-in-out infinite; }
         .orb-2 { animation: float-reverse 10s ease-in-out infinite; }
         .orb-3 { animation: float 12s ease-in-out infinite 2s; }
@@ -61,6 +65,16 @@
             background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
             background-size: 60px 60px;
         }
+        .product-card-glow-emerald { box-shadow: 0 0 0 1px rgba(16,185,129,0.1); }
+        .product-card-glow-emerald:hover { box-shadow: 0 0 40px -8px rgba(16,185,129,0.15), 0 20px 40px -12px rgba(0,0,0,0.1); }
+        .product-card-glow-purple { box-shadow: 0 0 0 1px rgba(139,92,246,0.1); }
+        .product-card-glow-purple:hover { box-shadow: 0 0 40px -8px rgba(139,92,246,0.15), 0 20px 40px -12px rgba(0,0,0,0.1); }
+        .product-card-glow-blue { box-shadow: 0 0 0 1px rgba(37,99,235,0.1); }
+        .product-card-glow-blue:hover { box-shadow: 0 0 40px -8px rgba(37,99,235,0.15), 0 20px 40px -12px rgba(0,0,0,0.1); }
+        .step-connector { position: relative; }
+        .step-connector::after { content: ''; position: absolute; top: 50%; right: -24px; width: 48px; height: 2px; background: linear-gradient(90deg, #10b981, #8b5cf6); opacity: 0.3; }
+        @media (max-width: 768px) { .step-connector::after { display: none; } }
+        .feature-icon-glow { box-shadow: 0 0 20px -4px currentColor; }
     </style>
 </head>
 <body class="antialiased text-gray-700 scroll-smooth bg-white dark:bg-gray-900 overflow-x-hidden">
@@ -127,28 +141,28 @@
             </div>
 
             <div class="mt-20 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto">
-                <div class="stat-glass rounded-2xl p-5 text-center">
+                <div class="stat-glass rounded-2xl p-5 text-center transition-all duration-300">
                     <div class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center mx-auto mb-3">
                         <svg class="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
                     </div>
                     <p class="text-2xl sm:text-3xl font-bold text-white">99.9%</p>
                     <p class="text-xs text-gray-400 mt-1">Uptime SLA</p>
                 </div>
-                <div class="stat-glass rounded-2xl p-5 text-center">
+                <div class="stat-glass rounded-2xl p-5 text-center transition-all duration-300">
                     <div class="w-10 h-10 rounded-xl bg-teal-500/20 flex items-center justify-center mx-auto mb-3">
                         <svg class="w-5 h-5 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                     </div>
                     <p class="text-2xl sm:text-3xl font-bold text-white">{{ isset($stats['total_invoices']) && $stats['total_invoices'] > 0 ? number_format($stats['total_invoices']) : '50k+' }}</p>
                     <p class="text-xs text-gray-400 mt-1">Invoices Processed</p>
                 </div>
-                <div class="stat-glass rounded-2xl p-5 text-center">
+                <div class="stat-glass rounded-2xl p-5 text-center transition-all duration-300">
                     <div class="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center mx-auto mb-3">
                         <svg class="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                     </div>
                     <p class="text-2xl sm:text-3xl font-bold text-white">{{ isset($stats['total_companies']) && $stats['total_companies'] > 0 ? number_format($stats['total_companies']) . '+' : '500+' }}</p>
                     <p class="text-xs text-gray-400 mt-1">Companies Trust Us</p>
                 </div>
-                <div class="stat-glass rounded-2xl p-5 text-center">
+                <div class="stat-glass rounded-2xl p-5 text-center transition-all duration-300">
                     <div class="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center mx-auto mb-3">
                         <svg class="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                     </div>
@@ -187,7 +201,40 @@
         </div>
     </div>
 
-    <section id="products" class="py-24 lg:py-28 bg-white dark:bg-gray-900">
+    <section class="py-20 lg:py-24 bg-white dark:bg-gray-900">
+        <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
+            <div class="text-center mb-14 fade-up">
+                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Get Started in Minutes</p>
+                <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">How It Works</h2>
+                <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">Three simple steps to complete tax compliance</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto fade-up">
+                <div class="text-center step-connector">
+                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-100 to-teal-50 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-emerald-500/10">
+                        <span class="text-2xl font-black text-emerald-600">1</span>
+                    </div>
+                    <h3 class="text-[16px] font-bold text-gray-900 mb-2">Register & Choose Product</h3>
+                    <p class="text-[13px] text-gray-500 leading-relaxed">Sign up in 30 seconds. Pick Digital Invoice, PRA POS, or FBR POS. Get a 14-day free trial instantly.</p>
+                </div>
+                <div class="text-center step-connector">
+                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-100 to-violet-50 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-purple-500/10">
+                        <span class="text-2xl font-black text-purple-600">2</span>
+                    </div>
+                    <h3 class="text-[16px] font-bold text-gray-900 mb-2">Configure & Connect FBR/PRA</h3>
+                    <p class="text-[13px] text-gray-500 leading-relaxed">Enter your NTN, connect to FBR or PRA API, set up your business profile. Takes under 5 minutes.</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-100 to-sky-50 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-blue-500/10">
+                        <span class="text-2xl font-black text-blue-600">3</span>
+                    </div>
+                    <h3 class="text-[16px] font-bold text-gray-900 mb-2">Create & Submit Invoices</h3>
+                    <p class="text-[13px] text-gray-500 leading-relaxed">Start creating compliant invoices immediately. Real-time submission to FBR/PRA with instant confirmation.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="products" class="py-24 lg:py-28 bg-gray-50 dark:bg-gray-800">
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="text-center mb-16 fade-up">
                 <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Three Products, One Platform</p>
@@ -196,11 +243,14 @@
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-                <div class="card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300 gradient-border-top">
-                    <div class="p-6">
+                <div class="relative card-hover bg-white dark:bg-gray-900 rounded-2xl product-card-glow-emerald overflow-hidden hover:-translate-y-2 hover:shadow-xl transition-all duration-300 gradient-border-top">
+                    <div class="absolute top-3 right-3">
+                        <span class="inline-flex items-center px-2.5 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full uppercase tracking-wide">Enterprise</span>
+                    </div>
+                    <div class="p-7">
                         <div class="flex items-center space-x-3 mb-5">
-                            <div class="w-14 h-14 rounded-[12px] bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center shadow-md">
-                                <svg class="w-7 h-7 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                            <div class="w-14 h-14 rounded-[14px] bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                                <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                             </div>
                             <div>
                                 <h3 class="text-lg font-bold text-gray-900">Digital Invoice</h3>
@@ -208,25 +258,28 @@
                             </div>
                         </div>
                         <p class="text-[14px] text-gray-600 leading-relaxed mb-5">Enterprise-grade FBR digital invoicing with PRAL API v1.12 integration, real-time submission, and compliance scoring.</p>
-                        <div class="grid grid-cols-2 gap-2 mb-6">
+                        <div class="grid grid-cols-2 gap-2.5 mb-6">
                             @foreach(['FBR API v1.12', 'HS Intelligence AI', 'Risk Detection', 'PDF + QR Codes', 'MIS Analytics', 'Multi-Branch'] as $feature)
                             <div class="flex items-center text-[12px] text-gray-700">
-                                <svg class="w-3.5 h-3.5 text-emerald-600 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                <svg class="w-3.5 h-3.5 text-emerald-500 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                 {{ $feature }}
                             </div>
                             @endforeach
                         </div>
-                        <a href="/digital-invoice" class="btn-glow block w-full py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white rounded-[10px] text-[13px] font-semibold hover:from-emerald-600 hover:to-emerald-800 shadow-md hover:shadow-lg text-center">
+                        <a href="/digital-invoice" class="btn-glow block w-full py-3 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white rounded-xl text-[13px] font-semibold hover:from-emerald-600 hover:to-emerald-800 shadow-md hover:shadow-lg text-center">
                             Explore Digital Invoice
                         </a>
                     </div>
                 </div>
 
-                <div class="card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300 gradient-border-top-purple">
-                    <div class="p-6">
+                <div class="relative card-hover bg-white dark:bg-gray-900 rounded-2xl product-card-glow-purple overflow-hidden hover:-translate-y-2 hover:shadow-xl transition-all duration-300 gradient-border-top-purple ring-2 ring-purple-200/50">
+                    <div class="absolute top-3 right-3">
+                        <span class="inline-flex items-center px-2.5 py-1 bg-gradient-to-r from-purple-500 to-violet-600 text-white text-[10px] font-bold rounded-full uppercase tracking-wide shadow-lg shadow-purple-500/20">Most Popular</span>
+                    </div>
+                    <div class="p-7">
                         <div class="flex items-center space-x-3 mb-5">
-                            <div class="w-14 h-14 rounded-[12px] bg-gradient-to-br from-purple-50 to-violet-50 flex items-center justify-center shadow-md">
-                                <svg class="w-7 h-7 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                            <div class="w-14 h-14 rounded-[14px] bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
+                                <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                             </div>
                             <div>
                                 <h3 class="text-lg font-bold text-gray-900">PRA POS</h3>
@@ -234,25 +287,28 @@
                             </div>
                         </div>
                         <p class="text-[14px] text-gray-600 leading-relaxed mb-5">Complete POS billing with PRA fiscal device integration via PRAL IMS API v1.2, thermal receipts, and real-time tax calculations.</p>
-                        <div class="grid grid-cols-2 gap-2 mb-6">
+                        <div class="grid grid-cols-2 gap-2.5 mb-6">
                             @foreach(['PRA IMS v1.2', 'Thermal Receipts', 'Multi-Terminal', 'Smart Billing', 'Cash/Card/QR Tax', 'Offline Billing'] as $feature)
                             <div class="flex items-center text-[12px] text-gray-700">
-                                <svg class="w-3.5 h-3.5 text-purple-600 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                <svg class="w-3.5 h-3.5 text-purple-500 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                 {{ $feature }}
                             </div>
                             @endforeach
                         </div>
-                        <a href="/pos" class="btn-glow-purple block w-full py-2.5 bg-gradient-to-r from-purple-500 to-purple-700 text-white rounded-[10px] text-[13px] font-semibold hover:from-purple-600 hover:to-purple-800 shadow-md hover:shadow-lg text-center">
+                        <a href="/pos" class="btn-glow-purple block w-full py-3 bg-gradient-to-r from-purple-500 to-purple-700 text-white rounded-xl text-[13px] font-semibold hover:from-purple-600 hover:to-purple-800 shadow-lg shadow-purple-500/20 hover:shadow-xl text-center">
                             Explore PRA POS
                         </a>
                     </div>
                 </div>
 
-                <div class="card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300" style="border-top: 4px solid; border-image: linear-gradient(to right, #2563eb, #3b82f6) 1;">
-                    <div class="p-6">
+                <div class="relative card-hover bg-white dark:bg-gray-900 rounded-2xl product-card-glow-blue overflow-hidden hover:-translate-y-2 hover:shadow-xl transition-all duration-300" style="border-top: 4px solid; border-image: linear-gradient(to right, #2563eb, #3b82f6) 1;">
+                    <div class="absolute top-3 right-3">
+                        <span class="inline-flex items-center px-2.5 py-1 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full uppercase tracking-wide">New</span>
+                    </div>
+                    <div class="p-7">
                         <div class="flex items-center space-x-3 mb-5">
-                            <div class="w-14 h-14 rounded-[12px] bg-gradient-to-br from-blue-50 to-sky-50 flex items-center justify-center shadow-md">
-                                <svg class="w-7 h-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                            <div class="w-14 h-14 rounded-[14px] bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                                <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                             </div>
                             <div>
                                 <h3 class="text-lg font-bold text-gray-900">FBR POS</h3>
@@ -260,15 +316,15 @@
                             </div>
                         </div>
                         <p class="text-[14px] text-gray-600 leading-relaxed mb-5">FBR-integrated POS billing with direct API submission, real-time compliance, automated tax calculation, and comprehensive reports.</p>
-                        <div class="grid grid-cols-2 gap-2 mb-6">
+                        <div class="grid grid-cols-2 gap-2.5 mb-6">
                             @foreach(['FBR Direct API', 'Smart Billing', 'Tax Compliance', 'Retry System', 'Tax Reports', 'Multi-User'] as $feature)
                             <div class="flex items-center text-[12px] text-gray-700">
-                                <svg class="w-3.5 h-3.5 text-blue-600 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                <svg class="w-3.5 h-3.5 text-blue-500 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                 {{ $feature }}
                             </div>
                             @endforeach
                         </div>
-                        <a href="/fbr-pos-landing" class="block w-full py-2.5 bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-[10px] text-[13px] font-semibold hover:from-blue-600 hover:to-blue-800 shadow-md hover:shadow-lg text-center transition">
+                        <a href="/fbr-pos-landing" class="block w-full py-3 bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-xl text-[13px] font-semibold hover:from-blue-600 hover:to-blue-800 shadow-md hover:shadow-lg text-center transition">
                             Explore FBR POS
                         </a>
                     </div>

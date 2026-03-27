@@ -15,7 +15,7 @@
         </style>
     </head>
     <body class="font-sans text-gray-900 antialiased">
-        <div class="min-h-screen flex flex-col items-center justify-center relative overflow-hidden" style="background: linear-gradient(135deg, #0c1a3a 0%, #1e3a5f 25%, #1e40af 50%, #2563eb 75%, #1d4ed8 100%);">
+        <div class="min-h-screen flex flex-col items-center justify-center relative overflow-hidden" style="background: linear-gradient(135deg, #dbeafe 0%, #93c5fd 25%, #60a5fa 50%, #3b82f6 75%, #2563eb 100%);">
             <div class="absolute inset-0 overflow-hidden">
                 <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl" style="animation: pulse-glow 4s ease-in-out infinite;"></div>
                 <div class="absolute bottom-1/4 right-1/4 w-80 h-80 bg-sky-400/15 rounded-full blur-3xl" style="animation: pulse-glow 6s ease-in-out infinite 1s;"></div>
@@ -31,12 +31,12 @@
                             </svg>
                         </div>
                     </a>
-                    <h1 class="mt-4 text-2xl font-extrabold text-white tracking-tight">FBR POS</h1>
-                    <p class="text-blue-200/60 text-sm mt-1">FBR Point of Sale System</p>
+                    <h1 class="mt-4 text-2xl font-extrabold text-gray-900 tracking-tight">FBR POS</h1>
+                    <p class="text-blue-800/60 text-sm mt-1">FBR Point of Sale System</p>
                 </div>
 
                 <div class="w-full max-w-md mx-auto px-4">
-                    <div class="rounded-2xl overflow-hidden" style="background: rgba(255,255,255,0.07); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 25px 60px -12px rgba(0,0,0,0.5), 0 0 0 1px rgba(37, 99, 235, 0.1);">
+                    <div class="rounded-2xl overflow-hidden" style="background: rgba(255,255,255,0.85); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.6); box-shadow: 0 25px 60px -12px rgba(0,0,0,0.15), 0 0 0 1px rgba(37, 99, 235, 0.08);">
                         @if(session('status'))
                         <div class="px-6 pt-5">
                             <div class="font-medium text-sm text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2">{{ session('status') }}</div>
@@ -49,23 +49,23 @@
                         @endif
 
                         <div class="px-6 pt-6 pb-2 text-center">
-                            <h2 class="text-lg font-bold text-white">Welcome Back</h2>
-                            <p class="text-sm text-blue-200/50 mt-1">Sign in to your FBR POS account</p>
+                            <h2 class="text-lg font-bold text-gray-900">Welcome Back</h2>
+                            <p class="text-sm text-gray-500 mt-1">Sign in to your FBR POS account</p>
                         </div>
 
                         <form method="POST" action="/fbr-pos/login" class="px-6 pb-6 pt-4 space-y-4">
                             @csrf
                             <div>
-                                <label for="login" class="block text-sm font-medium text-blue-100/70 mb-1.5">Email / Phone / Username / NTN / CNIC</label>
-                                <input id="login" type="text" name="login" value="{{ old('login') }}" required autofocus autocomplete="username" placeholder="Enter your credential" class="w-full rounded-xl text-sm text-white placeholder-blue-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(59,130,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
+                                <label for="login" class="block text-sm font-medium text-gray-700 mb-1.5">Email / Phone / Username / NTN / CNIC</label>
+                                <input id="login" type="text" name="login" value="{{ old('login') }}" required autofocus autocomplete="username" placeholder="Enter your credential" class="w-full rounded-xl text-sm text-gray-900 placeholder-gray-400 transition" style="background: rgba(255,255,255,0.7); border: 1px solid rgba(59,130,246,0.2); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(59,130,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)';" onblur="this.style.borderColor='rgba(59,130,246,0.2)'; this.style.boxShadow='none';">
                                 @error('login')
                                 <p class="text-sm text-red-400 mt-1.5">{{ $message }}</p>
                                 @enderror
                             </div>
 
                             <div>
-                                <label for="password" class="block text-sm font-medium text-blue-100/70 mb-1.5">Password</label>
-                                <input id="password" type="password" name="password" required autocomplete="current-password" placeholder="Enter your password" class="w-full rounded-xl text-sm text-white placeholder-blue-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(59,130,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
+                                <label for="password" class="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+                                <input id="password" type="password" name="password" required autocomplete="current-password" placeholder="Enter your password" class="w-full rounded-xl text-sm text-gray-900 placeholder-gray-400 transition" style="background: rgba(255,255,255,0.7); border: 1px solid rgba(59,130,246,0.2); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(59,130,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)';" onblur="this.style.borderColor='rgba(59,130,246,0.2)'; this.style.boxShadow='none';">
                                 @error('password')
                                 <p class="text-sm text-red-400 mt-1.5">{{ $message }}</p>
                                 @enderror
@@ -73,8 +73,8 @@
 
                             <div class="flex items-center justify-between">
                                 <label class="flex items-center">
-                                    <input id="remember_me" type="checkbox" name="remember" class="rounded border-blue-300/30 bg-white/5 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 w-4 h-4">
-                                    <span class="ml-2 text-sm text-blue-200/50">Remember me</span>
+                                    <input id="remember_me" type="checkbox" name="remember" class="rounded border-blue-300 bg-white/50 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 w-4 h-4">
+                                    <span class="ml-2 text-sm text-gray-600">Remember me</span>
                                 </label>
                             </div>
 
@@ -82,10 +82,10 @@
                                 Sign In
                             </button>
 
-                            <div class="pt-3 border-t border-white/10 text-center">
-                                <p class="text-sm text-blue-200/40">
+                            <div class="pt-3 border-t border-gray-200 text-center">
+                                <p class="text-sm text-gray-500">
                                     Don't have an account?
-                                    <a href="/fbr-pos/register" class="font-semibold text-blue-300 hover:text-white transition">Sign Up</a>
+                                    <a href="/fbr-pos/register" class="font-semibold text-blue-600 hover:text-blue-800 transition">Sign Up</a>
                                 </p>
                             </div>
                         </form>
@@ -93,8 +93,8 @@
                 </div>
 
                 <div class="mt-5 text-center space-x-4">
-                    <a href="/digital-invoice" class="text-xs text-blue-300/30 hover:text-blue-200/60 transition">Digital Invoice (FBR) Portal</a>
-                    <a href="/pos" class="text-xs text-blue-300/30 hover:text-blue-200/60 transition">PRA POS Portal</a>
+                    <a href="/digital-invoice" class="text-xs text-blue-700/50 hover:text-blue-900 transition">Digital Invoice (FBR) Portal</a>
+                    <a href="/pos" class="text-xs text-blue-700/50 hover:text-blue-900 transition">PRA POS Portal</a>
                 </div>
             </div>
         </div>

@@ -12,7 +12,7 @@
         body { font-family: 'Figtree', sans-serif; }
         [x-cloak] { display: none !important; }
         .fpos-gradient {
-            background: linear-gradient(135deg, #0c1a3a 0%, #1e3a5f 40%, #2563eb 70%, #3b82f6 100%);
+            background: linear-gradient(135deg, #bfdbfe 0%, #93c5fd 30%, #3b82f6 65%, #2563eb 100%);
             position: relative;
         }
         .fpos-gradient::before {

@@ -15,7 +15,7 @@
         </style>
     </head>
     <body class="font-sans text-gray-900 antialiased">
-        <div class="min-h-screen flex flex-col items-center justify-center relative overflow-hidden py-8" style="background: linear-gradient(135deg, #0c1a3a 0%, #1e3a5f 25%, #1e40af 50%, #2563eb 75%, #1d4ed8 100%);">
+        <div class="min-h-screen flex flex-col items-center justify-center relative overflow-hidden py-8" style="background: linear-gradient(135deg, #dbeafe 0%, #93c5fd 25%, #60a5fa 50%, #3b82f6 75%, #2563eb 100%);">
             <div class="absolute inset-0 overflow-hidden">
                 <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl" style="animation: pulse-glow 4s ease-in-out infinite;"></div>
                 <div class="absolute bottom-1/4 right-1/4 w-80 h-80 bg-sky-400/15 rounded-full blur-3xl" style="animation: pulse-glow 6s ease-in-out infinite 1s;"></div>
@@ -25,20 +25,20 @@
             <div class="relative z-10 w-full max-w-md px-4">
                 <div class="text-center mb-6">
                     <a href="/fbr-pos-landing" class="inline-block">
-                        <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-blue-400 to-blue-700 flex items-center justify-center shadow-2xl shadow-blue-500/30 ring-1 ring-white/10">
+                        <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-blue-400 to-blue-700 flex items-center justify-center shadow-2xl shadow-blue-500/30 ring-1 ring-white/20">
                             <svg class="h-9 w-9 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
                             </svg>
                         </div>
                     </a>
-                    <h1 class="mt-4 text-2xl font-extrabold text-white tracking-tight">FBR POS</h1>
-                    <p class="text-blue-200/60 text-sm mt-1">FBR Point of Sale System</p>
+                    <h1 class="mt-4 text-2xl font-extrabold text-gray-900 tracking-tight">FBR POS</h1>
+                    <p class="text-blue-800/60 text-sm mt-1">FBR Point of Sale System</p>
                 </div>
 
-                <div class="rounded-2xl overflow-hidden" style="background: rgba(255,255,255,0.07); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 25px 60px -12px rgba(0,0,0,0.5), 0 0 0 1px rgba(37, 99, 235, 0.1);">
+                <div class="rounded-2xl overflow-hidden" style="background: rgba(255,255,255,0.85); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.6); box-shadow: 0 25px 60px -12px rgba(0,0,0,0.15), 0 0 0 1px rgba(37, 99, 235, 0.08);">
                     @if($errors->any())
                     <div class="px-6 pt-5">
-                        <div class="font-medium text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                        <div class="font-medium text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                             @foreach($errors->all() as $error)
                                 <p>{{ $error }}</p>
                             @endforeach
@@ -47,71 +47,71 @@
                     @endif
 
                     <div class="px-6 pt-6 pb-2 text-center">
-                        <h2 class="text-lg font-bold text-white">Create FBR POS Account</h2>
-                        <p class="text-sm text-blue-200/50 mt-1">Register your business for FBR POS</p>
+                        <h2 class="text-lg font-bold text-gray-900">Create FBR POS Account</h2>
+                        <p class="text-sm text-gray-500 mt-1">Register your business for FBR POS</p>
                     </div>
 
                     <form method="POST" action="/fbr-pos/register" class="px-6 pb-6 pt-4 space-y-4">
                         @csrf
 
                         <div class="pt-1 pb-2">
-                            <p class="text-xs font-semibold text-blue-300/50 uppercase tracking-wider">Business Information</p>
+                            <p class="text-xs font-semibold text-blue-600/60 uppercase tracking-wider">Business Information</p>
                         </div>
 
                         <div>
-                            <label for="company_name" class="block text-sm font-medium text-blue-100/70 mb-1.5">Business Name</label>
-                            <input id="company_name" type="text" name="company_name" value="{{ old('company_name') }}" required placeholder="e.g. ABC Trading" class="w-full rounded-xl text-sm text-white placeholder-blue-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(59,130,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
+                            <label for="company_name" class="block text-sm font-medium text-gray-700 mb-1.5">Business Name</label>
+                            <input id="company_name" type="text" name="company_name" value="{{ old('company_name') }}" required placeholder="e.g. ABC Trading" class="w-full rounded-xl text-sm text-gray-900 placeholder-gray-400 transition" style="background: rgba(255,255,255,0.7); border: 1px solid rgba(59,130,246,0.2); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(59,130,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)';" onblur="this.style.borderColor='rgba(59,130,246,0.2)'; this.style.boxShadow='none';">
                         </div>
 
                         <div>
-                            <label for="company_ntn" class="block text-sm font-medium text-blue-100/70 mb-1.5">NTN (National Tax Number)</label>
-                            <input id="company_ntn" type="text" name="company_ntn" value="{{ old('company_ntn') }}" required placeholder="1234567-8" class="w-full rounded-xl text-sm text-white placeholder-blue-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(59,130,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
+                            <label for="company_ntn" class="block text-sm font-medium text-gray-700 mb-1.5">NTN (National Tax Number)</label>
+                            <input id="company_ntn" type="text" name="company_ntn" value="{{ old('company_ntn') }}" required placeholder="1234567-8" class="w-full rounded-xl text-sm text-gray-900 placeholder-gray-400 transition" style="background: rgba(255,255,255,0.7); border: 1px solid rgba(59,130,246,0.2); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(59,130,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)';" onblur="this.style.borderColor='rgba(59,130,246,0.2)'; this.style.boxShadow='none';">
                         </div>
 
-                        <div style="border-top: 1px solid rgba(255,255,255,0.08); margin-top: 8px; padding-top: 12px;">
-                            <p class="text-xs font-semibold text-blue-300/50 uppercase tracking-wider">Admin Account</p>
-                        </div>
-
-                        <div>
-                            <label for="name" class="block text-sm font-medium text-blue-100/70 mb-1.5">Your Name</label>
-                            <input id="name" type="text" name="name" value="{{ old('name') }}" required placeholder="Full name" class="w-full rounded-xl text-sm text-white placeholder-blue-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(59,130,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
+                        <div style="border-top: 1px solid rgba(59,130,246,0.1); margin-top: 8px; padding-top: 12px;">
+                            <p class="text-xs font-semibold text-blue-600/60 uppercase tracking-wider">Admin Account</p>
                         </div>
 
                         <div>
-                            <label for="email" class="block text-sm font-medium text-blue-100/70 mb-1.5">Email</label>
-                            <input id="email" type="email" name="email" value="{{ old('email') }}" required placeholder="you@example.com" class="w-full rounded-xl text-sm text-white placeholder-blue-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(59,130,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
+                            <label for="name" class="block text-sm font-medium text-gray-700 mb-1.5">Your Name</label>
+                            <input id="name" type="text" name="name" value="{{ old('name') }}" required placeholder="Full name" class="w-full rounded-xl text-sm text-gray-900 placeholder-gray-400 transition" style="background: rgba(255,255,255,0.7); border: 1px solid rgba(59,130,246,0.2); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(59,130,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)';" onblur="this.style.borderColor='rgba(59,130,246,0.2)'; this.style.boxShadow='none';">
                         </div>
 
                         <div>
-                            <label for="phone" class="block text-sm font-medium text-blue-100/70 mb-1.5">Phone <span class="text-blue-300/30">(Optional)</span></label>
-                            <input id="phone" type="text" name="phone" value="{{ old('phone') }}" placeholder="03001234567" class="w-full rounded-xl text-sm text-white placeholder-blue-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(59,130,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
+                            <label for="email" class="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+                            <input id="email" type="email" name="email" value="{{ old('email') }}" required placeholder="you@example.com" class="w-full rounded-xl text-sm text-gray-900 placeholder-gray-400 transition" style="background: rgba(255,255,255,0.7); border: 1px solid rgba(59,130,246,0.2); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(59,130,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)';" onblur="this.style.borderColor='rgba(59,130,246,0.2)'; this.style.boxShadow='none';">
                         </div>
 
                         <div>
-                            <label for="password" class="block text-sm font-medium text-blue-100/70 mb-1.5">Password</label>
-                            <input id="password" type="password" name="password" required autocomplete="new-password" placeholder="Min 8 characters" class="w-full rounded-xl text-sm text-white placeholder-blue-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(59,130,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
+                            <label for="phone" class="block text-sm font-medium text-gray-700 mb-1.5">Phone <span class="text-gray-400">(Optional)</span></label>
+                            <input id="phone" type="text" name="phone" value="{{ old('phone') }}" placeholder="03001234567" class="w-full rounded-xl text-sm text-gray-900 placeholder-gray-400 transition" style="background: rgba(255,255,255,0.7); border: 1px solid rgba(59,130,246,0.2); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(59,130,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)';" onblur="this.style.borderColor='rgba(59,130,246,0.2)'; this.style.boxShadow='none';">
                         </div>
 
                         <div>
-                            <label for="password_confirmation" class="block text-sm font-medium text-blue-100/70 mb-1.5">Confirm Password</label>
-                            <input id="password_confirmation" type="password" name="password_confirmation" required autocomplete="new-password" placeholder="Re-enter password" class="w-full rounded-xl text-sm text-white placeholder-blue-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(59,130,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
+                            <label for="password" class="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+                            <input id="password" type="password" name="password" required autocomplete="new-password" placeholder="Min 8 characters" class="w-full rounded-xl text-sm text-gray-900 placeholder-gray-400 transition" style="background: rgba(255,255,255,0.7); border: 1px solid rgba(59,130,246,0.2); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(59,130,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)';" onblur="this.style.borderColor='rgba(59,130,246,0.2)'; this.style.boxShadow='none';">
+                        </div>
+
+                        <div>
+                            <label for="password_confirmation" class="block text-sm font-medium text-gray-700 mb-1.5">Confirm Password</label>
+                            <input id="password_confirmation" type="password" name="password_confirmation" required autocomplete="new-password" placeholder="Re-enter password" class="w-full rounded-xl text-sm text-gray-900 placeholder-gray-400 transition" style="background: rgba(255,255,255,0.7); border: 1px solid rgba(59,130,246,0.2); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(59,130,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)';" onblur="this.style.borderColor='rgba(59,130,246,0.2)'; this.style.boxShadow='none';">
                         </div>
 
                         <button type="submit" class="w-full py-3 rounded-xl text-sm font-bold text-white transition-all duration-200" style="background: linear-gradient(135deg, #2563eb, #3b82f6); box-shadow: 0 4px 20px rgba(37, 99, 235, 0.4);" onmouseover="this.style.boxShadow='0 6px 28px rgba(37, 99, 235, 0.55)'; this.style.transform='translateY(-1px)';" onmouseout="this.style.boxShadow='0 4px 20px rgba(37, 99, 235, 0.4)'; this.style.transform='translateY(0)';">
                             Create Account
                         </button>
 
-                        <div class="pt-3 border-t border-white/10 text-center">
-                            <p class="text-sm text-blue-200/40">
+                        <div class="pt-3 border-t border-gray-200 text-center">
+                            <p class="text-sm text-gray-500">
                                 Already have an account?
-                                <a href="/fbr-pos/login" class="font-semibold text-blue-300 hover:text-white transition">Log in</a>
+                                <a href="/fbr-pos/login" class="font-semibold text-blue-600 hover:text-blue-800 transition">Log in</a>
                             </p>
                         </div>
                     </form>
                 </div>
 
                 <div class="mt-5 text-center">
-                    <a href="/fbr-pos-landing" class="text-xs text-blue-300/30 hover:text-blue-200/60 transition">&larr; Back to FBR POS</a>
+                    <a href="/fbr-pos-landing" class="text-xs text-blue-700/50 hover:text-blue-900 transition">&larr; Back to FBR POS</a>
                 </div>
             </div>
         </div>

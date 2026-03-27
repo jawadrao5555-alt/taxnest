@@ -141,7 +141,7 @@
     </div>
 
     <div class="mt-4 text-xs text-gray-400 text-center">
-        These customers are exclusive to NestPOS. Digital Invoice customers are managed separately.
+        These customers are exclusive to NestPOS (PRA). Digital Invoice and FBR POS customers are managed separately in their own systems.
     </div>
 </div>
 </x-pos-layout>

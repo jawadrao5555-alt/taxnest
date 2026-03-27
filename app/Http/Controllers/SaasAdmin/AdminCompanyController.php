@@ -285,7 +285,7 @@ class AdminCompanyController extends Controller
     public function changeProductType(Request $request, $id)
     {
         $company = Company::findOrFail($id);
-        $request->validate(['product_type' => 'required|in:di,pos']);
+        $request->validate(['product_type' => 'required|in:di,pos,fbrpos']);
         $old = $company->product_type;
         $company->update(['product_type' => $request->product_type]);
         AdminAuditLog::log(auth('admin')->id(), 'Company type changed', 'Company', $id, [

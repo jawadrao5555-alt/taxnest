@@ -3,13 +3,15 @@
         <div class="flex items-center gap-2">
             <h3 class="text-lg font-bold text-white">{{ $plan->name }}</h3>
             @if($plan->is_trial)<span class="text-[10px] px-1.5 py-0.5 bg-blue-900/50 text-blue-300 rounded font-bold">TRIAL</span>@endif
-            <span class="text-[10px] px-1.5 py-0.5 rounded font-bold {{ $plan->product_type === 'pos' ? 'bg-purple-900/50 text-purple-300' : 'bg-emerald-900/50 text-emerald-300' }}">{{ strtoupper($plan->product_type) }}</span>
+            @php $badgeColors = ['di' => 'bg-emerald-900/50 text-emerald-300', 'pos' => 'bg-purple-900/50 text-purple-300', 'fbrpos' => 'bg-blue-900/50 text-blue-300']; @endphp
+            <span class="text-[10px] px-1.5 py-0.5 rounded font-bold {{ $badgeColors[$plan->product_type] ?? 'bg-gray-900/50 text-gray-300' }}">{{ strtoupper($plan->product_type) }}</span>
         </div>
         <button @click="editing = !editing" class="text-xs px-2 py-1 rounded transition" :class="editing ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30' : 'bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30'" x-text="editing ? 'Cancel' : 'Edit'"></button>
     </div>
 
     <div x-show="!editing">
         <div class="text-2xl font-bold text-{{ $color }}-400 mb-3">PKR {{ number_format($plan->price, 0) }}<span class="text-sm text-gray-500 dark:text-gray-400 font-normal">{{ $plan->product_type === 'pos' ? '/yr' : '/mo' }}</span></div>
+
         <div class="space-y-1.5 text-sm">
             <div class="flex justify-between"><span class="text-gray-400">Invoices{{ $plan->product_type === 'pos' ? '' : '/mo' }}</span><span class="text-white">{{ $plan->invoice_limit > 0 ? number_format($plan->invoice_limit) : ($plan->invoice_limit == -1 ? 'Unlimited' : '0') }}</span></div>
             <div class="flex justify-between"><span class="text-gray-400">Users</span><span class="text-white">{{ ($plan->max_users ?? 0) == -1 ? 'Unlimited' : ($plan->max_users ?? ($plan->user_limit ?? 'N/A')) }}</span></div>
@@ -45,7 +47,8 @@
                 <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Product Type</label>
                 <select name="product_type" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
                     <option value="di" {{ $plan->product_type === 'di' ? 'selected' : '' }}>Digital Invoice</option>
-                    <option value="pos" {{ $plan->product_type === 'pos' ? 'selected' : '' }}>POS</option>
+                    <option value="pos" {{ $plan->product_type === 'pos' ? 'selected' : '' }}>PRA POS</option>
+                    <option value="fbrpos" {{ $plan->product_type === 'fbrpos' ? 'selected' : '' }}>FBR POS</option>
                 </select>
             </div>
             <div>

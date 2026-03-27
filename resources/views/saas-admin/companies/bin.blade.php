@@ -27,7 +27,7 @@
                 </thead>
                 <tbody class="divide-y divide-gray-800">
                     @forelse($companies as $company)
-                    @php $tc = ['di' => 'bg-emerald-900/30 text-emerald-400', 'pos' => 'bg-purple-900/30 text-purple-400']; @endphp
+                    @php $tc = ['di' => 'bg-emerald-900/30 text-emerald-400', 'pos' => 'bg-purple-900/30 text-purple-400', 'fbrpos' => 'bg-blue-900/30 text-blue-400']; @endphp
                     <tr class="hover:bg-gray-800/50">
                         <td class="px-4 py-3">
                             <span class="text-white font-medium">{{ $company->name }}</span>

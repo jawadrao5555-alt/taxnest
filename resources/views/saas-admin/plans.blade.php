@@ -13,7 +13,8 @@
 
     <div class="flex flex-wrap items-center gap-2 mb-6">
         <button @click="activeTab = 'di'" :class="activeTab === 'di' ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Digital Invoice Plans</button>
-        <button @click="activeTab = 'pos'" :class="activeTab === 'pos' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">POS Plans</button>
+        <button @click="activeTab = 'pos'" :class="activeTab === 'pos' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">PRA POS Plans</button>
+        <button @click="activeTab = 'fbrpos'" :class="activeTab === 'fbrpos' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">FBR POS Plans</button>
     </div>
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6" x-data="{ showForm: false }">
@@ -28,7 +29,8 @@
                 <div>
                     <select name="product_type" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                         <option value="di">Digital Invoice</option>
-                        <option value="pos">POS</option>
+                        <option value="pos">PRA POS</option>
+                        <option value="fbrpos">FBR POS</option>
                     </select>
                 </div>
                 <input type="number" name="price" placeholder="Price (PKR)" step="1" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
@@ -65,12 +67,25 @@
     <div x-show="activeTab === 'pos'" x-cloak>
         <div class="flex items-center gap-2 mb-4">
             <div class="w-2 h-2 rounded-full bg-purple-500"></div>
-            <h2 class="text-lg font-bold text-white">POS Plans</h2>
+            <h2 class="text-lg font-bold text-white">PRA POS Plans</h2>
             <span class="text-xs text-gray-500 dark:text-gray-400">({{ $posPlans->count() }} plans — prices are annual)</span>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             @foreach($posPlans as $plan)
             @include('saas-admin.partials.plan-card', ['plan' => $plan, 'color' => 'purple'])
+            @endforeach
+        </div>
+    </div>
+
+    <div x-show="activeTab === 'fbrpos'" x-cloak>
+        <div class="flex items-center gap-2 mb-4">
+            <div class="w-2 h-2 rounded-full bg-blue-500"></div>
+            <h2 class="text-lg font-bold text-white">FBR POS Plans</h2>
+            <span class="text-xs text-gray-500 dark:text-gray-400">({{ $fbrposPlans->count() }} plans — prices are monthly)</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            @foreach($fbrposPlans as $plan)
+            @include('saas-admin.partials.plan-card', ['plan' => $plan, 'color' => 'blue'])
             @endforeach
         </div>
     </div>

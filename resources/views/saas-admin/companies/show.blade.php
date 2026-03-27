@@ -149,27 +149,33 @@
         </div>
     </div>
 
-    @if($company->product_type === 'di')
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
         <h3 class="text-sm font-semibold text-white mb-3">Change Company Type</h3>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Switch between Digital Invoice and NestPOS.</p>
-        <form method="POST" action="{{ route('saas.admin.companies.changeType', $company->id) }}" class="flex items-center gap-3">
-            @csrf
-            <input type="hidden" name="product_type" value="pos">
-            <button type="submit" onclick="return confirm('Are you sure? This will change the company type to NestPOS.')" class="px-4 py-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-400 text-sm rounded-lg transition font-medium border border-purple-800">Switch to NestPOS</button>
-        </form>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Switch between Digital Invoice, NestPOS (PRA), and FBR POS.</p>
+        <div class="flex flex-wrap items-center gap-3">
+            @if($company->product_type !== 'di')
+            <form method="POST" action="{{ route('saas.admin.companies.changeType', $company->id) }}">
+                @csrf
+                <input type="hidden" name="product_type" value="di">
+                <button type="submit" onclick="return confirm('Are you sure? This will change the company type to Digital Invoice.')" class="px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 text-sm rounded-lg transition font-medium border border-emerald-800">Switch to Digital Invoice</button>
+            </form>
+            @endif
+            @if($company->product_type !== 'pos')
+            <form method="POST" action="{{ route('saas.admin.companies.changeType', $company->id) }}">
+                @csrf
+                <input type="hidden" name="product_type" value="pos">
+                <button type="submit" onclick="return confirm('Are you sure? This will change the company type to NestPOS (PRA).')" class="px-4 py-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-400 text-sm rounded-lg transition font-medium border border-purple-800">Switch to NestPOS</button>
+            </form>
+            @endif
+            @if($company->product_type !== 'fbrpos')
+            <form method="POST" action="{{ route('saas.admin.companies.changeType', $company->id) }}">
+                @csrf
+                <input type="hidden" name="product_type" value="fbrpos">
+                <button type="submit" onclick="return confirm('Are you sure? This will change the company type to FBR POS.')" class="px-4 py-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 text-sm rounded-lg transition font-medium border border-blue-800">Switch to FBR POS</button>
+            </form>
+            @endif
+        </div>
     </div>
-    @else
-    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
-        <h3 class="text-sm font-semibold text-white mb-3">Change Company Type</h3>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Switch between Digital Invoice and NestPOS.</p>
-        <form method="POST" action="{{ route('saas.admin.companies.changeType', $company->id) }}" class="flex items-center gap-3">
-            @csrf
-            <input type="hidden" name="product_type" value="di">
-            <button type="submit" onclick="return confirm('Are you sure? This will change the company type to Digital Invoice.')" class="px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 text-sm rounded-lg transition font-medium border border-emerald-800">Switch to Digital Invoice</button>
-        </form>
-    </div>
-    @endif
 
     <div x-show="showDeleteModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @click.self="showDeleteModal = false">
         <div class="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md mx-4" @click.stop>

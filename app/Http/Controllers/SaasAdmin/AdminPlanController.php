@@ -13,7 +13,8 @@ class AdminPlanController extends Controller
     {
         $diPlans = PricingPlan::where('product_type', 'di')->orderBy('price')->get();
         $posPlans = PricingPlan::where('product_type', 'pos')->orderBy('price')->get();
-        return view('saas-admin.plans', compact('diPlans', 'posPlans'));
+        $fbrposPlans = PricingPlan::where('product_type', 'fbrpos')->orderBy('price')->get();
+        return view('saas-admin.plans', compact('diPlans', 'posPlans', 'fbrposPlans'));
     }
 
     public function store(Request $request)
@@ -22,7 +23,7 @@ class AdminPlanController extends Controller
             'name' => 'required|string|max:100',
             'price' => 'required|numeric|min:0',
             'invoice_limit' => 'required|integer|min:-1',
-            'product_type' => 'required|in:di,pos',
+            'product_type' => 'required|in:di,pos,fbrpos',
             'max_terminals' => 'nullable|integer|min:-1',
             'max_users' => 'nullable|integer|min:-1',
             'max_products' => 'nullable|integer|min:-1',
@@ -34,7 +35,7 @@ class AdminPlanController extends Controller
         $features = array_filter(array_map('trim', explode("\n", $request->input('features_text', ''))));
 
         $plan = PricingPlan::create(array_merge($request->except('features_text'), [
-            'price_monthly' => $request->product_type === 'di' ? $request->price : null,
+            'price_monthly' => in_array($request->product_type, ['di', 'fbrpos']) ? $request->price : null,
             'features' => $features,
             'inventory_enabled' => $request->boolean('inventory_enabled'),
             'reports_enabled' => $request->boolean('reports_enabled'),
@@ -52,7 +53,7 @@ class AdminPlanController extends Controller
             'name' => 'required|string|max:100',
             'price' => 'required|numeric|min:0',
             'invoice_limit' => 'required|integer|min:-1',
-            'product_type' => 'required|in:di,pos',
+            'product_type' => 'required|in:di,pos,fbrpos',
             'max_terminals' => 'nullable|integer|min:-1',
             'max_users' => 'nullable|integer|min:-1',
             'max_products' => 'nullable|integer|min:-1',
@@ -62,7 +63,7 @@ class AdminPlanController extends Controller
         $features = array_filter(array_map('trim', explode("\n", $request->input('features_text', ''))));
 
         $plan->update(array_merge($request->except('features_text'), [
-            'price_monthly' => $request->product_type === 'di' ? $request->price : null,
+            'price_monthly' => in_array($request->product_type, ['di', 'fbrpos']) ? $request->price : null,
             'features' => $features,
             'inventory_enabled' => $request->boolean('inventory_enabled'),
             'reports_enabled' => $request->boolean('reports_enabled'),

@@ -349,4 +349,52 @@ function shareInvoice(transactionId) {
     };
 }
 </script>
+
+@if(session('success') && str_contains(session('success'), 'Invoice Created Successfully'))
+<div id="printPopup" class="fixed inset-0 z-[60] flex items-center justify-center transition-opacity duration-300">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closePrintPopup()"></div>
+    <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-5xl mx-4 h-[85vh] flex flex-col overflow-hidden">
+        <button onclick="closePrintPopup()" class="absolute top-4 right-4 z-10 p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition text-gray-500 hover:text-gray-700">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+        <div class="px-6 py-4 border-b border-gray-100 flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900">Invoice Created Successfully!</h3>
+                    <p class="text-sm text-gray-500">{{ $transaction->invoice_number }} — PKR {{ number_format($transaction->total_amount, 2) }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="flex-1 overflow-hidden p-4 min-h-0">
+            <iframe src="{{ route('pos.receipt', $transaction->id) }}" class="w-full h-full border border-gray-200 rounded-lg bg-white"></iframe>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-100 flex-shrink-0 bg-gray-50">
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <a href="{{ route('pos.receipt', $transaction->id) }}" target="_blank" class="inline-flex items-center justify-center px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition">
+                    <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                    Print Receipt
+                </a>
+                <a href="{{ route('pos.invoice.pdf', $transaction->id) }}" class="inline-flex items-center justify-center px-5 py-2.5 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition">
+                    <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    Download PDF
+                </a>
+                <button onclick="closePrintPopup()" class="inline-flex items-center justify-center px-5 py-2.5 bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-300 transition sm:ml-auto">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+function closePrintPopup() {
+    document.getElementById('printPopup').style.display = 'none';
+}
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closePrintPopup();
+});
+</script>
+@endif
 </x-pos-layout>

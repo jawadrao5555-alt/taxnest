@@ -562,4 +562,43 @@ class FbrPosController extends Controller
 
         return view('fbr-pos.billing', compact('company', 'plans', 'currentSubscription'));
     }
+
+    public function receipt($id)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $transaction = FbrPosTransaction::where('company_id', $companyId)
+            ->with(['items', 'creator'])
+            ->findOrFail($id);
+
+        return view('fbr-pos.receipt', compact('transaction', 'company'));
+    }
+
+    public function downloadPdf($id)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $transaction = FbrPosTransaction::where('company_id', $companyId)
+            ->with(['items', 'creator'])
+            ->findOrFail($id);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fbr-pos.invoice-pdf', compact('transaction', 'company'));
+        $pdf->setPaper('a4', 'portrait');
+
+        return $pdf->download("FBR-POS-Invoice-{$transaction->invoice_number}.pdf");
+    }
+
+    public function previewPdf($id)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $transaction = FbrPosTransaction::where('company_id', $companyId)
+            ->with(['items', 'creator'])
+            ->findOrFail($id);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fbr-pos.invoice-pdf', compact('transaction', 'company'));
+        $pdf->setPaper('a4', 'portrait');
+
+        return $pdf->stream("FBR-POS-Invoice-{$transaction->invoice_number}.pdf");
+    }
 }

@@ -109,7 +109,7 @@
                 </h1>
 
                 <p class="text-[17px] sm:text-lg text-gray-400 leading-relaxed mb-10 max-w-2xl mx-auto">
-                    Manage FBR Digital Invoicing and PRA POS billing in one secure enterprise platform. Fully isolated, real-time compliant.
+                    Manage FBR Digital Invoicing, PRA POS, and FBR POS billing in one secure enterprise platform. Three fully isolated products, real-time compliant.
                 </p>
 
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -190,9 +190,9 @@
     <section id="products" class="py-24 lg:py-28 bg-white dark:bg-gray-900">
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="text-center mb-16 fade-up">
-                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Two Products, One Platform</p>
+                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Three Products, One Platform</p>
                 <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Choose Your Solution</h2>
-                <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">Both products are 100% isolated — separate data, separate logins, separate dashboards.</p>
+                <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">All three products are 100% isolated — separate data, separate logins, separate dashboards.</p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
@@ -295,7 +295,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 fade-up">
                 @php
                 $features = [
-                    ['Real-time FBR + PRA Sync', 'Direct PRAL API v1.12 for FBR and IMS API v1.2 for PRA. Synchronous submission with instant responses.', 'M13 10V3L4 14h7v7l9-11h-7z', 'emerald'],
+                    ['Real-time FBR + PRA Sync', 'Direct PRAL API v1.12 for FBR Digital Invoice, IMS API v1.2 for PRA POS, and FBR Direct API for FBR POS. Synchronous submission with instant responses.', 'M13 10V3L4 14h7v7l9-11h-7z', 'emerald'],
                     ['HS Intelligence Engine', '6-factor AI model learns from every submission. Auto-suggests HS codes, SRO numbers, and tax rates.', 'M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z', 'blue'],
                     ['Risk Intelligence Engine', 'Pre-submission risk detection with anomaly scoring, compliance warnings, and automatic blocking.', 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z', 'purple'],
                     ['6-Phase Idempotency Shield', 'Enterprise-grade duplicate prevention. Per-invoice guards with SHA-256 hashing and auto-recovery.', 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', 'orange'],
@@ -334,7 +334,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-2.5">
                             @foreach([
                                 'Real-time FBR PRAL API',
-                                'PRA POS fiscal reporting',
+                                'PRA + FBR POS fiscal reporting',
                                 'Offline billing + auto sync',
                                 'Inventory + reporting engine',
                                 'Compliance scoring + risk alerts',
@@ -388,7 +388,8 @@
                                 ['Multi-Branch + Company Isolation', true, 'partial'],
                                 ['FBR + PRA Token Health Monitor', true, false],
                                 ['PWA + Keyboard Shortcuts', true, false],
-                                ['Separate DI + POS Isolation', true, false],
+                                ['FBR POS Direct API Submission', true, false],
+                                ['Separate DI + PRA POS + FBR POS Isolation', true, false],
                             ];
                             @endphp
                             @foreach($comparisons as $comp)
@@ -424,7 +425,7 @@
                 <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Simple, Transparent Pricing</h2>
                 <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">Each product has its own plans. Visit the product page for details and start your 14-day free trial.</p>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto fade-up">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto fade-up">
                 <div class="relative card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 p-8 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
                     <div class="absolute inset-0 rounded-xl bg-gradient-to-br from-emerald-500/5 to-teal-500/5 pointer-events-none"></div>
                     <div class="relative">
@@ -453,6 +454,20 @@
                         </a>
                     </div>
                 </div>
+                <div class="relative card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 p-8 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+                    <div class="absolute inset-0 rounded-xl bg-gradient-to-br from-blue-500/5 to-sky-500/5 pointer-events-none"></div>
+                    <div class="relative">
+                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-50 to-sky-50 flex items-center justify-center mx-auto mb-5 shadow-sm">
+                            <svg class="w-7 h-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">FBR POS</h3>
+                        <p class="text-[14px] text-gray-500 mb-6 leading-relaxed">FBR-integrated POS with direct API submission and low-budget billing cycles</p>
+                        <a href="/fbr-pos-landing#pricing" class="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-[10px] text-[14px] font-semibold hover:bg-blue-700 transition">
+                            View FBR POS Plans
+                            <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
@@ -466,11 +481,11 @@
             <div class="space-y-3 fade-up" x-data="{ open: null }">
                 @php
                 $faqs = [
-                    ['What is TaxNest?', 'TaxNest is Pakistan\'s most advanced tax compliance platform with two products: <strong>Digital Invoice</strong> for FBR compliance (Federal Board of Revenue) and <strong>NestPOS</strong> for PRA compliance (Punjab Revenue Authority). Both products are completely isolated with separate databases, logins, and dashboards.'],
-                    ['What is the difference between Digital Invoice and NestPOS?', '<strong>Digital Invoice</strong> is for businesses that need to submit invoices to FBR via PRAL API v1.12. It includes HS Intelligence, compliance scoring, risk detection, and enterprise analytics.<br><br><strong>NestPOS</strong> is a Point of Sale system for retail/service businesses that need PRA fiscal device integration via PRAL IMS API v1.2. It includes thermal receipt printing, multi-terminal support, and real-time tax calculations.'],
-                    ['Are Digital Invoice and NestPOS data separate?', 'Yes, 100%. They have separate databases, separate login pages, separate dashboards, and separate user accounts. There is zero cross-contamination of data between the two systems.'],
-                    ['Is there a free trial?', 'Yes! Both products come with a 14-day free trial. No credit card required. You get full access to all features during the trial period with up to 20 invoices/transactions.'],
-                    ['How does FBR/PRA compliance work?', '<strong>FBR (Digital Invoice):</strong> Uses PRAL API v1.12 for real-time synchronous invoice submission. Invoices are validated, scored for compliance, and submitted with HS codes, tax rates, and QR codes.<br><br><strong>NestPOS:</strong> Uses PRAL IMS API v1.2 for fiscal device integration. Each transaction is fiscalized and assigned a PRA fiscal invoice number with QR code.'],
+                    ['What is TaxNest?', 'TaxNest is Pakistan\'s most advanced tax compliance platform with three products: <strong>Digital Invoice</strong> for FBR compliance (Federal Board of Revenue), <strong>NestPOS</strong> for PRA compliance (Punjab Revenue Authority), and <strong>FBR POS</strong> for FBR-integrated point of sale billing. All three products are completely isolated with separate databases, logins, and dashboards.'],
+                    ['What is the difference between Digital Invoice, NestPOS, and FBR POS?', '<strong>Digital Invoice</strong> is for businesses that need to submit invoices to FBR via PRAL API v1.12. It includes HS Intelligence, compliance scoring, risk detection, and enterprise analytics.<br><br><strong>NestPOS</strong> is a Point of Sale system for retail/service businesses that need PRA fiscal device integration via PRAL IMS API v1.2. It includes thermal receipt printing, multi-terminal support, and real-time tax calculations.<br><br><strong>FBR POS</strong> is a Point of Sale system with direct FBR API submission, designed for businesses that need FBR-compliant POS billing with automated tax calculation and retry system.'],
+                    ['Are all three products data separate?', 'Yes, 100%. Digital Invoice, NestPOS, and FBR POS each have separate databases, separate login pages, separate dashboards, and separate user accounts. There is zero cross-contamination of data between any of the three systems.'],
+                    ['Is there a free trial?', 'Yes! All three products come with a 14-day free trial. No credit card required. You get full access to all features during the trial period with up to 20 invoices/transactions.'],
+                    ['How does FBR/PRA compliance work?', '<strong>FBR (Digital Invoice):</strong> Uses PRAL API v1.12 for real-time synchronous invoice submission. Invoices are validated, scored for compliance, and submitted with HS codes, tax rates, and QR codes.<br><br><strong>NestPOS:</strong> Uses PRAL IMS API v1.2 for fiscal device integration. Each transaction is fiscalized and assigned a PRA fiscal invoice number with QR code.<br><br><strong>FBR POS:</strong> Uses direct FBR API for real-time POS invoice submission with automated tax compliance, retry system, and comprehensive tax reports.'],
                     ['What security measures are in place?', 'TaxNest uses SHA-256 encrypted immutable audit logs, role-based access control, company isolation middleware, 6-phase idempotency shield for duplicate prevention, and HTTPS encryption. All critical operations are logged with tamper-proof hashing.'],
                 ];
                 @endphp

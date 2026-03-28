@@ -4,145 +4,81 @@
     <meta charset="UTF-8">
     <title>Invoice {{ $transaction->invoice_number }}</title>
     <style>
-        @page { margin: 10mm 15mm; }
+        @page { margin: 8mm 12mm; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'DejaVu Sans', Arial, Helvetica, sans-serif;
-            font-size: 10px;
-            color: #111827;
-            line-height: 1.4;
+            font-size: 11px;
+            color: #000000;
+            line-height: 1.5;
             background: #fff;
         }
-        .receipt {
-            max-width: 100%;
-            margin: 0 auto;
-        }
+        .receipt { max-width: 100%; margin: 0 auto; }
 
         .header-bar {
             background-color: #1e1b4b;
-            padding: 14px 18px 12px;
+            padding: 16px 20px 14px;
             text-align: center;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
         .header-bar .logo { margin-bottom: 6px; }
-        .header-bar .logo img { max-width: 110px; max-height: 40px; object-fit: contain; }
-        .header-bar h1 { font-size: 15px; font-weight: bold; color: #ffffff; margin-bottom: 3px; letter-spacing: 1.5px; text-transform: uppercase; }
-        .header-bar p { font-size: 9px; color: #d1d5db; line-height: 1.5; }
+        .header-bar .logo img { max-width: 120px; max-height: 45px; object-fit: contain; }
+        .header-bar h1 { font-size: 16px; font-weight: bold; color: #ffffff; margin-bottom: 4px; letter-spacing: 2px; text-transform: uppercase; }
+        .header-bar p { font-size: 10px; color: #e5e7eb; line-height: 1.6; }
 
         .invoice-box {
-            border: 1.5px solid #111827;
-            padding: 6px 12px;
-            margin: 0 0 8px;
+            border: 2px solid #1e1b4b;
+            padding: 8px 14px;
+            margin: 0 0 10px;
         }
         .invoice-row { display: table; width: 100%; }
-        .invoice-row .lbl { display: table-cell; width: 36%; font-size: 10px; font-weight: bold; padding: 2px 0; color: #111827; }
-        .invoice-row .val { display: table-cell; width: 64%; font-size: 10px; text-align: right; padding: 2px 0; font-weight: bold; color: #111827; letter-spacing: 0.3px; }
+        .invoice-row .lbl { display: table-cell; width: 36%; font-size: 11px; font-weight: bold; padding: 3px 0; color: #000000; }
+        .invoice-row .val { display: table-cell; width: 64%; font-size: 11px; text-align: right; padding: 3px 0; font-weight: bold; color: #000000; letter-spacing: 0.5px; }
 
-        .info-section {
-            padding: 4px 0;
-            margin-bottom: 6px;
-            border-bottom: 1px solid #d1d5db;
-        }
+        .info-section { padding: 6px 0; margin-bottom: 8px; border-bottom: 1.5px solid #9ca3af; }
         .info-row { display: table; width: 100%; }
-        .info-row .lbl { display: table-cell; width: 28%; font-size: 9px; font-weight: bold; padding: 2px 0; color: #374151; text-transform: uppercase; letter-spacing: 0.3px; }
-        .info-row .val { display: table-cell; width: 72%; font-size: 9.5px; text-align: right; padding: 2px 0; color: #111827; }
+        .info-row .lbl { display: table-cell; width: 28%; font-size: 10px; font-weight: bold; padding: 3px 0; color: #000000; text-transform: uppercase; letter-spacing: 0.3px; }
+        .info-row .val { display: table-cell; width: 72%; font-size: 10px; text-align: right; padding: 3px 0; color: #000000; }
 
-        .section-label {
-            font-size: 8px;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #374151;
-            margin-bottom: 3px;
-        }
+        .section-label { font-size: 9px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #000000; margin-bottom: 4px; }
 
-        table.items { width: 100%; border-collapse: collapse; margin: 4px 0; }
+        table.items { width: 100%; border-collapse: collapse; margin: 6px 0; }
         table.items thead th {
-            font-size: 8.5px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            padding: 5px 4px;
-            text-align: left;
-            font-weight: bold;
-            color: #ffffff;
-            background-color: #111827;
+            font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px;
+            padding: 6px 5px; text-align: left; font-weight: bold; color: #ffffff; background-color: #1e1b4b;
         }
         table.items thead th.r { text-align: right; }
-        table.items tbody td {
-            font-size: 9.5px;
-            padding: 4px 4px;
-            vertical-align: top;
-            border-bottom: 1px solid #e5e7eb;
-            color: #111827;
-        }
-        table.items tbody tr:nth-child(even) { background-color: #f9fafb; }
-        table.items tbody td.r { text-align: right; white-space: nowrap; font-weight: 600; }
-        table.items tbody tr:last-child td { border-bottom: none; }
-        .exempt-tag { font-size: 7px; font-weight: bold; color: #92400e; background: #fef3c7; padding: 1px 3px; border-radius: 2px; }
+        table.items thead th.c { text-align: center; }
+        table.items tbody td { font-size: 10px; padding: 5px 5px; vertical-align: top; border-bottom: 1px solid #d1d5db; color: #000000; }
+        table.items tbody tr:nth-child(even) { background-color: #f5f3ff; }
+        table.items tbody td.r { text-align: right; white-space: nowrap; font-weight: 700; }
+        table.items tbody td.c { text-align: center; }
+        .exempt-tag { font-size: 8px; font-weight: bold; color: #92400e; background: #fef3c7; padding: 1px 4px; border-radius: 2px; }
 
-        .totals-box {
-            border-top: 1.5px solid #111827;
-            padding: 5px 0;
-            margin: 5px 0;
-        }
+        .totals-box { border-top: 2px solid #1e1b4b; padding: 6px 0; margin: 6px 0; }
         .total-row { display: table; width: 100%; }
-        .total-row .lbl { display: table-cell; text-align: left; font-size: 9.5px; padding: 2px 0; color: #374151; }
-        .total-row .val { display: table-cell; text-align: right; font-size: 9.5px; padding: 2px 0; white-space: nowrap; color: #111827; font-weight: 600; }
+        .total-row .lbl { display: table-cell; text-align: left; font-size: 10px; padding: 3px 0; color: #000000; font-weight: 600; }
+        .total-row .val { display: table-cell; text-align: right; font-size: 10px; padding: 3px 0; white-space: nowrap; color: #000000; font-weight: 700; }
         .total-row.discount .val { color: #dc2626; }
 
         .grand-total-box {
-            background-color: #111827;
-            padding: 8px 14px;
-            margin: 3px 0 8px;
-            display: table;
-            width: 100%;
+            background-color: #1e1b4b; padding: 10px 16px; margin: 4px 0 10px; display: table; width: 100%;
         }
-        .grand-total-box .lbl {
-            display: table-cell;
-            text-align: left;
-            font-size: 14px;
-            font-weight: bold;
-            color: #ffffff;
-            vertical-align: middle;
-        }
-        .grand-total-box .val {
-            display: table-cell;
-            text-align: right;
-            font-size: 14px;
-            font-weight: bold;
-            color: #ffffff;
-            vertical-align: middle;
-        }
+        .grand-total-box .lbl { display: table-cell; text-align: left; font-size: 16px; font-weight: bold; color: #ffffff; vertical-align: middle; }
+        .grand-total-box .val { display: table-cell; text-align: right; font-size: 16px; font-weight: bold; color: #ffffff; vertical-align: middle; }
 
-        .pra-box {
-            border: 1.5px solid #111827;
-            padding: 6px;
-            margin: 5px 0;
-            text-align: center;
-        }
-        .pra-box .title { font-size: 10px; font-weight: bold; color: #111827; margin-bottom: 2px; letter-spacing: 0.5px; text-transform: uppercase; }
-        .pra-box .num { font-size: 9.5px; font-weight: bold; color: #111827; }
-        .pra-box div { color: #374151; font-size: 9px; }
-        .local-box {
-            border: 1px dashed #6b7280;
-            padding: 5px;
-            margin: 5px 0;
-            text-align: center;
-            font-size: 9px;
-            color: #6b7280;
-        }
-        .qr-section { text-align: center; margin: 5px 0; }
-        .qr-section img { width: 80px; height: 80px; }
-        .qr-section p { font-size: 7px; margin-top: 1px; color: #9ca3af; }
+        .pra-box { border: 2px solid #1e1b4b; padding: 8px; margin: 6px 0; text-align: center; }
+        .pra-box .title { font-size: 11px; font-weight: bold; color: #1e1b4b; margin-bottom: 3px; letter-spacing: 0.5px; text-transform: uppercase; }
+        .pra-box .num { font-size: 10px; font-weight: bold; color: #000000; }
+        .pra-box div { color: #000000; font-size: 10px; }
+        .local-box { border: 1.5px dashed #6b7280; padding: 6px; margin: 6px 0; text-align: center; font-size: 10px; color: #374151; font-weight: 600; }
+        .qr-section { text-align: center; margin: 6px 0; }
+        .qr-section img { width: 90px; height: 90px; }
+        .qr-section p { font-size: 8px; margin-top: 2px; color: #374151; }
 
-        .footer {
-            margin-top: 8px;
-            text-align: center;
-            padding-top: 6px;
-            border-top: 1px solid #d1d5db;
-        }
-        .footer p { font-size: 8px; color: #9ca3af; line-height: 1.5; }
-        .footer .brand { font-size: 9px; font-weight: bold; color: #111827; margin-top: 2px; }
+        .footer { margin-top: 10px; text-align: center; padding-top: 8px; border-top: 1.5px solid #9ca3af; }
+        .footer p { font-size: 9px; color: #374151; line-height: 1.6; }
+        .footer .brand { font-size: 10px; font-weight: bold; color: #1e1b4b; margin-top: 3px; }
     </style>
 </head>
 <body>
@@ -211,10 +147,11 @@
         <table class="items">
             <thead>
                 <tr>
-                    <th style="width:44%;">Item</th>
-                    <th style="width:10%;">Qty</th>
-                    <th class="r" style="width:22%;">Price</th>
-                    <th class="r" style="width:24%;">Total</th>
+                    <th style="width:40%;">Item</th>
+                    <th class="c" style="width:10%;">Qty</th>
+                    <th class="r" style="width:10%;">Tax%</th>
+                    <th class="r" style="width:20%;">Price</th>
+                    <th class="r" style="width:20%;">Total</th>
                 </tr>
             </thead>
             <tbody>
@@ -226,9 +163,10 @@
                         <span class="exempt-tag">EXEMPT</span>
                         @endif
                     </td>
-                    <td>{{ $item->quantity }}</td>
-                    <td class="r">{{ number_format($item->unit_price, 0) }}</td>
-                    <td class="r">{{ number_format($item->subtotal, 0) }}</td>
+                    <td class="c">{{ $item->quantity }}</td>
+                    <td class="r">{{ $item->is_tax_exempt ? 'Exempt' : number_format($item->tax_rate ?? $transaction->tax_rate, 0) . '%' }}</td>
+                    <td class="r">{{ number_format($item->unit_price, 2) }}</td>
+                    <td class="r">{{ number_format($item->subtotal, 2) }}</td>
                 </tr>
                 @endforeach
             </tbody>
@@ -258,7 +196,7 @@
 
         @if($transaction->pra_status === 'submitted' && $transaction->pra_invoice_number)
         <div class="pra-box">
-            <div class="title">PRA Fiscal Invoice</div>
+            <div class="title">✓ PRA Fiscal Invoice</div>
             <div>POS: {{ $transaction->invoice_number }}</div>
             <div class="num">PRA: {{ $transaction->pra_invoice_number }}</div>
         </div>

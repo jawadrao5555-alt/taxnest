@@ -6,60 +6,63 @@
     <style>
         @page { margin: 15mm 18mm 12mm 18mm; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Helvetica', 'Arial', sans-serif; color: #1f2937; font-size: 11px; line-height: 1.4; }
+        body { font-family: 'DejaVu Sans', 'Helvetica', Arial, sans-serif; color: #000000; font-size: 11px; line-height: 1.5; }
 
-        .company-header { width: 100%; margin-bottom: 8px; }
+        .company-header { width: 100%; margin-bottom: 10px; }
         .company-header table { width: 100%; }
-        .company-name { font-size: 18px; font-weight: bold; color: #1f2937; text-align: right; }
-        .company-province { font-size: 10px; color: #6b7280; text-align: right; margin-top: 1px; }
-        .company-detail { font-size: 9px; color: #6b7280; margin-top: 1px; }
+        .company-name { font-size: 20px; font-weight: bold; color: #000000; text-align: right; }
+        .company-detail { font-size: 10px; color: #000000; margin-top: 2px; text-align: right; }
 
-        .fbr-section { text-align: center; padding: 8px 0; margin-bottom: 10px; border-bottom: 1px solid #e5e7eb; }
+        .fbr-section { text-align: center; padding: 10px 0; margin-bottom: 12px; border-bottom: 2px solid #d1d5db; }
         .fbr-logo-box { display: inline-block; text-align: center; vertical-align: middle; }
-        .fbr-shield { display: inline-block; width: 44px; height: 44px; background: #166534; border-radius: 5px; text-align: center; line-height: 44px; color: #ffffff; font-size: 16px; font-weight: 900; letter-spacing: 2px; }
-        .fbr-label { margin-top: 1px; }
-        .fbr-label-digital { font-size: 9px; font-weight: 800; color: #166534; letter-spacing: 1px; }
-        .fbr-label-invoicing { font-size: 7px; font-weight: 700; color: #166534; letter-spacing: 0.5px; text-transform: uppercase; }
-        .di-number { font-size: 10px; color: #374151; font-weight: 600; margin-top: 5px; letter-spacing: 0.3px; }
+        .fbr-shield { display: inline-block; width: 48px; height: 48px; background: #166534; border-radius: 5px; text-align: center; line-height: 48px; color: #ffffff; font-size: 18px; font-weight: 900; letter-spacing: 2px; }
+        .fbr-label { margin-top: 2px; }
+        .fbr-label-digital { font-size: 10px; font-weight: 800; color: #166534; letter-spacing: 1px; }
+        .fbr-label-invoicing { font-size: 8px; font-weight: 700; color: #166534; letter-spacing: 0.5px; text-transform: uppercase; }
+        .di-number { font-size: 11px; color: #000000; font-weight: 700; margin-top: 6px; letter-spacing: 0.3px; }
 
-        .status-badge { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 9px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
-        .status-draft { background: #f3f4f6; color: #6b7280; }
+        .status-badge { display: inline-block; padding: 3px 12px; border-radius: 10px; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+        .status-draft { background: #e5e7eb; color: #374151; }
         .status-locked { background: #d1fae5; color: #065f46; }
+        .status-failed { background: #fee2e2; color: #991b1b; }
+        .status-pending_verification { background: #fef3c7; color: #92400e; }
 
-        .doc-label { font-size: 14px; font-weight: bold; color: #1f2937; margin-bottom: 8px; }
+        .doc-label { font-size: 15px; font-weight: bold; color: #000000; margin-bottom: 10px; }
 
-        .info-grid { width: 100%; margin-bottom: 12px; }
+        .info-grid { width: 100%; margin-bottom: 14px; }
         .info-grid td { vertical-align: top; }
-        .info-label { font-size: 8px; text-transform: uppercase; color: #9ca3af; font-weight: bold; letter-spacing: 1px; margin-bottom: 3px; }
-        .info-value { font-size: 10px; color: #1f2937; margin-top: 1px; }
+        .info-label { font-size: 9px; text-transform: uppercase; color: #374151; font-weight: bold; letter-spacing: 1px; margin-bottom: 3px; }
+        .info-value { font-size: 11px; color: #000000; margin-top: 2px; }
         .info-value strong { font-weight: 700; }
-        .inv-detail-label { font-size: 9px; color: #6b7280; font-weight: 600; }
-        .inv-detail-value { font-size: 9px; color: #1f2937; font-weight: 700; }
+        .inv-detail-label { font-size: 10px; color: #374151; font-weight: 700; }
+        .inv-detail-value { font-size: 10px; color: #000000; font-weight: 700; }
 
-        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-        .items-table thead th { background: #f3f4f6; padding: 5px 6px; text-align: left; font-size: 8px; text-transform: uppercase; color: #6b7280; font-weight: 700; letter-spacing: 0.5px; border-bottom: 2px solid #e5e7eb; }
+        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+        .items-table thead th { background: #1f2937; padding: 6px 7px; text-align: left; font-size: 9px; text-transform: uppercase; color: #ffffff; font-weight: 700; letter-spacing: 0.5px; }
         .items-table thead th.text-right { text-align: right; }
-        .items-table tbody td { padding: 4px 6px; border-bottom: 1px solid #f3f4f6; font-size: 10px; color: #374151; }
-        .items-table tbody tr:nth-child(even) td { background: #fafafa; }
-        .items-table tbody td.text-right { text-align: right; }
+        .items-table thead th.text-center { text-align: center; }
+        .items-table tbody td { padding: 5px 7px; border-bottom: 1px solid #d1d5db; font-size: 10px; color: #000000; }
+        .items-table tbody tr:nth-child(even) td { background: #f9fafb; }
+        .items-table tbody td.text-right { text-align: right; font-weight: 600; }
+        .items-table tbody td.text-center { text-align: center; }
         .items-table tbody td.mono { font-family: 'Courier New', monospace; font-size: 9px; }
 
         .totals-section { width: 100%; }
         .totals-section table { width: 100%; }
-        .totals-inner { width: 260px; }
+        .totals-inner { width: 280px; }
         .totals-inner table { width: 100%; border-collapse: collapse; }
-        .totals-inner td { padding: 3px 8px; font-size: 10px; }
-        .totals-inner td.label { text-align: right; color: #6b7280; font-weight: 600; }
-        .totals-inner td.value { text-align: right; color: #1f2937; font-weight: 600; }
-        .totals-inner tr.grand-total td { border-top: 2px solid #1f2937; padding-top: 6px; }
-        .totals-inner tr.grand-total td.value { font-size: 12px; font-weight: 800; color: #1f2937; }
+        .totals-inner td { padding: 4px 8px; font-size: 11px; }
+        .totals-inner td.label { text-align: right; color: #000000; font-weight: 600; }
+        .totals-inner td.value { text-align: right; color: #000000; font-weight: 700; }
+        .totals-inner tr.grand-total td { border-top: 2px solid #000000; padding-top: 8px; }
+        .totals-inner tr.grand-total td.value { font-size: 14px; font-weight: 800; color: #000000; }
         .totals-inner tr.net td { background: #f0fdf4; border-radius: 4px; }
 
         .watermark { position: fixed; top: 40%; left: 15%; font-size: 60px; color: rgba(156, 163, 175, 0.12); font-weight: bold; text-transform: uppercase; transform: rotate(-35deg); letter-spacing: 10px; z-index: 9999; pointer-events: none; white-space: nowrap; }
 
         .clearfix::after { content: ""; display: table; clear: both; }
 
-        .footer-note { margin-top: 12px; padding-top: 8px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 8px; color: #9ca3af; }
+        .footer-note { margin-top: 14px; padding-top: 10px; border-top: 1.5px solid #9ca3af; text-align: center; font-size: 9px; color: #374151; }
     </style>
 </head>
 <body>
@@ -70,7 +73,7 @@
                 <tr>
                     <td style="width: 50%; vertical-align: top;">
                         @if($invoice->fbr_invoice_number)
-                        <span class="status-badge status-locked" style="background: #d1fae5; color: #065f46;">FBR VERIFIED</span>
+                        <span class="status-badge status-locked">FBR VERIFIED</span>
                         @else
                         <span class="status-badge status-{{ $invoice->status }}">{{ strtoupper($invoice->status === 'locked' ? 'PRODUCTION' : $invoice->status) }}</span>
                         @endif
@@ -81,7 +84,7 @@
                         <div class="company-detail">{{ $invoice->company->address }}@if($invoice->company->city), {{ $invoice->company->city }}@endif</div>
                         @endif
                         @if($invoice->company->ntn)
-                        <div class="company-detail">NTN: {{ $invoice->company->ntn }}</div>
+                        <div class="company-detail" style="font-weight:700;">NTN: {{ $invoice->company->ntn }}</div>
                         @endif
                         @if($invoice->company->cnic && $invoice->company->cnic !== $invoice->company->ntn && $invoice->company->cnic !== $invoice->company->registration_no)
                         <div class="company-detail">CNIC: {{ $invoice->company->cnic }}</div>
@@ -107,9 +110,9 @@
         <div class="fbr-section">
             <table style="width: auto; margin: 0 auto; border-collapse: collapse;">
                 <tr>
-                    <td style="text-align: center; vertical-align: middle; padding: 0 12px 0 0;">
+                    <td style="text-align: center; vertical-align: middle; padding: 0 14px 0 0;">
                         @if(!empty($fbrLogoBase64))
-                        <img src="{{ $fbrLogoBase64 }}" alt="FBR Digital Invoicing System" style="width: 70px; height: auto;">
+                        <img src="{{ $fbrLogoBase64 }}" alt="FBR Digital Invoicing System" style="width: 75px; height: auto;">
                         @else
                         <div class="fbr-logo-box">
                             <div class="fbr-shield">FBR</div>
@@ -120,8 +123,8 @@
                         </div>
                         @endif
                     </td>
-                    <td style="text-align: center; vertical-align: middle; padding: 0 0 0 12px;">
-                        <img src="{{ $qrBase64 }}" alt="QR Code" style="width: 70px; height: 70px;">
+                    <td style="text-align: center; vertical-align: middle; padding: 0 0 0 14px;">
+                        <img src="{{ $qrBase64 }}" alt="QR Code" style="width: 75px; height: 75px;">
                     </td>
                 </tr>
             </table>
@@ -133,8 +136,9 @@
 
         <table class="info-grid">
             <tr>
-                <td style="width: 55%; padding-right: 10px;">
-                    <div style="font-weight: 700; font-size: 11px; margin-bottom: 1px;">{{ $invoice->buyer_registration_type ?? 'UNREGISTERED' }}</div>
+                <td style="width: 55%; padding-right: 12px;">
+                    <div class="info-label" style="margin-bottom:4px;">Bill To</div>
+                    <div style="font-weight: 700; font-size: 11px; margin-bottom: 2px; color:#000000;">{{ $invoice->buyer_registration_type ?? 'UNREGISTERED' }}</div>
                     <div class="info-value"><strong>{{ $invoice->buyer_name }}</strong></div>
                     @if($invoice->buyer_ntn)
                     <div class="info-value">NTN: {{ $invoice->buyer_ntn }}</div>
@@ -150,40 +154,41 @@
                     @endif
                     <div class="info-value">Pakistan</div>
                 </td>
-                <td style="width: 45%; padding-left: 10px; vertical-align: top;">
+                <td style="width: 45%; padding-left: 12px; vertical-align: top;">
+                    <div class="info-label" style="margin-bottom:4px;">Invoice Details</div>
                     <table style="width: 100%; border-collapse: collapse;">
                         <tr>
-                            <td style="padding: 1px 0;"><span class="inv-detail-label">Inv No.</span></td>
-                            <td style="padding: 1px 0; text-align: right;"><span class="inv-detail-value">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</span></td>
+                            <td style="padding: 2px 0;"><span class="inv-detail-label">Inv No.</span></td>
+                            <td style="padding: 2px 0; text-align: right;"><span class="inv-detail-value">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</span></td>
                         </tr>
                         <tr>
-                            <td style="padding: 1px 0;"><span class="inv-detail-label">Date</span></td>
-                            <td style="padding: 1px 0; text-align: right;"><span class="inv-detail-value">{{ $invoice->created_at->format('d/m/Y') }}</span></td>
+                            <td style="padding: 2px 0;"><span class="inv-detail-label">Date</span></td>
+                            <td style="padding: 2px 0; text-align: right;"><span class="inv-detail-value">{{ $invoice->created_at->format('d/m/Y') }}</span></td>
                         </tr>
                         <tr>
-                            <td style="padding: 1px 0;"><span class="inv-detail-label">Status</span></td>
-                            <td style="padding: 1px 0; text-align: right;"><span class="inv-detail-value">{{ $invoice->fbr_invoice_number ? 'FBR Verified' : ($invoice->status === 'locked' ? 'Production' : ucfirst($invoice->status)) }}</span></td>
+                            <td style="padding: 2px 0;"><span class="inv-detail-label">Status</span></td>
+                            <td style="padding: 2px 0; text-align: right;"><span class="inv-detail-value">{{ $invoice->fbr_invoice_number ? 'FBR Verified' : ($invoice->status === 'locked' ? 'Production' : ucfirst($invoice->status)) }}</span></td>
                         </tr>
                         @if($invoice->document_type && $invoice->document_type !== 'Sale Invoice')
                         <tr>
-                            <td style="padding: 1px 0;"><span class="inv-detail-label">Type</span></td>
-                            <td style="padding: 1px 0; text-align: right;"><span class="inv-detail-value">{{ $invoice->document_type }}</span></td>
+                            <td style="padding: 2px 0;"><span class="inv-detail-label">Type</span></td>
+                            <td style="padding: 2px 0; text-align: right;"><span class="inv-detail-value">{{ $invoice->document_type }}</span></td>
                         </tr>
                         @endif
                         @if($invoice->reference_invoice_number)
                         <tr>
-                            <td style="padding: 1px 0;"><span class="inv-detail-label">Ref Invoice</span></td>
-                            <td style="padding: 1px 0; text-align: right;"><span class="inv-detail-value">{{ $invoice->reference_invoice_number }}</span></td>
+                            <td style="padding: 2px 0;"><span class="inv-detail-label">Ref Invoice</span></td>
+                            <td style="padding: 2px 0; text-align: right;"><span class="inv-detail-value">{{ $invoice->reference_invoice_number }}</span></td>
                         </tr>
                         @endif
                         <tr>
-                            <td style="padding: 1px 0;"><span class="inv-detail-label">NTN</span></td>
-                            <td style="padding: 1px 0; text-align: right;"><span class="inv-detail-value">{{ $invoice->company->ntn ?? 'N/A' }}</span></td>
+                            <td style="padding: 2px 0;"><span class="inv-detail-label">NTN</span></td>
+                            <td style="padding: 2px 0; text-align: right;"><span class="inv-detail-value">{{ $invoice->company->ntn ?? 'N/A' }}</span></td>
                         </tr>
                         @if($invoice->supplier_province)
                         <tr>
-                            <td style="padding: 1px 0;"><span class="inv-detail-label">From</span></td>
-                            <td style="padding: 1px 0; text-align: right;"><span class="inv-detail-value">{{ $invoice->supplier_province }}</span></td>
+                            <td style="padding: 2px 0;"><span class="inv-detail-label">From</span></td>
+                            <td style="padding: 2px 0; text-align: right;"><span class="inv-detail-value">{{ $invoice->supplier_province }}</span></td>
                         </tr>
                         @endif
                     </table>
@@ -196,12 +201,12 @@
                 <tr>
                     <th style="width: 5%;">Sr</th>
                     <th style="width: 12%;">Code</th>
-                    <th style="width: 30%;">Product Name</th>
-                    <th style="width: 8%;">Unit</th>
+                    <th style="width: 28%;">Product Name</th>
+                    <th class="text-center" style="width: 8%;">Unit</th>
                     <th class="text-right" style="width: 8%;">Qty</th>
                     <th class="text-right" style="width: 14%;">Rate</th>
                     <th class="text-right" style="width: 14%;">Amount</th>
-                    <th class="text-right" style="width: 9%;">Disc</th>
+                    <th class="text-right" style="width: 11%;">Disc</th>
                 </tr>
             </thead>
             <tbody>
@@ -210,7 +215,7 @@
                     <td>{{ $index + 1 }}</td>
                     <td class="mono">{{ $item->hs_code }}</td>
                     <td>{{ $item->description }}</td>
-                    <td>{{ $item->default_uom ?? 'PCS' }}</td>
+                    <td class="text-center">{{ $item->default_uom ?? 'PCS' }}</td>
                     <td class="text-right">{{ number_format($item->quantity, 0) }}</td>
                     <td class="text-right">{{ number_format($item->price, 2) }}</td>
                     <td class="text-right">{{ number_format($item->price * $item->quantity, 2) }}</td>
@@ -249,7 +254,7 @@
                                 </tr>
                                 @endif
                                 <tr class="grand-total">
-                                    <td class="label" style="font-size: 11px;">Total:</td>
+                                    <td class="label" style="font-size: 12px;">Total:</td>
                                     <td class="value">PKR {{ number_format(($wht_rate ?? 0) > 0 ? ($net_receivable ?? $invoice->total_amount) : $invoice->total_amount, 2) }}</td>
                                 </tr>
                             </table>

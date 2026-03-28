@@ -220,9 +220,9 @@
             </div>
 
             @if($transaction->pra_status === 'local')
-            <div class="bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Local Invoice</h3>
-                <p class="text-xs text-gray-500 dark:text-gray-400">This invoice was created while PRA reporting was off. It will not be synced to PRA.</p>
+            <div class="bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700 p-5">
+                <h3 class="text-sm font-semibold text-purple-700 dark:text-purple-300 mb-2">Provisional Bill</h3>
+                <p class="text-xs text-purple-600 dark:text-purple-400">This is a provisional bill for your reference. It was not reported to PRA.</p>
             </div>
             @elseif($transaction->pra_status === 'offline')
             <div class="bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-700 p-5">

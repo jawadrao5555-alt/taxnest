@@ -212,7 +212,24 @@
     @elseif($transaction->pra_status === 'offline')
     <div class="local-badge">OFFLINE - Will sync to PRA</div>
     @else
-    <div class="local-badge">LOCAL INVOICE<br>(Not reported to PRA)</div>
+    @php
+        $qrData = json_encode([
+            'type' => 'Provisional Bill',
+            'inv' => $transaction->invoice_number,
+            'date' => $transaction->created_at->format('d/m/Y H:i'),
+            'total' => number_format($transaction->total_amount, 2),
+            'business' => $transaction->company->name ?? 'NestPOS',
+        ]);
+        $qrUrl = 'https://chart.googleapis.com/chart?cht=qr&chs=120x120&chl=' . urlencode($qrData);
+    @endphp
+    <div class="local-badge" style="border: 1.5px dashed #7c3aed; color: #5b21b6; padding: 6px;">
+        <strong style="font-size: 10px;">PROVISIONAL BILL</strong><br>
+        <span style="font-size: 8px;">{{ $transaction->invoice_number }}</span>
+    </div>
+    <div class="qr-code">
+        <img src="{{ $qrUrl }}" alt="Invoice QR" style="width: 80px; height: 80px; margin: 3px auto;">
+        <p style="font-size: 7px;">Scan for details</p>
+    </div>
     @endif
 
     <div class="footer text-center">

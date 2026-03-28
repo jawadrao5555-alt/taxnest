@@ -12,9 +12,40 @@
                     </select>
                 </div>
                 <div class="flex items-center gap-2">
-                    <div class="relative">
-                        <input type="text" x-model="searchQuery" @input="filterProducts()" placeholder="Search products... (Ctrl+S)" class="pl-8 pr-3 py-1.5 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white w-48">
+                    <div class="relative" @click.away="showSearchDropdown = false">
+                        <input type="text" x-ref="searchInput" x-model="searchQuery"
+                            @input="onSearchInput()"
+                            @focus="onSearchInput()"
+                            @keydown.enter.prevent="addHighlightedItem()"
+                            @keydown.arrow-down.prevent="moveHighlight(1)"
+                            @keydown.arrow-up.prevent="moveHighlight(-1)"
+                            @keydown.escape="showSearchDropdown = false; searchQuery = ''"
+                            placeholder="Type & Enter to add... (Ctrl+S)"
+                            class="pl-8 pr-3 py-1.5 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white w-64 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                            autocomplete="off">
                         <svg class="w-4 h-4 absolute left-2.5 top-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <div x-show="showSearchDropdown && searchSuggestions.length > 0" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-64 overflow-y-auto">
+                            <template x-for="(item, idx) in searchSuggestions" :key="item.id + '-' + item.type">
+                                <button @click="quickAddItem(item)" @mouseenter="highlightIndex = idx"
+                                    :class="idx === highlightIndex ? 'bg-purple-50 dark:bg-purple-900/30 border-l-2 border-purple-500' : 'border-l-2 border-transparent'"
+                                    class="w-full text-left px-3 py-2 flex items-center justify-between hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <span x-show="item.hasRecipe" class="text-xs flex-shrink-0">🍳</span>
+                                        <div class="min-w-0">
+                                            <div class="text-sm font-medium text-gray-900 dark:text-white truncate" x-text="item.name"></div>
+                                            <div class="text-[10px] text-gray-400" x-text="item.category || item.type"></div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2 flex-shrink-0">
+                                        <span class="text-sm font-bold text-purple-600 dark:text-purple-400" x-text="'Rs. ' + Number(item.price).toLocaleString()"></span>
+                                        <kbd class="text-[9px] bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1 rounded" x-show="idx === highlightIndex">Enter</kbd>
+                                    </div>
+                                </button>
+                            </template>
+                        </div>
+                        <div x-show="showSearchDropdown && searchQuery.length > 0 && searchSuggestions.length === 0" class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 p-4 text-center text-gray-400 text-sm">
+                            No items match "<span x-text="searchQuery"></span>"
+                        </div>
                     </div>
                     <button @click="showTablePicker = true" class="px-3 py-1.5 text-sm rounded-lg border border-purple-300 text-purple-700 dark:border-purple-600 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20">
                         <span x-text="selectedTable ? 'Table ' + selectedTable.table_number : 'Select Table'"></span>
@@ -238,6 +269,9 @@ function restaurantPos() {
         filteredItems: [],
         activeCategory: 'all',
         searchQuery: '',
+        searchSuggestions: [],
+        showSearchDropdown: false,
+        highlightIndex: 0,
         orderType: '{{ $selectedTable ? "dine_in" : "takeaway" }}',
         cart: [],
         kitchenNotes: '',
@@ -259,8 +293,49 @@ function restaurantPos() {
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); }
                 if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) this.showPayModal = true; }
-                if (e.ctrlKey && e.key === 's') { e.preventDefault(); document.querySelector('[x-model="searchQuery"]')?.focus(); }
+                if (e.ctrlKey && e.key === 's') { e.preventDefault(); this.$refs.searchInput?.focus(); }
             });
+            this.$nextTick(() => { this.$refs.searchInput?.focus(); });
+        },
+
+        onSearchInput() {
+            this.filterProducts();
+            const q = this.searchQuery.trim().toLowerCase();
+            if (q.length > 0) {
+                let all = [...this.allProducts, ...this.allServices];
+                if (this.activeCategory !== 'all' && this.activeCategory !== 'services') {
+                    all = this.allProducts.filter(p => p.category === this.activeCategory);
+                } else if (this.activeCategory === 'services') {
+                    all = this.allServices;
+                }
+                this.searchSuggestions = all.filter(i => i.name.toLowerCase().includes(q)).slice(0, 10);
+                this.highlightIndex = 0;
+                this.showSearchDropdown = true;
+            } else {
+                this.searchSuggestions = [];
+                this.showSearchDropdown = false;
+            }
+        },
+
+        moveHighlight(dir) {
+            if (!this.showSearchDropdown || this.searchSuggestions.length === 0) return;
+            this.highlightIndex = Math.max(0, Math.min(this.searchSuggestions.length - 1, this.highlightIndex + dir));
+        },
+
+        addHighlightedItem() {
+            if (this.showSearchDropdown && this.searchSuggestions.length > 0) {
+                this.quickAddItem(this.searchSuggestions[this.highlightIndex]);
+            }
+        },
+
+        quickAddItem(item) {
+            this.addToCart(item);
+            this.showToast(item.name + ' added', 'success');
+            this.searchQuery = '';
+            this.searchSuggestions = [];
+            this.showSearchDropdown = false;
+            this.filterProducts();
+            this.$nextTick(() => { this.$refs.searchInput?.focus(); });
         },
 
         filterProducts() {

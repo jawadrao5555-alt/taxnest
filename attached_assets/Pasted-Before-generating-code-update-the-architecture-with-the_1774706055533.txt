@@ -1,0 +1,71 @@
+Before generating code, update the architecture with the following REQUIRED corrections and then provide a FINAL VISUAL PREVIEW.
+
+DO NOT WRITE CODE YET.
+
+--------------------------------------
+MANDATORY CHANGES (APPLY FIRST)
+--------------------------------------
+
+1. Inventory Logic Fix
+- Inventory must be deducted ONLY when order is PAID
+- NOT on HOLD
+- Held orders must not affect stock
+
+2. Order Architecture Clarity
+- restaurant_orders = draft/temporary layer (for dine-in workflow)
+- pos_transactions = final billing (only when payment happens)
+- Ensure NO duplication of business logic between both
+
+3. Table Locking System
+- Add table_lock_by_terminal_id (or similar)
+- Prevent 2 terminals from editing same table at same time
+- If locked → show message: "Table is in use by Terminal X"
+
+4. KDS Improvement
+- Group orders by:
+  Table + Order ID (not only table)
+- So multiple orders on same table don’t merge incorrectly
+
+5. Keep Alpine.js ONLY
+- Do NOT use Livewire
+- Keep POS ultra-fast and frontend-driven
+
+6. Maintain Isolation
+- PRA POS = NO CHANGE
+- FBR POS = NO CHANGE
+- Digital Invoice = NO CHANGE
+
+--------------------------------------
+NOW PROVIDE FINAL VISUAL PREVIEW
+--------------------------------------
+
+Show updated UI mockups (text layout) including:
+
+1. POS Screen (with locking indicator if table is busy)
+2. Table Management (with lock status if applicable)
+3. KDS screen (with multiple orders per table clearly separated)
+4. Show what happens visually when:
+   - Table is locked
+   - Order is held
+   - Order is paid
+
+--------------------------------------
+FLOW CONFIRMATION (UPDATED)
+--------------------------------------
+
+Explain clearly:
+
+- Product click → cart → hold → pay → inventory deduction (ONLY at pay)
+- Table lock/unlock flow
+- KDS flow with multiple orders per table
+
+--------------------------------------
+FINAL CONFIRMATION
+
+Answer clearly:
+
+- Is system still production safe? (YES/NO)
+- Any new risks introduced?
+- Is performance still optimized?
+
+Wait for my approval before generating code.

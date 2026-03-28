@@ -414,7 +414,9 @@
                     this.startAutoSave();
 
                     window.addEventListener('beforeunload', () => {
-                        this.saveToLocalStorage();
+                        if (!this.submitting) {
+                            this.saveToLocalStorage();
+                        }
                     });
                 },
 

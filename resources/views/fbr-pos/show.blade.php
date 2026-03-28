@@ -210,7 +210,7 @@
             </div>
         </div>
         <div class="flex-1 overflow-hidden p-4 min-h-0">
-            <iframe id="fbrPosPdfIframe" src="" class="w-full h-full border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800"></iframe>
+            <iframe id="fbrPosPdfIframe" src="" class="w-full h-full border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
         </div>
         <div class="px-6 py-4 border-t border-gray-100 dark:border-gray-800 flex-shrink-0 bg-gray-50 dark:bg-gray-900">
             <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">

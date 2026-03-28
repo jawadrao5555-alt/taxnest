@@ -496,6 +496,7 @@
                 },
 
                 saveToLocalStorage() {
+                    if (this.submitting) return;
                     try {
                         const data = {
                             customer_name: this.customerName,
@@ -519,6 +520,7 @@
                 },
 
                 async autoSaveDraft() {
+                    if (this.submitting) return;
                     const hasContent = this.items.some(i => i.name && i.name.trim() !== '');
                     if (!hasContent) return;
 

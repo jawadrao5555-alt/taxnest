@@ -32,11 +32,19 @@
                     @error('email') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                 </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone</label>
-                <input type="text" name="phone" value="{{ old('phone', $user->phone) }}"
-                    class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                @error('phone') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone</label>
+                    <input type="text" name="phone" value="{{ old('phone', $user->phone) }}"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="0300-1234567">
+                    @error('phone') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
+                    <input type="text" name="username" value="{{ old('username', $user->username) }}"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="e.g. johndoe123">
+                    @error('username') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
             </div>
 
             <div class="pt-4 border-t border-gray-200 dark:border-gray-700">

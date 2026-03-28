@@ -2269,9 +2269,10 @@ class PosController extends Controller
                     'name' => 'required|string|max:255',
                     'email' => 'required|email|max:255|unique:users,email,' . $user->id,
                     'phone' => 'nullable|string|max:30',
+                    'username' => 'nullable|string|max:100|unique:users,username,' . $user->id,
                 ]);
 
-                $user->update($request->only(['name', 'email', 'phone']));
+                $user->update($request->only(['name', 'email', 'phone', 'username']));
                 return back()->with('success', 'Profile updated successfully.');
             }
 

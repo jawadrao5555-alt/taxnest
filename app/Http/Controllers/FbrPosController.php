@@ -674,6 +674,7 @@ class FbrPosController extends Controller
                 'name' => 'required|string|max:255',
                 'email' => 'required|email|max:255|unique:users,email,' . $user->id,
                 'phone' => 'nullable|string|max:20',
+                'username' => 'nullable|string|max:100|unique:users,username,' . $user->id,
                 'current_password' => 'nullable|required_with:new_password',
                 'new_password' => 'nullable|min:8|confirmed',
             ]);
@@ -681,6 +682,7 @@ class FbrPosController extends Controller
             $user->name = $validated['name'];
             $user->email = $validated['email'];
             $user->phone = $validated['phone'] ?? $user->phone;
+            $user->username = $validated['username'] ?? $user->username;
 
             if (!empty($validated['current_password'])) {
                 if (!\Hash::check($validated['current_password'], $user->password)) {

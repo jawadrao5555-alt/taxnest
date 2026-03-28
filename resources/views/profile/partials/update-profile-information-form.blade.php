@@ -47,6 +47,19 @@
             @endif
         </div>
 
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <x-input-label for="phone" :value="__('Phone')" />
+                <x-text-input id="phone" name="phone" type="text" class="mt-1 block w-full" :value="old('phone', $user->phone)" placeholder="0300-1234567" />
+                <x-input-error class="mt-2" :messages="$errors->get('phone')" />
+            </div>
+            <div>
+                <x-input-label for="username" :value="__('Username')" />
+                <x-text-input id="username" name="username" type="text" class="mt-1 block w-full" :value="old('username', $user->username)" placeholder="e.g. johndoe123" />
+                <x-input-error class="mt-2" :messages="$errors->get('username')" />
+            </div>
+        </div>
+
         <div class="flex items-center gap-4">
             <x-primary-button>{{ __('Save') }}</x-primary-button>
 

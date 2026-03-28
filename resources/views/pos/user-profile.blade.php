@@ -44,6 +44,11 @@
                             class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="0300-1234567">
                     </div>
                     <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Username</label>
+                        <input type="text" name="username" value="{{ old('username', $user->username) }}"
+                            class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="e.g. johndoe123">
+                    </div>
+                    <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Role</label>
                         <input type="text" value="{{ ucwords(str_replace('_', ' ', $user->role)) }}" disabled
                             class="w-full rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-500 text-sm cursor-not-allowed">

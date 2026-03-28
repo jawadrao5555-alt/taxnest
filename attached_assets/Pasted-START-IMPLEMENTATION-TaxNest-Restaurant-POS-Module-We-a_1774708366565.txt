@@ -1,0 +1,139 @@
+START IMPLEMENTATION — TaxNest Restaurant POS Module
+
+We are NOT building a new system.
+We are EXTENDING the existing NestPOS (/pos) system.
+
+IMPORTANT RULES:
+- DO NOT change any existing working code
+- DO NOT touch PRA POS logic
+- DO NOT touch FBR POS module
+- DO NOT touch Digital Invoice module
+- ONLY ADD new restaurant features inside /pos/restaurant/*
+
+-------------------------------------
+
+PHASE 1: DATABASE (Migrations)
+
+Create NEW tables ONLY:
+
+1. restaurant_floors
+2. restaurant_tables
+3. restaurant_orders
+4. restaurant_order_items
+5. ingredients
+6. product_recipes
+
+Rules:
+- All tables must include company_id
+- Use proper foreign keys
+- No modification of existing tables
+
+-------------------------------------
+
+PHASE 2: BACKEND (Laravel)
+
+Create:
+
+Controllers:
+- RestaurantPosController
+- TableController
+- KitchenController
+- RecipeController
+- IngredientController
+
+Logic:
+
+1. Table Lock System
+- lock when table selected
+- unlock on hold/pay
+- auto-expire after 30 min
+
+2. Order Flow:
+- HOLD → save in restaurant_orders (NO inventory deduction)
+- PAY → create pos_transaction + deduct inventory
+
+3. Recipe Logic:
+IF product has recipe:
+→ deduct ingredients from ingredients table
+
+ELSE:
+→ use existing inventory_stocks logic
+
+-------------------------------------
+
+PHASE 3: ROUTES
+
+All routes under:
+
+/pos/restaurant/*
+
+Examples:
+- /pos/restaurant/pos
+- /pos/restaurant/tables
+- /pos/restaurant/kitchen
+- /pos/restaurant/recipes
+- /pos/restaurant/ingredients
+
+Use existing POS middleware (pos.auth)
+
+-------------------------------------
+
+PHASE 4: FRONTEND (IMPORTANT)
+
+Use:
+- Blade + Alpine.js ONLY
+- NO Livewire
+
+Build:
+
+1. POS Dashing Screen
+- category bar
+- product grid
+- live cart
+- keyboard support (F5, F8, Ctrl+S)
+
+2. Table Management UI
+- grid with status colors
+- lock indicator
+
+3. Kitchen Display (KDS)
+- auto refresh (10 sec polling)
+- status: new → preparing → ready
+
+4. Recipe Management UI
+- ingredients + mapping
+
+-------------------------------------
+
+PHASE 5: INTEGRATION
+
+- Reuse existing:
+  - pos_transactions
+  - inventory_stocks
+  - inventory_movements
+
+- PRA submission should work EXACTLY same (no change)
+
+-------------------------------------
+
+PHASE 6: TESTING
+
+Test:
+
+✔ Table lock works (multi-user)
+✔ HOLD does NOT deduct inventory
+✔ PAY deducts correctly
+✔ Recipe deduction works
+✔ Non-recipe uses normal stock
+✔ No impact on existing POS
+✔ No impact on FBR POS
+✔ No impact on Digital Invoice
+
+-------------------------------------
+
+IMPORTANT:
+- DO NOT push to GitHub
+- Work locally only
+- Show progress step by step
+
+START NOW

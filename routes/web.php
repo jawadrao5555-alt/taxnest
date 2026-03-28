@@ -20,6 +20,10 @@ use App\Http\Controllers\CompanyUserController;
 use App\Http\Controllers\CompanySettingsController;
 use App\Http\Controllers\CustomerLedgerController;
 use App\Http\Controllers\PosController;
+use App\Http\Controllers\RestaurantPosController;
+use App\Http\Controllers\RestaurantTableController;
+use App\Http\Controllers\RestaurantKdsController;
+use App\Http\Controllers\IngredientController;
 use App\Http\Controllers\PosInventoryController;
 use App\Http\Controllers\PosAuthController;
 use App\Http\Controllers\HsCodeMappingController;
@@ -452,7 +456,40 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
         Route::post('/team/cashier', [PosController::class, 'storeCashier'])->name('pos.team.store-cashier');
         Route::put('/team/cashier/{id}', [PosController::class, 'updateCashier'])->name('pos.team.update-cashier');
         Route::post('/team/cashier/{id}/toggle', [PosController::class, 'toggleCashier'])->name('pos.team.toggle-cashier');
+
+        Route::prefix('restaurant')->group(function () {
+            Route::get('/table-management', [RestaurantTableController::class, 'manage'])->name('pos.restaurant.table-management');
+            Route::post('/floors', [RestaurantTableController::class, 'storeFloor'])->name('pos.restaurant.floors.store');
+            Route::put('/floors/{id}', [RestaurantTableController::class, 'updateFloor'])->name('pos.restaurant.floors.update');
+            Route::delete('/floors/{id}', [RestaurantTableController::class, 'deleteFloor'])->name('pos.restaurant.floors.delete');
+            Route::post('/tables', [RestaurantTableController::class, 'storeTable'])->name('pos.restaurant.tables.store');
+            Route::put('/tables/{id}', [RestaurantTableController::class, 'updateTable'])->name('pos.restaurant.tables.update');
+            Route::delete('/tables/{id}', [RestaurantTableController::class, 'deleteTable'])->name('pos.restaurant.tables.delete');
+            Route::get('/ingredients', [IngredientController::class, 'index'])->name('pos.restaurant.ingredients');
+            Route::post('/ingredients', [IngredientController::class, 'store'])->name('pos.restaurant.ingredients.store');
+            Route::put('/ingredients/{id}', [IngredientController::class, 'update'])->name('pos.restaurant.ingredients.update');
+            Route::post('/ingredients/{id}/adjust', [IngredientController::class, 'adjustStock'])->name('pos.restaurant.ingredients.adjust');
+            Route::delete('/ingredients/{id}', [IngredientController::class, 'destroy'])->name('pos.restaurant.ingredients.delete');
+            Route::get('/recipes', [IngredientController::class, 'recipes'])->name('pos.restaurant.recipes');
+            Route::post('/recipes', [IngredientController::class, 'storeRecipe'])->name('pos.restaurant.recipes.store');
+            Route::put('/recipes/{id}', [IngredientController::class, 'updateRecipe'])->name('pos.restaurant.recipes.update');
+            Route::delete('/recipes/{id}', [IngredientController::class, 'deleteRecipe'])->name('pos.restaurant.recipes.delete');
+        });
     });
+
+    Route::get('/restaurant/pos', [RestaurantPosController::class, 'pos'])->name('pos.restaurant.pos');
+    Route::post('/restaurant/orders/hold', [RestaurantPosController::class, 'holdOrder'])->name('pos.restaurant.orders.hold');
+    Route::post('/restaurant/orders/{id}/pay', [RestaurantPosController::class, 'payOrder'])->name('pos.restaurant.orders.pay');
+    Route::get('/restaurant/orders/by-table/{tableId}', [RestaurantPosController::class, 'getOrdersByTable'])->name('pos.restaurant.orders.by-table');
+    Route::get('/restaurant/api/customer-search', [RestaurantPosController::class, 'customerSearch'])->name('pos.restaurant.customer-search');
+    Route::post('/restaurant/api/customer-store', [RestaurantPosController::class, 'customerStore'])->name('pos.restaurant.customer-store');
+    Route::get('/restaurant/tables', [RestaurantTableController::class, 'index'])->name('pos.restaurant.tables');
+    Route::post('/restaurant/tables/{id}/lock', [RestaurantTableController::class, 'lockTable'])->name('pos.restaurant.tables.lock');
+    Route::post('/restaurant/tables/{id}/unlock', [RestaurantTableController::class, 'unlockTable'])->name('pos.restaurant.tables.unlock');
+    Route::get('/restaurant/api/table-status', [RestaurantTableController::class, 'tableStatus'])->name('pos.restaurant.table-status');
+    Route::get('/restaurant/kds', [RestaurantKdsController::class, 'index'])->name('pos.restaurant.kds');
+    Route::post('/restaurant/kds/{id}/status', [RestaurantKdsController::class, 'updateStatus'])->name('pos.restaurant.kds.status');
+    Route::get('/restaurant/api/live-orders', [RestaurantKdsController::class, 'liveOrders'])->name('pos.restaurant.live-orders');
 });
 
 use App\Http\Controllers\SaasAdmin\AdminAuthController;

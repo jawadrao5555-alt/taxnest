@@ -402,6 +402,9 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::get('/reports/csv', [PosController::class, 'exportReportCsv'])->name('pos.reports.csv');
     Route::get('/tax-reports/csv', [PosController::class, 'exportTaxReportCsv'])->name('pos.tax-reports.csv');
     Route::get('/tax-reports/pdf', [PosController::class, 'exportTaxReportPdf'])->name('pos.tax-reports.pdf');
+    Route::get('/day-close', [PosController::class, 'dayCloseReport'])->name('pos.day-close');
+    Route::post('/day-close', [PosController::class, 'closeDayReport'])->name('pos.close-day');
+    Route::get('/day-close/{id}/pdf', [PosController::class, 'dayCloseReportPdf'])->name('pos.day-close-pdf');
     Route::get('/api/tax-rate', [PosController::class, 'getTaxRate'])->name('pos.api.tax-rate');
     Route::post('/api/draft/save', [PosController::class, 'saveDraft'])->name('pos.api.draft.save');
     Route::get('/csrf-token', function () { return response()->json(['token' => csrf_token()]); })->name('pos.csrf-token');

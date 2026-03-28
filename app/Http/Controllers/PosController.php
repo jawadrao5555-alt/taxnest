@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Company;
 use App\Models\User;
+use App\Models\PosDayCloseReport;
 use App\Models\PosProduct;
 use App\Models\PosCustomer;
 use App\Models\PosService;
@@ -2294,5 +2295,139 @@ class PosController extends Controller
         }
 
         return view('pos.user-profile', compact('user'));
+    }
+
+    public function dayCloseReport(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $date = $request->get('date', today()->format('Y-m-d'));
+
+        $existingReport = PosDayCloseReport::where('company_id', $companyId)
+            ->where('report_date', $date)
+            ->first();
+
+        $transactions = PosTransaction::where('company_id', $companyId)
+            ->whereDate('created_at', $date)
+            ->with('creator')
+            ->orderBy('created_at')
+            ->get();
+
+        $stats = (object) [
+            'total_invoices' => $transactions->count(),
+            'pra_invoices' => $transactions->where('pra_status', 'submitted')->count(),
+            'local_invoices' => $transactions->whereIn('pra_status', ['local', null])->count(),
+            'offline_invoices' => $transactions->where('pra_status', 'offline')->count(),
+            'gross_sales' => $transactions->sum('subtotal'),
+            'total_discount' => $transactions->sum('discount_amount'),
+            'net_sales' => $transactions->sum('subtotal') - $transactions->sum('discount_amount'),
+            'total_tax' => $transactions->sum('tax_amount'),
+            'total_amount' => $transactions->sum('total_amount'),
+            'cash_amount' => $transactions->where('payment_method', 'cash')->sum('total_amount'),
+            'card_amount' => $transactions->where('payment_method', 'card')->sum('total_amount'),
+            'other_amount' => $transactions->whereNotIn('payment_method', ['cash', 'card'])->sum('total_amount'),
+            'first_invoice' => $transactions->first(),
+            'last_invoice' => $transactions->last(),
+        ];
+
+        $cashierBreakdown = $transactions->groupBy(fn($t) => $t->creator ? $t->creator->name : 'Unknown')->map(function ($group) {
+            return (object) [
+                'count' => $group->count(),
+                'revenue' => $group->sum('total_amount'),
+                'tax' => $group->sum('tax_amount'),
+            ];
+        });
+
+        $previousReports = PosDayCloseReport::where('company_id', $companyId)
+            ->orderBy('report_date', 'desc')
+            ->limit(10)
+            ->get();
+
+        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions'));
+    }
+
+    public function closeDayReport(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $user = \Illuminate\Support\Facades\Auth::guard('pos')->user();
+        $date = $request->input('date', today()->format('Y-m-d'));
+
+        $existing = PosDayCloseReport::where('company_id', $companyId)
+            ->where('report_date', $date)
+            ->first();
+
+        if ($existing) {
+            return back()->with('error', 'Day Close Report for this date already exists.');
+        }
+
+        $transactions = PosTransaction::where('company_id', $companyId)
+            ->whereDate('created_at', $date)
+            ->with('creator')
+            ->orderBy('created_at')
+            ->get();
+
+        if ($transactions->isEmpty()) {
+            return back()->with('error', 'No transactions found for this date.');
+        }
+
+        $reportCount = PosDayCloseReport::where('company_id', $companyId)->count();
+        $reportNumber = 'ZRPT-POS-' . str_pad($reportCount + 1, 5, '0', STR_PAD_LEFT);
+
+        $data = [
+            'company_id' => $companyId,
+            'report_date' => $date,
+            'report_number' => $reportNumber,
+            'total_invoices' => $transactions->count(),
+            'pra_invoices' => $transactions->where('pra_status', 'submitted')->count(),
+            'local_invoices' => $transactions->whereIn('pra_status', ['local', null])->count(),
+            'offline_invoices' => $transactions->where('pra_status', 'offline')->count(),
+            'gross_sales' => $transactions->sum('subtotal'),
+            'total_discount' => $transactions->sum('discount_amount'),
+            'net_sales' => $transactions->sum('subtotal') - $transactions->sum('discount_amount'),
+            'total_tax' => $transactions->sum('tax_amount'),
+            'total_amount' => $transactions->sum('total_amount'),
+            'cash_amount' => $transactions->where('payment_method', 'cash')->sum('total_amount'),
+            'card_amount' => $transactions->where('payment_method', 'card')->sum('total_amount'),
+            'other_amount' => $transactions->whereNotIn('payment_method', ['cash', 'card'])->sum('total_amount'),
+            'first_invoice_number' => $transactions->first()->invoice_number ?? null,
+            'last_invoice_number' => $transactions->last()->invoice_number ?? null,
+            'first_invoice_time' => $transactions->first()->created_at ?? null,
+            'last_invoice_time' => $transactions->last()->created_at ?? null,
+            'closed_by' => $user->id,
+            'notes' => $request->input('notes'),
+        ];
+
+        $hashString = json_encode($data);
+        $data['hash'] = hash('sha256', $hashString);
+
+        PosDayCloseReport::create($data);
+
+        return back()->with('success', 'Day Close Report ' . $reportNumber . ' generated successfully for ' . \Carbon\Carbon::parse($date)->format('d M Y'));
+    }
+
+    public function dayCloseReportPdf($id)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $report = PosDayCloseReport::where('company_id', $companyId)->findOrFail($id);
+
+        $transactions = PosTransaction::where('company_id', $companyId)
+            ->whereDate('created_at', $report->report_date)
+            ->with('creator')
+            ->orderBy('created_at')
+            ->get();
+
+        $cashierBreakdown = $transactions->groupBy(fn($t) => $t->creator ? $t->creator->name : 'Unknown')->map(function ($group) {
+            return (object) [
+                'count' => $group->count(),
+                'revenue' => $group->sum('total_amount'),
+                'tax' => $group->sum('tax_amount'),
+            ];
+        });
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.day-close-pdf', compact('company', 'report', 'transactions', 'cashierBreakdown'));
+        $pdf->setPaper('a4', 'portrait');
+
+        return $pdf->download("Day-Close-{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf");
     }
 }

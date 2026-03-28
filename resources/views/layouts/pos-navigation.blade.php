@@ -33,6 +33,11 @@
         Tax Reports
     </a>
 
+    <a href="{{ route('pos.day-close') }}" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->routeIs('pos.day-close') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Day Close (Z-Report)
+    </a>
+
     @php
         $inventoryEnabled = \App\Models\Company::find(app('currentCompanyId'))?->inventory_enabled ?? false;
         $posUserNav = auth('pos')->user();

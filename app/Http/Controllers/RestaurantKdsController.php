@@ -36,7 +36,7 @@ class RestaurantKdsController extends Controller
         $validTransitions = [
             'held' => ['preparing', 'cancelled'],
             'preparing' => ['ready', 'cancelled'],
-            'ready' => ['completed', 'cancelled'],
+            'ready' => ['cancelled'],
         ];
 
         $allowed = $validTransitions[$order->status] ?? [];

@@ -129,10 +129,20 @@ class IngredientController extends Controller
         $companyId = app('currentCompanyId');
 
         $request->validate([
-            'product_id' => 'required|exists:pos_products,id',
-            'ingredient_id' => 'required|exists:ingredients,id',
+            'product_id' => 'required|integer',
+            'ingredient_id' => 'required|integer',
             'quantity_needed' => 'required|numeric|min:0.0001',
         ]);
+
+        $product = PosProduct::where('company_id', $companyId)->where('id', $request->product_id)->first();
+        if (!$product) {
+            return back()->with('error', 'Invalid product.');
+        }
+
+        $ingredient = Ingredient::where('company_id', $companyId)->where('id', $request->ingredient_id)->first();
+        if (!$ingredient) {
+            return back()->with('error', 'Invalid ingredient.');
+        }
 
         $exists = ProductRecipe::where('company_id', $companyId)
             ->where('product_id', $request->product_id)

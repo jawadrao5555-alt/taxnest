@@ -61,7 +61,7 @@
                         <button @click="updateStatus(order.id, 'ready')" class="flex-1 py-2 text-xs rounded-lg bg-green-600 text-white hover:bg-green-700 font-semibold">Mark Ready</button>
                     </template>
                     <template x-if="order.status === 'ready'">
-                        <button @click="updateStatus(order.id, 'completed')" class="flex-1 py-2 text-xs rounded-lg bg-gray-600 text-white hover:bg-gray-700 font-semibold">Done / Served</button>
+                        <span class="flex-1 py-2 text-xs rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-semibold text-center">Ready for Pickup</span>
                     </template>
                     <button @click="updateStatus(order.id, 'cancelled')" class="py-2 px-3 text-xs rounded-lg border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400">Cancel</button>
                 </div>
@@ -80,23 +80,29 @@
     </div>
 </div>
 
+@php
+$kdsOrdersJson = $orders->map(function($o) {
+    $elapsed = now()->diffInMinutes($o->created_at);
+    $items = $o->items->map(function($i) {
+        return ['name' => $i->item_name, 'qty' => $i->quantity, 'notes' => $i->special_notes];
+    })->values();
+    return [
+        'id' => $o->id,
+        'order_number' => $o->order_number,
+        'status' => $o->status,
+        'table' => $o->table ? $o->table->table_number : null,
+        'items' => $items,
+        'kitchen_notes' => $o->kitchen_notes,
+        'elapsed_minutes' => $elapsed,
+        'is_urgent' => $elapsed > 15,
+        'created_at' => $o->created_at->format('H:i'),
+    ];
+})->values();
+@endphp
 <script>
 function kdsScreen() {
     return {
-        orders: @json($orders->map(function($o) {
-            $elapsed = now()->diffInMinutes($o->created_at);
-            return [
-                'id' => $o->id,
-                'order_number' => $o->order_number,
-                'status' => $o->status,
-                'table' => $o->table?->table_number,
-                'items' => $o->items->map(fn($i) => ['name' => $i->item_name, 'qty' => $i->quantity, 'notes' => $i->special_notes]),
-                'kitchen_notes' => $o->kitchen_notes,
-                'elapsed_minutes' => $elapsed,
-                'is_urgent' => $elapsed > 15,
-                'created_at' => $o->created_at->format('H:i'),
-            ];
-        })),
+        orders: @json($kdsOrdersJson),
         polling: null,
         toast: { show: false, message: '', type: 'success' },
 

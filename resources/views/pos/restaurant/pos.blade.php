@@ -221,18 +221,27 @@
     </div>
 </div>
 
+@php
+$productsJson = $products->map(function($p) use ($recipeLookup) {
+    return ['id' => $p->id, 'type' => 'product', 'name' => $p->name, 'price' => $p->price ?? 0, 'category' => $p->category, 'is_tax_exempt' => $p->is_tax_exempt ?? false, 'hasRecipe' => in_array($p->id, $recipeLookup ?? [])];
+})->values();
+$servicesJson = $services->map(function($s) {
+    return ['id' => $s->id, 'type' => 'service', 'name' => $s->name, 'price' => $s->price ?? 0, 'category' => 'Services', 'is_tax_exempt' => $s->is_tax_exempt ?? false, 'hasRecipe' => false];
+})->values();
+$selectedTableJson = $selectedTable ? ['id' => $selectedTable->id, 'table_number' => $selectedTable->table_number, 'seats' => $selectedTable->seats] : null;
+@endphp
 <script>
 function restaurantPos() {
     return {
-        allProducts: @json($products->map(fn($p) => ['id' => $p->id, 'type' => 'product', 'name' => $p->name, 'price' => $p->selling_price, 'category' => $p->category, 'is_tax_exempt' => $p->is_tax_exempt ?? false, 'hasRecipe' => in_array($p->id, $recipeLookup ?? [])])),
-        allServices: @json($services->map(fn($s) => ['id' => $s->id, 'type' => 'service', 'name' => $s->name, 'price' => $s->price, 'category' => 'Services', 'is_tax_exempt' => $s->is_tax_exempt ?? false, 'hasRecipe' => false])),
+        allProducts: @json($productsJson),
+        allServices: @json($servicesJson),
         filteredItems: [],
         activeCategory: 'all',
         searchQuery: '',
         orderType: '{{ $selectedTable ? "dine_in" : "takeaway" }}',
         cart: [],
         kitchenNotes: '',
-        selectedTable: @json($selectedTable ? ['id' => $selectedTable->id, 'table_number' => $selectedTable->table_number, 'seats' => $selectedTable->seats] : null),
+        selectedTable: @json($selectedTableJson),
         heldOrders: @json($heldOrders),
         showTablePicker: false,
         showPayModal: false,

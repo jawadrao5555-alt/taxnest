@@ -74,20 +74,63 @@ class RestaurantPosController extends Controller
             'items' => 'required|array|min:1',
             'items.*.item_id' => 'required|integer',
             'items.*.item_type' => 'required|in:product,service',
-            'items.*.item_name' => 'required|string',
             'items.*.quantity' => 'required|numeric|min:0.01',
-            'items.*.unit_price' => 'required|numeric|min:0',
             'order_type' => 'required|in:dine_in,takeaway,delivery',
         ]);
 
+        if ($request->table_id) {
+            $table = RestaurantTable::where('company_id', $companyId)->where('id', $request->table_id)->first();
+            if (!$table) {
+                return response()->json(['success' => false, 'message' => 'Invalid table'], 400);
+            }
+        }
+
+        if ($request->customer_id) {
+            $customer = PosCustomer::where('company_id', $companyId)->where('id', $request->customer_id)->first();
+            if (!$customer) {
+                return response()->json(['success' => false, 'message' => 'Invalid customer'], 400);
+            }
+        }
+
+        $resolvedItems = [];
+        foreach ($request->items as $item) {
+            $qty = (float)$item['quantity'];
+            if ($item['item_type'] === 'product') {
+                $product = PosProduct::where('company_id', $companyId)->where('id', $item['item_id'])->first();
+                if (!$product) {
+                    return response()->json(['success' => false, 'message' => "Product not found: #{$item['item_id']}"], 400);
+                }
+                $resolvedItems[] = [
+                    'item_type' => 'product',
+                    'item_id' => $product->id,
+                    'item_name' => $product->name,
+                    'quantity' => $qty,
+                    'unit_price' => (float)$product->price,
+                    'subtotal' => round($qty * (float)$product->price, 2),
+                    'special_notes' => $item['special_notes'] ?? null,
+                    'is_tax_exempt' => (bool)($product->is_tax_exempt ?? false),
+                ];
+            } else {
+                $service = PosService::where('company_id', $companyId)->where('id', $item['item_id'])->first();
+                if (!$service) {
+                    return response()->json(['success' => false, 'message' => "Service not found: #{$item['item_id']}"], 400);
+                }
+                $resolvedItems[] = [
+                    'item_type' => 'service',
+                    'item_id' => $service->id,
+                    'item_name' => $service->name,
+                    'quantity' => $qty,
+                    'unit_price' => (float)$service->price,
+                    'subtotal' => round($qty * (float)$service->price, 2),
+                    'special_notes' => $item['special_notes'] ?? null,
+                    'is_tax_exempt' => (bool)($service->is_tax_exempt ?? false),
+                ];
+            }
+        }
+
+        $subtotal = array_sum(array_column($resolvedItems, 'subtotal'));
         $orderCount = RestaurantOrder::where('company_id', $companyId)->count();
         $orderNumber = 'ORD-' . str_pad($orderCount + 1, 5, '0', STR_PAD_LEFT);
-
-        $items = $request->items;
-        $subtotal = 0;
-        foreach ($items as $item) {
-            $subtotal += round((float)$item['quantity'] * (float)$item['unit_price'], 2);
-        }
 
         $taxRate = PosTaxRule::getRateForMethod('cash');
         $taxAmount = round($subtotal * $taxRate / 100, 2);
@@ -111,18 +154,8 @@ class RestaurantPosController extends Controller
                 'created_by' => $user->id,
             ]);
 
-            foreach ($items as $item) {
-                RestaurantOrderItem::create([
-                    'order_id' => $order->id,
-                    'item_type' => $item['item_type'],
-                    'item_id' => (int)$item['item_id'],
-                    'item_name' => $item['item_name'],
-                    'quantity' => (float)$item['quantity'],
-                    'unit_price' => (float)$item['unit_price'],
-                    'subtotal' => round((float)$item['quantity'] * (float)$item['unit_price'], 2),
-                    'special_notes' => $item['special_notes'] ?? null,
-                    'is_tax_exempt' => (bool)($item['is_tax_exempt'] ?? false),
-                ]);
+            foreach ($resolvedItems as $item) {
+                RestaurantOrderItem::create(array_merge($item, ['order_id' => $order->id]));
             }
 
             if ($request->table_id) {
@@ -235,7 +268,7 @@ class RestaurantPosController extends Controller
                     ->exists();
 
                 if (!$otherActive) {
-                    RestaurantTable::where('id', $order->table_id)->update([
+                    RestaurantTable::where('company_id', $companyId)->where('id', $order->table_id)->update([
                         'status' => 'available',
                         'locked_by_user_id' => null,
                         'locked_at' => null,

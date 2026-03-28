@@ -127,7 +127,7 @@
                     </div>
                     @if($transaction->fbr_service_charge > 0)
                     <div class="flex justify-between">
-                        <span class="text-gray-500 dark:text-gray-400">FBR Service Charge</span>
+                        <span class="text-gray-500 dark:text-gray-400">FBR POS Fee</span>
                         <span class="text-gray-900 dark:text-white">PKR {{ number_format($transaction->fbr_service_charge, 2) }}</span>
                     </div>
                     @endif

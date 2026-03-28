@@ -178,7 +178,7 @@
                         </div>
                         @if($fbrReportingEnabled)
                         <div class="flex justify-between text-gray-600 dark:text-gray-400">
-                            <span>FBR Service Charge <span class="text-xs">(SRO 1279/2021)</span></span>
+                            <span>FBR POS Fee <span class="text-xs">(SRO 1279/2021)</span></span>
                             <span>PKR 1.00</span>
                         </div>
                         @endif

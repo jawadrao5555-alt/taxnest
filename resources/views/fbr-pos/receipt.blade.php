@@ -190,7 +190,7 @@
         </tr>
         @if($transaction->fbr_service_charge > 0)
         <tr>
-            <td class="tot-label">FBR Service Charge:</td>
+            <td class="tot-label">FBR POS Fee:</td>
             <td class="tot-value">PKR {{ number_format($transaction->fbr_service_charge, 2) }}</td>
         </tr>
         @endif

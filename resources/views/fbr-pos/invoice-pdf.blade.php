@@ -175,7 +175,7 @@
             </div>
             @if($transaction->fbr_service_charge > 0)
             <div class="total-row">
-                <div class="lbl">FBR Service Charge (SRO 1279/2021)</div>
+                <div class="lbl">FBR POS Fee (SRO 1279/2021)</div>
                 <div class="val">PKR {{ number_format($transaction->fbr_service_charge, 2) }}</div>
             </div>
             @endif

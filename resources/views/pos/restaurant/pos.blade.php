@@ -65,10 +65,27 @@
             </div>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-950">
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                <template x-for="item in filteredItems" :key="item.id + '-' + item.type">
-                    <button @click="addToCart(item)" class="group relative bg-white dark:bg-gray-800 rounded-xl p-3 border border-gray-200 dark:border-gray-700 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-md transition-all text-left">
+        <div class="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-950" x-ref="gridContainer"
+            @keydown.arrow-right.prevent="moveGridFocus(1)"
+            @keydown.arrow-left.prevent="moveGridFocus(-1)"
+            @keydown.arrow-down.prevent="moveGridFocus(gridCols)"
+            @keydown.arrow-up.prevent="moveGridFocus(-gridCols)"
+            @keydown.enter.prevent="addGridFocusedItem()"
+            @keydown.tab.prevent="moveGridFocus(1)"
+            tabindex="0">
+            <div class="flex items-center justify-between mb-2" x-show="gridFocusMode">
+                <div class="flex items-center gap-2 text-xs text-purple-600 dark:text-purple-400 font-medium">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"/></svg>
+                    Arrow keys to navigate, Enter to add, Esc to go back to search
+                </div>
+                <span class="text-xs text-gray-400" x-text="(gridFocusIndex+1) + ' / ' + filteredItems.length"></span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3" x-ref="productGrid">
+                <template x-for="(item, gIdx) in filteredItems" :key="item.id + '-' + item.type">
+                    <button @click="quickAddItem(item)"
+                        :id="'grid-item-' + gIdx"
+                        :class="gridFocusMode && gIdx === gridFocusIndex ? 'ring-2 ring-purple-500 border-purple-500 shadow-lg scale-[1.03]' : 'border-gray-200 dark:border-gray-700 hover:border-purple-400 dark:hover:border-purple-500'"
+                        class="group relative bg-white dark:bg-gray-800 rounded-xl p-3 border hover:shadow-md transition-all text-left">
                         <div class="flex items-start justify-between mb-1">
                             <span x-text="item.name" class="text-sm font-medium text-gray-900 dark:text-white line-clamp-2 leading-tight"></span>
                             <span x-show="item.hasRecipe" class="text-xs flex-shrink-0 ml-1" title="Has Recipe">🍳</span>
@@ -272,6 +289,9 @@ function restaurantPos() {
         searchSuggestions: [],
         showSearchDropdown: false,
         highlightIndex: 0,
+        gridFocusMode: false,
+        gridFocusIndex: 0,
+        gridCols: 5,
         orderType: '{{ $selectedTable ? "dine_in" : "takeaway" }}',
         cart: [],
         kitchenNotes: '',
@@ -289,13 +309,66 @@ function restaurantPos() {
 
         init() {
             this.filterProducts();
-            this.$watch('activeCategory', () => this.filterProducts());
+            this.$watch('activeCategory', () => { this.filterProducts(); this.gridFocusIndex = 0; });
+            this.calcGridCols();
+            window.addEventListener('resize', () => this.calcGridCols());
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); }
                 if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) this.showPayModal = true; }
-                if (e.ctrlKey && e.key === 's') { e.preventDefault(); this.$refs.searchInput?.focus(); }
+                if (e.ctrlKey && e.key === 's') { e.preventDefault(); this.enterSearchMode(); }
+                if (e.key === 'Escape' && this.gridFocusMode) { e.preventDefault(); this.enterSearchMode(); }
+                if (e.key === 'Tab' && !e.shiftKey && !this.gridFocusMode && document.activeElement === this.$refs.searchInput && !this.showSearchDropdown) {
+                    e.preventDefault(); this.enterGridMode();
+                }
             });
             this.$nextTick(() => { this.$refs.searchInput?.focus(); });
+        },
+
+        calcGridCols() {
+            const w = this.$refs.gridContainer?.offsetWidth || 800;
+            if (w >= 1024) this.gridCols = 5;
+            else if (w >= 768) this.gridCols = 4;
+            else if (w >= 640) this.gridCols = 3;
+            else this.gridCols = 2;
+        },
+
+        enterSearchMode() {
+            this.gridFocusMode = false;
+            this.$refs.searchInput?.focus();
+        },
+
+        enterGridMode() {
+            if (this.filteredItems.length === 0) return;
+            this.gridFocusMode = true;
+            this.gridFocusIndex = 0;
+            this.showSearchDropdown = false;
+            this.$refs.gridContainer?.focus();
+            this.scrollGridItemIntoView(0);
+        },
+
+        moveGridFocus(delta) {
+            if (!this.gridFocusMode) { this.enterGridMode(); return; }
+            const newIdx = this.gridFocusIndex + delta;
+            if (newIdx >= 0 && newIdx < this.filteredItems.length) {
+                this.gridFocusIndex = newIdx;
+                this.scrollGridItemIntoView(newIdx);
+            }
+        },
+
+        scrollGridItemIntoView(idx) {
+            this.$nextTick(() => {
+                const el = document.getElementById('grid-item-' + idx);
+                if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            });
+        },
+
+        addGridFocusedItem() {
+            if (!this.gridFocusMode || this.filteredItems.length === 0) return;
+            const item = this.filteredItems[this.gridFocusIndex];
+            if (item) {
+                this.addToCart(item);
+                this.showToast(item.name + ' added', 'success');
+            }
         },
 
         onSearchInput() {

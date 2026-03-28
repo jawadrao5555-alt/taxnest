@@ -10,23 +10,24 @@
 .product-card:hover { transform: translateY(-2px); }
 .product-card:active { transform: scale(0.97); }
 </style>
-<div x-data="restaurantPos()" x-init="init()" class="flex h-[calc(100vh-64px)] overflow-hidden">
-    <div class="flex-1 flex flex-col overflow-hidden">
-        <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-            <div class="flex items-center justify-between gap-3 flex-wrap">
-                <div class="flex items-center gap-3">
-                    <h1 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                        <span class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-violet-600 flex items-center justify-center text-white text-sm">R</span>
-                        Restaurant POS
+<div x-data="restaurantPos()" x-init="init()" class="flex flex-col md:flex-row h-[calc(100vh-64px)] overflow-hidden">
+    <div class="flex-1 flex flex-col overflow-hidden" :class="mobileView === 'cart' ? 'hidden md:flex' : 'flex'">
+        <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+            <div class="flex items-center justify-between gap-2 sm:gap-3 flex-wrap">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <h1 class="text-sm sm:text-lg font-bold text-gray-900 dark:text-white flex items-center gap-1.5 sm:gap-2">
+                        <span class="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-purple-600 to-violet-600 flex items-center justify-center text-white text-xs sm:text-sm">R</span>
+                        <span class="hidden sm:inline">Restaurant POS</span>
+                        <span class="sm:hidden">POS</span>
                     </h1>
-                    <select x-model="orderType" class="text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white px-3 py-1.5 focus:ring-purple-500">
+                    <select x-model="orderType" class="text-xs sm:text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white px-2 sm:px-3 py-1 sm:py-1.5 focus:ring-purple-500">
                         <option value="dine_in">Dine In</option>
                         <option value="takeaway">Takeaway</option>
                         <option value="delivery">Delivery</option>
                     </select>
                 </div>
-                <div class="flex items-center gap-2">
-                    <div class="relative" @click.away="showSearchDropdown = false">
+                <div class="flex items-center gap-1.5 sm:gap-2">
+                    <div class="relative flex-1 sm:flex-none" @click.away="showSearchDropdown = false">
                         <input type="text" x-ref="searchInput" x-model="searchQuery"
                             @input="onSearchInput()"
                             @focus="onSearchInput()"
@@ -34,8 +35,8 @@
                             @keydown.arrow-down.prevent="moveHighlight(1)"
                             @keydown.arrow-up.prevent="moveHighlight(-1)"
                             @keydown.escape="showSearchDropdown = false; searchQuery = ''"
-                            placeholder="Type & Enter to add... (Ctrl+S)"
-                            class="pl-8 pr-3 py-1.5 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white w-64 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                            placeholder="Search... (Ctrl+S)"
+                            class="pl-8 pr-3 py-1.5 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white w-full sm:w-64 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                             autocomplete="off">
                         <svg class="w-4 h-4 absolute left-2.5 top-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                         <div x-show="showSearchDropdown && searchSuggestions.length > 0" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-64 overflow-y-auto">
@@ -61,12 +62,16 @@
                             No items match "<span x-text="searchQuery"></span>"
                         </div>
                     </div>
-                    <button @click="showTablePicker = true" class="px-3 py-1.5 text-sm rounded-lg border border-purple-300 text-purple-700 dark:border-purple-600 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20">
+                    <button @click="showTablePicker = true" class="hidden sm:inline-flex px-3 py-1.5 text-sm rounded-lg border border-purple-300 text-purple-700 dark:border-purple-600 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20">
                         <span x-text="selectedTable ? 'Table ' + selectedTable.table_number : 'Select Table'"></span>
                     </button>
-                    <button @click="showHeldOrders = !showHeldOrders" class="relative px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
+                    <button @click="showHeldOrders = !showHeldOrders" class="hidden sm:inline-flex relative px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
                         Held Orders
                         <span x-show="heldOrders.length > 0" class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center" x-text="heldOrders.length"></span>
+                    </button>
+                    <button @click="mobileView = 'cart'" class="md:hidden relative px-3 py-1.5 text-sm rounded-lg bg-purple-600 text-white font-semibold shadow-md">
+                        <svg class="w-5 h-5 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
+                        <span x-show="cart.length > 0" class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="cart.reduce((s, i) => s + i.quantity, 0)"></span>
                     </button>
                 </div>
             </div>
@@ -94,7 +99,7 @@
                 </div>
                 <span class="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full" x-text="(gridFocusIndex+1) + ' / ' + filteredItems.length"></span>
             </div>
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3" x-ref="productGrid">
+            <div class="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3" x-ref="productGrid">
                 <template x-for="(item, gIdx) in filteredItems" :key="item.id + '-' + item.type">
                     <button @click="quickAddItem(item)"
                         :id="'grid-item-' + gIdx"
@@ -123,13 +128,25 @@
                 <p class="font-medium">No items found</p>
                 <p class="text-xs mt-1">Try a different search or category</p>
             </div>
+            <div class="md:hidden flex gap-2 p-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                <button @click="showTablePicker = true" class="flex-1 py-2 text-xs font-semibold rounded-lg border border-purple-300 text-purple-700 dark:border-purple-600 dark:text-purple-300">
+                    <span x-text="selectedTable ? 'Table ' + selectedTable.table_number : 'Select Table'"></span>
+                </button>
+                <button @click="showHeldOrders = !showHeldOrders" class="relative flex-1 py-2 text-xs font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300">
+                    Held Orders
+                    <span x-show="heldOrders.length > 0" class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center" x-text="heldOrders.length"></span>
+                </button>
+            </div>
         </div>
     </div>
 
-    <div class="w-80 lg:w-96 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
+    <div class="w-full md:w-80 lg:w-96 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden" :class="mobileView === 'cart' ? 'flex' : 'hidden md:flex'">
         <div class="p-4 border-b border-gray-200 dark:border-gray-700">
             <div class="flex items-center justify-between">
                 <h2 class="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <button @click="mobileView = 'menu'" class="md:hidden text-purple-600 mr-1">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    </button>
                     Current Order
                     <span x-show="cart.length > 0" class="w-5 h-5 bg-purple-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" :class="cartAnimating ? 'cart-pop' : ''" x-text="cart.reduce((s, i) => s + i.quantity, 0)"></span>
                 </h2>
@@ -352,6 +369,7 @@ function restaurantPos() {
         submitting: false,
         cartAnimating: false,
         stockError: '',
+        mobileView: 'menu',
         toast: { show: false, message: '', type: 'success' },
 
         get subtotal() { return this.cart.reduce((s, i) => s + (i.quantity * i.unit_price), 0); },

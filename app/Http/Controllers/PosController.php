@@ -2240,6 +2240,7 @@ class PosController extends Controller
 
             $data = $request->only(['name', 'owner_name', 'ntn', 'email', 'phone', 'mobile', 'address', 'city', 'business_activity', 'website']);
             $data['inventory_enabled'] = $request->has('inventory_enabled');
+            $data['restaurant_mode'] = $request->has('restaurant_mode');
 
             if ($request->hasFile('logo')) {
                 if ($company->logo_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($company->logo_path)) {

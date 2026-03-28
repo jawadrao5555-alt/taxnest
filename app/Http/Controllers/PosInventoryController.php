@@ -40,6 +40,9 @@ class PosInventoryController extends Controller
             ->where('quantity', '<=', 0)
             ->count();
 
+        $totalTracked = InventoryStock::where('company_id', $companyId)->count();
+        $healthyCount = InventoryStock::where('company_id', $companyId)->whereRaw('quantity > min_stock_level')->count();
+
         $recentMovements = InventoryMovement::where('company_id', $companyId)
             ->with(['product', 'creator'])
             ->orderBy('created_at', 'desc')
@@ -58,7 +61,7 @@ class PosInventoryController extends Controller
 
         return view('pos.inventory.dashboard', compact(
             'company', 'totalProducts', 'totalStockValue', 'lowStockItems',
-            'outOfStockCount', 'recentMovements', 'topMovers'
+            'outOfStockCount', 'recentMovements', 'topMovers', 'totalTracked', 'healthyCount'
         ));
     }
 

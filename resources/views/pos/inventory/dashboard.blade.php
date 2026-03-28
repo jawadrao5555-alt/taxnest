@@ -100,6 +100,72 @@
     </div>
     @endif
 
+    <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg p-5 mb-6">
+        <div class="flex items-center gap-2 mb-5">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+            </div>
+            <h3 class="text-sm font-bold text-gray-900 dark:text-white">Stock Health Overview</h3>
+        </div>
+        @php
+            $healthPct = $totalTracked > 0 ? round(($healthyCount / $totalTracked) * 100) : 100;
+            $lowPct = $totalTracked > 0 ? round(($lowStockItems->count() / $totalTracked) * 100) : 0;
+            $outPct = $totalTracked > 0 ? round(($outOfStockCount / $totalTracked) * 100) : 0;
+        @endphp
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 items-center">
+            <div class="flex flex-col items-center justify-center">
+                <div class="relative w-28 h-28" x-data="{ pct: 0 }" x-init="setTimeout(() => pct = {{ $healthPct }}, 200)">
+                    <svg class="w-28 h-28 -rotate-90" viewBox="0 0 120 120">
+                        <circle cx="60" cy="60" r="50" fill="none" stroke-width="10" class="stroke-gray-100 dark:stroke-gray-800"/>
+                        <circle cx="60" cy="60" r="50" fill="none" stroke-width="10" stroke-linecap="round" class="stroke-emerald-500 transition-all duration-1000" :stroke-dasharray="`${pct * 3.14} 314`"/>
+                    </svg>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <span class="text-2xl font-black text-gray-900 dark:text-white" x-text="pct + '%'">0%</span>
+                    </div>
+                </div>
+                <p class="text-xs font-semibold text-gray-500 mt-2">Healthy Stock</p>
+            </div>
+            <div class="sm:col-span-3 space-y-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-3 h-3 rounded-full bg-emerald-500 flex-shrink-0"></div>
+                    <div class="flex-1">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs font-semibold text-gray-700 dark:text-gray-300">In Stock</span>
+                            <span class="text-xs font-bold text-emerald-600">{{ $healthyCount }} products</span>
+                        </div>
+                        <div class="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2">
+                            <div class="h-2 rounded-full bg-emerald-500 transition-all duration-700" style="width: {{ $healthPct }}%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="w-3 h-3 rounded-full bg-amber-500 flex-shrink-0"></div>
+                    <div class="flex-1">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs font-semibold text-gray-700 dark:text-gray-300">Low Stock</span>
+                            <span class="text-xs font-bold text-amber-600">{{ $lowStockItems->count() }} products</span>
+                        </div>
+                        <div class="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2">
+                            <div class="h-2 rounded-full bg-amber-500 transition-all duration-700" style="width: {{ $lowPct }}%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="w-3 h-3 rounded-full bg-red-500 flex-shrink-0"></div>
+                    <div class="flex-1">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs font-semibold text-gray-700 dark:text-gray-300">Out of Stock</span>
+                            <span class="text-xs font-bold text-red-600">{{ $outOfStockCount }} products</span>
+                        </div>
+                        <div class="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2">
+                            <div class="h-2 rounded-full bg-red-500 transition-all duration-700" style="width: {{ $outPct }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg p-5">
             <div class="flex items-center justify-between mb-5">

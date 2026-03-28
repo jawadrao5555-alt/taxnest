@@ -38,6 +38,35 @@
     @endif
 
     @if($alerts->count() > 0)
+    @php
+        $criticalItems = $alerts->filter(fn($i) => $i->min_stock_level > 0 && ($i->quantity / $i->min_stock_level) < 0.25);
+        $warningItems = $alerts->filter(fn($i) => $i->min_stock_level > 0 && ($i->quantity / $i->min_stock_level) >= 0.25 && ($i->quantity / $i->min_stock_level) < 0.5);
+        $lowItems = $alerts->filter(fn($i) => $i->min_stock_level > 0 && ($i->quantity / $i->min_stock_level) >= 0.5);
+    @endphp
+    <div class="grid grid-cols-3 gap-3 mb-6">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl border-2 {{ $criticalItems->count() > 0 ? 'border-red-300 dark:border-red-700' : 'border-gray-100 dark:border-gray-700' }} shadow-lg p-4 text-center">
+            <div class="w-10 h-10 rounded-xl {{ $criticalItems->count() > 0 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-gray-100 dark:bg-gray-800' }} flex items-center justify-center mx-auto mb-2">
+                <svg class="w-5 h-5 {{ $criticalItems->count() > 0 ? 'text-red-600 animate-pulse' : 'text-gray-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            </div>
+            <p class="text-2xl font-black {{ $criticalItems->count() > 0 ? 'text-red-600' : 'text-gray-900 dark:text-white' }}">{{ $criticalItems->count() }}</p>
+            <p class="text-[10px] font-bold uppercase tracking-wider {{ $criticalItems->count() > 0 ? 'text-red-500' : 'text-gray-400' }}">Critical (&lt;25%)</p>
+        </div>
+        <div class="bg-white dark:bg-gray-900 rounded-2xl border-2 {{ $warningItems->count() > 0 ? 'border-amber-300 dark:border-amber-700' : 'border-gray-100 dark:border-gray-700' }} shadow-lg p-4 text-center">
+            <div class="w-10 h-10 rounded-xl {{ $warningItems->count() > 0 ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-gray-100 dark:bg-gray-800' }} flex items-center justify-center mx-auto mb-2">
+                <svg class="w-5 h-5 {{ $warningItems->count() > 0 ? 'text-amber-600' : 'text-gray-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <p class="text-2xl font-black {{ $warningItems->count() > 0 ? 'text-amber-600' : 'text-gray-900 dark:text-white' }}">{{ $warningItems->count() }}</p>
+            <p class="text-[10px] font-bold uppercase tracking-wider {{ $warningItems->count() > 0 ? 'text-amber-500' : 'text-gray-400' }}">Warning (25-50%)</p>
+        </div>
+        <div class="bg-white dark:bg-gray-900 rounded-2xl border-2 {{ $lowItems->count() > 0 ? 'border-yellow-300 dark:border-yellow-700' : 'border-gray-100 dark:border-gray-700' }} shadow-lg p-4 text-center">
+            <div class="w-10 h-10 rounded-xl {{ $lowItems->count() > 0 ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-gray-100 dark:bg-gray-800' }} flex items-center justify-center mx-auto mb-2">
+                <svg class="w-5 h-5 {{ $lowItems->count() > 0 ? 'text-yellow-600' : 'text-gray-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <p class="text-2xl font-black {{ $lowItems->count() > 0 ? 'text-yellow-600' : 'text-gray-900 dark:text-white' }}">{{ $lowItems->count() }}</p>
+            <p class="text-[10px] font-bold uppercase tracking-wider {{ $lowItems->count() > 0 ? 'text-yellow-500' : 'text-gray-400' }}">Low (50-100%)</p>
+        </div>
+    </div>
+
     <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg overflow-hidden">
         <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/10 dark:to-orange-900/10">
             <div class="flex items-center gap-2">
@@ -50,6 +79,7 @@
                 <thead>
                     <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-100 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/50">
                         <th class="px-5 py-3.5 font-semibold">Product</th>
+                        <th class="px-5 py-3.5 font-semibold">Urgency</th>
                         <th class="px-5 py-3.5 font-semibold">Stock Level</th>
                         <th class="px-5 py-3.5 text-right font-semibold">Min Level</th>
                         <th class="px-5 py-3.5 text-right font-semibold">Shortage</th>
@@ -57,20 +87,29 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-50 dark:divide-gray-800">
-                    @foreach($alerts as $item)
+                    @foreach($alerts->sortBy(fn($i) => $i->min_stock_level > 0 ? $i->quantity / $i->min_stock_level : 999) as $item)
                     @php
                         $pct = $item->min_stock_level > 0 ? min(($item->quantity / $item->min_stock_level) * 100, 100) : 0;
-                        $barColor = $pct < 30 ? 'bg-red-500' : ($pct < 70 ? 'bg-amber-500' : 'bg-emerald-500');
+                        $barColor = $pct < 25 ? 'bg-red-500' : ($pct < 50 ? 'bg-amber-500' : 'bg-yellow-400');
                         $shortage = $item->min_stock_level - $item->quantity;
+                        $urgencyLabel = $pct < 25 ? 'Critical' : ($pct < 50 ? 'Warning' : 'Low');
+                        $urgencyClass = $pct < 25 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 ring-1 ring-red-200 dark:ring-red-800' : ($pct < 50 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 ring-1 ring-yellow-200 dark:ring-yellow-800');
                     @endphp
-                    <tr class="hover:bg-gray-50/80 dark:hover:bg-gray-800/30 transition">
+                    <tr class="hover:bg-gray-50/80 dark:hover:bg-gray-800/30 transition {{ $pct < 25 ? 'bg-red-50/30 dark:bg-red-900/5' : '' }}">
                         <td class="px-5 py-4 font-semibold text-gray-900 dark:text-white">{{ $item->product->name ?? 'Unknown' }}</td>
                         <td class="px-5 py-4">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider {{ $urgencyClass }}">
+                                @if($pct < 25)<svg class="w-3 h-3 mr-1 animate-pulse" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="5"/></svg>@endif
+                                {{ $urgencyLabel }}
+                            </span>
+                        </td>
+                        <td class="px-5 py-4">
                             <div class="flex items-center gap-3">
-                                <span class="font-bold text-amber-600">{{ number_format($item->quantity, 0) }}</span>
-                                <div class="w-20 bg-gray-100 dark:bg-gray-700 rounded-full h-2">
-                                    <div class="h-2 rounded-full {{ $barColor }} transition-all duration-500" style="width: {{ $pct }}%"></div>
+                                <span class="font-bold {{ $pct < 25 ? 'text-red-600' : 'text-amber-600' }}">{{ number_format($item->quantity, 0) }}</span>
+                                <div class="w-24 bg-gray-100 dark:bg-gray-700 rounded-full h-2.5">
+                                    <div class="h-2.5 rounded-full {{ $barColor }} transition-all duration-500" style="width: {{ max($pct, 3) }}%"></div>
                                 </div>
+                                <span class="text-[10px] font-semibold text-gray-400">{{ round($pct) }}%</span>
                             </div>
                         </td>
                         <td class="px-5 py-4 text-right text-gray-600 dark:text-gray-400">{{ number_format($item->min_stock_level, 0) }}</td>

@@ -80,9 +80,10 @@
                         <td class="px-5 py-4">
                             <div class="flex items-center gap-3">
                                 <span class="font-bold text-sm {{ $stock->quantity <= 0 ? 'text-red-600' : ($stock->isLowStock() ? 'text-amber-600' : 'text-gray-900 dark:text-white') }}">{{ number_format($stock->quantity, 0) }}</span>
-                                <div class="w-20 bg-gray-100 dark:bg-gray-700 rounded-full h-2">
-                                    <div class="h-2 rounded-full {{ $barColor }} transition-all duration-500" style="width: {{ $barPct }}%"></div>
+                                <div class="w-28 bg-gray-100 dark:bg-gray-700 rounded-full h-2.5 relative">
+                                    <div class="h-2.5 rounded-full {{ $barColor }} transition-all duration-500" style="width: {{ max($barPct, 3) }}%"></div>
                                 </div>
+                                <span class="text-[10px] font-semibold text-gray-400">{{ round($barPct) }}%</span>
                             </div>
                         </td>
                         <td class="px-5 py-4 text-right text-gray-600 dark:text-gray-400 hidden sm:table-cell">{{ number_format($stock->min_stock_level, 0) }}</td>

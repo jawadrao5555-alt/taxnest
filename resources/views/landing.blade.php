@@ -50,6 +50,10 @@
         @keyframes countUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes slideInLeft { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
         @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        .marquee-track { animation: marquee 25s linear infinite; }
+        .marquee-track:hover { animation-play-state: paused; }
+        .testimonial-card { background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.06) 100%); backdrop-filter: blur(20px); }
         .orb-1 { animation: float 8s ease-in-out infinite; }
         .orb-2 { animation: float-reverse 10s ease-in-out infinite; }
         .orb-3 { animation: float 12s ease-in-out infinite 2s; }
@@ -140,33 +144,35 @@
                 <p class="text-[13px] text-gray-500 mt-5">14-day free trial &middot; No credit card required</p>
             </div>
 
-            <div class="mt-20 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto">
+            <div id="heroStats" class="mt-20 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto">
                 <div class="stat-glass rounded-2xl p-5 text-center transition-all duration-300">
                     <div class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center mx-auto mb-3">
                         <svg class="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
                     </div>
-                    <p class="text-2xl sm:text-3xl font-bold text-white">99.9%</p>
+                    <p class="text-2xl sm:text-3xl font-bold text-white"><span class="counter-val" data-target="99.9" data-decimal="1" data-step="2" data-suffix="%">0%</span></p>
                     <p class="text-xs text-gray-400 mt-1">Uptime SLA</p>
                 </div>
                 <div class="stat-glass rounded-2xl p-5 text-center transition-all duration-300">
                     <div class="w-10 h-10 rounded-xl bg-teal-500/20 flex items-center justify-center mx-auto mb-3">
                         <svg class="w-5 h-5 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                     </div>
-                    <p class="text-2xl sm:text-3xl font-bold text-white">{{ isset($stats['total_invoices']) && $stats['total_invoices'] > 0 ? number_format($stats['total_invoices']) : '50k+' }}</p>
+                    @php $invoiceTarget = isset($stats['total_invoices']) && $stats['total_invoices'] > 0 ? $stats['total_invoices'] : 50000; @endphp
+                    <p class="text-2xl sm:text-3xl font-bold text-white"><span class="counter-val" data-target="{{ $invoiceTarget }}" data-format="k" data-suffix="+">0</span></p>
                     <p class="text-xs text-gray-400 mt-1">Invoices Processed</p>
                 </div>
                 <div class="stat-glass rounded-2xl p-5 text-center transition-all duration-300">
                     <div class="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center mx-auto mb-3">
                         <svg class="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                     </div>
-                    <p class="text-2xl sm:text-3xl font-bold text-white">{{ isset($stats['total_companies']) && $stats['total_companies'] > 0 ? number_format($stats['total_companies']) . '+' : '500+' }}</p>
+                    @php $compTarget = isset($stats['total_companies']) && $stats['total_companies'] > 0 ? $stats['total_companies'] : 500; @endphp
+                    <p class="text-2xl sm:text-3xl font-bold text-white"><span class="counter-val" data-target="{{ $compTarget }}" data-suffix="+">0</span></p>
                     <p class="text-xs text-gray-400 mt-1">Companies Trust Us</p>
                 </div>
                 <div class="stat-glass rounded-2xl p-5 text-center transition-all duration-300">
                     <div class="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center mx-auto mb-3">
                         <svg class="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                     </div>
-                    <p class="text-2xl sm:text-3xl font-bold text-white">3</p>
+                    <p class="text-2xl sm:text-3xl font-bold text-white"><span class="counter-val" data-target="3" data-step="1" data-interval="300">0</span></p>
                     <p class="text-xs text-gray-400 mt-1">Integrated Products</p>
                 </div>
             </div>
@@ -200,6 +206,42 @@
             </div>
         </div>
     </div>
+
+    <section class="py-16 bg-[#0a0f1a] overflow-hidden relative">
+        <div class="absolute inset-0 opacity-[0.02]" style="background-image: url('data:image/svg+xml,%3Csvg width=&quot;60&quot; height=&quot;60&quot; viewBox=&quot;0 0 60 60&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;%3E%3Cg fill=&quot;none&quot; fill-rule=&quot;evenodd&quot;%3E%3Cg fill=&quot;%23ffffff&quot; fill-opacity=&quot;1&quot;%3E%3Cpath d=&quot;M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z&quot;/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"></div>
+        <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
+            <div class="text-center mb-10 fade-up">
+                <p class="text-[13px] font-semibold text-emerald-400 uppercase tracking-widest mb-2">What Our Clients Say</p>
+                <h2 class="text-[24px] sm:text-[28px] font-bold text-white tracking-tight">Trusted by Businesses Across Pakistan</h2>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 fade-up">
+                @php
+                $testimonials = [
+                    ['We switched from manual FBR filing to TaxNest and saved 15+ hours per month. The HS Intelligence Engine alone is worth it.', 'Ahmed K.', 'CEO, Textile Exports Ltd', 'emerald'],
+                    ['NestPOS transformed our retail billing. PRA compliance was a nightmare before — now it\'s completely automatic.', 'Fatima S.', 'Owner, Fashion Hub POS', 'purple'],
+                    ['The FBR POS module handles everything from invoice creation to tax reporting. Our accountant is finally happy.', 'Rahim M.', 'Director, Electronics Store', 'blue'],
+                ];
+                @endphp
+                @foreach($testimonials as $t)
+                <div class="testimonial-card rounded-2xl p-6 border border-white/[0.08] hover:border-white/[0.15] transition-all duration-300 hover:-translate-y-1">
+                    <div class="flex items-center gap-1 mb-4">
+                        @for($s=0;$s<5;$s++)
+                        <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                        @endfor
+                    </div>
+                    <p class="text-[14px] text-gray-300 leading-relaxed mb-5">"{{ $t[0] }}"</p>
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold" style="background: linear-gradient(135deg, {{ $t[3] === 'emerald' ? '#059669,#10b981' : ($t[3] === 'purple' ? '#7c3aed,#8b5cf6' : '#2563eb,#3b82f6') }});">{{ substr($t[1],0,1) }}</div>
+                        <div>
+                            <p class="text-sm font-semibold text-white">{{ $t[1] }}</p>
+                            <p class="text-xs text-gray-500">{{ $t[2] }}</p>
+                        </div>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+        </div>
+    </section>
 
     <section class="py-20 lg:py-24 bg-white dark:bg-gray-900">
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
@@ -667,17 +709,49 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const observer = new IntersectionObserver(function(entries) {
+            var fadeObserver = new IntersectionObserver(function(entries) {
                 entries.forEach(function(entry) {
                     if (entry.isIntersecting) {
                         entry.target.classList.add('visible');
                     }
                 });
             }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
-
             document.querySelectorAll('.fade-up').forEach(function(el) {
-                observer.observe(el);
+                fadeObserver.observe(el);
             });
+
+            var statsEl = document.getElementById('heroStats');
+            if (statsEl) {
+                var statsAnimated = false;
+                var statsObserver = new IntersectionObserver(function(entries) {
+                    if (entries[0].isIntersecting && !statsAnimated) {
+                        statsAnimated = true;
+                        document.querySelectorAll('.counter-val').forEach(function(el) {
+                            var target = parseFloat(el.dataset.target);
+                            var decimal = parseInt(el.dataset.decimal || '0');
+                            var suffix = el.dataset.suffix || '';
+                            var format = el.dataset.format || '';
+                            var interval = parseInt(el.dataset.interval || '25');
+                            var steps = parseInt(el.dataset.step || Math.ceil(target / 50)) || 1;
+                            var current = 0;
+                            var iv = setInterval(function() {
+                                current += steps;
+                                if (current >= target) { current = target; clearInterval(iv); }
+                                var display = '';
+                                if (format === 'k' && current >= 1000) {
+                                    display = (current / 1000).toFixed(current >= 10000 ? 0 : 1) + 'k';
+                                } else if (decimal > 0) {
+                                    display = current.toFixed(decimal);
+                                } else {
+                                    display = Math.round(current).toLocaleString();
+                                }
+                                el.textContent = display + suffix;
+                            }, interval);
+                        });
+                    }
+                }, { threshold: 0.3 });
+                statsObserver.observe(statsEl);
+            }
         });
     </script>
 

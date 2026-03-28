@@ -1,0 +1,114 @@
+Before writing any code, generate a FINAL CONSOLIDATED VISUAL PREVIEW + ARCHITECTURE for a MULTI-PRODUCT SaaS platform with FULL ISOLATION.
+
+SYSTEM OVERVIEW:
+We are building 3 COMPLETELY SEPARATE PRODUCTS under one brand (TaxNest):
+
+1. POS System (Restaurant + Retail)
+2. Digital Invoice System (FBR Invoicing)
+3. FBR POS System (Fiscal POS)
+
+CRITICAL RULES:
+- Each product must be FULLY ISOLATED
+- Separate registration per product
+- Separate authentication per product
+- Separate database (or strict table prefixing)
+- NO shared company, NO shared data
+- NO cross-dependency
+
+-------------------------------------
+1. VISUAL PREVIEW REQUIRED
+-------------------------------------
+
+A) MAIN PLATFORM (Product Selection Screen)
+- Show 3 product cards
+- Clean SaaS UI
+- Clear messaging: "Each product is separate"
+
+B) POS SYSTEM PREVIEW
+- Restaurant mode (tables, KDS, cart)
+- Retail mode (simple billing)
+- Inventory + Recipe indicators
+
+C) DIGITAL INVOICE PREVIEW
+- Invoice creation
+- FBR submission
+- Reports dashboard
+
+D) FBR POS PREVIEW
+- POS terminal
+- FBR submission logs
+- Fiscal invoice system
+
+-------------------------------------
+2. USER FLOW (END TO END)
+-------------------------------------
+
+Explain:
+
+- User enters platform
+- Selects product
+- Registers separately
+- Gets independent dashboard
+
+Example:
+User can have:
+- POS account
+- Invoice account
+(but NOT connected)
+
+-------------------------------------
+3. AUTHENTICATION STRUCTURE
+-------------------------------------
+
+Define:
+
+/login/pos
+/login/invoice
+/login/fbr-pos
+
+- Separate sessions
+- Separate guards (if Laravel)
+
+-------------------------------------
+4. DATABASE STRUCTURE
+-------------------------------------
+
+Option A (Preferred):
+- 3 separate databases
+
+Option B:
+- Prefixed tables (pos_, di_, fbrpos_)
+
+-------------------------------------
+5. ROUTING STRUCTURE
+-------------------------------------
+
+/pos/*
+/invoice/*
+/fbr-pos/*
+
+-------------------------------------
+6. ADMIN CONTROL
+-------------------------------------
+
+- Admin sees all 3 products separately
+- Can manage companies per product
+- No shared data
+
+-------------------------------------
+7. SAFETY CONFIRMATION
+
+Answer clearly:
+
+- Is POS isolated? YES/NO
+- Is Invoice isolated? YES/NO
+- Is FBR POS isolated? YES/NO
+- Any shared data? YES/NO
+- Production safe? YES/NO
+
+-------------------------------------
+
+IMPORTANT:
+- DO NOT write code yet
+- Only architecture + preview
+- Must be production-grade SaaS design

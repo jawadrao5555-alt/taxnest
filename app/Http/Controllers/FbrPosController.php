@@ -139,7 +139,8 @@ class FbrPosController extends Controller
                     $discountAmount = min($discountValue, $subtotal);
                 }
 
-                $totalAmount = round($subtotal - $discountAmount + $totalTax, 2);
+                $fbrServiceCharge = $invoiceMode === 'fbr' ? 1.00 : 0.00;
+                $totalAmount = round($subtotal - $discountAmount + $totalTax + $fbrServiceCharge, 2);
 
                 $invoiceNumber = $invoiceMode === 'local'
                     ? $this->generateLocalInvoiceNumber($companyId)
@@ -158,6 +159,7 @@ class FbrPosController extends Controller
                     'discount_amount' => $discountAmount,
                     'tax_rate' => $defaultTaxRate,
                     'tax_amount' => $totalTax,
+                    'fbr_service_charge' => $fbrServiceCharge,
                     'total_amount' => $totalAmount,
                     'payment_method' => $request->payment_method,
                     'status' => 'completed',

@@ -188,6 +188,12 @@
             <td class="tot-label">Tax ({{ number_format($transaction->tax_rate, 0) }}%):</td>
             <td class="tot-value">PKR {{ number_format($transaction->tax_amount, 2) }}</td>
         </tr>
+        @if($transaction->fbr_service_charge > 0)
+        <tr>
+            <td class="tot-label">FBR Service Charge:</td>
+            <td class="tot-value">PKR {{ number_format($transaction->fbr_service_charge, 2) }}</td>
+        </tr>
+        @endif
     </table>
     <div class="double-separator"></div>
     <table class="totals-table">

@@ -175,6 +175,12 @@
                             <span>Tax</span>
                             <span x-text="'PKR ' + formatNum(calcTax())"></span>
                         </div>
+                        @if($fbrReportingEnabled)
+                        <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                            <span>FBR Service Charge <span class="text-xs">(SRO 1279/2021)</span></span>
+                            <span>PKR 1.00</span>
+                        </div>
+                        @endif
                         <div class="flex justify-between font-bold text-lg text-blue-800 dark:text-blue-300 pt-2 border-t border-blue-200 dark:border-blue-700">
                             <span>Total</span>
                             <span x-text="'PKR ' + formatNum(calcTotal())"></span>
@@ -224,7 +230,8 @@ function fbrPosInvoice() {
             }, 0);
         },
         calcTotal() {
-            return this.calcSubtotal() - this.calcDiscount() + this.calcTax();
+            var fbrCharge = {{ $fbrReportingEnabled ? '1' : '0' }};
+            return this.calcSubtotal() - this.calcDiscount() + this.calcTax() + fbrCharge;
         },
         formatNum(n) {
             return Number(n).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

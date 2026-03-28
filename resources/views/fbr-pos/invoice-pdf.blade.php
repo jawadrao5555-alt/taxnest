@@ -173,6 +173,12 @@
                 <div class="lbl">Tax ({{ number_format($transaction->tax_rate, 0) }}%)</div>
                 <div class="val">PKR {{ number_format($transaction->tax_amount, 2) }}</div>
             </div>
+            @if($transaction->fbr_service_charge > 0)
+            <div class="total-row">
+                <div class="lbl">FBR Service Charge (SRO 1279/2021)</div>
+                <div class="val">PKR {{ number_format($transaction->fbr_service_charge, 2) }}</div>
+            </div>
+            @endif
         </div>
 
         <div class="grand-total-box">

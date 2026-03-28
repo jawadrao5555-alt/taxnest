@@ -125,6 +125,12 @@
                         <span class="text-gray-500 dark:text-gray-400">Tax</span>
                         <span class="text-gray-900 dark:text-white">PKR {{ number_format($transaction->tax_amount, 2) }}</span>
                     </div>
+                    @if($transaction->fbr_service_charge > 0)
+                    <div class="flex justify-between">
+                        <span class="text-gray-500 dark:text-gray-400">FBR Service Charge</span>
+                        <span class="text-gray-900 dark:text-white">PKR {{ number_format($transaction->fbr_service_charge, 2) }}</span>
+                    </div>
+                    @endif
                     <div class="flex justify-between font-bold text-lg pt-2 border-t border-gray-200 dark:border-gray-700">
                         <span class="text-gray-900 dark:text-white">Total</span>
                         <span class="text-blue-600">PKR {{ number_format($transaction->total_amount, 2) }}</span>

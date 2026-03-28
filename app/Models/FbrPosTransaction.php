@@ -9,7 +9,7 @@ class FbrPosTransaction extends Model
     protected $fillable = [
         'company_id', 'invoice_number', 'invoice_mode', 'customer_name', 'customer_phone', 'customer_ntn',
         'subtotal', 'discount_type', 'discount_value', 'discount_amount',
-        'tax_rate', 'tax_amount', 'total_amount', 'payment_method',
+        'tax_rate', 'tax_amount', 'fbr_service_charge', 'total_amount', 'payment_method',
         'status', 'fbr_invoice_number', 'fbr_status', 'fbr_response_code',
         'fbr_response', 'fbr_submission_hash', 'created_by',
         'share_token', 'share_token_created_at',
@@ -21,6 +21,7 @@ class FbrPosTransaction extends Model
         'discount_amount' => 'decimal:2',
         'tax_rate' => 'decimal:2',
         'tax_amount' => 'decimal:2',
+        'fbr_service_charge' => 'decimal:2',
         'total_amount' => 'decimal:2',
         'fbr_response' => 'array',
         'share_token_created_at' => 'datetime',

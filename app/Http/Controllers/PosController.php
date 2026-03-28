@@ -76,6 +76,11 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
+
+        if ($company && $company->restaurant_mode) {
+            return app(RestaurantPosController::class)->pos($request);
+        }
+
         $products = PosProduct::where('company_id', $companyId)->where('is_active', true)->get();
         $services = PosService::where('company_id', $companyId)->where('is_active', true)->get();
         $posCustomers = PosCustomer::where('company_id', $companyId)->where('is_active', true)->orderBy('name')->get();

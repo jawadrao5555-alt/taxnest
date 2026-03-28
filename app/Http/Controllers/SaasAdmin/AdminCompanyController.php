@@ -98,7 +98,8 @@ class AdminCompanyController extends Controller
     {
         $company = Company::findOrFail($id);
         $franchises = Franchise::where('status', 'active')->get();
-        return view('saas-admin.companies.edit', compact('company', 'franchises'));
+        $companyAdmin = User::where('company_id', $id)->where('role', 'company_admin')->first();
+        return view('saas-admin.companies.edit', compact('company', 'franchises', 'companyAdmin'));
     }
 
     public function update(Request $request, $id)
@@ -128,7 +129,23 @@ class AdminCompanyController extends Controller
             'fbr_pos_enabled' => 'nullable|boolean',
             'fbr_pos_environment' => 'nullable|in:sandbox,production',
             'fbr_pos_id' => 'nullable|string|max:100',
+            'admin_password' => 'nullable|string|min:6|max:100',
+            'admin_email' => 'nullable|email|max:255',
         ]);
+
+        if ($request->filled('admin_password') || $request->filled('admin_email')) {
+            $companyAdmin = User::where('company_id', $id)->where('role', 'company_admin')->first();
+            if ($companyAdmin) {
+                if ($request->filled('admin_password')) {
+                    $companyAdmin->password = Hash::make($request->admin_password);
+                }
+                if ($request->filled('admin_email')) {
+                    $companyAdmin->email = $request->admin_email;
+                }
+                $companyAdmin->save();
+                AdminAuditLog::log(auth('admin')->id(), 'Company admin credentials updated', 'User', $companyAdmin->id, ['company' => $company->name]);
+            }
+        }
 
         $fields = [
             'name', 'owner_name', 'email', 'ntn', 'cnic', 'phone', 'mobile',

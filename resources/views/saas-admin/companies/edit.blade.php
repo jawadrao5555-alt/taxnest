@@ -98,6 +98,32 @@
             </div>
         </div>
 
+        @if(isset($companyAdmin) && $companyAdmin)
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <h3 class="text-sm font-semibold text-white mb-1">Company Admin Credentials</h3>
+            <p class="text-xs text-gray-500 mb-4">Update login credentials for the company admin user. Leave password blank to keep unchanged.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Admin Login Email</label>
+                    <input type="email" name="admin_email" value="{{ old('admin_email', $companyAdmin->email) }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 placeholder-gray-600">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">New Password</label>
+                    <input type="password" name="admin_password" placeholder="Leave blank to keep current" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 placeholder-gray-600">
+                    <p class="text-[10px] text-gray-600 mt-1">Minimum 6 characters</p>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Current Username</label>
+                    <input type="text" value="{{ $companyAdmin->username ?? 'Not set' }}" disabled class="w-full bg-gray-800/50 border border-gray-700 rounded-lg text-gray-500 text-sm px-3 py-2 cursor-not-allowed">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Admin Name</label>
+                    <input type="text" value="{{ $companyAdmin->name }}" disabled class="w-full bg-gray-800/50 border border-gray-700 rounded-lg text-gray-500 text-sm px-3 py-2 cursor-not-allowed">
+                </div>
+            </div>
+        </div>
+        @endif
+
         @if($company->product_type === 'di')
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-white mb-4">FBR Settings</h3>

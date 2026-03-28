@@ -1,0 +1,139 @@
+Before writing ANY code, provide a COMPLETE FINAL VISUAL PREVIEW and ARCHITECTURE for the FULL POS SYSTEM with ALL modules combined.
+
+IMPORTANT:
+- Do NOT write code yet
+- Show final integrated system
+- Must be production-safe
+- Must NOT modify existing PRA POS, FBR POS, or Digital Invoice
+
+--------------------------------------
+MODULES INCLUDED
+--------------------------------------
+1. POS Dashing Screen (Aronium Style)
+2. Table Management System
+3. Kitchen Display System (KDS)
+4. Inventory System
+5. Recipe / BOM (Ingredient deduction)
+6. Customer Management (CRM)
+7. Full Keyboard-Driven POS (minimal mouse)
+
+--------------------------------------
+1. COMPLETE VISUAL PREVIEW
+--------------------------------------
+
+Show detailed UI layouts (text-based mockups) for:
+
+A) POS Screen
+- Category scroll
+- Product grid
+- Live cart
+- Customer input (search by phone/name)
+- Recipe indicator (recipe/simple product)
+- Table indicator + lock status
+- Keyboard-focused UI
+
+B) Table Management Screen
+- Floor layout
+- Table colors (available, occupied, reserved, locked)
+- Lock info (terminal/user)
+
+C) Kitchen Display System
+- Orders grouped by Table + Order ID
+- Status: new / preparing / ready
+- Multiple orders per table
+
+D) Recipe Management UI
+- Ingredients list
+- Recipe builder per product
+
+E) Customer System UI
+- Customer search (live)
+- New customer popup
+- Customer stats (orders, total spent)
+
+--------------------------------------
+2. COMPLETE FLOW (END-TO-END)
+--------------------------------------
+
+Explain FULL FLOW:
+
+- Table select → lock
+- Product add (keyboard)
+- Cart (frontend)
+- Customer attach (search or create)
+- HOLD order (no inventory deduction)
+- KDS receives order
+- PAY order:
+    → pos_transaction create
+    → recipe check
+    → ingredient deduction
+    → inventory update
+    → customer stats update
+    → table release
+
+--------------------------------------
+3. KEYBOARD SYSTEM (MANDATORY)
+--------------------------------------
+
+Define full keyboard workflow:
+
+- Search product
+- Add to cart
+- Change quantity
+- Select table
+- Hold order
+- Pay order
+- Navigate without mouse
+
+--------------------------------------
+4. DATABASE DESIGN (SAFE)
+--------------------------------------
+
+Show ALL new tables only:
+
+- restaurant_tables
+- restaurant_orders
+- restaurant_order_items
+- ingredients
+- product_recipes
+- customers
+
+Confirm:
+❌ No modification of existing tables
+❌ No breaking changes
+
+--------------------------------------
+5. INVENTORY + RECIPE INTEGRATION
+--------------------------------------
+
+Explain clearly:
+
+- Recipe exists → deduct ingredients
+- No recipe → deduct product
+- Deduction ONLY on PAY
+- No double deduction
+
+--------------------------------------
+6. PERFORMANCE PLAN
+--------------------------------------
+
+Explain:
+
+- Queries per action
+- No lag in POS
+- Alpine.js usage
+- Polling strategy for KDS
+
+--------------------------------------
+7. FINAL SAFETY CONFIRMATION
+
+Answer clearly:
+
+- Will PRA POS remain untouched? (YES/NO)
+- Will FBR POS remain untouched? (YES/NO)
+- Is system production safe? (YES/NO)
+- Any risks?
+
+--------------------------------------
+
+Wait for my approval before writing code.

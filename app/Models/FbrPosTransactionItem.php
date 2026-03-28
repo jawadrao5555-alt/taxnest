@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class FbrPosTransactionItem extends Model
 {
     protected $fillable = [
-        'transaction_id', 'product_id', 'item_name', 'hs_code',
+        'transaction_id', 'product_id', 'item_name', 'hs_code', 'uom',
         'quantity', 'unit_price', 'discount', 'tax_rate',
         'tax_amount', 'subtotal', 'total', 'is_tax_exempt',
     ];

@@ -42,6 +42,7 @@
                             <tr>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Item</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">HS Code</th>
+                                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">UoM</th>
                                 <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Qty</th>
                                 <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Price</th>
                                 <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">Tax</th>
@@ -58,6 +59,7 @@
                                     @endif
                                 </td>
                                 <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">{{ $item->hs_code ?? '—' }}</td>
+                                <td class="px-4 py-3 text-sm text-center text-gray-500 dark:text-gray-400 hidden sm:table-cell">{{ $item->uom ?? 'U' }}</td>
                                 <td class="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{{ $item->quantity }}</td>
                                 <td class="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">PKR {{ number_format($item->unit_price, 2) }}</td>
                                 <td class="px-4 py-3 text-sm text-right text-gray-500 dark:text-gray-400 hidden sm:table-cell">{{ $item->tax_rate }}%</td>
@@ -149,6 +151,10 @@
                         <span class="text-gray-900 dark:text-white">{{ $transaction->customer_ntn }}</span>
                     </div>
                     @endif
+                    <div class="flex justify-between">
+                        <span class="text-gray-500 dark:text-gray-400">Tax Period</span>
+                        <span class="text-gray-900 dark:text-white">{{ $transaction->created_at->format('F Y') }}</span>
+                    </div>
                     <div class="flex justify-between">
                         <span class="text-gray-500 dark:text-gray-400">Payment</span>
                         <span class="text-gray-900 dark:text-white capitalize">{{ str_replace('_', ' ', $transaction->payment_method) }}</span>

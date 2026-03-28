@@ -54,7 +54,7 @@
                                 <button type="button" @click="removeItem(index)" x-show="items.length > 1" class="text-red-500 hover:text-red-700 text-xs">Remove</button>
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                                <div class="sm:col-span-4">
+                                <div class="sm:col-span-3">
                                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Item Name *</label>
                                     <input type="text" :name="'items['+index+'][item_name]'" x-model="item.item_name" required
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
@@ -67,6 +67,22 @@
                                         placeholder="00000000">
                                 </div>
                                 <div class="sm:col-span-2">
+                                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">UoM</label>
+                                    <select :name="'items['+index+'][uom]'" x-model="item.uom"
+                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="U">Units (U)</option>
+                                        <option value="KG">Kilograms (KG)</option>
+                                        <option value="LTR">Litres (LTR)</option>
+                                        <option value="MTR">Metres (MTR)</option>
+                                        <option value="SQM">Sq. Metres (SQM)</option>
+                                        <option value="PCS">Pieces (PCS)</option>
+                                        <option value="PKT">Packets (PKT)</option>
+                                        <option value="DOZ">Dozens (DOZ)</option>
+                                        <option value="BOX">Boxes (BOX)</option>
+                                        <option value="SET">Sets (SET)</option>
+                                    </select>
+                                </div>
+                                <div class="sm:col-span-1">
                                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Qty *</label>
                                     <input type="number" :name="'items['+index+'][quantity]'" x-model.number="item.quantity" min="1" required
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
@@ -177,11 +193,11 @@
 <script>
 function fbrPosInvoice() {
     return {
-        items: [{ item_name: '', hs_code: '', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false }],
+        items: [{ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false }],
         discountType: '',
         discountValue: 0,
         addItem() {
-            this.items.push({ item_name: '', hs_code: '', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false });
+            this.items.push({ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false });
         },
         removeItem(index) {
             this.items.splice(index, 1);

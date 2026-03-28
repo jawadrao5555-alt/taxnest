@@ -80,6 +80,7 @@ class FbrPosController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.unit_price' => 'required|numeric|min:0.01',
             'items.*.hs_code' => 'nullable|string|max:20',
+            'items.*.uom' => 'nullable|string|in:U,KG,LTR,MTR,SQM,PCS,PKT,DOZ,BOX,SET',
             'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
             'items.*.is_tax_exempt' => 'nullable|boolean',
             'customer_name' => 'nullable|string|max:255',
@@ -116,6 +117,7 @@ class FbrPosController extends Controller
                     $itemsData[] = [
                         'item_name' => $item['item_name'],
                         'hs_code' => $item['hs_code'] ?? null,
+                        'uom' => $item['uom'] ?? 'U',
                         'product_id' => $item['product_id'] ?? null,
                         'quantity' => $qty,
                         'unit_price' => $price,

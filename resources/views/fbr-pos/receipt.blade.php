@@ -44,7 +44,8 @@
         .items-table { width: 100%; margin: 4px 0; border-collapse: collapse; table-layout: fixed; }
         .items-table th { font-size: 10px; text-transform: uppercase; border-bottom: 1px solid #000; padding: 2px 1px; text-align: left; }
         .items-table td { font-size: 11px; padding: 3px 1px; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }
-        .items-table .col-item { width: 46%; text-align: left; }
+        .items-table .col-item { width: 36%; text-align: left; }
+        .items-table .col-uom { width: 10%; text-align: center; }
         .items-table .col-qty { width: 10%; text-align: center; }
         .items-table .col-price { width: 22%; text-align: right; }
         .items-table .col-total { width: 22%; text-align: right; }
@@ -135,9 +136,13 @@
         @if($transaction->customer_ntn)
         <tr><td class="info-label">NTN:</td><td class="info-value">{{ $transaction->customer_ntn }}</td></tr>
         @endif
+        <tr><td class="info-label">Tax Period:</td><td class="info-value">{{ $transaction->created_at->format('M Y') }}</td></tr>
         <tr><td class="info-label">Payment:</td><td class="info-value">{{ ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</td></tr>
         @if($transaction->creator)
         <tr><td class="info-label">Cashier:</td><td class="info-value">{{ $transaction->creator->name }}</td></tr>
+        @endif
+        @if($company->fbr_pos_id)
+        <tr><td class="info-label">POS Reg #:</td><td class="info-value">{{ $company->fbr_pos_id }}</td></tr>
         @endif
     </table>
 
@@ -147,6 +152,7 @@
         <thead>
             <tr>
                 <th class="col-item">Item</th>
+                <th class="col-uom">UoM</th>
                 <th class="col-qty">Qty</th>
                 <th class="col-price">Price</th>
                 <th class="col-total">Total</th>
@@ -156,6 +162,7 @@
             @foreach($transaction->items as $item)
             <tr>
                 <td class="col-item">{{ $item->item_name }}</td>
+                <td class="col-uom">{{ $item->uom ?? 'U' }}</td>
                 <td class="col-qty">{{ $item->quantity }}</td>
                 <td class="col-price">{{ number_format($item->unit_price, 0) }}</td>
                 <td class="col-total">{{ number_format($item->subtotal, 0) }}</td>
@@ -194,9 +201,13 @@
 
     @if($transaction->fbr_status === 'submitted' && $transaction->fbr_invoice_number)
     <div class="fbr-badge">
-        <div class="fbr-title">FBR VERIFIED INVOICE</div>
+        <div class="fbr-title">✓ INTEGRATED WITH FBR</div>
+        <div style="font-size:11px; font-weight:bold; margin:3px 0;">FBR VERIFIED INVOICE</div>
         <div>POS: {{ $transaction->invoice_number }}</div>
         <div class="fbr-number">FBR: {{ $transaction->fbr_invoice_number }}</div>
+        @if($company->fbr_pos_id)
+        <div style="font-size:9px; margin-top:3px;">POS Reg #: {{ $company->fbr_pos_id }}</div>
+        @endif
     </div>
     @elseif($transaction->fbr_status === 'local')
     <div class="local-badge">
@@ -214,6 +225,9 @@
 
     <div class="footer text-center">
         <p>Thank you for your purchase!</p>
+        @if($company->fbr_pos_id)
+        <p style="font-weight:bold;">Integrated with FBR | Reg #: {{ $company->fbr_pos_id }}</p>
+        @endif
         <p>Powered by TaxNest FBR POS</p>
         <p>{{ now()->format('d/m/Y h:i:s A') }}</p>
     </div>

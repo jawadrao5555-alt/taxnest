@@ -1298,7 +1298,7 @@ class FbrService
             $rateValue = $isExempt ? '0%' : (($taxRate == intval($taxRate)) ? intval($taxRate) . '%' : round($taxRate, 2) . '%');
 
             $hsCode = $item->hs_code ?? '';
-            $uomCode = $this->getUomByHsCode($hsCode, 'U');
+            $uomCode = $item->uom ?? $this->getUomByHsCode($hsCode, 'U');
 
             if ($isExempt) {
                 $saleType = ($env === 'production') ? 'Exempt goods' : 'Exempt';

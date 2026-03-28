@@ -458,6 +458,8 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
         Route::post('/team/cashier/{id}/toggle', [PosController::class, 'toggleCashier'])->name('pos.team.toggle-cashier');
 
         Route::prefix('restaurant')->group(function () {
+            Route::get('/kitchen-settings', [RestaurantPosController::class, 'kitchenSettings'])->name('pos.restaurant.kitchen-settings');
+            Route::post('/kitchen-settings', [RestaurantPosController::class, 'updateKitchenSettings'])->name('pos.restaurant.kitchen-settings.update');
             Route::get('/table-management', [RestaurantTableController::class, 'manage'])->name('pos.restaurant.table-management');
             Route::post('/floors', [RestaurantTableController::class, 'storeFloor'])->name('pos.restaurant.floors.store');
             Route::put('/floors/{id}', [RestaurantTableController::class, 'updateFloor'])->name('pos.restaurant.floors.update');

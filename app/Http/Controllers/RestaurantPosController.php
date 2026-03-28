@@ -206,6 +206,15 @@ class RestaurantPosController extends Controller
         $praEnabled = (bool) $company->pra_reporting_enabled;
         $invoiceMode = $praEnabled ? 'pra' : 'local';
 
+        $stockErrors = $this->validateStockForOrder($companyId, $order);
+        if (!empty($stockErrors)) {
+            return response()->json([
+                'success' => false,
+                'stock_error' => true,
+                'message' => 'Insufficient stock: ' . implode(', ', $stockErrors),
+            ], 400);
+        }
+
         DB::beginTransaction();
         try {
             $invoiceNumber = $invoiceMode === 'local'
@@ -308,6 +317,28 @@ class RestaurantPosController extends Controller
             DB::rollBack();
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
+    }
+
+    private function validateStockForOrder($companyId, $order)
+    {
+        $errors = [];
+        foreach ($order->items->where('item_type', 'product') as $item) {
+            $recipes = ProductRecipe::where('company_id', $companyId)
+                ->where('product_id', $item->item_id)
+                ->with('ingredient')
+                ->get();
+
+            if ($recipes->isNotEmpty()) {
+                foreach ($recipes as $recipe) {
+                    $needed = round($recipe->quantity_needed * $item->quantity, 4);
+                    $ingredient = $recipe->ingredient;
+                    if ($ingredient && $ingredient->current_stock < $needed) {
+                        $errors[] = "{$ingredient->name} (need {$needed} {$ingredient->unit}, have {$ingredient->current_stock})";
+                    }
+                }
+            }
+        }
+        return $errors;
     }
 
     private function deductInventoryForOrder($companyId, $order, $transactionId, $invoiceNumber, $userId)
@@ -451,5 +482,27 @@ class RestaurantPosController extends Controller
             ->get();
 
         return response()->json($orders);
+    }
+
+    public function kitchenSettings()
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        return view('pos.restaurant.kitchen-settings', compact('company'));
+    }
+
+    public function updateKitchenSettings(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        $company->update([
+            'kds_enabled' => (bool) $request->kds_enabled,
+            'kitchen_printer_enabled' => (bool) $request->kitchen_printer_enabled,
+            'print_on_hold' => (bool) $request->print_on_hold,
+            'print_on_pay' => (bool) $request->print_on_pay,
+        ]);
+
+        return back()->with('success', 'Kitchen settings updated successfully.');
     }
 }

@@ -8,7 +8,7 @@ class PosProduct extends Model
 {
     protected $fillable = [
         'company_id', 'name', 'description', 'price', 'tax_rate',
-        'hs_code', 'uom', 'category', 'sku', 'barcode', 'is_active', 'is_tax_exempt',
+        'hs_code', 'uom', 'category', 'image', 'sku', 'barcode', 'is_active', 'is_tax_exempt',
     ];
 
     protected $casts = [

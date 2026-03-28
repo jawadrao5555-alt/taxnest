@@ -1,0 +1,151 @@
+UPGRADE EXISTING NESTPOS TO ENTERPRISE RESTAURANT POS (NO BREAKING CHANGES)
+
+IMPORTANT:
+- DO NOT modify existing working POS, PRA, FBR POS, or Digital Invoice
+- ONLY extend /pos/restaurant module
+- Keep full company isolation
+
+==================================================
+PHASE 1: UI / UX UPGRADE (PREMIUM LOOK)
+==================================================
+
+Upgrade POS Dashing Screen:
+
+1. Product Grid:
+- Convert to modern card layout
+- Add product images (square)
+- Add soft shadow, rounded corners
+- Add hover/keyboard focus scale effect
+- Show price badge
+- Show "🍳 Recipe" badge
+- Maintain full keyboard navigation
+
+2. Animations:
+- Smooth add-to-cart animation
+- Visual highlight on selection
+- Keep ultra-fast performance (no lag)
+
+3. Search:
+- Instant filter (frontend)
+- Smart dropdown suggestions
+
+==================================================
+PHASE 2: AI PRODUCT IMAGE SYSTEM
+==================================================
+
+1. Add column:
+- pos_products.image (nullable)
+
+2. On product create/update:
+- Fetch image from Unsplash API
+- Query: "<product_name> food"
+- Save locally in /storage/products/
+- Attach to product
+
+3. Add button:
+- "Refresh Image"
+
+4. Fallback:
+- Default placeholder if no image found
+
+==================================================
+PHASE 3: HYBRID KITCHEN SYSTEM (KDS + PRINT)
+==================================================
+
+Add settings (per company):
+
+- kds_enabled (boolean)
+- kitchen_printer_enabled (boolean)
+- print_on_hold (boolean)
+- print_on_pay (boolean)
+
+FLOW:
+
+ON HOLD:
+- Save restaurant_order
+- IF kds_enabled → send to KDS
+- IF printer_enabled AND print_on_hold → print KOT
+- DO NOT deduct inventory
+- DO NOT print customer receipt
+
+ON PAY:
+- Create pos_transaction
+- Deduct inventory (recipe or product)
+- Print customer receipt
+
+Add:
+- Reprint KOT
+- Reprint Receipt
+
+==================================================
+PHASE 4: KITCHEN DISPLAY SYSTEM (IMPROVED)
+==================================================
+
+- Show only: held, preparing
+- Auto refresh (10–15 sec)
+- Status flow:
+  held → preparing → ready
+
+- Each ORDER = separate card (even same table)
+
+==================================================
+PHASE 5: INVENTORY + RECIPE ENGINE (ENTERPRISE)
+==================================================
+
+1. BEFORE PAY:
+- Validate stock:
+
+IF ingredient stock < required:
+   → BLOCK payment
+   → show error
+
+2. ON PAY (DB TRANSACTION REQUIRED):
+
+DB::transaction:
+- create pos_transaction
+- IF recipe exists:
+     deduct ingredients
+     log inventory_movements (type: recipe_sale)
+- ELSE:
+     use existing stock deduction
+- update order status = completed
+
+3. Add:
+- Low stock alert (ingredients)
+- Recipe consumption tracking
+
+==================================================
+PHASE 6: TABLE LOCK SYSTEM (SAFE)
+==================================================
+
+- Lock on table select
+- Unlock on HOLD or PAY
+- Auto expire after 30 min
+
+==================================================
+PHASE 7: PERFORMANCE OPTIMIZATION
+==================================================
+
+- Load products once (JS memory)
+- No DB calls on search/filter
+- KDS optimized query (status filter)
+
+==================================================
+PHASE 8: SAFETY
+==================================================
+
+✔ No change to existing POS routes
+✔ No change to PRA logic
+✔ No change to FBR POS
+✔ No change to Digital Invoice
+✔ Only new tables / new features
+
+==================================================
+
+After implementation:
+→ Show visual preview of upgraded POS screen
+→ Show sample kitchen ticket
+→ Show KDS screen
+
+DO NOT PUSH TO GITHUB
+WORK LOCALLY ONLY

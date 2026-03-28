@@ -236,10 +236,12 @@ function openReceiptPopup() {
     document.getElementById('receiptPopupBadge').textContent = 'Invoice Receipt';
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
+    history.pushState({ receiptPopup: true }, '');
     requestAnimationFrame(() => { modal.classList.remove('opacity-0'); modal.classList.add('opacity-100'); });
 }
-function closeReceiptPopup() {
+function closeReceiptPopup(skipHistory) {
     const modal = document.getElementById('receiptPopup');
+    if (modal.style.display === 'none') return;
     modal.classList.remove('opacity-100');
     modal.classList.add('opacity-0');
     setTimeout(() => {
@@ -247,7 +249,14 @@ function closeReceiptPopup() {
         document.body.style.overflow = '';
         document.getElementById('fbrPosPdfIframe').src = '';
     }, 250);
+    if (!skipHistory) { try { history.back(); } catch(e) {} }
 }
+window.addEventListener('popstate', function(e) {
+    const modal = document.getElementById('receiptPopup');
+    if (modal && modal.style.display === 'flex') {
+        closeReceiptPopup(true);
+    }
+});
 function printFbrPosPdf() {
     try {
         const iframe = document.getElementById('fbrPosPdfIframe');

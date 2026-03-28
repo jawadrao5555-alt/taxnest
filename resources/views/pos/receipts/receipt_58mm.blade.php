@@ -81,12 +81,18 @@
     </style>
 </head>
 <body>
-    <div class="no-print">
+    <div class="no-print" id="receiptActions">
         <button onclick="window.print()" style="padding: 8px 24px; background: #059669; color: white; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; margin-right: 8px;">Print</button>
-        <a href="{{ route('pos.transactions') }}" style="padding: 8px 24px; background: #6b7280; color: white; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; text-decoration: none; display: inline-block;">Back</a>
+        <a href="{{ route('pos.transactions') }}" target="_top" style="padding: 8px 24px; background: #6b7280; color: white; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; text-decoration: none; display: inline-block;">Back</a>
     </div>
     <script>
+        var isInIframe = (window.self !== window.top);
+        if (isInIframe) {
+            var actions = document.getElementById('receiptActions');
+            if (actions) actions.style.display = 'none';
+        }
         window.onafterprint = function() {
+            if (isInIframe) return;
             if (window.opener) {
                 window.close();
             } else {

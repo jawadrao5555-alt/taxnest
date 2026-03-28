@@ -578,6 +578,124 @@ class FbrPosController extends Controller
         return view('fbr-pos.receipt', compact('transaction', 'company'));
     }
 
+    public function reports()
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        $todayStats = FbrPosTransaction::where('company_id', $companyId)
+            ->whereDate('created_at', today())
+            ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue, COALESCE(SUM(tax_amount), 0) as tax, COALESCE(SUM(discount_amount), 0) as discount')
+            ->first();
+
+        $monthStats = FbrPosTransaction::where('company_id', $companyId)
+            ->whereYear('created_at', now()->year)
+            ->whereMonth('created_at', now()->month)
+            ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue, COALESCE(SUM(tax_amount), 0) as tax, COALESCE(SUM(discount_amount), 0) as discount')
+            ->first();
+
+        $dailySales = FbrPosTransaction::where('company_id', $companyId)
+            ->whereYear('created_at', now()->year)
+            ->whereMonth('created_at', now()->month)
+            ->selectRaw('DATE(created_at) as date, COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue')
+            ->groupByRaw('DATE(created_at)')
+            ->orderBy('date')
+            ->get();
+
+        $paymentBreakdown = FbrPosTransaction::where('company_id', $companyId)
+            ->whereYear('created_at', now()->year)
+            ->whereMonth('created_at', now()->month)
+            ->selectRaw('payment_method, COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue')
+            ->groupBy('payment_method')
+            ->get();
+
+        return view('fbr-pos.reports', compact('company', 'todayStats', 'monthStats', 'dailySales', 'paymentBreakdown'));
+    }
+
+    public function taxReports()
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        $monthlyTax = FbrPosTransaction::where('company_id', $companyId)
+            ->whereYear('created_at', now()->year)
+            ->whereMonth('created_at', now()->month)
+            ->selectRaw('COALESCE(SUM(tax_amount), 0) as total_tax, COALESCE(SUM(subtotal), 0) as total_sales, COALESCE(SUM(fbr_service_charge), 0) as total_pos_fee, COUNT(*) as invoice_count')
+            ->first();
+
+        $fbrStats = FbrPosTransaction::where('company_id', $companyId)
+            ->whereYear('created_at', now()->year)
+            ->whereMonth('created_at', now()->month)
+            ->selectRaw("
+                COUNT(CASE WHEN fbr_status = 'submitted' THEN 1 END) as submitted,
+                COUNT(CASE WHEN fbr_status = 'pending' THEN 1 END) as pending,
+                COUNT(CASE WHEN fbr_status = 'failed' THEN 1 END) as failed,
+                COUNT(CASE WHEN fbr_status = 'local' THEN 1 END) as local_count
+            ")->first();
+
+        $taxByRate = FbrPosTransaction::where('company_id', $companyId)
+            ->whereYear('created_at', now()->year)
+            ->whereMonth('created_at', now()->month)
+            ->selectRaw('tax_rate, COUNT(*) as count, COALESCE(SUM(tax_amount), 0) as tax_total, COALESCE(SUM(subtotal), 0) as sales_total')
+            ->groupBy('tax_rate')
+            ->orderBy('tax_rate')
+            ->get();
+
+        return view('fbr-pos.tax-reports', compact('company', 'monthlyTax', 'fbrStats', 'taxByRate'));
+    }
+
+    public function businessProfile(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        if ($request->isMethod('post')) {
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'address' => 'nullable|string|max:500',
+                'phone' => 'nullable|string|max:20',
+                'email' => 'nullable|email|max:255',
+                'ntn' => 'nullable|string|max:20',
+            ]);
+
+            $company->update($validated);
+            return redirect()->route('fbrpos.business-profile')->with('success', 'Business profile updated successfully.');
+        }
+
+        return view('fbr-pos.business-profile', compact('company'));
+    }
+
+    public function myProfile(Request $request)
+    {
+        $user = Auth::guard('fbrpos')->user();
+
+        if ($request->isMethod('post')) {
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'email' => 'required|email|max:255|unique:users,email,' . $user->id,
+                'phone' => 'nullable|string|max:20',
+                'current_password' => 'nullable|required_with:new_password',
+                'new_password' => 'nullable|min:8|confirmed',
+            ]);
+
+            $user->name = $validated['name'];
+            $user->email = $validated['email'];
+            $user->phone = $validated['phone'] ?? $user->phone;
+
+            if (!empty($validated['current_password'])) {
+                if (!\Hash::check($validated['current_password'], $user->password)) {
+                    return back()->withErrors(['current_password' => 'Current password is incorrect.']);
+                }
+                $user->password = \Hash::make($validated['new_password']);
+            }
+
+            $user->save();
+            return redirect()->route('fbrpos.my-profile')->with('success', 'Profile updated successfully.');
+        }
+
+        return view('fbr-pos.my-profile', compact('user'));
+    }
+
     public function downloadPdf($id)
     {
         $companyId = app('currentCompanyId');

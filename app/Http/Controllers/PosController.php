@@ -1651,7 +1651,14 @@ class PosController extends Controller
             'barcode' => 'nullable|string|max:100',
             'uom' => 'nullable|string|max:20',
             'description' => 'nullable|string|max:500',
+            'image' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:2048',
         ]);
+
+        $imageName = null;
+        if ($request->hasFile('image')) {
+            $imageName = $companyId . '_' . time() . '_' . uniqid() . '.' . $request->file('image')->getClientOriginalExtension();
+            $request->file('image')->storeAs('products', $imageName, 'public');
+        }
 
         PosProduct::create([
             'company_id' => $companyId,
@@ -1664,6 +1671,7 @@ class PosController extends Controller
             'barcode' => $request->barcode,
             'uom' => $request->uom ?? 'NOS',
             'is_tax_exempt' => $request->has('is_tax_exempt'),
+            'image' => $imageName,
         ]);
 
         return back()->with('success', 'Product added successfully.');
@@ -1838,12 +1846,31 @@ class PosController extends Controller
             'barcode' => 'nullable|string|max:100',
             'uom' => 'nullable|string|max:20',
             'description' => 'nullable|string|max:500',
+            'image' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:2048',
         ]);
 
-        $product->update(array_merge(
+        $data = array_merge(
             $request->only(['name', 'description', 'price', 'tax_rate', 'category', 'sku', 'barcode', 'uom']),
             ['is_tax_exempt' => $request->has('is_tax_exempt')]
-        ));
+        );
+
+        if ($request->has('remove_image') && $request->remove_image === '1') {
+            if ($product->image && \Illuminate\Support\Facades\Storage::disk('public')->exists('products/' . $product->image)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete('products/' . $product->image);
+            }
+            $data['image'] = null;
+        }
+
+        if ($request->hasFile('image')) {
+            if ($product->image && \Illuminate\Support\Facades\Storage::disk('public')->exists('products/' . $product->image)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete('products/' . $product->image);
+            }
+            $imageName = $companyId . '_' . time() . '_' . uniqid() . '.' . $request->file('image')->getClientOriginalExtension();
+            $request->file('image')->storeAs('products', $imageName, 'public');
+            $data['image'] = $imageName;
+        }
+
+        $product->update($data);
         return back()->with('success', 'Product updated successfully.');
     }
 

@@ -59,7 +59,7 @@
 
     <div id="addProductForm" class="hidden mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-md p-5">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Add New Product</h3>
-        <form method="POST" action="{{ route('pos.products.store') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <form method="POST" action="{{ route('pos.products.store') }}" enctype="multipart/form-data" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             @csrf
             <div>
                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Product Name *</label>
@@ -97,6 +97,11 @@
                     <option value="BOX">BOX (Boxes)</option>
                 </select>
             </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Product Image</label>
+                <input type="file" name="image" accept="image/jpeg,image/jpg,image/png,image/webp"
+                    class="w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 dark:file:bg-purple-900/30 dark:file:text-purple-300">
+            </div>
             <div class="flex items-center gap-3 pt-5">
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" name="is_tax_exempt" value="1" class="rounded border-gray-300 text-amber-600 focus:ring-amber-500">
@@ -127,11 +132,17 @@
                     @forelse($products as $product)
                     <tr class="{{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }} {{ !$product->is_active ? 'opacity-50' : '' }}" x-data="{ editing: false }">
                         <td class="px-4 py-3">
-                            <div x-show="!editing" class="flex items-center gap-2">
-                                <span class="font-medium text-gray-900 dark:text-white">{{ $product->name }}</span>
-                                @if($product->is_tax_exempt)
-                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">EXEMPT</span>
-                                @endif
+                            <div x-show="!editing" class="flex items-center gap-3">
+                                <img src="{{ $product->image ? asset('storage/products/' . $product->image) : asset('img/food-placeholder.svg') }}" alt="{{ $product->name }}" class="w-10 h-10 rounded-lg object-cover bg-gray-100 dark:bg-gray-700 flex-shrink-0 border border-gray-200 dark:border-gray-700" onerror="this.src='{{ asset('img/food-placeholder.svg') }}'">
+                                <div>
+                                    <span class="font-medium text-gray-900 dark:text-white">{{ $product->name }}</span>
+                                    @if($product->is_tax_exempt)
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 ml-1">EXEMPT</span>
+                                    @endif
+                                    @if($product->description)
+                                    <div class="text-[10px] text-gray-400 truncate max-w-[180px]">{{ $product->description }}</div>
+                                    @endif
+                                </div>
                             </div>
                         </td>
                         <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ $product->category ?? '—' }}</td>
@@ -158,7 +169,7 @@
                     </tr>
                     <tr x-show="editing" class="bg-purple-50/50 dark:bg-purple-900/10">
                         <td colspan="7" class="px-4 py-3">
-                            <form method="POST" action="{{ route('pos.products.update', $product->id) }}" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 items-end">
+                            <form method="POST" action="{{ route('pos.products.update', $product->id) }}" enctype="multipart/form-data" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 items-end">
                                 @csrf @method('PUT')
                                 <input type="text" name="name" value="{{ $product->name }}" required placeholder="Name" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full col-span-2 sm:col-span-1">
                                 <input type="number" name="price" value="{{ $product->price }}" step="0.01" required placeholder="Price" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
@@ -171,6 +182,19 @@
                                     <option value="{{ $u }}" {{ $product->uom === $u ? 'selected' : '' }}>{{ $u }}</option>
                                     @endforeach
                                 </select>
+                                <div>
+                                    <div class="flex items-center gap-2 mb-1">
+                                        @if($product->image)
+                                        <img src="{{ asset('storage/products/' . $product->image) }}" class="w-8 h-8 rounded object-cover border" onerror="this.style.display='none'">
+                                        <label class="flex items-center gap-1 cursor-pointer">
+                                            <input type="checkbox" name="remove_image" value="1" class="rounded border-gray-300 text-red-500 focus:ring-red-500 w-3 h-3">
+                                            <span class="text-[10px] text-red-500">Remove</span>
+                                        </label>
+                                        @endif
+                                    </div>
+                                    <input type="file" name="image" accept="image/jpeg,image/jpg,image/png,image/webp"
+                                        class="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-purple-50 file:text-purple-700">
+                                </div>
                                 <div class="flex items-center gap-3">
                                     <label class="flex items-center gap-1.5 cursor-pointer">
                                         <input type="checkbox" name="is_tax_exempt" value="1" {{ $product->is_tax_exempt ? 'checked' : '' }} class="rounded border-gray-300 text-amber-600 focus:ring-amber-500">

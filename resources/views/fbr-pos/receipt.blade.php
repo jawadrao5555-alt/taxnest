@@ -205,10 +205,25 @@
 
     <div class="separator"></div>
 
+    @php
+        $qrData = json_encode([
+            'pos' => $transaction->invoice_number,
+            'fbr' => $transaction->fbr_invoice_number ?? '',
+            'ntn' => $company->ntn ?? '',
+            'date' => $transaction->created_at->format('d/m/Y'),
+            'total' => number_format($transaction->total_amount, 2, '.', ''),
+            'reg' => $company->fbr_pos_id ?? '',
+        ]);
+        $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' . urlencode($qrData);
+    @endphp
+
     @if($transaction->fbr_status === 'submitted' && $transaction->fbr_invoice_number)
     <div class="fbr-badge">
         <div class="fbr-title">✓ INTEGRATED WITH FBR</div>
         <div style="font-size:11px; font-weight:bold; margin:3px 0;">FBR VERIFIED INVOICE</div>
+        <div style="margin: 6px 0;">
+            <img src="{{ $qrUrl }}" alt="FBR QR Code" style="width:100px; height:100px; margin:0 auto; display:block;">
+        </div>
         <div>POS: {{ $transaction->invoice_number }}</div>
         <div class="fbr-number">FBR: {{ $transaction->fbr_invoice_number }}</div>
         @if($company->fbr_pos_id)
@@ -222,10 +237,16 @@
         {{ $transaction->invoice_number }}
     </div>
     @else
-    <div class="local-badge">
-        FBR PENDING<br>
-        Will retry automatically<br>
-        {{ $transaction->invoice_number }}
+    <div class="fbr-badge" style="border-style: dashed;">
+        <div class="fbr-title">⏳ FBR PENDING</div>
+        <div style="margin: 6px 0;">
+            <img src="{{ $qrUrl }}" alt="QR Code" style="width:100px; height:100px; margin:0 auto; display:block;">
+        </div>
+        <div>POS: {{ $transaction->invoice_number }}</div>
+        <div style="font-size:10px; margin-top:3px;">Will retry automatically</div>
+        @if($company->fbr_pos_id)
+        <div style="font-size:9px; margin-top:3px;">POS Reg #: {{ $company->fbr_pos_id }}</div>
+        @endif
     </div>
     @endif
 

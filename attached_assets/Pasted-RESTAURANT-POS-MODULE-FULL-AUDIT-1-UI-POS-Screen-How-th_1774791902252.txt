@@ -1,0 +1,119 @@
+RESTAURANT POS MODULE — FULL AUDIT
+1. UI / POS Screen
+How the product grid is built:
+
+Products and services are loaded from the database in a single pos() controller method — two queries: PosProduct::where(...) and PosService::where(...).
+They're converted to JSON and passed directly into an Alpine.js restaurantPos() component via @json().
+The grid uses CSS grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5. Responsive, but hardcoded breakpoints — the calcGridCols() function recalculates for keyboard nav but doesn't actually change the CSS grid; it only controls arrow-key navigation stride.
+How categories work:
+
+Categories are extracted server-side via $products->pluck('category')->filter()->unique()->sort().
+Rendered as horizontal scrollable pills (Blade @foreach). Category switching is instant — it just re-filters the already-loaded JS array.
+Weakness: Categories are not a separate table/model. They're just a free-text category column on pos_products. No ordering control, no color coding, no icons. If a product has no category, it falls under "All" only.
+How cart updates:
+
+100% frontend (Alpine.js). The cart is a JS array. No backend call on add/remove/qty change.
+Cart is persisted to localStorage keyed by user ID + company ID. Notes are also saved.
+On page reload, cart is restored from localStorage. This is good for power-outage recovery.
+Weakness: The cart items use the price from initial page load. If an admin changes a product price while a cashier has a session open, the old price stays in the cart until page refresh. There's no price sync.
+Product images:
+
+Dynamic. Images are stored via ProductImageService (Unsplash/Picsum auto-fetch on product creation). Stored at storage/products/{filename}.
+POS uses asset('storage/products/' . $p->image). Has an onerror fallback on <img> to show an initial letter placeholder if image fails.
+A manual refresh endpoint exists at /pos/restaurant/api/refresh-product-image/{id} — but there's no UI button on the POS screen itself to trigger it. It's only accessible via table management/product pages.
+2. Kitchen System
+When KDS receives orders:
+
+KDS (RestaurantKdsController) polls via /pos/restaurant/api/live-orders. It shows ALL orders with status held, preparing, or ready.
+So KDS receives the order on HOLD, not PAY. This is correct for restaurant flow — kitchen starts cooking when the order is placed (held), payment comes after.
+Live orders endpoint includes elapsed time and an is_urgent flag (>15 min).
+Kitchen ticket printing:
+
+Implemented. The kitchen ticket view (kitchen-ticket.blade.php) is a fully styled 80mm thermal receipt with category-grouped stations, RUSH priority badge, item quantities, special notes, kitchen notes, reprint button.
+Auto-print is supported via ?auto_print=1 URL parameter.
+print_on_hold setting: When enabled, holdOrder() JS opens a new window to the kitchen-ticket URL. This triggers browser print dialog. It's not direct printer integration — it relies on the browser's print-to-thermal-printer capability.
+Weakness: There is no actual raw ESC/POS printer integration. It's browser window.print() only. For a real restaurant, this requires the thermal printer to be set as the browser default printer and the user to click "Print" in the dialog. Not truly automatic.
+Order status flow:
+
+held → preparing → ready → (completed via pay) or cancelled at any stage.
+Status transitions are validated in RestaurantKdsController::updateStatus() with a strict $validTransitions map. You can't go backwards (e.g., ready → preparing is blocked).
+Weakness: ready → completed is NOT in the allowed KDS transitions. The only way to reach completed is through payOrder(). This is technically correct but means the KDS can only mark orders as cancelled, not complete them. The KDS has no "Serve" button that marks completion — completion is payment-driven only.
+3. Inventory + Recipe
+Exact logic on PAY:
+
+validateStockForOrder() runs first — checks each product item's recipes against ingredient stock. If any ingredient has insufficient stock, returns error with details.
+If stock passes, inside a DB transaction:
+Creates PosTransaction and PosTransactionItem records
+Updates order status to completed
+Calls deductInventoryForOrder():
+For products WITH recipes: uses lockForUpdate() on each ingredient row, subtracts recipe.quantity_needed × item.quantity, creates InventoryMovement record
+For products WITHOUT recipes: delegates to PosInventoryController::deductStockForInvoice() (standard POS stock deduction)
+Stock validation:
+
+Yes, implemented. validateStockForOrder() runs BEFORE the DB transaction begins. Checks each recipe ingredient's current_stock against recipe.quantity_needed × item.quantity.
+Weakness: There's a TOCTOU race condition. Stock is validated, then the transaction starts, then stock is deducted. Between validation and deduction, another concurrent payment could deduct the same stock. The lockForUpdate() on individual ingredients helps prevent double-deduction, but the initial validation check is NOT under the lock. In very high-concurrency scenarios (two cashiers paying for the same ingredient-heavy item simultaneously), one could pass validation but fail on actual deduction with negative stock.
+DB transaction used:
+
+Yes. Both holdOrder() and payOrder() use DB::beginTransaction() with try/catch and DB::rollBack() on failure. This is correctly implemented.
+Weakness: deductInventoryForOrder() runs INSIDE the transaction but calls PosInventoryController::deductStockForInvoice() for non-recipe products. If that static method throws, the rollback will handle it. But balance_after on InventoryMovement is calculated from $ingredient->current_stock which was just updated in the same transaction — this is correct but the value reflects the in-transaction state, not committed state.
+4. Table System
+How table locking works:
+
+Tables have locked_by_user_id and locked_at columns.
+RestaurantTableController::lockTable() checks isLockedByOther() — if another user locked it, returns 423 error.
+In holdOrder(), if the table is locked by another user AND the lock is less than 30 minutes old, the order is rejected. If the lock is stale (>30 min), the hold proceeds anyway.
+On successful hold, the table status changes to occupied and the lock is cleared.
+Auto-unlock:
+
+On payOrder(): After payment, it checks if there are any OTHER active orders on the same table. If not, the table status resets to available and lock fields are cleared. This is correctly implemented.
+Zombie cleanup: CleanZombieTables artisan command runs every 15 minutes via scheduler. It finds tables marked occupied that have zero active orders (held/preparing/ready) and resets them to available.
+Weakness: The zombie cleanup lacks company scoping in the query — it queries ALL occupied tables across all companies. While this still works (it checks each table's orders correctly), it's inefficient for multi-tenant scale. Also, there's no lock timeout auto-release — if a user locks a table and never holds an order, the lock persists until the 30-minute stale threshold is reached during someone else's hold attempt. There's no background job to clean stale locks specifically.
+5. Performance
+Frontend product caching:
+
+Yes, implemented. cacheProductData() saves products/services to localStorage with a 5-minute TTL.
+But here's the catch: The cache is written but never actually READ back. Looking at the code: cacheProductData() checks if cached data exists and is fresh, but if it is, it just returns without doing anything. The products are ALWAYS loaded from the Blade @json() (server-rendered). The localStorage write is essentially dead code — it stores data that's never retrieved on subsequent loads.
+DB queries on POS screen load:
+Counting the queries in pos() method:
+
+Company::find($companyId) — 1 query
+PosProduct::where(...) — 1 query
+PosService::where(...) — 1 query
+ProductRecipe::where(...)->pluck(...) — 1 query (for recipe lookup)
+RestaurantTable::where(...)->with('floor') — 1 query + N eager-loaded floors
+Optional RestaurantTable::where(...)->find($tableId) — 0 or 1 query
+RestaurantOrder::where(...)->with(['table', 'items']) — 1 query + eager loads
+PosCustomer::where(...) — 1 query
+PosTaxRule::getRateForMethod('cash') — 1 query
+ProductRecipe::where(...)->with('ingredient') — 1 query + eager loads
+Stock status loop: iterates loaded recipes, no extra queries (eager loaded)
+Total: ~9-11 queries. This is acceptable for a page load. However:
+
+Weakness: ALL products, ALL services, ALL customers, and ALL held orders are loaded at once. For a restaurant with 500+ products or 2,000+ customers, the JSON payload embedded in the HTML could be very large (100KB+). The lazy loading only affects rendering (displayCount=60), but the full dataset is always serialized and sent.
+Weakness: The stock status calculation iterates every recipe for every product on every page load. For 200 products with 5 ingredients each, that's 1,000 iterations. Not expensive, but could be cached server-side.
+6. Missing Features (NOT Implemented)
+Priority/Rush flag is NOT saved to database. The priority field is passed in the hold JSON but the controller never saves it — RestaurantOrder doesn't have a priority column. The KOT blade uses $order->priority ?? false which always evaluates to false. The Rush button on the POS screen toggles a visual state that is lost on hold.
+No split payment. Only single payment method per order (cash, card, etc.). No cash+card split.
+No order editing after hold. You can "recall" a held order to the cart, but this is a destructive operation — the original held order stays in the list while a new cart is populated. If you hold again, a DUPLICATE order is created. The original held order becomes orphaned.
+No refund/void after payment. Once an order is completed, there's no way to reverse it. No refund flow, no credit note.
+No real-time KDS push. KDS uses polling (liveOrders endpoint). No WebSocket or Server-Sent Events. In a busy kitchen, polling delay could cause stale displays.
+No waiter/server assignment. Orders track created_by but there's no concept of assigning a waiter to a table or order.
+No multi-currency. Everything is Rs. (PKR) only.
+No tip tracking. No field for tips in the payment flow.
+No print-on-pay for receipt. The receipt auto-print only works when manually clicking "Print" on the success modal. There's no automatic window.open() to the receipt URL on pay — unlike kitchen tickets which auto-open on hold.
+No order merging. Can't merge two tables or two held orders.
+No product modifiers/add-ons. No "extra cheese" or "large size" — just special_notes as free text.
+Dashboard has no auto-refresh. It's static on page load. No polling for live stats.
+Customer stats updateCustomerStats() is a no-op. The method body is empty — just a comment saying "Stats tracking is done via query aggregation." The customer lookup API does real-time aggregation, but there's no denormalized counter update, meaning the lookup query hits all transactions every time.
+7. UI Limitations (What Can Be Improved Visually)
+Cart item notes always visible. Every cart item shows a text input for special notes, even when empty. This wastes vertical space. Should be a click-to-expand.
+No visual indicator of payment method selection. The pay modal (lines 320+) has payment buttons, but they're basic. No icons for cash/card/wallet.
+Mobile cart footer is cramped. The Void/Hold/Recall row + Pay button + discount panel + kitchen notes + totals section creates a very tall footer on small screens. Could easily exceed the viewport.
+Search dropdown lacks category grouping. Search results show a flat list with tiny category text. When products and services share names, it's unclear which is which.
+Held orders modal is basic. Just a list with "Pay" and "Recall" buttons. No timer showing how long each order has been waiting. No visual urgency indicators. No search/filter within held orders.
+Table picker has no visual map. Tables are shown as a simple list/grid. No floor plan visualization. For a restaurant with 30+ tables across 3 floors, this gets unwieldy.
+No dark mode toggle on POS. The POS respects system dark mode, but there's no manual toggle. Kitchen staff often prefer dark mode to reduce eye strain.
+Product cards don't show category badge. The category is only visible in search suggestions. On the grid, you can only distinguish by the active pill filter.
+Discount panel positioning. The discount panel opens inline between kitchen notes and the totals. On a busy screen with a full cart, it pushes the "Pay" button below the fold.
+No loading state on Pay/Hold buttons. When submitting is true, buttons are just opacity-40. No spinner or "Processing..." text to indicate action is happening.
+That's the honest picture. The core flow (browse → cart → hold → KDS → pay → receipt) works end-to-end with proper DB transactions and company isolation. The biggest technical gaps are the non-functional Rush flag, the orphan-on-recall bug, the TOCTOU stock race, and the dead localStorage cache code. The biggest functional gaps are no order editing, no split payments, and no refunds.

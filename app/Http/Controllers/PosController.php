@@ -1660,7 +1660,7 @@ class PosController extends Controller
             $request->file('image')->storeAs('products', $imageName, 'public');
         }
 
-        PosProduct::create([
+        $product = PosProduct::create([
             'company_id' => $companyId,
             'name' => $request->name,
             'description' => $request->description,
@@ -1673,6 +1673,15 @@ class PosController extends Controller
             'is_tax_exempt' => $request->has('is_tax_exempt'),
             'image' => $imageName,
         ]);
+
+        if (!$imageName && $request->name) {
+            try {
+                $autoImage = \App\Services\ProductImageService::fetchForProduct($request->name, $companyId);
+                if ($autoImage) {
+                    $product->update(['image' => $autoImage]);
+                }
+            } catch (\Exception $e) {}
+        }
 
         return back()->with('success', 'Product added successfully.');
     }

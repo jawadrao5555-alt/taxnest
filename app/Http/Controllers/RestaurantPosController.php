@@ -19,6 +19,8 @@ use App\Models\InventoryMovement;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use App\Services\ProductImageService;
 
 class RestaurantPosController extends Controller
 {
@@ -63,10 +65,33 @@ class RestaurantPosController extends Controller
 
         $taxRate = PosTaxRule::getRateForMethod('cash');
 
+        $stockStatus = [];
+        $recipes = ProductRecipe::where('company_id', $companyId)
+            ->with('ingredient')
+            ->get()
+            ->groupBy('product_id');
+
+        foreach ($recipes as $productId => $productRecipes) {
+            $status = 'available';
+            foreach ($productRecipes as $recipe) {
+                $ing = $recipe->ingredient;
+                if (!$ing || !$ing->is_active) continue;
+                if ((float)$ing->current_stock < (float)$recipe->quantity_needed) {
+                    $status = 'out';
+                    break;
+                } elseif ($ing->isLowStock()) {
+                    $status = 'low';
+                }
+            }
+            $stockStatus[$productId] = $status;
+        }
+
+        $blockOutOfStock = (bool)($company->block_out_of_stock ?? false);
+
         return view('pos.restaurant.pos', compact(
             'company', 'products', 'services', 'categories',
             'recipeLookup', 'tables', 'selectedTable', 'heldOrders',
-            'customers', 'taxRate'
+            'customers', 'taxRate', 'stockStatus', 'blockOutOfStock'
         ));
     }
 
@@ -96,6 +121,13 @@ class RestaurantPosController extends Controller
                 return response()->json(['success' => false, 'message' => 'Invalid customer'], 400);
             }
         }
+
+        $cartHash = md5(json_encode($request->items) . $request->table_id . $request->customer_id . $user->id);
+        $cacheKey = 'hold_dedup_' . $companyId . '_' . $cartHash;
+        if (cache()->has($cacheKey)) {
+            return response()->json(['success' => false, 'message' => 'Duplicate order detected. Please wait.'], 429);
+        }
+        cache()->put($cacheKey, true, 5);
 
         $resolvedItems = [];
         foreach ($request->items as $item) {
@@ -190,7 +222,8 @@ class RestaurantPosController extends Controller
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            Log::error('Hold order failed: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to hold order. Please try again.'], 500);
         }
     }
 
@@ -240,6 +273,7 @@ class RestaurantPosController extends Controller
                 'company_id' => $companyId,
                 'invoice_number' => $invoiceNumber,
                 'invoice_mode' => $invoiceMode,
+                'customer_id' => $order->customer_id,
                 'customer_name' => $order->customer_name,
                 'customer_phone' => $order->customer_phone,
                 'subtotal' => $subtotal,
@@ -329,7 +363,8 @@ class RestaurantPosController extends Controller
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            Log::error('Payment failed for order ' . $orderId . ': ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Payment processing failed. Please try again.'], 500);
         }
     }
 
@@ -530,5 +565,133 @@ class RestaurantPosController extends Controller
         $company = Company::find($companyId);
 
         return view('pos.restaurant.kitchen-ticket', compact('order', 'company'));
+    }
+
+    public function checkStock(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $productId = $request->get('product_id');
+
+        if (!$productId) {
+            return response()->json(['status' => 'unknown']);
+        }
+
+        $recipes = ProductRecipe::where('company_id', $companyId)
+            ->where('product_id', $productId)
+            ->with('ingredient')
+            ->get();
+
+        if ($recipes->isEmpty()) {
+            return response()->json(['status' => 'available', 'has_recipe' => false]);
+        }
+
+        $qty = max(1, (float)$request->get('quantity', 1));
+        $status = 'available';
+        $details = [];
+
+        foreach ($recipes as $recipe) {
+            $ingredient = $recipe->ingredient;
+            if (!$ingredient || !$ingredient->is_active) continue;
+
+            $needed = $recipe->quantity_needed * $qty;
+            $available = (float)$ingredient->current_stock;
+
+            $itemStatus = 'available';
+            if ($available < $needed) {
+                $itemStatus = 'out';
+                $status = 'out';
+            } elseif ($available <= $ingredient->min_stock_level) {
+                $itemStatus = 'low';
+                if ($status !== 'out') $status = 'low';
+            }
+
+            $details[] = [
+                'name' => $ingredient->name,
+                'needed' => round($needed, 2),
+                'available' => round($available, 2),
+                'unit' => $ingredient->unit,
+                'status' => $itemStatus,
+            ];
+        }
+
+        return response()->json([
+            'status' => $status,
+            'has_recipe' => true,
+            'details' => $details,
+        ]);
+    }
+
+    public function customerLookup(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $phone = $request->get('phone', '');
+
+        if (strlen($phone) < 4) {
+            return response()->json(['found' => false]);
+        }
+
+        $customer = PosCustomer::where('company_id', $companyId)
+            ->where('phone', $phone)
+            ->first();
+
+        if (!$customer) {
+            $partials = PosCustomer::where('company_id', $companyId)
+                ->where('phone', 'ilike', '%' . $phone . '%')
+                ->limit(5)
+                ->get(['id', 'name', 'phone']);
+
+            return response()->json(['found' => false, 'suggestions' => $partials]);
+        }
+
+        $totalOrders = PosTransaction::where('company_id', $companyId)
+            ->where('customer_id', $customer->id)
+            ->count();
+
+        $totalSpent = PosTransaction::where('company_id', $companyId)
+            ->where('customer_id', $customer->id)
+            ->sum('total_amount');
+
+        $lastOrder = PosTransaction::where('company_id', $companyId)
+            ->where('customer_id', $customer->id)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        $restaurantOrders = RestaurantOrder::where('company_id', $companyId)
+            ->where('customer_id', $customer->id)
+            ->count();
+
+        $totalVisits = $totalOrders + $restaurantOrders;
+
+        return response()->json([
+            'found' => true,
+            'customer' => [
+                'id' => $customer->id,
+                'name' => $customer->name,
+                'phone' => $customer->phone,
+                'email' => $customer->email,
+            ],
+            'stats' => [
+                'total_orders' => $totalVisits,
+                'total_spent' => round($totalSpent, 2),
+                'is_frequent' => $totalVisits >= 5,
+                'last_order_date' => $lastOrder ? $lastOrder->created_at->format('M d, Y') : null,
+                'last_order_amount' => $lastOrder ? round($lastOrder->total_amount, 2) : null,
+            ],
+        ]);
+    }
+
+    public function refreshProductImage(Request $request, $productId)
+    {
+        $companyId = app('currentCompanyId');
+        $newImage = ProductImageService::refreshImage($productId, $companyId);
+
+        if ($newImage) {
+            return response()->json([
+                'success' => true,
+                'image_url' => asset('storage/products/' . $newImage),
+            ]);
+        }
+
+        return response()->json(['success' => false, 'message' => 'Could not fetch image']);
     }
 }

@@ -54,6 +54,15 @@
         .marquee-track { animation: marquee 25s linear infinite; }
         .marquee-track:hover { animation-play-state: paused; }
         .testimonial-card { background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.06) 100%); backdrop-filter: blur(20px); }
+        @keyframes typewriter { from { width: 0; } to { width: 100%; } }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        .typing-cursor { animation: blink 1s step-end infinite; }
+        @keyframes gradientMove { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        .gradient-animate { background-size: 200% auto; animation: gradientMove 4s ease infinite; }
+        @keyframes badgePulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.3); } 50% { box-shadow: 0 0 0 8px rgba(16,185,129,0); } }
+        .badge-pulse { animation: badgePulse 2s ease infinite; }
+        .trust-logo { opacity: 0.5; transition: opacity 0.3s; filter: grayscale(100%); }
+        .trust-logo:hover { opacity: 1; filter: grayscale(0%); }
         .orb-1 { animation: float 8s ease-in-out infinite; }
         .orb-2 { animation: float-reverse 10s ease-in-out infinite; }
         .orb-3 { animation: float 12s ease-in-out infinite 2s; }
@@ -116,32 +125,43 @@
 
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8 relative">
             <div class="text-center max-w-3xl mx-auto">
-                <div class="inline-flex items-center px-3.5 py-1.5 bg-white/[0.07] rounded-full text-[13px] font-medium text-gray-300 mb-8 border border-white/[0.08] backdrop-blur-sm">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-2 animate-pulse"></span>
-                    FBR + PRA Compliant Platform
+                <div class="inline-flex items-center px-4 py-2 bg-white/[0.07] rounded-full text-[13px] font-medium text-gray-300 mb-8 border border-white/[0.08] backdrop-blur-sm badge-pulse">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 mr-2.5 animate-pulse"></span>
+                    Trusted by 500+ Businesses Across Pakistan
+                    <svg class="w-3.5 h-3.5 ml-2 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>
                 </div>
 
-                <h1 class="text-[28px] sm:text-[52px] lg:text-[56px] font-bold text-white leading-[1.1] tracking-tight mb-6">
-                    TaxNest — Pakistan's Most Advanced
-                    <span class="block mt-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-300 bg-clip-text text-transparent">Tax Compliance Platform</span>
+                <h1 class="text-[28px] sm:text-[52px] lg:text-[60px] font-extrabold text-white leading-[1.08] tracking-tight mb-6">
+                    Pakistan's
+                    <span class="relative inline-block">
+                        <span class="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent gradient-animate">#1</span>
+                    </span>
+                    Tax Compliance
+                    <span class="block mt-1 sm:mt-2">
+                        <span class="bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-300 bg-clip-text text-transparent gradient-animate" x-data="{ words: ['Platform', 'Solution', 'Engine'], current: 0, display: 'Platform' }" x-init="setInterval(() => { current = (current + 1) % words.length; display = words[current]; }, 3000)" x-text="display" x-transition></span>
+                    </span>
                 </h1>
 
                 <p class="text-[17px] sm:text-lg text-gray-400 leading-relaxed mb-10 max-w-2xl mx-auto">
-                    Manage FBR Digital Invoicing, PRA POS, and FBR POS billing in one secure enterprise platform. Three fully isolated products, real-time compliant.
+                    FBR Digital Invoicing, PRA POS, and FBR POS — three fully isolated products in one enterprise platform. Real-time compliant, zero downtime.
                 </p>
 
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
-                    <a href="#products" class="btn-glow inline-flex items-center px-7 py-3.5 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-[10px] text-[15px] font-semibold hover:from-emerald-500 hover:to-teal-600 w-full sm:w-auto justify-center shadow-lg shadow-emerald-500/25">
-                        Start Free Trial
-                        <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                    <a href="#products" class="btn-glow group inline-flex items-center px-8 py-4 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-xl text-[15px] font-bold hover:from-emerald-500 hover:to-teal-600 w-full sm:w-auto justify-center shadow-xl shadow-emerald-500/30">
+                        Start 14-Day Free Trial
+                        <svg class="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
                     </a>
-                    <a href="#products" class="inline-flex items-center px-7 py-3.5 bg-white/[0.06] text-gray-300 border border-white/[0.12] rounded-[10px] text-[15px] font-semibold hover:bg-white/[0.15] hover:text-white hover:border-white/[0.2] transition w-full sm:w-auto justify-center backdrop-blur-sm">
+                    <a href="#products" class="group inline-flex items-center px-8 py-4 bg-white/[0.06] text-gray-300 border border-white/[0.12] rounded-xl text-[15px] font-semibold hover:bg-white/[0.15] hover:text-white hover:border-white/[0.2] transition w-full sm:w-auto justify-center backdrop-blur-sm">
                         Explore Products
-                        <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        <svg class="w-4 h-4 ml-2 group-hover:translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </a>
                 </div>
 
-                <p class="text-[13px] text-gray-500 mt-5">14-day free trial &middot; No credit card required</p>
+                <div class="flex items-center justify-center gap-6 mt-8 text-[12px] text-gray-500">
+                    <span class="flex items-center gap-1.5"><svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> No credit card</span>
+                    <span class="flex items-center gap-1.5"><svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> 14-day trial</span>
+                    <span class="flex items-center gap-1.5"><svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Cancel anytime</span>
+                </div>
             </div>
 
             <div id="heroStats" class="mt-20 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto">
@@ -179,29 +199,33 @@
         </div>
     </section>
 
-    <div class="relative bg-gradient-to-r from-gray-50 via-white to-gray-50 border-b border-gray-100 py-5">
+    <div class="relative bg-gradient-to-r from-gray-50 via-white to-gray-50 border-b border-gray-100 py-6">
         <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/40 to-transparent"></div>
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
-            <div class="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
-                <div class="flex items-center space-x-2 text-gray-600">
-                    <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                    <span class="text-[13px] font-medium">FBR API v1.12</span>
+            <div class="flex flex-wrap items-center justify-center gap-3 sm:gap-5">
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50/80 rounded-full border border-emerald-200/50">
+                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    <span class="text-[12px] font-semibold text-emerald-800">FBR API v1.12</span>
                 </div>
-                <div class="flex items-center space-x-2 text-gray-600">
-                    <svg class="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span class="text-[13px] font-medium">PRA IMS v1.2</span>
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-purple-50/80 rounded-full border border-purple-200/50">
+                    <svg class="w-3.5 h-3.5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span class="text-[12px] font-semibold text-purple-800">PRA IMS v1.2</span>
                 </div>
-                <div class="flex items-center space-x-2 text-gray-600">
-                    <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                    <span class="text-[13px] font-medium">SHA-256 Encrypted</span>
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50/80 rounded-full border border-emerald-200/50">
+                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    <span class="text-[12px] font-semibold text-emerald-800">SHA-256 Encrypted</span>
                 </div>
-                <div class="flex items-center space-x-2 text-gray-600">
-                    <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                    <span class="text-[13px] font-medium">Real-time Sync</span>
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-blue-50/80 rounded-full border border-blue-200/50">
+                    <svg class="w-3.5 h-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    <span class="text-[12px] font-semibold text-blue-800">Real-time Sync</span>
                 </div>
-                <div class="flex items-center space-x-2 text-gray-600">
-                    <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                    <span class="text-[13px] font-medium">PWA Ready</span>
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-teal-50/80 rounded-full border border-teal-200/50">
+                    <svg class="w-3.5 h-3.5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                    <span class="text-[12px] font-semibold text-teal-800">PWA + Offline</span>
+                </div>
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50/80 rounded-full border border-emerald-200/50">
+                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                    <span class="text-[12px] font-semibold text-emerald-800">99.9% Uptime</span>
                 </div>
             </div>
         </div>

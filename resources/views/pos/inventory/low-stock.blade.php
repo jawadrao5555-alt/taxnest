@@ -44,22 +44,25 @@
         $lowItems = $alerts->filter(fn($i) => $i->min_stock_level > 0 && ($i->quantity / $i->min_stock_level) >= 0.5);
     @endphp
     <div class="grid grid-cols-3 gap-3 mb-6">
-        <div class="bg-white dark:bg-gray-900 rounded-2xl border-2 {{ $criticalItems->count() > 0 ? 'border-red-300 dark:border-red-700' : 'border-gray-100 dark:border-gray-700' }} shadow-lg p-4 text-center">
-            <div class="w-10 h-10 rounded-xl {{ $criticalItems->count() > 0 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-gray-100 dark:bg-gray-800' }} flex items-center justify-center mx-auto mb-2">
+        <div class="group bg-white dark:bg-gray-900 rounded-2xl border-2 {{ $criticalItems->count() > 0 ? 'border-red-300 dark:border-red-700' : 'border-gray-100 dark:border-gray-700' }} shadow-lg p-4 text-center relative overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
+            <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 to-rose-500 {{ $criticalItems->count() > 0 ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100' }} transform transition-transform origin-left duration-500"></div>
+            <div class="w-11 h-11 rounded-xl {{ $criticalItems->count() > 0 ? 'bg-gradient-to-br from-red-100 to-red-50 dark:from-red-900/30 dark:to-red-800/20 shadow-sm shadow-red-500/10' : 'bg-gray-100 dark:bg-gray-800' }} flex items-center justify-center mx-auto mb-2">
                 <svg class="w-5 h-5 {{ $criticalItems->count() > 0 ? 'text-red-600 animate-pulse' : 'text-gray-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
             </div>
             <p class="text-2xl font-black {{ $criticalItems->count() > 0 ? 'text-red-600' : 'text-gray-900 dark:text-white' }}">{{ $criticalItems->count() }}</p>
             <p class="text-[10px] font-bold uppercase tracking-wider {{ $criticalItems->count() > 0 ? 'text-red-500' : 'text-gray-400' }}">Critical (&lt;25%)</p>
         </div>
-        <div class="bg-white dark:bg-gray-900 rounded-2xl border-2 {{ $warningItems->count() > 0 ? 'border-amber-300 dark:border-amber-700' : 'border-gray-100 dark:border-gray-700' }} shadow-lg p-4 text-center">
-            <div class="w-10 h-10 rounded-xl {{ $warningItems->count() > 0 ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-gray-100 dark:bg-gray-800' }} flex items-center justify-center mx-auto mb-2">
+        <div class="group bg-white dark:bg-gray-900 rounded-2xl border-2 {{ $warningItems->count() > 0 ? 'border-amber-300 dark:border-amber-700' : 'border-gray-100 dark:border-gray-700' }} shadow-lg p-4 text-center relative overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
+            <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-orange-500 {{ $warningItems->count() > 0 ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100' }} transform transition-transform origin-left duration-500"></div>
+            <div class="w-11 h-11 rounded-xl {{ $warningItems->count() > 0 ? 'bg-gradient-to-br from-amber-100 to-amber-50 dark:from-amber-900/30 dark:to-amber-800/20 shadow-sm shadow-amber-500/10' : 'bg-gray-100 dark:bg-gray-800' }} flex items-center justify-center mx-auto mb-2">
                 <svg class="w-5 h-5 {{ $warningItems->count() > 0 ? 'text-amber-600' : 'text-gray-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>
             <p class="text-2xl font-black {{ $warningItems->count() > 0 ? 'text-amber-600' : 'text-gray-900 dark:text-white' }}">{{ $warningItems->count() }}</p>
             <p class="text-[10px] font-bold uppercase tracking-wider {{ $warningItems->count() > 0 ? 'text-amber-500' : 'text-gray-400' }}">Warning (25-50%)</p>
         </div>
-        <div class="bg-white dark:bg-gray-900 rounded-2xl border-2 {{ $lowItems->count() > 0 ? 'border-yellow-300 dark:border-yellow-700' : 'border-gray-100 dark:border-gray-700' }} shadow-lg p-4 text-center">
-            <div class="w-10 h-10 rounded-xl {{ $lowItems->count() > 0 ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-gray-100 dark:bg-gray-800' }} flex items-center justify-center mx-auto mb-2">
+        <div class="group bg-white dark:bg-gray-900 rounded-2xl border-2 {{ $lowItems->count() > 0 ? 'border-yellow-300 dark:border-yellow-700' : 'border-gray-100 dark:border-gray-700' }} shadow-lg p-4 text-center relative overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
+            <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-400 to-amber-400 {{ $lowItems->count() > 0 ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100' }} transform transition-transform origin-left duration-500"></div>
+            <div class="w-11 h-11 rounded-xl {{ $lowItems->count() > 0 ? 'bg-gradient-to-br from-yellow-100 to-yellow-50 dark:from-yellow-900/30 dark:to-yellow-800/20 shadow-sm shadow-yellow-500/10' : 'bg-gray-100 dark:bg-gray-800' }} flex items-center justify-center mx-auto mb-2">
                 <svg class="w-5 h-5 {{ $lowItems->count() > 0 ? 'text-yellow-600' : 'text-gray-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>
             <p class="text-2xl font-black {{ $lowItems->count() > 0 ? 'text-yellow-600' : 'text-gray-900 dark:text-white' }}">{{ $lowItems->count() }}</p>

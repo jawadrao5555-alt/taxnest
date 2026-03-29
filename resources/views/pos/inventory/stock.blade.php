@@ -75,15 +75,20 @@
                         $maxLevel = max($stock->min_stock_level * 2, $stock->quantity, 1);
                         $barPct = min(($stock->quantity / $maxLevel) * 100, 100);
                     @endphp
-                    <tr class="hover:bg-gray-50/80 dark:hover:bg-gray-800/30 transition">
-                        <td class="px-5 py-4 font-semibold text-gray-900 dark:text-white">{{ $stock->product->name ?? 'Unknown' }}</td>
+                    <tr class="hover:bg-gray-50/80 dark:hover:bg-gray-800/30 transition group">
+                        <td class="px-5 py-4">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-2 h-2 rounded-full {{ $stock->quantity <= 0 ? 'bg-red-500' : ($stock->isLowStock() ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500') }}"></div>
+                                <span class="font-semibold text-gray-900 dark:text-white">{{ $stock->product->name ?? 'Unknown' }}</span>
+                            </div>
+                        </td>
                         <td class="px-5 py-4">
                             <div class="flex items-center gap-3">
-                                <span class="font-bold text-sm {{ $stock->quantity <= 0 ? 'text-red-600' : ($stock->isLowStock() ? 'text-amber-600' : 'text-gray-900 dark:text-white') }}">{{ number_format($stock->quantity, 0) }}</span>
-                                <div class="w-28 bg-gray-100 dark:bg-gray-700 rounded-full h-2.5 relative">
-                                    <div class="h-2.5 rounded-full {{ $barColor }} transition-all duration-500" style="width: {{ max($barPct, 3) }}%"></div>
+                                <span class="font-bold text-sm min-w-[2rem] {{ $stock->quantity <= 0 ? 'text-red-600' : ($stock->isLowStock() ? 'text-amber-600' : 'text-gray-900 dark:text-white') }}">{{ number_format($stock->quantity, 0) }}</span>
+                                <div class="w-28 bg-gray-100 dark:bg-gray-700 rounded-full h-2 relative overflow-hidden">
+                                    <div class="h-2 rounded-full {{ $barColor }} transition-all duration-700 ease-out" style="width: {{ max($barPct, 3) }}%"></div>
                                 </div>
-                                <span class="text-[10px] font-semibold text-gray-400">{{ round($barPct) }}%</span>
+                                <span class="text-[10px] font-bold {{ $barPct < 25 ? 'text-red-500' : ($barPct < 50 ? 'text-amber-500' : 'text-gray-400') }}">{{ round($barPct) }}%</span>
                             </div>
                         </td>
                         <td class="px-5 py-4 text-right text-gray-600 dark:text-gray-400 hidden sm:table-cell">{{ number_format($stock->min_stock_level, 0) }}</td>

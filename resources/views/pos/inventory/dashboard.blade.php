@@ -30,45 +30,49 @@
     </div>
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg p-5 relative overflow-hidden">
-            <div class="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-purple-500/10 to-transparent rounded-bl-full"></div>
+        <div class="group bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg p-5 relative overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
+            <div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-purple-500/10 to-transparent rounded-bl-full group-hover:from-purple-500/20 transition-colors"></div>
+            <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-violet-500 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-500"></div>
             <div class="flex items-center gap-3 mb-3">
-                <div class="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-100 to-purple-50 dark:from-purple-900/30 dark:to-purple-800/20 flex items-center justify-center shadow-sm shadow-purple-500/10">
                     <svg class="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                 </div>
-                <p class="text-xs font-medium text-gray-500 dark:text-gray-400">Total Products</p>
             </div>
-            <p class="text-3xl font-bold text-gray-900 dark:text-white">{{ number_format($totalProducts) }}</p>
+            <p class="text-3xl font-black text-gray-900 dark:text-white">{{ number_format($totalProducts) }}</p>
+            <p class="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-1">Total Products</p>
         </div>
-        <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg p-5 relative overflow-hidden">
-            <div class="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-emerald-500/10 to-transparent rounded-bl-full"></div>
+        <div class="group bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg p-5 relative overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
+            <div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-emerald-500/10 to-transparent rounded-bl-full group-hover:from-emerald-500/20 transition-colors"></div>
+            <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-teal-500 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-500"></div>
             <div class="flex items-center gap-3 mb-3">
-                <div class="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-900/30 dark:to-emerald-800/20 flex items-center justify-center shadow-sm shadow-emerald-500/10">
                     <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </div>
-                <p class="text-xs font-medium text-gray-500 dark:text-gray-400">Stock Value</p>
             </div>
-            <p class="text-2xl font-bold text-emerald-600">PKR {{ number_format($totalStockValue, 0) }}</p>
+            <p class="text-2xl font-black text-emerald-600">PKR {{ number_format($totalStockValue, 0) }}</p>
+            <p class="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-1">Stock Value</p>
         </div>
-        <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg p-5 relative overflow-hidden">
-            <div class="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-amber-500/10 to-transparent rounded-bl-full"></div>
+        <div class="group bg-white dark:bg-gray-900 rounded-2xl border {{ $lowStockItems->count() > 0 ? 'border-amber-200 dark:border-amber-800/50' : 'border-gray-100 dark:border-gray-700' }} shadow-lg p-5 relative overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
+            <div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-amber-500/10 to-transparent rounded-bl-full group-hover:from-amber-500/20 transition-colors"></div>
+            <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-orange-500 {{ $lowStockItems->count() > 0 ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100' }} transform transition-transform origin-left duration-500"></div>
             <div class="flex items-center gap-3 mb-3">
-                <div class="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-100 to-amber-50 dark:from-amber-900/30 dark:to-amber-800/20 flex items-center justify-center shadow-sm shadow-amber-500/10">
+                    <svg class="w-5 h-5 text-amber-600 {{ $lowStockItems->count() > 0 ? 'animate-pulse' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                 </div>
-                <p class="text-xs font-medium text-gray-500 dark:text-gray-400">Low Stock</p>
             </div>
-            <p class="text-3xl font-bold {{ $lowStockItems->count() > 0 ? 'text-amber-600' : 'text-gray-900 dark:text-white' }}">{{ $lowStockItems->count() }}</p>
+            <p class="text-3xl font-black {{ $lowStockItems->count() > 0 ? 'text-amber-600' : 'text-gray-900 dark:text-white' }}">{{ $lowStockItems->count() }}</p>
+            <p class="text-[11px] font-semibold {{ $lowStockItems->count() > 0 ? 'text-amber-500' : 'text-gray-400 dark:text-gray-500' }} uppercase tracking-wider mt-1">Low Stock</p>
         </div>
-        <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg p-5 relative overflow-hidden">
-            <div class="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-red-500/10 to-transparent rounded-bl-full"></div>
+        <div class="group bg-white dark:bg-gray-900 rounded-2xl border {{ $outOfStockCount > 0 ? 'border-red-200 dark:border-red-800/50' : 'border-gray-100 dark:border-gray-700' }} shadow-lg p-5 relative overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
+            <div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-red-500/10 to-transparent rounded-bl-full group-hover:from-red-500/20 transition-colors"></div>
+            <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 to-rose-500 {{ $outOfStockCount > 0 ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100' }} transform transition-transform origin-left duration-500"></div>
             <div class="flex items-center gap-3 mb-3">
-                <div class="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-red-100 to-red-50 dark:from-red-900/30 dark:to-red-800/20 flex items-center justify-center shadow-sm shadow-red-500/10">
+                    <svg class="w-5 h-5 text-red-600 {{ $outOfStockCount > 0 ? 'animate-pulse' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
                 </div>
-                <p class="text-xs font-medium text-gray-500 dark:text-gray-400">Out of Stock</p>
             </div>
-            <p class="text-3xl font-bold {{ $outOfStockCount > 0 ? 'text-red-600' : 'text-gray-900 dark:text-white' }}">{{ $outOfStockCount }}</p>
+            <p class="text-3xl font-black {{ $outOfStockCount > 0 ? 'text-red-600' : 'text-gray-900 dark:text-white' }}">{{ $outOfStockCount }}</p>
+            <p class="text-[11px] font-semibold {{ $outOfStockCount > 0 ? 'text-red-500' : 'text-gray-400 dark:text-gray-500' }} uppercase tracking-wider mt-1">Out of Stock</p>
         </div>
     </div>
 

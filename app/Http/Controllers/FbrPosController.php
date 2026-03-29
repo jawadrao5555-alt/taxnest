@@ -329,6 +329,21 @@ class FbrPosController extends Controller
         }
 
         if ($request->isMethod('post')) {
+            if ($request->has('pin_update')) {
+                if ($request->has('remove_pin')) {
+                    $company->update(['confidential_pin' => null]);
+                    return back()->with('success', 'Confidential PIN removed successfully.');
+                }
+
+                if ($request->filled('confidential_pin')) {
+                    $request->validate(['confidential_pin' => 'required|digits_between:4,6']);
+                    $company->update(['confidential_pin' => \Hash::make($request->confidential_pin)]);
+                    return back()->with('success', 'Confidential PIN updated successfully.');
+                }
+
+                return back()->with('error', 'Please enter a valid 4-6 digit PIN.');
+            }
+
             $request->validate([
                 'fbr_pos_environment' => 'required|in:sandbox,production',
                 'fbr_pos_id' => 'nullable|string|max:100',

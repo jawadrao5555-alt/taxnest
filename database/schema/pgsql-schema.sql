@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict K9qeIhrdwK38KUaZ5xyFZfaFheXxDuFZraATnMFQPxld2HHK3PloAQ0arsmNr06
+\restrict nJcBMh9ZfrmdnfOiHZq8XpVSndaNJLaJHXNwwqT0w2iiy0Kiu0xgDzoUhsQzJfi
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -361,7 +361,16 @@ CREATE TABLE public.companies (
     fbr_pos_id character varying(255),
     fbr_pos_token character varying(255),
     fbr_pos_environment character varying(255) DEFAULT 'sandbox'::character varying NOT NULL,
-    fbr_reporting_enabled boolean DEFAULT false NOT NULL
+    fbr_reporting_enabled boolean DEFAULT false NOT NULL,
+    kds_enabled boolean DEFAULT true NOT NULL,
+    kitchen_printer_enabled boolean DEFAULT false NOT NULL,
+    print_on_hold boolean DEFAULT false NOT NULL,
+    print_on_pay boolean DEFAULT true NOT NULL,
+    restaurant_mode boolean DEFAULT false NOT NULL,
+    pos_type character varying(20) DEFAULT 'general'::character varying NOT NULL,
+    manager_override_pin character varying(255),
+    cashier_discount_limit numeric(5,2) DEFAULT '10'::numeric NOT NULL,
+    manager_discount_limit numeric(5,2) DEFAULT '50'::numeric NOT NULL
 );
 
 
@@ -1318,6 +1327,43 @@ ALTER SEQUENCE public.hs_usage_patterns_id_seq OWNED BY public.hs_usage_patterns
 
 
 --
+-- Name: ingredients; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ingredients (
+    id bigint NOT NULL,
+    company_id bigint NOT NULL,
+    name character varying(255) NOT NULL,
+    unit character varying(20) NOT NULL,
+    cost_per_unit numeric(15,2) DEFAULT '0'::numeric NOT NULL,
+    current_stock numeric(15,2) DEFAULT '0'::numeric NOT NULL,
+    min_stock_level numeric(15,2) DEFAULT '0'::numeric NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp(0) without time zone,
+    updated_at timestamp(0) without time zone
+);
+
+
+--
+-- Name: ingredients_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ingredients_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ingredients_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ingredients_id_seq OWNED BY public.ingredients.id;
+
+
+--
 -- Name: inventory_adjustments; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1969,7 +2015,8 @@ CREATE TABLE public.pos_products (
     is_active boolean DEFAULT true NOT NULL,
     created_at timestamp(0) without time zone,
     updated_at timestamp(0) without time zone,
-    is_tax_exempt boolean DEFAULT false NOT NULL
+    is_tax_exempt boolean DEFAULT false NOT NULL,
+    image character varying(255)
 );
 
 
@@ -2115,6 +2162,9 @@ CREATE TABLE public.pos_transaction_items (
     is_tax_exempt boolean DEFAULT false NOT NULL,
     tax_rate numeric(8,2) DEFAULT '0'::numeric NOT NULL,
     tax_amount numeric(12,2) DEFAULT '0'::numeric NOT NULL,
+    item_discount_type character varying(20),
+    item_discount_value numeric(10,2) DEFAULT '0'::numeric NOT NULL,
+    item_discount_amount numeric(10,2) DEFAULT '0'::numeric NOT NULL,
     CONSTRAINT pos_transaction_items_item_type_check CHECK (((item_type)::text = ANY ((ARRAY['product'::character varying, 'service'::character varying])::text[])))
 );
 
@@ -2172,6 +2222,8 @@ CREATE TABLE public.pos_transactions (
     share_token character varying(64),
     share_token_created_at timestamp(0) without time zone,
     invoice_mode character varying(10) DEFAULT 'pra'::character varying NOT NULL,
+    receipt_printed_at timestamp(0) without time zone,
+    reprint_count smallint DEFAULT '0'::smallint NOT NULL,
     CONSTRAINT pos_transactions_discount_type_check CHECK (((discount_type)::text = ANY ((ARRAY['percentage'::character varying, 'amount'::character varying])::text[])))
 );
 
@@ -2273,6 +2325,40 @@ CREATE SEQUENCE public.pricing_plans_id_seq
 --
 
 ALTER SEQUENCE public.pricing_plans_id_seq OWNED BY public.pricing_plans.id;
+
+
+--
+-- Name: product_recipes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.product_recipes (
+    id bigint NOT NULL,
+    company_id bigint NOT NULL,
+    product_id bigint NOT NULL,
+    ingredient_id bigint NOT NULL,
+    quantity_needed numeric(10,4) NOT NULL,
+    created_at timestamp(0) without time zone,
+    updated_at timestamp(0) without time zone
+);
+
+
+--
+-- Name: product_recipes_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.product_recipes_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: product_recipes_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.product_recipes_id_seq OWNED BY public.product_recipes.id;
 
 
 --
@@ -2430,6 +2516,173 @@ CREATE SEQUENCE public.purchase_orders_id_seq
 --
 
 ALTER SEQUENCE public.purchase_orders_id_seq OWNED BY public.purchase_orders.id;
+
+
+--
+-- Name: restaurant_floors; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.restaurant_floors (
+    id bigint NOT NULL,
+    company_id bigint NOT NULL,
+    name character varying(255) NOT NULL,
+    sort_order integer DEFAULT 0 NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp(0) without time zone,
+    updated_at timestamp(0) without time zone
+);
+
+
+--
+-- Name: restaurant_floors_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.restaurant_floors_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: restaurant_floors_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.restaurant_floors_id_seq OWNED BY public.restaurant_floors.id;
+
+
+--
+-- Name: restaurant_order_items; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.restaurant_order_items (
+    id bigint NOT NULL,
+    order_id bigint NOT NULL,
+    item_type character varying(20) DEFAULT 'product'::character varying NOT NULL,
+    item_id bigint NOT NULL,
+    item_name character varying(255) NOT NULL,
+    quantity numeric(10,2) DEFAULT '1'::numeric NOT NULL,
+    unit_price numeric(15,2) NOT NULL,
+    subtotal numeric(15,2) NOT NULL,
+    special_notes character varying(255),
+    is_tax_exempt boolean DEFAULT false NOT NULL,
+    created_at timestamp(0) without time zone,
+    updated_at timestamp(0) without time zone,
+    item_discount_type character varying(20),
+    item_discount_value numeric(10,2) DEFAULT '0'::numeric NOT NULL,
+    item_discount_amount numeric(10,2) DEFAULT '0'::numeric NOT NULL
+);
+
+
+--
+-- Name: restaurant_order_items_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.restaurant_order_items_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: restaurant_order_items_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.restaurant_order_items_id_seq OWNED BY public.restaurant_order_items.id;
+
+
+--
+-- Name: restaurant_orders; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.restaurant_orders (
+    id bigint NOT NULL,
+    company_id bigint NOT NULL,
+    order_number character varying(30) NOT NULL,
+    table_id bigint,
+    order_type character varying(20) DEFAULT 'dine_in'::character varying NOT NULL,
+    status character varying(20) DEFAULT 'held'::character varying NOT NULL,
+    customer_id bigint,
+    customer_name character varying(255),
+    customer_phone character varying(30),
+    subtotal numeric(15,2) DEFAULT '0'::numeric NOT NULL,
+    discount_amount numeric(15,2) DEFAULT '0'::numeric NOT NULL,
+    tax_amount numeric(15,2) DEFAULT '0'::numeric NOT NULL,
+    total_amount numeric(15,2) DEFAULT '0'::numeric NOT NULL,
+    payment_method character varying(30),
+    kitchen_notes text,
+    pos_transaction_id bigint,
+    created_by bigint NOT NULL,
+    created_at timestamp(0) without time zone,
+    updated_at timestamp(0) without time zone,
+    discount_type character varying(255),
+    discount_value numeric(10,2) DEFAULT '0'::numeric NOT NULL,
+    priority boolean DEFAULT false NOT NULL,
+    estimated_cost numeric(10,2) DEFAULT '0'::numeric NOT NULL
+);
+
+
+--
+-- Name: restaurant_orders_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.restaurant_orders_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: restaurant_orders_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.restaurant_orders_id_seq OWNED BY public.restaurant_orders.id;
+
+
+--
+-- Name: restaurant_tables; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.restaurant_tables (
+    id bigint NOT NULL,
+    company_id bigint NOT NULL,
+    floor_id bigint NOT NULL,
+    table_number character varying(20) NOT NULL,
+    seats integer DEFAULT 4 NOT NULL,
+    status character varying(20) DEFAULT 'available'::character varying NOT NULL,
+    locked_by_user_id bigint,
+    locked_at timestamp(0) without time zone,
+    reservation_name character varying(255),
+    reservation_time timestamp(0) without time zone,
+    sort_order integer DEFAULT 0 NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp(0) without time zone,
+    updated_at timestamp(0) without time zone
+);
+
+
+--
+-- Name: restaurant_tables_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.restaurant_tables_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: restaurant_tables_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.restaurant_tables_id_seq OWNED BY public.restaurant_tables.id;
 
 
 --
@@ -3076,6 +3329,13 @@ ALTER TABLE ONLY public.hs_usage_patterns ALTER COLUMN id SET DEFAULT nextval('p
 
 
 --
+-- Name: ingredients id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ingredients ALTER COLUMN id SET DEFAULT nextval('public.ingredients_id_seq'::regclass);
+
+
+--
 -- Name: inventory_adjustments id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -3237,6 +3497,13 @@ ALTER TABLE ONLY public.pricing_plans ALTER COLUMN id SET DEFAULT nextval('publi
 
 
 --
+-- Name: product_recipes id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_recipes ALTER COLUMN id SET DEFAULT nextval('public.product_recipes_id_seq'::regclass);
+
+
+--
 -- Name: products id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -3262,6 +3529,34 @@ ALTER TABLE ONLY public.purchase_order_items ALTER COLUMN id SET DEFAULT nextval
 --
 
 ALTER TABLE ONLY public.purchase_orders ALTER COLUMN id SET DEFAULT nextval('public.purchase_orders_id_seq'::regclass);
+
+
+--
+-- Name: restaurant_floors id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.restaurant_floors ALTER COLUMN id SET DEFAULT nextval('public.restaurant_floors_id_seq'::regclass);
+
+
+--
+-- Name: restaurant_order_items id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.restaurant_order_items ALTER COLUMN id SET DEFAULT nextval('public.restaurant_order_items_id_seq'::regclass);
+
+
+--
+-- Name: restaurant_orders id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.restaurant_orders ALTER COLUMN id SET DEFAULT nextval('public.restaurant_orders_id_seq'::regclass);
+
+
+--
+-- Name: restaurant_tables id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.restaurant_tables ALTER COLUMN id SET DEFAULT nextval('public.restaurant_tables_id_seq'::regclass);
 
 
 --
@@ -3726,6 +4021,14 @@ ALTER TABLE ONLY public.hs_usage_patterns
 
 
 --
+-- Name: ingredients ingredients_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ingredients
+    ADD CONSTRAINT ingredients_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: inventory_stocks inv_stock_unique; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3982,6 +4285,22 @@ ALTER TABLE ONLY public.pricing_plans
 
 
 --
+-- Name: product_recipes product_recipes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_recipes
+    ADD CONSTRAINT product_recipes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: product_recipes product_recipes_product_id_ingredient_id_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_recipes
+    ADD CONSTRAINT product_recipes_product_id_ingredient_id_unique UNIQUE (product_id, ingredient_id);
+
+
+--
 -- Name: products products_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4027,6 +4346,46 @@ ALTER TABLE ONLY public.purchase_orders
 
 ALTER TABLE ONLY public.purchase_orders
     ADD CONSTRAINT purchase_orders_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: restaurant_floors restaurant_floors_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.restaurant_floors
+    ADD CONSTRAINT restaurant_floors_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: restaurant_order_items restaurant_order_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.restaurant_order_items
+    ADD CONSTRAINT restaurant_order_items_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: restaurant_orders restaurant_orders_order_number_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.restaurant_orders
+    ADD CONSTRAINT restaurant_orders_order_number_unique UNIQUE (order_number);
+
+
+--
+-- Name: restaurant_orders restaurant_orders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.restaurant_orders
+    ADD CONSTRAINT restaurant_orders_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: restaurant_tables restaurant_tables_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.restaurant_tables
+    ADD CONSTRAINT restaurant_tables_pkey PRIMARY KEY (id);
 
 
 --
@@ -4511,6 +4870,97 @@ CREATE INDEX hs_usage_patterns_hs_code_index ON public.hs_usage_patterns USING b
 
 
 --
+-- Name: idx_ing_company_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ing_company_active ON public.ingredients USING btree (company_id, is_active);
+
+
+--
+-- Name: idx_pr_company_product; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_pr_company_product ON public.product_recipes USING btree (company_id, product_id);
+
+
+--
+-- Name: idx_pt_company_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_pt_company_created ON public.pos_transactions USING btree (company_id, created_at);
+
+
+--
+-- Name: idx_pt_company_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_pt_company_status ON public.pos_transactions USING btree (company_id, status);
+
+
+--
+-- Name: idx_pti_transaction_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_pti_transaction_id ON public.pos_transaction_items USING btree (transaction_id);
+
+
+--
+-- Name: idx_ro_company_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ro_company_created ON public.restaurant_orders USING btree (company_id, created_at);
+
+
+--
+-- Name: idx_ro_company_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ro_company_status ON public.restaurant_orders USING btree (company_id, status);
+
+
+--
+-- Name: idx_ro_customer_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ro_customer_id ON public.restaurant_orders USING btree (customer_id);
+
+
+--
+-- Name: idx_ro_table_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ro_table_id ON public.restaurant_orders USING btree (table_id);
+
+
+--
+-- Name: idx_roi_item; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_roi_item ON public.restaurant_order_items USING btree (item_id, item_type);
+
+
+--
+-- Name: idx_roi_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_roi_order_id ON public.restaurant_order_items USING btree (order_id);
+
+
+--
+-- Name: idx_rt_company_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_rt_company_status ON public.restaurant_tables USING btree (company_id, status);
+
+
+--
+-- Name: ingredients_company_id_is_active_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ingredients_company_id_is_active_index ON public.ingredients USING btree (company_id, is_active);
+
+
+--
 -- Name: inventory_adjustments_company_id_product_id_index; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4742,6 +5192,13 @@ CREATE INDEX pra_logs_company_id_created_at_index ON public.pra_logs USING btree
 
 
 --
+-- Name: product_recipes_company_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX product_recipes_company_id_index ON public.product_recipes USING btree (company_id);
+
+
+--
 -- Name: province_tax_rules_province_index; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4753,6 +5210,55 @@ CREATE INDEX province_tax_rules_province_index ON public.province_tax_rules USIN
 --
 
 CREATE INDEX purchase_orders_company_id_status_index ON public.purchase_orders USING btree (company_id, status);
+
+
+--
+-- Name: restaurant_floors_company_id_is_active_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX restaurant_floors_company_id_is_active_index ON public.restaurant_floors USING btree (company_id, is_active);
+
+
+--
+-- Name: restaurant_order_items_order_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX restaurant_order_items_order_id_index ON public.restaurant_order_items USING btree (order_id);
+
+
+--
+-- Name: restaurant_orders_company_id_created_at_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX restaurant_orders_company_id_created_at_index ON public.restaurant_orders USING btree (company_id, created_at);
+
+
+--
+-- Name: restaurant_orders_company_id_status_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX restaurant_orders_company_id_status_index ON public.restaurant_orders USING btree (company_id, status);
+
+
+--
+-- Name: restaurant_orders_company_id_table_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX restaurant_orders_company_id_table_id_index ON public.restaurant_orders USING btree (company_id, table_id);
+
+
+--
+-- Name: restaurant_tables_company_id_floor_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX restaurant_tables_company_id_floor_id_index ON public.restaurant_tables USING btree (company_id, floor_id);
+
+
+--
+-- Name: restaurant_tables_company_id_status_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX restaurant_tables_company_id_status_index ON public.restaurant_tables USING btree (company_id, status);
 
 
 --
@@ -5009,6 +5515,14 @@ ALTER TABLE ONLY public.hs_mapping_responses
 
 ALTER TABLE ONLY public.hs_unmapped_queue
     ADD CONSTRAINT hs_unmapped_queue_company_id_foreign FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: ingredients ingredients_company_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ingredients
+    ADD CONSTRAINT ingredients_company_id_foreign FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
 
 
 --
@@ -5284,6 +5798,30 @@ ALTER TABLE ONLY public.pra_logs
 
 
 --
+-- Name: product_recipes product_recipes_company_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_recipes
+    ADD CONSTRAINT product_recipes_company_id_foreign FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: product_recipes product_recipes_ingredient_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_recipes
+    ADD CONSTRAINT product_recipes_ingredient_id_foreign FOREIGN KEY (ingredient_id) REFERENCES public.ingredients(id) ON DELETE CASCADE;
+
+
+--
+-- Name: product_recipes product_recipes_product_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_recipes
+    ADD CONSTRAINT product_recipes_product_id_foreign FOREIGN KEY (product_id) REFERENCES public.pos_products(id) ON DELETE CASCADE;
+
+
+--
 -- Name: products products_company_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5337,6 +5875,86 @@ ALTER TABLE ONLY public.purchase_orders
 
 ALTER TABLE ONLY public.purchase_orders
     ADD CONSTRAINT purchase_orders_supplier_id_foreign FOREIGN KEY (supplier_id) REFERENCES public.suppliers(id) ON DELETE SET NULL;
+
+
+--
+-- Name: restaurant_floors restaurant_floors_company_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.restaurant_floors
+    ADD CONSTRAINT restaurant_floors_company_id_foreign FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: restaurant_order_items restaurant_order_items_order_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.restaurant_order_items
+    ADD CONSTRAINT restaurant_order_items_order_id_foreign FOREIGN KEY (order_id) REFERENCES public.restaurant_orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: restaurant_orders restaurant_orders_company_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.restaurant_orders
+    ADD CONSTRAINT restaurant_orders_company_id_foreign FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: restaurant_orders restaurant_orders_created_by_foreign; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.restaurant_orders
+    ADD CONSTRAINT restaurant_orders_created_by_foreign FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: restaurant_orders restaurant_orders_customer_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.restaurant_orders
+    ADD CONSTRAINT restaurant_orders_customer_id_foreign FOREIGN KEY (customer_id) REFERENCES public.pos_customers(id) ON DELETE SET NULL;
+
+
+--
+-- Name: restaurant_orders restaurant_orders_pos_transaction_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.restaurant_orders
+    ADD CONSTRAINT restaurant_orders_pos_transaction_id_foreign FOREIGN KEY (pos_transaction_id) REFERENCES public.pos_transactions(id) ON DELETE SET NULL;
+
+
+--
+-- Name: restaurant_orders restaurant_orders_table_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.restaurant_orders
+    ADD CONSTRAINT restaurant_orders_table_id_foreign FOREIGN KEY (table_id) REFERENCES public.restaurant_tables(id) ON DELETE SET NULL;
+
+
+--
+-- Name: restaurant_tables restaurant_tables_company_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.restaurant_tables
+    ADD CONSTRAINT restaurant_tables_company_id_foreign FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: restaurant_tables restaurant_tables_floor_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.restaurant_tables
+    ADD CONSTRAINT restaurant_tables_floor_id_foreign FOREIGN KEY (floor_id) REFERENCES public.restaurant_floors(id) ON DELETE CASCADE;
+
+
+--
+-- Name: restaurant_tables restaurant_tables_locked_by_user_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.restaurant_tables
+    ADD CONSTRAINT restaurant_tables_locked_by_user_id_foreign FOREIGN KEY (locked_by_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
 
 
 --
@@ -5407,13 +6025,13 @@ ALTER TABLE ONLY public.vendor_risk_profiles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict K9qeIhrdwK38KUaZ5xyFZfaFheXxDuFZraATnMFQPxld2HHK3PloAQ0arsmNr06
+\unrestrict nJcBMh9ZfrmdnfOiHZq8XpVSndaNJLaJHXNwwqT0w2iiy0Kiu0xgDzoUhsQzJfi
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict JAI6kTLZzbeDRdDjDQEZBqQGgPleGLnHiM0PVSEL0rvt9pNIhKhJdETOPOjKgGN
+\restrict 97LftBKVxImTUijHuNiki95fnFjkHgsPhM1P0QQ79nWyeypIOAN71pXE4MlHzRG
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -5531,6 +6149,21 @@ COPY public.migrations (id, migration, batch) FROM stdin;
 127	2026_03_28_110000_add_fbr_service_charge	67
 128	2026_03_28_150326_create_fbr_day_close_reports_table	68
 129	2026_03_28_151106_create_pos_day_close_reports_table	69
+131	2026_03_28_193257_create_restaurant_floors_table	70
+132	2026_03_28_193258_create_restaurant_tables_table	70
+133	2026_03_28_193259_create_restaurant_orders_table	70
+134	2026_03_28_193260_create_restaurant_order_items_table	70
+135	2026_03_28_193300_create_ingredients_table	70
+136	2026_03_28_193300_create_product_recipes_table	70
+137	2026_03_28_200001_add_restaurant_enterprise_fields	71
+138	2026_03_28_200002_add_restaurant_mode_to_companies	72
+139	2026_03_29_165551_add_pos_type_to_companies_table	73
+140	2026_03_29_182258_add_discount_fields_to_restaurant_orders	74
+141	2026_03_29_184659_add_priority_to_restaurant_orders	75
+142	2026_03_29_190535_add_item_discount_to_restaurant_order_items	76
+143	2026_03_29_190743_add_item_discount_to_pos_transaction_items	77
+144	2026_03_29_192534_add_restaurant_polish_columns	78
+145	2026_03_29_200001_add_production_indexes_restaurant	79
 \.
 
 
@@ -5538,12 +6171,12 @@ COPY public.migrations (id, migration, batch) FROM stdin;
 -- Name: migrations_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.migrations_id_seq', 129, true);
+SELECT pg_catalog.setval('public.migrations_id_seq', 145, true);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict JAI6kTLZzbeDRdDjDQEZBqQGgPleGLnHiM0PVSEL0rvt9pNIhKhJdETOPOjKgGN
+\unrestrict 97LftBKVxImTUijHuNiki95fnFjkHgsPhM1P0QQ79nWyeypIOAN71pXE4MlHzRG
 

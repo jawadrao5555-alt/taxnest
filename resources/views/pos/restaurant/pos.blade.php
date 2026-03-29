@@ -228,14 +228,17 @@
                 </template>
             </div>
 
-            <template x-if="selectedCustomer && customerStats">
+            <template x-if="selectedCustomer">
                 <div class="px-3 py-2 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/20 flex items-center gap-2">
-                    <div class="w-7 h-7 rounded-full bg-blue-200 dark:bg-blue-800 flex items-center justify-center"><span class="text-xs font-bold text-blue-700 dark:text-blue-300" x-text="selectedCustomer.name.charAt(0)"></span></div>
+                    <div class="w-7 h-7 rounded-full bg-blue-200 dark:bg-blue-800 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-blue-700 dark:text-blue-300" x-text="selectedCustomer.name.charAt(0)"></span></div>
                     <div class="flex-1 min-w-0">
                         <p class="text-xs font-semibold text-blue-800 dark:text-blue-200 truncate" x-text="selectedCustomer.name"></p>
-                        <p class="text-[10px] text-blue-600 dark:text-blue-400" x-text="customerStats.total_orders + ' orders • Rs. ' + Number(customerStats.total_spent).toLocaleString() + ' total'"></p>
+                        <p class="text-[10px] text-blue-600 dark:text-blue-400" x-text="(selectedCustomer.phone || 'No phone') + (selectedCustomer.address ? ' • ' + selectedCustomer.address : '')"></p>
+                        <template x-if="customerStats">
+                            <p class="text-[10px] text-blue-500 dark:text-blue-500" x-text="customerStats.total_orders + ' orders • Rs. ' + Number(customerStats.total_spent).toLocaleString() + ' spent'"></p>
+                        </template>
                     </div>
-                    <template x-if="customerStats.is_frequent"><span class="freq-badge">VIP</span></template>
+                    <template x-if="customerStats && customerStats.is_frequent"><span class="freq-badge">VIP</span></template>
                 </div>
             </template>
 
@@ -453,13 +456,16 @@
                 <template x-if="customerLookupResult && customerLookupResult.found">
                     <div class="mt-2 p-2.5 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
                         <div class="flex items-center gap-2">
-                            <div class="w-8 h-8 rounded-full bg-green-200 dark:bg-green-800 flex items-center justify-center"><span class="text-xs font-bold text-green-700" x-text="customerLookupResult.customer.name.charAt(0)"></span></div>
-                            <div class="flex-1">
+                            <div class="w-8 h-8 rounded-full bg-green-200 dark:bg-green-800 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-green-700" x-text="customerLookupResult.customer.name.charAt(0)"></span></div>
+                            <div class="flex-1 min-w-0">
                                 <p class="text-xs font-bold text-green-800 dark:text-green-200" x-text="customerLookupResult.customer.name"></p>
-                                <p class="text-[10px] text-green-600" x-text="customerLookupResult.stats.total_orders + ' orders • Last: ' + (customerLookupResult.stats.last_order_date || 'N/A')"></p>
+                                <p class="text-[10px] text-green-600" x-text="customerLookupResult.stats.total_orders + ' orders • Rs. ' + Number(customerLookupResult.stats.total_spent).toLocaleString() + ' spent'"></p>
+                                <template x-if="customerLookupResult.customer.address">
+                                    <p class="text-[10px] text-green-500 truncate" x-text="'📍 ' + customerLookupResult.customer.address"></p>
+                                </template>
                             </div>
                             <template x-if="customerLookupResult.stats.is_frequent"><span class="freq-badge">VIP</span></template>
-                            <button @click="selectLookedUpCustomer()" class="px-3 py-1 text-xs font-bold text-white bg-green-600 rounded-lg">Select</button>
+                            <button @click="selectLookedUpCustomer()" class="px-3 py-1 text-xs font-bold text-white bg-green-600 rounded-lg flex-shrink-0">Select</button>
                         </div>
                     </div>
                 </template>
@@ -473,7 +479,11 @@
                     <div class="w-full flex items-center gap-3 px-4 py-3 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition border-b border-gray-50 dark:border-gray-800">
                         <button @click="selectCustomerWithStats(c)" class="flex items-center gap-3 flex-1 min-w-0">
                             <div class="w-9 h-9 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0"><span class="text-sm font-bold text-purple-600 dark:text-purple-400" x-text="c.name.charAt(0)"></span></div>
-                            <div class="text-left min-w-0"><p class="text-sm font-medium text-gray-900 dark:text-white truncate" x-text="c.name"></p><p class="text-xs text-gray-400" x-text="c.phone || 'No phone'"></p></div>
+                            <div class="text-left min-w-0">
+                                <p class="text-sm font-medium text-gray-900 dark:text-white truncate" x-text="c.name"></p>
+                                <p class="text-xs text-gray-400" x-text="c.phone || 'No phone'"></p>
+                                <template x-if="c.address"><p class="text-[10px] text-gray-400 truncate" x-text="'📍 ' + c.address"></p></template>
+                            </div>
                         </button>
                         <button @click="loadCustomerHistory(c.id)" class="flex-shrink-0 text-[9px] font-bold text-purple-600 hover:text-purple-800 bg-purple-50 dark:bg-purple-900/30 px-2 py-1 rounded-lg transition" title="View history">
                             <svg class="w-3.5 h-3.5 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -487,7 +497,8 @@
                 </div>
                 <div x-show="showQuickAdd" class="space-y-2">
                     <input type="text" x-model="quickCustomerName" placeholder="Customer name *" class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-purple-500">
-                    <input type="text" x-model="quickCustomerPhone" placeholder="Phone (optional)" class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-purple-500">
+                    <input type="text" x-model="quickCustomerPhone" placeholder="Phone *" class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-purple-500">
+                    <input type="text" x-model="quickCustomerAddress" placeholder="Address (for delivery)" class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-purple-500">
                     <div class="flex gap-2">
                         <button @click="showQuickAdd = false" class="flex-1 py-2 text-xs font-semibold text-gray-500 bg-gray-100 dark:bg-gray-800 rounded-xl">Cancel</button>
                         <button @click="addQuickCustomer()" class="flex-1 py-2 text-xs font-bold text-white bg-purple-600 rounded-xl hover:bg-purple-700">Save</button>
@@ -698,6 +709,7 @@ function restaurantPos() {
         showQuickAdd: false,
         quickCustomerName: '',
         quickCustomerPhone: '',
+        quickCustomerAddress: '',
         selectedCustomer: null,
         highlightIndex: 0,
         gridFocusMode: false,
@@ -987,13 +999,19 @@ function restaurantPos() {
 
         async selectCustomerWithStats(c) {
             this.selectedCustomer = c;
+            this.customerStats = null;
             this.showCustomerPicker = false;
             this.showToast('Customer: ' + c.name, 'success');
             if (c.phone) {
                 try {
                     const res = await fetch('/pos/restaurant/api/customer-lookup?phone=' + encodeURIComponent(c.phone));
                     const data = await res.json();
-                    if (data.found) this.customerStats = data.stats;
+                    if (data.found) {
+                        this.customerStats = data.stats;
+                        if (data.customer.address && !this.selectedCustomer.address) {
+                            this.selectedCustomer.address = data.customer.address;
+                        }
+                    }
                 } catch(e) {}
             }
         },
@@ -1070,18 +1088,21 @@ function restaurantPos() {
         },
 
         async addQuickCustomer() {
-            if (!this.quickCustomerName.trim()) return;
+            if (!this.quickCustomerName.trim() || !this.quickCustomerPhone.trim()) {
+                this.showToast('Name and phone are required', 'error'); return;
+            }
             try {
-                const res = await fetch('{{ route("pos.customers.store") }}', {
+                const res = await fetch('{{ route("pos.restaurant.customer-store") }}', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                    body: JSON.stringify({ name: this.quickCustomerName.trim(), phone: this.quickCustomerPhone.trim() || null, type: 'unregistered' }),
+                    body: JSON.stringify({ name: this.quickCustomerName.trim(), phone: this.quickCustomerPhone.trim(), address: this.quickCustomerAddress.trim() || null }),
                 });
                 const data = await res.json();
                 if (data.customer || data.success) {
-                    const cust = data.customer || { id: Date.now(), name: this.quickCustomerName.trim(), phone: this.quickCustomerPhone.trim() };
-                    this.allCustomers.push(cust); this.selectedCustomer = cust; this.showQuickAdd = false;
-                    this.quickCustomerName = ''; this.quickCustomerPhone = ''; this.showCustomerPicker = false;
-                    this.showToast('Customer added: ' + cust.name, 'success');
+                    const cust = data.customer || { id: Date.now(), name: this.quickCustomerName.trim(), phone: this.quickCustomerPhone.trim(), address: this.quickCustomerAddress.trim() };
+                    if (!data.existing) this.allCustomers.push(cust);
+                    this.selectedCustomer = cust; this.showQuickAdd = false;
+                    this.quickCustomerName = ''; this.quickCustomerPhone = ''; this.quickCustomerAddress = ''; this.showCustomerPicker = false;
+                    this.showToast(data.existing ? 'Customer found: ' + cust.name : 'Customer added: ' + cust.name, 'success');
                 } else { this.showToast(data.message || 'Failed', 'error'); }
             } catch (e) { this.showToast('Error adding customer', 'error'); }
         },

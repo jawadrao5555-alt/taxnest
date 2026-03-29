@@ -605,7 +605,15 @@ class RestaurantPosController extends Controller
     {
         $customer = PosCustomer::find($customerId);
         if (!$customer) return;
-        // Stats tracking is done via query aggregation, no separate columns needed
+
+        $companyId = $customer->company_id;
+        $totalOrders = PosTransaction::where('company_id', $companyId)->where('customer_id', $customerId)->where('status', 'completed')->count();
+        $restaurantOrders = RestaurantOrder::where('company_id', $companyId)->where('customer_id', $customerId)->where('status', 'completed')->count();
+
+        $totalVisits = $totalOrders + $restaurantOrders;
+        if ($totalVisits >= 5 && $customer->type !== 'frequent') {
+            $customer->update(['type' => 'frequent']);
+        }
     }
 
     private function generateInvoiceNumber($companyId)
@@ -656,7 +664,7 @@ class RestaurantPosController extends Controller
                     ->orWhere('phone', 'ilike', "%{$q}%");
             })
             ->limit(10)
-            ->get(['id', 'name', 'phone', 'email']);
+            ->get(['id', 'name', 'phone', 'email', 'address']);
 
         return response()->json($customers);
     }
@@ -668,13 +676,26 @@ class RestaurantPosController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'phone' => 'required|string|max:30',
+            'address' => 'nullable|string|max:500',
         ]);
+
+        $existing = PosCustomer::where('company_id', $companyId)
+            ->where('phone', $request->phone)
+            ->first();
+
+        if ($existing) {
+            if ($request->address && !$existing->address) {
+                $existing->update(['address' => $request->address]);
+            }
+            return response()->json(['success' => true, 'customer' => $existing, 'existing' => true]);
+        }
 
         $customer = PosCustomer::create([
             'company_id' => $companyId,
             'name' => $request->name,
             'phone' => $request->phone,
             'email' => $request->email,
+            'address' => $request->address,
             'type' => 'unregistered',
         ]);
 
@@ -800,26 +821,30 @@ class RestaurantPosController extends Controller
             $partials = PosCustomer::where('company_id', $companyId)
                 ->where('phone', 'ilike', '%' . $phone . '%')
                 ->limit(5)
-                ->get(['id', 'name', 'phone']);
+                ->get(['id', 'name', 'phone', 'address']);
 
             return response()->json(['found' => false, 'suggestions' => $partials]);
         }
 
         $totalOrders = PosTransaction::where('company_id', $companyId)
             ->where('customer_id', $customer->id)
+            ->where('status', 'completed')
             ->count();
 
         $totalSpent = PosTransaction::where('company_id', $companyId)
             ->where('customer_id', $customer->id)
+            ->where('status', 'completed')
             ->sum('total_amount');
 
         $lastOrder = PosTransaction::where('company_id', $companyId)
             ->where('customer_id', $customer->id)
+            ->where('status', 'completed')
             ->orderBy('created_at', 'desc')
             ->first();
 
         $restaurantOrders = RestaurantOrder::where('company_id', $companyId)
             ->where('customer_id', $customer->id)
+            ->where('status', 'completed')
             ->count();
 
         $totalVisits = $totalOrders + $restaurantOrders;
@@ -831,6 +856,7 @@ class RestaurantPosController extends Controller
                 'name' => $customer->name,
                 'phone' => $customer->phone,
                 'email' => $customer->email,
+                'address' => $customer->address,
             ],
             'stats' => [
                 'total_orders' => $totalVisits,

@@ -54,6 +54,7 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
     - **Polish:** Role Control (cashier/manager discount limits), Profit Engine, Receipt Control, Customer Intelligence (history API), KDS Improvements, Mobile Optimization.
     - **Production Launch Prep:** DB indexes for restaurant tables, immutable audit logging (order create/pay/discount/settings), low-stock ingredient popup on POS screen, input validation hardening, DatabaseBackup artisan command.
     - **Enterprise POS Upgrade:** Direct POS login (cashier to POS, admin to dashboard), full keyboard system (F5 hold, F8 pay, 1/2 cash/card, +/-/Delete cart, auto-focus search with type-to-filter), clean premium UI (full-width search, letter fallback for no-image, Rs.0 product filter, recipe emoji badge), keyboard hints on all buttons.
+    - **Customer Address System:** Lightweight customer management with address storage for fast delivery workflows. Search by phone/name, auto-create on first order, address auto-fill on repeat orders. Stats (total orders, total spent) computed from completed orders only. Customer info bar in cart shows name, phone, address, and stats. Duplicate phone detection with auto-attach.
 
 **FBR POS Module:**
 - **Isolated FBR-integrated POS:** Accessible at `/fbr-pos` with direct FBR API submission, separate from PRA POS.

@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Services\ProductImageService;
+use App\Services\AuditLogService;
 
 class RestaurantPosController extends Controller
 {
@@ -105,17 +106,25 @@ class RestaurantPosController extends Controller
             $ingredientCosts[$productId] = round($cost, 2);
         }
 
+        $lowStockAlerts = Ingredient::where('company_id', $companyId)
+            ->where('is_active', true)
+            ->whereColumn('current_stock', '<=', 'min_stock_level')
+            ->select('name', 'current_stock', 'min_stock_level', 'unit')
+            ->get();
+
         return view('pos.restaurant.pos', compact(
             'company', 'products', 'services', 'categories',
             'recipeLookup', 'tables', 'selectedTable', 'heldOrders',
             'customers', 'taxRate', 'stockStatus', 'blockOutOfStock',
-            'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts'
+            'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts',
+            'lowStockAlerts'
         ));
     }
 
     public function holdOrder(Request $request)
     {
         $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
         $user = Auth::guard('pos')->user();
 
         $request->validate([
@@ -319,6 +328,19 @@ class RestaurantPosController extends Controller
 
             DB::commit();
 
+            try {
+                $auditMeta = ['order_number' => $orderNumber, 'total' => $totalAmount, 'items_count' => count($resolvedItems)];
+                if ($discountAmount > 0) {
+                    $auditMeta['discount_type'] = $discountType;
+                    $auditMeta['discount_value'] = $discountValue;
+                    $auditMeta['discount_amount'] = $discountAmount;
+                    AuditLogService::log('discount_applied', 'restaurant_order', $order->id, null, $auditMeta, $companyId, $user->id);
+                }
+                AuditLogService::log('order_created', 'restaurant_order', $order->id, null, $auditMeta, $companyId, $user->id);
+            } catch (\Exception $e) {
+                Log::warning('Audit log failed: ' . $e->getMessage());
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => "Order {$orderNumber} held successfully",
@@ -336,6 +358,14 @@ class RestaurantPosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $user = Auth::guard('pos')->user();
+
+        if (!is_numeric($orderId) || $orderId < 1) {
+            return response()->json(['success' => false, 'message' => 'Invalid order ID'], 400);
+        }
+
+        $request->validate([
+            'payment_method' => 'nullable|string|in:cash,card,online,split',
+        ]);
 
         $order = RestaurantOrder::where('company_id', $companyId)
             ->with('items')
@@ -465,6 +495,18 @@ class RestaurantPosController extends Controller
                 } catch (\Exception $e) {
                     $transaction->update(['pra_status' => 'offline']);
                 }
+            }
+
+            try {
+                AuditLogService::log('order_paid', 'restaurant_order', $order->id, null, [
+                    'order_number' => $order->order_number,
+                    'invoice_number' => $invoiceNumber,
+                    'total' => $totalAmount,
+                    'payment_method' => $paymentMethod,
+                    'discount_amount' => (float)($order->discount_amount ?? 0),
+                ], $companyId, $user->id);
+            } catch (\Exception $e) {
+                Log::warning('Audit log failed: ' . $e->getMessage());
             }
 
             return response()->json([
@@ -1075,7 +1117,16 @@ class RestaurantPosController extends Controller
             $updates['manager_discount_limit'] = $request->manager_discount_limit;
         }
         if (!empty($updates)) {
+            $oldValues = Company::where('id', $companyId)->first(['cashier_discount_limit', 'manager_discount_limit'])?->toArray();
             Company::where('id', $companyId)->update($updates);
+            try {
+                $logUpdates = $updates;
+                unset($logUpdates['manager_override_pin']);
+                if ($request->pin) $logUpdates['pin_changed'] = true;
+                AuditLogService::log('settings_updated', 'company', $companyId, $oldValues, $logUpdates, $companyId, $user->id);
+            } catch (\Exception $e) {
+                Log::warning('Audit log failed: ' . $e->getMessage());
+            }
         }
         return response()->json(['success' => true, 'message' => 'Settings saved']);
     }

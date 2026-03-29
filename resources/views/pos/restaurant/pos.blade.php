@@ -592,6 +592,35 @@
         </div>
     </div>
 
+    {{-- Low Stock Alert Popup --}}
+    <div x-show="showLowStockPopup && lowStockAlerts.length > 0" x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" @click.outside="showLowStockPopup = false">
+            <div class="p-4 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-amber-900 dark:text-amber-200">Low Stock Warning</h3>
+                    <p class="text-[10px] text-amber-700 dark:text-amber-400" x-text="lowStockAlerts.length + ' ingredient(s) running low'"></p>
+                </div>
+            </div>
+            <div class="max-h-[40vh] overflow-y-auto p-3 space-y-1.5">
+                <template x-for="alert in lowStockAlerts" :key="alert.name">
+                    <div class="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <div>
+                            <p class="text-xs font-semibold text-gray-900 dark:text-white" x-text="alert.name"></p>
+                            <p class="text-[10px] text-gray-400" x-text="'Min: ' + alert.min_stock_level + ' ' + alert.unit"></p>
+                        </div>
+                        <span class="text-xs font-bold" :class="parseFloat(alert.current_stock) <= 0 ? 'text-red-600' : 'text-amber-600'" x-text="alert.current_stock + ' ' + alert.unit"></span>
+                    </div>
+                </template>
+            </div>
+            <div class="p-3 border-t border-gray-100 dark:border-gray-800">
+                <button @click="showLowStockPopup = false" class="w-full py-2.5 text-sm font-bold text-amber-700 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400 rounded-xl hover:bg-amber-100 transition">Dismiss</button>
+            </div>
+        </div>
+    </div>
+
     <div x-show="toast.show" x-transition.opacity class="fixed top-4 right-4 z-[60] max-w-xs px-4 py-2.5 rounded-xl shadow-2xl text-sm font-medium" :class="toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'" x-text="toast.message"></div>
 </div>
 
@@ -640,6 +669,8 @@ function restaurantPos() {
         managerPin: '',
         managerPinError: '',
         ingredientCosts: @json($ingredientCosts ?? []),
+        lowStockAlerts: @json($lowStockAlerts ?? []),
+        showLowStockPopup: {{ ($lowStockAlerts ?? collect())->count() > 0 ? 'true' : 'false' }},
         customerHistory: null,
         showCustomerHistory: false,
         loadingCustomerHistory: false,

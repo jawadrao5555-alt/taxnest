@@ -1,0 +1,119 @@
+PREPARE SYSTEM FOR PRODUCTION LAUNCH + VERIFY DASHBOARD UI
+
+IMPORTANT:
+- Do NOT modify business logic
+- Do NOT change existing flows
+- Only optimize, secure, and verify UI
+
+==================================================
+PHASE 1 — BACKUP SYSTEM
+==================================================
+
+1. Daily automatic backup (database)
+2. Manual backup download button in admin panel
+3. Store backups in /storage/backups with timestamp
+
+==================================================
+PHASE 2 — ACTIVITY / AUDIT LOGS
+==================================================
+
+Create audit_logs table:
+
+- user_id
+- company_id
+- action (discount_applied, refund, order_edit, login, etc)
+- reference_id
+- meta (json)
+- created_at
+
+Log:
+- Discount usage
+- Refunds
+- Order edits
+- Login/logout
+
+==================================================
+PHASE 3 — LOW STOCK ALERTS
+==================================================
+
+1. Detect ingredients where:
+current_stock <= min_stock_level
+
+2. Show alerts:
+- Dashboard widget
+- POS warning popup
+
+==================================================
+PHASE 4 — DATABASE OPTIMIZATION
+==================================================
+
+Add indexes:
+
+- company_id
+- status
+- created_at
+- table_id
+- order_id
+
+Ensure all heavy queries use indexes
+
+==================================================
+PHASE 5 — PRODUCTION CONFIG
+==================================================
+
+Run:
+
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+
+Set:
+APP_ENV=production
+APP_DEBUG=false
+
+==================================================
+PHASE 6 — SECURITY HARDENING
+==================================================
+
+1. Validate all inputs (server-side)
+2. Sanitize user inputs
+3. Protect sensitive routes with middleware
+
+==================================================
+PHASE 7 — DASHBOARD UI VERIFICATION
+==================================================
+
+Check and show preview:
+
+Dashboard MUST include:
+
+1. Cards:
+- Today Sales
+- Orders Count
+- Profit
+- Cost
+- Margin %
+
+2. Charts:
+- Hourly Sales Line Chart (with peak indicator)
+
+3. Widgets:
+- Top 5 Products
+- Low Stock Alerts
+- Table Occupancy
+
+4. Auto-refresh every 2 minutes
+
+5. Clean spacing + modern UI
+
+==================================================
+OUTPUT REQUIRED:
+==================================================
+
+1. Confirm all production steps completed
+2. Show dashboard UI preview (describe layout)
+3. List any missing UI elements
+4. Suggest UI improvements if needed
+
+DO NOT PUSH TO GITHUB
+WORK LOCALLY ONLY

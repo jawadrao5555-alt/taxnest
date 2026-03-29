@@ -6,7 +6,7 @@ use App\Models\AuditLog;
 
 class AuditLogService
 {
-    public static function log($action, $entityType, $entityId = null, $oldValues = null, $newValues = null)
+    public static function log($action, $entityType, $entityId = null, $oldValues = null, $newValues = null, $companyId = null, $userId = null)
     {
         $hash = hash('sha256', implode('|', [
             $action, $entityType, $entityId,
@@ -14,8 +14,8 @@ class AuditLogService
         ]));
 
         AuditLog::create([
-            'company_id' => auth()->user()?->company_id,
-            'user_id' => auth()->id(),
+            'company_id' => $companyId ?? auth()->user()?->company_id ?? app('currentCompanyId', null),
+            'user_id' => $userId ?? auth()->id() ?? auth('pos')->id(),
             'action' => $action,
             'entity_type' => $entityType,
             'entity_id' => $entityId,

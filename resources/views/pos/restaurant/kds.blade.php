@@ -15,14 +15,22 @@
         </div>
     </div>
 
+    <style>
+        @keyframes urgentPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); } 50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); } }
+        .kds-urgent { animation: urgentPulse 1.5s ease-in-out infinite; }
+        .kds-timer-green { background: linear-gradient(135deg, #dcfce7, #bbf7d0); color: #166534; }
+        .kds-timer-yellow { background: linear-gradient(135deg, #fef9c3, #fde68a); color: #92400e; }
+        .kds-timer-red { background: linear-gradient(135deg, #fee2e2, #fecaca); color: #991b1b; font-weight: 800; }
+    </style>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         <template x-for="order in orders" :key="order.id">
             <div :class="{
                 'border-amber-400 bg-amber-50 dark:bg-amber-900/10': order.status === 'held',
                 'border-blue-400 bg-blue-50 dark:bg-blue-900/10': order.status === 'preparing',
                 'border-green-400 bg-green-50 dark:bg-green-900/10': order.status === 'ready',
-                'ring-2 ring-red-500': order.is_urgent
-            }" class="border-2 rounded-xl overflow-hidden dark:border-opacity-50">
+                'ring-2 ring-red-500 kds-urgent': order.elapsed_minutes > 15,
+                'ring-1 ring-amber-400': order.elapsed_minutes > 5 && order.elapsed_minutes <= 15
+            }" class="border-2 rounded-xl overflow-hidden dark:border-opacity-50 transition-all">
                 <div class="px-4 py-3 flex items-center justify-between" :class="{
                     'bg-amber-100 dark:bg-amber-900/30': order.status === 'held',
                     'bg-blue-100 dark:bg-blue-900/30': order.status === 'preparing',
@@ -34,8 +42,8 @@
                         <span x-show="order.priority" class="ml-1 text-[9px] bg-red-600 text-white px-1.5 py-0.5 rounded-full font-black animate-pulse">RUSH</span>
                     </div>
                     <div class="text-right">
-                        <div class="text-xs font-medium" :class="order.is_urgent ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'" x-text="order.elapsed_minutes + ' min'"></div>
-                        <div class="text-[10px] text-gray-400" x-text="order.created_at"></div>
+                        <div class="text-xs font-bold px-2 py-0.5 rounded-full inline-block" :class="order.elapsed_minutes <= 5 ? 'kds-timer-green' : (order.elapsed_minutes <= 15 ? 'kds-timer-yellow' : 'kds-timer-red')" x-text="order.elapsed_minutes + ' min'"></div>
+                        <div class="text-[10px] text-gray-400 mt-0.5" x-text="order.created_at"></div>
                     </div>
                 </div>
 
@@ -110,6 +118,23 @@ function kdsScreen() {
 
         startPolling() {
             this.polling = setInterval(() => this.refreshOrders(), 15000);
+            this.timerInterval = setInterval(() => {
+                this.orders.forEach(o => { o.elapsed_minutes++; });
+                const hasUrgent = this.orders.some(o => o.elapsed_minutes > 15 && (o.status === 'held' || o.status === 'preparing'));
+                if (hasUrgent) this.playUrgentBeep();
+            }, 60000);
+        },
+
+        playUrgentBeep() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator(); const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.frequency.value = 880; osc.type = 'square';
+                gain.gain.value = 0.15;
+                osc.start(); osc.stop(ctx.currentTime + 0.15);
+                setTimeout(() => { const o2 = ctx.createOscillator(); o2.connect(gain); o2.frequency.value = 880; o2.type = 'square'; o2.start(); o2.stop(ctx.currentTime + 0.15); }, 200);
+            } catch(e) {}
         },
 
         async refreshOrders() {

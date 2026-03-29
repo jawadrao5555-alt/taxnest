@@ -74,6 +74,9 @@ class Company extends Model
         'fbr_pos_id',
         'fbr_pos_token',
         'fbr_pos_environment',
+        'manager_override_pin',
+        'cashier_discount_limit',
+        'manager_discount_limit',
     ];
 
     protected $casts = [
@@ -95,6 +98,7 @@ class Company extends Model
         'fbr_sandbox_token',
         'fbr_production_token',
         'confidential_pin',
+        'manager_override_pin',
     ];
 
     public function isSuspended()

@@ -28,6 +28,12 @@
 .stock-available { background: #22c55e; }
 .stock-low { background: #f59e0b; box-shadow: 0 0 0 2px rgba(245,158,11,0.3); }
 .stock-out { background: #ef4444; }
+@media (max-width: 767px) {
+    .mobile-sticky-pay { position: sticky; bottom: 0; z-index: 20; background: inherit; padding-bottom: env(safe-area-inset-bottom, 0); }
+    .mobile-collapse-header { cursor: pointer; user-select: none; }
+    .mobile-collapse-header::after { content: '▾'; float: right; transition: transform 0.2s; font-size: 10px; color: #9ca3af; }
+    .mobile-collapse-header.collapsed::after { transform: rotate(-90deg); }
+}
 .priority-badge { position: relative; }
 .priority-badge::after { content: ''; position: absolute; top: -1px; right: -1px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; }
 ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -285,6 +291,9 @@
                         <button @click="showDiscount = !showDiscount" class="text-[10px] font-semibold px-2 py-0.5 rounded-lg transition" :class="discountAmount > 0 ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-600' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200'">
                             <span x-text="discountAmount > 0 ? 'Discount: -Rs. ' + Number(discountAmount).toLocaleString() : '+ Discount'"></span>
                         </button>
+                        <span class="text-[8px] text-gray-400" x-text="'Limit: ' + effectiveDiscountLimit + '%'"></span>
+                        <button x-show="!managerOverrideActive && hasManagerPin && posRole !== 'pos_admin'" @click="requestManagerOverride()" class="text-[8px] font-bold text-blue-600 hover:text-blue-800 px-1">Override</button>
+                        <span x-show="managerOverrideActive" class="text-[8px] font-bold text-green-600 px-1">Unlocked</span>
                     </div>
                     <div x-show="showDiscount" x-transition class="mt-1.5 p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl space-y-1.5">
                         <div class="flex gap-1">
@@ -292,11 +301,11 @@
                             <button @click="discountType = 'amount'" class="flex-1 text-[10px] font-bold py-1 rounded-lg transition" :class="discountType === 'amount' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-500'">Rs.</button>
                         </div>
                         <div class="flex items-center gap-1.5">
-                            <input type="number" x-model.number="discountValue" @input="recalcDiscount()" min="0" :max="discountType === 'percentage' ? 100 : subtotal" step="any" :placeholder="discountType === 'percentage' ? 'e.g. 10' : 'e.g. 500'" class="flex-1 text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-gray-900 dark:text-white focus:ring-purple-500">
+                            <input type="number" x-model.number="discountValue" @input="if(!checkDiscountLimit(discountValue, discountType)) { discountValue = discountType === 'percentage' ? effectiveDiscountLimit : r2(effectiveSubtotal * effectiveDiscountLimit / 100); showToast('Discount capped at ' + effectiveDiscountLimit + '%', 'error'); } recalcDiscount()" min="0" :max="discountType === 'percentage' ? effectiveDiscountLimit : r2(effectiveSubtotal * effectiveDiscountLimit / 100)" step="any" :placeholder="discountType === 'percentage' ? 'Max ' + effectiveDiscountLimit + '%' : 'e.g. 500'" class="flex-1 text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-gray-900 dark:text-white focus:ring-purple-500">
                             <button @click="discountValue = 0; recalcDiscount(); showDiscount = false" class="text-[10px] text-red-500 hover:text-red-700 px-1.5">Clear</button>
                         </div>
                         <div class="flex gap-1 flex-wrap">
-                            <template x-for="q in [5, 10, 15, 20]" :key="q">
+                            <template x-for="q in [5, 10, 15, 20].filter(v => v <= effectiveDiscountLimit)" :key="q">
                                 <button @click="discountType = 'percentage'; discountValue = q; recalcDiscount()" class="text-[9px] font-semibold px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-md hover:bg-purple-100 hover:text-purple-700 transition" x-text="q + '%'"></button>
                             </template>
                         </div>
@@ -318,8 +327,14 @@
                         <span>Total</span>
                         <span x-text="'Rs. ' + Number(totalAmount).toLocaleString()" :class="cartAnimating ? 'cart-pop' : ''"></span>
                     </div>
+                    <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] text-gray-400 pt-0.5">
+                        <span>Est. Cost</span><span x-text="'Rs. ' + r2(getCartCost()).toLocaleString()"></span>
+                    </div>
+                    <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] font-semibold" :class="(totalAmount - getCartCost()) >= 0 ? 'text-green-600' : 'text-red-500'">
+                        <span>Est. Profit</span><span x-text="'Rs. ' + r2(totalAmount - getCartCost()).toLocaleString()"></span>
+                    </div>
                 </div>
-                <div class="px-3 pb-3 space-y-2">
+                <div class="px-3 pb-3 space-y-2 mobile-sticky-pay">
                     <div class="grid grid-cols-3 gap-2">
                         <button @click="voidOrder()" :disabled="cart.length === 0" class="py-2 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-30 transition">Void</button>
                         <button @click="holdOrder()" :disabled="cart.length === 0 || submitting" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 transition flex items-center justify-center gap-1">
@@ -447,10 +462,15 @@
                     <span class="text-sm font-medium text-gray-600 dark:text-gray-400">Walk-in Customer</span>
                 </button>
                 <template x-for="c in filteredCustomers" :key="c.id">
-                    <button @click="selectCustomerWithStats(c)" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition border-b border-gray-50 dark:border-gray-800">
-                        <div class="w-9 h-9 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center"><span class="text-sm font-bold text-purple-600 dark:text-purple-400" x-text="c.name.charAt(0)"></span></div>
-                        <div class="text-left"><p class="text-sm font-medium text-gray-900 dark:text-white" x-text="c.name"></p><p class="text-xs text-gray-400" x-text="c.phone || 'No phone'"></p></div>
-                    </button>
+                    <div class="w-full flex items-center gap-3 px-4 py-3 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition border-b border-gray-50 dark:border-gray-800">
+                        <button @click="selectCustomerWithStats(c)" class="flex items-center gap-3 flex-1 min-w-0">
+                            <div class="w-9 h-9 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0"><span class="text-sm font-bold text-purple-600 dark:text-purple-400" x-text="c.name.charAt(0)"></span></div>
+                            <div class="text-left min-w-0"><p class="text-sm font-medium text-gray-900 dark:text-white truncate" x-text="c.name"></p><p class="text-xs text-gray-400" x-text="c.phone || 'No phone'"></p></div>
+                        </button>
+                        <button @click="loadCustomerHistory(c.id)" class="flex-shrink-0 text-[9px] font-bold text-purple-600 hover:text-purple-800 bg-purple-50 dark:bg-purple-900/30 px-2 py-1 rounded-lg transition" title="View history">
+                            <svg class="w-3.5 h-3.5 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </button>
+                    </div>
                 </template>
             </div>
             <div class="p-3 border-t border-gray-200 dark:border-gray-700">
@@ -483,6 +503,91 @@
             <div class="p-4 grid grid-cols-2 gap-3">
                 <a :href="'/pos/restaurant/receipt/' + lastTransactionId + '?auto_print=1'" target="_blank" class="py-3 text-center rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold transition shadow-sm">Print</a>
                 <button @click="showReceipt = false; clearCart();" class="py-3 text-center rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-gray-700 dark:text-gray-300 text-sm font-bold transition">New Sale</button>
+            </div>
+        </div>
+    </div>
+
+    {{-- Manager PIN Modal --}}
+    <div x-show="showManagerPinModal" x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden" @click.outside="showManagerPinModal = false">
+            <div class="p-5 text-center">
+                <div class="w-12 h-12 mx-auto rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-3">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                </div>
+                <h3 class="text-lg font-extrabold text-gray-900 dark:text-white">Manager Override</h3>
+                <p class="text-xs text-gray-500 mt-1">Enter manager PIN to unlock full discount</p>
+            </div>
+            <div class="px-5 pb-5 space-y-3">
+                <input type="password" x-model="managerPin" @keydown.enter="submitManagerPin()" maxlength="6" placeholder="Enter PIN" class="w-full text-center text-2xl tracking-[0.5em] bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:ring-blue-500 focus:border-blue-500" autofocus>
+                <p x-show="managerPinError" class="text-xs text-red-500 text-center" x-text="managerPinError"></p>
+                <div class="flex gap-2">
+                    <button @click="showManagerPinModal = false" class="flex-1 py-2.5 text-sm font-semibold text-gray-600 bg-gray-100 dark:bg-gray-800 dark:text-gray-400 rounded-xl hover:bg-gray-200 transition">Cancel</button>
+                    <button @click="submitManagerPin()" class="flex-1 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition">Verify</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Customer History Modal --}}
+    <div x-show="showCustomerHistory" x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col" @click.outside="showCustomerHistory = false">
+            <div class="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-extrabold text-gray-900 dark:text-white">Customer History</h3>
+                    <p class="text-xs text-gray-500" x-text="customerHistory?.customer_name || ''"></p>
+                </div>
+                <button @click="showCustomerHistory = false" class="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 space-y-4">
+                <template x-if="loadingCustomerHistory">
+                    <div class="text-center py-8"><div class="w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto"></div><p class="text-xs text-gray-400 mt-2">Loading...</p></div>
+                </template>
+                <template x-if="customerHistory && !loadingCustomerHistory">
+                    <div>
+                        <div class="flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-xl mb-4">
+                            <div class="w-10 h-10 rounded-full bg-purple-200 dark:bg-purple-800 flex items-center justify-center"><span class="text-sm font-bold text-purple-700 dark:text-purple-300" x-text="(customerHistory.customer_name || 'C').charAt(0)"></span></div>
+                            <div>
+                                <p class="text-sm font-bold text-gray-900 dark:text-white" x-text="customerHistory.customer_name"></p>
+                                <p class="text-[10px] text-gray-500"><span x-text="customerHistory.total_orders"></span> orders &bull; Rs. <span x-text="Number(customerHistory.total_spent || 0).toLocaleString()"></span> spent</p>
+                            </div>
+                            <span x-show="customerHistory.total_orders >= 5" class="ml-auto text-[9px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">VIP</span>
+                        </div>
+
+                        <template x-if="customerHistory.favorites && customerHistory.favorites.length > 0">
+                            <div class="mb-4">
+                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Favorites</p>
+                                <div class="flex flex-wrap gap-1.5">
+                                    <template x-for="fav in customerHistory.favorites" :key="fav.name">
+                                        <span class="text-[10px] px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg font-medium" x-text="fav.name + ' (' + fav.count + 'x)'"></span>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
+                        <template x-if="customerHistory.recent_orders && customerHistory.recent_orders.length > 0">
+                            <div>
+                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Recent Orders</p>
+                                <div class="space-y-2">
+                                    <template x-for="ord in customerHistory.recent_orders" :key="ord.id">
+                                        <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                                            <div class="flex items-center justify-between mb-1.5">
+                                                <span class="text-xs font-bold text-gray-900 dark:text-white" x-text="ord.order_number"></span>
+                                                <span class="text-[10px] text-gray-400" x-text="ord.date"></span>
+                                            </div>
+                                            <div class="text-[10px] text-gray-500 mb-2" x-text="ord.items.map(i => i.qty + 'x ' + i.name).join(', ')"></div>
+                                            <div class="flex items-center justify-between">
+                                                <span class="text-xs font-bold text-purple-600" x-text="'Rs. ' + Number(ord.total).toLocaleString()"></span>
+                                                <button @click="reorderItems(ord)" class="text-[10px] font-bold text-white bg-purple-600 hover:bg-purple-700 px-2.5 py-1 rounded-lg transition">Reorder</button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
             </div>
         </div>
     </div>
@@ -527,6 +632,17 @@ function restaurantPos() {
         kitchenSettings: @json($kitchenSettings),
         blockOutOfStock: {{ $blockOutOfStock ? 'true' : 'false' }},
         taxRate: {{ $taxRate }},
+        posRole: '{{ $posRole }}',
+        discountLimit: {{ $discountLimit }},
+        hasManagerPin: {{ $hasManagerPin ? 'true' : 'false' }},
+        managerOverrideActive: false,
+        showManagerPinModal: false,
+        managerPin: '',
+        managerPinError: '',
+        ingredientCosts: @json($ingredientCosts ?? []),
+        customerHistory: null,
+        showCustomerHistory: false,
+        loadingCustomerHistory: false,
         filteredItems: [],
         displayItems: [],
         displayCount: 60,
@@ -760,7 +876,7 @@ function restaurantPos() {
         updateQty(index, delta) { this.cart[index].quantity = Math.max(0.01, parseFloat(this.cart[index].quantity) + delta); },
         setQty(index, val) { const v = parseFloat(val); if (v > 0) this.cart[index].quantity = v; },
         removeFromCart(index) { this.cart.splice(index, 1); },
-        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.clearCartStorage(); },
+        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm('Current order has ' + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast('New sale started', 'success');
@@ -900,6 +1016,56 @@ function restaurantPos() {
             } catch (e) { this.showToast('Error adding customer', 'error'); }
         },
 
+        get effectiveDiscountLimit() {
+            if (this.posRole === 'pos_admin') return 100;
+            return this.managerOverrideActive ? {{ $hasManagerPin ? ($company->manager_discount_limit ?? 50) : 100 }} : this.discountLimit;
+        },
+        checkDiscountLimit(val, type) {
+            if (type === 'percentage' && val > this.effectiveDiscountLimit) return false;
+            if (type === 'amount' && this.effectiveSubtotal > 0 && (val / this.effectiveSubtotal * 100) > this.effectiveDiscountLimit) return false;
+            return true;
+        },
+        async requestManagerOverride() {
+            if (!this.hasManagerPin) { this.showToast('Manager PIN not configured', 'error'); return; }
+            this.showManagerPinModal = true; this.managerPin = ''; this.managerPinError = '';
+        },
+        async submitManagerPin() {
+            try {
+                const res = await fetch('{{ route("pos.restaurant.verify-manager-pin") }}', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ pin: this.managerPin }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.managerOverrideActive = true; this.showManagerPinModal = false;
+                    this.showToast('Manager override granted', 'success');
+                } else { this.managerPinError = data.message || 'Invalid PIN'; }
+            } catch (e) { this.managerPinError = 'Connection error'; }
+        },
+        async loadCustomerHistory(customerId) {
+            this.loadingCustomerHistory = true; this.customerHistory = null;
+            try {
+                const res = await fetch(`/pos/restaurant/api/customer-history/${customerId}`);
+                if (res.ok) { this.customerHistory = await res.json(); this.showCustomerHistory = true; }
+            } catch (e) {}
+            this.loadingCustomerHistory = false;
+        },
+        reorderItems(order) {
+            for (const item of order.items) {
+                const existing = this.cart.find(c => c.item_id === item.item_id && c.item_type === item.item_type);
+                if (existing) { existing.quantity += item.qty; } else {
+                    this.cart.push({ item_id: item.item_id, item_type: item.item_type, item_name: item.name, quantity: item.qty, unit_price: item.price, special_notes: '', is_tax_exempt: false, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false });
+                }
+            }
+            this.showCustomerHistory = false; this.showToast('Items added to cart', 'success');
+        },
+        getCartCost() {
+            return this.cart.reduce((s, i) => {
+                if (i.item_type === 'service') return s;
+                const cost = this.ingredientCosts[i.item_id] || 0;
+                return s + (cost * i.quantity);
+            }, 0);
+        },
         showToast(msg, type) { this.toast = { show: true, message: msg, type }; setTimeout(() => this.toast.show = false, 2500); },
     };
 }

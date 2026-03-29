@@ -200,15 +200,24 @@
 
     <script>
         let hasPrinted = false;
+        const txnId = {{ $transaction->id }};
+        function markPrinted() {
+            fetch('/pos/restaurant/api/receipt-printed/' + txnId, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+            }).catch(function(){});
+        }
         function handlePrint() {
-            if (hasPrinted && !confirm('This receipt has already been printed. Print again?')) return;
+            if (hasPrinted && !confirm('This receipt has already been printed (reprint #{{ ($transaction->reprint_count ?? 0) + 1 }}). Print again?')) return;
             hasPrinted = true;
+            markPrinted();
             window.print();
         }
         window.onload = function() {
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.get('auto_print') === '1' && !hasPrinted) {
                 hasPrinted = true;
+                markPrinted();
                 setTimeout(function() { window.print(); }, 500);
             }
         };

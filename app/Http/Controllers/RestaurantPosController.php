@@ -88,10 +88,28 @@ class RestaurantPosController extends Controller
 
         $blockOutOfStock = (bool)($company->block_out_of_stock ?? false);
 
+        $user = Auth::guard('pos')->user();
+        $posRole = $user->pos_role ?? 'pos_cashier';
+        $discountLimit = $posRole === 'pos_admin'
+            ? (float)($company->manager_discount_limit ?? 50)
+            : (float)($company->cashier_discount_limit ?? 10);
+        $hasManagerPin = !empty($company->manager_override_pin);
+
+        $ingredientCosts = [];
+        foreach ($recipes as $productId => $productRecipes) {
+            $cost = 0;
+            foreach ($productRecipes as $recipe) {
+                $ing = $recipe->ingredient;
+                if ($ing) $cost += (float)$recipe->quantity_needed * (float)($ing->cost_per_unit ?? 0);
+            }
+            $ingredientCosts[$productId] = round($cost, 2);
+        }
+
         return view('pos.restaurant.pos', compact(
             'company', 'products', 'services', 'categories',
             'recipeLookup', 'tables', 'selectedTable', 'heldOrders',
-            'customers', 'taxRate', 'stockStatus', 'blockOutOfStock'
+            'customers', 'taxRate', 'stockStatus', 'blockOutOfStock',
+            'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts'
         ));
     }
 
@@ -199,10 +217,17 @@ class RestaurantPosController extends Controller
         $discountType = $request->discount_type;
         $discountValue = (float)($request->discount_value ?? 0);
         $discountAmount = (float)($request->discount_amount ?? 0);
+
+        $maxDiscountPct = 100;
+        if ($user->pos_role === 'pos_cashier') {
+            $maxDiscountPct = (float)($company->cashier_discount_limit ?? 10);
+        }
         if ($discountType === 'percentage' && $discountValue > 0) {
+            $discountValue = min($discountValue, $maxDiscountPct);
             $discountAmount = round($subtotal * min(100, $discountValue) / 100, 2);
         } elseif ($discountType === 'amount' && $discountValue > 0) {
-            $discountAmount = min($subtotal, round($discountValue, 2));
+            $maxAmountFromPct = round($subtotal * $maxDiscountPct / 100, 2);
+            $discountAmount = min($subtotal, min($maxAmountFromPct, round($discountValue, 2)));
         }
         $discountAmount = max(0, $discountAmount);
 
@@ -238,6 +263,17 @@ class RestaurantPosController extends Controller
                 }
             }
 
+            $estimatedCost = 0;
+            $recipeLookup = ProductRecipe::where('company_id', $companyId)->with('ingredient')->get()->groupBy('product_id');
+            foreach ($resolvedItems as $ri) {
+                if ($ri['item_type'] === 'product' && isset($recipeLookup[$ri['item_id']])) {
+                    foreach ($recipeLookup[$ri['item_id']] as $recipe) {
+                        $ing = $recipe->ingredient;
+                        if ($ing) $estimatedCost += (float)$recipe->quantity_needed * (float)($ing->cost_per_unit ?? 0) * $ri['quantity'];
+                    }
+                }
+            }
+
             $order = RestaurantOrder::create([
                 'company_id' => $companyId,
                 'order_number' => $orderNumber,
@@ -253,6 +289,7 @@ class RestaurantPosController extends Controller
                 'discount_amount' => $discountAmount,
                 'tax_amount' => $taxAmount,
                 'total_amount' => $totalAmount,
+                'estimated_cost' => round($estimatedCost, 2),
                 'kitchen_notes' => $request->kitchen_notes,
                 'priority' => (bool)($request->priority ?? false),
                 'created_by' => $user->id,
@@ -897,13 +934,20 @@ class RestaurantPosController extends Controller
             ->where('created_at', '>=', $today)
             ->sum('discount_amount');
 
+        $todayCost = RestaurantOrder::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->where('created_at', '>=', $today)
+            ->sum('estimated_cost');
+        $todayProfit = $todaySales - $todayCost;
+
         return view('pos.restaurant.dashboard', compact(
             'company', 'todaySales', 'yesterdaySales', 'todayOrders',
             'heldCount', 'completedCount', 'totalTables', 'occupiedTables',
             'topProducts', 'lowStockItems', 'recentOrders',
             'salesChartLabels', 'salesChartData', 'orderTypeCounts',
             'hourlyLabels', 'hourlySales', 'hourlyOrders',
-            'peakHour', 'peakSales', 'todayTax', 'todayDiscount'
+            'peakHour', 'peakSales', 'todayTax', 'todayDiscount',
+            'todayCost', 'todayProfit'
         ));
     }
 
@@ -922,5 +966,117 @@ class RestaurantPosController extends Controller
             ->first();
 
         return view('pos.restaurant.receipt', compact('transaction', 'company', 'order'));
+    }
+
+    public function verifyManagerPin(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $pin = $request->input('pin');
+        if (!$company->manager_override_pin) {
+            return response()->json(['success' => false, 'message' => 'Manager PIN not configured'], 400);
+        }
+        if (password_verify($pin, $company->manager_override_pin)) {
+            return response()->json(['success' => true]);
+        }
+        return response()->json(['success' => false, 'message' => 'Invalid PIN'], 403);
+    }
+
+    public function markReceiptPrinted(Request $request, $transactionId)
+    {
+        $companyId = app('currentCompanyId');
+        $txn = PosTransaction::where('company_id', $companyId)->findOrFail($transactionId);
+        if ($txn->receipt_printed_at) {
+            $txn->increment('reprint_count');
+            return response()->json(['success' => true, 'reprint' => true, 'count' => $txn->reprint_count]);
+        }
+        $txn->update(['receipt_printed_at' => now()]);
+        return response()->json(['success' => true, 'reprint' => false]);
+    }
+
+    public function customerHistory($customerId)
+    {
+        $companyId = app('currentCompanyId');
+        $customer = PosCustomer::where('company_id', $companyId)->findOrFail($customerId);
+
+        $recentOrders = RestaurantOrder::where('company_id', $companyId)
+            ->where('customer_id', $customer->id)
+            ->where('status', 'completed')
+            ->with('items')
+            ->orderBy('created_at', 'desc')
+            ->limit(5)
+            ->get()
+            ->map(function ($o) {
+                return [
+                    'id' => $o->id,
+                    'order_number' => $o->order_number,
+                    'total' => (float)$o->total_amount,
+                    'date' => $o->created_at->format('M d, g:i A'),
+                    'items' => $o->items->map(fn($i) => [
+                        'item_id' => $i->item_id,
+                        'item_type' => $i->item_type,
+                        'name' => $i->item_name,
+                        'qty' => (float)$i->quantity,
+                        'price' => (float)$i->unit_price,
+                    ]),
+                ];
+            });
+
+        $favorites = RestaurantOrderItem::whereHas('order', function ($q) use ($companyId, $customer) {
+            $q->where('company_id', $companyId)
+              ->where('customer_id', $customer->id)
+              ->where('status', 'completed');
+        })
+        ->select('item_id', 'item_type', 'item_name', DB::raw('SUM(quantity) as total_qty'), DB::raw('COUNT(*) as order_count'))
+        ->groupBy('item_id', 'item_type', 'item_name')
+        ->orderByDesc('total_qty')
+        ->limit(5)
+        ->get();
+
+        $totalOrders = RestaurantOrder::where('company_id', $companyId)
+            ->where('customer_id', $customer->id)
+            ->where('status', 'completed')
+            ->count();
+        $totalSpent = RestaurantOrder::where('company_id', $companyId)
+            ->where('customer_id', $customer->id)
+            ->where('status', 'completed')
+            ->sum('total_amount');
+
+        return response()->json([
+            'customer_name' => $customer->name,
+            'customer_phone' => $customer->phone,
+            'total_orders' => $totalOrders,
+            'total_spent' => round((float)$totalSpent, 2),
+            'recent_orders' => $recentOrders,
+            'favorites' => $favorites->map(fn($f) => ['name' => $f->item_name, 'count' => (int)$f->total_qty]),
+        ]);
+    }
+
+    public function saveManagerPin(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $user = Auth::guard('pos')->user();
+        if ($user->pos_role !== 'pos_admin' && $user->role !== 'company_admin') {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+        $request->validate([
+            'pin' => 'nullable|digits_between:4,6',
+            'cashier_discount_limit' => 'nullable|numeric|min:0|max:100',
+            'manager_discount_limit' => 'nullable|numeric|min:0|max:100',
+        ]);
+        $updates = [];
+        if ($request->pin) {
+            $updates['manager_override_pin'] = bcrypt($request->pin);
+        }
+        if ($request->has('cashier_discount_limit')) {
+            $updates['cashier_discount_limit'] = $request->cashier_discount_limit;
+        }
+        if ($request->has('manager_discount_limit')) {
+            $updates['manager_discount_limit'] = $request->manager_discount_limit;
+        }
+        if (!empty($updates)) {
+            Company::where('id', $companyId)->update($updates);
+        }
+        return response()->json(['success' => true, 'message' => 'Settings saved']);
     }
 }

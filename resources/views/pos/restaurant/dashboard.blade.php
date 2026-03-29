@@ -79,6 +79,47 @@
         </div>
     </div>
 
+    @if(auth('pos')->user() && auth('pos')->user()->pos_role === 'pos_admin')
+    <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        <div class="bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 rounded-2xl p-4 border border-emerald-200 dark:border-emerald-800 shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                </div>
+                <div>
+                    <p class="text-xs text-emerald-600 font-medium">Today's Profit</p>
+                    <p class="text-xl font-extrabold {{ ($todayProfit ?? 0) >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600' }}">Rs. {{ number_format($todayProfit ?? 0) }}</p>
+                </div>
+            </div>
+            <p class="text-[10px] mt-2 text-emerald-600/70">Revenue minus ingredient costs</p>
+        </div>
+        <div class="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-500 font-medium">Today's Cost</p>
+                    <p class="text-xl font-extrabold text-gray-900 dark:text-white">Rs. {{ number_format($todayCost ?? 0) }}</p>
+                </div>
+            </div>
+            <p class="text-[10px] mt-2 text-gray-400">Ingredient cost from recipes</p>
+        </div>
+        <div class="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-500 font-medium">Margin</p>
+                    <p class="text-xl font-extrabold {{ ($todayProfit ?? 0) >= 0 ? 'text-indigo-700 dark:text-indigo-400' : 'text-red-600' }}">{{ $todaySales > 0 ? round(($todayProfit ?? 0) / $todaySales * 100) : 0 }}%</p>
+                </div>
+            </div>
+            <p class="text-[10px] mt-2 text-gray-400">Profit margin on sales</p>
+        </div>
+    </div>
+    @endif
+
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div class="bg-white dark:bg-gray-900 rounded-2xl p-3 border border-gray-100 dark:border-gray-800 shadow-sm">
             <p class="text-[10px] text-gray-400 font-medium">Tax Collected</p>
@@ -208,6 +249,40 @@
             </table>
         </div>
     </div>
+
+    @if(auth('pos')->user() && auth('pos')->user()->pos_role === 'pos_admin')
+    <div x-data="{ showSettings: false, mgrPin: '', cashierLimit: {{ $company->cashier_discount_limit ?? 10 }}, managerLimit: {{ $company->manager_discount_limit ?? 50 }}, saving: false, saved: false }" class="bg-white dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-800 shadow-sm mb-6">
+        <button @click="showSettings = !showSettings" class="flex items-center justify-between w-full">
+            <h2 class="text-sm font-bold text-gray-900 dark:text-white">Role & Discount Settings</h2>
+            <svg class="w-4 h-4 text-gray-400 transition-transform" :class="showSettings ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div x-show="showSettings" x-transition class="mt-4 space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                    <label class="text-xs font-medium text-gray-500 block mb-1">Cashier Discount Limit (%)</label>
+                    <input type="number" x-model.number="cashierLimit" min="0" max="100" class="w-full text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-gray-900 dark:text-white">
+                    <p class="text-[10px] text-gray-400 mt-1">Max discount % cashiers can apply</p>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 block mb-1">Manager Discount Limit (%)</label>
+                    <input type="number" x-model.number="managerLimit" min="0" max="100" class="w-full text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-gray-900 dark:text-white">
+                    <p class="text-[10px] text-gray-400 mt-1">Max discount after PIN override</p>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 block mb-1">Manager Override PIN</label>
+                    <input type="password" x-model="mgrPin" maxlength="6" placeholder="{{ $company->manager_override_pin ? '••••••' : 'Set 4-6 digit PIN' }}" class="w-full text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-gray-900 dark:text-white">
+                    <p class="text-[10px] text-gray-400 mt-1">{{ $company->manager_override_pin ? 'PIN is set. Enter new to change.' : 'Required for cashier override' }}</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button @click="async function() { saving = true; saved = false; try { const res = await fetch('{{ route('pos.restaurant.save-manager-pin') }}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ pin: mgrPin || undefined, cashier_discount_limit: cashierLimit, manager_discount_limit: managerLimit }) }); const d = await res.json(); if (d.success) { saved = true; mgrPin = ''; setTimeout(() => saved = false, 3000); } } catch(e) {} saving = false; }()" :disabled="saving" class="px-4 py-2 text-sm font-bold text-white bg-purple-600 rounded-xl hover:bg-purple-700 disabled:opacity-50 transition">
+                    <span x-text="saving ? 'Saving...' : 'Save Settings'"></span>
+                </button>
+                <span x-show="saved" x-transition class="text-xs text-green-600 font-medium">Settings saved!</span>
+            </div>
+        </div>
+    </div>
+    @endif
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>

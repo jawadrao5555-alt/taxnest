@@ -31,6 +31,7 @@
                     <div>
                         <span class="font-bold text-gray-900 dark:text-white text-sm" x-text="order.order_number"></span>
                         <span x-show="order.table" class="ml-2 text-xs bg-white dark:bg-gray-800 px-1.5 py-0.5 rounded text-purple-600 dark:text-purple-400 font-medium" x-text="'T-' + order.table"></span>
+                        <span x-show="order.priority" class="ml-1 text-[9px] bg-red-600 text-white px-1.5 py-0.5 rounded-full font-black animate-pulse">RUSH</span>
                     </div>
                     <div class="text-right">
                         <div class="text-xs font-medium" :class="order.is_urgent ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'" x-text="order.elapsed_minutes + ' min'"></div>
@@ -90,6 +91,7 @@ $kdsOrdersJson = $orders->map(function($o) {
         'id' => $o->id,
         'order_number' => $o->order_number,
         'status' => $o->status,
+        'priority' => (bool)$o->priority,
         'table' => $o->table ? $o->table->table_number : null,
         'items' => $items,
         'kitchen_notes' => $o->kitchen_notes,

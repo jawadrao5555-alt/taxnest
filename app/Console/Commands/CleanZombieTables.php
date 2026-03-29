@@ -17,7 +17,11 @@ class CleanZombieTables extends Command
         $cleaned = 0;
 
         foreach ($zombies as $table) {
+            $companyId = $table->company_id;
+            if (!$companyId) continue;
+
             $activeOrders = RestaurantOrder::where('table_id', $table->id)
+                ->where('company_id', $companyId)
                 ->whereIn('status', ['held', 'preparing', 'ready'])
                 ->count();
 
@@ -28,6 +32,7 @@ class CleanZombieTables extends Command
                     'locked_at' => null,
                 ]);
                 $cleaned++;
+                \Log::info("CleanZombieTables: Reset table {$table->table_number} (company_id: {$companyId})");
             }
         }
 

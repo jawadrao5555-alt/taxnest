@@ -71,6 +71,7 @@ class RestaurantKdsController extends Controller
                     'order_number' => $o->order_number,
                     'status' => $o->status,
                     'order_type' => $o->order_type,
+                    'priority' => (bool)$o->priority,
                     'table' => $o->table ? $o->table->table_number : null,
                     'items' => $o->items->map(fn($i) => [
                         'name' => $i->item_name,

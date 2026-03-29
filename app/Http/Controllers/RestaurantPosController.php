@@ -188,6 +188,28 @@ class RestaurantPosController extends Controller
 
         DB::beginTransaction();
         try {
+            if ($request->recalled_order_id) {
+                $oldOrder = RestaurantOrder::where('id', $request->recalled_order_id)
+                    ->where('company_id', $companyId)
+                    ->whereIn('status', ['held', 'preparing', 'ready'])
+                    ->lockForUpdate()
+                    ->first();
+                if ($oldOrder) {
+                    $oldOrder->items()->delete();
+                    $oldOrder->update(['status' => 'cancelled']);
+                    if ($oldOrder->table_id) {
+                        $activeOnTable = RestaurantOrder::where('table_id', $oldOrder->table_id)
+                            ->where('company_id', $companyId)
+                            ->where('id', '!=', $oldOrder->id)
+                            ->whereIn('status', ['held', 'preparing', 'ready'])
+                            ->exists();
+                        if (!$activeOnTable) {
+                            RestaurantTable::where('id', $oldOrder->table_id)->update(['status' => 'available', 'locked_by_user_id' => null, 'locked_at' => null]);
+                        }
+                    }
+                }
+            }
+
             $order = RestaurantOrder::create([
                 'company_id' => $companyId,
                 'order_number' => $orderNumber,
@@ -204,6 +226,7 @@ class RestaurantPosController extends Controller
                 'tax_amount' => $taxAmount,
                 'total_amount' => $totalAmount,
                 'kitchen_notes' => $request->kitchen_notes,
+                'priority' => (bool)($request->priority ?? false),
                 'created_by' => $user->id,
             ]);
 
@@ -271,17 +294,17 @@ class RestaurantPosController extends Controller
         $praEnabled = (bool) $company->pra_reporting_enabled;
         $invoiceMode = $praEnabled ? 'pra' : 'local';
 
-        $stockErrors = $this->validateStockForOrder($companyId, $order);
-        if (!empty($stockErrors)) {
-            return response()->json([
-                'success' => false,
-                'stock_error' => true,
-                'message' => 'Insufficient stock: ' . implode(', ', $stockErrors),
-            ], 400);
-        }
-
         DB::beginTransaction();
         try {
+            $stockErrors = $this->validateStockForOrder($companyId, $order, true);
+            if (!empty($stockErrors)) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'stock_error' => true,
+                    'message' => 'Insufficient stock: ' . implode(', ', $stockErrors),
+                ], 400);
+            }
             $invoiceNumber = $invoiceMode === 'local'
                 ? $this->generateLocalInvoiceNumber($companyId)
                 : $this->generateInvoiceNumber($companyId);
@@ -387,23 +410,30 @@ class RestaurantPosController extends Controller
         }
     }
 
-    private function validateStockForOrder($companyId, $order)
+    private function validateStockForOrder($companyId, $order, $lock = false)
     {
-        $errors = [];
+        $aggregated = [];
         foreach ($order->items->where('item_type', 'product') as $item) {
             $recipes = ProductRecipe::where('company_id', $companyId)
                 ->where('product_id', $item->item_id)
-                ->with('ingredient')
                 ->get();
 
-            if ($recipes->isNotEmpty()) {
-                foreach ($recipes as $recipe) {
-                    $needed = round($recipe->quantity_needed * $item->quantity, 4);
-                    $ingredient = $recipe->ingredient;
-                    if ($ingredient && $ingredient->current_stock < $needed) {
-                        $errors[] = "{$ingredient->name} (need {$needed} {$ingredient->unit}, have {$ingredient->current_stock})";
-                    }
+            foreach ($recipes as $recipe) {
+                $needed = round($recipe->quantity_needed * $item->quantity, 4);
+                $ingId = $recipe->ingredient_id;
+                if (!isset($aggregated[$ingId])) {
+                    $aggregated[$ingId] = 0;
                 }
+                $aggregated[$ingId] += $needed;
+            }
+        }
+
+        $errors = [];
+        foreach ($aggregated as $ingredientId => $totalNeeded) {
+            $query = Ingredient::where('id', $ingredientId)->where('company_id', $companyId);
+            $ingredient = $lock ? $query->lockForUpdate()->first() : $query->first();
+            if ($ingredient && $ingredient->current_stock < $totalNeeded) {
+                $errors[] = "{$ingredient->name} (need {$totalNeeded} {$ingredient->unit}, have {$ingredient->current_stock})";
             }
         }
         return $errors;

@@ -10,7 +10,7 @@ class RestaurantOrder extends Model
         'company_id', 'order_number', 'table_id', 'order_type', 'status',
         'customer_id', 'customer_name', 'customer_phone',
         'subtotal', 'discount_type', 'discount_value', 'discount_amount', 'tax_amount', 'total_amount',
-        'payment_method', 'kitchen_notes', 'pos_transaction_id', 'created_by',
+        'payment_method', 'kitchen_notes', 'priority', 'pos_transaction_id', 'created_by',
     ];
 
     protected $casts = [
@@ -18,6 +18,7 @@ class RestaurantOrder extends Model
         'discount_amount' => 'decimal:2',
         'tax_amount' => 'decimal:2',
         'total_amount' => 'decimal:2',
+        'priority' => 'boolean',
     ];
 
     public function company()

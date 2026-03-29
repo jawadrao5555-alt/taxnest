@@ -27,18 +27,18 @@
             <svg class="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
             <span class="text-[9px] text-gray-500 dark:text-gray-400 mt-0.5">Search</span>
         </button>
-        <button @click="showCustomerPicker = !showCustomerPicker" class="action-btn flex flex-col items-center px-2.5 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 min-w-[52px]">
-            <svg class="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-            <span class="text-[9px] text-gray-500 dark:text-gray-400 mt-0.5">Customer</span>
+        <button @click="showCustomerPicker = !showCustomerPicker" class="action-btn flex flex-col items-center px-2.5 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 min-w-[52px]" :class="selectedCustomer ? 'bg-blue-50 dark:bg-blue-900/20' : ''">
+            <svg class="w-4 h-4" :class="selectedCustomer ? 'text-blue-600' : 'text-gray-600 dark:text-gray-400'" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            <span class="text-[9px] mt-0.5" :class="selectedCustomer ? 'text-blue-600 font-bold' : 'text-gray-500 dark:text-gray-400'" x-text="selectedCustomer ? selectedCustomer.name.substring(0,8) : 'Customer'"></span>
         </button>
         <button @click="showTablePicker = true" class="action-btn flex flex-col items-center px-2.5 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 min-w-[52px]" :class="selectedTable ? 'bg-purple-50 dark:bg-purple-900/20' : ''">
             <svg class="w-4 h-4" :class="selectedTable ? 'text-purple-600' : 'text-gray-600 dark:text-gray-400'" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
             <span class="text-[9px] mt-0.5" :class="selectedTable ? 'text-purple-600 font-bold' : 'text-gray-500 dark:text-gray-400'" x-text="selectedTable ? 'T-' + selectedTable.table_number : 'Table'"></span>
         </button>
         <div class="w-px h-8 bg-gray-200 dark:bg-gray-700 mx-1"></div>
-        <button @click="clearCart()" class="action-btn flex flex-col items-center px-2.5 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 min-w-[52px]">
-            <svg class="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-            <span class="text-[9px] text-gray-500 dark:text-gray-400 mt-0.5">New sale</span>
+        <button @click="newSale()" class="action-btn flex flex-col items-center px-2.5 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 min-w-[52px]">
+            <svg class="w-4 h-4 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+            <span class="text-[9px] text-green-600 dark:text-green-400 font-bold mt-0.5">New Sale</span>
         </button>
         <button @click="showHeldOrders = !showHeldOrders" class="action-btn relative flex flex-col items-center px-2.5 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 min-w-[52px]">
             <svg class="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -77,6 +77,9 @@
                 <span class="text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded font-medium" x-text="orderType.replace('_', ' ').toUpperCase()"></span>
                 <template x-if="selectedTable">
                     <span class="text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded font-medium" x-text="'T-' + selectedTable.table_number"></span>
+                </template>
+                <template x-if="selectedCustomer">
+                    <span class="text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-1.5 py-0.5 rounded font-medium" x-text="selectedCustomer.name.substring(0,10)"></span>
                 </template>
             </div>
 
@@ -121,8 +124,12 @@
                         <span>Subtotal</span>
                         <span x-text="Number(subtotal).toLocaleString()"></span>
                     </div>
+                    <div x-show="exemptAmount > 0" class="flex justify-between text-green-600 dark:text-green-400">
+                        <span>Tax Exempt</span>
+                        <span x-text="'-' + Number(exemptAmount).toLocaleString()"></span>
+                    </div>
                     <div class="flex justify-between text-gray-500 dark:text-gray-400">
-                        <span>Tax</span>
+                        <span x-text="'Tax (' + taxRate + '%)'">Tax</span>
                         <span x-text="Number(taxAmount).toLocaleString()"></span>
                     </div>
                     <div class="flex justify-between text-lg font-black text-gray-900 dark:text-white pt-1 border-t border-gray-200 dark:border-gray-600">
@@ -133,7 +140,7 @@
             </div>
 
             <div class="flex border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
-                <button @click="clearCart()" class="flex-1 py-2 text-[10px] font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 border-r border-gray-200 dark:border-gray-700 transition uppercase tracking-wider">Void</button>
+                <button @click="voidOrder()" class="flex-1 py-2 text-[10px] font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 border-r border-gray-200 dark:border-gray-700 transition uppercase tracking-wider">Void</button>
                 <button @click="holdOrder()" :disabled="cart.length === 0" class="flex-1 py-2 text-[10px] font-bold text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 border-r border-gray-200 dark:border-gray-700 transition uppercase tracking-wider disabled:opacity-40">Hold</button>
                 <button @click="showHeldOrders = !showHeldOrders" class="flex-1 py-2 text-[10px] font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition uppercase tracking-wider relative">
                     Recall
@@ -339,6 +346,70 @@
         </div>
     </div>
 
+    <div x-show="showCustomerPicker" x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showCustomerPicker = false">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden" x-transition.scale.90>
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Select Customer</h3>
+                <button @click="showCustomerPicker = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            </div>
+            <div class="p-3 border-b border-gray-100 dark:border-gray-800">
+                <input type="text" x-model="customerSearch" placeholder="Search by name or phone..." class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white text-sm px-3 py-2 focus:ring-purple-500">
+            </div>
+            <div class="overflow-y-auto max-h-[50vh]">
+                <button @click="selectedCustomer = null; showCustomerPicker = false" class="w-full text-left px-4 py-3 text-sm text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 border-b border-gray-50 dark:border-gray-800">
+                    Walk-in Customer (No selection)
+                </button>
+                <template x-for="cust in filteredCustomers" :key="cust.id">
+                    <button @click="selectedCustomer = cust; showCustomerPicker = false" class="w-full text-left px-4 py-3 hover:bg-purple-50 dark:hover:bg-purple-900/20 border-b border-gray-50 dark:border-gray-800 transition flex items-center justify-between">
+                        <div>
+                            <div class="text-sm font-semibold text-gray-900 dark:text-white" x-text="cust.name"></div>
+                            <div class="text-[11px] text-gray-400" x-text="cust.phone || 'No phone'"></div>
+                        </div>
+                        <svg x-show="selectedCustomer?.id === cust.id" class="w-5 h-5 text-purple-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    </button>
+                </template>
+                <div x-show="filteredCustomers.length === 0 && customerSearch.length > 0" class="p-6 text-center text-gray-400 text-sm">No customers found</div>
+            </div>
+            <div class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                <div x-show="!showQuickAdd">
+                    <button @click="showQuickAdd = true" class="w-full py-2 text-sm font-semibold text-purple-600 hover:text-purple-800 transition">+ Add New Customer</button>
+                </div>
+                <div x-show="showQuickAdd" class="space-y-2">
+                    <input type="text" x-model="quickCustomerName" placeholder="Customer name *" class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm px-3 py-2">
+                    <input type="text" x-model="quickCustomerPhone" placeholder="Phone number" class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm px-3 py-2">
+                    <div class="flex gap-2">
+                        <button @click="addQuickCustomer()" :disabled="!quickCustomerName.trim()" class="flex-1 py-2 text-sm font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-lg disabled:opacity-40 transition">Save</button>
+                        <button @click="showQuickAdd = false; quickCustomerName = ''; quickCustomerPhone = ''" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showReceipt" x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showReceipt = false">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm" x-transition.scale.90>
+            <div class="p-5 text-center border-b border-gray-200 dark:border-gray-700">
+                <div class="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-3">
+                    <svg class="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                </div>
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Payment Successful!</h3>
+                <p class="text-sm text-gray-500 mt-1" x-text="'Invoice: ' + lastInvoiceNumber"></p>
+                <div class="text-3xl font-black text-green-600 mt-2" x-text="'Rs. ' + Number(lastTotal).toLocaleString()"></div>
+                <div class="text-xs text-gray-400 mt-1" x-text="lastPaymentMethod.toUpperCase() + ' Payment'"></div>
+            </div>
+            <div class="p-4 grid grid-cols-2 gap-3">
+                <a :href="'/pos/transactions/' + lastTransactionId + '/receipt'" target="_blank" class="py-3 text-center rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold transition shadow-sm">
+                    <svg class="w-5 h-5 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                    Print
+                </a>
+                <button @click="showReceipt = false" class="py-3 text-center rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-bold transition">
+                    <svg class="w-5 h-5 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                    New Sale
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div x-show="toast.show" x-transition.opacity
         class="fixed top-4 right-4 z-[60] max-w-xs px-4 py-2.5 rounded-xl shadow-2xl text-sm font-medium"
         :class="toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'"
@@ -364,6 +435,7 @@ $servicesJson = $services->map(function($s) {
     ];
 })->values();
 $selectedTableJson = $selectedTable ? ['id' => $selectedTable->id, 'table_number' => $selectedTable->table_number, 'seats' => $selectedTable->seats] : null;
+$customersJson = $customers->map(fn($c) => ['id' => $c->id, 'name' => $c->name, 'phone' => $c->phone])->values();
 $kitchenSettings = [
     'kds_enabled' => (bool)($company->kds_enabled ?? true),
     'printer_enabled' => (bool)($company->kitchen_printer_enabled ?? false),
@@ -376,13 +448,20 @@ function restaurantPos() {
     return {
         allProducts: @json($productsJson),
         allServices: @json($servicesJson),
+        allCustomers: @json($customersJson),
         kitchenSettings: @json($kitchenSettings),
+        taxRate: {{ $taxRate }},
         filteredItems: [],
         activeCategory: 'all',
         searchQuery: '',
         searchSuggestions: [],
         showSearchDropdown: false,
         showCustomerPicker: false,
+        customerSearch: '',
+        showQuickAdd: false,
+        quickCustomerName: '',
+        quickCustomerPhone: '',
+        selectedCustomer: null,
         highlightIndex: 0,
         gridFocusMode: false,
         gridFocusIndex: 0,
@@ -395,15 +474,28 @@ function restaurantPos() {
         showTablePicker: false,
         showPayModal: false,
         showHeldOrders: false,
+        showReceipt: false,
+        lastInvoiceNumber: '',
+        lastTransactionId: null,
+        lastTotal: 0,
+        lastPaymentMethod: '',
         submitting: false,
         cartAnimating: false,
         stockError: '',
         mobileView: 'menu',
         toast: { show: false, message: '', type: 'success' },
 
+        get filteredCustomers() {
+            const q = this.customerSearch.toLowerCase();
+            if (!q) return this.allCustomers;
+            return this.allCustomers.filter(c => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q)));
+        },
+
         get subtotal() { return this.cart.reduce((s, i) => s + (i.quantity * i.unit_price), 0); },
-        get taxAmount() { return Math.round(this.subtotal * 0.16); },
+        get taxableSubtotal() { return this.cart.filter(i => !i.is_tax_exempt).reduce((s, i) => s + (i.quantity * i.unit_price), 0); },
+        get taxAmount() { return Math.round(this.taxableSubtotal * this.taxRate / 100); },
         get totalAmount() { return this.subtotal + this.taxAmount; },
+        get exemptAmount() { return this.cart.filter(i => i.is_tax_exempt).reduce((s, i) => s + (i.quantity * i.unit_price), 0); },
 
         init() {
             this.filterProducts();
@@ -547,7 +639,22 @@ function restaurantPos() {
 
         removeFromCart(index) { this.cart.splice(index, 1); },
 
-        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.stockError = ''; },
+        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.stockError = ''; },
+
+        newSale() {
+            if (this.cart.length > 0) {
+                if (!confirm('Current order has ' + this.cart.length + ' item(s). Discard and start new sale?')) return;
+            }
+            this.clearCart();
+            this.showToast('New sale started', 'success');
+        },
+
+        voidOrder() {
+            if (this.cart.length === 0) return;
+            if (!confirm('Void current order? All items will be removed.')) return;
+            this.clearCart();
+            this.showToast('Order voided', 'success');
+        },
 
         selectTable(table) {
             this.selectedTable = table;
@@ -564,7 +671,11 @@ function restaurantPos() {
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                     body: JSON.stringify({
                         items: this.cart, order_type: this.orderType,
-                        table_id: this.selectedTable?.id || null, kitchen_notes: this.kitchenNotes,
+                        table_id: this.selectedTable?.id || null,
+                        customer_id: this.selectedCustomer?.id || null,
+                        customer_name: this.selectedCustomer?.name || null,
+                        customer_phone: this.selectedCustomer?.phone || null,
+                        kitchen_notes: this.kitchenNotes,
                     }),
                 });
                 const data = await res.json();
@@ -581,11 +692,34 @@ function restaurantPos() {
             if (this.cart.length === 0 || this.submitting) return;
             this.submitting = true;
             this.stockError = '';
-            await this.holdOrder();
-            if (this.heldOrders.length > 0) {
-                const lastOrder = this.heldOrders[0];
-                await this.payHeldOrderDirect(lastOrder.id, method);
+
+            try {
+                const holdRes = await fetch('{{ route("pos.restaurant.orders.hold") }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({
+                        items: this.cart, order_type: this.orderType,
+                        table_id: this.selectedTable?.id || null,
+                        customer_id: this.selectedCustomer?.id || null,
+                        customer_name: this.selectedCustomer?.name || null,
+                        customer_phone: this.selectedCustomer?.phone || null,
+                        kitchen_notes: this.kitchenNotes,
+                    }),
+                });
+                const holdData = await holdRes.json();
+                if (!holdData.success) {
+                    this.showToast(holdData.message || 'Failed to create order', 'error');
+                    this.submitting = false;
+                    return;
+                }
+
+                const savedTotal = this.totalAmount;
+                await this.payHeldOrderDirect(holdData.order.id, method, savedTotal);
+                this.clearCart();
+            } catch (e) {
+                this.showToast('Network error', 'error');
             }
+
             this.showPayModal = false;
             this.submitting = false;
         },
@@ -594,10 +728,12 @@ function restaurantPos() {
             this.showHeldOrders = false;
             this.showPayModal = false;
             this.stockError = '';
-            await this.payHeldOrderDirect(orderId, 'cash');
+            this.submitting = true;
+            await this.payHeldOrderDirect(orderId, 'cash', null);
+            this.submitting = false;
         },
 
-        async payHeldOrderDirect(orderId, method) {
+        async payHeldOrderDirect(orderId, method, savedTotal) {
             try {
                 const res = await fetch(`/pos/restaurant/orders/${orderId}/pay`, {
                     method: 'POST',
@@ -606,8 +742,12 @@ function restaurantPos() {
                 });
                 const data = await res.json();
                 if (data.success) {
-                    this.showToast(data.message, 'success');
                     this.heldOrders = this.heldOrders.filter(o => o.id !== orderId);
+                    this.lastInvoiceNumber = data.invoice_number || '';
+                    this.lastTransactionId = data.transaction_id || null;
+                    this.lastTotal = savedTotal || data.total_amount || 0;
+                    this.lastPaymentMethod = method;
+                    this.showReceipt = true;
                 } else {
                     if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; }
                     this.showToast(data.message || 'Payment failed', 'error');
@@ -616,6 +756,7 @@ function restaurantPos() {
         },
 
         recallOrder(order) {
+            if (this.cart.length > 0 && !confirm('Current cart has items. Replace with recalled order?')) return;
             this.cart = order.items.map(i => ({
                 item_id: i.item_id, item_type: i.item_type, item_name: i.item_name,
                 quantity: parseFloat(i.quantity), unit_price: parseFloat(i.unit_price),
@@ -626,7 +767,36 @@ function restaurantPos() {
                 this.selectedTable = { id: order.table.id, table_number: order.table.table_number };
                 this.orderType = 'dine_in';
             }
+            this.selectedCustomer = order.customer_id ? { id: order.customer_id, name: order.customer_name || 'Customer', phone: order.customer_phone || '' } : null;
+            this.heldOrders = this.heldOrders.filter(o => o.id !== order.id);
             this.showHeldOrders = false;
+            this.showToast('Order recalled to cart', 'success');
+        },
+
+        async addQuickCustomer() {
+            if (!this.quickCustomerName.trim()) return;
+            try {
+                const res = await fetch('{{ route("pos.customers.store") }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: JSON.stringify({ name: this.quickCustomerName.trim(), phone: this.quickCustomerPhone.trim() || null, type: 'unregistered' }),
+                });
+                const data = await res.json();
+                if (data.customer || data.success) {
+                    const cust = data.customer || { id: Date.now(), name: this.quickCustomerName.trim(), phone: this.quickCustomerPhone.trim() };
+                    this.allCustomers.push(cust);
+                    this.selectedCustomer = cust;
+                    this.showQuickAdd = false;
+                    this.quickCustomerName = '';
+                    this.quickCustomerPhone = '';
+                    this.showCustomerPicker = false;
+                    this.showToast('Customer added: ' + cust.name, 'success');
+                } else {
+                    this.showToast(data.message || 'Failed to add customer', 'error');
+                }
+            } catch (e) {
+                this.showToast('Error adding customer', 'error');
+            }
         },
 
         showToast(msg, type) {

@@ -1913,9 +1913,13 @@ class PosController extends Controller
             'type' => 'required|in:registered,unregistered',
         ]);
 
-        PosCustomer::create(array_merge($request->only(['name', 'email', 'phone', 'address', 'city', 'ntn', 'cnic', 'type']), [
+        $customer = PosCustomer::create(array_merge($request->only(['name', 'email', 'phone', 'address', 'city', 'ntn', 'cnic', 'type']), [
             'company_id' => $companyId,
         ]));
+
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'customer' => ['id' => $customer->id, 'name' => $customer->name, 'phone' => $customer->phone]]);
+        }
 
         return back()->with('success', 'Customer added successfully.');
     }

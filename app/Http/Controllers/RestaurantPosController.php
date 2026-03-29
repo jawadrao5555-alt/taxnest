@@ -59,9 +59,14 @@ class RestaurantPosController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        $customers = PosCustomer::where('company_id', $companyId)->orderBy('name')->get();
+
+        $taxRate = PosTaxRule::getRateForMethod('cash');
+
         return view('pos.restaurant.pos', compact(
             'company', 'products', 'services', 'categories',
-            'recipeLookup', 'tables', 'selectedTable', 'heldOrders'
+            'recipeLookup', 'tables', 'selectedTable', 'heldOrders',
+            'customers', 'taxRate'
         ));
     }
 
@@ -129,11 +134,12 @@ class RestaurantPosController extends Controller
         }
 
         $subtotal = array_sum(array_column($resolvedItems, 'subtotal'));
+        $taxableSubtotal = array_sum(array_column(array_filter($resolvedItems, fn($i) => !($i['is_tax_exempt'] ?? false)), 'subtotal'));
         $orderCount = RestaurantOrder::where('company_id', $companyId)->count();
         $orderNumber = 'ORD-' . str_pad($orderCount + 1, 5, '0', STR_PAD_LEFT);
 
         $taxRate = PosTaxRule::getRateForMethod('cash');
-        $taxAmount = round($subtotal * $taxRate / 100, 2);
+        $taxAmount = round($taxableSubtotal * $taxRate / 100, 2);
         $totalAmount = round($subtotal + $taxAmount, 2);
 
         DB::beginTransaction();
@@ -312,6 +318,7 @@ class RestaurantPosController extends Controller
                 'message' => "Payment received. Invoice: {$invoiceNumber}",
                 'transaction_id' => $transaction->id,
                 'invoice_number' => $invoiceNumber,
+                'total_amount' => $totalAmount,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();

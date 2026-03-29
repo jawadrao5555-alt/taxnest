@@ -105,10 +105,11 @@
 
         <div class="hidden md:flex items-center gap-1.5">
             <button @click="holdOrder()" :disabled="cart.length === 0 || submitting" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-40 shadow-sm transition">
-                <span class="text-[10px] bg-amber-400/30 px-1 rounded">F5</span> Hold
+                <svg x-show="submitting" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                <span x-show="!submitting" class="text-[10px] bg-amber-400/30 px-1 rounded">F5</span> <span x-text="submitting ? 'Holding...' : 'Hold'"></span>
             </button>
             <button @click="showPayModal = true" :disabled="cart.length === 0 || submitting" class="flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold bg-green-600 hover:bg-green-700 text-white disabled:opacity-40 shadow-lg shadow-green-600/20 transition">
-                <span class="text-[10px] bg-green-500/30 px-1 rounded">F8</span> Pay
+                <span x-show="!submitting" class="text-[10px] bg-green-500/30 px-1 rounded">F8</span> Pay
             </button>
         </div>
     </div>
@@ -255,13 +256,22 @@
                                 </button>
                             </div>
                             <div class="text-right min-w-[56px]">
-                                <p class="text-sm font-bold text-gray-900 dark:text-white" x-text="'Rs. ' + (item.quantity * item.unit_price).toLocaleString()"></p>
+                                <p class="text-sm font-bold text-gray-900 dark:text-white" x-text="'Rs. ' + getItemTotal(item).toLocaleString()"></p>
                             </div>
                             <button @click="removeFromCart(index)" class="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                             </button>
                         </div>
-                        <input type="text" x-model="item.special_notes" placeholder="Special notes..." class="mt-1.5 w-full text-[11px] bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg px-2 py-1 text-gray-600 dark:text-gray-400 focus:ring-purple-500 placeholder-gray-300">
+                        <div class="flex items-center gap-1.5 mt-1">
+                            <input type="text" x-model="item.special_notes" placeholder="Notes..." class="flex-1 text-[11px] bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg px-2 py-1 text-gray-600 dark:text-gray-400 focus:ring-purple-500 placeholder-gray-300">
+                            <button @click="item.showItemDiscount = !item.showItemDiscount" class="text-[9px] font-bold px-1.5 py-1 rounded-md transition whitespace-nowrap" :class="(item.item_discount_value || 0) > 0 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-orange-500'" x-text="(item.item_discount_value || 0) > 0 ? ((item.item_discount_type || 'percentage') === 'percentage' ? '-' + item.item_discount_value + '%' : '-Rs.' + item.item_discount_value) : 'Disc'"></button>
+                        </div>
+                        <div x-show="item.showItemDiscount" x-transition class="mt-1 flex items-center gap-1">
+                            <button @click="item.item_discount_type = 'percentage'" class="text-[9px] font-bold px-1.5 py-0.5 rounded transition" :class="(item.item_discount_type || 'percentage') === 'percentage' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400'">%</button>
+                            <button @click="item.item_discount_type = 'amount'" class="text-[9px] font-bold px-1.5 py-0.5 rounded transition" :class="item.item_discount_type === 'amount' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400'">Rs</button>
+                            <input type="number" x-model.number="item.item_discount_value" min="0" step="any" placeholder="0" class="w-14 text-[10px] bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 text-gray-900 dark:text-white focus:ring-purple-500">
+                            <button @click="item.item_discount_value = 0; item.showItemDiscount = false" class="text-[9px] text-red-400 hover:text-red-600 px-1">X</button>
+                        </div>
                     </div>
                 </template>
             </div>
@@ -294,8 +304,12 @@
                 </div>
                 <div class="px-3 py-2 space-y-1">
                     <div class="flex justify-between text-xs text-gray-500"><span>Subtotal</span><span x-text="'Rs. ' + Number(subtotal).toLocaleString()"></span></div>
+                    <div x-show="itemDiscountsTotal > 0" class="flex justify-between text-xs text-orange-500">
+                        <span>Item Discounts</span>
+                        <span x-text="'-Rs. ' + Number(itemDiscountsTotal).toLocaleString()"></span>
+                    </div>
                     <div x-show="discountAmount > 0" class="flex justify-between text-xs text-orange-600 dark:text-orange-400">
-                        <span x-text="discountType === 'percentage' ? 'Discount (' + discountValue + '%)' : 'Discount'"></span>
+                        <span x-text="discountType === 'percentage' ? 'Order Discount (' + discountValue + '%)' : 'Order Discount'"></span>
                         <span x-text="'-Rs. ' + Number(discountAmount).toLocaleString()"></span>
                     </div>
                     <div x-show="exemptAmount > 0" class="flex justify-between text-xs text-green-600 dark:text-green-400"><span>Tax-Exempt</span><span x-text="'-Rs. ' + Number(exemptAmount).toLocaleString()"></span></div>
@@ -308,7 +322,10 @@
                 <div class="px-3 pb-3 space-y-2">
                     <div class="grid grid-cols-3 gap-2">
                         <button @click="voidOrder()" :disabled="cart.length === 0" class="py-2 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-30 transition">Void</button>
-                        <button @click="holdOrder()" :disabled="cart.length === 0 || submitting" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 transition">Hold</button>
+                        <button @click="holdOrder()" :disabled="cart.length === 0 || submitting" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 transition flex items-center justify-center gap-1">
+                            <svg x-show="submitting" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                            <span x-text="submitting ? 'Holding...' : 'Hold'"></span>
+                        </button>
                         <button @click="showHeldOrders = !showHeldOrders" class="relative py-2 text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition">
                             Recall
                             <span x-show="heldOrders.length > 0" class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[8px] rounded-full flex items-center justify-center" x-text="heldOrders.length"></span>
@@ -316,7 +333,8 @@
                     </div>
                     <button @click="showPayModal = true" :disabled="cart.length === 0 || submitting" class="w-full py-3.5 rounded-xl text-sm font-extrabold text-white bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:opacity-30 shadow-lg shadow-green-600/25 transition-all transform hover:scale-[1.01] active:scale-[0.99]">
                         <span class="flex items-center justify-center gap-2">
-                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                            <svg x-show="submitting" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                            <svg x-show="!submitting" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                             PAY Rs. <span x-text="Number(totalAmount).toLocaleString()"></span>
                         </span>
                     </button>
@@ -335,12 +353,14 @@
             </div>
             <div class="p-4 grid grid-cols-2 gap-3">
                 <button @click="processPayment('cash')" :disabled="submitting" class="py-4 rounded-xl text-center bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 hover:bg-green-100 transition disabled:opacity-50">
-                    <svg class="w-8 h-8 mx-auto text-green-600 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                    <span class="text-sm font-bold text-green-700 dark:text-green-400">Cash</span>
+                    <svg x-show="submitting" class="w-8 h-8 mx-auto text-green-600 mb-1 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    <svg x-show="!submitting" class="w-8 h-8 mx-auto text-green-600 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    <span class="text-sm font-bold text-green-700 dark:text-green-400" x-text="submitting ? 'Processing...' : 'Cash'"></span>
                 </button>
                 <button @click="processPayment('card')" :disabled="submitting" class="py-4 rounded-xl text-center bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition disabled:opacity-50">
-                    <svg class="w-8 h-8 mx-auto text-blue-600 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-                    <span class="text-sm font-bold text-blue-700 dark:text-blue-400">Card</span>
+                    <svg x-show="submitting" class="w-8 h-8 mx-auto text-blue-600 mb-1 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    <svg x-show="!submitting" class="w-8 h-8 mx-auto text-blue-600 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                    <span class="text-sm font-bold text-blue-700 dark:text-blue-400" x-text="submitting ? 'Processing...' : 'Card'"></span>
                 </button>
             </div>
             <div class="p-4 pt-0">
@@ -561,22 +581,33 @@ function restaurantPos() {
             return this.allCustomers.filter(c => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q)));
         },
 
-        get subtotal() { return this.cart.reduce((s, i) => s + (i.quantity * i.unit_price), 0); },
-        get taxableSubtotal() {
-            const taxable = this.cart.filter(i => !i.is_tax_exempt).reduce((s, i) => s + (i.quantity * i.unit_price), 0);
-            const discountRatio = this.subtotal > 0 ? (this.subtotal - this.discountAmount) / this.subtotal : 1;
-            return Math.max(0, Math.round(taxable * discountRatio));
+        r2(v) { return Math.round((v + Number.EPSILON) * 100) / 100; },
+        getItemDiscount(item) {
+            const lineTotal = this.r2(item.quantity * item.unit_price);
+            const dv = parseFloat(item.item_discount_value) || 0;
+            if (dv <= 0) return 0;
+            if ((item.item_discount_type || 'percentage') === 'percentage') return this.r2(lineTotal * Math.min(100, dv) / 100);
+            return this.r2(Math.min(lineTotal, dv));
         },
-        get taxAmount() { return Math.round(this.taxableSubtotal * this.taxRate / 100); },
-        get totalAmount() { return Math.max(0, this.subtotal - this.discountAmount + this.taxAmount); },
-        get exemptAmount() { return this.cart.filter(i => i.is_tax_exempt).reduce((s, i) => s + (i.quantity * i.unit_price), 0); },
+        getItemTotal(item) { return Math.max(0, this.r2(item.quantity * item.unit_price - this.getItemDiscount(item))); },
+        get itemDiscountsTotal() { return this.r2(this.cart.reduce((s, i) => s + this.getItemDiscount(i), 0)); },
+        get subtotal() { return this.r2(this.cart.reduce((s, i) => s + (i.quantity * i.unit_price), 0)); },
+        get effectiveSubtotal() { return Math.max(0, this.r2(this.subtotal - this.itemDiscountsTotal)); },
+        get taxableSubtotal() {
+            const taxable = this.cart.filter(i => !i.is_tax_exempt).reduce((s, i) => s + this.getItemTotal(i), 0);
+            const discountRatio = this.effectiveSubtotal > 0 ? (this.effectiveSubtotal - this.discountAmount) / this.effectiveSubtotal : 1;
+            return Math.max(0, this.r2(taxable * Math.max(0, discountRatio)));
+        },
+        get taxAmount() { return this.r2(this.taxableSubtotal * this.taxRate / 100); },
+        get totalAmount() { return Math.max(0, this.r2(this.effectiveSubtotal - this.discountAmount + this.taxAmount)); },
+        get exemptAmount() { return this.cart.filter(i => i.is_tax_exempt).reduce((s, i) => s + this.getItemTotal(i), 0); },
         recalcDiscount() {
             if (!this.discountValue || this.discountValue <= 0) { this.discountAmount = 0; return; }
             if (this.discountType === 'percentage') {
                 const pct = Math.min(100, Math.max(0, this.discountValue));
-                this.discountAmount = Math.round(this.subtotal * pct / 100);
+                this.discountAmount = this.r2(this.effectiveSubtotal * pct / 100);
             } else {
-                this.discountAmount = Math.min(this.subtotal, Math.max(0, Math.round(this.discountValue)));
+                this.discountAmount = this.r2(Math.min(this.effectiveSubtotal, Math.max(0, this.discountValue)));
             }
         },
 
@@ -722,7 +753,7 @@ function restaurantPos() {
         addToCart(item) {
             const existing = this.cart.find(c => c.item_id === item.id && c.item_type === item.type);
             if (existing) { existing.quantity++; } else {
-                this.cart.push({ item_id: item.id, item_type: item.type, item_name: item.name, quantity: 1, unit_price: parseFloat(item.price), special_notes: '', is_tax_exempt: item.is_tax_exempt || false });
+                this.cart.push({ item_id: item.id, item_type: item.type, item_name: item.name, quantity: 1, unit_price: parseFloat(item.price), special_notes: '', is_tax_exempt: item.is_tax_exempt || false, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false });
             }
             this.cartAnimating = true; setTimeout(() => this.cartAnimating = false, 300);
         },
@@ -842,7 +873,7 @@ function restaurantPos() {
 
         recallOrder(order) {
             if (this.cart.length > 0 && !confirm('Current cart has items. Replace with recalled order?')) return;
-            this.cart = order.items.map(i => ({ item_id: i.item_id, item_type: i.item_type, item_name: i.item_name, quantity: parseFloat(i.quantity), unit_price: parseFloat(i.unit_price), special_notes: i.special_notes || '', is_tax_exempt: i.is_tax_exempt || false }));
+            this.cart = order.items.map(i => ({ item_id: i.item_id, item_type: i.item_type, item_name: i.item_name, quantity: parseFloat(i.quantity), unit_price: parseFloat(i.unit_price), special_notes: i.special_notes || '', is_tax_exempt: i.is_tax_exempt || false, item_discount_type: i.item_discount_type || 'percentage', item_discount_value: parseFloat(i.item_discount_value) || 0, showItemDiscount: parseFloat(i.item_discount_value) > 0 }));
             this.kitchenNotes = order.kitchen_notes || '';
             this.recalledOrderId = order.id;
             this.priorityOrder = order.priority || false;

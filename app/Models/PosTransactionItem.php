@@ -10,6 +10,7 @@ class PosTransactionItem extends Model
         'transaction_id', 'item_type', 'item_id', 'item_name',
         'quantity', 'unit_price', 'subtotal',
         'is_tax_exempt', 'tax_rate', 'tax_amount',
+        'item_discount_type', 'item_discount_value', 'item_discount_amount',
     ];
 
     protected $casts = [
@@ -18,6 +19,8 @@ class PosTransactionItem extends Model
         'is_tax_exempt' => 'boolean',
         'tax_rate' => 'decimal:2',
         'tax_amount' => 'decimal:2',
+        'item_discount_value' => 'decimal:2',
+        'item_discount_amount' => 'decimal:2',
     ];
 
     public function transaction()

@@ -105,7 +105,11 @@ class RestaurantPosController extends Controller
             'items.*.item_id' => 'required|integer',
             'items.*.item_type' => 'required|in:product,service',
             'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.item_discount_type' => 'nullable|in:percentage,amount',
+            'items.*.item_discount_value' => 'nullable|numeric|min:0|max:999999',
             'order_type' => 'required|in:dine_in,takeaway,delivery',
+            'discount_type' => 'nullable|in:percentage,amount',
+            'discount_value' => 'nullable|numeric|min:0|max:999999',
         ]);
 
         if ($request->table_id) {
@@ -137,20 +141,41 @@ class RestaurantPosController extends Controller
                 if (!$product) {
                     return response()->json(['success' => false, 'message' => "Product not found: #{$item['item_id']}"], 400);
                 }
+                $lineTotal = round($qty * (float)$product->price, 2);
+                $itemDiscountType = $item['item_discount_type'] ?? null;
+                $itemDiscountValue = (float)($item['item_discount_value'] ?? 0);
+                $itemDiscountAmount = 0;
+                if ($itemDiscountValue > 0 && $itemDiscountType === 'percentage') {
+                    $itemDiscountAmount = round($lineTotal * min(100, $itemDiscountValue) / 100, 2);
+                } elseif ($itemDiscountValue > 0 && $itemDiscountType === 'amount') {
+                    $itemDiscountAmount = min($lineTotal, round($itemDiscountValue, 2));
+                }
                 $resolvedItems[] = [
                     'item_type' => 'product',
                     'item_id' => $product->id,
                     'item_name' => $product->name,
                     'quantity' => $qty,
                     'unit_price' => (float)$product->price,
-                    'subtotal' => round($qty * (float)$product->price, 2),
+                    'subtotal' => round($lineTotal - $itemDiscountAmount, 2),
                     'special_notes' => $item['special_notes'] ?? null,
                     'is_tax_exempt' => (bool)($product->is_tax_exempt ?? false),
+                    'item_discount_type' => $itemDiscountValue > 0 ? $itemDiscountType : null,
+                    'item_discount_value' => $itemDiscountValue,
+                    'item_discount_amount' => $itemDiscountAmount,
                 ];
             } else {
                 $service = PosService::where('company_id', $companyId)->where('id', $item['item_id'])->first();
                 if (!$service) {
                     return response()->json(['success' => false, 'message' => "Service not found: #{$item['item_id']}"], 400);
+                }
+                $lineTotal = round($qty * (float)$service->price, 2);
+                $itemDiscountType = $item['item_discount_type'] ?? null;
+                $itemDiscountValue = (float)($item['item_discount_value'] ?? 0);
+                $itemDiscountAmount = 0;
+                if ($itemDiscountValue > 0 && $itemDiscountType === 'percentage') {
+                    $itemDiscountAmount = round($lineTotal * min(100, $itemDiscountValue) / 100, 2);
+                } elseif ($itemDiscountValue > 0 && $itemDiscountType === 'amount') {
+                    $itemDiscountAmount = min($lineTotal, round($itemDiscountValue, 2));
                 }
                 $resolvedItems[] = [
                     'item_type' => 'service',
@@ -158,9 +183,12 @@ class RestaurantPosController extends Controller
                     'item_name' => $service->name,
                     'quantity' => $qty,
                     'unit_price' => (float)$service->price,
-                    'subtotal' => round($qty * (float)$service->price, 2),
+                    'subtotal' => round($lineTotal - $itemDiscountAmount, 2),
                     'special_notes' => $item['special_notes'] ?? null,
                     'is_tax_exempt' => (bool)($service->is_tax_exempt ?? false),
+                    'item_discount_type' => $itemDiscountValue > 0 ? $itemDiscountType : null,
+                    'item_discount_value' => $itemDiscountValue,
+                    'item_discount_amount' => $itemDiscountAmount,
                 ];
             }
         }
@@ -287,9 +315,10 @@ class RestaurantPosController extends Controller
         $discountAmount = (float)($order->discount_amount ?? 0);
         $discountRatio = $subtotal > 0 ? ($subtotal - $discountAmount) / $subtotal : 1;
         $taxableSubtotal = $order->items->where('is_tax_exempt', false)->sum('subtotal');
-        $adjustedTaxable = round($taxableSubtotal * $discountRatio, 2);
+        $adjustedTaxable = round($taxableSubtotal * max(0, $discountRatio), 2);
         $taxAmount = round($adjustedTaxable * $taxRate / 100, 2);
         $totalAmount = round($subtotal - $discountAmount + $taxAmount, 2);
+        $totalItemDiscounts = $order->items->sum('item_discount_amount');
 
         $praEnabled = (bool) $company->pra_reporting_enabled;
         $invoiceMode = $praEnabled ? 'pra' : 'local';
@@ -334,6 +363,8 @@ class RestaurantPosController extends Controller
             ]);
 
             foreach ($order->items as $item) {
+                $lineAfterOrderDisc = $subtotal > 0 ? round($item->subtotal * max(0, $discountRatio), 2) : $item->subtotal;
+                $lineTax = $item->is_tax_exempt ? 0 : round($lineAfterOrderDisc * $taxRate / 100, 2);
                 PosTransactionItem::create([
                     'transaction_id' => $transaction->id,
                     'item_type' => $item->item_type,
@@ -344,7 +375,10 @@ class RestaurantPosController extends Controller
                     'subtotal' => $item->subtotal,
                     'is_tax_exempt' => $item->is_tax_exempt,
                     'tax_rate' => $item->is_tax_exempt ? 0 : $taxRate,
-                    'tax_amount' => $item->is_tax_exempt ? 0 : round($item->subtotal * $taxRate / 100, 2),
+                    'tax_amount' => $lineTax,
+                    'item_discount_type' => $item->item_discount_type,
+                    'item_discount_value' => $item->item_discount_value ?? 0,
+                    'item_discount_amount' => $item->item_discount_amount ?? 0,
                 ]);
             }
 
@@ -828,11 +862,48 @@ class RestaurantPosController extends Controller
             $orderTypeCounts = ['dine_in' => 0, 'takeaway' => 0, 'delivery' => 0];
         }
 
+        $hourlyLabels = [];
+        $hourlySales = [];
+        $hourlyOrders = [];
+        $peakHour = null;
+        $peakSales = 0;
+        for ($h = 0; $h < 24; $h++) {
+            $hourStart = $today->copy()->addHours($h);
+            $hourEnd = $today->copy()->addHours($h + 1);
+            $hourlyLabels[] = $hourStart->format('gA');
+            $hSales = (float) RestaurantOrder::where('company_id', $companyId)
+                ->where('status', 'completed')
+                ->whereBetween('created_at', [$hourStart, $hourEnd])
+                ->sum('total_amount');
+            $hOrders = RestaurantOrder::where('company_id', $companyId)
+                ->where('status', 'completed')
+                ->whereBetween('created_at', [$hourStart, $hourEnd])
+                ->count();
+            $hourlySales[] = $hSales;
+            $hourlyOrders[] = $hOrders;
+            if ($hSales > $peakSales) {
+                $peakSales = $hSales;
+                $peakHour = $hourStart->format('g:00 A') . ' - ' . $hourEnd->format('g:00 A');
+            }
+        }
+
+        $todayTax = RestaurantOrder::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->where('created_at', '>=', $today)
+            ->sum('tax_amount');
+
+        $todayDiscount = RestaurantOrder::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->where('created_at', '>=', $today)
+            ->sum('discount_amount');
+
         return view('pos.restaurant.dashboard', compact(
             'company', 'todaySales', 'yesterdaySales', 'todayOrders',
             'heldCount', 'completedCount', 'totalTables', 'occupiedTables',
             'topProducts', 'lowStockItems', 'recentOrders',
-            'salesChartLabels', 'salesChartData', 'orderTypeCounts'
+            'salesChartLabels', 'salesChartData', 'orderTypeCounts',
+            'hourlyLabels', 'hourlySales', 'hourlyOrders',
+            'peakHour', 'peakSales', 'todayTax', 'todayDiscount'
         ));
     }
 

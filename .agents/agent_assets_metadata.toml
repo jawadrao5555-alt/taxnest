@@ -12,3 +12,39 @@ id = "mfqjVWFVWhWep5mFvrjQQ"
 uri = "file://routes-update.zip"
 type = "unspecified"
 title = "Routes Update (44KB) - Upload to cPanel"
+
+[[outputs]]
+id = "Frf2PBDmSfKEKlzvvmUFW"
+uri = "file://screenshots/01-homepage.jpg"
+type = "image"
+title = "1. TaxNest Homepage - Main Landing"
+
+[[outputs]]
+id = "MSkDt2zqZbDHmsY36tKed"
+uri = "file://screenshots/02-digital-invoice-landing.jpg"
+type = "image"
+title = "2. Digital Invoice Landing (FBR)"
+
+[[outputs]]
+id = "54UrrzLpbjRjujO-jrrUx"
+uri = "file://screenshots/03-pos-landing.jpg"
+type = "image"
+title = "3. NestPOS Landing (PRA POS)"
+
+[[outputs]]
+id = "K1UmAHHVLnUgUK2mZ8YiF"
+uri = "file://screenshots/04-admin-login.jpg"
+type = "image"
+title = "4. Admin Login Panel"
+
+[[outputs]]
+id = "Rxw_U3l77sMxtTrclBjPV"
+uri = "file://screenshots/05-pos-login.jpg"
+type = "image"
+title = "5. POS Login (Purple Theme)"
+
+[[outputs]]
+id = "7PIGz7nfhT30LfNOZyBmm"
+uri = "file://screenshots/06-fbrpos-login.jpg"
+type = "image"
+title = "6. FBR POS Login (Blue Theme)"

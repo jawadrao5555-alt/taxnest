@@ -1,0 +1,122 @@
+FULL TECHNICAL AUDIT REQUIRED — RESTAURANT POS MODULE
+
+I want a COMPLETE and HONEST breakdown of the Restaurant POS system you implemented.
+
+DO NOT summarize. Give FULL technical details.
+
+==================================================
+1. DATABASE STRUCTURE
+==================================================
+
+- List ALL new tables created
+- Show columns of each table
+- Show relationships (foreign keys)
+- Explain how company_id isolation is enforced
+- Mention any indexes added
+
+==================================================
+2. BACKEND LOGIC
+==================================================
+
+Explain in detail:
+
+A) Order Flow:
+- What happens on HOLD (step by step)
+- What happens on PAY (step by step)
+
+B) Inventory Logic:
+- When inventory is deducted
+- How recipe-based deduction works
+- What happens if product has no recipe
+
+C) Validation:
+- Is stock checked before payment?
+- What happens if stock is insufficient?
+
+D) Transactions:
+- Is DB::transaction used or not?
+
+==================================================
+3. KITCHEN SYSTEM
+==================================================
+
+- How KDS is implemented
+- How orders move (held → preparing → ready)
+- Is polling or realtime used?
+
+- Is kitchen printing implemented?
+If YES:
+   - How?
+If NO:
+   - Why not?
+
+==================================================
+4. TABLE MANAGEMENT
+==================================================
+
+- How table locking works
+- When lock is applied
+- When lock is released
+- Is auto-expiry implemented?
+
+==================================================
+5. FRONTEND (POS SCREEN)
+==================================================
+
+- How product grid works
+- Is data preloaded or fetched per request?
+- Is search frontend or backend?
+- Keyboard navigation details
+
+==================================================
+6. SECURITY
+==================================================
+
+- How cross-company data is prevented
+- How product price is validated (server-side?)
+- Any vulnerabilities still present?
+
+==================================================
+7. PERFORMANCE
+==================================================
+
+- Number of queries per action:
+   - Load POS screen
+   - Add item
+   - Hold order
+   - Pay order
+
+==================================================
+8. MISSING FEATURES / LIMITATIONS
+==================================================
+
+IMPORTANT:
+List ALL missing or incomplete features such as:
+
+- Kitchen printing
+- Stock validation
+- AI images
+- UI limitations
+- Error handling gaps
+- Edge cases not handled
+
+==================================================
+9. RISKS
+==================================================
+
+- Any data inconsistency risks?
+- Any race conditions?
+- Any performance bottlenecks?
+
+==================================================
+10. FINAL STATUS
+==================================================
+
+Answer clearly:
+
+- Is this production-ready? (YES/NO)
+- What needs to be fixed before deployment?
+
+==================================================
+
+Be brutally honest. No marketing language.

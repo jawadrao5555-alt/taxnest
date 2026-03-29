@@ -14,3 +14,4 @@ Artisan::command('inspire', function () {
 Schedule::job(new NightlyComplianceCronJob)->daily()->at('02:00');
 Schedule::job(new CheckFbrTokenExpiryJob)->daily()->at('06:00');
 Schedule::job(new SyncPosOfflineInvoicesJob)->everyTwoMinutes();
+Schedule::command('pos:clean-zombie-tables')->everyFifteenMinutes();

@@ -59,6 +59,33 @@
                         </div>
 
                         <div>
+                            <label class="block text-sm font-medium text-purple-100/70 mb-1.5">Business Type</label>
+                            <div class="grid grid-cols-3 gap-2">
+                                <label class="relative cursor-pointer">
+                                    <input type="radio" name="pos_type" value="restaurant" {{ old('pos_type') === 'restaurant' ? 'checked' : '' }} class="peer sr-only">
+                                    <div class="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl text-center transition-all peer-checked:ring-2 peer-checked:ring-purple-400 peer-checked:bg-purple-500/20" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);">
+                                        <svg class="w-6 h-6 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+                                        <span class="text-xs font-semibold text-white/80">Restaurant</span>
+                                    </div>
+                                </label>
+                                <label class="relative cursor-pointer">
+                                    <input type="radio" name="pos_type" value="retail" {{ old('pos_type') === 'retail' ? 'checked' : '' }} class="peer sr-only">
+                                    <div class="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl text-center transition-all peer-checked:ring-2 peer-checked:ring-purple-400 peer-checked:bg-purple-500/20" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);">
+                                        <svg class="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
+                                        <span class="text-xs font-semibold text-white/80">Retail</span>
+                                    </div>
+                                </label>
+                                <label class="relative cursor-pointer">
+                                    <input type="radio" name="pos_type" value="general" {{ old('pos_type', 'general') === 'general' ? 'checked' : '' }} class="peer sr-only">
+                                    <div class="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl text-center transition-all peer-checked:ring-2 peer-checked:ring-purple-400 peer-checked:bg-purple-500/20" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);">
+                                        <svg class="w-6 h-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                                        <span class="text-xs font-semibold text-white/80">General</span>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
                             <label for="company_name" class="block text-sm font-medium text-purple-100/70 mb-1.5">Business Name</label>
                             <input id="company_name" type="text" name="company_name" value="{{ old('company_name') }}" required placeholder="e.g. ABC Restaurant" class="w-full rounded-xl text-sm text-white placeholder-purple-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(139,92,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
                         </div>

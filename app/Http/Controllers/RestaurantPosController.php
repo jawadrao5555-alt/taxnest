@@ -135,8 +135,7 @@ class RestaurantPosController extends Controller
 
         $subtotal = array_sum(array_column($resolvedItems, 'subtotal'));
         $taxableSubtotal = array_sum(array_column(array_filter($resolvedItems, fn($i) => !($i['is_tax_exempt'] ?? false)), 'subtotal'));
-        $orderCount = RestaurantOrder::where('company_id', $companyId)->count();
-        $orderNumber = 'ORD-' . str_pad($orderCount + 1, 5, '0', STR_PAD_LEFT);
+        $orderNumber = 'ORD-' . date('ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 5));
 
         $taxRate = PosTaxRule::getRateForMethod('cash');
         $taxAmount = round($taxableSubtotal * $taxRate / 100, 2);
@@ -165,6 +164,14 @@ class RestaurantPosController extends Controller
             }
 
             if ($request->table_id) {
+                $table = RestaurantTable::where('company_id', $companyId)->where('id', $request->table_id)->first();
+                if ($table && $table->locked_by_user_id && $table->locked_by_user_id !== $user->id) {
+                    $lockAge = $table->locked_at ? now()->diffInMinutes($table->locked_at) : 0;
+                    if ($lockAge < 30) {
+                        DB::rollBack();
+                        return response()->json(['success' => false, 'message' => 'Table is locked by another user'], 423);
+                    }
+                }
                 RestaurantTable::where('company_id', $companyId)
                     ->where('id', $request->table_id)
                     ->update([
@@ -511,5 +518,17 @@ class RestaurantPosController extends Controller
         ]);
 
         return back()->with('success', 'Kitchen settings updated successfully.');
+    }
+
+    public function kitchenTicket($orderId)
+    {
+        $companyId = app('currentCompanyId');
+        $order = RestaurantOrder::where('company_id', $companyId)
+            ->with(['items', 'table', 'creator'])
+            ->findOrFail($orderId);
+
+        $company = Company::find($companyId);
+
+        return view('pos.restaurant.kitchen-ticket', compact('order', 'company'));
     }
 }

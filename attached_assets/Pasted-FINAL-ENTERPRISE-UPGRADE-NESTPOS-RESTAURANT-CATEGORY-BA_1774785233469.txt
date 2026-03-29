@@ -1,0 +1,220 @@
+FINAL ENTERPRISE UPGRADE — NESTPOS (RESTAURANT + CATEGORY-BASED POS + UI FIX)
+
+IMPORTANT:
+- DO NOT break any existing working system
+- DO NOT modify PRA, FBR POS, or Digital Invoice modules
+- ONLY extend and fix NestPOS (/pos) and /pos/restaurant
+- Keep full company isolation intact
+
+==================================================
+PHASE 1: CATEGORY-BASED POS SYSTEM (CORE FIX)
+==================================================
+
+1. Add column in companies table:
+- pos_type (string)
+
+Values:
+- restaurant
+- retail
+- general (default)
+- pharmacy (future)
+
+2. During registration:
+- Add "Business Type" selection
+- Save to companies.pos_type
+
+3. Auto behavior:
+IF pos_type = restaurant:
+   enable restaurant module
+
+IF pos_type = retail:
+   disable restaurant module
+
+4. Sidebar control:
+IF restaurant:
+   SHOW:
+   - Restaurant POS
+   - Tables
+   - Kitchen Display
+   - Ingredients
+   - Recipes
+
+ELSE:
+   HIDE all above
+
+5. Route protection:
+IF accessing /pos/restaurant/*
+AND pos_type != restaurant:
+   → block (403 or redirect)
+
+==================================================
+PHASE 2: POS UI COMPLETE REDESIGN (CRITICAL)
+==================================================
+
+Fix current broken POS UI and implement proper layout:
+
+1. Top Bar:
+- Search input (full width)
+- Table selector
+- Customer selector
+- Hold (F5) and Pay (F8) buttons
+
+2. Category Bar:
+- Horizontal scroll
+- Dynamic categories from products
+- Rounded pill design
+
+3. Product Grid:
+- 4-column responsive grid
+- Product cards:
+   - Image (top)
+   - Name
+   - Price badge
+- Add hover + scale animation
+- Click → add to cart
+
+4. Cart Sidebar (RIGHT):
+- Fixed panel
+- Items with +/- controls
+- Subtotal, tax, total
+- Large Pay button
+
+5. Empty State:
+- Show "No products found"
+
+IMPORTANT:
+- Use existing product data
+- DO NOT change backend logic
+- Keep keyboard navigation working
+
+==================================================
+PHASE 3: AI PRODUCT IMAGE SYSTEM
+==================================================
+
+1. Ensure pos_products.image exists
+
+2. On product create/update:
+- Fetch image from Unsplash API
+- Query: "<product_name> food"
+- Save locally in storage/products/
+- Attach path to product
+
+3. Add:
+- "Refresh Image" button
+
+4. Fallback:
+- Default placeholder image
+
+==================================================
+PHASE 4: CRITICAL BUG FIXES (FROM AUDIT)
+==================================================
+
+1. FIX Order Number:
+Replace count-based with:
+- timestamp + random OR UUID
+
+2. FIX Table Lock Bypass:
+In holdOrder():
+- check if table is locked by another user
+- block request if locked
+
+3. FIX Double Payment:
+Before pay:
+IF order.status == completed:
+   → block
+
+4. FIX Zombie Tables:
+Create scheduled cleanup:
+- tables with status occupied but no active orders
+→ set available
+
+==================================================
+PHASE 5: INVENTORY + RECIPE HARDENING
+==================================================
+
+1. Before PAY:
+- Validate stock (ingredients/products)
+
+IF insufficient:
+   → block payment
+
+2. During PAY:
+- Wrap everything in DB transaction
+
+3. Deduction:
+IF recipe exists:
+   → deduct ingredients (lockForUpdate)
+
+ELSE:
+   → use existing stock logic
+
+4. Add:
+- low stock alert flag
+
+==================================================
+PHASE 6: HYBRID KITCHEN SYSTEM
+==================================================
+
+Add company settings:
+
+- kds_enabled
+- kitchen_printer_enabled
+- print_on_hold
+- print_on_pay
+
+FLOW:
+
+ON HOLD:
+- save order
+- IF kds_enabled → send to KDS
+- IF printer_enabled AND print_on_hold → generate kitchen ticket (print view)
+
+ON PAY:
+- create pos_transaction
+- deduct inventory
+- show printable customer receipt
+
+Add:
+- Reprint Kitchen Ticket
+- Reprint Receipt
+
+NOTE:
+Use browser print (window.print()) for now
+
+==================================================
+PHASE 7: CART PERSISTENCE (UX FIX)
+==================================================
+
+- Save cart to localStorage
+- Restore on reload
+- Clear after HOLD or PAY
+
+==================================================
+PHASE 8: PERFORMANCE OPTIMIZATION
+==================================================
+
+- Preload products in frontend (JS)
+- No DB calls for search/filter
+- Optimize KDS query:
+   only status IN (held, preparing)
+
+==================================================
+PHASE 9: SAFETY RULES
+==================================================
+
+✔ No breaking changes
+✔ No changes to existing POS billing
+✔ No changes to PRA logic
+✔ No changes to FBR POS
+✔ Only additive + UI fixes
+
+==================================================
+
+After implementation:
+
+1. Show updated POS screen preview
+2. Show category-based behavior (restaurant vs retail)
+3. Show kitchen ticket preview
+
+DO NOT PUSH TO GITHUB
+WORK LOCALLY ONLY

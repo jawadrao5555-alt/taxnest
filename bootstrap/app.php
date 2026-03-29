@@ -30,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'franchise.auth' => \App\Http\Middleware\FranchiseAuth::class,
             'plan.limit' => \App\Http\Middleware\CheckPlanLimit::class,
             'company.approval' => \App\Http\Middleware\CheckCompanyApproval::class,
+            'restaurant.only' => \App\Http\Middleware\RestaurantOnly::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

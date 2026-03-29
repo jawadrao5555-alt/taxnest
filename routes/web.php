@@ -457,7 +457,7 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
         Route::put('/team/cashier/{id}', [PosController::class, 'updateCashier'])->name('pos.team.update-cashier');
         Route::post('/team/cashier/{id}/toggle', [PosController::class, 'toggleCashier'])->name('pos.team.toggle-cashier');
 
-        Route::prefix('restaurant')->group(function () {
+        Route::prefix('restaurant')->middleware('restaurant.only')->group(function () {
             Route::get('/kitchen-settings', [RestaurantPosController::class, 'kitchenSettings'])->name('pos.restaurant.kitchen-settings');
             Route::post('/kitchen-settings', [RestaurantPosController::class, 'updateKitchenSettings'])->name('pos.restaurant.kitchen-settings.update');
             Route::get('/table-management', [RestaurantTableController::class, 'manage'])->name('pos.restaurant.table-management');
@@ -479,6 +479,7 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
         });
     });
 
+    Route::middleware('restaurant.only')->group(function () {
     Route::get('/restaurant/pos', [RestaurantPosController::class, 'pos'])->name('pos.restaurant.pos');
     Route::post('/restaurant/orders/hold', [RestaurantPosController::class, 'holdOrder'])->name('pos.restaurant.orders.hold');
     Route::post('/restaurant/orders/{id}/pay', [RestaurantPosController::class, 'payOrder'])->name('pos.restaurant.orders.pay');
@@ -492,6 +493,8 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::get('/restaurant/kds', [RestaurantKdsController::class, 'index'])->name('pos.restaurant.kds');
     Route::post('/restaurant/kds/{id}/status', [RestaurantKdsController::class, 'updateStatus'])->name('pos.restaurant.kds.status');
     Route::get('/restaurant/api/live-orders', [RestaurantKdsController::class, 'liveOrders'])->name('pos.restaurant.live-orders');
+    Route::get('/restaurant/orders/{id}/kitchen-ticket', [RestaurantPosController::class, 'kitchenTicket'])->name('pos.restaurant.kitchen-ticket');
+    });
 });
 
 use App\Http\Controllers\SaasAdmin\AdminAuthController;

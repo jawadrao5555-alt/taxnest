@@ -118,7 +118,10 @@ class PosAuthController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'phone' => 'nullable|string|max:20',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'pos_type' => 'required|in:restaurant,retail,general',
         ]);
+
+        $posType = $request->pos_type ?? 'general';
 
         $company = Company::create([
             'name' => $request->company_name,
@@ -127,6 +130,8 @@ class PosAuthController extends Controller
             'phone' => $request->phone,
             'company_status' => 'pending',
             'product_type' => 'pos',
+            'pos_type' => $posType,
+            'restaurant_mode' => ($posType === 'restaurant'),
             'pra_reporting_enabled' => false,
             'pra_environment' => 'sandbox',
         ]);

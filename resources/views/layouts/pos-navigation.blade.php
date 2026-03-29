@@ -69,9 +69,14 @@
     </a>
     @endif
 
-    @php $posUser = auth('pos')->user(); $isCashier = $posUser && $posUser->isPosCashier(); @endphp
+    @php
+        $posUser = auth('pos')->user();
+        $isCashier = $posUser && $posUser->isPosCashier();
+        $companyNav = \App\Models\Company::find(app('currentCompanyId'));
+        $isRestaurantNav = $companyNav && ($companyNav->pos_type === 'restaurant' || $companyNav->restaurant_mode);
+    @endphp
 
-    @if(!$isCashierNav)
+    @if(!$isCashierNav && $isRestaurantNav)
     <div class="pt-4 pb-1 px-4">
         <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Restaurant</p>
     </div>

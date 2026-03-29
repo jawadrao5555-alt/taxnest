@@ -51,6 +51,7 @@ class Company extends Model
         'pra_reporting_enabled',
         'kds_enabled',
         'restaurant_mode',
+        'pos_type',
         'kitchen_printer_enabled',
         'print_on_hold',
         'print_on_pay',

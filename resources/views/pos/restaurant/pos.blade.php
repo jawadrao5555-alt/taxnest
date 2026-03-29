@@ -47,9 +47,13 @@
 <div x-data="restaurantPos()" x-init="init()" class="flex flex-col h-[calc(100vh-64px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
 
     <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0 shadow-sm">
-        <div class="flex-1 relative max-w-md">
-            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input type="text" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent="addHighlightedItem()" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="Search products... (Ctrl+S)" class="w-full pl-9 pr-3 py-2 rounded-xl text-sm border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent transition">
+        <div class="flex-1 relative">
+            <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input type="text" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent="addHighlightedItem()" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="Search products... (type to filter, Enter to add)" class="w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition shadow-sm" autocomplete="off">
+            <kbd x-show="!searchQuery" class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 font-mono">Ctrl+S</kbd>
+            <button x-show="searchQuery" @click="searchQuery = ''; showSearchDropdown = false; filterProducts(); $refs.searchInput.focus()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
             <div x-show="showSearchDropdown && searchSuggestions.length > 0" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 max-h-64 overflow-y-auto">
                 <template x-for="(s, i) in searchSuggestions" :key="s.id + s.type">
                     <button @click="quickAddItem(s)" class="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-purple-50 dark:hover:bg-purple-900/20 transition" :class="i === highlightIndex ? 'bg-purple-50 dark:bg-purple-900/20' : ''">
@@ -150,8 +154,8 @@
                                     <template x-if="item.image">
                                         <img :src="item.image" :alt="item.name" class="w-full h-full object-cover" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                                     </template>
-                                    <div x-show="!item.image" class="flex flex-col items-center justify-center text-gray-300 dark:text-gray-600 w-full h-full">
-                                        <svg class="w-10 h-10 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                    <div x-show="!item.image" class="flex flex-col items-center justify-center w-full h-full bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/10">
+                                        <span class="text-3xl font-black text-purple-300 dark:text-purple-700 select-none" x-text="item.name ? item.name.charAt(0).toUpperCase() : '?'"></span>
                                     </div>
                                     <div class="absolute top-1.5 left-1.5 flex flex-col gap-1">
                                         <template x-if="item.stockStatus === 'available'"><span class="stock-dot stock-available"></span></template>
@@ -159,7 +163,7 @@
                                         <template x-if="item.stockStatus === 'out'"><span class="px-1.5 py-0.5 bg-red-500/90 text-white text-[8px] font-bold rounded-md">OUT</span></template>
                                     </div>
                                     <div class="absolute top-1.5 right-1.5 flex flex-col gap-1">
-                                        <template x-if="item.hasRecipe"><span class="px-1.5 py-0.5 bg-blue-500/90 text-white text-[8px] font-bold rounded-md">RECIPE</span></template>
+                                        <template x-if="item.hasRecipe"><span class="px-1.5 py-0.5 bg-orange-500/90 text-white text-[8px] font-bold rounded-md flex items-center gap-0.5"><span class="text-[9px]">&#x1F373;</span> Recipe</span></template>
                                         <template x-if="item.is_tax_exempt"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md">NO TAX</span></template>
                                     </div>
                                     <button @click.stop="handleProductClick(item)" class="quick-add absolute bottom-2 right-2 w-9 h-9 rounded-full bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-600/30 flex items-center justify-center transition-all">
@@ -340,6 +344,7 @@
                         <button @click="holdOrder()" :disabled="cart.length === 0 || submitting" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 transition flex items-center justify-center gap-1">
                             <svg x-show="submitting" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                             <span x-text="submitting ? 'Holding...' : 'Hold'"></span>
+                            <kbd x-show="!submitting" class="text-[8px] bg-amber-200/50 dark:bg-amber-800/30 px-1 rounded ml-0.5 font-mono">F5</kbd>
                         </button>
                         <button @click="showHeldOrders = !showHeldOrders" class="relative py-2 text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition">
                             Recall
@@ -351,6 +356,7 @@
                             <svg x-show="submitting" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                             <svg x-show="!submitting" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                             PAY Rs. <span x-text="Number(totalAmount).toLocaleString()"></span>
+                            <kbd x-show="!submitting" class="text-[9px] bg-green-500/30 px-1.5 rounded font-mono">F8</kbd>
                         </span>
                     </button>
                 </div>
@@ -367,19 +373,21 @@
                 <p x-show="submitting" class="text-xs text-purple-500 mt-2">Processing payment...</p>
             </div>
             <div class="p-4 grid grid-cols-2 gap-3">
-                <button @click="processPayment('cash')" :disabled="submitting" class="py-4 rounded-xl text-center bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 hover:bg-green-100 transition disabled:opacity-50">
+                <button @click="processPayment('cash')" :disabled="submitting" class="py-4 rounded-xl text-center bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 hover:bg-green-100 hover:border-green-400 transition disabled:opacity-50 group">
                     <svg x-show="submitting" class="w-8 h-8 mx-auto text-green-600 mb-1 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                     <svg x-show="!submitting" class="w-8 h-8 mx-auto text-green-600 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                     <span class="text-sm font-bold text-green-700 dark:text-green-400" x-text="submitting ? 'Processing...' : 'Cash'"></span>
+                    <kbd x-show="!submitting" class="block mt-1 text-[9px] text-green-500/60 font-mono">Press 1</kbd>
                 </button>
-                <button @click="processPayment('card')" :disabled="submitting" class="py-4 rounded-xl text-center bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition disabled:opacity-50">
+                <button @click="processPayment('card')" :disabled="submitting" class="py-4 rounded-xl text-center bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 hover:bg-blue-100 hover:border-blue-400 transition disabled:opacity-50 group">
                     <svg x-show="submitting" class="w-8 h-8 mx-auto text-blue-600 mb-1 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                     <svg x-show="!submitting" class="w-8 h-8 mx-auto text-blue-600 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                     <span class="text-sm font-bold text-blue-700 dark:text-blue-400" x-text="submitting ? 'Processing...' : 'Card'"></span>
+                    <kbd x-show="!submitting" class="block mt-1 text-[9px] text-blue-500/60 font-mono">Press 2</kbd>
                 </button>
             </div>
             <div class="p-4 pt-0">
-                <button @click="showPayModal = false" :disabled="submitting" class="w-full py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:text-gray-700 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition disabled:opacity-50">Cancel</button>
+                <button @click="showPayModal = false" :disabled="submitting" class="w-full py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:text-gray-700 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition disabled:opacity-50">Cancel <span class="text-[9px] text-gray-400 font-mono ml-1">ESC</span></button>
             </div>
         </div>
     </div>
@@ -769,19 +777,49 @@ function restaurantPos() {
             this.$watch('kitchenNotes', () => { this.saveCart(); });
             this.cacheProductData();
             document.addEventListener('keydown', (e) => {
-                if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); }
-                if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) this.showPayModal = true; }
-                if (e.ctrlKey && e.key === 's') { e.preventDefault(); this.enterSearchMode(); }
+                const tag = document.activeElement?.tagName;
+                const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+                if (this.showPayModal) {
+                    if (e.key === '1') { e.preventDefault(); this.processPayment('cash'); return; }
+                    if (e.key === '2') { e.preventDefault(); this.processPayment('card'); return; }
+                    if (e.key === 'Escape') { e.preventDefault(); this.showPayModal = false; return; }
+                    return;
+                }
+                if (this.showManagerPinModal) {
+                    if (e.key === 'Escape') { e.preventDefault(); this.showManagerPinModal = false; return; }
+                    return;
+                }
+
+                if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
+                if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) this.showPayModal = true; return; }
+                if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
                 if (e.key === 'Escape') {
-                    if (this.showPayModal) { this.showPayModal = false; return; }
+                    if (this.showLowStockPopup) { this.showLowStockPopup = false; return; }
                     if (this.showHeldOrders) { this.showHeldOrders = false; return; }
                     if (this.showTablePicker) { this.showTablePicker = false; return; }
                     if (this.showCustomerPicker) { this.showCustomerPicker = false; return; }
+                    if (this.showCustomerHistory) { this.showCustomerHistory = false; return; }
                     if (this.gridFocusMode) { this.enterSearchMode(); return; }
-                    if (this.activeCategory !== 'all') { this.activeCategory = 'all'; this.searchQuery = ''; this.filterProducts(); return; }
+                    if (this.searchQuery) { this.searchQuery = ''; this.showSearchDropdown = false; this.filterProducts(); return; }
+                    if (this.activeCategory !== 'all') { this.activeCategory = 'all'; this.filterProducts(); return; }
                 }
+
+                if (!isInput && !this.gridFocusMode && this.cart.length > 0) {
+                    if (e.key === '+' || e.key === '=') { e.preventDefault(); this.updateQty(this.cart.length - 1, 1); return; }
+                    if (e.key === '-') { e.preventDefault(); this.updateQty(this.cart.length - 1, -1); return; }
+                    if (e.key === 'Delete') { e.preventDefault(); this.removeFromCart(this.cart.length - 1); return; }
+                }
+
                 if (e.key === 'Tab' && !e.shiftKey && !this.gridFocusMode && document.activeElement === this.$refs.searchInput && !this.showSearchDropdown) {
                     e.preventDefault(); this.enterGridMode();
+                }
+
+                if (!isInput && !this.gridFocusMode && e.key.length === 1 && /[a-zA-Z0-9]/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                    e.preventDefault();
+                    this.searchQuery += e.key;
+                    this.$refs.searchInput?.focus();
+                    this.$nextTick(() => this.onSearchInput());
                 }
             });
             this.$nextTick(() => { this.$refs.searchInput?.focus(); });
@@ -850,7 +888,7 @@ function restaurantPos() {
                 return;
             }
             this.addToCart(item);
-            this.showToast(item.name + ' added', 'success');
+            this.showToast('Added: ' + item.name, 'success');
         },
 
         getCartQty(item) {
@@ -862,7 +900,7 @@ function restaurantPos() {
             this.filterProducts();
             const q = this.searchQuery.trim().toLowerCase();
             if (q.length > 0) {
-                let all = [...this.allProducts, ...this.allServices];
+                let all = [...this.allProducts, ...this.allServices].filter(i => parseFloat(i.price) > 0 && i.name && i.name.trim().length > 0);
                 this.searchSuggestions = all.filter(i => i.name.toLowerCase().includes(q)).slice(0, 12);
                 this.highlightIndex = 0; this.showSearchDropdown = true;
             } else { this.searchSuggestions = []; this.showSearchDropdown = false; }
@@ -880,8 +918,9 @@ function restaurantPos() {
 
         filterProducts() {
             let items = [...this.allProducts, ...this.allServices];
-            if (this.activeCategory !== 'all' && this.activeCategory !== 'services') { items = this.allProducts.filter(p => p.category === this.activeCategory); }
-            else if (this.activeCategory === 'services') { items = this.allServices; }
+            items = items.filter(i => parseFloat(i.price) > 0 && i.name && i.name.trim().length > 0);
+            if (this.activeCategory !== 'all' && this.activeCategory !== 'services') { items = this.allProducts.filter(p => p.category === this.activeCategory && parseFloat(p.price) > 0 && p.name && p.name.trim().length > 0); }
+            else if (this.activeCategory === 'services') { items = this.allServices.filter(s => parseFloat(s.price) > 0 && s.name && s.name.trim().length > 0); }
             if (this.searchQuery) { const q = this.searchQuery.toLowerCase(); items = items.filter(i => i.name.toLowerCase().includes(q)); }
             this.filteredItems = items;
             this.displayCount = 60;

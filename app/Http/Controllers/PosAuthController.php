@@ -17,6 +17,13 @@ class PosAuthController extends Controller
     public function showLogin()
     {
         if (Auth::guard('pos')->check()) {
+            $user = Auth::guard('pos')->user();
+            $loginCompany = Company::find($user->company_id);
+            if ($loginCompany && $loginCompany->restaurant_mode) {
+                return ($user->pos_role === 'pos_admin' || $user->role === 'company_admin')
+                    ? redirect('/pos/restaurant/dashboard')
+                    : redirect('/pos/restaurant/pos');
+            }
             return redirect('/pos/dashboard');
         }
         return view('pos.auth.login');
@@ -81,6 +88,14 @@ class PosAuthController extends Controller
             Auth::guard('pos')->login($user, $request->boolean('remember'));
             $request->session()->regenerate();
             $request->session()->forget('url.intended');
+
+            $loginCompany = Company::find($user->company_id);
+            if ($loginCompany && $loginCompany->restaurant_mode) {
+                if ($user->pos_role === 'pos_admin' || $user->role === 'company_admin') {
+                    return redirect('/pos/restaurant/dashboard');
+                }
+                return redirect('/pos/restaurant/pos');
+            }
             return redirect('/pos/dashboard');
         }
 

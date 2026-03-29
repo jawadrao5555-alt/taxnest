@@ -166,12 +166,25 @@ class RestaurantPosController extends Controller
         }
 
         $subtotal = array_sum(array_column($resolvedItems, 'subtotal'));
-        $taxableSubtotal = array_sum(array_column(array_filter($resolvedItems, fn($i) => !($i['is_tax_exempt'] ?? false)), 'subtotal'));
         $orderNumber = 'ORD-' . date('ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 5));
 
+        $discountType = $request->discount_type;
+        $discountValue = (float)($request->discount_value ?? 0);
+        $discountAmount = (float)($request->discount_amount ?? 0);
+        if ($discountType === 'percentage' && $discountValue > 0) {
+            $discountAmount = round($subtotal * min(100, $discountValue) / 100, 2);
+        } elseif ($discountType === 'amount' && $discountValue > 0) {
+            $discountAmount = min($subtotal, round($discountValue, 2));
+        }
+        $discountAmount = max(0, $discountAmount);
+
+        $taxableSubtotal = array_sum(array_column(array_filter($resolvedItems, fn($i) => !($i['is_tax_exempt'] ?? false)), 'subtotal'));
+        $discountRatio = $subtotal > 0 ? ($subtotal - $discountAmount) / $subtotal : 1;
+        $adjustedTaxable = round($taxableSubtotal * $discountRatio, 2);
+
         $taxRate = PosTaxRule::getRateForMethod('cash');
-        $taxAmount = round($taxableSubtotal * $taxRate / 100, 2);
-        $totalAmount = round($subtotal + $taxAmount, 2);
+        $taxAmount = round($adjustedTaxable * $taxRate / 100, 2);
+        $totalAmount = round($subtotal - $discountAmount + $taxAmount, 2);
 
         DB::beginTransaction();
         try {
@@ -185,6 +198,9 @@ class RestaurantPosController extends Controller
                 'customer_name' => $request->customer_name,
                 'customer_phone' => $request->customer_phone,
                 'subtotal' => $subtotal,
+                'discount_type' => $discountType,
+                'discount_value' => $discountValue,
+                'discount_amount' => $discountAmount,
                 'tax_amount' => $taxAmount,
                 'total_amount' => $totalAmount,
                 'kitchen_notes' => $request->kitchen_notes,
@@ -245,9 +261,12 @@ class RestaurantPosController extends Controller
         $taxRate = PosTaxRule::getRateForMethod($paymentMethod);
 
         $subtotal = $order->items->sum('subtotal');
+        $discountAmount = (float)($order->discount_amount ?? 0);
+        $discountRatio = $subtotal > 0 ? ($subtotal - $discountAmount) / $subtotal : 1;
         $taxableSubtotal = $order->items->where('is_tax_exempt', false)->sum('subtotal');
-        $taxAmount = round($taxableSubtotal * $taxRate / 100, 2);
-        $totalAmount = round($subtotal + $taxAmount, 2);
+        $adjustedTaxable = round($taxableSubtotal * $discountRatio, 2);
+        $taxAmount = round($adjustedTaxable * $taxRate / 100, 2);
+        $totalAmount = round($subtotal - $discountAmount + $taxAmount, 2);
 
         $praEnabled = (bool) $company->pra_reporting_enabled;
         $invoiceMode = $praEnabled ? 'pra' : 'local';
@@ -277,9 +296,9 @@ class RestaurantPosController extends Controller
                 'customer_name' => $order->customer_name,
                 'customer_phone' => $order->customer_phone,
                 'subtotal' => $subtotal,
-                'discount_type' => 'amount',
-                'discount_value' => 0,
-                'discount_amount' => 0,
+                'discount_type' => $order->discount_type ?? 'amount',
+                'discount_value' => (float)($order->discount_value ?? 0),
+                'discount_amount' => $discountAmount,
                 'tax_rate' => $taxRate,
                 'tax_amount' => $taxAmount,
                 'exempt_amount' => $subtotal - $taxableSubtotal,
@@ -693,5 +712,114 @@ class RestaurantPosController extends Controller
         }
 
         return response()->json(['success' => false, 'message' => 'Could not fetch image']);
+    }
+
+    public function dashboard()
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $today = now()->startOfDay();
+        $yesterday = now()->subDay()->startOfDay();
+
+        $todaySales = RestaurantOrder::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->where('created_at', '>=', $today)
+            ->sum('total_amount');
+
+        $yesterdaySales = RestaurantOrder::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->whereBetween('created_at', [$yesterday, $today])
+            ->sum('total_amount');
+
+        $todayOrders = RestaurantOrder::where('company_id', $companyId)
+            ->where('created_at', '>=', $today)
+            ->count();
+
+        $heldCount = RestaurantOrder::where('company_id', $companyId)
+            ->where('created_at', '>=', $today)
+            ->whereIn('status', ['held', 'preparing', 'ready'])
+            ->count();
+
+        $completedCount = RestaurantOrder::where('company_id', $companyId)
+            ->where('created_at', '>=', $today)
+            ->where('status', 'completed')
+            ->count();
+
+        $totalTables = RestaurantTable::where('company_id', $companyId)->count();
+        $occupiedTables = RestaurantTable::where('company_id', $companyId)->where('status', 'occupied')->count();
+
+        $topProducts = RestaurantOrderItem::select('item_name',
+            DB::raw('SUM(quantity) as total_qty'),
+            DB::raw('SUM(subtotal) as total_revenue'))
+            ->whereHas('order', function ($q) use ($companyId, $today) {
+                $q->where('company_id', $companyId)
+                    ->where('status', 'completed')
+                    ->where('created_at', '>=', $today->copy()->subDays(7));
+            })
+            ->groupBy('item_name')
+            ->orderByDesc('total_qty')
+            ->limit(8)
+            ->get();
+
+        $lowStockItems = Ingredient::where('company_id', $companyId)
+            ->where('is_active', true)
+            ->whereColumn('current_stock', '<=', 'min_stock_level')
+            ->orderBy('current_stock')
+            ->limit(10)
+            ->get();
+
+        $recentOrders = RestaurantOrder::where('company_id', $companyId)
+            ->with(['items', 'table'])
+            ->where('created_at', '>=', $today)
+            ->orderBy('created_at', 'desc')
+            ->limit(15)
+            ->get();
+
+        $salesChartLabels = [];
+        $salesChartData = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $day = now()->subDays($i);
+            $salesChartLabels[] = $day->format('D');
+            $salesChartData[] = (float) RestaurantOrder::where('company_id', $companyId)
+                ->where('status', 'completed')
+                ->whereDate('created_at', $day->toDateString())
+                ->sum('total_amount');
+        }
+
+        $orderTypeCounts = RestaurantOrder::where('company_id', $companyId)
+            ->where('created_at', '>=', $today->copy()->subDays(7))
+            ->where('status', 'completed')
+            ->select('order_type', DB::raw('count(*) as cnt'))
+            ->groupBy('order_type')
+            ->pluck('cnt', 'order_type')
+            ->toArray();
+
+        if (empty($orderTypeCounts)) {
+            $orderTypeCounts = ['dine_in' => 0, 'takeaway' => 0, 'delivery' => 0];
+        }
+
+        return view('pos.restaurant.dashboard', compact(
+            'company', 'todaySales', 'yesterdaySales', 'todayOrders',
+            'heldCount', 'completedCount', 'totalTables', 'occupiedTables',
+            'topProducts', 'lowStockItems', 'recentOrders',
+            'salesChartLabels', 'salesChartData', 'orderTypeCounts'
+        ));
+    }
+
+    public function receipt($transactionId)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        $transaction = PosTransaction::where('company_id', $companyId)
+            ->with(['items', 'creator'])
+            ->findOrFail($transactionId);
+
+        $order = RestaurantOrder::where('company_id', $companyId)
+            ->where('pos_transaction_id', $transaction->id)
+            ->with('table')
+            ->first();
+
+        return view('pos.restaurant.receipt', compact('transaction', 'company', 'order'));
     }
 }

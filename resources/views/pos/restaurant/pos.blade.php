@@ -270,8 +270,34 @@
                 <div class="px-3 py-1.5">
                     <textarea x-model="kitchenNotes" rows="1" placeholder="Kitchen notes..." class="w-full text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-purple-500 resize-none placeholder-gray-300"></textarea>
                 </div>
+                <div class="px-3 py-1.5">
+                    <div class="flex items-center gap-1.5">
+                        <button @click="showDiscount = !showDiscount" class="text-[10px] font-semibold px-2 py-0.5 rounded-lg transition" :class="discountAmount > 0 ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-600' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200'">
+                            <span x-text="discountAmount > 0 ? 'Discount: -Rs. ' + Number(discountAmount).toLocaleString() : '+ Discount'"></span>
+                        </button>
+                    </div>
+                    <div x-show="showDiscount" x-transition class="mt-1.5 p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl space-y-1.5">
+                        <div class="flex gap-1">
+                            <button @click="discountType = 'percentage'" class="flex-1 text-[10px] font-bold py-1 rounded-lg transition" :class="discountType === 'percentage' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-500'">%</button>
+                            <button @click="discountType = 'amount'" class="flex-1 text-[10px] font-bold py-1 rounded-lg transition" :class="discountType === 'amount' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-500'">Rs.</button>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <input type="number" x-model.number="discountValue" @input="recalcDiscount()" min="0" :max="discountType === 'percentage' ? 100 : subtotal" step="any" :placeholder="discountType === 'percentage' ? 'e.g. 10' : 'e.g. 500'" class="flex-1 text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-gray-900 dark:text-white focus:ring-purple-500">
+                            <button @click="discountValue = 0; recalcDiscount(); showDiscount = false" class="text-[10px] text-red-500 hover:text-red-700 px-1.5">Clear</button>
+                        </div>
+                        <div class="flex gap-1 flex-wrap">
+                            <template x-for="q in [5, 10, 15, 20]" :key="q">
+                                <button @click="discountType = 'percentage'; discountValue = q; recalcDiscount()" class="text-[9px] font-semibold px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-md hover:bg-purple-100 hover:text-purple-700 transition" x-text="q + '%'"></button>
+                            </template>
+                        </div>
+                    </div>
+                </div>
                 <div class="px-3 py-2 space-y-1">
                     <div class="flex justify-between text-xs text-gray-500"><span>Subtotal</span><span x-text="'Rs. ' + Number(subtotal).toLocaleString()"></span></div>
+                    <div x-show="discountAmount > 0" class="flex justify-between text-xs text-orange-600 dark:text-orange-400">
+                        <span x-text="discountType === 'percentage' ? 'Discount (' + discountValue + '%)' : 'Discount'"></span>
+                        <span x-text="'-Rs. ' + Number(discountAmount).toLocaleString()"></span>
+                    </div>
                     <div x-show="exemptAmount > 0" class="flex justify-between text-xs text-green-600 dark:text-green-400"><span>Tax-Exempt</span><span x-text="'-Rs. ' + Number(exemptAmount).toLocaleString()"></span></div>
                     <div class="flex justify-between text-xs text-gray-500"><span x-text="'Tax (' + taxRate + '%)'"></span><span x-text="'Rs. ' + Number(taxAmount).toLocaleString()"></span></div>
                     <div class="flex justify-between text-lg font-extrabold text-gray-900 dark:text-white pt-1.5 border-t border-gray-200 dark:border-gray-700">
@@ -435,7 +461,7 @@
                 <p class="text-xs text-gray-400 mt-1 capitalize" x-text="lastPaymentMethod + ' payment'"></p>
             </div>
             <div class="p-4 grid grid-cols-2 gap-3">
-                <a :href="'/pos/transactions/' + lastTransactionId + '/receipt'" target="_blank" class="py-3 text-center rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold transition shadow-sm">Print</a>
+                <a :href="'/pos/restaurant/receipt/' + lastTransactionId + '?auto_print=1'" target="_blank" class="py-3 text-center rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold transition shadow-sm">Print</a>
                 <button @click="showReceipt = false; clearCart();" class="py-3 text-center rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-gray-700 dark:text-gray-300 text-sm font-bold transition">New Sale</button>
             </div>
         </div>
@@ -523,6 +549,10 @@ function restaurantPos() {
         toast: { show: false, message: '', type: 'success' },
         lastHoldTime: 0,
         lastPayTime: 0,
+        showDiscount: false,
+        discountType: 'percentage',
+        discountValue: 0,
+        discountAmount: 0,
 
         get filteredCustomers() {
             const q = this.customerSearch.toLowerCase();
@@ -531,10 +561,23 @@ function restaurantPos() {
         },
 
         get subtotal() { return this.cart.reduce((s, i) => s + (i.quantity * i.unit_price), 0); },
-        get taxableSubtotal() { return this.cart.filter(i => !i.is_tax_exempt).reduce((s, i) => s + (i.quantity * i.unit_price), 0); },
+        get taxableSubtotal() {
+            const taxable = this.cart.filter(i => !i.is_tax_exempt).reduce((s, i) => s + (i.quantity * i.unit_price), 0);
+            const discountRatio = this.subtotal > 0 ? (this.subtotal - this.discountAmount) / this.subtotal : 1;
+            return Math.max(0, Math.round(taxable * discountRatio));
+        },
         get taxAmount() { return Math.round(this.taxableSubtotal * this.taxRate / 100); },
-        get totalAmount() { return this.subtotal + this.taxAmount; },
+        get totalAmount() { return Math.max(0, this.subtotal - this.discountAmount + this.taxAmount); },
         get exemptAmount() { return this.cart.filter(i => i.is_tax_exempt).reduce((s, i) => s + (i.quantity * i.unit_price), 0); },
+        recalcDiscount() {
+            if (!this.discountValue || this.discountValue <= 0) { this.discountAmount = 0; return; }
+            if (this.discountType === 'percentage') {
+                const pct = Math.min(100, Math.max(0, this.discountValue));
+                this.discountAmount = Math.round(this.subtotal * pct / 100);
+            } else {
+                this.discountAmount = Math.min(this.subtotal, Math.max(0, Math.round(this.discountValue)));
+            }
+        },
 
         init() {
             this.filterProducts();
@@ -543,7 +586,7 @@ function restaurantPos() {
             this.calcGridCols();
             window.addEventListener('resize', () => this.calcGridCols());
             this.restoreCart();
-            this.$watch('cart', () => { this.saveCart(); }, { deep: true });
+            this.$watch('cart', () => { this.saveCart(); this.recalcDiscount(); }, { deep: true });
             this.$watch('kitchenNotes', () => { this.saveCart(); });
             this.cacheProductData();
             document.addEventListener('keydown', (e) => {
@@ -685,7 +728,7 @@ function restaurantPos() {
         updateQty(index, delta) { this.cart[index].quantity = Math.max(0.01, parseFloat(this.cart[index].quantity) + delta); },
         setQty(index, val) { const v = parseFloat(val); if (v > 0) this.cart[index].quantity = v; },
         removeFromCart(index) { this.cart.splice(index, 1); },
-        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.stockError = ''; this.priorityOrder = false; this.clearCartStorage(); },
+        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.stockError = ''; this.priorityOrder = false; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm('Current order has ' + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast('New sale started', 'success');
@@ -746,7 +789,7 @@ function restaurantPos() {
             try {
                 const res = await fetch('{{ route("pos.restaurant.orders.hold") }}', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder }),
+                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount }),
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -766,7 +809,7 @@ function restaurantPos() {
             try {
                 const holdRes = await fetch('{{ route("pos.restaurant.orders.hold") }}', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder }),
+                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount }),
                 });
                 const holdData = await holdRes.json();
                 if (!holdData.success) { this.showToast(holdData.message || 'Failed', 'error'); this.submitting = false; return; }

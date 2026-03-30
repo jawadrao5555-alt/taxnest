@@ -7,6 +7,7 @@
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(1.8); opacity: 0; } }
+@keyframes scaleIn { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 @keyframes qtyPop { 0% { transform: scale(1); } 40% { transform: scale(1.15); } 100% { transform: scale(1); } }
 .cart-pop { animation: cartPop 0.2s ease; }
 .qty-pop { animation: qtyPop 0.15s ease; }
@@ -571,20 +572,31 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
-    <div x-show="showReceipt" x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div x-show="showReceipt" x-transition.opacity class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
-            <div class="p-6 text-center">
-                <div class="w-16 h-16 mx-auto rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-4">
-                    <svg class="w-9 h-9 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            <div class="relative p-8 text-center bg-gradient-to-b from-green-50 to-white dark:from-green-900/20 dark:to-gray-900">
+                <div class="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center mb-4 shadow-lg shadow-green-600/30" style="animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)">
+                    <svg class="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                 </div>
-                <h3 class="text-xl font-extrabold text-gray-900 dark:text-white">Payment Successful</h3>
-                <p class="text-sm text-gray-500 mt-1" x-text="lastInvoiceNumber"></p>
-                <p class="text-3xl font-extrabold text-green-600 mt-3" x-text="'Rs. ' + Number(lastTotal).toLocaleString()"></p>
-                <p class="text-xs text-gray-400 mt-1 capitalize" x-text="lastPaymentMethod + ' payment'"></p>
+                <h3 class="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">Payment Complete!</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 font-mono" x-text="lastInvoiceNumber"></p>
+                <div class="mt-4 py-3 px-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800/50 inline-block">
+                    <p class="text-3xl font-extrabold text-green-600 dark:text-green-400" x-text="'Rs. ' + Number(lastTotal).toLocaleString()" style="font-variant-numeric: tabular-nums;"></p>
+                </div>
+                <p class="text-xs text-gray-400 mt-2 capitalize flex items-center justify-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                    <span x-text="lastPaymentMethod + ' payment'"></span>
+                </p>
             </div>
-            <div class="p-4 grid grid-cols-2 gap-3">
-                <a :href="'/pos/restaurant/receipt/' + lastTransactionId + '?auto_print=1'" target="_blank" class="py-3 text-center rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold transition shadow-sm">Print</a>
-                <button @click="startNewAfterPayment()" class="py-3 text-center rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-bold transition shadow-sm">New Sale <kbd class="text-[8px] bg-green-500/40 px-1 rounded ml-1 font-mono">Enter</kbd></button>
+            <div class="p-4 grid grid-cols-2 gap-3 bg-gray-50 dark:bg-gray-800/50">
+                <a :href="'/pos/restaurant/receipt/' + lastTransactionId + '?auto_print=1'" target="_blank" class="py-3.5 text-center rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                    Print <kbd class="text-[8px] bg-purple-500/40 px-1 rounded ml-1 font-mono">P</kbd>
+                </a>
+                <button @click="startNewAfterPayment()" class="py-3.5 text-center rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-bold transition shadow-md shadow-green-600/20 flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                    New Sale <kbd class="text-[8px] bg-green-500/40 px-1 rounded ml-1 font-mono">Enter</kbd>
+                </button>
             </div>
         </div>
     </div>
@@ -1272,6 +1284,7 @@ function restaurantPos() {
                 const data = await res.json();
                 if (data.success) {
                     this.showToast(data.message, 'success'); this.heldOrders.unshift(data.order); this.clearCart();
+                    this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
                     if (this.kitchenSettings.print_on_hold) { window.open('/pos/restaurant/orders/' + data.order.id + '/kitchen-ticket', '_blank', 'width=350,height=600'); }
                 } else { this.showToast(data.message || 'Failed', 'error'); }
             } catch (e) { this.showToast('Network error', 'error'); }

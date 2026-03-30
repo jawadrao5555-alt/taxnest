@@ -460,17 +460,17 @@ class RestaurantPosController extends Controller
                 PosTransactionItem::create([
                     'transaction_id' => $transaction->id,
                     'item_type' => $item->item_type,
-                    'item_id' => $item->item_id,
+                    'item_id' => (int) $item->item_id,
                     'item_name' => $item->item_name,
-                    'quantity' => $item->quantity,
-                    'unit_price' => $item->unit_price,
-                    'subtotal' => $item->subtotal,
-                    'is_tax_exempt' => $item->is_tax_exempt,
+                    'quantity' => (int) $item->quantity,
+                    'unit_price' => (float) $item->unit_price,
+                    'subtotal' => (float) $item->subtotal,
+                    'is_tax_exempt' => (bool) $item->is_tax_exempt,
                     'tax_rate' => $item->is_tax_exempt ? 0 : $taxRate,
                     'tax_amount' => $lineTax,
-                    'item_discount_type' => $item->item_discount_type,
-                    'item_discount_value' => $item->item_discount_value ?? 0,
-                    'item_discount_amount' => $item->item_discount_amount ?? 0,
+                    'item_discount_type' => $item->item_discount_type ?? 'percentage',
+                    'item_discount_value' => (float) ($item->item_discount_value ?? 0),
+                    'item_discount_amount' => (float) ($item->item_discount_amount ?? 0),
                 ]);
             }
 

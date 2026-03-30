@@ -119,7 +119,7 @@
                             <p class="text-[8px] font-bold uppercase tracking-[0.15em] text-gray-400 dark:text-gray-600">Main</p>
                         </div>
 
-                        <a href="{{ route('pos.dashboard') }}" class="exe-nav-item flex items-center gap-2.5 px-3 py-2 rounded-r-lg text-[11px] font-medium {{ request()->routeIs('pos.dashboard') ? 'active text-purple-700 dark:text-purple-400' : 'text-gray-600 dark:text-gray-400' }}">
+                        <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}" class="exe-nav-item flex items-center gap-2.5 px-3 py-2 rounded-r-lg text-[11px] font-medium {{ request()->routeIs('pos.dashboard') || request()->routeIs('pos.restaurant.dashboard') ? 'active text-purple-700 dark:text-purple-400' : 'text-gray-600 dark:text-gray-400' }}">
                             <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
                             Dashboard
                         </a>

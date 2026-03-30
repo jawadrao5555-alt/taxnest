@@ -23,7 +23,6 @@ class PraIntegrationService
     private const SANDBOX_URL = 'https://ims.pral.com.pk/ims/sandbox/api/Live/PostData';
     private const PRODUCTION_URL = 'https://ims.pral.com.pk/ims/production/api/Live/PostData';
     private const SANDBOX_TOKEN = '24d8fab3-f2e9-398f-ae17-b387125ec4a2';
-    private const PROXY_AUTH_SECRET = 'TaxNestPraProxy2026Secret';
 
     public function __construct(Company $company)
     {
@@ -176,116 +175,38 @@ class PraIntegrationService
             $apiUrl = $this->getApiUrl();
             $token = $this->getToken();
             $jsonPayload = json_encode($payload);
-            $proxyUrl = $this->company->pra_proxy_url;
 
             $responseBody = null;
             $httpCode = 0;
-            $method = 'unknown';
+            $method = 'curl-direct';
 
-            if ($proxyUrl) {
-                $method = 'proxy';
-                Log::info('PRA Proxy: Routing through proxy', [
-                    'proxy_url' => $proxyUrl,
-                    'pra_url' => $apiUrl,
-                ]);
+            $ch = curl_init($apiUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $jsonPayload,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_CONNECTTIMEOUT => 15,
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'Accept: application/json',
+                    'Authorization: Bearer ' . $token,
+                ],
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => 0,
+                CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
+                CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            ]);
 
-                $ch = curl_init($proxyUrl);
-                curl_setopt_array($ch, [
-                    CURLOPT_POST => true,
-                    CURLOPT_POSTFIELDS => $jsonPayload,
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 45,
-                    CURLOPT_CONNECTTIMEOUT => 15,
-                    CURLOPT_HTTPHEADER => [
-                        'Content-Type: application/json',
-                        'Accept: application/json',
-                        'X-Proxy-Auth: ' . self::PROXY_AUTH_SECRET,
-                        'X-Pra-Url: ' . $apiUrl,
-                        'X-Pra-Token: ' . $token,
-                    ],
-                    CURLOPT_SSL_VERIFYPEER => false,
-                    CURLOPT_SSL_VERIFYHOST => 0,
-                ]);
+            $curlResult = curl_exec($ch);
+            $curlError = curl_error($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
 
-                $proxyResult = curl_exec($ch);
-                $proxyError = curl_error($ch);
-                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
-
-                if ($proxyResult !== false && !$proxyError) {
-                    $responseBody = $proxyResult;
-                } else {
-                    Log::warning('PRA Proxy failed, falling back to direct', ['error' => $proxyError]);
-                }
-            }
-
-            if ($responseBody === null) {
-                $sslContext = stream_context_create([
-                    'ssl' => [
-                        'verify_peer' => false,
-                        'verify_peer_name' => false,
-                        'allow_self_signed' => true,
-                        'crypto_method' => STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT,
-                    ],
-                    'http' => [
-                        'method' => 'POST',
-                        'header' => "Content-Type: application/json\r\nAccept: application/json\r\nAuthorization: Bearer {$token}\r\nConnection: close\r\n",
-                        'content' => $jsonPayload,
-                        'timeout' => 30,
-                        'ignore_errors' => true,
-                    ],
-                ]);
-
-                $streamResult = @file_get_contents($apiUrl, false, $sslContext);
-
-                if ($streamResult !== false) {
-                    $method = $method === 'proxy' ? 'direct-fallback-stream' : 'stream';
-                    $responseBody = $streamResult;
-                    $httpCode = 200;
-                    if (isset($http_response_header)) {
-                        foreach ($http_response_header as $hdr) {
-                            if (preg_match('/HTTP\/\d\.\d\s+(\d+)/', $hdr, $m)) {
-                                $httpCode = (int) $m[1];
-                            }
-                        }
-                    }
-                }
-            }
-
-            if ($responseBody === null) {
-                $method = $method === 'proxy' ? 'direct-fallback-curl' : 'curl';
-                $ch = curl_init($apiUrl);
-                curl_setopt_array($ch, [
-                    CURLOPT_POST => true,
-                    CURLOPT_POSTFIELDS => $jsonPayload,
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 30,
-                    CURLOPT_CONNECTTIMEOUT => 15,
-                    CURLOPT_HTTPHEADER => [
-                        'Content-Type: application/json',
-                        'Accept: application/json',
-                        'Authorization: Bearer ' . $token,
-                        'Connection: close',
-                    ],
-                    CURLOPT_SSL_VERIFYPEER => false,
-                    CURLOPT_SSL_VERIFYHOST => 0,
-                    CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
-                    CURLOPT_SSL_CIPHER_LIST => 'DEFAULT@SECLEVEL=0',
-                    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-                    CURLOPT_FORBID_REUSE => true,
-                    CURLOPT_FRESH_CONNECT => true,
-                ]);
-
-                $curlResult = curl_exec($ch);
-                $curlError = curl_error($ch);
-                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
-
-                if ($curlResult !== false && !$curlError) {
-                    $responseBody = $curlResult;
-                } else {
-                    throw new \Exception('PRA connection failed (proxy+stream+curl): ' . ($curlError ?: 'No response'));
-                }
+            if ($curlResult !== false && !$curlError) {
+                $responseBody = $curlResult;
+            } else {
+                throw new \Exception('PRA connection failed: ' . ($curlError ?: 'No response'));
             }
 
             Log::info('PRA Direct: Raw response', [

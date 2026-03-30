@@ -117,11 +117,12 @@ window.addEventListener('popstate', function() {
             <span x-text="selectedTable ? 'T-' + selectedTable.table_number : 'Table'"></span>
         </button>
 
-        <select x-model="orderType" class="text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-2 focus:ring-purple-500 flex-shrink-0">
-            <option value="dine_in">Dine In</option>
-            <option value="takeaway">Takeaway</option>
-            <option value="delivery">Delivery</option>
-        </select>
+        <div class="flex items-center rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex-shrink-0" title="Press F2 to cycle">
+            <button @click="orderType = 'dine_in'" class="px-2 py-1.5 text-[10px] font-bold transition-all" :class="orderType === 'dine_in' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">Dine In</button>
+            <button @click="orderType = 'takeaway'" class="px-2 py-1.5 text-[10px] font-bold transition-all border-x border-gray-200 dark:border-gray-700" :class="orderType === 'takeaway' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">Takeaway</button>
+            <button @click="orderType = 'delivery'" class="px-2 py-1.5 text-[10px] font-bold transition-all" :class="orderType === 'delivery' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">Delivery</button>
+            <span class="px-1.5 py-1.5 text-[8px] font-mono text-gray-400 bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">F2</span>
+        </div>
 
         <div class="w-px h-6 bg-gray-200 dark:bg-gray-700 hidden sm:block flex-shrink-0"></div>
 
@@ -372,14 +373,14 @@ window.addEventListener('popstate', function() {
                 </div>
                 <div class="px-3 pb-3 space-y-2 mobile-sticky-pay">
                     <div class="grid grid-cols-3 gap-2">
-                        <button @click="voidOrder()" :disabled="cart.length === 0" class="py-2 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-30 transition">Void</button>
+                        <button @click="if(cart.length && confirm('Clear entire cart?')) { clearCart(); }" :disabled="cart.length === 0" class="py-2 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-30 transition flex items-center justify-center gap-0.5">Clear <kbd class="text-[8px] bg-red-200/50 dark:bg-red-800/30 px-1 rounded font-mono">F4</kbd></button>
                         <button @click="holdOrder()" :disabled="cart.length === 0 || submitting" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 transition flex items-center justify-center gap-1">
                             <svg x-show="submitting" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                             <span x-text="submitting ? 'Holding...' : 'Hold'"></span>
                             <kbd x-show="!submitting" class="text-[8px] bg-amber-200/50 dark:bg-amber-800/30 px-1 rounded ml-0.5 font-mono">F5</kbd>
                         </button>
-                        <button @click="showHeldOrders = !showHeldOrders" class="relative py-2 text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition">
-                            Recall
+                        <button @click="showHeldOrders = !showHeldOrders" class="relative py-2 text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition flex items-center justify-center gap-0.5">
+                            Recall <kbd class="text-[8px] bg-purple-200/50 dark:bg-purple-800/30 px-1 rounded font-mono">F3</kbd>
                             <span x-show="heldOrders.length > 0" class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[8px] rounded-full flex items-center justify-center" x-text="heldOrders.length"></span>
                         </button>
                     </div>
@@ -588,14 +589,19 @@ window.addEventListener('popstate', function() {
                     <span x-text="lastPaymentMethod + ' payment'"></span>
                 </p>
             </div>
-            <div class="p-4 grid grid-cols-2 gap-3 bg-gray-50 dark:bg-gray-800/50">
-                <a :href="'/pos/restaurant/receipt/' + lastTransactionId + '?auto_print=1'" target="_blank" class="py-3.5 text-center rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-2">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                    Print <kbd class="text-[8px] bg-purple-500/40 px-1 rounded ml-1 font-mono">P</kbd>
-                </a>
-                <button @click="startNewAfterPayment()" class="py-3.5 text-center rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-bold transition shadow-md shadow-green-600/20 flex items-center justify-center gap-2">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-                    New Sale <kbd class="text-[8px] bg-green-500/40 px-1 rounded ml-1 font-mono">Enter</kbd>
+            <div class="p-4 space-y-3 bg-gray-50 dark:bg-gray-800/50">
+                <div class="grid grid-cols-2 gap-3">
+                    <a :href="'/pos/restaurant/receipt/' + lastTransactionId + '?auto_print=1'" target="_blank" class="py-3.5 text-center rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                        Print <kbd class="text-[8px] bg-purple-500/40 px-1 rounded ml-1 font-mono">P</kbd>
+                    </a>
+                    <button @click="startNewAfterPayment()" class="py-3.5 text-center rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-bold transition shadow-md shadow-green-600/20 flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                        New Sale <kbd class="text-[8px] bg-green-500/40 px-1 rounded ml-1 font-mono">Enter</kbd>
+                    </button>
+                </div>
+                <button @click="showReceipt = false" class="w-full py-2.5 text-center rounded-xl bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 text-sm font-semibold transition flex items-center justify-center gap-2">
+                    Close <kbd class="text-[8px] bg-gray-300 dark:bg-gray-600 px-1 rounded ml-1 font-mono">Esc</kbd>
                 </button>
             </div>
         </div>
@@ -881,6 +887,7 @@ function restaurantPos() {
                 const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 
                 if (this.showReceipt) {
+                    if (e.key === 'Escape') { e.preventDefault(); this.showReceipt = false; return; }
                     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); return; }
                     if (e.key === 'p' || e.key === 'P') { e.preventDefault(); if (this.lastTransactionId) window.open('/pos/restaurant/receipt/' + this.lastTransactionId + '?auto_print=1', '_blank', 'width=400,height=700'); return; }
                     return;
@@ -905,7 +912,9 @@ function restaurantPos() {
                     return;
                 }
 
+                if (e.key === 'F2') { e.preventDefault(); const types = ['dine_in', 'takeaway', 'delivery']; const idx = types.indexOf(this.orderType); this.orderType = types[(idx + 1) % types.length]; return; }
                 if (e.key === 'F3') { e.preventDefault(); this.activeHeldIndex = 0; this.showHeldOrders = true; return; }
+                if (e.key === 'F4') { e.preventDefault(); if (this.cart.length && confirm('Clear entire cart?')) { this.clearCart(); } return; }
                 if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
                 if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) this.showPayModal = true; return; }
                 if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }

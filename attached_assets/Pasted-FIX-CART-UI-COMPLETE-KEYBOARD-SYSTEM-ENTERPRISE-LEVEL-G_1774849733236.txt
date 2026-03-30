@@ -1,0 +1,111 @@
+FIX CART UI + COMPLETE KEYBOARD SYSTEM (ENTERPRISE LEVEL)
+
+GOAL:
+Make POS fully keyboard-driven with clear quantity visibility and fast cart control
+
+DO NOT BREAK EXISTING LOGIC
+
+--------------------------------------------------
+STEP 1 — FIX QUANTITY UI (CRITICAL)
+--------------------------------------------------
+- Increase quantity input size:
+
+class:
+h-12 text-lg font-bold text-center w-16
+
+- Layout:
+
+[ - ]  [ 2 ]  [ + ]   PKR 500   🗑
+
+- Ensure:
+  - number clearly visible
+  - centered text
+  - high contrast
+
+--------------------------------------------------
+STEP 2 — CART ITEM DESIGN IMPROVEMENT
+--------------------------------------------------
+Each cart item:
+
+LEFT:
+- Product name (bold)
+- Price small
+
+RIGHT:
+- Qty controls (large)
+- Remove button
+
+- Add spacing between items
+
+--------------------------------------------------
+STEP 3 — KEYBOARD CART CONTROL (IMPORTANT)
+--------------------------------------------------
+Implement:
+
+ACTIVE ITEM SYSTEM:
+
+- Arrow Up / Down:
+  → move between cart items
+
+- Selected item:
+  → highlight with border (purple ring)
+
+--------------------------------------------------
+STEP 4 — QTY SHORTCUTS
+--------------------------------------------------
+For selected item:
+
++ key → increase quantity  
+- key → decrease quantity  
+Delete → remove item  
+
+--------------------------------------------------
+STEP 5 — DIRECT NUMBER INPUT
+--------------------------------------------------
+If user types:
+
+"5"
+
+→ set quantity = 5 for selected item
+
+(Reset input buffer after 1 sec)
+
+--------------------------------------------------
+STEP 6 — SEARCH ALWAYS PRIORITY
+--------------------------------------------------
+Typing letters:
+→ always go to search input
+
+Ctrl + S:
+→ force focus search
+
+--------------------------------------------------
+STEP 7 — FLOW OPTIMIZATION
+--------------------------------------------------
+Final flow:
+
+Type product → Enter  
+Type product → Enter  
+↓ (Arrow Down to cart)  
++ / - adjust  
+F5 Hold  
+F8 Pay  
+
+NO mouse required
+
+--------------------------------------------------
+STEP 8 — VISUAL FEEDBACK
+--------------------------------------------------
+- Add highlight:
+  selected cart item → border-purple-500
+
+- Add animation:
+  qty change → slight scale effect
+
+--------------------------------------------------
+FINAL RESULT:
+✔ Quantity clearly visible
+✔ Full keyboard control
+✔ Fast billing (no mouse)
+✔ Clean professional cart UI
+✔ Real POS feel

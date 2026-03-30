@@ -7,7 +7,9 @@
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(1.8); opacity: 0; } }
+@keyframes qtyPop { 0% { transform: scale(1); } 40% { transform: scale(1.15); } 100% { transform: scale(1); } }
 .cart-pop { animation: cartPop 0.2s ease; }
+.qty-pop { animation: qtyPop 0.15s ease; }
 .slide-in { animation: slideIn 0.2s ease; }
 .fade-in { animation: fadeIn 0.15s ease; }
 .skeleton { background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%); background-size: 200% 100%; animation: shimmer 1.5s ease-in-out infinite; }
@@ -267,48 +269,48 @@ window.addEventListener('popstate', function() {
                 </div>
             </template>
 
-            <div class="flex-1 overflow-y-auto">
+            <div class="flex-1 overflow-y-auto" x-ref="cartList">
                 <template x-if="cart.length === 0">
                     <div class="flex flex-col items-center justify-center h-full text-gray-400 py-16">
                         <div class="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
                             <svg class="w-10 h-10 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4"/></svg>
                         </div>
                         <p class="text-sm font-medium">Empty order</p>
-                        <p class="text-xs mt-1 text-gray-300">Tap products to add them</p>
+                        <p class="text-xs mt-1 text-gray-300">Add products to begin</p>
                     </div>
                 </template>
                 <template x-for="(item, index) in cart" :key="index">
-                    <div class="cart-item px-3 py-2.5 border-b border-gray-50 dark:border-gray-800 slide-in">
-                        <div class="flex items-center gap-2">
+                    <div class="cart-item px-3 py-2 border-b border-gray-100 dark:border-gray-800 transition-all duration-150 cursor-pointer" :class="activeCartIndex === index ? 'bg-purple-50 dark:bg-purple-900/15 ring-2 ring-purple-400 dark:ring-purple-600 ring-inset' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'" @click="activeCartIndex = index" :data-cart-index="index">
+                        <div class="flex items-center gap-2.5">
                             <div class="flex-1 min-w-0">
-                                <p class="text-sm font-semibold text-gray-900 dark:text-white truncate" x-text="item.item_name"></p>
-                                <p class="text-xs text-gray-400 mt-0.5" x-text="'Rs. ' + Number(item.unit_price).toLocaleString() + ' each'"></p>
+                                <p class="text-sm font-bold text-gray-900 dark:text-white truncate" x-text="item.item_name"></p>
+                                <p class="text-[11px] text-gray-400 mt-0.5" x-text="'Rs. ' + Number(item.unit_price).toLocaleString() + '/unit'"></p>
                             </div>
-                            <div class="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg px-0.5">
-                                <button @click="updateQty(index, -1)" class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition">
-                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M20 12H4"/></svg>
+                            <div class="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-xl p-0.5">
+                                <button @click.stop="updateQty(index, -1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M20 12H4"/></svg>
                                 </button>
-                                <input type="number" :value="item.quantity" @change="setQty(index, $event.target.value)" class="w-10 text-center text-sm font-bold bg-transparent text-gray-900 dark:text-white border-0 focus:ring-0 p-0" min="0.01" step="1">
-                                <button @click="updateQty(index, 1)" class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition">
-                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"/></svg>
+                                <input type="number" :value="item.quantity" @change="setQty(index, $event.target.value)" @click.stop class="w-14 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner" :class="activeCartIndex === index ? 'qty-pop' : ''" min="0.01" step="1">
+                                <button @click.stop="updateQty(index, 1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M12 4v16m8-8H4"/></svg>
                                 </button>
                             </div>
-                            <div class="text-right min-w-[56px]">
-                                <p class="text-sm font-bold text-gray-900 dark:text-white" x-text="'Rs. ' + getItemTotal(item).toLocaleString()"></p>
+                            <div class="text-right min-w-[60px]">
+                                <p class="text-sm font-extrabold text-gray-900 dark:text-white" x-text="'Rs.' + getItemTotal(item).toLocaleString()"></p>
                             </div>
-                            <button @click="removeFromCart(index)" class="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition">
+                            <button @click.stop="removeFromCart(index)" class="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition active:scale-90">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                             </button>
                         </div>
-                        <div class="flex items-center gap-1.5 mt-1">
-                            <input type="text" x-model="item.special_notes" placeholder="Notes..." class="flex-1 text-[11px] bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg px-2 py-1 text-gray-600 dark:text-gray-400 focus:ring-purple-500 placeholder-gray-300">
-                            <button @click="item.showItemDiscount = !item.showItemDiscount" class="text-[9px] font-bold px-1.5 py-1 rounded-md transition whitespace-nowrap" :class="(item.item_discount_value || 0) > 0 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-orange-500'" x-text="(item.item_discount_value || 0) > 0 ? ((item.item_discount_type || 'percentage') === 'percentage' ? '-' + item.item_discount_value + '%' : '-Rs.' + item.item_discount_value) : 'Disc'"></button>
+                        <div class="flex items-center gap-1.5 mt-1.5">
+                            <input type="text" x-model="item.special_notes" @click.stop placeholder="Notes..." class="flex-1 text-[11px] bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg px-2 py-1 text-gray-600 dark:text-gray-400 focus:ring-purple-500 placeholder-gray-300">
+                            <button @click.stop="item.showItemDiscount = !item.showItemDiscount" class="text-[9px] font-bold px-1.5 py-1 rounded-md transition whitespace-nowrap" :class="(item.item_discount_value || 0) > 0 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-orange-500'" x-text="(item.item_discount_value || 0) > 0 ? ((item.item_discount_type || 'percentage') === 'percentage' ? '-' + item.item_discount_value + '%' : '-Rs.' + item.item_discount_value) : 'Disc'"></button>
                         </div>
                         <div x-show="item.showItemDiscount" x-transition class="mt-1 flex items-center gap-1">
-                            <button @click="item.item_discount_type = 'percentage'" class="text-[9px] font-bold px-1.5 py-0.5 rounded transition" :class="(item.item_discount_type || 'percentage') === 'percentage' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400'">%</button>
-                            <button @click="item.item_discount_type = 'amount'" class="text-[9px] font-bold px-1.5 py-0.5 rounded transition" :class="item.item_discount_type === 'amount' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400'">Rs</button>
-                            <input type="number" x-model.number="item.item_discount_value" min="0" step="any" placeholder="0" class="w-14 text-[10px] bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 text-gray-900 dark:text-white focus:ring-purple-500">
-                            <button @click="item.item_discount_value = 0; item.showItemDiscount = false" class="text-[9px] text-red-400 hover:text-red-600 px-1">X</button>
+                            <button @click.stop="item.item_discount_type = 'percentage'" class="text-[9px] font-bold px-1.5 py-0.5 rounded transition" :class="(item.item_discount_type || 'percentage') === 'percentage' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400'">%</button>
+                            <button @click.stop="item.item_discount_type = 'amount'" class="text-[9px] font-bold px-1.5 py-0.5 rounded transition" :class="item.item_discount_type === 'amount' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400'">Rs</button>
+                            <input type="number" x-model.number="item.item_discount_value" @click.stop min="0" step="any" placeholder="0" class="w-14 text-[10px] bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 text-gray-900 dark:text-white focus:ring-purple-500">
+                            <button @click.stop="item.item_discount_value = 0; item.showItemDiscount = false" class="text-[9px] text-red-400 hover:text-red-600 px-1">X</button>
                         </div>
                     </div>
                 </template>
@@ -772,6 +774,10 @@ function restaurantPos() {
         newCustomerName: '',
         newCustomerAddress: '',
         highlightIndex: 0,
+        activeCartIndex: -1,
+        cartMode: false,
+        qtyInputBuffer: '',
+        qtyInputTimer: null,
         gridFocusMode: false,
         gridFocusIndex: 0,
         gridCols: 4,
@@ -880,9 +886,27 @@ function restaurantPos() {
                     if (this.activeCategory !== 'all') { this.activeCategory = 'all'; this.filterProducts(); return; }
                 }
 
+                if (this.cartMode && this.cart.length > 0) {
+                    const ci = this.activeCartIndex;
+                    if (e.key === 'ArrowDown') { e.preventDefault(); this.moveCartSelection(1); return; }
+                    if (e.key === 'ArrowUp') { e.preventDefault(); this.moveCartSelection(-1); return; }
+                    if ((e.key === '+' || e.key === '=') && ci >= 0) { e.preventDefault(); this.updateQty(ci, 1); this.animateQty(ci); return; }
+                    if (e.key === '-' && ci >= 0) { e.preventDefault(); this.updateQty(ci, -1); this.animateQty(ci); return; }
+                    if (e.key === 'Delete' && ci >= 0) { e.preventDefault(); this.removeFromCart(ci); if (this.cart.length === 0) { this.cartMode = false; this.activeCartIndex = -1; } else { this.activeCartIndex = Math.min(ci, this.cart.length - 1); } return; }
+                    if (e.key === 'Escape') { e.preventDefault(); this.cartMode = false; this.activeCartIndex = -1; return; }
+                    if (/^[0-9]$/.test(e.key) && ci >= 0 && !e.ctrlKey && !e.metaKey) { e.preventDefault(); this.handleQtyDigit(e.key, ci); return; }
+                    if (/^[a-zA-Z]$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
+                        e.preventDefault(); this.cartMode = false; this.activeCartIndex = -1;
+                        this.searchQuery += e.key; this.$refs.searchInput?.focus();
+                        this.$nextTick(() => this.onSearchInput()); return;
+                    }
+                    return;
+                }
+
                 if (!isInput && !this.gridFocusMode && this.cart.length > 0) {
-                    if (e.key === '+' || e.key === '=') { e.preventDefault(); this.updateQty(this.cart.length - 1, 1); return; }
-                    if (e.key === '-') { e.preventDefault(); this.updateQty(this.cart.length - 1, -1); return; }
+                    if (e.key === 'ArrowDown') { e.preventDefault(); this.enterCartMode(); return; }
+                    if (e.key === '+' || e.key === '=') { e.preventDefault(); this.updateQty(this.cart.length - 1, 1); this.animateQty(this.cart.length - 1); return; }
+                    if (e.key === '-') { e.preventDefault(); this.updateQty(this.cart.length - 1, -1); this.animateQty(this.cart.length - 1); return; }
                     if (e.key === 'Delete') { e.preventDefault(); this.removeFromCart(this.cart.length - 1); return; }
                 }
 
@@ -890,7 +914,7 @@ function restaurantPos() {
                     e.preventDefault(); this.enterGridMode();
                 }
 
-                if (!isInput && !this.gridFocusMode && e.key.length === 1 && /[a-zA-Z0-9]/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                if (!isInput && !this.gridFocusMode && e.key.length === 1 && /[a-zA-Z]/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
                     e.preventDefault();
                     this.searchQuery += e.key;
                     this.$refs.searchInput?.focus();
@@ -1013,15 +1037,62 @@ function restaurantPos() {
 
         addToCart(item) {
             const existing = this.cart.find(c => c.item_id === item.id && c.item_type === item.type);
-            if (existing) { existing.quantity++; } else {
+            if (existing) {
+                existing.quantity++;
+                this.activeCartIndex = this.cart.indexOf(existing);
+                this.animateQty(this.activeCartIndex);
+            } else {
                 this.cart.push({ item_id: item.id, item_type: item.type, item_name: item.name, quantity: 1, unit_price: parseFloat(item.price), special_notes: '', is_tax_exempt: item.is_tax_exempt || false, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false });
+                this.activeCartIndex = this.cart.length - 1;
             }
             this.cartAnimating = true; setTimeout(() => this.cartAnimating = false, 300);
+            this.scrollToCartItem(this.activeCartIndex);
         },
         updateQty(index, delta) { this.cart[index].quantity = Math.max(0.01, parseFloat(this.cart[index].quantity) + delta); },
         setQty(index, val) { const v = parseFloat(val); if (v > 0) this.cart[index].quantity = v; },
-        removeFromCart(index) { this.cart.splice(index, 1); },
-        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.clearCartStorage(); },
+        removeFromCart(index) { this.cart.splice(index, 1); if (this.activeCartIndex >= this.cart.length) this.activeCartIndex = this.cart.length - 1; },
+
+        enterCartMode() {
+            if (this.cart.length === 0) return;
+            this.cartMode = true;
+            this.gridFocusMode = false;
+            this.activeCartIndex = this.cart.length - 1;
+            document.activeElement?.blur();
+            this.scrollToCartItem(this.activeCartIndex);
+        },
+
+        moveCartSelection(dir) {
+            if (this.cart.length === 0) return;
+            let next = this.activeCartIndex + dir;
+            if (next < 0) next = 0;
+            if (next >= this.cart.length) next = this.cart.length - 1;
+            this.activeCartIndex = next;
+            this.scrollToCartItem(next);
+        },
+
+        scrollToCartItem(index) {
+            this.$nextTick(() => {
+                const el = this.$refs.cartList?.querySelector(`[data-cart-index="${index}"]`);
+                if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            });
+        },
+
+        handleQtyDigit(digit, index) {
+            if (this.qtyInputTimer) clearTimeout(this.qtyInputTimer);
+            this.qtyInputBuffer += digit;
+            const val = parseInt(this.qtyInputBuffer);
+            if (val > 0) { this.cart[index].quantity = val; this.animateQty(index); }
+            this.qtyInputTimer = setTimeout(() => { this.qtyInputBuffer = ''; }, 800);
+        },
+
+        animateQty(index) {
+            this.$nextTick(() => {
+                const el = this.$refs.cartList?.querySelector(`[data-cart-index="${index}"] input[type="number"]`);
+                if (el) { el.classList.remove('qty-pop'); void el.offsetWidth; el.classList.add('qty-pop'); }
+            });
+        },
+
+        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.qtyInputBuffer = ''; this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm('Current order has ' + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast('New sale started', 'success');

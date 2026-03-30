@@ -591,10 +591,10 @@ window.addEventListener('popstate', function() {
             </div>
             <div class="p-4 space-y-3 bg-gray-50 dark:bg-gray-800/50">
                 <div class="grid grid-cols-2 gap-3">
-                    <a :href="'/pos/restaurant/receipt/' + lastTransactionId + '?auto_print=1'" target="_blank" class="py-3.5 text-center rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-2">
+                    <button @click="printReceipt()" class="py-3.5 text-center rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-2">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                         Print <kbd class="text-[8px] bg-purple-500/40 px-1 rounded ml-1 font-mono">P</kbd>
-                    </a>
+                    </button>
                     <button @click="startNewAfterPayment()" class="py-3.5 text-center rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-bold transition shadow-md shadow-green-600/20 flex items-center justify-center gap-2">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
                         New Sale <kbd class="text-[8px] bg-green-500/40 px-1 rounded ml-1 font-mono">Enter</kbd>
@@ -889,7 +889,7 @@ function restaurantPos() {
                 if (this.showReceipt) {
                     if (e.key === 'Escape') { e.preventDefault(); this.showReceipt = false; return; }
                     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); return; }
-                    if (e.key === 'p' || e.key === 'P') { e.preventDefault(); if (this.lastTransactionId) window.open('/pos/restaurant/receipt/' + this.lastTransactionId + '?auto_print=1', '_blank', 'width=400,height=700'); return; }
+                    if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.printReceipt(); return; }
                     return;
                 }
                 if (this.showPayModal) {
@@ -1344,6 +1344,24 @@ function restaurantPos() {
             this.showReceipt = false;
             this.clearCart();
             this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); });
+        },
+
+        printReceipt() {
+            if (!this.lastTransactionId) return;
+            const url = '/pos/restaurant/receipt/' + this.lastTransactionId + '?auto_print=1';
+            let printFrame = document.getElementById('print-receipt-frame');
+            if (!printFrame) {
+                printFrame = document.createElement('iframe');
+                printFrame.id = 'print-receipt-frame';
+                printFrame.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;top:-9999px;';
+                document.body.appendChild(printFrame);
+            }
+            printFrame.onload = () => {
+                setTimeout(() => {
+                    try { printFrame.contentWindow.print(); } catch(e) { window.open(url, '_blank', 'width=400,height=700'); }
+                }, 500);
+            };
+            printFrame.src = url;
         },
 
         async deleteHeldOrder(orderId) {

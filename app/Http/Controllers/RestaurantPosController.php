@@ -131,7 +131,7 @@ class RestaurantPosController extends Controller
             'items' => 'required|array|min:1',
             'items.*.item_id' => 'required|integer',
             'items.*.item_type' => 'required|in:product,service',
-            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.quantity' => 'required|integer|min:1',
             'items.*.item_discount_type' => 'nullable|in:percentage,amount',
             'items.*.item_discount_value' => 'nullable|numeric|min:0|max:999999',
             'order_type' => 'required|in:dine_in,takeaway,delivery',
@@ -162,7 +162,7 @@ class RestaurantPosController extends Controller
 
         $resolvedItems = [];
         foreach ($request->items as $item) {
-            $qty = (float)$item['quantity'];
+            $qty = (int)$item['quantity'];
             if ($item['item_type'] === 'product') {
                 $product = PosProduct::where('company_id', $companyId)->where('id', $item['item_id'])->first();
                 if (!$product) {
@@ -432,42 +432,44 @@ class RestaurantPosController extends Controller
 
             $submissionHash = hash('sha256', $companyId . '|' . $invoiceNumber . '|' . $totalAmount . '|' . now()->timestamp);
 
-            $transaction = PosTransaction::create([
-                'company_id' => $companyId,
+            $transactionData = [
+                'company_id' => (int) $companyId,
                 'invoice_number' => $invoiceNumber,
                 'invoice_mode' => $invoiceMode,
-                'customer_id' => $order->customer_id,
+                'customer_id' => $order->customer_id ? (int) $order->customer_id : null,
                 'customer_name' => $order->customer_name,
                 'customer_phone' => $order->customer_phone,
-                'subtotal' => $subtotal,
+                'subtotal' => (float) $subtotal,
                 'discount_type' => $order->discount_type ?? 'amount',
                 'discount_value' => (float)($order->discount_value ?? 0),
-                'discount_amount' => $discountAmount,
-                'tax_rate' => $taxRate,
-                'tax_amount' => $taxAmount,
-                'exempt_amount' => $subtotal - $taxableSubtotal,
-                'total_amount' => $totalAmount,
+                'discount_amount' => (float) $discountAmount,
+                'tax_rate' => (float) $taxRate,
+                'tax_amount' => (float) $taxAmount,
+                'exempt_amount' => (float) ($subtotal - $taxableSubtotal),
+                'total_amount' => (float) $totalAmount,
                 'payment_method' => $paymentMethod,
                 'status' => 'completed',
                 'pra_status' => $praEnabled ? 'pending' : 'local',
                 'submission_hash' => $submissionHash,
-                'created_by' => $user->id,
-            ]);
+                'created_by' => (int) $user->id,
+            ];
+            $transaction = PosTransaction::create($transactionData);
 
             foreach ($order->items as $item) {
                 $lineAfterOrderDisc = $subtotal > 0 ? round($item->subtotal * max(0, $discountRatio), 2) : $item->subtotal;
                 $lineTax = $item->is_tax_exempt ? 0 : round($lineAfterOrderDisc * $taxRate / 100, 2);
+                $itemQty = max(1, (int) $item->quantity);
                 PosTransactionItem::create([
-                    'transaction_id' => $transaction->id,
+                    'transaction_id' => (int) $transaction->id,
                     'item_type' => $item->item_type,
                     'item_id' => (int) $item->item_id,
-                    'item_name' => $item->item_name,
-                    'quantity' => (int) $item->quantity,
+                    'item_name' => (string) $item->item_name,
+                    'quantity' => $itemQty,
                     'unit_price' => (float) $item->unit_price,
                     'subtotal' => (float) $item->subtotal,
                     'is_tax_exempt' => (bool) $item->is_tax_exempt,
-                    'tax_rate' => $item->is_tax_exempt ? 0 : $taxRate,
-                    'tax_amount' => $lineTax,
+                    'tax_rate' => $item->is_tax_exempt ? 0 : (float) $taxRate,
+                    'tax_amount' => (float) $lineTax,
                     'item_discount_type' => $item->item_discount_type ?? 'percentage',
                     'item_discount_value' => (float) ($item->item_discount_value ?? 0),
                     'item_discount_amount' => (float) ($item->item_discount_amount ?? 0),
@@ -508,8 +510,8 @@ class RestaurantPosController extends Controller
 
             if ($praEnabled) {
                 try {
-                    $praService = new \App\Services\PraIntegrationService();
-                    $praResult = $praService->submitInvoice($transaction, $company);
+                    $praService = new \App\Services\PraIntegrationService($company);
+                    $praResult = $praService->sendInvoice($transaction);
                     if ($praResult && isset($praResult['success']) && $praResult['success']) {
                         $transaction->update([
                             'pra_status' => 'submitted',
@@ -517,8 +519,9 @@ class RestaurantPosController extends Controller
                             'pra_response_code' => $praResult['response_code'] ?? null,
                         ]);
                     }
-                } catch (\Exception $e) {
+                } catch (\Throwable $e) {
                     $transaction->update(['pra_status' => 'offline']);
+                    Log::warning('PRA submission failed: ' . $e->getMessage());
                 }
             }
 
@@ -543,7 +546,14 @@ class RestaurantPosController extends Controller
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Payment failed for order ' . $orderId . ': ' . $e->getMessage());
+            $errorDetail = $e->getMessage();
+            if ($e->getPrevious()) {
+                $errorDetail .= ' | PREVIOUS: ' . $e->getPrevious()->getMessage();
+            }
+            if ($e instanceof \Illuminate\Database\QueryException) {
+                $errorDetail .= ' | SQL: ' . $e->getSql() . ' | Bindings: ' . json_encode($e->getBindings());
+            }
+            Log::error('Payment failed for order ' . $orderId . ': ' . $errorDetail);
             return response()->json(['success' => false, 'message' => 'Payment processing failed. Please try again.'], 500);
         }
     }

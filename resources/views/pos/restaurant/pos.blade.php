@@ -3,7 +3,7 @@
 <style>
 *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
 @keyframes cartPop { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }
-@keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1;e. transform: translateY(0); } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(1.8); opacity: 0; } }
@@ -84,24 +84,42 @@ window.addEventListener('popstate', function() {
             </div>
         </div>
 
-        <button @click="showTablePicker = true" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition" :class="selectedTable ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        <div class="w-px h-6 bg-gray-200 dark:bg-gray-700 hidden sm:block flex-shrink-0"></div>
+
+        <div class="relative flex-shrink-0" style="min-width:160px;max-width:200px;">
+            <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+            <input type="text" x-ref="customerPhoneInput" x-model="customerPhoneQuery" @input="onCustomerPhoneInput()" @keydown.enter.prevent="onCustomerPhoneEnter()" @keydown.escape.prevent="customerPhoneDropdown = false" inputmode="tel" placeholder="Mobile number..." class="w-full pl-8 pr-7 py-2 rounded-lg text-xs border-2 transition shadow-sm" :class="selectedCustomer ? 'border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white'" autocomplete="off">
+            <kbd x-show="!customerPhoneQuery && !selectedCustomer" class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded font-mono">Ctrl+C</kbd>
+            <button x-show="customerPhoneQuery || selectedCustomer" @click="clearCustomerInput()" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+            <div x-show="customerPhoneDropdown && customerPhoneResults.length > 0" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 max-h-52 overflow-y-auto">
+                <template x-for="(cr, ci) in customerPhoneResults" :key="cr.id">
+                    <button @click="selectCustomerFromPhone(cr)" class="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 transition border-b border-gray-50 dark:border-gray-800" :class="ci === 0 ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''">
+                        <div class="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0"><span class="text-[10px] font-bold text-blue-600" x-text="cr.name.charAt(0)"></span></div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-xs font-semibold text-gray-900 dark:text-white truncate" x-text="cr.name"></p>
+                            <p class="text-[10px] text-gray-400" x-text="cr.phone + (cr.stats ? ' • ' + cr.stats.total_orders + ' orders • Rs.' + Number(cr.stats.total_spent).toLocaleString() : '')"></p>
+                            <template x-if="cr.address"><p class="text-[9px] text-gray-400 truncate" x-text="cr.address"></p></template>
+                        </div>
+                        <template x-if="cr.stats && cr.stats.is_frequent"><span class="freq-badge">VIP</span></template>
+                    </button>
+                </template>
+            </div>
+        </div>
+
+        <button @click="showTablePicker = true" class="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold border transition flex-shrink-0" :class="selectedTable ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
             <span x-text="selectedTable ? 'T-' + selectedTable.table_number : 'Table'"></span>
         </button>
 
-        <button @click="showCustomerPicker = !showCustomerPicker" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition" :class="selectedCustomer ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-            <span x-text="selectedCustomer ? selectedCustomer.name.substring(0,10) : 'Customer'"></span>
-            <template x-if="customerStats && customerStats.is_frequent"><span class="freq-badge ml-0.5">VIP</span></template>
-        </button>
-
-        <select x-model="orderType" class="text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2.5 py-2 focus:ring-purple-500">
+        <select x-model="orderType" class="text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-2 focus:ring-purple-500 flex-shrink-0">
             <option value="dine_in">Dine In</option>
             <option value="takeaway">Takeaway</option>
             <option value="delivery">Delivery</option>
         </select>
 
-        <div class="w-px h-8 bg-gray-200 dark:bg-gray-700 hidden sm:block"></div>
+        <div class="w-px h-6 bg-gray-200 dark:bg-gray-700 hidden sm:block flex-shrink-0"></div>
 
         <button @click="priorityOrder = !priorityOrder" class="hidden sm:flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-semibold border transition" :class="priorityOrder ? 'bg-red-50 dark:bg-red-900/20 border-red-300 text-red-600' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50'">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
@@ -451,6 +469,33 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
+    <div x-show="showNewCustomerModal" x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showNewCustomerModal = false" @keydown.escape.window="if(showNewCustomerModal) showNewCustomerModal = false">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h3 class="text-base font-bold text-gray-900 dark:text-white">New Customer</h3>
+                <button @click="showNewCustomerModal = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            </div>
+            <div class="p-4 space-y-3">
+                <div>
+                    <label class="text-[10px] font-medium text-gray-500 block mb-1">Mobile Number</label>
+                    <input type="text" :value="newCustomerPhone" disabled class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-sm px-3 py-2 text-gray-600 dark:text-gray-400">
+                </div>
+                <div>
+                    <label class="text-[10px] font-medium text-gray-500 block mb-1">Customer Name <span class="text-red-500">*</span></label>
+                    <input type="text" x-ref="newCustomerNameInput" x-model="newCustomerName" @keydown.enter.prevent="saveNewCustomer()" placeholder="Enter customer name" class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400">
+                </div>
+                <div>
+                    <label class="text-[10px] font-medium text-gray-500 block mb-1">Address <span class="text-gray-400">(optional)</span></label>
+                    <input type="text" x-model="newCustomerAddress" @keydown.enter.prevent="saveNewCustomer()" placeholder="Delivery address" class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400">
+                </div>
+                <div class="flex gap-2 pt-1">
+                    <button @click="showNewCustomerModal = false" class="flex-1 py-2.5 text-xs font-semibold text-gray-500 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 transition">Cancel</button>
+                    <button @click="saveNewCustomer()" class="flex-1 py-2.5 text-xs font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition">Save & Select</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div x-show="showCustomerPicker" x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showCustomerPicker = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden" x-transition.scale.90>
             <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
@@ -717,6 +762,14 @@ function restaurantPos() {
         quickCustomerPhone: '',
         quickCustomerAddress: '',
         selectedCustomer: null,
+        customerPhoneQuery: '',
+        customerPhoneResults: [],
+        customerPhoneDropdown: false,
+        customerPhoneTimer: null,
+        showNewCustomerModal: false,
+        newCustomerPhone: '',
+        newCustomerName: '',
+        newCustomerAddress: '',
         highlightIndex: 0,
         gridFocusMode: false,
         gridFocusIndex: 0,
@@ -812,12 +865,15 @@ function restaurantPos() {
                 if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
                 if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) this.showPayModal = true; return; }
                 if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
+                if ((e.ctrlKey || e.metaKey) && e.key === 'c') { if (!window.getSelection().toString()) { e.preventDefault(); this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); return; } }
                 if (e.key === 'Escape') {
+                    if (this.showNewCustomerModal) { this.showNewCustomerModal = false; return; }
                     if (this.showLowStockPopup) { this.showLowStockPopup = false; return; }
                     if (this.showHeldOrders) { this.showHeldOrders = false; return; }
                     if (this.showTablePicker) { this.showTablePicker = false; return; }
                     if (this.showCustomerPicker) { this.showCustomerPicker = false; return; }
                     if (this.showCustomerHistory) { this.showCustomerHistory = false; return; }
+                    if (this.customerPhoneDropdown) { this.customerPhoneDropdown = false; return; }
                     if (this.gridFocusMode) { this.enterSearchMode(); return; }
                     if (this.searchQuery) { this.searchQuery = ''; this.showSearchDropdown = false; this.filterProducts(); return; }
                     if (this.activeCategory !== 'all') { this.activeCategory = 'all'; this.filterProducts(); return; }
@@ -964,7 +1020,7 @@ function restaurantPos() {
         updateQty(index, delta) { this.cart[index].quantity = Math.max(0.01, parseFloat(this.cart[index].quantity) + delta); },
         setQty(index, val) { const v = parseFloat(val); if (v > 0) this.cart[index].quantity = v; },
         removeFromCart(index) { this.cart.splice(index, 1); },
-        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.clearCartStorage(); },
+        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm('Current order has ' + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast('New sale started', 'success');
@@ -998,6 +1054,7 @@ function restaurantPos() {
             const c = this.customerLookupResult.customer;
             this.selectedCustomer = c;
             this.customerStats = this.customerLookupResult.stats;
+            this.customerPhoneQuery = c.phone || c.name;
             this.showCustomerPicker = false;
             this.customerLookupResult = null;
             this.showToast('Customer: ' + c.name + (this.customerStats.is_frequent ? ' (VIP)' : ''), 'success');
@@ -1006,6 +1063,7 @@ function restaurantPos() {
         async selectCustomerWithStats(c) {
             this.selectedCustomer = c;
             this.customerStats = null;
+            this.customerPhoneQuery = c.phone || c.name;
             this.showCustomerPicker = false;
             this.showToast('Customer: ' + c.name, 'success');
             if (c.phone) {
@@ -1020,6 +1078,85 @@ function restaurantPos() {
                     }
                 } catch(e) {}
             }
+        },
+
+        onCustomerPhoneInput() {
+            if (this.customerPhoneTimer) clearTimeout(this.customerPhoneTimer);
+            const q = this.customerPhoneQuery.trim();
+            if (this.selectedCustomer) {
+                this.selectedCustomer = null;
+                this.customerStats = null;
+            }
+            if (q.length >= 3) {
+                this.customerPhoneTimer = setTimeout(() => this.searchCustomerByPhone(q), 300);
+            } else {
+                this.customerPhoneResults = [];
+                this.customerPhoneDropdown = false;
+            }
+        },
+
+        async searchCustomerByPhone(q) {
+            try {
+                const res = await fetch('/pos/restaurant/api/customer-search?q=' + encodeURIComponent(q));
+                const data = await res.json();
+                this.customerPhoneResults = data.customers || [];
+                this.customerPhoneDropdown = this.customerPhoneResults.length > 0;
+            } catch(e) { this.customerPhoneResults = []; this.customerPhoneDropdown = false; }
+        },
+
+        onCustomerPhoneEnter() {
+            const q = this.customerPhoneQuery.trim();
+            if (!q) return;
+            if (this.customerPhoneDropdown && this.customerPhoneResults.length > 0) {
+                this.selectCustomerFromPhone(this.customerPhoneResults[0]);
+            } else if (q.length >= 4 && /^\d+$/.test(q)) {
+                this.newCustomerPhone = q;
+                this.newCustomerName = '';
+                this.newCustomerAddress = '';
+                this.showNewCustomerModal = true;
+                this.$nextTick(() => this.$refs.newCustomerNameInput?.focus());
+            } else {
+                this.showToast('Enter a valid mobile number', 'error');
+            }
+        },
+
+        selectCustomerFromPhone(cr) {
+            this.selectedCustomer = { id: cr.id, name: cr.name, phone: cr.phone, address: cr.address };
+            this.customerStats = cr.stats || null;
+            this.customerPhoneQuery = cr.phone || cr.name;
+            this.customerPhoneDropdown = false;
+            this.customerPhoneResults = [];
+            this.showToast('Customer: ' + cr.name + (cr.stats && cr.stats.is_frequent ? ' (VIP)' : ''), 'success');
+        },
+
+        async saveNewCustomer() {
+            const name = this.newCustomerName.trim();
+            if (!name) { this.showToast('Customer name is required', 'error'); return; }
+            try {
+                const res = await fetch('{{ route("pos.restaurant.customer-store") }}', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ name: name, phone: this.newCustomerPhone, address: this.newCustomerAddress.trim() || null })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.selectedCustomer = { id: data.customer.id, name: data.customer.name, phone: data.customer.phone, address: data.customer.address };
+                    this.customerStats = { total_orders: 0, total_spent: 0, is_frequent: false };
+                    this.customerPhoneQuery = data.customer.phone || data.customer.name;
+                    this.showNewCustomerModal = false;
+                    this.customerPhoneDropdown = false;
+                    if (this.allCustomers) this.allCustomers.push(data.customer);
+                    this.showToast('Customer created: ' + data.customer.name, 'success');
+                } else { this.showToast(data.message || 'Failed', 'error'); }
+            } catch(e) { this.showToast('Network error', 'error'); }
+        },
+
+        clearCustomerInput() {
+            this.customerPhoneQuery = '';
+            this.customerPhoneResults = [];
+            this.customerPhoneDropdown = false;
+            this.selectedCustomer = null;
+            this.customerStats = null;
+            this.$refs.customerPhoneInput?.focus();
         },
 
         async holdOrder() {
@@ -1090,6 +1227,7 @@ function restaurantPos() {
             if (order.discount_type && parseFloat(order.discount_value) > 0) { this.discountType = order.discount_type; this.discountValue = parseFloat(order.discount_value) || 0; this.showDiscount = true; } else { this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; }
             if (order.table) { this.selectedTable = { id: order.table.id, table_number: order.table.table_number }; this.orderType = 'dine_in'; }
             this.selectedCustomer = order.customer_id ? { id: order.customer_id, name: order.customer_name || 'Customer', phone: order.customer_phone || '' } : null;
+            this.customerPhoneQuery = this.selectedCustomer ? (this.selectedCustomer.phone || this.selectedCustomer.name) : '';
             this.heldOrders = this.heldOrders.filter(o => o.id !== order.id); this.showHeldOrders = false; this.showToast('Order recalled for editing', 'success');
         },
 
@@ -1107,6 +1245,7 @@ function restaurantPos() {
                     const cust = data.customer || { id: Date.now(), name: this.quickCustomerName.trim(), phone: this.quickCustomerPhone.trim(), address: this.quickCustomerAddress.trim() };
                     if (!data.existing) this.allCustomers.push(cust);
                     this.selectedCustomer = cust; this.showQuickAdd = false;
+                    this.customerPhoneQuery = cust.phone || cust.name;
                     this.quickCustomerName = ''; this.quickCustomerPhone = ''; this.quickCustomerAddress = ''; this.showCustomerPicker = false;
                     this.showToast(data.existing ? 'Customer found: ' + cust.name : 'Customer added: ' + cust.name, 'success');
                 } else { this.showToast(data.message || 'Failed', 'error'); }

@@ -654,7 +654,7 @@ class RestaurantPosController extends Controller
         $q = $request->get('q', '');
 
         if (strlen($q) < 2) {
-            return response()->json([]);
+            return response()->json(['customers' => []]);
         }
 
         $customers = PosCustomer::where('company_id', $companyId)
@@ -663,10 +663,36 @@ class RestaurantPosController extends Controller
                 $query->where('name', 'ilike', "%{$q}%")
                     ->orWhere('phone', 'ilike', "%{$q}%");
             })
-            ->limit(10)
+            ->limit(8)
             ->get(['id', 'name', 'phone', 'email', 'address']);
 
-        return response()->json($customers);
+        $result = [];
+        foreach ($customers as $c) {
+            $posOrders = PosTransaction::where('company_id', $companyId)
+                ->where('customer_id', $c->id)
+                ->where('status', 'completed')
+                ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as total')
+                ->first();
+            $restOrders = RestaurantOrder::where('company_id', $companyId)
+                ->where('customer_id', $c->id)
+                ->where('status', 'completed')
+                ->count();
+            $totalOrders = ($posOrders->cnt ?? 0) + $restOrders;
+            $totalSpent = round($posOrders->total ?? 0, 2);
+            $result[] = [
+                'id' => $c->id,
+                'name' => $c->name,
+                'phone' => $c->phone,
+                'address' => $c->address,
+                'stats' => [
+                    'total_orders' => $totalOrders,
+                    'total_spent' => $totalSpent,
+                    'is_frequent' => $totalOrders >= 5,
+                ],
+            ];
+        }
+
+        return response()->json(['customers' => $result]);
     }
 
     public function customerStore(Request $request)

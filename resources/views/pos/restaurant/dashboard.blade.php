@@ -80,7 +80,7 @@
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                     POS Screen
                 </a>
-                <a href="{{ route('pos.restaurant.orders') }}" class="exe-sidebar-item flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium text-gray-600 dark:text-gray-400">
+                <a href="{{ route('pos.transactions') }}" class="exe-sidebar-item flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium text-gray-600 dark:text-gray-400">
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                     Orders
                 </a>
@@ -324,7 +324,7 @@
                         <span class="w-1.5 h-4 rounded-full bg-indigo-500"></span>
                         <h2 class="text-xs font-bold text-gray-900 dark:text-white">Recent Transactions</h2>
                     </div>
-                    <a href="{{ route('pos.restaurant.orders') }}" class="text-[10px] text-purple-600 hover:text-purple-700 font-semibold">View All</a>
+                    <a href="{{ route('pos.transactions') }}" class="text-[10px] text-purple-600 hover:text-purple-700 font-semibold">View All</a>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-xs exe-table">

@@ -43,6 +43,12 @@
 .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .freq-badge { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; font-size: 9px; padding: 1px 6px; border-radius: 999px; font-weight: 700; }
 </style>
+<script>
+window.history.pushState(null, null, window.location.href);
+window.addEventListener('popstate', function() {
+    window.history.pushState(null, null, window.location.href);
+});
+</script>
 
 <div x-data="restaurantPos()" x-init="init()" class="flex flex-col h-[calc(100vh-64px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
 

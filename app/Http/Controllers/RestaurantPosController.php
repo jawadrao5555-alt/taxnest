@@ -887,6 +887,12 @@ class RestaurantPosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
+
+        $user = auth('pos')->user();
+        if ($user && $user->pos_role !== 'pos_admin' && $user->role !== 'company_admin') {
+            return redirect('/pos/restaurant/pos');
+        }
+
         $today = now()->startOfDay();
         $yesterday = now()->subDay()->startOfDay();
 
@@ -967,29 +973,17 @@ class RestaurantPosController extends Controller
             $orderTypeCounts = ['dine_in' => 0, 'takeaway' => 0, 'delivery' => 0];
         }
 
-        $hourlyLabels = [];
-        $hourlySales = [];
-        $hourlyOrders = [];
         $peakHour = null;
-        $peakSales = 0;
-        for ($h = 0; $h < 24; $h++) {
-            $hourStart = $today->copy()->addHours($h);
-            $hourEnd = $today->copy()->addHours($h + 1);
-            $hourlyLabels[] = $hourStart->format('gA');
-            $hSales = (float) RestaurantOrder::where('company_id', $companyId)
-                ->where('status', 'completed')
-                ->whereBetween('created_at', [$hourStart, $hourEnd])
-                ->sum('total_amount');
-            $hOrders = RestaurantOrder::where('company_id', $companyId)
-                ->where('status', 'completed')
-                ->whereBetween('created_at', [$hourStart, $hourEnd])
-                ->count();
-            $hourlySales[] = $hSales;
-            $hourlyOrders[] = $hOrders;
-            if ($hSales > $peakSales) {
-                $peakSales = $hSales;
-                $peakHour = $hourStart->format('g:00 A') . ' - ' . $hourEnd->format('g:00 A');
-            }
+        $peakData = RestaurantOrder::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->where('created_at', '>=', $today)
+            ->select(DB::raw('EXTRACT(HOUR FROM created_at) as hr'), DB::raw('SUM(total_amount) as total'))
+            ->groupBy('hr')
+            ->orderByDesc('total')
+            ->first();
+        if ($peakData && $peakData->total > 0) {
+            $h = (int) $peakData->hr;
+            $peakHour = date('g:00 A', mktime($h)) . ' - ' . date('g:00 A', mktime($h + 1));
         }
 
         $todayTax = RestaurantOrder::where('company_id', $companyId)
@@ -1013,8 +1007,7 @@ class RestaurantPosController extends Controller
             'heldCount', 'completedCount', 'totalTables', 'occupiedTables',
             'topProducts', 'lowStockItems', 'recentOrders',
             'salesChartLabels', 'salesChartData', 'orderTypeCounts',
-            'hourlyLabels', 'hourlySales', 'hourlyOrders',
-            'peakHour', 'peakSales', 'todayTax', 'todayDiscount',
+            'peakHour', 'todayTax', 'todayDiscount',
             'todayCost', 'todayProfit'
         ));
     }

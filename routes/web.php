@@ -389,6 +389,7 @@ Route::middleware('auth')->group(function () {
 
 Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::get('/dashboard', [PosController::class, 'dashboard'])->name('pos.dashboard');
+    Route::post('/settings/theme', [PosController::class, 'updateTheme'])->name('pos.settings.theme');
     Route::get('/invoice/create', [PosController::class, 'createInvoice'])->name('pos.invoice.create');
     Route::post('/invoice/store', [PosController::class, 'storeInvoice'])->name('pos.invoice.store');
     Route::get('/transactions', [PosController::class, 'transactions'])->name('pos.transactions');

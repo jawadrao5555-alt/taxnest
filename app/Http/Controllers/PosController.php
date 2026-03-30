@@ -20,6 +20,18 @@ use Illuminate\Support\Facades\DB;
 
 class PosController extends Controller
 {
+    public function updateTheme(Request $request)
+    {
+        $theme = $request->input('theme', 'purple');
+        $allowed = ['purple', 'blue', 'emerald', 'orange', 'midnight', 'rose'];
+        if (!in_array($theme, $allowed)) {
+            return response()->json(['success' => false, 'message' => 'Invalid theme'], 422);
+        }
+        $companyId = app('currentCompanyId');
+        Company::where('id', $companyId)->update(['pos_theme' => $theme]);
+        return response()->json(['success' => true, 'theme' => $theme]);
+    }
+
     public function dashboard()
     {
         $companyId = app('currentCompanyId');

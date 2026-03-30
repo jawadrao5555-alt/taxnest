@@ -11,6 +11,7 @@
     $userName = $posUserLayout->name ?? 'User';
     $userInitial = strtoupper(substr($userName, 0, 1));
     $userRole = $isCashierLayout ? 'Cashier' : 'Admin';
+    $posTheme = $companyLayout->pos_theme ?? 'purple';
 @endphp
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="{{ $isDarkMode ? 'dark' : '' }}">
     <head>
@@ -51,67 +52,80 @@
             .main-scroll::-webkit-scrollbar { width: 6px; }
             .main-scroll::-webkit-scrollbar-thumb { background: rgba(156,163,175,0.3); border-radius: 4px; }
             .main-scroll::-webkit-scrollbar-track { background: transparent; }
-            .topnav-bar { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4c1d95 100%); }
+
+            [data-theme="purple"] { --nav-bg: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4c1d95 100%); --accent-h: 263; --accent-s: 70%; --accent-l: 50%; --avatar-from: #a78bfa; --avatar-to: #7c3aed; --accent-glow: rgba(124,58,237,0.2); --meta-color: rgba(196,181,253,0.5); --status-text: rgba(196,181,253,0.6); --pill-hover: rgba(255,255,255,0.12); --pill-active: rgba(255,255,255,0.18); }
+            [data-theme="blue"] { --nav-bg: linear-gradient(135deg, #0c1929 0%, #1e3a5f 40%, #1d4ed8 100%); --accent-h: 217; --accent-s: 91%; --accent-l: 48%; --avatar-from: #60a5fa; --avatar-to: #2563eb; --accent-glow: rgba(37,99,235,0.2); --meta-color: rgba(147,197,253,0.5); --status-text: rgba(147,197,253,0.6); --pill-hover: rgba(255,255,255,0.12); --pill-active: rgba(255,255,255,0.18); }
+            [data-theme="emerald"] { --nav-bg: linear-gradient(135deg, #022c22 0%, #064e3b 40%, #047857 100%); --accent-h: 160; --accent-s: 84%; --accent-l: 39%; --avatar-from: #34d399; --avatar-to: #059669; --accent-glow: rgba(5,150,105,0.2); --meta-color: rgba(110,231,183,0.5); --status-text: rgba(110,231,183,0.6); --pill-hover: rgba(255,255,255,0.12); --pill-active: rgba(255,255,255,0.18); }
+            [data-theme="orange"] { --nav-bg: linear-gradient(135deg, #431407 0%, #7c2d12 40%, #c2410c 100%); --accent-h: 21; --accent-s: 90%; --accent-l: 48%; --avatar-from: #fb923c; --avatar-to: #ea580c; --accent-glow: rgba(234,88,12,0.2); --meta-color: rgba(253,186,116,0.5); --status-text: rgba(253,186,116,0.6); --pill-hover: rgba(255,255,255,0.12); --pill-active: rgba(255,255,255,0.18); }
+            [data-theme="midnight"] { --nav-bg: linear-gradient(135deg, #0a0a0a 0%, #171717 40%, #262626 100%); --accent-h: 0; --accent-s: 0%; --accent-l: 45%; --avatar-from: #a3a3a3; --avatar-to: #525252; --accent-glow: rgba(115,115,115,0.2); --meta-color: rgba(163,163,163,0.5); --status-text: rgba(163,163,163,0.6); --pill-hover: rgba(255,255,255,0.1); --pill-active: rgba(255,255,255,0.15); }
+            [data-theme="rose"] { --nav-bg: linear-gradient(135deg, #4c0519 0%, #881337 40%, #be123c 100%); --accent-h: 347; --accent-s: 77%; --accent-l: 50%; --avatar-from: #fb7185; --avatar-to: #e11d48; --accent-glow: rgba(225,29,72,0.2); --meta-color: rgba(253,164,175,0.5); --status-text: rgba(253,164,175,0.6); --pill-hover: rgba(255,255,255,0.12); --pill-active: rgba(255,255,255,0.18); }
+
+            .topnav-bar { background: var(--nav-bg, linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4c1d95 100%)); }
             .nav-pill { transition: all 0.15s ease; }
-            .nav-pill:hover { background: rgba(255,255,255,0.12); }
-            .nav-pill.active { background: rgba(255,255,255,0.18); box-shadow: 0 0 0 1px rgba(255,255,255,0.1); }
+            .nav-pill:hover { background: var(--pill-hover); }
+            .nav-pill.active { background: var(--pill-active); box-shadow: 0 0 0 1px rgba(255,255,255,0.1); }
             .profile-dropdown { animation: slideDown 0.15s ease-out; }
             .menu-link { transition: all 0.1s ease; }
-            .menu-link:hover { background: rgba(124,58,237,0.08); }
-            .dark .menu-link:hover { background: rgba(124,58,237,0.15); }
+            .menu-link:hover { background: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.08); }
+            .dark .menu-link:hover { background: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.15); }
+            .avatar-themed { background: linear-gradient(135deg, var(--avatar-from), var(--avatar-to)); }
+            .accent-glow { box-shadow: 0 4px 15px var(--accent-glow); }
+            .theme-swatch { width: 28px; height: 28px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; transition: all 0.15s ease; }
+            .theme-swatch:hover { transform: scale(1.15); }
+            .theme-swatch.active-theme { border-color: white; box-shadow: 0 0 0 2px rgba(255,255,255,0.3); }
             [x-cloak] { display: none !important; }
         </style>
     </head>
-    <body class="h-screen overflow-hidden antialiased">
-        <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false">
+    <body class="h-screen overflow-hidden antialiased" data-theme="{{ $posTheme }}">
+        <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false, themeOpen: false, currentTheme: '{{ $posTheme }}' }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false">
 
             <header class="topnav-bar flex-shrink-0 relative z-50">
                 <div class="flex items-center justify-between px-3 sm:px-5 h-12">
 
                     <div class="flex items-center gap-3">
                         <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}" class="flex items-center gap-2 group">
-                            <div class="w-7 h-7 rounded-lg bg-purple-500/25 flex items-center justify-center group-hover:bg-purple-500/35 transition">
-                                <svg class="w-4 h-4 text-purple-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            <div class="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center group-hover:bg-white/25 transition">
+                                <svg class="w-4 h-4 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                             </div>
                             <div class="hidden sm:block">
                                 <span class="text-sm font-extrabold text-white tracking-tight">NestPOS</span>
-                                <span class="text-[9px] text-purple-300/50 ml-1 hidden lg:inline">Enterprise</span>
+                                <span class="text-[9px] text-white/30 ml-1 hidden lg:inline">Enterprise</span>
                             </div>
                         </a>
 
-                        <div class="h-5 w-px bg-purple-400/15 hidden md:block"></div>
+                        <div class="h-5 w-px bg-white/10 hidden md:block"></div>
 
                         <nav class="hidden md:flex items-center gap-1">
                             <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}"
-                               class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.dashboard') || request()->routeIs('pos.restaurant.dashboard') ? 'active text-white' : 'text-purple-200/70' }}">
+                               class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.dashboard') || request()->routeIs('pos.restaurant.dashboard') ? 'active text-white' : 'text-white/60' }}">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
                                 Home
                             </a>
                             @if($isRestaurantLayout)
                             <a href="{{ route('pos.restaurant.pos') }}"
-                               class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.restaurant.pos') ? 'active text-white' : 'text-purple-200/70' }}">
+                               class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.restaurant.pos') ? 'active text-white' : 'text-white/60' }}">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h18v18H3V3zm3 6h12m-12 6h12"/></svg>
                                 POS
                             </a>
                             @endif
                             <a href="{{ route('pos.invoice.create') }}"
-                               class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.invoice.create') ? 'active text-white' : 'text-purple-200/70' }}">
+                               class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.invoice.create') ? 'active text-white' : 'text-white/60' }}">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
                                 New Sale
                             </a>
                             <a href="{{ route('pos.transactions') }}"
-                               class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.transactions') || request()->routeIs('pos.transaction.show') ? 'active text-white' : 'text-purple-200/70' }}">
+                               class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.transactions') || request()->routeIs('pos.transaction.show') ? 'active text-white' : 'text-white/60' }}">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                                 Orders
                             </a>
                             @if($isRestaurantLayout && !$isCashierLayout)
                             <a href="{{ route('pos.restaurant.tables') }}"
-                               class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.restaurant.tables') ? 'active text-white' : 'text-purple-200/70' }}">
+                               class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.restaurant.tables') ? 'active text-white' : 'text-white/60' }}">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/></svg>
                                 Tables
                             </a>
                             <a href="{{ route('pos.restaurant.kds') }}"
-                               class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.restaurant.kds') ? 'active text-white' : 'text-purple-200/70' }}">
+                               class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.restaurant.kds') ? 'active text-white' : 'text-white/60' }}">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                                 KDS
                             </a>
@@ -123,24 +137,44 @@
                         <div class="hidden lg:flex items-center gap-2 mr-2">
                             <span class="w-1.5 h-1.5 rounded-full {{ $praEnabledLayout ? 'bg-green-400' : 'bg-amber-400' }}" style="box-shadow: 0 0 6px {{ $praEnabledLayout ? 'rgba(16,185,129,0.5)' : 'rgba(245,158,11,0.5)' }}"></span>
                             <span class="text-[9px] {{ $praEnabledLayout ? 'text-green-300' : 'text-amber-300' }} font-medium">PRA {{ $praEnabledLayout ? 'Online' : 'Offline' }}</span>
-                            <span class="text-[9px] text-purple-300/40 font-mono ml-2">{{ now()->format('H:i') }}</span>
+                            <span class="text-[9px] font-mono ml-2" style="color: var(--meta-color)">{{ now()->format('H:i') }}</span>
                         </div>
 
-                        <button @click="mobileMenuOpen = !mobileMenuOpen" class="md:hidden p-2 rounded-lg text-purple-200/70 hover:text-white hover:bg-white/10 transition">
+                        <div class="relative">
+                            <button @click="themeOpen = !themeOpen; profileOpen = false" class="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition" title="Change Theme">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+                            </button>
+                            <div x-show="themeOpen" x-cloak @click.outside="themeOpen = false" x-transition class="absolute right-0 top-full mt-2 bg-white dark:bg-gray-900 rounded-xl shadow-2xl shadow-black/20 border border-gray-200/80 dark:border-gray-700/80 p-3 z-[100] w-48">
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">POS Theme</p>
+                                <div class="grid grid-cols-3 gap-2">
+                                    <button @click="currentTheme='purple'; document.body.setAttribute('data-theme','purple'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'purple'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='purple' && 'active-theme'" style="background:linear-gradient(135deg,#312e81,#7c3aed)" title="Royal Purple"></button>
+                                    <button @click="currentTheme='blue'; document.body.setAttribute('data-theme','blue'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'blue'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='blue' && 'active-theme'" style="background:linear-gradient(135deg,#1e3a5f,#2563eb)" title="Ocean Blue"></button>
+                                    <button @click="currentTheme='emerald'; document.body.setAttribute('data-theme','emerald'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'emerald'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='emerald' && 'active-theme'" style="background:linear-gradient(135deg,#064e3b,#059669)" title="Emerald Green"></button>
+                                    <button @click="currentTheme='orange'; document.body.setAttribute('data-theme','orange'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'orange'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='orange' && 'active-theme'" style="background:linear-gradient(135deg,#7c2d12,#ea580c)" title="Sunset Orange"></button>
+                                    <button @click="currentTheme='midnight'; document.body.setAttribute('data-theme','midnight'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'midnight'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='midnight' && 'active-theme'" style="background:linear-gradient(135deg,#171717,#404040)" title="Midnight Dark"></button>
+                                    <button @click="currentTheme='rose'; document.body.setAttribute('data-theme','rose'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'rose'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='rose' && 'active-theme'" style="background:linear-gradient(135deg,#881337,#e11d48)" title="Rose Pink"></button>
+                                </div>
+                                <div class="mt-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                                    <p class="text-[9px] text-gray-400 text-center" x-text="currentTheme.charAt(0).toUpperCase() + currentTheme.slice(1) + ' Theme'"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button @click="mobileMenuOpen = !mobileMenuOpen" class="md:hidden p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                         </button>
 
                         <div class="relative">
-                            <button @click="profileOpen = !profileOpen"
+                            <button @click="profileOpen = !profileOpen; themeOpen = false"
                                     class="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-white/10 transition cursor-pointer">
-                                <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-400 to-violet-500 flex items-center justify-center text-[11px] font-bold text-white shadow-lg shadow-purple-500/20">
+                                <div class="w-7 h-7 rounded-lg avatar-themed flex items-center justify-center text-[11px] font-bold text-white accent-glow">
                                     {{ $userInitial }}
                                 </div>
                                 <div class="hidden sm:block text-left">
                                     <p class="text-[11px] font-semibold text-white leading-tight">{{ Str::limit($userName, 15) }}</p>
-                                    <p class="text-[9px] text-purple-300/60 leading-tight">{{ $userRole }} · {{ Str::limit($companyName, 18) }}</p>
+                                    <p class="text-[9px] leading-tight" style="color: var(--status-text)">{{ $userRole }} · {{ Str::limit($companyName, 18) }}</p>
                                 </div>
-                                <svg class="w-3 h-3 text-purple-300/50 hidden sm:block transition-transform" :class="profileOpen && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                <svg class="w-3 h-3 hidden sm:block transition-transform" style="color: var(--meta-color)" :class="profileOpen && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                             </button>
 
                             <div x-show="profileOpen" x-cloak @click.outside="profileOpen = false"
@@ -152,9 +186,9 @@
                                  x-transition:leave-end="opacity-0 scale-95"
                                  class="profile-dropdown absolute right-0 top-full mt-2 w-64 bg-white dark:bg-gray-900 rounded-xl shadow-2xl shadow-black/20 border border-gray-200/80 dark:border-gray-700/80 overflow-hidden z-[100]">
 
-                                <div class="px-4 py-3 bg-gradient-to-r from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20 border-b border-gray-100 dark:border-gray-800">
+                                <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800" style="background: linear-gradient(to right, hsla(var(--accent-h), var(--accent-s), 95%, 1), hsla(var(--accent-h), var(--accent-s), 92%, 1))">
                                     <div class="flex items-center gap-3">
-                                        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center text-sm font-bold text-white">{{ $userInitial }}</div>
+                                        <div class="w-9 h-9 rounded-xl avatar-themed flex items-center justify-center text-sm font-bold text-white">{{ $userInitial }}</div>
                                         <div>
                                             <p class="text-sm font-bold text-gray-900 dark:text-white">{{ $userName }}</p>
                                             <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ $userRole }} · {{ $companyName }}</p>
@@ -284,16 +318,16 @@
                      x-transition:leave="transition ease-in duration-100"
                      x-transition:leave-start="opacity-100"
                      x-transition:leave-end="opacity-0 -translate-y-2"
-                     class="md:hidden border-t border-purple-400/10 px-3 py-2 flex flex-wrap gap-1.5 bg-indigo-950/80">
-                    <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.dashboard') || request()->routeIs('pos.restaurant.dashboard') ? 'active text-white' : 'text-purple-200/70' }}">Home</a>
+                     class="md:hidden border-t border-white/10 px-3 py-2 flex flex-wrap gap-1.5" style="background: hsla(var(--accent-h), var(--accent-s), 10%, 0.9)">
+                    <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.dashboard') || request()->routeIs('pos.restaurant.dashboard') ? 'active text-white' : 'text-white/60' }}">Home</a>
                     @if($isRestaurantLayout)
-                    <a href="{{ route('pos.restaurant.pos') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.restaurant.pos') ? 'active text-white' : 'text-purple-200/70' }}">POS</a>
+                    <a href="{{ route('pos.restaurant.pos') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.restaurant.pos') ? 'active text-white' : 'text-white/60' }}">POS</a>
                     @endif
-                    <a href="{{ route('pos.invoice.create') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.invoice.create') ? 'active text-white' : 'text-purple-200/70' }}">New Sale</a>
-                    <a href="{{ route('pos.transactions') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.transactions') ? 'active text-white' : 'text-purple-200/70' }}">Orders</a>
+                    <a href="{{ route('pos.invoice.create') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.invoice.create') ? 'active text-white' : 'text-white/60' }}">New Sale</a>
+                    <a href="{{ route('pos.transactions') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.transactions') ? 'active text-white' : 'text-white/60' }}">Orders</a>
                     @if($isRestaurantLayout && !$isCashierLayout)
-                    <a href="{{ route('pos.restaurant.tables') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.restaurant.tables') ? 'active text-white' : 'text-purple-200/70' }}">Tables</a>
-                    <a href="{{ route('pos.restaurant.kds') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.restaurant.kds') ? 'active text-white' : 'text-purple-200/70' }}">KDS</a>
+                    <a href="{{ route('pos.restaurant.tables') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.restaurant.tables') ? 'active text-white' : 'text-white/60' }}">Tables</a>
+                    <a href="{{ route('pos.restaurant.kds') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.restaurant.kds') ? 'active text-white' : 'text-white/60' }}">KDS</a>
                     @endif
                 </div>
             </header>

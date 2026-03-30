@@ -353,6 +353,31 @@ class RestaurantPosController extends Controller
         }
     }
 
+    public function deleteOrder(Request $request, $orderId)
+    {
+        $companyId = app('currentCompanyId');
+        if (!is_numeric($orderId) || $orderId < 1) {
+            return response()->json(['success' => false, 'message' => 'Invalid order ID'], 400);
+        }
+        $order = RestaurantOrder::where('company_id', $companyId)->findOrFail($orderId);
+        if ($order->status === 'completed') {
+            return response()->json(['success' => false, 'message' => 'Cannot delete a completed order'], 400);
+        }
+        DB::beginTransaction();
+        try {
+            $order->items()->delete();
+            $order->delete();
+            if (class_exists(\App\Services\AuditLogService::class)) {
+                \App\Services\AuditLogService::log('order_deleted', 'restaurant_order', $orderId, ['order_number' => $order->order_number, 'total_amount' => $order->total_amount], $companyId);
+            }
+            DB::commit();
+            return response()->json(['success' => true, 'message' => 'Order deleted']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => 'Failed to delete order'], 500);
+        }
+    }
+
     public function payOrder(Request $request, $orderId)
     {
         $companyId = app('currentCompanyId');

@@ -58,7 +58,7 @@ window.addEventListener('popstate', function() {
 
         <div class="relative flex-shrink-0" style="min-width:180px;max-width:220px;">
             <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-            <input type="text" x-ref="customerPhoneInput" x-model="customerPhoneQuery" @input="onCustomerPhoneInput()" @keydown.enter.prevent="onCustomerPhoneEnter()" @keydown.escape.prevent="customerPhoneDropdown = false" @click.away="customerPhoneDropdown = false" inputmode="tel" placeholder="Customer mobile..." class="w-full pl-9 pr-7 py-2.5 rounded-xl text-sm border-2 transition shadow-sm font-medium" :class="selectedCustomer ? 'border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200' : 'border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400'" autocomplete="off">
+            <input type="text" x-ref="customerPhoneInput" x-model="customerPhoneQuery" @input="onCustomerPhoneInput()" @keydown.enter.prevent="onCustomerPhoneEnter()" @keydown.escape.prevent="customerPhoneDropdown = false" @keydown.tab.prevent="$refs.searchInput?.focus()" @click.away="customerPhoneDropdown = false" inputmode="tel" placeholder="Customer mobile..." class="w-full pl-9 pr-7 py-2.5 rounded-xl text-sm border-2 transition shadow-sm font-medium" :class="selectedCustomer ? 'border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200' : 'border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400'" autocomplete="off">
             <kbd x-show="!customerPhoneQuery && !selectedCustomer" class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded font-mono">Ctrl+C</kbd>
             <button x-show="customerPhoneQuery || selectedCustomer" @click="clearCustomerInput()" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -134,8 +134,9 @@ window.addEventListener('popstate', function() {
             <span class="hidden sm:inline">New</span>
         </button>
 
-        <button @click="showHeldOrders = !showHeldOrders" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition">
+        <button @click="activeHeldIndex = 0; showHeldOrders = !showHeldOrders" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span class="text-[10px] bg-amber-400/30 px-1 rounded">F3</span>
             <span class="hidden sm:inline">Held</span>
             <span x-show="heldOrders.length > 0" class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="heldOrders.length"></span>
         </button>
@@ -443,28 +444,36 @@ window.addEventListener('popstate', function() {
     <div x-show="showHeldOrders" x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showHeldOrders = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden" x-transition.scale.90>
             <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Held Orders</h3>
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">Held Orders</h3>
+                    <p class="text-[10px] text-gray-400 mt-0.5">Arrow keys to navigate • Enter=Recall • P=Pay • D=Delete • ESC=Close</p>
+                </div>
                 <button @click="showHeldOrders = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
             </div>
             <div class="max-h-[60vh] overflow-y-auto">
                 <template x-if="heldOrders.length === 0">
                     <div class="p-8 text-center text-gray-400"><p class="text-sm">No held orders</p></div>
                 </template>
-                <template x-for="order in heldOrders" :key="order.id">
-                    <div class="p-4 border-b border-gray-100 dark:border-gray-800">
+                <template x-for="(order, oi) in heldOrders" :key="order.id">
+                    <div class="p-4 border-b border-gray-100 dark:border-gray-800 transition-all" :class="activeHeldIndex === oi ? 'bg-purple-50 dark:bg-purple-900/15 ring-2 ring-purple-400 ring-inset' : ''">
                         <div class="flex items-center justify-between mb-2">
-                            <span class="text-sm font-bold text-gray-900 dark:text-white" x-text="order.order_number"></span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] font-mono text-gray-400 w-5" x-text="oi + 1"></span>
+                                <span class="text-sm font-bold text-gray-900 dark:text-white" x-text="order.order_number"></span>
+                            </div>
                             <div class="flex items-center gap-1.5">
+                                <template x-if="order.customer_name"><span class="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full font-medium" x-text="order.customer_name"></span></template>
                                 <template x-if="order.priority"><span class="text-[9px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold">RUSH</span></template>
                                 <span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="{'bg-amber-100 text-amber-700': order.status==='held', 'bg-blue-100 text-blue-700': order.status==='preparing', 'bg-green-100 text-green-700': order.status==='ready'}" x-text="order.status"></span>
                             </div>
                         </div>
-                        <p class="text-xs text-gray-500 mb-1" x-text="'Rs. ' + Number(order.total_amount).toLocaleString() + ' • ' + order.items.length + ' item(s)'"></p>
-                        <template x-if="order.table"><p class="text-[10px] text-purple-600" x-text="'Table: T-' + order.table.table_number"></p></template>
-                        <div class="flex gap-2 mt-2">
+                        <p class="text-xs text-gray-500 mb-1 ml-7" x-text="'Rs. ' + Number(order.total_amount).toLocaleString() + ' • ' + order.items.length + ' item(s)'"></p>
+                        <template x-if="order.table"><p class="text-[10px] text-purple-600 ml-7" x-text="'Table: T-' + order.table.table_number"></p></template>
+                        <div class="flex gap-2 mt-2 ml-7">
                             <button @click="recallOrder(order)" class="flex-1 py-2 text-xs font-bold text-purple-600 border border-purple-300 rounded-xl hover:bg-purple-50 transition">Recall</button>
-                            <a :href="'/pos/restaurant/orders/' + order.id + '/kitchen-ticket'" target="_blank" class="flex-1 py-2 text-xs font-bold text-center text-orange-600 border border-orange-300 rounded-xl hover:bg-orange-50 transition">KOT</a>
+                            <a :href="'/pos/restaurant/orders/' + order.id + '/kitchen-ticket'" target="_blank" class="py-2 px-3 text-xs font-bold text-center text-orange-600 border border-orange-300 rounded-xl hover:bg-orange-50 transition">KOT</a>
                             <button @click="payHeldOrder(order.id)" class="flex-1 py-2 text-xs font-bold text-white bg-green-600 rounded-xl hover:bg-green-700 transition">Pay</button>
+                            <button @click="deleteHeldOrder(order.id)" class="py-2 px-3 text-xs font-bold text-red-500 border border-red-300 rounded-xl hover:bg-red-50 transition">Delete</button>
                         </div>
                     </div>
                 </template>
@@ -575,7 +584,7 @@ window.addEventListener('popstate', function() {
             </div>
             <div class="p-4 grid grid-cols-2 gap-3">
                 <a :href="'/pos/restaurant/receipt/' + lastTransactionId + '?auto_print=1'" target="_blank" class="py-3 text-center rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold transition shadow-sm">Print</a>
-                <button @click="showReceipt = false; clearCart();" class="py-3 text-center rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-gray-700 dark:text-gray-300 text-sm font-bold transition">New Sale</button>
+                <button @click="startNewAfterPayment()" class="py-3 text-center rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-bold transition shadow-sm">New Sale <kbd class="text-[8px] bg-green-500/40 px-1 rounded ml-1 font-mono">Enter</kbd></button>
             </div>
         </div>
     </div>
@@ -778,6 +787,7 @@ function restaurantPos() {
         cartMode: false,
         qtyInputBuffer: '',
         qtyInputTimer: null,
+        activeHeldIndex: 0,
         gridFocusMode: false,
         gridFocusIndex: 0,
         gridCols: 4,
@@ -858,10 +868,24 @@ function restaurantPos() {
                 const tag = document.activeElement?.tagName;
                 const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 
+                if (this.showReceipt) {
+                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); return; }
+                    if (e.key === 'p' || e.key === 'P') { e.preventDefault(); if (this.lastTransactionId) window.open('/pos/restaurant/receipt/' + this.lastTransactionId + '?auto_print=1', '_blank', 'width=400,height=700'); return; }
+                    return;
+                }
                 if (this.showPayModal) {
                     if (e.key === '1') { e.preventDefault(); this.processPayment('cash'); return; }
                     if (e.key === '2') { e.preventDefault(); this.processPayment('card'); return; }
                     if (e.key === 'Escape') { e.preventDefault(); this.showPayModal = false; return; }
+                    return;
+                }
+                if (this.showHeldOrders && this.heldOrders.length > 0) {
+                    if (e.key === 'ArrowDown') { e.preventDefault(); this.activeHeldIndex = Math.min(this.activeHeldIndex + 1, this.heldOrders.length - 1); return; }
+                    if (e.key === 'ArrowUp') { e.preventDefault(); this.activeHeldIndex = Math.max(this.activeHeldIndex - 1, 0); return; }
+                    if (e.key === 'Enter') { e.preventDefault(); this.recallOrder(this.heldOrders[this.activeHeldIndex]); return; }
+                    if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.payHeldOrder(this.heldOrders[this.activeHeldIndex].id); return; }
+                    if (e.key === 'd' || e.key === 'D') { e.preventDefault(); this.deleteHeldOrder(this.heldOrders[this.activeHeldIndex].id); return; }
+                    if (e.key === 'Escape') { e.preventDefault(); this.showHeldOrders = false; return; }
                     return;
                 }
                 if (this.showManagerPinModal) {
@@ -869,6 +893,7 @@ function restaurantPos() {
                     return;
                 }
 
+                if (e.key === 'F3') { e.preventDefault(); this.activeHeldIndex = 0; this.showHeldOrders = true; return; }
                 if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
                 if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) this.showPayModal = true; return; }
                 if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
@@ -1199,6 +1224,7 @@ function restaurantPos() {
             this.customerPhoneDropdown = false;
             this.customerPhoneResults = [];
             this.showToast('Customer: ' + cr.name + (cr.stats && cr.stats.is_frequent ? ' (VIP)' : ''), 'success');
+            this.$nextTick(() => { this.$refs.searchInput?.focus(); });
         },
 
         async saveNewCustomer() {
@@ -1218,6 +1244,7 @@ function restaurantPos() {
                     this.customerPhoneDropdown = false;
                     if (this.allCustomers) this.allCustomers.push(data.customer);
                     this.showToast('Customer created: ' + data.customer.name, 'success');
+                    this.$nextTick(() => { this.$refs.searchInput?.focus(); });
                 } else { this.showToast(data.message || 'Failed', 'error'); }
             } catch(e) { this.showToast('Network error', 'error'); }
         },
@@ -1252,7 +1279,17 @@ function restaurantPos() {
         },
 
         async processPayment(method) {
-            if (this.cart.length === 0 || this.submitting) return;
+            if (this.submitting) return;
+
+            if (this.payingHeldOrderId) {
+                this.submitting = true; this.stockError = '';
+                await this.payHeldOrderDirect(this.payingHeldOrderId, method, null);
+                this.payingHeldOrderId = null;
+                this.showPayModal = false; this.submitting = false;
+                return;
+            }
+
+            if (this.cart.length === 0) return;
             const now = Date.now();
             if (now - this.lastPayTime < 3000) return;
             this.lastPayTime = now;
@@ -1271,10 +1308,33 @@ function restaurantPos() {
             this.showPayModal = false; this.submitting = false;
         },
 
+        payingHeldOrderId: null,
+
         async payHeldOrder(orderId) {
             if (this.submitting) return;
-            this.showHeldOrders = false; this.showPayModal = false; this.stockError = ''; this.submitting = true;
-            await this.payHeldOrderDirect(orderId, 'cash', null); this.submitting = false;
+            this.payingHeldOrderId = orderId;
+            this.showHeldOrders = false;
+            this.stockError = '';
+            this.showPayModal = true;
+        },
+
+        startNewAfterPayment() {
+            this.showReceipt = false;
+            this.clearCart();
+            this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); });
+        },
+
+        async deleteHeldOrder(orderId) {
+            if (!confirm('Delete this held order permanently?')) return;
+            try {
+                const res = await fetch(`/pos/restaurant/orders/${orderId}/delete`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' } });
+                const data = await res.json();
+                if (data.success) {
+                    this.heldOrders = this.heldOrders.filter(o => o.id !== orderId);
+                    if (this.activeHeldIndex >= this.heldOrders.length) this.activeHeldIndex = Math.max(0, this.heldOrders.length - 1);
+                    this.showToast('Order deleted', 'success');
+                } else { this.showToast(data.message || 'Failed', 'error'); }
+            } catch (e) { this.showToast('Error deleting order', 'error'); }
         },
 
         async payHeldOrderDirect(orderId, method, savedTotal) {

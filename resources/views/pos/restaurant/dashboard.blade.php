@@ -13,8 +13,13 @@
 .r-d3 { animation-delay: 120ms; }
 .r-d4 { animation-delay: 180ms; }
 .r-d5 { animation-delay: 240ms; }
+.r-d6 { animation-delay: 300ms; }
 .r-row:hover { background: rgba(124,58,237,0.02); }
 .dark .r-row:hover { background: rgba(124,58,237,0.06); }
+.tile-card { transition: all 0.2s ease; }
+.tile-card:hover { transform: translateY(-3px); box-shadow: 0 8px 25px -5px rgba(0,0,0,0.1), 0 4px 10px -5px rgba(0,0,0,0.05); }
+.tile-icon { transition: all 0.2s ease; }
+.tile-card:hover .tile-icon { transform: scale(1.1); }
 </style>
 
 @php
@@ -23,29 +28,71 @@
 @endphp
 
 <div class="w-full overflow-x-hidden" x-data="rDash()" x-init="init()">
-    <div class="space-y-4 w-full">
+    <div class="space-y-5 w-full">
 
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 r-anim r-d1">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 r-anim r-d1">
             <div>
-                <h1 class="text-lg font-extrabold text-gray-900 dark:text-white tracking-tight">Restaurant Dashboard</h1>
-                <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">{{ now()->format('l, d M Y') }}</p>
+                <h1 class="text-xl font-extrabold text-gray-900 dark:text-white tracking-tight">Welcome Back<span class="text-purple-500">.</span></h1>
+                <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{{ now()->format('l, d M Y') }} — {{ $company->name ?? 'Restaurant' }}</p>
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
-                <button @click="refreshDashboard()" class="p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-purple-600 transition shadow-sm" title="Refresh">
-                    <svg class="w-3.5 h-3.5" :class="refreshing ? 'animate-spin' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                <button @click="refreshDashboard()" class="p-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-purple-600 transition shadow-sm" title="Refresh">
+                    <svg class="w-4 h-4" :class="refreshing ? 'animate-spin' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                 </button>
-                <a href="{{ route('pos.restaurant.pos') }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-violet-600 text-white text-[11px] font-bold rounded-lg hover:from-purple-700 hover:to-violet-700 transition shadow-sm shadow-purple-500/20">
-                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                    POS Screen
-                </a>
-                <a href="{{ route('pos.restaurant.kds') }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-orange-600 bg-orange-50 dark:bg-orange-900/20 dark:text-orange-400 rounded-lg border border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-900/30 transition">
-                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                    KDS
-                </a>
             </div>
         </div>
 
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 r-anim r-d2">
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 r-anim r-d2">
+            <a href="{{ route('pos.restaurant.pos') }}" class="tile-card r-glass p-4 text-center group cursor-pointer">
+                <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center mb-2.5 shadow-lg shadow-purple-500/20">
+                    <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                </div>
+                <p class="text-[11px] font-bold text-gray-900 dark:text-white">POS Screen</p>
+                <p class="text-[9px] text-gray-400 mt-0.5">Start selling</p>
+            </a>
+
+            <a href="{{ route('pos.transactions') }}" class="tile-card r-glass p-4 text-center group cursor-pointer">
+                <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-2.5 shadow-lg shadow-blue-500/20">
+                    <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                </div>
+                <p class="text-[11px] font-bold text-gray-900 dark:text-white">Orders</p>
+                <p class="text-[9px] text-gray-400 mt-0.5">View history</p>
+            </a>
+
+            <a href="{{ route('pos.restaurant.tables') }}" class="tile-card r-glass p-4 text-center group cursor-pointer">
+                <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center mb-2.5 shadow-lg shadow-amber-500/20">
+                    <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </div>
+                <p class="text-[11px] font-bold text-gray-900 dark:text-white">Tables</p>
+                <p class="text-[9px] text-gray-400 mt-0.5">{{ $occupiedTables }}/{{ $totalTables }} occupied</p>
+            </a>
+
+            <a href="{{ route('pos.restaurant.kds') }}" class="tile-card r-glass p-4 text-center group cursor-pointer">
+                <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center mb-2.5 shadow-lg shadow-orange-500/20">
+                    <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                </div>
+                <p class="text-[11px] font-bold text-gray-900 dark:text-white">Kitchen</p>
+                <p class="text-[9px] text-gray-400 mt-0.5">KDS display</p>
+            </a>
+
+            <a href="{{ route('pos.products') }}" class="tile-card r-glass p-4 text-center group cursor-pointer">
+                <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mb-2.5 shadow-lg shadow-emerald-500/20">
+                    <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                </div>
+                <p class="text-[11px] font-bold text-gray-900 dark:text-white">Menu</p>
+                <p class="text-[9px] text-gray-400 mt-0.5">Products</p>
+            </a>
+
+            <a href="{{ route('pos.restaurant.ingredients') }}" class="tile-card r-glass p-4 text-center group cursor-pointer">
+                <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center mb-2.5 shadow-lg shadow-pink-500/20">
+                    <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+                </div>
+                <p class="text-[11px] font-bold text-gray-900 dark:text-white">Ingredients</p>
+                <p class="text-[9px] text-gray-400 mt-0.5">{{ $lowStockItems->count() > 0 ? $lowStockItems->count() . ' low stock' : 'All stocked' }}</p>
+            </a>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 r-anim r-d3">
             <div class="r-stat bg-gradient-to-br from-emerald-500 to-emerald-700 p-3.5 shadow-md">
                 <div class="relative z-10">
                     <div class="flex items-center justify-between mb-1.5">
@@ -108,7 +155,7 @@
         </div>
 
         @if($isAdmin)
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 r-anim r-d3">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 r-anim r-d4">
             <div class="r-glass p-3.5 border-l-4 border-l-emerald-500 !rounded-l-none">
                 <div class="flex items-center justify-between">
                     <div class="min-w-0">
@@ -145,7 +192,7 @@
         </div>
         @endif
 
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 r-anim r-d3">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 r-anim r-d4">
             <div class="r-glass p-3 flex items-center gap-2.5">
                 <div class="w-7 h-7 rounded-lg bg-cyan-50 dark:bg-cyan-900/20 flex items-center justify-center flex-shrink-0">
                     <svg class="w-3.5 h-3.5 text-cyan-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
@@ -184,7 +231,7 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 r-anim r-d4">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 r-anim r-d5">
             <div class="lg:col-span-2 r-glass p-4">
                 <div class="flex items-center gap-2 mb-3">
                     <span class="w-1 h-3.5 rounded-full bg-purple-600"></span>
@@ -202,7 +249,7 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 r-anim r-d5">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 r-anim r-d6">
             <div class="r-glass overflow-hidden">
                 <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800/50 flex items-center gap-2">
                     <span class="w-1 h-3.5 rounded-full bg-amber-500"></span>
@@ -255,7 +302,7 @@
             </div>
         </div>
 
-        <div class="r-glass overflow-hidden r-anim r-d5">
+        <div class="r-glass overflow-hidden r-anim r-d6">
             <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800/50 flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <span class="w-1 h-3.5 rounded-full bg-indigo-500"></span>
@@ -302,7 +349,7 @@
         </div>
 
         @if($isAdmin)
-        <div x-data="{ showSettings: false, mgrPin: '', cashierLimit: {{ $company->cashier_discount_limit ?? 10 }}, managerLimit: {{ $company->manager_discount_limit ?? 50 }}, saving: false, saved: false }" class="r-glass overflow-hidden r-anim r-d5">
+        <div x-data="{ showSettings: false, mgrPin: '', cashierLimit: {{ $company->cashier_discount_limit ?? 10 }}, managerLimit: {{ $company->manager_discount_limit ?? 50 }}, saving: false, saved: false }" class="r-glass overflow-hidden r-anim r-d6">
             <button @click="showSettings = !showSettings" class="flex items-center justify-between w-full px-4 py-3 hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition">
                 <div class="flex items-center gap-2">
                     <span class="w-1 h-3.5 rounded-full bg-gray-400"></span>

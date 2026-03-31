@@ -1,10 +1,10 @@
 <div class="relative" x-data="{ styleOpen: false, currentStyle: '{{ $dashboardStyle ?? 'default' }}' }">
-    <button @click.stop="styleOpen = !styleOpen" class="p-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition shadow-sm" title="Dashboard Style">
-        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
+    <button @click.stop="styleOpen = !styleOpen" class="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition shadow-md" title="Dashboard Style">
+        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
     </button>
-    <div x-show="styleOpen" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0 scale-95" class="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 z-50 p-3" @click.away="styleOpen = false" x-cloak>
-        <p class="text-[10px] font-extrabold text-gray-700 dark:text-gray-200 uppercase tracking-widest mb-2.5 px-1">Dashboard Design</p>
-        <div class="space-y-1">
+    <div x-show="styleOpen" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0 scale-95" class="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-300 dark:border-gray-600 z-50 p-4" @click.away="styleOpen = false" x-cloak>
+        <p class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider mb-3 px-1">Dashboard Design</p>
+        <div class="space-y-1.5">
             @php
             $styles = [
                 ['id' => 'default', 'name' => 'Square Classic', 'desc' => 'Clean & minimal', 'icon' => '◻', 'colors' => ['#f3f4f6','#e5e7eb','#d1d5db']],
@@ -16,19 +16,19 @@
             ];
             @endphp
             @foreach($styles as $s)
-            <button @click="currentStyle='{{ $s['id'] }}'; styleOpen=false; fetch('{{ route('fbrpos.settings.dashboard-style') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({style:'{{ $s['id'] }}'})}).then(()=>window.location.reload())" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all" :class="currentStyle === '{{ $s['id'] }}' ? 'bg-blue-50 dark:bg-blue-900/20 ring-2 ring-blue-500' : 'hover:bg-gray-50 dark:hover:bg-gray-800'">
-                <span class="text-xl w-8 text-center flex-shrink-0">{{ $s['icon'] }}</span>
+            <button @click="currentStyle='{{ $s['id'] }}'; styleOpen=false; fetch('{{ route('fbrpos.settings.dashboard-style') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({style:'{{ $s['id'] }}'})}).then(()=>window.location.reload())" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all" :class="currentStyle === '{{ $s['id'] }}' ? 'bg-blue-100 dark:bg-blue-900/30 ring-2 ring-blue-500' : 'hover:bg-gray-100 dark:hover:bg-gray-800'">
+                <span class="text-2xl w-9 text-center flex-shrink-0">{{ $s['icon'] }}</span>
                 <div class="flex-1 text-left min-w-0">
-                    <p class="text-xs font-extrabold text-gray-900 dark:text-white">{{ $s['name'] }}</p>
-                    <p class="text-[10px] text-gray-500 dark:text-gray-400 font-medium">{{ $s['desc'] }}</p>
+                    <p class="text-sm font-black text-gray-900 dark:text-white">{{ $s['name'] }}</p>
+                    <p class="text-xs text-gray-600 dark:text-gray-300 font-semibold">{{ $s['desc'] }}</p>
                 </div>
-                <div class="flex gap-1 flex-shrink-0">
+                <div class="flex gap-1.5 flex-shrink-0">
                     @foreach($s['colors'] as $c)
-                    <span class="w-4 h-4 rounded-full border border-gray-200 dark:border-gray-600" style="background: {{ $c }}"></span>
+                    <span class="w-5 h-5 rounded-full border-2 border-gray-300 dark:border-gray-500" style="background: {{ $c }}"></span>
                     @endforeach
                 </div>
                 <span x-show="currentStyle === '{{ $s['id'] }}'" class="text-blue-600 flex-shrink-0">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                 </span>
             </button>
             @endforeach

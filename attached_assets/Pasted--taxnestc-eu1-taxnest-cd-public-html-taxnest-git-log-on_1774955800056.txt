@@ -1,0 +1,35 @@
+[taxnestc@eu1 taxnest]$ cd ~/public_html/taxnest && git log --oneline -1
+f8979c6 (HEAD -> main, origin/main, origin/HEAD) Improve readability of interface elements by darkening git fetch origin && git reset --hard origin/m
+ain && git log --oneline -1 fetch origin && git reset --hard origin/main && git log --oneline -1
+HEAD is now at f8979c6 Improve readability of interface elements by darkening text and increasing icon sizes
+f8979c6 (HEAD -> main, origin/main, origin/HEAD) Improve readability of interface elements by darkening text and increasing icon sizes
+[taxnestc@eu1 taxnest]$ php artisan optimize:clear && php artisan view:clear && php artisan config:clear && php artisan route:clear && php artisan cache:clear
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.78ms DONE
+  cache .......................................................... 1.83ms DONE
+  compiled ....................................................... 0.86ms DONE
+  events ......................................................... 0.34ms DONE
+  routes ......................................................... 0.30ms DONE
+  views .......................................................... 3.22ms DONE
+
+
+   INFO  Compiled views cleared successfully.
+
+
+   INFO  Configuration cache cleared successfully.
+
+
+   INFO  Route cache cleared successfully.
+
+
+   INFO  Application cache cleared successfully.
+                        php -r "if(function_exists('opcache_reset')){opcache_reset();echo 'OPcache cleared';}else{head -5 resources/views/pos/dashboa
+rd-styles/_style-picker.blade.php head -5 resources/views/pos/dashboard-styles/_style-picker.blade.phpared';}else{echo 'No OPcache';}"
+<div class="flex items-center gap-2 flex-shrink-0" x-data="{ styleOpen: false, currentStyle: '{{ $dashboardStyle ?? 'default' }}' }">
+    <div x-data="{ praEnabled: {{ ($praStatus ?? $company->pra_reporting_enabled ?? false) ? 'true' : 'false' }}, praLoading: false }" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
+        <span class="text-[10px] font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wide">PRA</span>
+        <button @click="praLoading=true; fetch('{{ route('pos.api.toggle-pra') }}', {method:'POST', headers:{'X-CSRF-TOKEN':'{{ csrf_token() }}','Content-Type':'application/json'}}).then(r=>r.json()).then(d=>{praEnabled=d.enabled; praLoading=false;})" :class="praEnabled ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'" class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out" :disabled="praLoading">
+            <span :class="praEnabled ? 'translate-x-4' : 'translate-x-0.5'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5"></span>
+[taxnestc@eu1 taxnest]$

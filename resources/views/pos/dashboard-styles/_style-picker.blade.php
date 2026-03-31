@@ -1,18 +1,18 @@
-<div class="flex items-center gap-2 flex-shrink-0" x-data="{ styleOpen: false, currentStyle: '{{ $dashboardStyle ?? 'default' }}' }">
-    <div x-data="{ praEnabled: {{ ($praStatus ?? $company->pra_reporting_enabled ?? false) ? 'true' : 'false' }}, praLoading: false }" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
-        <span class="text-[10px] font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wide">PRA</span>
-        <button @click="praLoading=true; fetch('{{ route('pos.api.toggle-pra') }}', {method:'POST', headers:{'X-CSRF-TOKEN':'{{ csrf_token() }}','Content-Type':'application/json'}}).then(r=>r.json()).then(d=>{praEnabled=d.enabled; praLoading=false;})" :class="praEnabled ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'" class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out" :disabled="praLoading">
-            <span :class="praEnabled ? 'translate-x-4' : 'translate-x-0.5'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5"></span>
+<div class="flex items-center gap-3 flex-shrink-0" x-data="{ styleOpen: false, currentStyle: '{{ $dashboardStyle ?? 'default' }}' }">
+    <div x-data="{ praEnabled: {{ ($praStatus ?? $company->pra_reporting_enabled ?? false) ? 'true' : 'false' }}, praLoading: false }" class="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 shadow-md">
+        <span class="text-xs font-extrabold text-gray-900 dark:text-white uppercase tracking-wide">PRA</span>
+        <button @click="praLoading=true; fetch('{{ route('pos.api.toggle-pra') }}', {method:'POST', headers:{'X-CSRF-TOKEN':'{{ csrf_token() }}','Content-Type':'application/json'}}).then(r=>r.json()).then(d=>{praEnabled=d.enabled; praLoading=false;})" :class="praEnabled ? 'bg-purple-600' : 'bg-gray-400 dark:bg-gray-500'" class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out" :disabled="praLoading">
+            <span :class="praEnabled ? 'translate-x-5' : 'translate-x-0.5'" class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5"></span>
         </button>
-        <span x-text="praEnabled ? 'ON' : 'OFF'" :class="praEnabled ? 'text-purple-600 font-extrabold' : 'text-gray-500 font-bold'" class="text-[10px]"></span>
+        <span x-text="praEnabled ? 'ON' : 'OFF'" :class="praEnabled ? 'text-purple-700 font-black' : 'text-gray-600 font-extrabold'" class="text-xs"></span>
     </div>
     <div class="relative">
-        <button @click.stop="styleOpen = !styleOpen" class="p-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:text-purple-600 dark:hover:text-purple-400 transition shadow-sm" title="Dashboard Style">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
+        <button @click.stop="styleOpen = !styleOpen" class="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white hover:text-purple-600 dark:hover:text-purple-400 transition shadow-md" title="Dashboard Style">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
         </button>
-        <div x-show="styleOpen" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0 scale-95" class="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 z-50 p-3" @click.away="styleOpen = false" x-cloak>
-            <p class="text-[10px] font-extrabold text-gray-700 dark:text-gray-200 uppercase tracking-widest mb-2.5 px-1">Dashboard Design</p>
-            <div class="space-y-1">
+        <div x-show="styleOpen" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0 scale-95" class="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-300 dark:border-gray-600 z-50 p-4" @click.away="styleOpen = false" x-cloak>
+            <p class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider mb-3 px-1">Dashboard Design</p>
+            <div class="space-y-1.5">
                 @php
                 $styles = [
                     ['id' => 'default', 'name' => 'Square Classic', 'desc' => 'Clean & minimal', 'icon' => '◻', 'colors' => ['#f3f4f6','#e5e7eb','#d1d5db']],
@@ -24,19 +24,19 @@
                 ];
                 @endphp
                 @foreach($styles as $s)
-                <button @click="currentStyle='{{ $s['id'] }}'; styleOpen=false; fetch('{{ route('pos.settings.dashboard-style') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({style:'{{ $s['id'] }}'})}).then(()=>window.location.reload())" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all" :class="currentStyle === '{{ $s['id'] }}' ? 'bg-purple-50 dark:bg-purple-900/20 ring-2 ring-purple-500' : 'hover:bg-gray-50 dark:hover:bg-gray-800'">
-                    <span class="text-xl w-8 text-center flex-shrink-0">{{ $s['icon'] }}</span>
+                <button @click="currentStyle='{{ $s['id'] }}'; styleOpen=false; fetch('{{ route('pos.settings.dashboard-style') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({style:'{{ $s['id'] }}'})}).then(()=>window.location.reload())" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all" :class="currentStyle === '{{ $s['id'] }}' ? 'bg-purple-100 dark:bg-purple-900/30 ring-2 ring-purple-500' : 'hover:bg-gray-100 dark:hover:bg-gray-800'">
+                    <span class="text-2xl w-9 text-center flex-shrink-0">{{ $s['icon'] }}</span>
                     <div class="flex-1 text-left min-w-0">
-                        <p class="text-xs font-extrabold text-gray-900 dark:text-white">{{ $s['name'] }}</p>
-                        <p class="text-[10px] text-gray-500 dark:text-gray-400 font-medium">{{ $s['desc'] }}</p>
+                        <p class="text-sm font-black text-gray-900 dark:text-white">{{ $s['name'] }}</p>
+                        <p class="text-xs text-gray-600 dark:text-gray-300 font-semibold">{{ $s['desc'] }}</p>
                     </div>
-                    <div class="flex gap-1 flex-shrink-0">
+                    <div class="flex gap-1.5 flex-shrink-0">
                         @foreach($s['colors'] as $c)
-                        <span class="w-4 h-4 rounded-full border border-gray-200 dark:border-gray-600" style="background: {{ $c }}"></span>
+                        <span class="w-5 h-5 rounded-full border-2 border-gray-300 dark:border-gray-500" style="background: {{ $c }}"></span>
                         @endforeach
                     </div>
                     <span x-show="currentStyle === '{{ $s['id'] }}'" class="text-purple-600 flex-shrink-0">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                     </span>
                 </button>
                 @endforeach

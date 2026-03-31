@@ -20,9 +20,7 @@ class PosAuthController extends Controller
             $user = Auth::guard('pos')->user();
             $loginCompany = Company::find($user->company_id);
             if ($loginCompany && $loginCompany->restaurant_mode) {
-                return ($user->pos_role === 'pos_admin' || $user->role === 'company_admin')
-                    ? redirect('/pos/restaurant/dashboard')
-                    : redirect('/pos/restaurant/pos');
+                return redirect('/pos/restaurant/dashboard');
             }
             return redirect('/pos/dashboard');
         }
@@ -91,10 +89,7 @@ class PosAuthController extends Controller
 
             $loginCompany = Company::find($user->company_id);
             if ($loginCompany && $loginCompany->restaurant_mode) {
-                if ($user->pos_role === 'pos_admin' || $user->role === 'company_admin') {
-                    return redirect('/pos/restaurant/dashboard');
-                }
-                return redirect('/pos/restaurant/pos');
+                return redirect('/pos/restaurant/dashboard');
             }
             return redirect('/pos/dashboard');
         }

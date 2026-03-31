@@ -34,8 +34,10 @@ class PosController extends Controller
 
     public function updateDashboardStyle(Request $request)
     {
-        if (auth('pos')->user()->role !== 'company_admin') {
-            return response()->json(['success' => false, 'message' => 'Only company admin can change dashboard style.'], 403);
+        $user = auth('pos')->user();
+        $isAdmin = in_array($user->pos_role ?? $user->role ?? '', ['pos_admin', 'company_admin']);
+        if (!$isAdmin) {
+            return response()->json(['success' => false, 'message' => 'Only admin can change dashboard style.'], 403);
         }
         $style = $request->json('style') ?? $request->input('style', 'default');
         $allowed = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify'];

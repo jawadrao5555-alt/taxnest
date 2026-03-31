@@ -40,10 +40,6 @@
                     <p class="text-[9px] text-sky-200/50 font-bold uppercase">Tax Collected</p>
                     <p class="text-lg font-black text-white">Rs.{{ number_format($todayTax ?? $todayStats->tax ?? 0) }}</p>
                 </div>
-                <span class="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/20">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block mr-1"></span>
-                    PRA {{ ($company->pra_reporting_enabled ?? false) ? 'Active' : 'Inactive' }}
-                </span>
                 @include('pos.dashboard-styles._style-picker')
             </div>
         </div>

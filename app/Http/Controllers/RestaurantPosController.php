@@ -1067,6 +1067,8 @@ class RestaurantPosController extends Controller
         $dashboardStyle = in_array($company->pos_dashboard_style, $allowedStyles) ? $company->pos_dashboard_style : 'default';
         $isRestaurant = true;
         $isAdmin = in_array($user->pos_role ?? $user->role ?? '', ['pos_admin', 'company_admin']);
+        $praStatus = $company->pra_reporting_enabled;
+        $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
 
         return view('pos.restaurant.dashboard', compact(
             'company', 'todaySales', 'yesterdaySales', 'todayOrders',
@@ -1075,7 +1077,7 @@ class RestaurantPosController extends Controller
             'salesChartLabels', 'salesChartData', 'orderTypeCounts',
             'peakHour', 'todayTax', 'todayDiscount',
             'todayCost', 'todayProfit',
-            'dashboardStyle', 'isRestaurant', 'isAdmin'
+            'dashboardStyle', 'isRestaurant', 'isAdmin', 'praStatus', 'isCashier'
         ));
     }
 

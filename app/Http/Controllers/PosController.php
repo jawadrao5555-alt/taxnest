@@ -1383,6 +1383,11 @@ class PosController extends Controller
 
     public function togglePra(Request $request)
     {
+        $user = auth('pos')->user();
+        if ($user && ($user->pos_role ?? 'pos_admin') === 'pos_cashier') {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $company->pra_reporting_enabled = !$company->pra_reporting_enabled;

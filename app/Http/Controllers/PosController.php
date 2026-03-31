@@ -37,7 +37,7 @@ class PosController extends Controller
         if (auth('pos')->user()->role !== 'company_admin') {
             return response()->json(['success' => false, 'message' => 'Only company admin can change dashboard style.'], 403);
         }
-        $style = $request->input('style', 'default');
+        $style = $request->json('style') ?? $request->input('style', 'default');
         $allowed = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify'];
         if (!in_array($style, $allowed)) {
             return response()->json(['success' => false, 'message' => 'Invalid style'], 422);

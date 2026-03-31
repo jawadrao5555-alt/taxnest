@@ -32,6 +32,21 @@ class PosController extends Controller
         return response()->json(['success' => true, 'theme' => $theme]);
     }
 
+    public function updateDashboardStyle(Request $request)
+    {
+        if (auth('pos')->user()->role !== 'company_admin') {
+            return response()->json(['success' => false, 'message' => 'Only company admin can change dashboard style.'], 403);
+        }
+        $style = $request->input('style', 'default');
+        $allowed = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify'];
+        if (!in_array($style, $allowed)) {
+            return response()->json(['success' => false, 'message' => 'Invalid style'], 422);
+        }
+        $companyId = app('currentCompanyId');
+        Company::where('id', $companyId)->update(['pos_dashboard_style' => $style]);
+        return response()->json(['success' => true, 'style' => $style]);
+    }
+
     public function dashboard()
     {
         $companyId = app('currentCompanyId');
@@ -79,8 +94,14 @@ class PosController extends Controller
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
 
+        $allowedStyles = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify'];
+        $dashboardStyle = in_array($company->pos_dashboard_style, $allowedStyles) ? $company->pos_dashboard_style : 'default';
+        $isRestaurant = false;
+        $isAdmin = !$isCashier;
+
         return view('pos.dashboard', compact(
-            'company', 'todayStats', 'monthStats', 'recentTransactions', 'paymentBreakdown', 'praStatus', 'drafts', 'isCashier'
+            'company', 'todayStats', 'monthStats', 'recentTransactions', 'paymentBreakdown', 'praStatus', 'drafts', 'isCashier',
+            'dashboardStyle', 'isRestaurant', 'isAdmin'
         ));
     }
 

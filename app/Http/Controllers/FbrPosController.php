@@ -17,6 +17,21 @@ use Illuminate\Support\Facades\Log;
 
 class FbrPosController extends Controller
 {
+    public function updateDashboardStyle(Request $request)
+    {
+        if (Auth::guard('fbrpos')->user()->role !== 'company_admin') {
+            return response()->json(['success' => false, 'message' => 'Only company admin can change dashboard style.'], 403);
+        }
+        $style = $request->input('style', 'default');
+        $allowed = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify'];
+        if (!in_array($style, $allowed)) {
+            return response()->json(['success' => false, 'message' => 'Invalid style'], 422);
+        }
+        $companyId = app('currentCompanyId');
+        Company::where('id', $companyId)->update(['pos_dashboard_style' => $style]);
+        return response()->json(['success' => true, 'style' => $style]);
+    }
+
     public function dashboard()
     {
         $companyId = app('currentCompanyId');
@@ -54,9 +69,13 @@ class FbrPosController extends Controller
 
         $fbrReportingStatus = (bool) $company->fbr_reporting_enabled;
 
+        $allowedStyles = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify'];
+        $dashboardStyle = in_array($company->pos_dashboard_style, $allowedStyles) ? $company->pos_dashboard_style : 'default';
+
         return view('fbr-pos.dashboard', compact(
             'company', 'todayStats', 'monthStats',
-            'fbrSubmitted', 'fbrPending', 'recentTransactions', 'fbrReportingStatus'
+            'fbrSubmitted', 'fbrPending', 'recentTransactions', 'fbrReportingStatus',
+            'dashboardStyle'
         ));
     }
 

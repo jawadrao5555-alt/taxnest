@@ -1063,13 +1063,19 @@ class RestaurantPosController extends Controller
             ->sum('estimated_cost');
         $todayProfit = $todaySales - $todayCost;
 
+        $allowedStyles = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify'];
+        $dashboardStyle = in_array($company->pos_dashboard_style, $allowedStyles) ? $company->pos_dashboard_style : 'default';
+        $isRestaurant = true;
+        $isAdmin = in_array($user->pos_role ?? $user->role ?? '', ['pos_admin', 'company_admin']);
+
         return view('pos.restaurant.dashboard', compact(
             'company', 'todaySales', 'yesterdaySales', 'todayOrders',
             'heldCount', 'completedCount', 'totalTables', 'occupiedTables',
             'topProducts', 'lowStockItems', 'recentOrders',
             'salesChartLabels', 'salesChartData', 'orderTypeCounts',
             'peakHour', 'todayTax', 'todayDiscount',
-            'todayCost', 'todayProfit'
+            'todayCost', 'todayProfit',
+            'dashboardStyle', 'isRestaurant', 'isAdmin'
         ));
     }
 

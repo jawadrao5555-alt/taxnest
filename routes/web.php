@@ -390,6 +390,7 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::get('/dashboard', [PosController::class, 'dashboard'])->name('pos.dashboard');
     Route::post('/settings/theme', [PosController::class, 'updateTheme'])->name('pos.settings.theme');
+    Route::post('/settings/dashboard-style', [PosController::class, 'updateDashboardStyle'])->name('pos.settings.dashboard-style');
     Route::get('/invoice/create', [PosController::class, 'createInvoice'])->name('pos.invoice.create');
     Route::post('/invoice/store', [PosController::class, 'storeInvoice'])->name('pos.invoice.store');
     Route::get('/transactions', [PosController::class, 'transactions'])->name('pos.transactions');
@@ -651,6 +652,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth'])->group(function () {
     Route::match(['get', 'post'], '/settings', [FbrPosController::class, 'fbrSettings'])->name('fbrpos.settings');
     Route::post('/test-connection', [FbrPosController::class, 'testConnection'])->name('fbrpos.testConnection');
     Route::post('/api/toggle-fbr-reporting', [FbrPosController::class, 'toggleFbrReporting'])->name('fbrpos.api.toggle-fbr-reporting');
+    Route::post('/settings/dashboard-style', [FbrPosController::class, 'updateDashboardStyle'])->name('fbrpos.settings.dashboard-style');
     Route::post('/api/verify-pin', [FbrPosController::class, 'verifyPin'])->name('fbrpos.api.verify-pin');
     Route::get('/api/check-pin-session', [FbrPosController::class, 'checkPinSession'])->name('fbrpos.api.check-pin-session');
     Route::get('/billing', [FbrPosController::class, 'billing'])->name('fbrpos.billing');

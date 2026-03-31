@@ -1,5 +1,4 @@
 <div class="flex items-center gap-2 flex-shrink-0" x-data="{ styleOpen: false, currentStyle: '{{ $dashboardStyle ?? 'default' }}' }">
-    @if(!($isCashier ?? false))
     <div x-data="{ praEnabled: {{ ($praStatus ?? $company->pra_reporting_enabled ?? false) ? 'true' : 'false' }}, praLoading: false }" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/90 dark:bg-gray-800/90 backdrop-blur border border-gray-200 dark:border-gray-700 shadow-sm">
         <span class="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">PRA</span>
         <button @click="praLoading=true; fetch('{{ route('pos.api.toggle-pra') }}', {method:'POST', headers:{'X-CSRF-TOKEN':'{{ csrf_token() }}','Content-Type':'application/json'}}).then(r=>r.json()).then(d=>{praEnabled=d.enabled; praLoading=false;})" :class="praEnabled ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'" class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out" :disabled="praLoading">
@@ -7,7 +6,6 @@
         </button>
         <span x-text="praEnabled ? 'ON' : 'OFF'" :class="praEnabled ? 'text-purple-600 font-bold' : 'text-gray-400 font-semibold'" class="text-[10px]"></span>
     </div>
-    @endif
     <div class="relative">
         <button @click.stop="styleOpen = !styleOpen" class="p-2 rounded-xl bg-white/90 dark:bg-gray-800/90 backdrop-blur border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition shadow-sm" title="Dashboard Style">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>

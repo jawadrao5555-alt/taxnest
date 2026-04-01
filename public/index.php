@@ -1,5 +1,18 @@
 <?php
 
+if (function_exists('opcache_invalidate')) {
+    $baseDir = dirname(__DIR__);
+    $criticalFiles = [
+        $baseDir . '/app/Http/Controllers/PosAuthController.php',
+        $baseDir . '/app/Http/Controllers/PosController.php',
+        $baseDir . '/app/Http/Controllers/RestaurantPosController.php',
+        $baseDir . '/app/Http/Controllers/FbrPosController.php',
+    ];
+    foreach ($criticalFiles as $f) {
+        if (file_exists($f)) opcache_invalidate($f, true);
+    }
+}
+
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
 

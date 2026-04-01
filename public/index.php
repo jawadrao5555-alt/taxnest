@@ -1,15 +1,12 @@
 <?php
 
-if (function_exists('opcache_invalidate')) {
-    $baseDir = dirname(__DIR__);
-    $criticalFiles = [
-        $baseDir . '/app/Http/Controllers/PosAuthController.php',
-        $baseDir . '/app/Http/Controllers/PosController.php',
-        $baseDir . '/app/Http/Controllers/RestaurantPosController.php',
-        $baseDir . '/app/Http/Controllers/FbrPosController.php',
-    ];
-    foreach ($criticalFiles as $f) {
-        if (file_exists($f)) opcache_invalidate($f, true);
+if (function_exists('opcache_reset')) {
+    $versionFile = dirname(__DIR__) . '/storage/framework/.deploy_version';
+    $currentVersion = '20260401_v2';
+    $lastVersion = file_exists($versionFile) ? file_get_contents($versionFile) : '';
+    if ($lastVersion !== $currentVersion) {
+        opcache_reset();
+        file_put_contents($versionFile, $currentVersion);
     }
 }
 

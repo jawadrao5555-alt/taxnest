@@ -22,7 +22,7 @@ class PosAuthController extends Controller
             if ($loginCompany && $loginCompany->restaurant_mode) {
                 return redirect('/pos/restaurant/pos');
             }
-            return redirect('/pos/create');
+            return redirect('/pos/invoice/create');
         }
         return view('pos.auth.login');
     }
@@ -91,7 +91,7 @@ class PosAuthController extends Controller
             if ($loginCompany && $loginCompany->restaurant_mode) {
                 return redirect('/pos/restaurant/pos');
             }
-            return redirect('/pos/create');
+            return redirect('/pos/invoice/create');
         }
 
         if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
@@ -114,7 +114,7 @@ class PosAuthController extends Controller
     public function showRegister()
     {
         if (Auth::guard('pos')->check()) {
-            return redirect('/pos/create');
+            return redirect('/pos/invoice/create');
         }
         return view('pos.auth.register');
     }
@@ -162,7 +162,7 @@ class PosAuthController extends Controller
         if ($posType === 'restaurant') {
             return redirect('/pos/restaurant/pos');
         }
-        return redirect('/pos/create');
+        return redirect('/pos/invoice/create');
     }
 
     public function logout(Request $request)

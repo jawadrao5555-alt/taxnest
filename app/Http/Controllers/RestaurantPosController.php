@@ -699,8 +699,8 @@ class RestaurantPosController extends Controller
         $customers = PosCustomer::where('company_id', $companyId)
             ->where('is_active', true)
             ->where(function ($query) use ($q) {
-                $query->where('name', 'ilike', "%{$q}%")
-                    ->orWhere('phone', 'ilike', "%{$q}%");
+                $query->whereRaw('LOWER(name) LIKE ?', ['%' . strtolower($q) . '%'])
+                    ->orWhereRaw('LOWER(phone) LIKE ?', ['%' . strtolower($q) . '%']);
             })
             ->limit(8)
             ->get(['id', 'name', 'phone', 'email', 'address']);
@@ -884,7 +884,7 @@ class RestaurantPosController extends Controller
 
         if (!$customer) {
             $partials = PosCustomer::where('company_id', $companyId)
-                ->where('phone', 'ilike', '%' . $phone . '%')
+                ->whereRaw('LOWER(phone) LIKE ?', ['%' . strtolower($phone) . '%'])
                 ->limit(5)
                 ->get(['id', 'name', 'phone', 'address']);
 

@@ -242,9 +242,9 @@ class FbrPosController extends Controller
         if ($request->search) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('invoice_number', 'ilike', "%{$search}%")
-                    ->orWhere('customer_name', 'ilike', "%{$search}%")
-                    ->orWhere('fbr_invoice_number', 'ilike', "%{$search}%");
+                $q->whereRaw('LOWER(invoice_number) LIKE ?', ['%' . strtolower($search) . '%'])
+                    ->orWhereRaw('LOWER(customer_name) LIKE ?', ['%' . strtolower($search) . '%'])
+                    ->orWhereRaw('LOWER(fbr_invoice_number) LIKE ?', ['%' . strtolower($search) . '%']);
             });
         }
 

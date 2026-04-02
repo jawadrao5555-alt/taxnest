@@ -31,7 +31,14 @@
         }
         applyAdminTheme(getAdminTheme());
     </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
+        *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        html, body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
+        body { letter-spacing: -0.011em; }
+        h1, h2, h3, h4, h5, h6, .font-bold, .font-extrabold, .font-semibold { text-rendering: geometricPrecision; }
         body.admin-themed { background-color: var(--admin-body) !important; }
         .admin-sidebar { background-color: var(--admin-sidebar) !important; border-color: var(--admin-sidebar-border) !important; }
         .admin-sidebar-border { border-color: var(--admin-sidebar-border) !important; }

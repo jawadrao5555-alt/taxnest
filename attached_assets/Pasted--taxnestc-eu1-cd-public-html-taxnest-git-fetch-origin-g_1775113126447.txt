@@ -1,0 +1,261 @@
+[taxnestc@eu1 ~]$ cd ~/public_html/taxnest && git fetch origin && git reset --hard origin/main && php artisan optimize:clear
+remote: Enumerating objects: 14, done.
+remote: Counting objects: 100% (14/14), done.
+remote: Compressing objects: 100% (2/2), done.
+remote: Total 9 (delta 6), reused 9 (delta 6), pack-reused 0 (from 0)
+Unpacking objects: 100% (9/9), 1.32 KiB | 169.00 KiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+   13ba74c..7ca1b45  main       -> origin/main
+HEAD is now at 7ca1b45 Saved progress at the end of the loop
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 1.06ms DONE
+  cache .......................................................... 3.05ms DONE
+  compiled ....................................................... 0.51ms DONE
+  events ......................................................... 0.27ms DONE
+  routes ......................................................... 0.26ms DONE
+  views ......................................................... 10.19ms DONE[taxnestc@eu1 taxnest]$ cd ~/public_html/taxnest && php artisan migrate --force                                                                                                        ALTER TABLE pos_transactions ADD COLUMN IF NO
+T EXISTS customer_id BIGINT NULL;ALTER TABLE companies ADD COLUMN IF NOT EXISTS pos_theme VARCHAR(30) DEFAULT 'default';ALTER TABLE companies ADD COLUMN IF NOT EXISTS pos_dashboard_style VARCHAR(30) DEFAULT 'default';NULL;
+bash: ALTER: command not foundMN IF NOT EXISTS pos_theme cd ~/public_html/taxnest && php artisan tinker --execute="DB::statement('ALTER TABLE pos_tra
+nsactions ADD COLUMN IF cd ~/public_html/taxnest && php -r "; echo 'customer_id done'; DB::statement(\"ALTER TABLE companies ADD COLUMN IF NOT EXISTS
+\$db = parse_url(getenv('DATABASE_URL'));"); echo 'pos_theme done'; DB::statement(\"ALTER TABLE companies ADD COLUMN IF NOT EXISTS pos_dashboard_styl
+\$dsn = 'pgsql:host='.\$db['host'].';port='.(\$db['port']??5432).';dbname='.ltrim(\$db['path'],'/');ER TABLE pos_transactions ADD COLUMN IF NOT EXIST\$pdo = new PDO(\$dsn, \$db['user'], \$db['pass']);nment.:statement(\"ALTER TABLE companies ADD COLUMN IF NOT EXISTS pos_theme VARCHAR(30) DEFAULT 'd\$pdo->exec('ALTER TABLE pos_transactions ADD COLUMN IF NOT EXISTS customer_id BIGINT NULL');ISTS pos_dashboard_style VARCHAR(30) DEFAULT 'default'\"echo \"customer_id added\n\";BASE_URL'));
+\$pdo->exec(\"ALTER TABLE companies ADD COLUMN IF NOT EXISTS pos_theme VARCHAR(30) DEFAULT 'default'\");
+echo \"pos_theme added\n\";['user'], \$db['pass']);
+\$pdo->exec(\"ALTER TABLE companies ADD COLUMN IF NOT EXISTS pos_dashboard_style VARCHAR(30) DEFAULT 'default'\");
+echo \"pos_dashboard_style added\n\";
+"$pdo->exec(\"ALTER TABLE companies ADD COLUMN IF NOT EXISTS pos_theme VARCHAR(30) DEFAULT 'default'\");
+Unsuccessful stat on filcd ~/public_html/taxnest && git fetch origin && git reset --hard origin/main && php artisan optimize:clear
+remote: Enumerating objects: 15, done.
+remote: Counting objects: 100% (15/15), done.
+remote: Compressing objects: 100% (4/4), done.
+remote: Total 9 (delta 5), reused 9 (delta 5), pack-reused 0 (from 0)
+Unpacking objects: 100% (9/9), 2.27 KiB | 1.13 MiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+   7ca1b45..2d2381b  main       -> origin/main
+HEAD is now at 2d2381b Fix payment processing errors and add database migration scripts
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.81ms DONE
+  cache .......................................................... 1.79ms DONE
+  compiled ....................................................... 0.70ms DONE
+  events ......................................................... 0.29ms DONE
+  routes ......................................................... 0.28ms DONE
+  views .......................................................... 2.57ms DONE
+
+[taxnestc@eu1 taxnest]$ https://taxnest.com.pk/run-missing-migrations.php
+bash: https://taxnest.com.pk/run-missing-migrations.php: No such file or directory                      cd ~/public_html/taxnest && php public/run-mi
+ssing-migrations.phpt]$ cd ~/public_html/taxnest && php public/run-missing-migrations.php
+{
+    "success": true,
+    "results": [
+        "customer_id already exists in pos_transactions",
+        "pos_theme already exists in companies",
+        "pos_dashboard_style already exists in companies"
+    ],
+    "columns": {
+        "pos_transactions": [
+            "id",
+            "company_id",
+            "terminal_id",
+            "invoice_number",
+            "invoice_mode",
+            "customer_id",
+            "customer_name",
+            "customer_phone",
+            "subtotal",
+            "discount_type",
+            "discount_value",
+            "discount_amount",
+            "tax_rate",
+            "tax_amount",
+            "exempt_amount",
+            "total_amount",
+            "payment_method",
+            "status",
+            "locked_by_terminal_id",
+            "lock_time",
+            "pra_invoice_number",
+            "pra_response_code",
+            "pra_status",
+            "submission_hash",
+            "pra_qr_code",
+            "created_by",
+            "created_at",
+            "updated_at",
+            "share_token",
+            "share_token_created_at",
+            "receipt_printed_at",
+            "reprint_count"
+        ],
+        "restaurant_orders": [
+            "id",
+            "company_id",
+            "order_number",
+            "table_id",
+            "order_type",
+            "status",
+            "customer_id",
+            "customer_name",
+            "customer_phone",
+            "subtotal",
+            "discount_type",
+            "discount_value",
+            "discount_amount",
+            "tax_amount",
+            "total_amount",
+            "payment_method",
+            "kitchen_notes",
+            "priority",
+            "pos_transaction_id",
+            "created_by",
+            "created_at",
+            "updated_at",
+            "estimated_cost"
+        ],
+        "restaurant_order_items": [
+            "id",
+            "order_id",
+            "item_type",
+            "item_id",
+            "item_name",
+            "quantity",
+            "unit_price",
+            "subtotal",
+            "special_notes",
+            "is_tax_exempt",
+            "item_discount_type",
+            "item_discount_value",
+            "item_discount_amount",
+            "created_at",
+            "updated_at"
+        ],
+        "companies": [
+            "id",
+            "name",
+            "owner_name",
+            "registration_no",
+            "ntn",
+            "cnic",
+            "email",
+            "website",
+            "logo_path",
+            "phone",
+            "mobile",
+            "address",
+            "city",
+            "business_activity",
+            "fbr_token",
+            "token_expires_at",
+            "compliance_score",
+            "created_at",
+            "updated_at",
+            "deleted_at",
+            "deleted_reason",
+            "is_internal_account",
+            "onboarding_completed",
+            "fbr_sandbox_url",
+            "fbr_production_url",
+            "fbr_environment",
+            "fbr_sandbox_token",
+            "fbr_production_token",
+            "fbr_registration_no",
+            "fbr_business_name",
+            "suspended_at",
+            "company_status",
+            "force_watermark",
+            "status",
+            "product_type",
+            "pos_type",
+            "pos_theme",
+            "pos_dashboard_style",
+            "franchise_id",
+            "token_expiry_date",
+            "last_successful_submission",
+            "fbr_connection_status",
+            "standard_tax_rate",
+            "sector_type",
+            "province",
+            "invoice_number_prefix",
+            "next_invoice_number",
+            "invoice_limit_override",
+            "user_limit_override",
+            "branch_limit_override",
+            "inventory_enabled",
+            "pra_reporting_enabled",
+            "kds_enabled",
+            "restaurant_mode",
+            "kitchen_printer_enabled",
+            "print_on_hold",
+            "print_on_pay",
+            "pra_environment",
+            "pra_pos_id",
+            "pra_production_token",
+            "pra_proxy_url",
+            "fbr_pos_enabled",
+            "fbr_reporting_enabled",
+            "fbr_pos_id",
+            "fbr_pos_token",
+            "fbr_pos_environment",
+            "receipt_printer_size",
+            "confidential_pin",
+            "next_local_invoice_number",
+            "pra_access_code",
+            "manager_override_pin",
+            "cashier_discount_limit",
+            "manager_discount_limit"
+        ]
+    }                   cd ~/public_html/taxnest && git fetch origin && git reset --hard origin/main && php artisan optimize:clear
+remote: Enumerating objects: 10, done.
+remote: Counting objects: 100% (10/10), done.
+remote: Compressing objects: 100% (2/2), done.
+remote: Total 8 (delta 6), reused 8 (delta 6), pack-reused 0 (from 0)
+Unpacking objects: 100% (8/8), 2.16 KiB | 739.00 KiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+   2d2381b..5790595  main       -> origin/main
+HEAD is now at 5790595 Update application code and database with the latest changes
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.77ms DONE
+  cache .......................................................... 2.23ms DONE
+  compiled ....................................................... 0.62ms DONE
+  events ......................................................... 0.44ms DONE
+  routes ......................................................... 0.31ms DONE
+  views .......................................................... 2.99ms DONE
+                        cd ~/public_html/taxnest && git fetch origin && git reset --hard origin/main && php artisan optimize:clear
+HEAD is now at 5790595 Update application code and database with the latest changes-hard origin/main && php artisan optimize:clear
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.85ms DONE
+  cache .......................................................... 2.59ms DONE
+  compiled ....................................................... 0.55ms DONE
+  events ......................................................... 0.32ms DONE
+  routes ......................................................... 0.34ms DONE
+  views .......................................................... 3.67ms DONE
+
+[taxnestc@eu1 taxnest]$ cd ~/public_html/taxnest && git log --oneline -1
+5790595 (HEAD -> main, origin/main, origin/HEAD) Update application code and database with the latest chcd ~/public_html/taxnest && git pull origin m
+ain && php artisan optimize:clear && php artisan view:clearl origin main && php artisan optimize:clear && php artisan view:clear
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.76ms DONE
+  cache .......................................................... 2.79ms DONE
+  compiled ....................................................... 0.52ms DONE
+  events ......................................................... 0.29ms DONE
+  routes ......................................................... 0.27ms DONE
+  views .......................................................... 3.34ms DONE
+
+
+   INFO  Compiled views cleared successfully.
+                                                                                                        grep -c "NULLS LAST" ~/public_html/taxnest/ap
+p/Http/Controllers/RestaurantPosController.php/public_html/taxnest/app/Http/Controllers/RestaurantPosController.php
+2                                  cd ~/public_html/taxnest && php -r "if(function_exists('opcache_reset')){opcache_reset();echo 'OPcache cleared';}e
+lse{echo 'No opcache';}" && rm -f storage/framework/.deploy_versiontion_exists('opcache_reset')){opcache_reset();echo 'OPcache cleared';}else{echo 'NNo opcache[taxnestc@eu1 taxnest]$ mework/.deploy_version

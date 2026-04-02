@@ -1,0 +1,34 @@
+[taxnestc@eu1 ~]$ cd ~/public_html/taxnest && git fetch origin && git reset --hard origin/main && php artisan optimize:clear
+remote: Enumerating objects: 14, done.
+remote: Counting objects: 100% (14/14), done.
+remote: Compressing objects: 100% (2/2), done.
+remote: Total 9 (delta 6), reused 9 (delta 6), pack-reused 0 (from 0)
+Unpacking objects: 100% (9/9), 1.32 KiB | 169.00 KiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+   13ba74c..7ca1b45  main       -> origin/main
+HEAD is now at 7ca1b45 Saved progress at the end of the loop
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 1.06ms DONE
+  cache .......................................................... 3.05ms DONE
+  compiled ....................................................... 0.51ms DONE
+  events ......................................................... 0.27ms DONE
+  routes ......................................................... 0.26ms DONE
+  views ......................................................... 10.19ms DONE[taxnestc@eu1 taxnest]$ cd ~/public_html/taxnest && php artisan migrate --force                                                                                                        ALTER TABLE pos_transactions ADD COLUMN IF NO
+T EXISTS customer_id BIGINT NULL;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS pos_theme VARCHAR(30) DEFAULT 'default';
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS pos_dashboard_style VARCHAR(30) DEFAULT 'default';NULL;
+bash: ALTER: command not foundMN IF NOT EXISTS pos_theme cd ~/public_html/taxnest && php artisan tinker --execute="DB::statement('ALTER TABLE pos_tra
+nsactions ADD COLUMN IF cd ~/public_html/taxnest && php -r "; echo 'customer_id done'; DB::statement(\"ALTER TABLE companies ADD COLUMN IF NOT EXISTS
+\$db = parse_url(getenv('DATABASE_URL'));"); echo 'pos_theme done'; DB::statement(\"ALTER TABLE companies ADD COLUMN IF NOT EXISTS pos_dashboard_styl
+\$dsn = 'pgsql:host='.\$db['host'].';port='.(\$db['port']??5432).';dbname='.ltrim(\$db['path'],'/');ER TABLE pos_transactions ADD COLUMN IF NOT EXIST\$pdo = new PDO(\$dsn, \$db['user'], \$db['pass']);nment.:statement(\"ALTER TABLE companies ADD COLUMN IF NOT EXISTS pos_theme VARCHAR(30) DEFAULT 'd\$pdo->exec('ALTER TABLE pos_transactions ADD COLUMN IF NOT EXISTS customer_id BIGINT NULL');ISTS pos_dashboard_style VARCHAR(30) DEFAULT 'default'\"echo \"customer_id added\n\";BASE_URL'));
+\$pdo->exec(\"ALTER TABLE companies ADD COLUMN IF NOT EXISTS pos_theme VARCHAR(30) DEFAULT 'default'\");
+echo \"pos_theme added\n\";['user'], \$db['pass']);
+\$pdo->exec(\"ALTER TABLE companies ADD COLUMN IF NOT EXISTS pos_dashboard_style VARCHAR(30) DEFAULT 'default'\");
+echo \"pos_dashboard_style added\n\";
+"$pdo->exec(\"ALTER TABLE companies ADD COLUMN IF NOT EXISTS pos_theme VARCHAR(30) DEFAULT 'default'\");
+Unsuccessful stat on filename containing newline at /var/cpanel/ea4/ea_php_cli.pm line 87.
+[taxnestc@eu1 taxnest]$ E companies ADD COLUMN IF NOT EXISTS pos_dashboard_style VARCHAR(30) DEFAULT 'default'\");
+echo \"pos_dashboard_style added\n\";
+"

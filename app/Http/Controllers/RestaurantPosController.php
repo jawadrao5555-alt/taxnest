@@ -654,33 +654,37 @@ class RestaurantPosController extends Controller
     private function generateInvoiceNumber($companyId)
     {
         $year = date('Y');
-        $last = PosTransaction::where('company_id', $companyId)
+        $prefix = "POS-{$year}-";
+        $all = PosTransaction::where('company_id', $companyId)
             ->where('invoice_mode', 'pra')
-            ->where('invoice_number', 'like', "POS-{$year}-%")
-            ->orderByRaw("CAST(SUBSTRING(invoice_number FROM 'POS-{$year}-([0-9]+)') AS INTEGER) DESC NULLS LAST")
-            ->first();
+            ->where('invoice_number', 'like', "{$prefix}%")
+            ->pluck('invoice_number');
 
-        $nextNum = 1;
-        if ($last && preg_match('/POS-' . $year . '-(\d+)/', $last->invoice_number, $m)) {
-            $nextNum = (int) $m[1] + 1;
+        $maxNum = 0;
+        foreach ($all as $inv) {
+            if (preg_match('/POS-' . $year . '-(\d+)/', $inv, $m)) {
+                $maxNum = max($maxNum, (int) $m[1]);
+            }
         }
-        return "POS-{$year}-" . str_pad($nextNum, 5, '0', STR_PAD_LEFT);
+        return $prefix . str_pad($maxNum + 1, 5, '0', STR_PAD_LEFT);
     }
 
     private function generateLocalInvoiceNumber($companyId)
     {
         $year = date('Y');
-        $last = PosTransaction::where('company_id', $companyId)
+        $prefix = "LOCAL-{$year}-";
+        $all = PosTransaction::where('company_id', $companyId)
             ->where('invoice_mode', 'local')
-            ->where('invoice_number', 'like', "LOCAL-{$year}-%")
-            ->orderByRaw("CAST(SUBSTRING(invoice_number FROM 'LOCAL-{$year}-([0-9]+)') AS INTEGER) DESC NULLS LAST")
-            ->first();
+            ->where('invoice_number', 'like', "{$prefix}%")
+            ->pluck('invoice_number');
 
-        $nextNum = 1;
-        if ($last && preg_match('/LOCAL-' . $year . '-(\d+)/', $last->invoice_number, $m)) {
-            $nextNum = (int) $m[1] + 1;
+        $maxNum = 0;
+        foreach ($all as $inv) {
+            if (preg_match('/LOCAL-' . $year . '-(\d+)/', $inv, $m)) {
+                $maxNum = max($maxNum, (int) $m[1]);
+            }
         }
-        return "LOCAL-{$year}-" . str_pad($nextNum, 5, '0', STR_PAD_LEFT);
+        return $prefix . str_pad($maxNum + 1, 5, '0', STR_PAD_LEFT);
     }
 
     public function customerSearch(Request $request)

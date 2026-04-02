@@ -32,12 +32,12 @@
                     @if($pct != 0)<span class="ls-badge {{ $pct >= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300' }}"><svg class="w-3 h-3 {{ $pct < 0 ? 'rotate-180' : '' }}" fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z"/></svg>{{ abs($pct) }}%</span>@endif
                 </div>
                 <div class="flex gap-8 mt-4">
-                    <div><p class="text-2xl font-black text-white">{{ $todayOrders ?? $todayStats->count ?? 0 }}</p><p class="text-[9px] text-violet-200/50 font-bold uppercase">Orders</p></div>
-                    <div><p class="text-2xl font-black text-white">Rs.{{ number_format($todayStats->avg_ticket ?? (($todayOrders ?? 0) > 0 ? ($todaySales ?? 0) / ($todayOrders ?? 1) : 0)) }}</p><p class="text-[9px] text-violet-200/50 font-bold uppercase">Avg Ticket</p></div>
+                    <div><p class="text-2xl font-black text-white">{{ $todayOrders ?? $todayStats->count ?? 0 }}</p><p class="text-[9px] text-violet-200/90 font-bold uppercase">Orders</p></div>
+                    <div><p class="text-2xl font-black text-white">Rs.{{ number_format($todayStats->avg_ticket ?? (($todayOrders ?? 0) > 0 ? ($todaySales ?? 0) / ($todayOrders ?? 1) : 0)) }}</p><p class="text-[9px] text-violet-200/90 font-bold uppercase">Avg Ticket</p></div>
                     @if($isRestaurant)
-                    <div><p class="text-2xl font-black text-white">{{ $occupiedTables ?? 0 }}<span class="text-lg text-white/30">/{{ $totalTables ?? 0 }}</span></p><p class="text-[9px] text-violet-200/50 font-bold uppercase">Tables</p></div>
+                    <div><p class="text-2xl font-black text-white">{{ $occupiedTables ?? 0 }}<span class="text-lg text-white/70">/{{ $totalTables ?? 0 }}</span></p><p class="text-[9px] text-violet-200/90 font-bold uppercase">Tables</p></div>
                     @else
-                    <div><p class="text-2xl font-black text-white">Rs.{{ number_format(($monthSales ?? $monthStats->revenue ?? 0) / 1000) }}k</p><p class="text-[9px] text-violet-200/50 font-bold uppercase">Monthly</p></div>
+                    <div><p class="text-2xl font-black text-white">Rs.{{ number_format(($monthSales ?? $monthStats->revenue ?? 0) / 1000) }}k</p><p class="text-[9px] text-violet-200/90 font-bold uppercase">Monthly</p></div>
                     @endif
                 </div>
             </div>
@@ -50,42 +50,42 @@
             <div class="relative z-10">
                 <div class="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center mb-3"><svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg></div>
                 <p class="text-sm font-black text-white">POS</p>
-                <p class="text-[9px] text-white/50 mt-0.5">Start selling</p>
+                <p class="text-[9px] text-white/80 mt-0.5">Start selling</p>
             </div>
         </a>
         <a href="{{ route('pos.transactions') }}" class="ls-tile bg-gradient-to-br from-blue-500 to-indigo-700 shadow-xl shadow-blue-500/20">
             <div class="relative z-10">
                 <div class="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center mb-3"><svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg></div>
                 <p class="text-sm font-black text-white">Orders</p>
-                <p class="text-[9px] text-white/50 mt-0.5">{{ $todayOrders ?? 0 }} today</p>
+                <p class="text-[9px] text-white/80 mt-0.5">{{ $todayOrders ?? 0 }} today</p>
             </div>
         </a>
         <a href="{{ route('pos.restaurant.tables') }}" class="ls-tile bg-gradient-to-br from-amber-500 to-orange-700 shadow-xl shadow-amber-500/20">
             <div class="relative z-10">
                 <div class="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center mb-3"><svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/></svg></div>
                 <p class="text-sm font-black text-white">Tables</p>
-                <p class="text-[9px] text-white/50 mt-0.5">{{ $occupiedTables ?? 0 }}/{{ $totalTables ?? 0 }}</p>
+                <p class="text-[9px] text-white/80 mt-0.5">{{ $occupiedTables ?? 0 }}/{{ $totalTables ?? 0 }}</p>
             </div>
         </a>
         <a href="{{ route('pos.restaurant.kds') }}" class="ls-tile bg-gradient-to-br from-rose-500 to-pink-700 shadow-xl shadow-rose-500/20">
             <div class="relative z-10">
                 <div class="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center mb-3"><svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg></div>
                 <p class="text-sm font-black text-white">Kitchen</p>
-                <p class="text-[9px] text-white/50 mt-0.5">KDS view</p>
+                <p class="text-[9px] text-white/80 mt-0.5">KDS view</p>
             </div>
         </a>
         <a href="{{ route('pos.products') }}" class="ls-tile bg-gradient-to-br from-emerald-500 to-teal-700 shadow-xl shadow-emerald-500/20">
             <div class="relative z-10">
                 <div class="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center mb-3"><svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg></div>
                 <p class="text-sm font-black text-white">Menu</p>
-                <p class="text-[9px] text-white/50 mt-0.5">Products</p>
+                <p class="text-[9px] text-white/80 mt-0.5">Products</p>
             </div>
         </a>
         <a href="{{ route('pos.restaurant.ingredients') }}" class="ls-tile bg-gradient-to-br from-cyan-500 to-sky-700 shadow-xl shadow-cyan-500/20">
             <div class="relative z-10">
                 <div class="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center mb-3"><svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg></div>
                 <p class="text-sm font-black text-white">Stock</p>
-                <p class="text-[9px] text-white/50 mt-0.5">{{ ($lowStockItems ?? collect())->count() > 0 ? ($lowStockItems ?? collect())->count() . ' low' : 'OK' }}</p>
+                <p class="text-[9px] text-white/80 mt-0.5">{{ ($lowStockItems ?? collect())->count() > 0 ? ($lowStockItems ?? collect())->count() . ' low' : 'OK' }}</p>
             </div>
         </a>
     </div>

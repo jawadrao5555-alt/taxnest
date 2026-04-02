@@ -147,7 +147,7 @@
         <div class="stat-card bg-gradient-to-br from-amber-500 to-orange-600 p-4 shadow-lg shadow-amber-500/15">
             <div class="relative z-10">
                 <span class="text-[9px] font-bold uppercase tracking-wider text-amber-100/70">Tables</span>
-                <p class="text-xl font-extrabold text-white count-up mt-1">{{ $occupiedTables ?? 0 }}<span class="text-sm text-white/50">/{{ $totalTables ?? 0 }}</span></p>
+                <p class="text-xl font-extrabold text-white count-up mt-1">{{ $occupiedTables ?? 0 }}<span class="text-sm text-white/80">/{{ $totalTables ?? 0 }}</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: {{ ($totalTables ?? 0) > 0 ? round(($occupiedTables ?? 0) / ($totalTables ?? 1) * 100) : 0 }}%"></div></div>
             </div>
         </div>

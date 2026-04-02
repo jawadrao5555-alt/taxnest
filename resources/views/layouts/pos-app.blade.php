@@ -53,12 +53,12 @@
             .main-scroll::-webkit-scrollbar-thumb { background: rgba(156,163,175,0.3); border-radius: 4px; }
             .main-scroll::-webkit-scrollbar-track { background: transparent; }
 
-            [data-theme="purple"] { --nav-bg: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4c1d95 100%); --accent-h: 263; --accent-s: 70%; --accent-l: 50%; --avatar-from: #a78bfa; --avatar-to: #7c3aed; --accent-glow: rgba(124,58,237,0.2); --meta-color: rgba(196,181,253,0.5); --status-text: rgba(196,181,253,0.6); --pill-hover: rgba(255,255,255,0.12); --pill-active: rgba(255,255,255,0.18); }
-            [data-theme="blue"] { --nav-bg: linear-gradient(135deg, #0c1929 0%, #1e3a5f 40%, #1d4ed8 100%); --accent-h: 217; --accent-s: 91%; --accent-l: 48%; --avatar-from: #60a5fa; --avatar-to: #2563eb; --accent-glow: rgba(37,99,235,0.2); --meta-color: rgba(147,197,253,0.5); --status-text: rgba(147,197,253,0.6); --pill-hover: rgba(255,255,255,0.12); --pill-active: rgba(255,255,255,0.18); }
-            [data-theme="emerald"] { --nav-bg: linear-gradient(135deg, #022c22 0%, #064e3b 40%, #047857 100%); --accent-h: 160; --accent-s: 84%; --accent-l: 39%; --avatar-from: #34d399; --avatar-to: #059669; --accent-glow: rgba(5,150,105,0.2); --meta-color: rgba(110,231,183,0.5); --status-text: rgba(110,231,183,0.6); --pill-hover: rgba(255,255,255,0.12); --pill-active: rgba(255,255,255,0.18); }
-            [data-theme="orange"] { --nav-bg: linear-gradient(135deg, #431407 0%, #7c2d12 40%, #c2410c 100%); --accent-h: 21; --accent-s: 90%; --accent-l: 48%; --avatar-from: #fb923c; --avatar-to: #ea580c; --accent-glow: rgba(234,88,12,0.2); --meta-color: rgba(253,186,116,0.5); --status-text: rgba(253,186,116,0.6); --pill-hover: rgba(255,255,255,0.12); --pill-active: rgba(255,255,255,0.18); }
-            [data-theme="midnight"] { --nav-bg: linear-gradient(135deg, #0a0a0a 0%, #171717 40%, #262626 100%); --accent-h: 0; --accent-s: 0%; --accent-l: 45%; --avatar-from: #a3a3a3; --avatar-to: #525252; --accent-glow: rgba(115,115,115,0.2); --meta-color: rgba(163,163,163,0.5); --status-text: rgba(163,163,163,0.6); --pill-hover: rgba(255,255,255,0.1); --pill-active: rgba(255,255,255,0.15); }
-            [data-theme="rose"] { --nav-bg: linear-gradient(135deg, #4c0519 0%, #881337 40%, #be123c 100%); --accent-h: 347; --accent-s: 77%; --accent-l: 50%; --avatar-from: #fb7185; --avatar-to: #e11d48; --accent-glow: rgba(225,29,72,0.2); --meta-color: rgba(253,164,175,0.5); --status-text: rgba(253,164,175,0.6); --pill-hover: rgba(255,255,255,0.12); --pill-active: rgba(255,255,255,0.18); }
+            [data-theme="purple"] { --nav-bg: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4c1d95 100%); --accent-h: 263; --accent-s: 70%; --accent-l: 50%; --avatar-from: #a78bfa; --avatar-to: #7c3aed; --accent-glow: rgba(124,58,237,0.2); --meta-color: rgba(216,206,253,0.9); --status-text: rgba(216,206,253,0.85); --pill-hover: rgba(255,255,255,0.12); --pill-active: rgba(255,255,255,0.18); }
+            [data-theme="blue"] { --nav-bg: linear-gradient(135deg, #0c1929 0%, #1e3a5f 40%, #1d4ed8 100%); --accent-h: 217; --accent-s: 91%; --accent-l: 48%; --avatar-from: #60a5fa; --avatar-to: #2563eb; --accent-glow: rgba(37,99,235,0.2); --meta-color: rgba(178,213,253,0.9); --status-text: rgba(178,213,253,0.85); --pill-hover: rgba(255,255,255,0.12); --pill-active: rgba(255,255,255,0.18); }
+            [data-theme="emerald"] { --nav-bg: linear-gradient(135deg, #022c22 0%, #064e3b 40%, #047857 100%); --accent-h: 160; --accent-s: 84%; --accent-l: 39%; --avatar-from: #34d399; --avatar-to: #059669; --accent-glow: rgba(5,150,105,0.2); --meta-color: rgba(144,238,200,0.9); --status-text: rgba(144,238,200,0.85); --pill-hover: rgba(255,255,255,0.12); --pill-active: rgba(255,255,255,0.18); }
+            [data-theme="orange"] { --nav-bg: linear-gradient(135deg, #431407 0%, #7c2d12 40%, #c2410c 100%); --accent-h: 21; --accent-s: 90%; --accent-l: 48%; --avatar-from: #fb923c; --avatar-to: #ea580c; --accent-glow: rgba(234,88,12,0.2); --meta-color: rgba(253,205,150,0.9); --status-text: rgba(253,205,150,0.85); --pill-hover: rgba(255,255,255,0.12); --pill-active: rgba(255,255,255,0.18); }
+            [data-theme="midnight"] { --nav-bg: linear-gradient(135deg, #0a0a0a 0%, #171717 40%, #262626 100%); --accent-h: 0; --accent-s: 0%; --accent-l: 45%; --avatar-from: #a3a3a3; --avatar-to: #525252; --accent-glow: rgba(115,115,115,0.2); --meta-color: rgba(200,200,200,0.9); --status-text: rgba(200,200,200,0.85); --pill-hover: rgba(255,255,255,0.1); --pill-active: rgba(255,255,255,0.15); }
+            [data-theme="rose"] { --nav-bg: linear-gradient(135deg, #4c0519 0%, #881337 40%, #be123c 100%); --accent-h: 347; --accent-s: 77%; --accent-l: 50%; --avatar-from: #fb7185; --avatar-to: #e11d48; --accent-glow: rgba(225,29,72,0.2); --meta-color: rgba(253,190,200,0.9); --status-text: rgba(253,190,200,0.85); --pill-hover: rgba(255,255,255,0.12); --pill-active: rgba(255,255,255,0.18); }
 
             .topnav-bar { background: var(--nav-bg, linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4c1d95 100%)); }
             .nav-pill { transition: all 0.15s ease; }
@@ -85,11 +85,11 @@
                     <div class="flex items-center gap-3">
                         <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}" class="flex items-center gap-2 group">
                             <div class="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center group-hover:bg-white/25 transition">
-                                <svg class="w-4 h-4 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                             </div>
                             <div class="hidden sm:block">
                                 <span class="text-sm font-extrabold text-white tracking-tight">NestPOS</span>
-                                <span class="text-[9px] text-white/30 ml-1 hidden lg:inline">Enterprise</span>
+                                <span class="text-[9px] text-white/70 ml-1 hidden lg:inline">Enterprise</span>
                             </div>
                         </a>
 
@@ -98,13 +98,13 @@
                         <nav class="hidden md:flex items-center gap-1">
                             @if($isRestaurantLayout)
                             <a href="{{ route('pos.restaurant.pos') }}"
-                               class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.restaurant.pos') ? 'active text-white' : 'text-white/60' }}">
+                               class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.restaurant.pos') ? 'active text-white' : 'text-white/90' }}">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
                                 New Sale
                             </a>
                             @else
                             <a href="{{ route('pos.invoice.create') }}"
-                               class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.invoice.create') ? 'active text-white' : 'text-white/60' }}">
+                               class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.invoice.create') ? 'active text-white' : 'text-white/90' }}">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
                                 New Sale
                             </a>
@@ -120,7 +120,7 @@
                         </div>
 
                         <div class="relative">
-                            <button @click="themeOpen = !themeOpen; profileOpen = false" class="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition" title="Change Theme">
+                            <button @click="themeOpen = !themeOpen; profileOpen = false" class="p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition" title="Change Theme">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
                             </button>
                             <div x-show="themeOpen" x-cloak @click.outside="themeOpen = false" x-transition class="absolute right-0 top-full mt-2 bg-white dark:bg-gray-900 rounded-xl shadow-2xl shadow-black/20 border border-gray-200/80 dark:border-gray-700/80 p-3 z-[100] w-48">
@@ -139,7 +139,7 @@
                             </div>
                         </div>
 
-                        <button @click="mobileMenuOpen = !mobileMenuOpen" class="md:hidden p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition">
+                        <button @click="mobileMenuOpen = !mobileMenuOpen" class="md:hidden p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                         </button>
 
@@ -317,9 +317,9 @@
                      x-transition:leave-end="opacity-0 -translate-y-2"
                      class="md:hidden border-t border-white/10 px-3 py-2 flex flex-wrap gap-1.5" style="background: hsla(var(--accent-h), var(--accent-s), 10%, 0.9)">
                     @if($isRestaurantLayout)
-                    <a href="{{ route('pos.restaurant.pos') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.restaurant.pos') ? 'active text-white' : 'text-white/60' }}">New Sale</a>
+                    <a href="{{ route('pos.restaurant.pos') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.restaurant.pos') ? 'active text-white' : 'text-white/90' }}">New Sale</a>
                     @else
-                    <a href="{{ route('pos.invoice.create') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.invoice.create') ? 'active text-white' : 'text-white/60' }}">New Sale</a>
+                    <a href="{{ route('pos.invoice.create') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.invoice.create') ? 'active text-white' : 'text-white/90' }}">New Sale</a>
                     @endif
                 </div>
             </header>

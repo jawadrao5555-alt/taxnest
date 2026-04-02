@@ -1,0 +1,57 @@
+[taxnestc@eu1 ~]$ cd ~/public_html/taxnest && git fetch origin && git reset --hard origin/main && php artisan optimize:clear && php artisan view:clear && php artisan cache:clear && php artisan migrate --force
+remote: Enumerating objects: 92, done.
+remote: Counting objects: 100% (92/92), done.
+remote: Compressing objects: 100% (25/25), done.
+remote: Total 62 (delta 39), reused 58 (delta 35), pack-reused 0 (from 0)
+Unpacking objects: 100% (62/62), 72.17 KiB | 1.76 MiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+   80b1ca3..dcaf5aa  main       -> origin/main
+HEAD is now at dcaf5aa Fix: POS redirect /pos/create→/pos/invoice/create, remove all ilike (MySQL compat), add updateProduct validation
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.83ms DONE
+  cache .......................................................... 2.49ms DONE
+  compiled ....................................................... 0.47ms DONE
+  events ......................................................... 0.29ms DONE
+  routes ......................................................... 0.28ms DONE
+  views .......................................................... 3.80ms DONE
+
+
+   INFO  Compiled views cleared successfully.
+
+   INFO  Application cache cleared successfully.
+
+
+   INFO  Running migrations.
+
+  2026_04_02_124109_add_category_fields_to_pos_products_table ... 52.17ms DONE
+                        cd ~/public_html/taxnest && git fetch origin && git reset --hard origin/main && php artisan optimize:clear && php artisan vie
+w:clear && php artisan cache:clear && php artisan migrate --forcegin && git reset --hard origin/main && php artisan optimize:clear && php artisan vieremote: Enumerating objects: 44, done.
+remote: Counting objects: 100% (44/44), done.
+remote: Compressing objects: 100% (4/4), done.
+remote: Total 28 (delta 23), reused 28 (delta 23), pack-reused 0 (from 0)
+Unpacking objects: 100% (28/28), 134.39 KiB | 1.68 MiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+   dcaf5aa..d854a9e  main       -> origin/main
+HEAD is now at d854a9e Fix: prevent browser autocomplete on POS search inputs (email prefill bug)
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.93ms DONE
+  cache .......................................................... 3.98ms DONE
+  compiled ....................................................... 1.19ms DONE
+  events ......................................................... 0.56ms DONE
+  routes ......................................................... 0.37ms DONE
+  views .......................................................... 3.22ms DONE
+
+
+   INFO  Compiled views cleared successfully.
+
+
+   INFO  Application cache cleared successfully.
+
+
+   INFO  Nothing to migrate.
+
+[taxnestc@eu1 taxnest]$

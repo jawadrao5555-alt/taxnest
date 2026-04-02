@@ -20,9 +20,9 @@ class PosAuthController extends Controller
             $user = Auth::guard('pos')->user();
             $loginCompany = Company::find($user->company_id);
             if ($loginCompany && $loginCompany->restaurant_mode) {
-                return redirect('/pos/restaurant/dashboard');
+                return redirect('/pos/restaurant/pos');
             }
-            return redirect('/pos/dashboard');
+            return redirect('/pos/create');
         }
         return view('pos.auth.login');
     }
@@ -89,9 +89,9 @@ class PosAuthController extends Controller
 
             $loginCompany = Company::find($user->company_id);
             if ($loginCompany && $loginCompany->restaurant_mode) {
-                return redirect('/pos/restaurant/dashboard');
+                return redirect('/pos/restaurant/pos');
             }
-            return redirect('/pos/dashboard');
+            return redirect('/pos/create');
         }
 
         if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
@@ -114,7 +114,7 @@ class PosAuthController extends Controller
     public function showRegister()
     {
         if (Auth::guard('pos')->check()) {
-            return redirect('/pos/dashboard');
+            return redirect('/pos/create');
         }
         return view('pos.auth.register');
     }
@@ -128,7 +128,7 @@ class PosAuthController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'phone' => 'nullable|string|max:20',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            'pos_type' => 'required|in:restaurant,retail,general',
+            'pos_type' => 'required|in:restaurant,retail,general,pharmacy,grocery,clothing,electronics,hardware,salon,autoparts,bakery',
         ]);
 
         $posType = $request->pos_type ?? 'general';
@@ -159,7 +159,10 @@ class PosAuthController extends Controller
 
         Auth::guard('pos')->login($user);
 
-        return redirect('/pos/dashboard');
+        if ($posType === 'restaurant') {
+            return redirect('/pos/restaurant/pos');
+        }
+        return redirect('/pos/create');
     }
 
     public function logout(Request $request)

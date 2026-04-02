@@ -12,6 +12,9 @@
             @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-6px); } }
             @keyframes pulse-glow { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.7; } }
             .animate-float { animation: float 6s ease-in-out infinite; }
+            .cat-card { background: rgba(255,255,255,0.7); border: 1px solid rgba(59,130,246,0.15); }
+            .cat-card:hover { background: rgba(255,255,255,0.9); border-color: rgba(59,130,246,0.3); }
+            .cat-active { background: rgba(59,130,246,0.12) !important; border-color: rgba(59,130,246,0.5) !important; box-shadow: 0 0 12px rgba(59,130,246,0.2); }
         </style>
     </head>
     <body class="font-sans text-gray-900 antialiased">
@@ -22,7 +25,7 @@
                 <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-3xl"></div>
             </div>
 
-            <div class="relative z-10 w-full max-w-md px-4">
+            <div class="relative z-10 w-full max-w-lg px-4">
                 <div class="text-center mb-6">
                     <a href="/fbr-pos-landing" class="inline-block">
                         <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-blue-400 to-blue-700 flex items-center justify-center shadow-2xl shadow-blue-500/30 ring-1 ring-white/20">
@@ -51,10 +54,79 @@
                         <p class="text-sm text-gray-500 mt-1">Register your business for FBR POS</p>
                     </div>
 
-                    <form method="POST" action="/fbr-pos/register" class="px-6 pb-6 pt-4 space-y-4">
+                    <form method="POST" action="/fbr-pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'retail') }}' }">
                         @csrf
 
                         <div class="pt-1 pb-2">
+                            <p class="text-xs font-semibold text-blue-600/60 uppercase tracking-wider">Select Your Business Type</p>
+                        </div>
+
+                        <input type="hidden" name="pos_type" :value="posType">
+
+                        <div class="grid grid-cols-5 gap-2">
+                            <label class="relative cursor-pointer" @click="posType = 'retail'">
+                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === 'retail' ? 'cat-active' : ''">
+                                    <span class="text-xl">🛒</span>
+                                    <span class="text-[10px] font-semibold text-gray-700 leading-tight">Retail</span>
+                                </div>
+                            </label>
+                            <label class="relative cursor-pointer" @click="posType = 'restaurant'">
+                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === 'restaurant' ? 'cat-active' : ''">
+                                    <span class="text-xl">🍽️</span>
+                                    <span class="text-[10px] font-semibold text-gray-700 leading-tight">Restaurant</span>
+                                </div>
+                            </label>
+                            <label class="relative cursor-pointer" @click="posType = 'pharmacy'">
+                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === 'pharmacy' ? 'cat-active' : ''">
+                                    <span class="text-xl">💊</span>
+                                    <span class="text-[10px] font-semibold text-gray-700 leading-tight">Pharmacy</span>
+                                </div>
+                            </label>
+                            <label class="relative cursor-pointer" @click="posType = 'grocery'">
+                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === 'grocery' ? 'cat-active' : ''">
+                                    <span class="text-xl">🏪</span>
+                                    <span class="text-[10px] font-semibold text-gray-700 leading-tight">Grocery</span>
+                                </div>
+                            </label>
+                            <label class="relative cursor-pointer" @click="posType = 'clothing'">
+                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === 'clothing' ? 'cat-active' : ''">
+                                    <span class="text-xl">👔</span>
+                                    <span class="text-[10px] font-semibold text-gray-700 leading-tight">Clothing</span>
+                                </div>
+                            </label>
+                            <label class="relative cursor-pointer" @click="posType = 'electronics'">
+                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === 'electronics' ? 'cat-active' : ''">
+                                    <span class="text-xl">📱</span>
+                                    <span class="text-[10px] font-semibold text-gray-700 leading-tight">Electronics</span>
+                                </div>
+                            </label>
+                            <label class="relative cursor-pointer" @click="posType = 'hardware'">
+                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === 'hardware' ? 'cat-active' : ''">
+                                    <span class="text-xl">🔧</span>
+                                    <span class="text-[10px] font-semibold text-gray-700 leading-tight">Hardware</span>
+                                </div>
+                            </label>
+                            <label class="relative cursor-pointer" @click="posType = 'salon'">
+                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === 'salon' ? 'cat-active' : ''">
+                                    <span class="text-xl">💇</span>
+                                    <span class="text-[10px] font-semibold text-gray-700 leading-tight">Salon</span>
+                                </div>
+                            </label>
+                            <label class="relative cursor-pointer" @click="posType = 'autoparts'">
+                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === 'autoparts' ? 'cat-active' : ''">
+                                    <span class="text-xl">🚗</span>
+                                    <span class="text-[10px] font-semibold text-gray-700 leading-tight">Auto Parts</span>
+                                </div>
+                            </label>
+                            <label class="relative cursor-pointer" @click="posType = 'bakery'">
+                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === 'bakery' ? 'cat-active' : ''">
+                                    <span class="text-xl">🧁</span>
+                                    <span class="text-[10px] font-semibold text-gray-700 leading-tight">Bakery</span>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div class="pt-1 pb-1" style="border-top: 1px solid rgba(59,130,246,0.1);">
                             <p class="text-xs font-semibold text-blue-600/60 uppercase tracking-wider">Business Information</p>
                         </div>
 

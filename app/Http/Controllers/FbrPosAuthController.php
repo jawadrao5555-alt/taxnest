@@ -17,7 +17,7 @@ class FbrPosAuthController extends Controller
     public function showLogin()
     {
         if (Auth::guard('fbrpos')->check()) {
-            return redirect('/fbr-pos/dashboard');
+            return redirect('/fbr-pos/create');
         }
         return view('fbr-pos.auth.login');
     }
@@ -83,7 +83,7 @@ class FbrPosAuthController extends Controller
             Auth::guard('fbrpos')->login($user, $request->boolean('remember'));
             $request->session()->regenerate();
             $request->session()->forget('url.intended');
-            return redirect('/fbr-pos/dashboard');
+            return redirect('/fbr-pos/create');
         }
 
         if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
@@ -106,7 +106,7 @@ class FbrPosAuthController extends Controller
     public function showRegister()
     {
         if (Auth::guard('fbrpos')->check()) {
-            return redirect('/fbr-pos/dashboard');
+            return redirect('/fbr-pos/create');
         }
         return view('fbr-pos.auth.register');
     }
@@ -120,7 +120,10 @@ class FbrPosAuthController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'phone' => 'nullable|string|max:20',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'pos_type' => 'required|in:restaurant,retail,general,pharmacy,grocery,clothing,electronics,hardware,salon,autoparts,bakery',
         ]);
+
+        $posType = $request->pos_type ?? 'general';
 
         $company = Company::create([
             'name' => $request->company_name,
@@ -129,6 +132,8 @@ class FbrPosAuthController extends Controller
             'phone' => $request->phone,
             'company_status' => 'pending',
             'product_type' => 'fbrpos',
+            'pos_type' => $posType,
+            'restaurant_mode' => ($posType === 'restaurant'),
             'fbr_pos_enabled' => true,
             'fbr_pos_environment' => 'sandbox',
             'fbr_reporting_enabled' => true,
@@ -146,7 +151,7 @@ class FbrPosAuthController extends Controller
 
         Auth::guard('fbrpos')->login($user);
 
-        return redirect('/fbr-pos/dashboard');
+        return redirect('/fbr-pos/create');
     }
 
     public function logout(Request $request)

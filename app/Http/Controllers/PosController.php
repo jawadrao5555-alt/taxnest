@@ -1671,7 +1671,10 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $products = PosProduct::where('company_id', $companyId)->orderBy('name')->get();
-        return view('pos.products', compact('products'));
+        $company = \App\Models\Company::find($companyId);
+        $posType = $company->pos_type ?? 'retail';
+        $categoryFields = PosProduct::categoryFields()[$posType] ?? [];
+        return view('pos.products', compact('products', 'posType', 'categoryFields'));
     }
 
     public function storeProduct(Request $request)
@@ -1687,6 +1690,24 @@ class PosController extends Controller
             'uom' => 'nullable|string|max:20',
             'description' => 'nullable|string|max:500',
             'image' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:2048',
+            'batch_number' => 'nullable|string|max:100',
+            'expiry_date' => 'nullable|date',
+            'drug_type' => 'nullable|string|max:50',
+            'unit_type' => 'nullable|string|max:20',
+            'size' => 'nullable|string|max:30',
+            'color' => 'nullable|string|max:50',
+            'season' => 'nullable|string|max:30',
+            'serial_number' => 'nullable|string|max:100',
+            'warranty_months' => 'nullable|integer|min:0',
+            'imei' => 'nullable|string|max:20',
+            'bulk_discount_qty' => 'nullable|integer|min:0',
+            'bulk_discount_pct' => 'nullable|numeric|min:0|max:100',
+            'service_duration' => 'nullable|integer|min:0',
+            'staff_assignment' => 'nullable|string|max:100',
+            'vehicle_make' => 'nullable|string|max:50',
+            'vehicle_model' => 'nullable|string|max:50',
+            'part_number' => 'nullable|string|max:100',
+            'box_type' => 'nullable|string|max:50',
         ]);
 
         $imageName = null;
@@ -1695,7 +1716,7 @@ class PosController extends Controller
             $request->file('image')->storeAs('products', $imageName, 'public');
         }
 
-        $product = PosProduct::create([
+        $data = [
             'company_id' => $companyId,
             'name' => $request->name,
             'description' => $request->description,
@@ -1707,7 +1728,24 @@ class PosController extends Controller
             'uom' => $request->uom ?? 'NOS',
             'is_tax_exempt' => $request->has('is_tax_exempt'),
             'image' => $imageName,
-        ]);
+            'prescription_required' => $request->has('prescription_required'),
+            'weight_based' => $request->has('weight_based'),
+            'custom_order' => $request->has('custom_order'),
+        ];
+
+        $categoryExtraFields = [
+            'batch_number', 'expiry_date', 'drug_type', 'unit_type',
+            'size', 'color', 'season', 'serial_number', 'warranty_months', 'imei',
+            'bulk_discount_qty', 'bulk_discount_pct', 'service_duration', 'staff_assignment',
+            'vehicle_make', 'vehicle_model', 'part_number', 'box_type',
+        ];
+        foreach ($categoryExtraFields as $field) {
+            if ($request->filled($field)) {
+                $data[$field] = $request->$field;
+            }
+        }
+
+        $product = PosProduct::create($data);
 
         if (!$imageName && $request->name) {
             try {
@@ -1895,8 +1933,23 @@ class PosController extends Controller
 
         $data = array_merge(
             $request->only(['name', 'description', 'price', 'tax_rate', 'category', 'sku', 'barcode', 'uom']),
-            ['is_tax_exempt' => $request->has('is_tax_exempt')]
+            [
+                'is_tax_exempt' => $request->has('is_tax_exempt'),
+                'prescription_required' => $request->has('prescription_required'),
+                'weight_based' => $request->has('weight_based'),
+                'custom_order' => $request->has('custom_order'),
+            ]
         );
+
+        $categoryExtraFields = [
+            'batch_number', 'expiry_date', 'drug_type', 'unit_type',
+            'size', 'color', 'season', 'serial_number', 'warranty_months', 'imei',
+            'bulk_discount_qty', 'bulk_discount_pct', 'service_duration', 'staff_assignment',
+            'vehicle_make', 'vehicle_model', 'part_number', 'box_type',
+        ];
+        foreach ($categoryExtraFields as $field) {
+            $data[$field] = $request->filled($field) ? $request->$field : null;
+        }
 
         if ($request->has('remove_image') && $request->remove_image === '1') {
             if ($product->image && \Illuminate\Support\Facades\Storage::disk('public')->exists('products/' . $product->image)) {

@@ -2,7 +2,7 @@
 
 if (function_exists('opcache_reset')) {
     $versionFile = dirname(__DIR__) . '/storage/framework/.deploy_version';
-    $currentVersion = '20260402_v3';
+    $currentVersion = '20260402_v5';
     $lastVersion = file_exists($versionFile) ? file_get_contents($versionFile) : '';
     if ($lastVersion !== $currentVersion) {
         opcache_reset();

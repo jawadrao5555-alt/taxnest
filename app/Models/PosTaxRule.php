@@ -17,7 +17,17 @@ class PosTaxRule extends Model
 
     public static function getRateForMethod(string $method): float
     {
-        $rule = static::where('payment_method', $method)->where('is_active', true)->first();
+        $methodMap = [
+            'card' => 'debit_card',
+        ];
+        $lookupMethod = $methodMap[$method] ?? $method;
+
+        $rule = static::where('payment_method', $lookupMethod)->where('is_active', true)->first();
+
+        if (!$rule && $lookupMethod !== $method) {
+            $rule = static::where('payment_method', $method)->where('is_active', true)->first();
+        }
+
         return $rule ? (float) $rule->tax_rate : 16.00;
     }
 }

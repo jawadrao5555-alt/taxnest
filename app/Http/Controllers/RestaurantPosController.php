@@ -65,6 +65,7 @@ class RestaurantPosController extends Controller
         $customers = PosCustomer::where('company_id', $companyId)->orderBy('name')->get();
 
         $taxRate = PosTaxRule::getRateForMethod('cash');
+        $taxRules = PosTaxRule::where('is_active', true)->get()->keyBy('payment_method');
 
         $stockStatus = [];
         $recipes = ProductRecipe::where('company_id', $companyId)
@@ -115,7 +116,7 @@ class RestaurantPosController extends Controller
         return view('pos.restaurant.pos', compact(
             'company', 'products', 'services', 'categories',
             'recipeLookup', 'tables', 'selectedTable', 'heldOrders',
-            'customers', 'taxRate', 'stockStatus', 'blockOutOfStock',
+            'customers', 'taxRate', 'taxRules', 'stockStatus', 'blockOutOfStock',
             'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts',
             'lowStockAlerts'
         ));

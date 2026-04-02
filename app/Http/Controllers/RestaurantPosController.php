@@ -359,7 +359,10 @@ class RestaurantPosController extends Controller
         if (!is_numeric($orderId) || $orderId < 1) {
             return response()->json(['success' => false, 'message' => 'Invalid order ID'], 400);
         }
-        $order = RestaurantOrder::where('company_id', $companyId)->findOrFail($orderId);
+        $order = RestaurantOrder::where('company_id', $companyId)->find($orderId);
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Order not found'], 404);
+        }
         if ($order->status === 'completed') {
             return response()->json(['success' => false, 'message' => 'Cannot delete a completed order'], 400);
         }

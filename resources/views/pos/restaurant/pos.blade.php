@@ -1365,7 +1365,6 @@ function restaurantPos() {
         },
 
         async deleteHeldOrder(orderId) {
-            if (!confirm('Delete this held order permanently?')) return;
             try {
                 const res = await fetch(`/pos/restaurant/orders/${orderId}/delete`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' } });
                 if (!res.ok) { this.showToast('Failed to delete order (Error ' + res.status + ')', 'error'); return; }

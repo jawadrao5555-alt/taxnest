@@ -368,16 +368,20 @@ class RestaurantPosController extends Controller
         }
         DB::beginTransaction();
         try {
+            $orderData = ['order_number' => $order->order_number, 'total_amount' => $order->total_amount, 'status' => $order->status];
             $order->items()->delete();
             $order->delete();
-            if (class_exists(\App\Services\AuditLogService::class)) {
-                \App\Services\AuditLogService::log('order_deleted', 'restaurant_order', $orderId, ['order_number' => $order->order_number, 'total_amount' => $order->total_amount], $companyId);
+            try {
+                if (class_exists(\App\Services\AuditLogService::class)) {
+                    \App\Services\AuditLogService::log('order_deleted', 'restaurant_order', $orderId, $orderData, null, $companyId, Auth::guard('pos')->id());
+                }
+            } catch (\Exception $auditEx) {
             }
             DB::commit();
             return response()->json(['success' => true, 'message' => 'Order deleted']);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['success' => false, 'message' => 'Failed to delete order'], 500);
+            return response()->json(['success' => false, 'message' => 'Failed to delete order: ' . $e->getMessage()], 500);
         }
     }
 

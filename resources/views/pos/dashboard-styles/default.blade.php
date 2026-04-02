@@ -13,10 +13,11 @@
 .progress-fill { height: 100%; border-radius: 2px; transition: width 1.2s ease-out; }
 .table-row-hover:hover { background: linear-gradient(90deg, rgba(124,58,237,0.02) 0%, transparent 100%); }
 .dark .table-row-hover:hover { background: linear-gradient(90deg, rgba(124,58,237,0.06) 0%, transparent 100%); }
-.tile-card { transition: all 0.2s ease; border-radius: 14px; }
-.tile-card:hover { transform: translateY(-3px); box-shadow: 0 8px 25px -5px rgba(0,0,0,0.1), 0 4px 10px -5px rgba(0,0,0,0.05); }
-.tile-icon { transition: all 0.2s ease; }
-.tile-card:hover .tile-icon { transform: scale(1.1); }
+.tile-card { transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); border-radius: 14px; }
+.tile-card:hover { transform: translateY(-4px) scale(1.02); box-shadow: 0 12px 30px -8px rgba(0,0,0,0.12), 0 4px 10px -5px rgba(0,0,0,0.05); }
+.tile-card:active { transform: translateY(-1px) scale(0.98); }
+.tile-icon { transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.tile-card:hover .tile-icon { transform: scale(1.15) rotate(3deg); }
 .r-stat { position: relative; overflow: hidden; border-radius: 14px; }
 .r-stat::before { content: ''; position: absolute; top: -40%; right: -40%; width: 80%; height: 80%; background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%); pointer-events: none; }
 .stat-val { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
@@ -122,40 +123,40 @@
     @endif
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 slide-up slide-up-3">
-        <div class="stat-card bg-gradient-to-br from-emerald-500 to-emerald-700 p-4 shadow-lg shadow-emerald-500/15">
+        <div class="stat-card card-reveal bg-gradient-to-br from-emerald-500 to-emerald-700 p-4 shadow-lg shadow-emerald-500/15">
             <div class="relative z-10">
                 <span class="text-[9px] font-bold uppercase tracking-wider text-emerald-100/70">Today's Revenue</span>
-                <p class="text-xl font-extrabold text-white count-up mt-1">Rs. {{ number_format($todaySales ?? $todayStats->revenue ?? 0) }}</p>
+                <p class="text-xl font-extrabold text-white mt-1">Rs. <span data-count-target="{{ $todaySales ?? $todayStats->revenue ?? 0 }}">0</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: {{ min(100, ($monthSales ?? $monthStats->revenue ?? 1) > 0 ? (($todaySales ?? $todayStats->revenue ?? 0) / ($monthSales ?? $monthStats->revenue ?? 1) * 100) : 0) }}%"></div></div>
             </div>
         </div>
-        <div class="stat-card bg-gradient-to-br from-blue-500 to-blue-700 p-4 shadow-lg shadow-blue-500/15">
+        <div class="stat-card card-reveal bg-gradient-to-br from-blue-500 to-blue-700 p-4 shadow-lg shadow-blue-500/15">
             <div class="relative z-10">
                 <span class="text-[9px] font-bold uppercase tracking-wider text-blue-100/70">Orders</span>
-                <p class="text-xl font-extrabold text-white count-up mt-1">{{ $todayOrders ?? $todayStats->count ?? 0 }}</p>
+                <p class="text-xl font-extrabold text-white mt-1"><span data-count-target="{{ $todayOrders ?? $todayStats->count ?? 0 }}">0</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: {{ min(100, ($todayOrders ?? $todayStats->count ?? 0) * 5) }}%"></div></div>
             </div>
         </div>
-        <div class="stat-card bg-gradient-to-br from-purple-500 to-violet-700 p-4 shadow-lg shadow-purple-500/15">
+        <div class="stat-card card-reveal bg-gradient-to-br from-purple-500 to-violet-700 p-4 shadow-lg shadow-purple-500/15">
             <div class="relative z-10">
                 <span class="text-[9px] font-bold uppercase tracking-wider text-purple-100/70">Avg Order</span>
-                <p class="text-xl font-extrabold text-white count-up mt-1">Rs. {{ number_format($todayStats->avg_ticket ?? (($todayOrders ?? 0) > 0 ? ($todaySales ?? 0) / ($todayOrders ?? 1) : 0)) }}</p>
+                <p class="text-xl font-extrabold text-white mt-1">Rs. <span data-count-target="{{ round($todayStats->avg_ticket ?? (($todayOrders ?? 0) > 0 ? ($todaySales ?? 0) / ($todayOrders ?? 1) : 0)) }}">0</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: 60%"></div></div>
             </div>
         </div>
         @if($isRestaurant)
-        <div class="stat-card bg-gradient-to-br from-amber-500 to-orange-600 p-4 shadow-lg shadow-amber-500/15">
+        <div class="stat-card card-reveal bg-gradient-to-br from-amber-500 to-orange-600 p-4 shadow-lg shadow-amber-500/15">
             <div class="relative z-10">
                 <span class="text-[9px] font-bold uppercase tracking-wider text-amber-100/70">Tables</span>
-                <p class="text-xl font-extrabold text-white count-up mt-1">{{ $occupiedTables ?? 0 }}<span class="text-sm text-white/80">/{{ $totalTables ?? 0 }}</span></p>
+                <p class="text-xl font-extrabold text-white mt-1"><span data-count-target="{{ $occupiedTables ?? 0 }}">0</span><span class="text-sm text-white/80">/{{ $totalTables ?? 0 }}</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: {{ ($totalTables ?? 0) > 0 ? round(($occupiedTables ?? 0) / ($totalTables ?? 1) * 100) : 0 }}%"></div></div>
             </div>
         </div>
         @else
-        <div class="stat-card bg-gradient-to-br from-amber-500 to-orange-600 p-4 shadow-lg shadow-amber-500/15">
+        <div class="stat-card card-reveal bg-gradient-to-br from-amber-500 to-orange-600 p-4 shadow-lg shadow-amber-500/15">
             <div class="relative z-10">
                 <span class="text-[9px] font-bold uppercase tracking-wider text-amber-100/70">Monthly</span>
-                <p class="text-xl font-extrabold text-white count-up mt-1">Rs. {{ number_format($monthSales ?? $monthStats->revenue ?? 0) }}</p>
+                <p class="text-xl font-extrabold text-white mt-1">Rs. <span data-count-target="{{ $monthSales ?? $monthStats->revenue ?? 0 }}">0</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: 75%"></div></div>
             </div>
         </div>

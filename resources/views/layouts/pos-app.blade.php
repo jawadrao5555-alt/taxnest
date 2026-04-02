@@ -44,11 +44,24 @@
         <style>
             *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
             @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+            @keyframes pageSlideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
             @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
             @keyframes slideDown { from { opacity: 0; transform: translateY(-8px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
-            .page-fade { animation: fadeIn 0.15s ease-out; }
+            @keyframes skeletonPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+            @keyframes shimmerLoad { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+            @keyframes btnPress { 0% { transform: scale(1); } 50% { transform: scale(0.96); } 100% { transform: scale(1); } }
+            .page-fade { animation: pageSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
             .btn-loading { position: relative; pointer-events: none; opacity: 0.7; }
             .btn-loading::after { content: ''; position: absolute; right: 8px; top: 50%; width: 14px; height: 14px; margin-top: -7px; border: 2px solid transparent; border-top-color: currentColor; border-radius: 50%; animation: spin 0.6s linear infinite; }
+            .btn-press { transition: transform 0.15s ease; }
+            .btn-press:active { animation: btnPress 0.2s ease; }
+            .skeleton-block { background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%); background-size: 200% 100%; animation: shimmerLoad 1.5s ease-in-out infinite; border-radius: 8px; }
+            .dark .skeleton-block { background: linear-gradient(90deg, #1f2937 25%, #374151 50%, #1f2937 75%); background-size: 200% 100%; }
+            .skeleton-text { height: 12px; width: 60%; }
+            .skeleton-card { border-radius: 12px; height: 120px; }
+            .page-loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.7); backdrop-filter: blur(4px); z-index: 9999; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+            .dark .page-loading-overlay { background: rgba(17,24,39,0.7); }
+            .page-loading-overlay.active { opacity: 1; pointer-events: auto; }
             .main-scroll::-webkit-scrollbar { width: 6px; }
             .main-scroll::-webkit-scrollbar-thumb { background: rgba(156,163,175,0.3); border-radius: 4px; }
             .main-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -346,6 +359,12 @@
             </main>
         </div>
 
+        <div id="pageLoadOverlay" class="page-loading-overlay">
+            <div class="flex flex-col items-center gap-3">
+                <div class="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+                <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Loading...</span>
+            </div>
+        </div>
         <script>
             document.addEventListener('DOMContentLoaded', function() {
                 document.querySelectorAll('form:not(.no-auto-loading)').forEach(function(form) {
@@ -354,6 +373,17 @@
                         if (btn && !btn.classList.contains('btn-loading')) {
                             btn.classList.add('btn-loading');
                             setTimeout(function() { btn.classList.remove('btn-loading'); }, 5000);
+                        }
+                    });
+                });
+                document.querySelectorAll('a[href]:not([target]):not([download]):not([href^="#"]):not([href^="javascript"])').forEach(function(link) {
+                    link.addEventListener('click', function(e) {
+                        if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+                        var href = link.getAttribute('href');
+                        if (href && href !== window.location.pathname && !href.startsWith('#')) {
+                            var overlay = document.getElementById('pageLoadOverlay');
+                            if (overlay) { overlay.classList.add('active'); }
+                            setTimeout(function() { if (overlay) overlay.classList.remove('active'); }, 4000);
                         }
                     });
                 });

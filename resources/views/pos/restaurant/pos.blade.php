@@ -3,39 +3,78 @@
 <style>
 *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
 @keyframes cartPop { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }
-@keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1;e. transform: translateY(0); } }
+@keyframes slideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideOut { from { opacity: 1; transform: translateX(0); max-height: 120px; } to { opacity: 0; transform: translateX(60px); max-height: 0; padding-top:0; padding-bottom:0; margin:0; } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(8px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(1.8); opacity: 0; } }
 @keyframes scaleIn { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-@keyframes qtyPop { 0% { transform: scale(1); } 40% { transform: scale(1.15); } 100% { transform: scale(1); } }
-.cart-pop { animation: cartPop 0.2s ease; }
-.qty-pop { animation: qtyPop 0.15s ease; }
-.slide-in { animation: slideIn 0.2s ease; }
-.fade-in { animation: fadeIn 0.15s ease; }
+@keyframes qtyPop { 0% { transform: scale(1); } 40% { transform: scale(1.2); } 100% { transform: scale(1); } }
+@keyframes cartItemAdd { 0% { opacity: 0; transform: translateX(-20px) scale(0.95); } 100% { opacity: 1; transform: translateX(0) scale(1); } }
+@keyframes ripple { to { transform: scale(4); opacity: 0; } }
+@keyframes toastSlide { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes toastSlideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(120%); opacity: 0; } }
+@keyframes floatBadge { 0% { transform: translateY(0) scale(1); } 50% { transform: translateY(-3px) scale(1.05); } 100% { transform: translateY(0) scale(1); } }
+@keyframes cardEnter { from { opacity: 0; transform: translateY(16px) scale(0.92); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes pulseGlow { 0%, 100% { box-shadow: 0 0 0 0 rgba(124,58,237,0.4); } 50% { box-shadow: 0 0 0 6px rgba(124,58,237,0); } }
+.cart-pop { animation: cartPop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.qty-pop { animation: qtyPop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.slide-in { animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+.fade-in { animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.cart-item-enter { animation: cartItemAdd 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.cart-item-exit { animation: slideOut 0.25s ease forwards; overflow: hidden; }
 .skeleton { background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%); background-size: 200% 100%; animation: shimmer 1.5s ease-in-out infinite; }
 .dark .skeleton { background: linear-gradient(90deg, #1f2937 25%, #374151 50%, #1f2937 75%); background-size: 200% 100%; }
-.prod-card { transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; position: relative; }
-.prod-card:hover { transform: translateY(-4px); box-shadow: 0 20px 40px -12px rgba(0,0,0,0.15); }
-.prod-card:active { transform: translateY(-1px) scale(0.98); }
-.prod-card .quick-add { opacity: 0; transform: scale(0.7); transition: all 0.15s ease; }
-.prod-card:hover .quick-add { opacity: 1; transform: scale(1); }
-.prod-card.stock-out { opacity: 0.5; pointer-events: none; }
-.prod-card.stock-out.allow-add { opacity: 0.7; pointer-events: auto; }
-.cat-pill { transition: all 0.15s ease; white-space: nowrap; }
-.cat-pill:hover { transform: scale(1.05); }
-.cat-pill.active { background: linear-gradient(135deg, #7c3aed, #a855f7); color: white; box-shadow: 0 4px 15px rgba(124,58,237,0.35); }
-.cart-item { transition: all 0.15s ease; }
-.cart-item:hover { background: rgba(139,92,246,0.04); }
+.prod-card { transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); cursor: pointer; position: relative; animation: cardEnter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.prod-card:nth-child(2) { animation-delay: 0.02s; } .prod-card:nth-child(3) { animation-delay: 0.04s; } .prod-card:nth-child(4) { animation-delay: 0.06s; } .prod-card:nth-child(5) { animation-delay: 0.08s; } .prod-card:nth-child(6) { animation-delay: 0.1s; }
+.prod-card:hover { transform: translateY(-6px) scale(1.02); box-shadow: 0 20px 40px -12px rgba(0,0,0,0.18), 0 0 0 1px rgba(124,58,237,0.1); }
+.prod-card:active { transform: translateY(-2px) scale(0.97); transition-duration: 0.1s; }
+.prod-card .quick-add { opacity: 0; transform: scale(0.5) rotate(-90deg); transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.prod-card:hover .quick-add { opacity: 1; transform: scale(1) rotate(0deg); }
+.prod-card.stock-out { opacity: 0.5; pointer-events: none; filter: grayscale(0.5); }
+.prod-card.stock-out.allow-add { opacity: 0.7; pointer-events: auto; filter: grayscale(0.3); }
+.prod-card .cart-qty-badge { animation: floatBadge 2s ease-in-out infinite; }
+.letter-A,.letter-B { background: linear-gradient(135deg, #f472b6, #ec4899, #db2777) !important; }
+.letter-C,.letter-D { background: linear-gradient(135deg, #a78bfa, #8b5cf6, #7c3aed) !important; }
+.letter-E,.letter-F { background: linear-gradient(135deg, #60a5fa, #3b82f6, #2563eb) !important; }
+.letter-G,.letter-H { background: linear-gradient(135deg, #34d399, #10b981, #059669) !important; }
+.letter-I,.letter-J { background: linear-gradient(135deg, #fbbf24, #f59e0b, #d97706) !important; }
+.letter-K,.letter-L { background: linear-gradient(135deg, #f87171, #ef4444, #dc2626) !important; }
+.letter-M,.letter-N { background: linear-gradient(135deg, #c084fc, #a855f7, #9333ea) !important; }
+.letter-O,.letter-P { background: linear-gradient(135deg, #38bdf8, #0ea5e9, #0284c7) !important; }
+.letter-Q,.letter-R { background: linear-gradient(135deg, #fb923c, #f97316, #ea580c) !important; }
+.letter-S,.letter-T { background: linear-gradient(135deg, #2dd4bf, #14b8a6, #0d9488) !important; }
+.letter-U,.letter-V { background: linear-gradient(135deg, #e879f9, #d946ef, #c026d3) !important; }
+.letter-W,.letter-X { background: linear-gradient(135deg, #818cf8, #6366f1, #4f46e5) !important; }
+.letter-Y,.letter-Z { background: linear-gradient(135deg, #a3e635, #84cc16, #65a30d) !important; }
+.cat-pill { transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); white-space: nowrap; position: relative; overflow: hidden; }
+.cat-pill:hover { transform: translateY(-2px) scale(1.05); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+.cat-pill.active { background: linear-gradient(135deg, #7c3aed, #a855f7); color: white; box-shadow: 0 4px 15px rgba(124,58,237,0.35); transform: scale(1.05); }
+.cart-item { transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+.cart-item:hover { background: rgba(139,92,246,0.06); }
 .stock-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.stock-available { background: #22c55e; }
-.stock-low { background: #f59e0b; box-shadow: 0 0 0 2px rgba(245,158,11,0.3); }
-.stock-out { background: #ef4444; }
+.stock-available { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.4); }
+.stock-low { background: #f59e0b; box-shadow: 0 0 6px rgba(245,158,11,0.5); animation: pulseGlow 2s ease-in-out infinite; }
+.stock-low { --tw-shadow-color: rgba(245,158,11,0.4); }
+.stock-out { background: #ef4444; box-shadow: 0 0 4px rgba(239,68,68,0.3); }
+.btn-ripple { position: relative; overflow: hidden; }
+.btn-ripple::after { content: ''; position: absolute; width: 100%; padding-top: 100%; border-radius: 50%; background: rgba(255,255,255,0.2); top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0); opacity: 1; transition: none; }
+.btn-ripple:active::after { animation: ripple 0.5s ease-out; }
+.toast-enter { animation: toastSlide 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+.toast-exit { animation: toastSlideOut 0.3s ease forwards; }
+.price-badge { background: linear-gradient(135deg, rgba(124,58,237,0.08), rgba(124,58,237,0.15)); border: 1px solid rgba(124,58,237,0.15); border-radius: 8px; padding: 2px 8px; }
+.dark .price-badge { background: linear-gradient(135deg, rgba(167,139,250,0.1), rgba(167,139,250,0.2)); border-color: rgba(167,139,250,0.2); }
 @media (max-width: 767px) {
     .mobile-sticky-pay { position: sticky; bottom: 0; z-index: 20; background: inherit; padding-bottom: env(safe-area-inset-bottom, 0); }
     .mobile-collapse-header { cursor: pointer; user-select: none; }
     .mobile-collapse-header::after { content: '▾'; float: right; transition: transform 0.2s; font-size: 10px; color: #9ca3af; }
     .mobile-collapse-header.collapsed::after { transform: rotate(-90deg); }
+    .prod-card { min-height: 0; }
+    .prod-card:hover { transform: none; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    .prod-card:active { transform: scale(0.96); }
+    .cart-item { padding: 10px 12px !important; }
+    .cart-item .qty-btn-mobile { min-width: 44px; min-height: 44px; }
 }
 .priority-badge { position: relative; }
 .priority-badge::after { content: ''; position: absolute; top: -1px; right: -1px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; }
@@ -45,6 +84,8 @@
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .freq-badge { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; font-size: 9px; padding: 1px 6px; border-radius: 999px; font-weight: 700; }
+.swipe-hint { position: absolute; right: 0; top: 0; bottom: 0; width: 60px; background: linear-gradient(90deg, transparent, rgba(239,68,68,0.1)); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+.cart-item:hover .swipe-hint { opacity: 1; }
 </style>
 <script>
 window.history.pushState(null, null, window.location.href);
@@ -184,8 +225,9 @@ window.addEventListener('popstate', function() {
                                     <template x-if="item.image">
                                         <img :src="item.image" :alt="item.name" class="w-full h-full object-cover" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                                     </template>
-                                    <div x-show="!item.image" class="flex flex-col items-center justify-center w-full h-full bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/10">
-                                        <span class="text-3xl font-black text-purple-300 dark:text-purple-700 select-none" x-text="item.name ? item.name.charAt(0).toUpperCase() : '?'"></span>
+                                    <div x-show="!item.image" class="flex flex-col items-center justify-center w-full h-full" :class="'letter-' + (item.name ? item.name.charAt(0).toUpperCase() : 'A')">
+                                        <span class="text-4xl font-black text-white/90 select-none drop-shadow-sm" x-text="item.name ? item.name.charAt(0).toUpperCase() : '?'"></span>
+                                        <span class="text-[9px] font-semibold text-white/60 mt-0.5 tracking-wider uppercase truncate max-w-[80%]" x-text="item.category || item.type"></span>
                                     </div>
                                     <div class="absolute top-1.5 left-1.5 flex flex-col gap-1">
                                         <template x-if="item.stockStatus === 'available'"><span class="stock-dot stock-available"></span></template>
@@ -201,11 +243,11 @@ window.addEventListener('popstate', function() {
                                     </button>
                                 </div>
                                 <div class="px-3 py-2.5">
-                                    <p class="text-xs font-semibold text-gray-900 dark:text-white truncate leading-tight" x-text="item.name"></p>
-                                    <div class="flex items-center justify-between mt-1">
-                                        <p class="text-sm font-extrabold text-purple-600 dark:text-purple-400" x-text="'Rs. ' + Number(item.price).toLocaleString()"></p>
+                                    <p class="text-xs font-bold text-gray-900 dark:text-white truncate leading-tight" x-text="item.name"></p>
+                                    <div class="flex items-center justify-between mt-1.5">
+                                        <span class="price-badge text-sm font-extrabold text-purple-600 dark:text-purple-400" x-text="'Rs. ' + Number(item.price).toLocaleString()"></span>
                                         <template x-if="getCartQty(item) > 0">
-                                            <span class="text-[10px] bg-purple-600 text-white w-5 h-5 rounded-full flex items-center justify-center font-bold" x-text="getCartQty(item)"></span>
+                                            <span class="cart-qty-badge text-[10px] bg-gradient-to-br from-purple-500 to-purple-700 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold shadow-lg shadow-purple-500/30" x-text="getCartQty(item)"></span>
                                         </template>
                                     </div>
                                 </div>
@@ -283,7 +325,7 @@ window.addEventListener('popstate', function() {
                     </div>
                 </template>
                 <template x-for="(item, index) in cart" :key="index">
-                    <div class="cart-item px-3 py-2 border-b border-gray-100 dark:border-gray-800 transition-all duration-150 cursor-pointer" :class="activeCartIndex === index ? 'bg-purple-50 dark:bg-purple-900/15 ring-2 ring-purple-400 dark:ring-purple-600 ring-inset' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'" @click="activeCartIndex = index" :data-cart-index="index">
+                    <div class="cart-item cart-item-enter px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 cursor-pointer relative" :class="activeCartIndex === index ? 'bg-purple-50 dark:bg-purple-900/15 ring-2 ring-purple-400 dark:ring-purple-600 ring-inset' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'" @click="activeCartIndex = index" :data-cart-index="index">
                         <div class="flex items-center gap-2.5">
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-bold text-gray-900 dark:text-white truncate" x-text="item.item_name"></p>
@@ -384,7 +426,7 @@ window.addEventListener('popstate', function() {
                             <span x-show="heldOrders.length > 0" class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[8px] rounded-full flex items-center justify-center" x-text="heldOrders.length"></span>
                         </button>
                     </div>
-                    <button @click="showPayModal = true" :disabled="cart.length === 0 || submitting" class="w-full py-3.5 rounded-xl text-sm font-extrabold text-white bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:opacity-30 shadow-lg shadow-green-600/25 transition-all transform hover:scale-[1.01] active:scale-[0.99]">
+                    <button @click="showPayModal = true" :disabled="cart.length === 0 || submitting" class="btn-ripple w-full py-3.5 rounded-xl text-sm font-extrabold text-white bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:opacity-30 shadow-lg shadow-green-600/25 transition-all transform hover:scale-[1.01] active:scale-[0.98]">
                         <span class="flex items-center justify-center gap-2">
                             <svg x-show="submitting" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                             <svg x-show="!submitting" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
@@ -721,7 +763,15 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
-    <div x-show="toast.show" x-transition.opacity class="fixed top-4 right-4 z-[60] max-w-xs px-4 py-2.5 rounded-xl shadow-2xl text-sm font-medium" :class="toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'" x-text="toast.message"></div>
+    <div x-show="toast.show" class="fixed top-4 right-4 z-[60] max-w-sm" :class="toast.show ? 'toast-enter' : 'toast-exit'">
+        <div class="flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl backdrop-blur-xl border" :class="toast.type === 'success' ? 'bg-green-600/95 text-white border-green-500/30' : 'bg-red-600/95 text-white border-red-500/30'" style="box-shadow: 0 20px 60px -15px rgba(0,0,0,0.3);">
+            <div class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center" :class="toast.type === 'success' ? 'bg-white/20' : 'bg-white/20'">
+                <svg x-show="toast.type === 'success'" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <svg x-show="toast.type !== 'success'" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+            </div>
+            <span class="text-sm font-semibold" x-text="toast.message"></span>
+        </div>
+    </div>
 </div>
 
 @php
@@ -1096,7 +1146,19 @@ function restaurantPos() {
         },
         updateQty(index, delta) { this.cart[index].quantity = Math.max(0.01, parseFloat(this.cart[index].quantity) + delta); },
         setQty(index, val) { const v = parseFloat(val); if (v > 0) this.cart[index].quantity = v; },
-        removeFromCart(index) { this.cart.splice(index, 1); if (this.activeCartIndex >= this.cart.length) this.activeCartIndex = this.cart.length - 1; },
+        removeFromCart(index) {
+            const el = this.$refs.cartList?.querySelector(`[data-cart-index="${index}"]`);
+            if (el) {
+                el.classList.add('cart-item-exit');
+                setTimeout(() => {
+                    this.cart.splice(index, 1);
+                    if (this.activeCartIndex >= this.cart.length) this.activeCartIndex = this.cart.length - 1;
+                }, 250);
+            } else {
+                this.cart.splice(index, 1);
+                if (this.activeCartIndex >= this.cart.length) this.activeCartIndex = this.cart.length - 1;
+            }
+        },
 
         enterCartMode() {
             if (this.cart.length === 0) return;

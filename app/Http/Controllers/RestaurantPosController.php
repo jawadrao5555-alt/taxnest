@@ -554,7 +554,7 @@ class RestaurantPosController extends Controller
                 $errorDetail .= ' | SQL: ' . $e->getSql() . ' | Bindings: ' . json_encode($e->getBindings());
             }
             Log::error('Payment failed for order ' . $orderId . ': ' . $errorDetail);
-            return response()->json(['success' => false, 'message' => 'Payment processing failed. Please try again.'], 500);
+            return response()->json(['success' => false, 'message' => 'Payment failed: ' . $e->getMessage()], 500);
         }
     }
 

@@ -44,7 +44,6 @@
         .items-table .name .item-line { font-weight: 600; color: #111; font-size: 11px; }
         .items-table .name .item-line .item-qty { font-weight: 700; color: #555; }
         .items-table .name .item-line .item-rate { font-weight: 400; color: #888; font-size: 10px; }
-        .items-table .name .item-discount { font-size: 9px; color: #c2410c; font-style: italic; }
         .items-table .name .tax-exempt { font-size: 8px; color: #059669; font-weight: 600; background: #ecfdf5; padding: 1px 4px; border-radius: 3px; }
         .items-table .price { text-align: right; font-weight: 700; color: #111; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
         .item-row { border-bottom: 1px dotted #eee; }
@@ -141,9 +140,6 @@
         <tr class="item-row">
             <td class="name">
                 <span class="item-line"><span class="item-qty">{{ number_format($item->quantity, $item->quantity == intval($item->quantity) ? 0 : 2) }}x</span> {{ $item->item_name }}@if($item->is_tax_exempt) <span class="tax-exempt">NT</span>@endif @if($item->quantity > 1)<span class="item-rate">&commat;{{ number_format($item->unit_price) }}</span>@endif</span>
-                @if(isset($item->item_discount_amount) && $item->item_discount_amount > 0)
-                <br><span class="item-discount">Disc: -Rs.{{ number_format($item->item_discount_amount, 2) }}</span>
-                @endif
             </td>
             <td class="price">{{ number_format($item->subtotal, 2) }}</td>
         </tr>

@@ -36,17 +36,18 @@
         .customer-block .name { font-weight: 700; color: #111; font-size: 11px; }
         .customer-block .detail { color: #666; margin-top: 1px; }
         .items-table { width: 100%; border-collapse: collapse; margin: 4px 0; }
-        .items-table th { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #888; padding: 4px 0; border-bottom: 1.5px solid #ddd; }
-        .items-table th:first-child { text-align: left; width: 64%; }
-        .items-table th:last-child { text-align: right; width: 36%; }
-        .items-table td { padding: 4px 0; vertical-align: top; }
-        .items-table .name { text-align: left; }
-        .items-table .name .item-line { font-weight: 600; color: #111; font-size: 11px; }
-        .items-table .name .item-line .item-qty { font-weight: 700; color: #555; }
-        .items-table .name .item-line .item-rate { font-weight: 400; color: #888; font-size: 10px; }
-        .items-table .name .tax-exempt { font-size: 8px; color: #059669; font-weight: 600; background: #ecfdf5; padding: 1px 4px; border-radius: 3px; }
-        .items-table .price { text-align: right; font-weight: 700; color: #111; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-        .item-row { border-bottom: 1px dotted #eee; }
+        .items-table th { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #888; padding: 4px 0; border-bottom: 1.5px solid #999; }
+        .items-table .col-qty { text-align: center; width: 10%; }
+        .items-table .col-item { text-align: left; width: 55%; }
+        .items-table .col-rate { text-align: right; width: 15%; }
+        .items-table .col-amt { text-align: right; width: 20%; }
+        .items-table td { padding: 4px 2px; vertical-align: top; font-size: 11px; }
+        .items-table td.col-qty { font-weight: 700; color: #333; text-align: center; }
+        .items-table td.col-item { font-weight: 600; color: #111; }
+        .items-table td.col-rate { color: #666; font-size: 10px; text-align: right; }
+        .items-table td.col-amt { font-weight: 700; color: #111; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+        .items-table .tax-exempt { font-size: 8px; color: #059669; font-weight: 600; background: #ecfdf5; padding: 1px 4px; border-radius: 3px; }
+        .item-row { border-bottom: 1px dotted #ddd; }
         .item-row:last-child { border-bottom: none; }
         .totals-section { padding: 4px 0; }
         .total-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 11px; }
@@ -131,17 +132,19 @@
     <table class="items-table">
         <thead>
             <tr>
-                <th>Item</th>
-                <th>Amount</th>
+                <th class="col-qty">Qty</th>
+                <th class="col-item">Item</th>
+                <th class="col-rate">Rate</th>
+                <th class="col-amt">Amt</th>
             </tr>
         </thead>
         <tbody>
         @foreach($transaction->items as $item)
         <tr class="item-row">
-            <td class="name">
-                <span class="item-line"><span class="item-qty">{{ number_format($item->quantity, $item->quantity == intval($item->quantity) ? 0 : 2) }}x</span> {{ $item->item_name }}@if($item->is_tax_exempt) <span class="tax-exempt">NT</span>@endif @if($item->quantity > 1)<span class="item-rate">&commat;{{ number_format($item->unit_price) }}</span>@endif</span>
-            </td>
-            <td class="price">{{ number_format($item->subtotal, 2) }}</td>
+            <td class="col-qty">{{ number_format($item->quantity, $item->quantity == intval($item->quantity) ? 0 : 2) }}</td>
+            <td class="col-item">{{ $item->item_name }}@if($item->is_tax_exempt) <span class="tax-exempt">NT</span>@endif</td>
+            <td class="col-rate">{{ number_format($item->unit_price) }}</td>
+            <td class="col-amt">{{ number_format($item->subtotal) }}</td>
         </tr>
         @endforeach
         </tbody>

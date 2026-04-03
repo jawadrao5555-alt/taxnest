@@ -47,8 +47,10 @@
         .items-table { width: 100%; margin: 4px 0; border-collapse: collapse; table-layout: fixed; }
         .items-table th { font-size: 10px; text-transform: uppercase; border-bottom: 1px solid #000; padding: 2px 1px; text-align: left; }
         .items-table td { font-size: 11px; padding: 3px 1px; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }
-        .items-table .col-item { width: 64%; text-align: left; }
-        .items-table .col-total { width: 36%; text-align: right; }
+        .items-table .col-qty { width: 10%; text-align: center; }
+        .items-table .col-item { width: 48%; text-align: left; }
+        .items-table .col-rate { width: 20%; text-align: right; }
+        .items-table .col-total { width: 22%; text-align: right; }
         .items-table tbody tr { border-bottom: 1px dotted #ccc; }
         .items-table tbody tr:last-child { border-bottom: none; }
         .exempt-tag { font-size: 8px; font-weight: bold; }
@@ -151,14 +153,18 @@
     <table class="items-table">
         <thead>
             <tr>
+                <th class="col-qty">Qty</th>
                 <th class="col-item">Item</th>
-                <th class="col-total">Amount</th>
+                <th class="col-rate">Rate</th>
+                <th class="col-total">Amt</th>
             </tr>
         </thead>
         <tbody>
             @foreach($transaction->items as $item)
             <tr>
-                <td class="col-item"><span class="bold">{{ $item->quantity }}x</span> {{ $item->item_name }}@if($item->quantity > 1) <span style="font-size:9px;color:#666;">&commat;{{ number_format($item->unit_price, 0) }}</span>@endif</td>
+                <td class="col-qty">{{ $item->quantity }}</td>
+                <td class="col-item">{{ $item->item_name }}</td>
+                <td class="col-rate">{{ number_format($item->unit_price, 0) }}</td>
                 <td class="col-total">{{ number_format($item->subtotal, 0) }}</td>
             </tr>
             @endforeach

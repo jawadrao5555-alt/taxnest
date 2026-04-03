@@ -37,17 +37,16 @@
         .customer-block .detail { color: #666; margin-top: 1px; }
         .items-table { width: 100%; border-collapse: collapse; margin: 4px 0; }
         .items-table th { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #888; padding: 4px 0; border-bottom: 1.5px solid #ddd; }
-        .items-table th:first-child { text-align: center; width: 12%; }
-        .items-table th:nth-child(2) { text-align: left; width: 52%; }
+        .items-table th:first-child { text-align: left; width: 64%; }
         .items-table th:last-child { text-align: right; width: 36%; }
-        .items-table td { padding: 5px 0; vertical-align: top; }
-        .items-table .qty { text-align: center; font-weight: 700; color: #333; font-size: 12px; }
+        .items-table td { padding: 4px 0; vertical-align: top; }
         .items-table .name { text-align: left; }
-        .items-table .name .item-title { font-weight: 600; color: #111; font-size: 11px; }
-        .items-table .name .item-meta { font-size: 9px; color: #888; margin-top: 1px; }
+        .items-table .name .item-line { font-weight: 600; color: #111; font-size: 11px; }
+        .items-table .name .item-line .item-qty { font-weight: 700; color: #555; }
+        .items-table .name .item-line .item-rate { font-weight: 400; color: #888; font-size: 10px; }
         .items-table .name .item-discount { font-size: 9px; color: #c2410c; font-style: italic; }
         .items-table .name .tax-exempt { font-size: 8px; color: #059669; font-weight: 600; background: #ecfdf5; padding: 1px 4px; border-radius: 3px; }
-        .items-table .price { text-align: right; font-weight: 700; color: #111; font-size: 12px; font-variant-numeric: tabular-nums; }
+        .items-table .price { text-align: right; font-weight: 700; color: #111; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
         .item-row { border-bottom: 1px dotted #eee; }
         .item-row:last-child { border-bottom: none; }
         .totals-section { padding: 4px 0; }
@@ -133,7 +132,6 @@
     <table class="items-table">
         <thead>
             <tr>
-                <th>Qty</th>
                 <th>Item</th>
                 <th>Amount</th>
             </tr>
@@ -141,13 +139,10 @@
         <tbody>
         @foreach($transaction->items as $item)
         <tr class="item-row">
-            <td class="qty">{{ number_format($item->quantity, $item->quantity == intval($item->quantity) ? 0 : 2) }}</td>
             <td class="name">
-                <span class="item-title">{{ $item->item_name }}</span>
-                @if($item->is_tax_exempt)<span class="tax-exempt">NT</span>@endif
-                <br><span class="item-meta">@ Rs. {{ number_format($item->unit_price, 2) }} each</span>
+                <span class="item-line"><span class="item-qty">{{ number_format($item->quantity, $item->quantity == intval($item->quantity) ? 0 : 2) }}x</span> {{ $item->item_name }}@if($item->is_tax_exempt) <span class="tax-exempt">NT</span>@endif @if($item->quantity > 1)<span class="item-rate">&commat;{{ number_format($item->unit_price) }}</span>@endif</span>
                 @if(isset($item->item_discount_amount) && $item->item_discount_amount > 0)
-                <br><span class="item-discount">Disc: -Rs. {{ number_format($item->item_discount_amount, 2) }}</span>
+                <br><span class="item-discount">Disc: -Rs.{{ number_format($item->item_discount_amount, 2) }}</span>
                 @endif
             </td>
             <td class="price">{{ number_format($item->subtotal, 2) }}</td>

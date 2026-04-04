@@ -1449,18 +1449,28 @@ function openInlinePdfPopup() {
     if (existing) existing.remove();
     const popup = document.createElement('div');
     popup.id = 'inlinePdfPopup';
-    popup.style.cssText = 'position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;background:rgba(0,0,0,0.6);';
+    popup.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;background:rgba(0,0,0,0.7);';
     popup.innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:white;border-bottom:1px solid #e5e7eb;">
-            <span style="font-size:14px;font-weight:700;color:#1f2937;">Invoice PDF</span>
-            <div style="display:flex;gap:8px;">
-                <button onclick="printInlinePdf()" style="display:inline-flex;align-items:center;padding:6px 12px;background:#4f46e5;color:white;border-radius:8px;font-size:12px;font-weight:600;border:none;cursor:pointer;">Print</button>
-                <a href="/invoice/{{ $invoice->id }}/download" style="display:inline-flex;align-items:center;padding:6px 12px;background:#059669;color:white;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;">Download</a>
-                <button onclick="closeInlinePdfPopup()" style="display:inline-flex;align-items:center;padding:6px 12px;background:#e5e7eb;color:#374151;border-radius:8px;font-size:12px;font-weight:600;border:none;cursor:pointer;">Close</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;background:#ffffff;border-bottom:2px solid #e5e7eb;flex-shrink:0;">
+            <span style="font-size:15px;font-weight:800;color:#111827;">Invoice PDF Preview</span>
+            <div style="display:flex;gap:10px;align-items:center;">
+                <button onclick="printInlinePdf()" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#4f46e5;color:white;border-radius:8px;font-size:13px;font-weight:700;border:none;cursor:pointer;box-shadow:0 2px 4px rgba(79,70,229,0.3);">
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                    Print
+                </button>
+                <a href="/invoice/{{ $invoice->id }}/download" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#059669;color:white;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;box-shadow:0 2px 4px rgba(5,150,105,0.3);">
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    Download
+                </a>
+                <a href="/invoice/{{ $invoice->id }}/pdf" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#2563eb;color:white;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;box-shadow:0 2px 4px rgba(37,99,235,0.3);">
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                    Open Full
+                </a>
+                <button onclick="closeInlinePdfPopup()" style="display:inline-flex;align-items:center;padding:8px 16px;background:#f3f4f6;color:#374151;border-radius:8px;font-size:13px;font-weight:700;border:1px solid #d1d5db;cursor:pointer;">Close</button>
             </div>
         </div>
-        <div style="flex:1;overflow:hidden;padding:8px;background:#f3f4f6;">
-            <iframe src="/invoice/{{ $invoice->id }}/pdf?t=${Date.now()}" style="width:100%;height:100%;border:0;border-radius:8px;background:white;"></iframe>
+        <div style="flex:1;overflow:hidden;padding:12px;background:#e5e7eb;display:flex;align-items:stretch;justify-content:center;">
+            <iframe src="/invoice/{{ $invoice->id }}/pdf?t=${Date.now()}" style="width:100%;max-width:900px;height:100%;border:none;border-radius:8px;background:white;box-shadow:0 4px 20px rgba(0,0,0,0.15);"></iframe>
         </div>
     `;
     document.body.appendChild(popup);

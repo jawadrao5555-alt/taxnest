@@ -1045,86 +1045,75 @@
     </div>
 
 <div id="fbrSuccessModal" style="display:none;" class="fixed inset-0 z-[60] flex items-center justify-center transition-opacity duration-300 opacity-0">
-    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
-    <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-6xl mx-4 h-[90vh] sm:h-[90vh] flex flex-col overflow-hidden" style="max-height: 90vh;">
-        <button onclick="closeFbrSuccessModal()" class="absolute top-4 right-4 z-10 p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition text-gray-500 hover:text-gray-700 dark:text-gray-400">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-
-        <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-800 dark:border-gray-800 flex-shrink-0">
-            <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-                <div class="flex items-center gap-3">
-                    <div class="flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100">
-                        <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    </div>
-                    <div>
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">FBR Production Successful</span>
-                    </div>
-                </div>
-                <div class="sm:ml-auto text-right">
-                    <p class="text-sm font-bold text-gray-800 dark:text-gray-200" id="modalFbrNumber"></p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400" id="modalTimestamp"></p>
-                </div>
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeFbrSuccessModal()"></div>
+    <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+        <div class="bg-gradient-to-r from-emerald-600 to-emerald-700 px-6 py-6 text-center">
+            <div class="flex items-center justify-center w-16 h-16 rounded-full bg-white/20 mx-auto mb-3">
+                <svg class="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>
+            <h3 class="text-xl font-bold text-white mb-1">FBR Production Successful</h3>
+            <p class="text-emerald-100 text-sm" id="modalFbrNumber"></p>
+            <p class="text-emerald-200 text-xs mt-1" id="modalTimestamp"></p>
         </div>
 
-        <div class="flex-1 overflow-hidden p-4 min-h-0">
-            <iframe id="modalPdfIframe" src="" class="w-full h-full border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800"></iframe>
-        </div>
-
-        <div class="px-6 py-4 border-t border-gray-100 dark:border-gray-800 dark:border-gray-800 flex-shrink-0 bg-gray-50 dark:bg-gray-900">
-            <div id="modalWhtSection" class="mb-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div class="px-6 py-5">
+            <div id="modalWhtSection" class="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
                 <div id="modalWhtSelector">
-                    <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center justify-between mb-3">
                         <p class="text-sm font-bold text-gray-800 dark:text-gray-200">
                             <svg class="w-4 h-4 inline mr-1 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                             Select WHT Rate
                         </p>
                         <span class="text-xs text-gray-500 dark:text-gray-400">Lock before printing</span>
                     </div>
-                    <div class="flex flex-wrap gap-2 mb-2">
-                        <label class="modal-wht-opt flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 text-xs font-semibold transition">
+                    <div class="flex flex-wrap gap-2 mb-3">
+                        <label class="modal-wht-opt flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-xs font-bold transition">
                             <input type="radio" name="modal_wht" value="0" checked class="text-emerald-500"> 0%
                         </label>
-                        <label class="modal-wht-opt flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 text-xs font-semibold transition">
+                        <label class="modal-wht-opt flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-xs font-bold transition">
                             <input type="radio" name="modal_wht" value="0.5" class="text-amber-500"> 0.5%
                         </label>
-                        <label class="modal-wht-opt flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 text-xs font-semibold transition">
+                        <label class="modal-wht-opt flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-xs font-bold transition">
                             <input type="radio" name="modal_wht" value="1" class="text-blue-500"> 1%
                         </label>
-                        <label class="modal-wht-opt flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 text-xs font-semibold transition">
+                        <label class="modal-wht-opt flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-xs font-bold transition">
                             <input type="radio" name="modal_wht" value="2" class="text-orange-500"> 2%
                         </label>
-                        <label class="modal-wht-opt flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 text-xs font-semibold transition">
+                        <label class="modal-wht-opt flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-xs font-bold transition">
                             <input type="radio" name="modal_wht" value="2.5" class="text-red-500"> 2.5%
                         </label>
-                        <button onclick="lockWhtInModal()" id="modalWhtLockBtn" class="ml-auto px-4 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition">
-                            Lock WHT & Refresh PDF
-                        </button>
                     </div>
+                    <button onclick="lockWhtInModal()" id="modalWhtLockBtn" class="w-full px-4 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-bold hover:bg-amber-700 transition">
+                        Lock WHT Rate
+                    </button>
                 </div>
-                <div id="modalWhtLocked" style="display:none;" class="flex items-center gap-2">
-                    <span class="inline-flex items-center px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-bold">
-                        <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                <div id="modalWhtLocked" style="display:none;" class="flex items-center justify-center gap-2">
+                    <span class="inline-flex items-center px-4 py-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-sm font-bold">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                         WHT <span id="modalWhtRateText">0</span>% Locked
                     </span>
-                    <span class="text-xs text-emerald-600 font-medium">PDF updated with WHT calculation</span>
                 </div>
             </div>
-            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                <button onclick="printFbrPdf()" class="inline-flex items-center justify-center px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition">
-                    <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                    Print
-                </button>
-                <button onclick="downloadFbrPdf()" class="inline-flex items-center justify-center px-5 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition">
-                    <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                    Download PDF
-                </button>
-                <button onclick="closeFbrSuccessModal()" class="inline-flex items-center justify-center px-5 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition sm:ml-auto">
-                    Close
-                </button>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                <a href="/invoice/{{ $invoice->id }}/pdf" target="_blank" class="flex flex-col items-center gap-2 px-4 py-4 bg-indigo-600 text-white rounded-xl text-center font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none">
+                    <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                    <span class="text-sm">View & Print</span>
+                </a>
+                <a href="/invoice/{{ $invoice->id }}/download" class="flex flex-col items-center gap-2 px-4 py-4 bg-emerald-600 text-white rounded-xl text-center font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 dark:shadow-none">
+                    <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    <span class="text-sm">Download PDF</span>
+                </a>
+                <a href="https://wa.me/?text={{ urlencode('Invoice ' . ($invoice->display_invoice_number ?? '') . "\nDownload: " . url('/share/invoice/' . ($invoice->share_uuid ?? '') . '/pdf')) }}" target="_blank" class="flex flex-col items-center gap-2 px-4 py-4 bg-green-500 text-white rounded-xl text-center font-bold hover:bg-green-600 transition shadow-lg shadow-green-200 dark:shadow-none">
+                    <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.75.75 0 00.917.918l4.462-1.494A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.4 0-4.637-.734-6.482-1.988l-.452-.305-2.971.993.994-2.969-.316-.461A9.955 9.955 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
+                    <span class="text-sm">WhatsApp</span>
+                </a>
             </div>
-            <p class="text-xs text-gray-400 mt-3 text-center">Protected by TaxNest Idempotency Shield — Duplicate submission impossible.</p>
+
+            <button onclick="closeFbrSuccessModal()" class="w-full px-4 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition">
+                Close
+            </button>
+            <p class="text-xs text-gray-400 mt-3 text-center">Protected by TaxNest Idempotency Shield</p>
         </div>
     </div>
 </div>
@@ -1287,11 +1276,10 @@ function handleFbrResponse(data) {
 }
 
 function openFbrSuccessModal(data) {
-    _fbrPdfUrl = data.pdf_url || '';
+    _fbrPdfUrl = data.pdf_url || '/invoice/{{ $invoice->id }}/pdf';
     _lastFbrNumber = data.fbr_invoice_number || '';
     document.getElementById('modalFbrNumber').textContent = 'FBR #: ' + _lastFbrNumber;
     document.getElementById('modalTimestamp').textContent = 'Submitted: ' + new Date().toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' });
-    document.getElementById('modalPdfIframe').src = _fbrPdfUrl + '?preview=1';
     const modal = document.getElementById('fbrSuccessModal');
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
@@ -1305,7 +1293,6 @@ function closeFbrSuccessModal() {
     setTimeout(() => {
         modal.style.display = 'none';
         document.body.style.overflow = '';
-        document.getElementById('modalPdfIframe').src = '';
         smartRefreshInvoiceStatus();
     }, 250);
 }
@@ -1408,18 +1395,16 @@ async function lockWhtInModal() {
             document.getElementById('modalWhtSelector').style.display = 'none';
             document.getElementById('modalWhtLocked').style.display = 'flex';
             document.getElementById('modalWhtRateText').textContent = whtRate;
-            const iframe = document.getElementById('modalPdfIframe');
-            iframe.src = '/invoice/{{ $invoice->id }}/pdf?preview=1&t=' + Date.now();
             _fbrPdfUrl = '/invoice/{{ $invoice->id }}/pdf';
         } else {
             alert(data.message || 'Failed to lock WHT rate');
             btn.disabled = false;
-            btn.textContent = 'Lock WHT & Refresh PDF';
+            btn.textContent = 'Lock WHT Rate';
         }
     } catch(e) {
         alert('Network error. Please try again.');
         btn.disabled = false;
-        btn.textContent = 'Lock WHT & Refresh PDF';
+        btn.textContent = 'Lock WHT Rate';
     }
 }
 

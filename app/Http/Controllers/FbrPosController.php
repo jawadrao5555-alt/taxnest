@@ -896,4 +896,128 @@ class FbrPosController extends Controller
 
         return $pdf->download("Day-Close-{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf");
     }
+
+    public function products(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $search = $request->get('search', '');
+        $query = Product::where('company_id', $companyId);
+        if ($search) {
+            $like = \App\Helpers\DbCompat::like();
+            $query->where(function ($q) use ($search, $like) {
+                $q->where('name', $like, "%{$search}%")
+                  ->orWhere('hs_code', $like, "%{$search}%");
+            });
+        }
+        $products = $query->orderBy('name')->paginate(20);
+        return view('fbr-pos.products', compact('products', 'search'));
+    }
+
+    public function createProduct()
+    {
+        if (Auth::guard('fbrpos')->user()->role !== 'company_admin') abort(403, 'Only admin can manage products.');
+        return view('fbr-pos.product-form');
+    }
+
+    public function storeProduct(Request $request)
+    {
+        if (Auth::guard('fbrpos')->user()->role !== 'company_admin') abort(403, 'Only admin can manage products.');
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'default_price' => 'required|numeric|min:0',
+            'hs_code' => 'nullable|string|max:50',
+            'uom' => 'nullable|string|max:20',
+            'tax_type' => 'required|in:taxable,exempt,custom',
+            'default_tax_rate' => 'nullable|numeric|min:0|max:100',
+        ]);
+
+        $taxType = $request->tax_type;
+        $taxRate = $taxType === 'taxable' ? 18 : ($taxType === 'exempt' ? 0 : ($request->default_tax_rate ?? 0));
+
+        Product::create([
+            'company_id' => app('currentCompanyId'),
+            'name' => $request->name,
+            'default_price' => $request->default_price,
+            'hs_code' => $request->hs_code,
+            'uom' => $request->uom ?? 'U',
+            'tax_type' => $taxType,
+            'default_tax_rate' => $taxRate,
+        ]);
+
+        return redirect()->route('fbrpos.products')->with('success', 'Product created successfully.');
+    }
+
+    public function editProduct($id)
+    {
+        if (Auth::guard('fbrpos')->user()->role !== 'company_admin') abort(403, 'Only admin can manage products.');
+        $companyId = app('currentCompanyId');
+        $product = Product::where('company_id', $companyId)->findOrFail($id);
+        return view('fbr-pos.product-form', compact('product'));
+    }
+
+    public function updateProduct(Request $request, $id)
+    {
+        if (Auth::guard('fbrpos')->user()->role !== 'company_admin') abort(403, 'Only admin can manage products.');
+        $companyId = app('currentCompanyId');
+        $product = Product::where('company_id', $companyId)->findOrFail($id);
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'default_price' => 'required|numeric|min:0',
+            'hs_code' => 'nullable|string|max:50',
+            'uom' => 'nullable|string|max:20',
+            'tax_type' => 'required|in:taxable,exempt,custom',
+            'default_tax_rate' => 'nullable|numeric|min:0|max:100',
+        ]);
+
+        $taxType = $request->tax_type;
+        $taxRate = $taxType === 'taxable' ? 18 : ($taxType === 'exempt' ? 0 : ($request->default_tax_rate ?? 0));
+
+        $product->update([
+            'name' => $request->name,
+            'default_price' => $request->default_price,
+            'hs_code' => $request->hs_code,
+            'uom' => $request->uom ?? 'U',
+            'tax_type' => $taxType,
+            'default_tax_rate' => $taxRate,
+        ]);
+
+        return redirect()->route('fbrpos.products')->with('success', 'Product updated successfully.');
+    }
+
+    public function toggleProduct($id)
+    {
+        if (Auth::guard('fbrpos')->user()->role !== 'company_admin') abort(403, 'Only admin can manage products.');
+        $companyId = app('currentCompanyId');
+        $product = Product::where('company_id', $companyId)->findOrFail($id);
+        $product->update(['is_active' => !$product->is_active]);
+        return redirect()->route('fbrpos.products')->with('success', 'Product status updated.');
+    }
+
+    public function destroyProduct($id)
+    {
+        if (Auth::guard('fbrpos')->user()->role !== 'company_admin') abort(403, 'Only admin can manage products.');
+        $companyId = app('currentCompanyId');
+        $product = Product::where('company_id', $companyId)->findOrFail($id);
+        $name = $product->name;
+        $product->delete();
+        return redirect()->route('fbrpos.products')->with('success', "Product \"{$name}\" deleted.");
+    }
+
+    public function searchProducts(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $q = $request->get('q', '');
+        $like = \App\Helpers\DbCompat::like();
+        $products = Product::where('company_id', $companyId)
+            ->where('is_active', true)
+            ->where(function ($query) use ($q, $like) {
+                $query->where('name', $like, "%{$q}%")
+                      ->orWhere('hs_code', $like, "%{$q}%");
+            })
+            ->take(15)
+            ->get(['id', 'name', 'hs_code', 'default_price', 'default_tax_rate', 'tax_type', 'uom']);
+
+        return response()->json($products);
+    }
 }

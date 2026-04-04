@@ -12,6 +12,7 @@ class Product extends Model
         'hs_code',
         'pct_code',
         'default_tax_rate',
+        'tax_type',
         'uom',
         'schedule_type',
         'sro_reference',

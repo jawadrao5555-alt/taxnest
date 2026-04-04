@@ -32,6 +32,7 @@
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">HS Code</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Schedule</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tax Type</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tax</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Price</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tax Amt</th>
@@ -67,6 +68,20 @@
                                     @else
                                         <span class="text-gray-400 text-sm">-</span>
                                     @endif
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    @php
+                                        $taxType = $product->tax_type ?? 'taxable';
+                                        $taxBadgeMap = [
+                                            'taxable' => 'bg-amber-100 text-amber-800',
+                                            'exempt' => 'bg-green-100 text-green-800',
+                                            'custom' => 'bg-purple-100 text-purple-800',
+                                        ];
+                                        $taxBadgeLabel = ['taxable' => '18% GST', 'exempt' => 'Exempt', 'custom' => intval($product->default_tax_rate) . '%'];
+                                    @endphp
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold {{ $taxBadgeMap[$taxType] ?? 'bg-gray-100 text-gray-800' }}">
+                                        {{ $taxBadgeLabel[$taxType] ?? intval($product->default_tax_rate) . '%' }}
+                                    </span>
                                 </td>
                                 <td class="px-4 py-3 whitespace-nowrap text-sm font-medium {{ $product->default_tax_rate > 0 ? 'text-amber-600' : 'text-gray-600 dark:text-gray-400' }}">{{ intval($product->default_tax_rate) }}%</td>
                                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">PKR {{ number_format($product->default_price, 2) }}</td>
@@ -113,7 +128,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="11" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                <td colspan="12" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                                     No products found. <a href="/products/create" class="text-emerald-600 hover:text-emerald-800 font-medium">Create your first product</a>.
                                 </td>
                             </tr>

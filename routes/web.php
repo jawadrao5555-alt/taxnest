@@ -666,6 +666,15 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth'])->group(function () {
     Route::get('/day-close', [FbrPosController::class, 'dayCloseReport'])->name('fbrpos.day-close');
     Route::post('/day-close', [FbrPosController::class, 'closeDayReport'])->name('fbrpos.close-day');
     Route::get('/day-close/{id}/pdf', [FbrPosController::class, 'dayCloseReportPdf'])->name('fbrpos.day-close-pdf');
+
+    Route::get('/products', [FbrPosController::class, 'products'])->name('fbrpos.products');
+    Route::get('/products/create', [FbrPosController::class, 'createProduct'])->name('fbrpos.products.create');
+    Route::post('/products', [FbrPosController::class, 'storeProduct'])->name('fbrpos.products.store');
+    Route::get('/products/{id}/edit', [FbrPosController::class, 'editProduct'])->name('fbrpos.products.edit');
+    Route::put('/products/{id}', [FbrPosController::class, 'updateProduct'])->name('fbrpos.products.update');
+    Route::post('/products/{id}/toggle', [FbrPosController::class, 'toggleProduct'])->name('fbrpos.products.toggle');
+    Route::delete('/products/{id}', [FbrPosController::class, 'destroyProduct'])->name('fbrpos.products.destroy');
+    Route::get('/api/products/search', [FbrPosController::class, 'searchProducts'])->name('fbrpos.api.products.search');
 });
 
 Route::get('/setup-migrate-xK9mP2', function () {

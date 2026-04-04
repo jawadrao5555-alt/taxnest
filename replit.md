@@ -71,6 +71,7 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **Isolated FBR-integrated POS:** Accessible at `/fbr-pos` with direct FBR API submission, separate from PRA POS.
 - **Top Nav Layout:** Converted from sidebar to top nav bar (blue gradient) matching NestPOS style. Logo + "New Sale" in top bar, everything else in profile dropdown. Direct-to-sale login (`/fbr-pos/create`).
 - **Universal Categories:** Same 10 business types as NestPOS, with emoji grid picker on registration.
+- **Product Tax Configuration:** Products have `tax_type` field (taxable/exempt/custom). FBR POS has full product CRUD at `/fbr-pos/products` (admin-only). Invoice create form has product search with auto-fill of name, price, HS code, tax rate based on product settings. Per-item tax badges (18% GST / Exempt / Custom %). DI products also show tax type badges.
 - **FBR Reporting Toggle:** Admin-only toggle to control FBR reporting (ON/OFF) with corresponding invoice prefixes (`FPOS-` or `FLOCAL-`).
 - **Local Tabs & Confidential PIN System:** PIN-protected access to local invoice data and details.
 

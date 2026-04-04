@@ -44,16 +44,69 @@
                 <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="font-semibold text-gray-900 dark:text-white">Items</h3>
-                        <button type="button" @click="addItem()" class="text-sm text-blue-600 hover:text-blue-700 font-medium">+ Add Item</button>
+                        <div class="flex items-center gap-3">
+                            <div class="relative" x-data="{ searchOpen: false, searchQuery: '', searchResults: [] }">
+                                <button type="button" @click="searchOpen = !searchOpen; $nextTick(() => $refs.productSearch && $refs.productSearch.focus())"
+                                    class="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                    Search Product
+                                </button>
+                                <div x-show="searchOpen" @click.away="searchOpen = false" x-cloak x-transition
+                                    class="absolute right-0 top-8 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 z-50 p-3">
+                                    <input type="text" x-ref="productSearch" x-model="searchQuery"
+                                        @input.debounce.300ms="
+                                            if(searchQuery.length >= 1) {
+                                                fetch('{{ route('fbrpos.api.products.search') }}?q=' + encodeURIComponent(searchQuery))
+                                                    .then(r => r.json())
+                                                    .then(data => searchResults = data)
+                                            } else { searchResults = [] }
+                                        "
+                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 mb-2"
+                                        placeholder="Type product name...">
+                                    <div class="max-h-60 overflow-y-auto space-y-1">
+                                        <template x-for="p in searchResults" :key="p.id">
+                                            <button type="button" @click="addProductItem(p); searchOpen = false; searchQuery = ''; searchResults = [];"
+                                                class="w-full text-left px-3 py-2.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition flex items-center justify-between group">
+                                                <div>
+                                                    <p class="text-sm font-medium text-gray-900 dark:text-gray-100" x-text="p.name"></p>
+                                                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                                                        <span x-text="'PKR ' + Number(p.default_price).toFixed(2)"></span>
+                                                        <span class="mx-1">|</span>
+                                                        <span x-text="p.hs_code || 'No HS'"></span>
+                                                    </p>
+                                                </div>
+                                                <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                                                    :class="p.tax_type === 'exempt' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'"
+                                                    x-text="p.tax_type === 'exempt' ? 'Exempt' : (p.default_tax_rate + '%')"></span>
+                                            </button>
+                                        </template>
+                                        <p x-show="searchQuery.length >= 1 && searchResults.length === 0" class="text-xs text-gray-500 dark:text-gray-400 text-center py-3">No products found</p>
+                                        <p x-show="searchQuery.length < 1" class="text-xs text-gray-500 dark:text-gray-400 text-center py-3">Type to search saved products</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="button" @click="addItem()" class="text-sm text-blue-600 hover:text-blue-700 font-medium">+ Add Manual</button>
+                        </div>
                     </div>
 
                     <template x-for="(item, index) in items" :key="index">
-                        <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-3">
+                        <div class="border rounded-lg p-4 mb-3 transition"
+                            :class="item.is_tax_exempt ? 'border-green-300 dark:border-green-700 bg-green-50/30 dark:bg-green-900/10' : 'border-gray-200 dark:border-gray-700'">
                             <div class="flex items-center justify-between mb-3">
-                                <span class="text-xs font-medium text-gray-500 dark:text-gray-400" x-text="'Item #' + (index + 1)"></span>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400" x-text="'Item #' + (index + 1)"></span>
+                                    <span x-show="item.is_tax_exempt"
+                                        class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">EXEMPT</span>
+                                    <span x-show="!item.is_tax_exempt && item.tax_rate != 18"
+                                        class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
+                                        x-text="item.tax_rate + '% TAX'"></span>
+                                    <span x-show="!item.is_tax_exempt && item.tax_rate == 18"
+                                        class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">18% GST</span>
+                                </div>
                                 <button type="button" @click="removeItem(index)" x-show="items.length > 1" class="text-red-500 hover:text-red-700 text-xs">Remove</button>
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                                <input type="hidden" :name="'items['+index+'][product_id]'" :value="item.product_id || ''">
                                 <div class="sm:col-span-4">
                                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Item Name *</label>
                                     <input type="text" :name="'items['+index+'][item_name]'" x-model="item.item_name" required
@@ -205,6 +258,20 @@ function fbrPosInvoice() {
         discountValue: 0,
         addItem() {
             this.items.push({ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false });
+        },
+        addProductItem(p) {
+            let isExempt = p.tax_type === 'exempt';
+            let taxRate = isExempt ? 0 : (parseFloat(p.default_tax_rate) || 18);
+            this.items.push({
+                item_name: p.name,
+                hs_code: p.hs_code || '',
+                uom: p.uom || 'U',
+                quantity: 1,
+                unit_price: parseFloat(p.default_price) || 0,
+                tax_rate: taxRate,
+                is_tax_exempt: isExempt,
+                product_id: p.id
+            });
         },
         removeItem(index) {
             this.items.splice(index, 1);

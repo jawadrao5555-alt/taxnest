@@ -44,6 +44,7 @@ class ProductController extends Controller
             'hs_code' => 'required|string|max:50',
             'pct_code' => 'nullable|string|max:50',
             'default_tax_rate' => 'required|integer|min:0|max:100',
+            'tax_type' => 'nullable|in:taxable,exempt,custom',
             'uom' => 'required|string|max:20',
             'schedule_type' => 'nullable|string|max:100',
             'sro_reference' => 'nullable|string|max:100',
@@ -66,12 +67,20 @@ class ProductController extends Controller
 
         $companyId = app('currentCompanyId');
 
+        $taxType = $request->tax_type ?? 'taxable';
+        if ($scheduleType === 'exempt' || $scheduleType === 'zero_rated') {
+            $taxType = 'exempt';
+        } elseif ($taxRate != 18 && $taxRate > 0) {
+            $taxType = 'custom';
+        }
+
         Product::create([
             'company_id' => $companyId,
             'name' => $request->name,
             'hs_code' => $request->hs_code,
             'pct_code' => $request->pct_code,
             'default_tax_rate' => $request->default_tax_rate,
+            'tax_type' => $taxType,
             'uom' => $request->uom,
             'schedule_type' => $request->schedule_type,
             'sro_reference' => $request->sro_reference,
@@ -124,10 +133,17 @@ class ProductController extends Controller
 
         $request->validate($validationRules);
 
-        $product->update($request->only([
+        $taxType = $request->tax_type ?? 'taxable';
+        if ($scheduleType === 'exempt' || $scheduleType === 'zero_rated') {
+            $taxType = 'exempt';
+        } elseif ($taxRate != 18 && $taxRate > 0) {
+            $taxType = 'custom';
+        }
+
+        $product->update(array_merge($request->only([
             'name', 'hs_code', 'pct_code', 'default_tax_rate',
             'uom', 'schedule_type', 'sro_reference', 'serial_number', 'mrp', 'default_price'
-        ]));
+        ]), ['tax_type' => $taxType]));
 
         return redirect('/products')->with('success', 'Product updated successfully.');
     }
@@ -163,7 +179,7 @@ class ProductController extends Controller
                   ->orWhere('hs_code', $like, "%{$query}%");
             })
             ->take(20)
-            ->get(['id', 'name', 'hs_code', 'pct_code', 'default_tax_rate', 'uom', 'default_price', 'schedule_type', 'sro_reference', 'serial_number', 'mrp']);
+            ->get(['id', 'name', 'hs_code', 'pct_code', 'default_tax_rate', 'tax_type', 'uom', 'default_price', 'schedule_type', 'sro_reference', 'serial_number', 'mrp']);
 
         $products->transform(function ($product) {
             $rules = \App\Services\ScheduleEngine::resolveValidationRules($product->schedule_type ?? 'standard', (float)($product->default_tax_rate ?? 18));

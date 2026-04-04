@@ -4,297 +4,411 @@
     <meta charset="utf-8">
     <title>Invoice {{ $invoice->invoice_number ?? $invoice->id }}</title>
     <style>
-        @page { margin: 12mm 14mm 10mm 14mm; size: A4 portrait; }
+        @page {
+            margin: 14mm 16mm 12mm 16mm;
+            size: A4 portrait;
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'DejaVu Sans', 'Helvetica', Arial, sans-serif; color: #000000; font-size: 10px; line-height: 1.4; width: 100%; }
+        body {
+            font-family: 'DejaVu Sans', 'Helvetica', Arial, sans-serif;
+            color: #111111;
+            font-size: 11px;
+            line-height: 1.45;
+            width: 100%;
+        }
 
-        .page { width: 100%; max-width: 100%; overflow: hidden; }
+        .header-row { width: 100%; margin-bottom: 6px; }
+        .header-row table { width: 100%; border-collapse: collapse; }
+        .header-row td { vertical-align: top; }
+        .company-name { font-size: 20px; font-weight: 900; color: #111111; letter-spacing: 0.5px; }
+        .company-info { font-size: 10px; color: #333333; margin-top: 2px; line-height: 1.5; }
+        .company-info strong { font-weight: 700; }
 
-        .company-header { width: 100%; margin-bottom: 8px; }
-        .company-header table { width: 100%; table-layout: fixed; }
-        .company-name { font-size: 18px; font-weight: bold; color: #000000; text-align: right; word-wrap: break-word; }
-        .company-detail { font-size: 9px; color: #000000; margin-top: 1px; text-align: right; word-wrap: break-word; }
+        .status-pill {
+            display: inline-block;
+            padding: 3px 12px;
+            border-radius: 12px;
+            font-size: 9px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+        }
+        .pill-verified { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+        .pill-draft { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+        .pill-production { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+        .pill-failed { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+        .pill-pending { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
 
-        .fbr-section { text-align: center; padding: 8px 0; margin-bottom: 10px; border-bottom: 2px solid #d1d5db; }
-        .fbr-logo-box { display: inline-block; text-align: center; vertical-align: middle; }
-        .fbr-shield { display: inline-block; width: 44px; height: 44px; background: #166534; border-radius: 4px; text-align: center; line-height: 44px; color: #ffffff; font-size: 16px; font-weight: 900; letter-spacing: 2px; }
-        .fbr-label { margin-top: 2px; }
-        .fbr-label-digital { font-size: 9px; font-weight: 800; color: #166534; letter-spacing: 1px; }
-        .fbr-label-invoicing { font-size: 7px; font-weight: 700; color: #166534; letter-spacing: 0.5px; text-transform: uppercase; }
-        .di-number { font-size: 10px; color: #000000; font-weight: 700; margin-top: 4px; letter-spacing: 0.3px; word-wrap: break-word; }
+        .divider { border: none; border-top: 2px solid #e5e7eb; margin: 10px 0; }
+        .divider-dark { border: none; border-top: 2px solid #1f2937; margin: 8px 0; }
 
-        .status-badge { display: inline-block; padding: 2px 10px; border-radius: 8px; font-size: 9px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
-        .status-draft { background: #e5e7eb; color: #374151; }
-        .status-locked { background: #d1fae5; color: #065f46; }
-        .status-failed { background: #fee2e2; color: #991b1b; }
-        .status-pending_verification { background: #fef3c7; color: #92400e; }
+        .fbr-block { text-align: center; padding: 10px 0 8px 0; margin-bottom: 8px; }
+        .fbr-block table { margin: 0 auto; border-collapse: collapse; }
+        .fbr-block td { vertical-align: middle; }
+        .fbr-badge {
+            display: inline-block;
+            width: 48px;
+            height: 48px;
+            background: #166534;
+            border-radius: 6px;
+            text-align: center;
+            line-height: 48px;
+            color: #ffffff;
+            font-size: 17px;
+            font-weight: 900;
+            letter-spacing: 2px;
+        }
+        .fbr-text { margin-top: 3px; }
+        .fbr-text-digital { font-size: 10px; font-weight: 800; color: #166534; letter-spacing: 1px; }
+        .fbr-text-sub { font-size: 7px; font-weight: 700; color: #166534; letter-spacing: 0.5px; text-transform: uppercase; }
+        .fbr-inv-no { font-size: 11px; color: #111111; font-weight: 800; margin-top: 5px; letter-spacing: 0.2px; }
 
-        .doc-label { font-size: 14px; font-weight: bold; color: #000000; margin-bottom: 8px; }
+        .doc-title { font-size: 16px; font-weight: 900; color: #111111; margin-bottom: 10px; letter-spacing: 0.5px; }
 
-        .info-grid { width: 100%; margin-bottom: 10px; table-layout: fixed; }
-        .info-grid td { vertical-align: top; }
-        .info-label { font-size: 8px; text-transform: uppercase; color: #374151; font-weight: bold; letter-spacing: 1px; margin-bottom: 2px; }
-        .info-value { font-size: 10px; color: #000000; margin-top: 1px; word-wrap: break-word; }
-        .info-value strong { font-weight: 700; }
-        .inv-detail-label { font-size: 9px; color: #374151; font-weight: 700; }
-        .inv-detail-value { font-size: 9px; color: #000000; font-weight: 700; word-wrap: break-word; }
+        .info-section { width: 100%; margin-bottom: 12px; border-collapse: collapse; }
+        .info-section td { vertical-align: top; }
+        .info-heading {
+            font-size: 9px;
+            text-transform: uppercase;
+            color: #ffffff;
+            background: #1f2937;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            padding: 4px 8px;
+            margin-bottom: 6px;
+        }
+        .info-row { font-size: 10.5px; color: #111111; padding: 2px 0; line-height: 1.5; }
+        .info-row strong { font-weight: 700; }
+        .info-row-label { font-size: 10px; color: #555555; font-weight: 600; }
+        .info-row-value { font-size: 10.5px; color: #111111; font-weight: 700; }
 
-        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; table-layout: fixed; }
-        .items-table thead th { background: #1f2937; padding: 5px 4px; text-align: left; font-size: 8px; text-transform: uppercase; color: #ffffff; font-weight: 700; letter-spacing: 0.3px; overflow: hidden; }
-        .items-table thead th.text-right { text-align: right; }
-        .items-table thead th.text-center { text-align: center; }
-        .items-table tbody td { padding: 4px; border-bottom: 1px solid #d1d5db; font-size: 9px; color: #000000; overflow: hidden; word-wrap: break-word; }
+        .detail-table { width: 100%; border-collapse: collapse; }
+        .detail-table td { padding: 3px 6px; font-size: 10px; }
+        .detail-table .dt-label { color: #555555; font-weight: 600; text-align: left; }
+        .detail-table .dt-value { color: #111111; font-weight: 700; text-align: right; }
+        .detail-table tr { border-bottom: 1px solid #f3f4f6; }
+
+        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+        .items-table thead th {
+            background: #1f2937;
+            padding: 7px 6px;
+            font-size: 9px;
+            text-transform: uppercase;
+            color: #ffffff;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            text-align: left;
+            border: 1px solid #1f2937;
+        }
+        .items-table thead th.ar { text-align: right; }
+        .items-table thead th.ac { text-align: center; }
+        .items-table tbody td {
+            padding: 6px;
+            border: 1px solid #e5e7eb;
+            font-size: 10px;
+            color: #111111;
+        }
         .items-table tbody tr:nth-child(even) td { background: #f9fafb; }
-        .items-table tbody td.text-right { text-align: right; font-weight: 600; }
-        .items-table tbody td.text-center { text-align: center; }
-        .items-table tbody td.mono { font-family: 'Courier New', monospace; font-size: 8px; }
+        .items-table tbody td.ar { text-align: right; font-weight: 700; }
+        .items-table tbody td.ac { text-align: center; }
+        .items-table tbody td.code {
+            font-family: 'DejaVu Sans', 'Helvetica', sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            color: #111111;
+            letter-spacing: 0.3px;
+        }
+        .items-table tbody td.product { font-weight: 600; }
         .items-table tbody tr { page-break-inside: avoid; }
 
-        .totals-section { width: 100%; margin-top: 4px; }
-        .totals-section > table { width: 100%; table-layout: fixed; }
-        .totals-inner { width: 100%; }
-        .totals-inner table { width: 100%; border-collapse: collapse; }
-        .totals-inner td { padding: 3px 6px; font-size: 10px; }
-        .totals-inner td.label { text-align: right; color: #000000; font-weight: 600; }
-        .totals-inner td.value { text-align: right; color: #000000; font-weight: 700; white-space: nowrap; }
-        .totals-inner tr.grand-total td { border-top: 2px solid #000000; padding-top: 6px; }
-        .totals-inner tr.grand-total td.value { font-size: 13px; font-weight: 800; color: #000000; }
-        .totals-inner tr.net td { background: #f0fdf4; border-radius: 4px; }
+        .summary-table { width: 100%; border-collapse: collapse; }
+        .summary-table td { vertical-align: top; }
 
-        .watermark { position: fixed; top: 40%; left: 15%; font-size: 60px; color: rgba(156, 163, 175, 0.12); font-weight: bold; text-transform: uppercase; transform: rotate(-35deg); letter-spacing: 10px; z-index: 9999; pointer-events: none; white-space: nowrap; }
+        .totals-box { border: 1px solid #e5e7eb; border-radius: 4px; overflow: hidden; }
+        .totals-box table { width: 100%; border-collapse: collapse; }
+        .totals-box td { padding: 5px 10px; font-size: 10.5px; }
+        .totals-box .t-label { text-align: right; color: #333333; font-weight: 600; width: 55%; }
+        .totals-box .t-value { text-align: right; color: #111111; font-weight: 700; width: 45%; white-space: nowrap; }
+        .totals-box tr { border-bottom: 1px solid #f3f4f6; }
+        .totals-box tr.total-row { background: #1f2937; }
+        .totals-box tr.total-row td { border-bottom: none; padding: 8px 10px; }
+        .totals-box tr.total-row .t-label { color: #ffffff; font-size: 12px; font-weight: 800; }
+        .totals-box tr.total-row .t-value { color: #ffffff; font-size: 14px; font-weight: 900; }
 
-        .clearfix::after { content: ""; display: table; clear: both; }
+        .schedule-info { font-size: 9px; color: #555555; line-height: 1.5; margin-top: 6px; }
+        .schedule-info strong { font-weight: 700; color: #333333; }
 
-        .footer-note { margin-top: 10px; padding-top: 8px; border-top: 1.5px solid #9ca3af; text-align: center; font-size: 8px; color: #374151; }
+        .footer { margin-top: 14px; padding-top: 8px; border-top: 1.5px solid #d1d5db; text-align: center; }
+        .footer-text { font-size: 8px; color: #6b7280; }
+        .footer-brand { font-size: 9px; color: #374151; font-weight: 700; margin-top: 2px; }
+
+        .watermark {
+            position: fixed;
+            top: 40%;
+            left: 12%;
+            font-size: 60px;
+            color: rgba(156, 163, 175, 0.12);
+            font-weight: bold;
+            text-transform: uppercase;
+            transform: rotate(-35deg);
+            letter-spacing: 10px;
+            z-index: 9999;
+            pointer-events: none;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
-    <div class="page">
 
-        <div class="company-header">
-            <table>
-                <tr>
-                    <td style="width: 50%; vertical-align: top;">
-                        @if($invoice->fbr_invoice_number)
-                        <span class="status-badge status-locked">FBR VERIFIED</span>
-                        @else
-                        <span class="status-badge status-{{ $invoice->status }}">{{ strtoupper($invoice->status === 'locked' ? 'PRODUCTION' : $invoice->status) }}</span>
-                        @endif
-                    </td>
-                    <td style="width: 50%; vertical-align: top; text-align: right;">
-                        <div class="company-name">{{ $invoice->company->name ?? 'TaxNest' }}</div>
+    {{-- ===== COMPANY HEADER ===== --}}
+    <div class="header-row">
+        <table>
+            <tr>
+                <td style="width: 45%;">
+                    @if($invoice->fbr_invoice_number)
+                    <span class="status-pill pill-verified">FBR VERIFIED</span>
+                    @elseif($invoice->status === 'draft')
+                    <span class="status-pill pill-draft">DRAFT</span>
+                    @elseif($invoice->status === 'locked')
+                    <span class="status-pill pill-production">PRODUCTION</span>
+                    @elseif($invoice->status === 'failed')
+                    <span class="status-pill pill-failed">FAILED</span>
+                    @elseif($invoice->status === 'pending_verification')
+                    <span class="status-pill pill-pending">PENDING</span>
+                    @endif
+                </td>
+                <td style="width: 55%; text-align: right;">
+                    <div class="company-name">{{ $invoice->company->name ?? 'TaxNest' }}</div>
+                    <div class="company-info">
                         @if($invoice->company->address)
-                        <div class="company-detail">{{ $invoice->company->address }}@if($invoice->company->city), {{ $invoice->company->city }}@endif</div>
+                        {{ $invoice->company->address }}@if($invoice->company->city), {{ $invoice->company->city }}@endif<br>
                         @endif
                         @if($invoice->company->ntn)
-                        <div class="company-detail" style="font-weight:700;">NTN: {{ $invoice->company->ntn }}</div>
+                        <strong>NTN: {{ $invoice->company->ntn }}</strong><br>
                         @endif
                         @if($invoice->company->cnic && $invoice->company->cnic !== $invoice->company->ntn && $invoice->company->cnic !== $invoice->company->registration_no)
-                        <div class="company-detail">CNIC: {{ $invoice->company->cnic }}</div>
+                        CNIC: {{ $invoice->company->cnic }}<br>
                         @endif
                         @if($invoice->company->registration_no)
-                        <div class="company-detail">Reg #: {{ $invoice->company->registration_no }}</div>
+                        Reg #: {{ $invoice->company->registration_no }}<br>
                         @endif
                         @if($invoice->company->phone)
-                        <div class="company-detail">Phone: {{ $invoice->company->phone }}</div>
+                        Phone: {{ $invoice->company->phone }}
                         @endif
                         @if($invoice->company->mobile && $invoice->company->mobile !== $invoice->company->phone)
-                        <div class="company-detail">Mobile: {{ $invoice->company->mobile }}</div>
+                        &nbsp;| Mobile: {{ $invoice->company->mobile }}
                         @endif
                         @if($invoice->company->email)
-                        <div class="company-detail">Email: {{ $invoice->company->email }}</div>
+                        <br>{{ $invoice->company->email }}
                         @endif
-                    </td>
-                </tr>
-            </table>
-        </div>
-
-        @if($invoice->fbr_invoice_number && !empty($qrBase64))
-        <div class="fbr-section">
-            <table style="width: auto; margin: 0 auto; border-collapse: collapse;">
-                <tr>
-                    <td style="text-align: center; vertical-align: middle; padding: 0 12px 0 0;">
-                        @if(!empty($fbrLogoBase64))
-                        <img src="{{ $fbrLogoBase64 }}" alt="FBR Digital Invoicing System" style="width: 65px; height: auto;">
-                        @else
-                        <div class="fbr-logo-box">
-                            <div class="fbr-shield">FBR</div>
-                            <div class="fbr-label">
-                                <div class="fbr-label-digital">DIGITAL</div>
-                                <div class="fbr-label-invoicing">INVOICING SYSTEM</div>
-                            </div>
-                        </div>
-                        @endif
-                    </td>
-                    <td style="text-align: center; vertical-align: middle; padding: 0 0 0 12px;">
-                        <img src="{{ $qrBase64 }}" alt="QR Code" style="width: 65px; height: 65px;">
-                    </td>
-                </tr>
-            </table>
-            <div class="di-number">Digital Invoice #: {{ $invoice->fbr_invoice_number }}</div>
-        </div>
-        @endif
-
-        <div class="doc-label">{{ $invoice->document_type ?? 'Invoice' }}</div>
-
-        <table class="info-grid">
-            <tr>
-                <td style="width: 55%; padding-right: 10px;">
-                    <div class="info-label" style="margin-bottom:3px;">Bill To</div>
-                    <div style="font-weight: 700; font-size: 10px; margin-bottom: 2px; color:#000000;">{{ $invoice->buyer_registration_type ?? 'UNREGISTERED' }}</div>
-                    <div class="info-value"><strong>{{ $invoice->buyer_name }}</strong></div>
-                    @if($invoice->buyer_ntn)
-                    <div class="info-value">NTN: {{ $invoice->buyer_ntn }}</div>
-                    @endif
-                    @if($invoice->buyer_cnic)
-                    <div class="info-value">CNIC: {{ $invoice->buyer_cnic }}</div>
-                    @endif
-                    @if($invoice->buyer_address)
-                    <div class="info-value">{{ $invoice->buyer_address }}</div>
-                    @endif
-                    @if($invoice->destination_province)
-                    <div class="info-value">{{ $invoice->destination_province }}</div>
-                    @endif
-                    <div class="info-value">Pakistan</div>
-                </td>
-                <td style="width: 45%; padding-left: 10px; vertical-align: top;">
-                    <div class="info-label" style="margin-bottom:3px;">Invoice Details</div>
-                    <table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
-                        <tr>
-                            <td style="padding: 2px 0; width: 35%;"><span class="inv-detail-label">Inv No.</span></td>
-                            <td style="padding: 2px 0; text-align: right; width: 65%;"><span class="inv-detail-value">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</span></td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 2px 0;"><span class="inv-detail-label">Date</span></td>
-                            <td style="padding: 2px 0; text-align: right;"><span class="inv-detail-value">{{ $invoice->created_at->format('d/m/Y') }}</span></td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 2px 0;"><span class="inv-detail-label">Status</span></td>
-                            <td style="padding: 2px 0; text-align: right;"><span class="inv-detail-value">{{ $invoice->fbr_invoice_number ? 'FBR Verified' : ($invoice->status === 'locked' ? 'Production' : ucfirst($invoice->status)) }}</span></td>
-                        </tr>
-                        @if($invoice->document_type && $invoice->document_type !== 'Sale Invoice')
-                        <tr>
-                            <td style="padding: 2px 0;"><span class="inv-detail-label">Type</span></td>
-                            <td style="padding: 2px 0; text-align: right;"><span class="inv-detail-value">{{ $invoice->document_type }}</span></td>
-                        </tr>
-                        @endif
-                        @if($invoice->reference_invoice_number)
-                        <tr>
-                            <td style="padding: 2px 0;"><span class="inv-detail-label">Ref Invoice</span></td>
-                            <td style="padding: 2px 0; text-align: right;"><span class="inv-detail-value">{{ $invoice->reference_invoice_number }}</span></td>
-                        </tr>
-                        @endif
-                        <tr>
-                            <td style="padding: 2px 0;"><span class="inv-detail-label">NTN</span></td>
-                            <td style="padding: 2px 0; text-align: right;"><span class="inv-detail-value">{{ $invoice->company->ntn ?? 'N/A' }}</span></td>
-                        </tr>
-                        @if($invoice->supplier_province)
-                        <tr>
-                            <td style="padding: 2px 0;"><span class="inv-detail-label">From</span></td>
-                            <td style="padding: 2px 0; text-align: right;"><span class="inv-detail-value">{{ $invoice->supplier_province }}</span></td>
-                        </tr>
-                        @endif
-                    </table>
+                    </div>
                 </td>
             </tr>
         </table>
-
-        <table class="items-table">
-            <thead>
-                <tr>
-                    <th style="width: 5%;">Sr</th>
-                    <th style="width: 11%;">Code</th>
-                    <th style="width: 29%;">Product Name</th>
-                    <th class="text-center" style="width: 8%;">Unit</th>
-                    <th class="text-right" style="width: 7%;">Qty</th>
-                    <th class="text-right" style="width: 13%;">Rate</th>
-                    <th class="text-right" style="width: 14%;">Amount</th>
-                    <th class="text-right" style="width: 6%;">Tax%</th>
-                    <th class="text-right" style="width: 7%;">Disc</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($invoice->items as $index => $item)
-                <tr>
-                    <td>{{ $index + 1 }}</td>
-                    <td class="mono">{{ $item->hs_code }}</td>
-                    <td>{{ $item->description }}</td>
-                    <td class="text-center">{{ $item->default_uom ?? 'PCS' }}</td>
-                    <td class="text-right">{{ number_format($item->quantity, 0) }}</td>
-                    <td class="text-right">{{ number_format($item->price, 2) }}</td>
-                    <td class="text-right">{{ number_format($item->price * $item->quantity, 2) }}</td>
-                    <td class="text-right">{{ number_format($item->tax_rate ?? 0, 0) }}%</td>
-                    <td class="text-right">{{ number_format($item->discount ?? 0, 2) }}</td>
-                </tr>
-                @endforeach
-            </tbody>
-        </table>
-
-        <div class="clearfix">
-            <table style="width: 100%; table-layout: fixed;">
-                <tr>
-                    <td style="width: 55%; vertical-align: top;">
-                        @if($invoice->items->count() > 0)
-                        <div style="font-size: 8px; color: #6b7280; margin-top: 4px;">
-                            @php
-                                $scheduleTypes = $invoice->items->pluck('schedule_type')->unique()->filter();
-                                $sroNumbers = $invoice->items->pluck('sro_schedule_no')->unique()->filter();
-                            @endphp
-                            @if($scheduleTypes->count() > 0)
-                            <div>Schedule: {{ $scheduleTypes->map(fn($t) => ucfirst(str_replace('_', ' ', $t)))->join(', ') }}</div>
-                            @endif
-                            @if($sroNumbers->count() > 0)
-                            <div>SRO: {{ $sroNumbers->join(', ') }}</div>
-                            @endif
-                        </div>
-                        @endif
-                    </td>
-                    <td style="width: 45%;">
-                        <div class="totals-inner">
-                            <table>
-                                <tr>
-                                    <td class="label">Sub Total:</td>
-                                    <td class="value">PKR {{ number_format($subtotal, 2) }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="label">GST:</td>
-                                    <td class="value">PKR {{ number_format($totalTax, 2) }}</td>
-                                </tr>
-                                @php $totalFurtherTax = $invoice->items->sum('further_tax'); @endphp
-                                @if($totalFurtherTax > 0)
-                                <tr>
-                                    <td class="label">Further Tax (4%):</td>
-                                    <td class="value" style="color: #ea580c;">PKR {{ number_format($totalFurtherTax, 2) }}</td>
-                                </tr>
-                                @endif
-                                @if(($wht_rate ?? 0) > 0)
-                                <tr>
-                                    <td class="label">WHT ({{ $wht_rate }}%):</td>
-                                    <td class="value">PKR {{ number_format($wht_amount ?? 0, 2) }}</td>
-                                </tr>
-                                @endif
-                                <tr class="grand-total">
-                                    <td class="label" style="font-size: 11px;">Total:</td>
-                                    <td class="value">PKR {{ number_format(($wht_rate ?? 0) > 0 ? ($net_receivable ?? $invoice->total_amount) : $invoice->total_amount, 2) }}</td>
-                                </tr>
-                            </table>
-                        </div>
-                    </td>
-                </tr>
-            </table>
-        </div>
-
-        <div class="footer-note">
-            Generated by TaxNest — Tax & Invoice Management System | {{ now()->format('d/m/Y h:i A') }}
-        </div>
-
-        @if(!empty($isDraft) && $isDraft)
-        <div class="watermark">DRAFT</div>
-        @endif
-
-        @if(!empty($showWatermark) && $showWatermark)
-        <div class="watermark" style="color: rgba(239, 68, 68, 0.10); font-size: 44px;">SUBSCRIPTION EXPIRED</div>
-        @endif
     </div>
+
+    <hr class="divider">
+
+    {{-- ===== FBR SECTION ===== --}}
+    @if($invoice->fbr_invoice_number && !empty($qrBase64))
+    <div class="fbr-block">
+        <table>
+            <tr>
+                <td style="padding: 0 16px 0 0;">
+                    @if(!empty($fbrLogoBase64))
+                    <img src="{{ $fbrLogoBase64 }}" alt="FBR" style="width: 70px; height: auto;">
+                    @else
+                    <div style="text-align: center;">
+                        <div class="fbr-badge">FBR</div>
+                        <div class="fbr-text">
+                            <div class="fbr-text-digital">DIGITAL</div>
+                            <div class="fbr-text-sub">INVOICING SYSTEM</div>
+                        </div>
+                    </div>
+                    @endif
+                </td>
+                <td style="padding: 0 0 0 16px;">
+                    <img src="{{ $qrBase64 }}" alt="QR Code" style="width: 70px; height: 70px;">
+                </td>
+            </tr>
+        </table>
+        <div class="fbr-inv-no">Digital Invoice #: {{ $invoice->fbr_invoice_number }}</div>
+    </div>
+    <hr class="divider">
+    @endif
+
+    {{-- ===== DOCUMENT TITLE ===== --}}
+    <div class="doc-title">{{ $invoice->document_type ?? 'Sale Invoice' }}</div>
+
+    {{-- ===== BILL TO + INVOICE DETAILS ===== --}}
+    <table class="info-section">
+        <tr>
+            <td style="width: 52%; padding-right: 14px;">
+                <div class="info-heading">Bill To</div>
+                <div style="padding: 4px 0;">
+                    <div class="info-row" style="font-weight:800; font-size: 11px; text-transform: uppercase; color: #374151; margin-bottom: 2px;">
+                        {{ $invoice->buyer_registration_type ?? 'UNREGISTERED' }}
+                    </div>
+                    <div class="info-row"><strong style="font-size: 12px;">{{ $invoice->buyer_name }}</strong></div>
+                    @if($invoice->buyer_ntn)
+                    <div class="info-row"><span class="info-row-label">NTN:</span> <strong>{{ $invoice->buyer_ntn }}</strong></div>
+                    @endif
+                    @if($invoice->buyer_cnic)
+                    <div class="info-row"><span class="info-row-label">CNIC:</span> {{ $invoice->buyer_cnic }}</div>
+                    @endif
+                    @if($invoice->buyer_address)
+                    <div class="info-row">{{ $invoice->buyer_address }}</div>
+                    @endif
+                    @if($invoice->destination_province)
+                    <div class="info-row">{{ $invoice->destination_province }}, Pakistan</div>
+                    @else
+                    <div class="info-row">Pakistan</div>
+                    @endif
+                </div>
+            </td>
+            <td style="width: 48%; padding-left: 14px;">
+                <div class="info-heading">Invoice Details</div>
+                <table class="detail-table" style="margin-top: 4px;">
+                    <tr>
+                        <td class="dt-label">Invoice No.</td>
+                        <td class="dt-value">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</td>
+                    </tr>
+                    <tr>
+                        <td class="dt-label">Date</td>
+                        <td class="dt-value">{{ $invoice->created_at->format('d M Y') }}</td>
+                    </tr>
+                    <tr>
+                        <td class="dt-label">Status</td>
+                        <td class="dt-value">{{ $invoice->fbr_invoice_number ? 'FBR Verified' : ($invoice->status === 'locked' ? 'Production' : ucfirst($invoice->status)) }}</td>
+                    </tr>
+                    @if($invoice->document_type && $invoice->document_type !== 'Sale Invoice')
+                    <tr>
+                        <td class="dt-label">Type</td>
+                        <td class="dt-value">{{ $invoice->document_type }}</td>
+                    </tr>
+                    @endif
+                    @if($invoice->reference_invoice_number)
+                    <tr>
+                        <td class="dt-label">Ref Invoice</td>
+                        <td class="dt-value">{{ $invoice->reference_invoice_number }}</td>
+                    </tr>
+                    @endif
+                    <tr>
+                        <td class="dt-label">NTN</td>
+                        <td class="dt-value">{{ $invoice->company->ntn ?? 'N/A' }}</td>
+                    </tr>
+                    @if($invoice->supplier_province)
+                    <tr>
+                        <td class="dt-label">From</td>
+                        <td class="dt-value">{{ $invoice->supplier_province }}</td>
+                    </tr>
+                    @endif
+                </table>
+            </td>
+        </tr>
+    </table>
+
+    {{-- ===== ITEMS TABLE ===== --}}
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th style="width: 28px;">SR</th>
+                <th style="width: 78px;">HS CODE</th>
+                <th>DESCRIPTION</th>
+                <th class="ac" style="width: 55px;">UNIT</th>
+                <th class="ar" style="width: 40px;">QTY</th>
+                <th class="ar" style="width: 70px;">RATE</th>
+                <th class="ar" style="width: 80px;">AMOUNT</th>
+                <th class="ar" style="width: 38px;">TAX</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($invoice->items as $index => $item)
+            <tr>
+                <td class="ac">{{ $index + 1 }}</td>
+                <td class="code">{{ $item->hs_code }}</td>
+                <td class="product">{{ $item->description }}</td>
+                <td class="ac" style="font-size: 9px;">{{ $item->default_uom ?? 'PCS' }}</td>
+                <td class="ar">{{ number_format($item->quantity, 0) }}</td>
+                <td class="ar">{{ number_format($item->price, 2) }}</td>
+                <td class="ar" style="font-weight: 800;">{{ number_format($item->price * $item->quantity, 2) }}</td>
+                <td class="ar" style="font-size: 9px;">{{ number_format($item->tax_rate ?? 0, 0) }}%</td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+
+    {{-- ===== TOTALS SECTION ===== --}}
+    <table class="summary-table">
+        <tr>
+            <td style="width: 50%; padding-right: 16px;">
+                @php
+                    $scheduleTypes = $invoice->items->pluck('schedule_type')->unique()->filter();
+                    $sroNumbers = $invoice->items->pluck('sro_schedule_no')->unique()->filter();
+                    $serialNumbers = $invoice->items->pluck('serial_no')->unique()->filter();
+                @endphp
+                @if($scheduleTypes->count() > 0 || $sroNumbers->count() > 0)
+                <div class="schedule-info">
+                    @if($scheduleTypes->count() > 0)
+                    <strong>Schedule:</strong> {{ $scheduleTypes->map(fn($t) => ucfirst(str_replace('_', ' ', $t)))->join(', ') }}<br>
+                    @endif
+                    @if($sroNumbers->count() > 0)
+                    <strong>SRO:</strong> {{ $sroNumbers->join(', ') }}<br>
+                    @endif
+                    @if($serialNumbers->count() > 0)
+                    <strong>Serial No:</strong> {{ $serialNumbers->join(', ') }}
+                    @endif
+                </div>
+                @endif
+            </td>
+            <td style="width: 50%;">
+                <div class="totals-box">
+                    <table>
+                        <tr>
+                            <td class="t-label">Sub Total</td>
+                            <td class="t-value">PKR {{ number_format($subtotal, 2) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="t-label">Sales Tax (GST)</td>
+                            <td class="t-value">PKR {{ number_format($totalTax, 2) }}</td>
+                        </tr>
+                        @php $totalFurtherTax = $invoice->items->sum('further_tax'); @endphp
+                        @if($totalFurtherTax > 0)
+                        <tr>
+                            <td class="t-label">Further Tax (4%)</td>
+                            <td class="t-value" style="color: #ea580c;">PKR {{ number_format($totalFurtherTax, 2) }}</td>
+                        </tr>
+                        @endif
+                        @if(($wht_rate ?? 0) > 0)
+                        <tr>
+                            <td class="t-label">WHT ({{ $wht_rate }}%)</td>
+                            <td class="t-value">PKR {{ number_format($wht_amount ?? 0, 2) }}</td>
+                        </tr>
+                        @endif
+                        <tr class="total-row">
+                            <td class="t-label">TOTAL</td>
+                            <td class="t-value">PKR {{ number_format(($wht_rate ?? 0) > 0 ? ($net_receivable ?? $invoice->total_amount) : $invoice->total_amount, 2) }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    {{-- ===== FOOTER ===== --}}
+    <div class="footer">
+        <div class="footer-text">This is a computer-generated invoice. | {{ now()->format('d M Y, h:i A') }}</div>
+        <div class="footer-brand">TaxNest — Tax &amp; Invoice Management System</div>
+    </div>
+
+    {{-- ===== WATERMARKS ===== --}}
+    @if(!empty($isDraft) && $isDraft)
+    <div class="watermark">DRAFT</div>
+    @endif
+
+    @if(!empty($showWatermark) && $showWatermark)
+    <div class="watermark" style="color: rgba(239, 68, 68, 0.10); font-size: 44px;">SUBSCRIPTION EXPIRED</div>
+    @endif
+
 </body>
 </html>

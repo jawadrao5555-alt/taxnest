@@ -6,32 +6,35 @@ class SroSuggestionService
 {
     private static array $sroDatabase = [
         '3rd_schedule' => [
-            'default' => ['sro' => 'SRO 1125(I)/2011', 'serial' => '54', 'description' => '3rd Schedule - Sales Tax Act 1990'],
+            'default' => ['sro' => '3rd Schedule goods', 'serial' => '54', 'description' => '3rd Schedule - Sales Tax Act 1990'],
             'rates' => [
-                17 => ['sro' => 'SRO 1125(I)/2011', 'serial' => '54', 'description' => '3rd Schedule items at 17% reduced rate'],
-                16 => ['sro' => 'SRO 1125(I)/2011', 'serial' => '54', 'description' => '3rd Schedule items at 16% reduced rate'],
-                15 => ['sro' => 'SRO 1125(I)/2011', 'serial' => '54', 'description' => '3rd Schedule items at 15% reduced rate'],
-                12 => ['sro' => 'SRO 1125(I)/2011', 'serial' => '49', 'description' => '3rd Schedule items at 12% concessionary rate'],
-                10 => ['sro' => 'SRO 1125(I)/2011', 'serial' => '49', 'description' => '3rd Schedule items at 10% concessionary rate'],
-                5 => ['sro' => 'SRO 1125(I)/2011', 'serial' => '48', 'description' => '3rd Schedule items at 5% concessionary rate'],
+                17 => ['sro' => '3rd Schedule goods', 'serial' => '54', 'description' => '3rd Schedule items at 17% reduced rate'],
+                16 => ['sro' => '3rd Schedule goods', 'serial' => '54', 'description' => '3rd Schedule items at 16% reduced rate'],
+                15 => ['sro' => '3rd Schedule goods', 'serial' => '54', 'description' => '3rd Schedule items at 15% reduced rate'],
+                12 => ['sro' => '3rd Schedule goods', 'serial' => '49', 'description' => '3rd Schedule items at 12% concessionary rate'],
+                10 => ['sro' => '3rd Schedule goods', 'serial' => '49', 'description' => '3rd Schedule items at 10% concessionary rate'],
+                5 => ['sro' => '3rd Schedule goods', 'serial' => '48', 'description' => '3rd Schedule items at 5% concessionary rate'],
             ],
         ],
         'exempt' => [
-            'default' => ['sro' => 'SRO 551(I)/2008', 'serial' => '1', 'description' => '6th Schedule - Exempt from Sales Tax'],
+            'default' => ['sro' => '6th Schedule', 'serial' => '1', 'description' => '6th Schedule - Exempt from Sales Tax'],
             'hs_prefixes' => [
-                '01' => ['sro' => 'SRO 551(I)/2008', 'serial' => '1', 'description' => 'Live animals - 6th Schedule exempt'],
-                '02' => ['sro' => 'SRO 551(I)/2008', 'serial' => '2', 'description' => 'Meat - 6th Schedule exempt'],
-                '04' => ['sro' => 'SRO 551(I)/2008', 'serial' => '3', 'description' => 'Dairy - 6th Schedule exempt'],
-                '10' => ['sro' => 'SRO 551(I)/2008', 'serial' => '5', 'description' => 'Cereals - 6th Schedule exempt'],
-                '11' => ['sro' => 'SRO 551(I)/2008', 'serial' => '6', 'description' => 'Milling products - 6th Schedule exempt'],
-                '30' => ['sro' => 'SRO 551(I)/2008', 'serial' => '25', 'description' => 'Pharmaceutical products - 6th Schedule exempt'],
+                '01' => ['sro' => '6th Schedule', 'serial' => '1', 'description' => 'Live animals - 6th Schedule exempt'],
+                '02' => ['sro' => '6th Schedule', 'serial' => '2', 'description' => 'Meat - 6th Schedule exempt'],
+                '04' => ['sro' => '6th Schedule', 'serial' => '3', 'description' => 'Dairy - 6th Schedule exempt'],
+                '10' => ['sro' => '6th Schedule', 'serial' => '5', 'description' => 'Cereals - 6th Schedule exempt'],
+                '11' => ['sro' => '6th Schedule', 'serial' => '6', 'description' => 'Milling products - 6th Schedule exempt'],
+                '29' => ['sro' => '6th Schedule', 'serial' => '13', 'description' => 'Organic chemicals - 6th Schedule exempt'],
+                '30' => ['sro' => '6th Schedule', 'serial' => '25', 'description' => 'Pharmaceutical products - 6th Schedule exempt'],
+                '31' => ['sro' => '6th Schedule', 'serial' => '27', 'description' => 'Fertilizers - 6th Schedule exempt'],
+                '38' => ['sro' => '6th Schedule', 'serial' => '25', 'description' => 'Chemical products - 6th Schedule exempt'],
             ],
         ],
         'zero_rated' => [
-            'default' => ['sro' => 'SRO 1190(I)/2019', 'serial' => '1', 'description' => '5th Schedule - Zero Rated Supply'],
+            'default' => ['sro' => '5th Schedule', 'serial' => '1', 'description' => '5th Schedule - Zero Rated Supply'],
         ],
         'reduced' => [
-            'default' => ['sro' => 'SRO 1125(I)/2011', 'serial' => '1', 'description' => 'Reduced rate supply under SRO'],
+            'default' => ['sro' => '8th Schedule', 'serial' => '1', 'description' => 'Reduced rate supply under 8th Schedule'],
         ],
     ];
 

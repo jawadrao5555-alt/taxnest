@@ -91,7 +91,7 @@ class FbrService
             $totalValues = round($valueSalesExcludingST + $salesTaxApplicable + floatval($extraTaxVal) + $furtherTax + $fedPayable - $discount, 2);
 
             if ($isExempt) {
-                $rateValue = "-";
+                $rateValue = "Exempt";
             } else {
                 $rateNum = ($taxRate == intval($taxRate)) ? intval($taxRate) : round($taxRate, 2);
                 $rateValue = $rateNum . '%';
@@ -122,8 +122,14 @@ class FbrService
             $needsSro = ($is3rdSchedule && $taxRate < 18) || $isExempt || $isReduced;
             if ($needsSro) {
                 $sroValue = $item->sro_schedule_no ?? "";
-                if (stripos($sroValue, '3rd schedule') !== false) {
+                if ($isExempt) {
+                    $sroValue = '6th Schedule';
+                } elseif ($is3rdSchedule || stripos($sroValue, '3rd schedule') !== false) {
                     $sroValue = '3rd Schedule goods';
+                } elseif (stripos($sroValue, 'zero') !== false || stripos($sroValue, '5th') !== false) {
+                    $sroValue = '5th Schedule';
+                } elseif (stripos($sroValue, '8th') !== false || $isReduced) {
+                    $sroValue = '8th Schedule';
                 }
                 $itemPayload["sroScheduleNo"] = $sroValue;
                 $itemPayload["sroItemSerialNo"] = $item->serial_no ?? "";
@@ -774,8 +780,8 @@ class FbrService
         $schemaErrors = [];
         foreach ($payload['items'] as $idx => $pItem) {
             $itemNum = $idx + 1;
-            if (!is_string($pItem['rate'] ?? null) || (!str_ends_with($pItem['rate'], '%') && $pItem['rate'] !== '-')) {
-                $schemaErrors[] = "Item {$itemNum}: rate must be string ending with '%' or '-' for exempt, got: " . json_encode($pItem['rate'] ?? null);
+            if (!is_string($pItem['rate'] ?? null) || (!str_ends_with($pItem['rate'], '%') && $pItem['rate'] !== '-' && $pItem['rate'] !== 'Exempt')) {
+                $schemaErrors[] = "Item {$itemNum}: rate must be string ending with '%', '-', or 'Exempt', got: " . json_encode($pItem['rate'] ?? null);
             }
             if (!is_numeric($pItem['quantity'] ?? null)) {
                 $schemaErrors[] = "Item {$itemNum}: quantity must be numeric";

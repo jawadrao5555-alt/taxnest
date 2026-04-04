@@ -91,12 +91,12 @@ class FbrService
             $totalValues = round($valueSalesExcludingST + $salesTaxApplicable + floatval($extraTaxVal) + $furtherTax + $fedPayable - $discount, 2);
 
             if ($isExempt) {
-                $rateValue = "0%";
+                $rateValue = "-";
             } else {
                 $rateNum = ($taxRate == intval($taxRate)) ? intval($taxRate) : round($taxRate, 2);
                 $rateValue = $rateNum . '%';
+                $rateValue = rtrim(trim($rateValue), '%') . '%';
             }
-            $rateValue = rtrim(trim($rateValue), '%') . '%';
 
             $hsCode = $item->hs_code ?? "";
             $uomCode = $this->getUomByHsCode($hsCode, $item->default_uom ?? 'U');
@@ -774,8 +774,8 @@ class FbrService
         $schemaErrors = [];
         foreach ($payload['items'] as $idx => $pItem) {
             $itemNum = $idx + 1;
-            if (!is_string($pItem['rate'] ?? null) || !str_ends_with($pItem['rate'], '%')) {
-                $schemaErrors[] = "Item {$itemNum}: rate must be string ending with '%', got: " . json_encode($pItem['rate'] ?? null);
+            if (!is_string($pItem['rate'] ?? null) || (!str_ends_with($pItem['rate'], '%') && $pItem['rate'] !== '-')) {
+                $schemaErrors[] = "Item {$itemNum}: rate must be string ending with '%' or '-' for exempt, got: " . json_encode($pItem['rate'] ?? null);
             }
             if (!is_numeric($pItem['quantity'] ?? null)) {
                 $schemaErrors[] = "Item {$itemNum}: quantity must be numeric";

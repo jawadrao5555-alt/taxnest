@@ -22,6 +22,55 @@ class FbrService
         return trim($text);
     }
 
+    private function getExemptSerialNo(?string $hsCode, ?string $fallback = ""): string
+    {
+        if (empty($hsCode)) return $fallback ?: "";
+        $clean = str_replace('.', '', $hsCode);
+        $chapter = intval(substr($clean, 0, 2));
+
+        $chapterSerialMap = [
+            1 => '1', 2 => '2', 3 => '3', 4 => '4', 5 => '5',
+            6 => '6', 7 => '7', 8 => '8', 9 => '9', 10 => '163',
+            11 => '11', 12 => '12', 13 => '13', 14 => '14', 15 => '15',
+            16 => '16', 17 => '17', 19 => '18', 20 => '19', 21 => '20',
+            22 => '21', 23 => '22', 24 => '23', 25 => '24', 27 => '25',
+            28 => '25', 29 => '25', 30 => '26', 31 => '168',
+            32 => '28', 33 => '29', 34 => '30', 35 => '31',
+            36 => '32', 37 => '33', 38 => '25', 39 => '34',
+            40 => '35', 41 => '36', 42 => '37', 43 => '38',
+            44 => '39', 47 => '40', 48 => '41', 49 => '42',
+            50 => '43', 51 => '44', 52 => '45', 53 => '46',
+            54 => '47', 55 => '48', 56 => '49', 57 => '50',
+            58 => '51', 59 => '52', 60 => '53', 61 => '54',
+            62 => '55', 63 => '56', 64 => '57', 65 => '58',
+            68 => '59', 69 => '60', 70 => '61', 71 => '62',
+            72 => '63', 73 => '64', 76 => '65', 82 => '66',
+            84 => '67', 85 => '68', 87 => '69', 90 => '70',
+            94 => '71', 96 => '72', 97 => '73',
+        ];
+
+        $hsSpecificMap = [
+            '10051000' => '163',
+            '31021000' => '168',
+            '31051000' => '51',
+            '31053000' => '51',
+            '38089210' => '25',
+            '29302020' => '25',
+            '28332940' => '25',
+            '28401900' => '25',
+        ];
+
+        if (isset($hsSpecificMap[$clean])) {
+            return $hsSpecificMap[$clean];
+        }
+
+        if (isset($chapterSerialMap[$chapter])) {
+            return $chapterSerialMap[$chapter];
+        }
+
+        return $fallback ?: "";
+    }
+
     private function getUomByHsCode(?string $hsCode, ?string $defaultUom = 'U'): string
     {
         if (empty($hsCode)) return $this->normalizeUom($defaultUom);
@@ -123,16 +172,22 @@ class FbrService
             if ($needsSro) {
                 $sroValue = $item->sro_schedule_no ?? "";
                 if ($isExempt) {
-                    $sroValue = '6th Schedule';
+                    $sroValue = '6th Schd Table I';
+                    $serialNo = $this->getExemptSerialNo($hsCode, $item->serial_no);
                 } elseif ($is3rdSchedule || stripos($sroValue, '3rd schedule') !== false) {
                     $sroValue = '3rd Schedule goods';
+                    $serialNo = $item->serial_no ?? "51";
                 } elseif (stripos($sroValue, 'zero') !== false || stripos($sroValue, '5th') !== false) {
                     $sroValue = '5th Schedule';
+                    $serialNo = $item->serial_no ?? "";
                 } elseif (stripos($sroValue, '8th') !== false || $isReduced) {
                     $sroValue = '8th Schedule';
+                    $serialNo = $item->serial_no ?? "";
+                } else {
+                    $serialNo = $item->serial_no ?? "";
                 }
                 $itemPayload["sroScheduleNo"] = $sroValue;
-                $itemPayload["sroItemSerialNo"] = $item->serial_no ?? "";
+                $itemPayload["sroItemSerialNo"] = $serialNo;
             }
 
             if ($item->petroleum_levy && $item->petroleum_levy > 0) {

@@ -1424,19 +1424,10 @@ async function lockWhtInModal() {
 }
 
 function printFbrPdf() {
-    try {
-        const iframe = document.getElementById('modalPdfIframe');
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-    } catch (e) {
-        const printWin = document.createElement('iframe');
-        printWin.style.display = 'none';
-        printWin.src = _fbrPdfUrl + '?preview=1';
-        document.body.appendChild(printWin);
-        printWin.onload = function() {
-            try { printWin.contentWindow.print(); } catch(ex) {}
-            setTimeout(() => document.body.removeChild(printWin), 5000);
-        };
+    const url = _fbrPdfUrl || '/invoice/{{ $invoice->id }}/pdf';
+    const printWin = window.open(url, '_blank');
+    if (!printWin) {
+        window.location.href = url;
     }
 }
 
@@ -1480,9 +1471,9 @@ function closeInlinePdfPopup() {
     if (popup) { popup.remove(); document.body.style.overflow = ''; }
 }
 function printInlinePdf() {
-    const iframe = document.querySelector('#inlinePdfPopup iframe');
-    if (iframe && iframe.contentWindow) {
-        try { iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch(e) {}
+    const printWin = window.open('/invoice/{{ $invoice->id }}/pdf', '_blank');
+    if (!printWin) {
+        window.location.href = '/invoice/{{ $invoice->id }}/pdf';
     }
 }
 

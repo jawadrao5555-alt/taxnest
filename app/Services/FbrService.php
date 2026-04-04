@@ -526,6 +526,10 @@ class FbrService
         $internalNumber = $invoice->internal_invoice_number ?? $invoice->invoice_number ?? (string) $invoice->id;
         $cleanNumber = preg_replace('/[^A-Za-z0-9]/', '', $internalNumber);
 
+        if (str_starts_with($cleanNumber, $identifier)) {
+            return $cleanNumber;
+        }
+
         return $identifier . 'DI' . $cleanNumber;
     }
 

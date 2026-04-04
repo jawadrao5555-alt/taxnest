@@ -793,7 +793,7 @@
                             item.sroSuggestion = data;
                             if (data.auto_fill && !item.sro_schedule_no) {
                                 item.sro_schedule_no = data.sro_schedule_no;
-                                item.serial_no = data.serial_no;
+                                if (!item.serial_no) item.serial_no = data.serial_no;
                             }
                         }
                     } catch(e) {}

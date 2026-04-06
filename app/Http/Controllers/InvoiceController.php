@@ -78,9 +78,58 @@ class InvoiceController extends Controller
             });
         }
 
-        $invoices = $query->orderBy('created_at', 'desc')->paginate(15)->appends($request->query());
+        if ($tab === 'completed') {
+            $fbrStatusFilter = $request->get('fbr_status');
+            if ($fbrStatusFilter && in_array($fbrStatusFilter, ['production', 'sandbox', 'validated', 'pending', 'failed'])) {
+                $query->where('fbr_status', $fbrStatusFilter);
+            }
+            $dateFrom = $request->get('date_from');
+            if ($dateFrom && preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) {
+                $query->whereDate('created_at', '>=', $dateFrom);
+            }
+            $dateTo = $request->get('date_to');
+            if ($dateTo && preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
+                $query->whereDate('created_at', '<=', $dateTo);
+            }
+            $month = $request->get('month');
+            if ($month && preg_match('/^\d{4}-\d{2}$/', $month)) {
+                $dateExpr = \App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM');
+                $query->whereRaw("{$dateExpr} = ?", [$month]);
+            }
+            $docType = $request->get('doc_type');
+            if ($docType && in_array($docType, ['Sale Invoice', 'Credit Note', 'Debit Note'])) {
+                $query->where('document_type', $docType);
+            }
+        }
 
-        return view('invoice.index', compact('invoices', 'tab', 'draftCount', 'failedCount', 'completedCount'));
+        $perPage = (int) $request->get('per_page', $tab === 'completed' ? 25 : 15);
+        $perPage = in_array($perPage, [15, 25, 50, 100]) ? $perPage : 25;
+
+        $sortBy = $request->get('sort', 'created_at');
+        $sortDir = $request->get('dir', 'desc');
+        $allowedSorts = ['created_at', 'total_amount', 'buyer_name', 'invoice_number'];
+        if (!in_array($sortBy, $allowedSorts)) $sortBy = 'created_at';
+        if (!in_array($sortDir, ['asc', 'desc'])) $sortDir = 'desc';
+
+        $invoices = $query->orderBy($sortBy, $sortDir)->paginate($perPage)->appends($request->query());
+
+        $completedStats = null;
+        if ($tab === 'completed') {
+            $statsBase = Invoice::where('company_id', $companyId)
+                ->whereIn('status', ['locked', 'pending_verification']);
+            
+            $completedStats = [
+                'total_amount' => (clone $statsBase)->sum('total_amount'),
+                'total_tax' => (clone $statsBase)->sum('total_sales_tax'),
+                'production_count' => (clone $statsBase)->where('fbr_status', 'production')->count(),
+                'pending_count' => (clone $statsBase)->where('status', 'pending_verification')->count(),
+                'this_month_count' => (clone $statsBase)->whereMonth('created_at', now()->month)->whereYear('created_at', now()->year)->count(),
+                'this_month_amount' => (clone $statsBase)->whereMonth('created_at', now()->month)->whereYear('created_at', now()->year)->sum('total_amount'),
+                'unique_buyers' => (clone $statsBase)->distinct('buyer_ntn')->count('buyer_ntn'),
+            ];
+        }
+
+        return view('invoice.index', compact('invoices', 'tab', 'draftCount', 'failedCount', 'completedCount', 'completedStats'));
     }
 
     public function create()

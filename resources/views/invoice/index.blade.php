@@ -148,7 +148,7 @@
                     </a>
                 </div>
             </div>
-            <div class="flex gap-2 mb-6">
+            <div class="flex flex-wrap gap-2 mb-6">
                 <a href="/invoices?tab=draft" class="px-4 py-2 rounded-lg text-sm font-medium transition {{ $tab === 'draft' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700' }}">
                     Draft
                     <span class="ml-1 px-2 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-800">{{ $draftCount }}</span>
@@ -164,45 +164,212 @@
                     <span class="ml-1 px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-800">{{ $completedCount }}</span>
                 </a>
             </div>
-            <div class="mb-6">
-                <form method="GET" action="/invoices" class="flex flex-col sm:flex-row gap-3">
-                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by invoice #, FBR #, customer name, or NTN..." class="flex-1 rounded-lg bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 focus:border-emerald-400 focus:ring-emerald-400 text-sm">
+
+            @if($tab === 'completed' && $completedStats)
+            <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
+                <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/30 dark:to-emerald-800/20 rounded-xl p-4 border border-emerald-200 dark:border-emerald-800">
+                    <p class="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Total Amount</p>
+                    <p class="text-lg font-bold text-emerald-800 dark:text-emerald-200 mt-1">PKR {{ number_format($completedStats['total_amount'], 0) }}</p>
+                </div>
+                <div class="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+                    <p class="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wider">Total Tax</p>
+                    <p class="text-lg font-bold text-blue-800 dark:text-blue-200 mt-1">PKR {{ number_format($completedStats['total_tax'], 0) }}</p>
+                </div>
+                <div class="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/20 rounded-xl p-4 border border-green-200 dark:border-green-800">
+                    <p class="text-xs font-medium text-green-600 dark:text-green-400 uppercase tracking-wider">FBR Production</p>
+                    <p class="text-lg font-bold text-green-800 dark:text-green-200 mt-1">{{ $completedStats['production_count'] }}</p>
+                </div>
+                <div class="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/30 dark:to-amber-800/20 rounded-xl p-4 border border-amber-200 dark:border-amber-800">
+                    <p class="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider">Pending</p>
+                    <p class="text-lg font-bold text-amber-800 dark:text-amber-200 mt-1">{{ $completedStats['pending_count'] }}</p>
+                </div>
+                <div class="bg-gradient-to-br from-violet-50 to-violet-100 dark:from-violet-900/30 dark:to-violet-800/20 rounded-xl p-4 border border-violet-200 dark:border-violet-800">
+                    <p class="text-xs font-medium text-violet-600 dark:text-violet-400 uppercase tracking-wider">This Month</p>
+                    <p class="text-lg font-bold text-violet-800 dark:text-violet-200 mt-1">{{ $completedStats['this_month_count'] }}</p>
+                </div>
+                <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900/30 dark:to-indigo-800/20 rounded-xl p-4 border border-indigo-200 dark:border-indigo-800">
+                    <p class="text-xs font-medium text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Month Amount</p>
+                    <p class="text-lg font-bold text-indigo-800 dark:text-indigo-200 mt-1">PKR {{ number_format($completedStats['this_month_amount'], 0) }}</p>
+                </div>
+                <div class="bg-gradient-to-br from-pink-50 to-pink-100 dark:from-pink-900/30 dark:to-pink-800/20 rounded-xl p-4 border border-pink-200 dark:border-pink-800">
+                    <p class="text-xs font-medium text-pink-600 dark:text-pink-400 uppercase tracking-wider">Unique Buyers</p>
+                    <p class="text-lg font-bold text-pink-800 dark:text-pink-200 mt-1">{{ $completedStats['unique_buyers'] }}</p>
+                </div>
+            </div>
+            @endif
+
+            <div class="mb-4">
+                <form method="GET" action="/invoices" class="flex flex-col sm:flex-row gap-3" id="invoiceSearchForm">
+                    <input type="text" name="search" id="invoiceSearchInput" value="{{ request('search') }}" placeholder="Search invoice #, FBR #, customer, NTN, HS code...  (Press /)" class="flex-1 rounded-lg bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 focus:border-emerald-400 focus:ring-emerald-400 text-sm">
                     <input type="hidden" name="tab" value="{{ $tab }}">
+                    @foreach(['per_page','fbr_status','date_from','date_to','month','doc_type','sort','dir'] as $p)
+                        @if(request($p))
+                        <input type="hidden" name="{{ $p }}" value="{{ request($p) }}">
+                        @endif
+                    @endforeach
                     <button type="submit" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">Search</button>
                     @if(request('search'))
-                    <a href="/invoices?tab={{ $tab }}" class="px-4 py-2 bg-gray-200 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-300 transition">Clear</a>
+                    <a href="/invoices?tab={{ $tab }}{{ request('per_page') ? '&per_page='.request('per_page') : '' }}" class="px-4 py-2 bg-gray-200 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-300 transition">Clear</a>
                     @endif
                 </form>
             </div>
-            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+
+            @if($tab === 'completed')
+            <div x-data="{ showFilters: {{ request('fbr_status') || request('date_from') || request('date_to') || request('month') || request('doc_type') ? 'true' : 'false' }} }" class="mb-4">
+                <button @click="showFilters = !showFilters" class="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-emerald-600 transition mb-2">
+                    <svg class="w-4 h-4 transition-transform" :class="showFilters ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    Advanced Filters
+                    @if(request('fbr_status') || request('date_from') || request('date_to') || request('month') || request('doc_type'))
+                    <span class="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-bold">Active</span>
+                    @endif
+                </button>
+                <div x-show="showFilters" x-cloak x-transition class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+                    <form method="GET" action="/invoices" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                        <input type="hidden" name="tab" value="completed">
+                        @foreach(['search','per_page','sort','dir'] as $p)
+                            @if(request($p))
+                            <input type="hidden" name="{{ $p }}" value="{{ request($p) }}">
+                            @endif
+                        @endforeach
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">FBR Status</label>
+                            <select name="fbr_status" class="w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:border-emerald-400 focus:ring-emerald-400">
+                                <option value="">All</option>
+                                <option value="production" {{ request('fbr_status') === 'production' ? 'selected' : '' }}>Production</option>
+                                <option value="sandbox" {{ request('fbr_status') === 'sandbox' ? 'selected' : '' }}>Sandbox</option>
+                                <option value="validated" {{ request('fbr_status') === 'validated' ? 'selected' : '' }}>Validated</option>
+                                <option value="pending" {{ request('fbr_status') === 'pending' ? 'selected' : '' }}>Pending</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Doc Type</label>
+                            <select name="doc_type" class="w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:border-emerald-400 focus:ring-emerald-400">
+                                <option value="">All</option>
+                                <option value="Sale Invoice" {{ request('doc_type') === 'Sale Invoice' ? 'selected' : '' }}>Invoice</option>
+                                <option value="Credit Note" {{ request('doc_type') === 'Credit Note' ? 'selected' : '' }}>Credit Note</option>
+                                <option value="Debit Note" {{ request('doc_type') === 'Debit Note' ? 'selected' : '' }}>Debit Note</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tax Period</label>
+                            <input type="month" name="month" value="{{ request('month') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:border-emerald-400 focus:ring-emerald-400">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">From Date</label>
+                            <input type="date" name="date_from" value="{{ request('date_from') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:border-emerald-400 focus:ring-emerald-400">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">To Date</label>
+                            <input type="date" name="date_to" value="{{ request('date_to') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:border-emerald-400 focus:ring-emerald-400">
+                        </div>
+                        <div class="flex items-end gap-2">
+                            <button type="submit" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">Apply</button>
+                            <a href="/invoices?tab=completed" class="px-4 py-2 bg-gray-200 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-300 transition">Reset</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            @endif
+
+            <div x-data="invoiceKeyboardNav()" @keydown.window="handleKeydown($event)" class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+                <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/50">
+                    <div class="flex items-center gap-3">
+                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                            Showing <span class="font-bold text-gray-700 dark:text-gray-300">{{ $invoices->firstItem() ?? 0 }}-{{ $invoices->lastItem() ?? 0 }}</span> of <span class="font-bold text-gray-700 dark:text-gray-300">{{ $invoices->total() }}</span>
+                        </p>
+                        @if($tab === 'completed')
+                        <div class="hidden sm:flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 border-l border-gray-200 dark:border-gray-700 pl-3">
+                            <kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-[10px] font-mono border border-gray-200 dark:border-gray-600">J</kbd><span>/</span><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-[10px] font-mono border border-gray-200 dark:border-gray-600">K</kbd> Navigate
+                            <kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-[10px] font-mono border border-gray-200 dark:border-gray-600 ml-2">Enter</kbd> View
+                            <kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-[10px] font-mono border border-gray-200 dark:border-gray-600 ml-2">D</kbd> Download
+                            <kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-[10px] font-mono border border-gray-200 dark:border-gray-600 ml-2">/</kbd> Search
+                            <kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-[10px] font-mono border border-gray-200 dark:border-gray-600 ml-2">&larr;</kbd><span>/</span><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-[10px] font-mono border border-gray-200 dark:border-gray-600">&rarr;</kbd> Pages
+                        </div>
+                        @endif
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-xs text-gray-500 dark:text-gray-400">Per page:</label>
+                        <select onchange="updatePerPage(this.value)" class="rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs py-1 pl-2 pr-7 focus:border-emerald-400 focus:ring-emerald-400">
+                            @foreach([15, 25, 50, 100] as $pp)
+                            <option value="{{ $pp }}" {{ (request('per_page', $tab === 'completed' ? 25 : 15) == $pp) ? 'selected' : '' }}>{{ $pp }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700" id="invoiceTable">
                         <thead class="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Invoice #</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Buyer</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">NTN</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Branch</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amount</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Items</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                                @if($tab === 'completed')
+                                <th class="px-2 py-3 text-center text-xs font-medium text-gray-400 w-8">#</th>
+                                @endif
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                    @if($tab === 'completed')
+                                    <a href="/invoices?tab=completed&sort=created_at&dir={{ request('sort') === 'created_at' && request('dir', 'desc') === 'desc' ? 'asc' : 'desc' }}&{{ http_build_query(request()->except(['sort','dir','page'])) }}" class="hover:text-emerald-600 inline-flex items-center gap-1">
+                                        Invoice #
+                                        @if(request('sort', 'created_at') === 'created_at')
+                                        <svg class="w-3 h-3 {{ request('dir', 'desc') === 'asc' ? 'rotate-180' : '' }}" fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+                                        @endif
+                                    </a>
+                                    @else
+                                    Invoice #
+                                    @endif
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                    @if($tab === 'completed')
+                                    <a href="/invoices?tab=completed&sort=buyer_name&dir={{ request('sort') === 'buyer_name' && request('dir', 'desc') === 'asc' ? 'desc' : 'asc' }}&{{ http_build_query(request()->except(['sort','dir','page'])) }}" class="hover:text-emerald-600 inline-flex items-center gap-1">
+                                        Buyer
+                                        @if(request('sort') === 'buyer_name')
+                                        <svg class="w-3 h-3 {{ request('dir') === 'asc' ? 'rotate-180' : '' }}" fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+                                        @endif
+                                    </a>
+                                    @else
+                                    Buyer
+                                    @endif
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">NTN</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                    @if($tab === 'completed')
+                                    <a href="/invoices?tab=completed&sort=total_amount&dir={{ request('sort') === 'total_amount' && request('dir', 'desc') === 'desc' ? 'asc' : 'desc' }}&{{ http_build_query(request()->except(['sort','dir','page'])) }}" class="hover:text-emerald-600 inline-flex items-center gap-1">
+                                        Amount
+                                        @if(request('sort') === 'total_amount')
+                                        <svg class="w-3 h-3 {{ request('dir', 'desc') === 'asc' ? 'rotate-180' : '' }}" fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+                                        @endif
+                                    </a>
+                                    @else
+                                    Amount
+                                    @endif
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Items</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                            @forelse($invoices as $invoice)
-                            <tr class="even:bg-gray-50/50 dark:even:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
-                                <td class="px-6 py-4 whitespace-nowrap">
-    @if($invoice->fbr_invoice_number)
-        <div class="text-sm font-semibold text-emerald-700">{{ $invoice->fbr_invoice_number }}</div>
-        <div class="text-xs text-gray-400">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number }}</div>
-    @else
-        <div class="text-sm font-medium text-gray-900">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-'.$invoice->id }}</div>
-    @endif
-</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-xs">
+                            @forelse($invoices as $index => $invoice)
+                            <tr class="invoice-row transition-all duration-150 cursor-pointer"
+                                :class="selectedRow === {{ $index }} ? 'bg-emerald-50 dark:bg-emerald-900/20 ring-1 ring-inset ring-emerald-300 dark:ring-emerald-700' : '{{ $index % 2 === 0 ? '' : 'bg-gray-50/50 dark:bg-gray-800/50' }} hover:bg-gray-100 dark:hover:bg-gray-800'"
+                                @click="selectedRow = {{ $index }}"
+                                @dblclick="window.location.href='/invoice/{{ $invoice->id }}'"
+                                data-invoice-id="{{ $invoice->id }}"
+                                data-invoice-url="/invoice/{{ $invoice->id }}"
+                                data-download-url="/invoice/{{ $invoice->id }}/download"
+                                data-wht-locked="{{ $invoice->wht_locked ? '1' : '0' }}">
+                                @if($tab === 'completed')
+                                <td class="px-2 py-3 text-center text-xs text-gray-400 font-mono">{{ ($invoices->currentPage() - 1) * $invoices->perPage() + $index + 1 }}</td>
+                                @endif
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    @if($invoice->fbr_invoice_number)
+                                        <div class="text-sm font-semibold text-emerald-700">{{ $invoice->fbr_invoice_number }}</div>
+                                        <div class="text-xs text-gray-400">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number }}</div>
+                                    @else
+                                        <div class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-'.$invoice->id }}</div>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap text-xs">
                                     @if($invoice->document_type === 'Credit Note')
                                         <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">CN</span>
                                     @elseif($invoice->document_type === 'Debit Note')
@@ -211,12 +378,11 @@
                                         <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-600 dark:text-gray-400 font-medium">INV</span>
                                     @endif
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ $invoice->buyer_name }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $invoice->buyer_ntn }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $invoice->branch->name ?? '—' }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">PKR {{ number_format($invoice->total_amount, 2) }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $invoice->items->count() }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap">
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 max-w-[180px] truncate" title="{{ $invoice->buyer_name }}">{{ $invoice->buyer_name }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-mono text-xs">{{ $invoice->buyer_ntn }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-gray-100">PKR {{ number_format($invoice->total_amount, 2) }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-center">{{ $invoice->items->count() }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap">
                                     <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold
                                         @if($invoice->status === 'draft') bg-gray-200 text-gray-700 dark:text-gray-300
                                         @elseif($invoice->status === 'failed') bg-red-100 text-red-800
@@ -258,8 +424,8 @@
                                     <p class="text-xs text-emerald-600 mt-1 max-w-[200px] truncate" title="{{ $invoice->fbr_invoice_number }}">FBR: {{ $invoice->fbr_invoice_number }}</p>
                                     @elseif(in_array($invoice->status, ['locked', 'pending_verification']) && !$invoice->fbr_invoice_number && in_array(auth()->user()->role, ['company_admin', 'super_admin']))
                                     <div x-data="{ showInput: false }" class="mt-1">
-                                        <button x-show="!showInput" @click="showInput = true" class="text-xs text-blue-600 hover:text-blue-800 underline">+ FBR #</button>
-                                        <form x-show="showInput" x-cloak method="POST" action="/invoice/{{ $invoice->id }}/update-fbr-number" class="flex items-center gap-1 mt-1">
+                                        <button x-show="!showInput" @click.stop="showInput = true" class="text-xs text-blue-600 hover:text-blue-800 underline">+ FBR #</button>
+                                        <form x-show="showInput" x-cloak method="POST" action="/invoice/{{ $invoice->id }}/update-fbr-number" class="flex items-center gap-1 mt-1" @click.stop>
                                             @csrf
                                             <input type="text" name="fbr_invoice_number" placeholder="FBR #" class="px-1.5 py-0.5 text-xs border border-gray-300 rounded w-36">
                                             <button type="submit" class="px-1.5 py-0.5 bg-emerald-600 text-white rounded text-xs">Save</button>
@@ -267,28 +433,44 @@
                                     </div>
                                     @endif
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $invoice->created_at->format('d M Y') }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                                    <a href="/invoice/{{ $invoice->id }}" class="text-emerald-600 hover:text-emerald-800 font-medium">View</a>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $invoice->created_at->format('d M Y') }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm" @click.stop>
+                                    <div class="flex items-center gap-2">
+                                        <a href="/invoice/{{ $invoice->id }}" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 transition" title="View Invoice (Enter)">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                            View
+                                        </a>
                                     @if($tab === 'draft')
                                         @if($invoice->status === 'draft')
-                                        <a href="/invoice/{{ $invoice->id }}/edit" class="text-blue-600 hover:text-blue-800 font-medium">Edit</a>
-                                        <a href="/invoice/{{ $invoice->id }}#submit" class="text-purple-600 hover:text-purple-800 font-medium">Submit to FBR</a>
+                                        <a href="/invoice/{{ $invoice->id }}/edit" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 transition">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                            Edit
+                                        </a>
+                                        <a href="/invoice/{{ $invoice->id }}#submit" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 transition">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                                            FBR
+                                        </a>
                                         @endif
                                     @else
                                         @if($invoice->status === 'draft' && $invoice->fbr_status === 'failed')
-                                        <a href="/invoice/{{ $invoice->id }}/edit" class="text-amber-600 hover:text-amber-800 font-medium">Edit</a>
+                                        <a href="/invoice/{{ $invoice->id }}/edit" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 transition">Edit</a>
                                         <form method="POST" action="/invoice/{{ $invoice->id }}/retry" class="inline">
                                             @csrf
-                                            <button type="submit" class="text-emerald-600 hover:text-emerald-800 font-medium">Retry</button>
+                                            <button type="submit" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition">Retry</button>
                                         </form>
                                         @endif
                                         <div x-data="{ showWhtModal: false, pdfWhtRate: {{ $invoice->wht_rate ?? 0 }}, whtLocked: {{ $invoice->wht_locked ? 'true' : 'false' }}, saving: false }" class="inline-block">
                                             <template x-if="whtLocked">
-                                                <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="text-gray-600 hover:text-gray-800 dark:text-gray-100 font-medium">Download</a>
+                                                <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 transition" title="Download PDF (D)">
+                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                                    PDF
+                                                </a>
                                             </template>
                                             <template x-if="!whtLocked">
-                                                <button @click="showWhtModal = true" class="text-gray-600 hover:text-gray-800 dark:text-gray-100 font-medium">Download</button>
+                                                <button @click="showWhtModal = true" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 transition" title="Download PDF (D)">
+                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                                    PDF
+                                                </button>
                                             </template>
                                             <div x-show="showWhtModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background-color: rgba(0,0,0,0.4);">
                                                 <div @click.away="showWhtModal = false" class="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800 p-6 w-80 max-w-[90vw]">
@@ -347,29 +529,165 @@
                                             </div>
                                         </div>
                                     @endif
+                                    </div>
                                 </td>
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="10" class="px-6 py-12 text-center">
+                                <td colspan="{{ $tab === 'completed' ? '11' : '10' }}" class="px-6 py-12 text-center">
                                     <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                                    <p class="mt-2 text-gray-500 dark:text-gray-400">No invoices yet</p>
+                                    <p class="mt-2 text-gray-500 dark:text-gray-400">No invoices found</p>
+                                    @if(request('search') || request('fbr_status') || request('month') || request('date_from'))
+                                    <a href="/invoices?tab={{ $tab }}" class="mt-3 inline-block text-emerald-600 hover:text-emerald-700 font-medium">Clear filters</a>
+                                    @else
                                     <a href="/invoice/create" class="mt-3 inline-block text-emerald-600 hover:text-emerald-700 font-medium">Create your first invoice</a>
+                                    @endif
                                 </td>
                             </tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
+
                 @if($invoices->hasPages())
-                <div class="px-6 py-4 border-t border-gray-100">
-                    {{ $invoices->links() }}
+                <div class="px-4 py-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div class="flex items-center gap-2">
+                        @if($invoices->previousPageUrl())
+                        <a href="{{ $invoices->previousPageUrl() }}" id="prevPageLink" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition shadow-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                            Prev
+                        </a>
+                        @else
+                        <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                            Prev
+                        </span>
+                        @endif
+
+                        <div class="flex items-center gap-1">
+                            @for($p = max(1, $invoices->currentPage() - 2); $p <= min($invoices->lastPage(), $invoices->currentPage() + 2); $p++)
+                            <a href="{{ $invoices->url($p) }}" class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs font-bold transition {{ $p === $invoices->currentPage() ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50' }}">{{ $p }}</a>
+                            @endfor
+                            @if($invoices->currentPage() + 2 < $invoices->lastPage())
+                            <span class="text-gray-400 px-1">...</span>
+                            <a href="{{ $invoices->url($invoices->lastPage()) }}" class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs font-bold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 transition">{{ $invoices->lastPage() }}</a>
+                            @endif
+                        </div>
+
+                        @if($invoices->nextPageUrl())
+                        <a href="{{ $invoices->nextPageUrl() }}" id="nextPageLink" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition shadow-sm">
+                            Next
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                        </a>
+                        @else
+                        <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed">
+                            Next
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                        </span>
+                        @endif
+                    </div>
+
+                    @if($invoices->lastPage() > 5)
+                    <div class="flex items-center gap-2">
+                        <label class="text-xs text-gray-500 dark:text-gray-400">Go to page:</label>
+                        <input type="number" min="1" max="{{ $invoices->lastPage() }}" value="{{ $invoices->currentPage() }}"
+                            onkeydown="if(event.key==='Enter'){let p=Math.max(1,Math.min({{ $invoices->lastPage() }},parseInt(this.value)||1));let url=new URL(window.location);url.searchParams.set('page',p);window.location=url.toString();}"
+                            class="w-16 rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs text-center py-1 focus:border-emerald-400 focus:ring-emerald-400">
+                        <span class="text-xs text-gray-400">/ {{ $invoices->lastPage() }}</span>
+                    </div>
+                    @endif
                 </div>
                 @endif
             </div>
         </div>
     </div>
 <script>
+function updatePerPage(val) {
+    let url = new URL(window.location);
+    url.searchParams.set('per_page', val);
+    url.searchParams.delete('page');
+    window.location = url.toString();
+}
+
+function invoiceKeyboardNav() {
+    return {
+        selectedRow: -1,
+        totalRows: {{ $invoices->count() }},
+
+        handleKeydown(e) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT' || e.target.isContentEditable) return;
+
+            const rows = document.querySelectorAll('.invoice-row');
+            if (!rows.length) return;
+
+            switch(e.key) {
+                case 'j':
+                case 'J':
+                case 'ArrowDown':
+                    e.preventDefault();
+                    this.selectedRow = Math.min(this.selectedRow + 1, this.totalRows - 1);
+                    rows[this.selectedRow]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    break;
+
+                case 'k':
+                case 'K':
+                case 'ArrowUp':
+                    e.preventDefault();
+                    this.selectedRow = Math.max(this.selectedRow - 1, 0);
+                    rows[this.selectedRow]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    break;
+
+                case 'Enter':
+                    if (this.selectedRow >= 0 && rows[this.selectedRow]) {
+                        e.preventDefault();
+                        const url = rows[this.selectedRow].dataset.invoiceUrl;
+                        if (url) window.location.href = url;
+                    }
+                    break;
+
+                case 'd':
+                case 'D':
+                    if (this.selectedRow >= 0 && rows[this.selectedRow]) {
+                        e.preventDefault();
+                        const row = rows[this.selectedRow];
+                        const dlUrl = row.dataset.downloadUrl;
+                        const whtLocked = row.dataset.whtLocked === '1';
+                        if (dlUrl && whtLocked) {
+                            window.open(dlUrl, '_blank');
+                        } else if (dlUrl) {
+                            const viewUrl = row.dataset.invoiceUrl;
+                            if (viewUrl) window.location.href = viewUrl;
+                        }
+                    }
+                    break;
+
+                case '/':
+                    e.preventDefault();
+                    const searchInput = document.getElementById('invoiceSearchInput');
+                    if (searchInput) searchInput.focus();
+                    break;
+
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    const prevLink = document.getElementById('prevPageLink');
+                    if (prevLink) window.location.href = prevLink.href;
+                    break;
+
+                case 'ArrowRight':
+                    e.preventDefault();
+                    const nextLink = document.getElementById('nextPageLink');
+                    if (nextLink) window.location.href = nextLink.href;
+                    break;
+
+                case 'Escape':
+                    this.selectedRow = -1;
+                    document.activeElement?.blur();
+                    break;
+            }
+        }
+    };
+}
+
 function csvImport() {
     return {
         showModal: false,

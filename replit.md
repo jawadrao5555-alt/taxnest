@@ -58,6 +58,8 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **Dashboard Home Screen:** Redesigned dashboards with quick-access tiles and performance metrics.
 - **POS Theme System:** 6 pre-built themes selectable by users, affecting UI colors and gradients.
 - **Dashboard Style System:** 6 selectable dashboard layouts inspired by major POS platforms, configurable per company.
+- **HS Code Mapping Engine (DB-First):** `hs_code_mappings` table provides admin-managed FBR-confirmed HS→SRO/Serial mappings. Both `SroSuggestionService` and `FbrService` do DB-first lookup with hardcoded fallback. Admin CRUD at `/admin/hs-mapping-engine`.
+- **Enterprise Completed Invoices:** Summary stats bar (total amount/tax/production/pending/this month/buyers), keyboard navigation (J/K/Enter/D/arrows/Esc), advanced filters (FBR status, doc type, tax period, date range), column sorting, per-page selector (15/25/50/100), jump-to-page pagination.
 
 **FBR POS Module:**
 - **Isolated FBR-integrated POS:** Accessible at `/fbr-pos` with direct FBR API submission.

@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\DB;
+
 class SroSuggestionService
 {
     private static array $sroDatabase = [
@@ -38,8 +40,57 @@ class SroSuggestionService
         ],
     ];
 
+    private static function normalizeHsCode(string $hsCode): string
+    {
+        return trim($hsCode);
+    }
+
+    private static function lookupFromDatabase(?string $hsCode, string $scheduleType): ?array
+    {
+        if (empty($hsCode)) return null;
+
+        try {
+            $normalized = self::normalizeHsCode($hsCode);
+
+            $mapping = DB::table('hs_code_mappings')
+                ->where('hs_code', $normalized)
+                ->where('sale_type', $scheduleType)
+                ->where('is_active', true)
+                ->where('sro_applicable', true)
+                ->orderBy('priority')
+                ->first();
+
+            if ($mapping && $mapping->sro_number) {
+                $serial = '';
+                if ($mapping->serial_number_applicable && $mapping->serial_number_value) {
+                    $serial = $mapping->serial_number_value;
+                }
+
+                return [
+                    'sro' => $mapping->sro_number,
+                    'serial' => $serial,
+                    'description' => $mapping->label ?? 'Admin-managed mapping',
+                    'confidence' => 'high',
+                    'auto_fill' => true,
+                    'source' => 'admin_mapping',
+                ];
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('HS mapping DB lookup failed: ' . $e->getMessage());
+        }
+
+        return null;
+    }
+
     public static function suggest(string $scheduleType, ?float $taxRate = null, ?string $hsCode = null, float $standardTaxRate = 18.0): ?array
     {
+        if ($hsCode) {
+            $dbMapping = self::lookupFromDatabase($hsCode, $scheduleType);
+            if ($dbMapping) {
+                return $dbMapping;
+            }
+        }
+
         if ($scheduleType === 'standard') {
             if ($hsCode) {
                 $learned = HsUsagePatternService::getSroSuggestionForHs($hsCode, 'standard');

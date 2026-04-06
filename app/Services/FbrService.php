@@ -25,6 +25,7 @@ class FbrService
     private function getExemptSerialNo(?string $hsCode, ?string $fallback = ""): string
     {
         if (empty($hsCode)) return $fallback ?: "";
+
         $clean = str_replace('.', '', $hsCode);
         $chapter = intval(substr($clean, 0, 2));
 
@@ -90,6 +91,27 @@ class FbrService
         $env = $company->fbr_environment ?? 'sandbox';
 
         $invoiceType = $invoice->document_type ?? "Sale Invoice";
+
+        $allHsCodes = $invoice->items->pluck('hs_code')->filter()->unique()->values()->toArray();
+        $preloadedMappings = [];
+        if (!empty($allHsCodes)) {
+            try {
+                $dbMappings = \Illuminate\Support\Facades\DB::table('hs_code_mappings')
+                    ->whereIn('hs_code', $allHsCodes)
+                    ->where('is_active', true)
+                    ->where('sro_applicable', true)
+                    ->orderBy('priority')
+                    ->get();
+                foreach ($dbMappings as $m) {
+                    $key = $m->hs_code . '|' . $m->sale_type;
+                    if (!isset($preloadedMappings[$key])) {
+                        $preloadedMappings[$key] = $m;
+                    }
+                }
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning('HS mapping preload failed: ' . $e->getMessage());
+            }
+        }
 
         $items = [];
         foreach ($invoice->items as $item) {
@@ -171,7 +193,19 @@ class FbrService
             $needsSro = ($is3rdSchedule && $taxRate < 18) || $isExempt || $isReduced;
             if ($needsSro) {
                 $sroValue = $item->sro_schedule_no ?? "";
-                if ($isExempt) {
+                $serialNo = $item->serial_no ?? "";
+
+                $dbSroMapping = null;
+                $saleTypeForLookup = $isExempt ? 'exempt' : ($is3rdSchedule ? '3rd_schedule' : ($isReduced ? 'reduced' : null));
+                if ($saleTypeForLookup && $hsCode) {
+                    $lookupKey = trim($hsCode) . '|' . $saleTypeForLookup;
+                    $dbSroMapping = $preloadedMappings[$lookupKey] ?? null;
+                }
+
+                if ($dbSroMapping && $dbSroMapping->sro_number) {
+                    $sroValue = $dbSroMapping->sro_number;
+                    $serialNo = $dbSroMapping->serial_number_value ?? $serialNo;
+                } elseif ($isExempt) {
                     $sroValue = '6th Schd Table I';
                     $serialNo = $this->getExemptSerialNo($hsCode, $item->serial_no);
                 } elseif ($is3rdSchedule || stripos($sroValue, '3rd schedule') !== false) {
@@ -182,8 +216,6 @@ class FbrService
                     $serialNo = $item->serial_no ?? "";
                 } elseif (stripos($sroValue, '8th') !== false || $isReduced) {
                     $sroValue = '8th Schedule';
-                    $serialNo = $item->serial_no ?? "";
-                } else {
                     $serialNo = $item->serial_no ?? "";
                 }
                 $itemPayload["sroScheduleNo"] = $sroValue;

@@ -191,9 +191,9 @@
                     <p class="text-xs font-medium text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Month Amount</p>
                     <p class="text-lg font-bold text-indigo-800 dark:text-indigo-200 mt-1">PKR {{ number_format($completedStats['this_month_amount'], 0) }}</p>
                 </div>
-                <div class="bg-gradient-to-br from-pink-50 to-pink-100 dark:from-pink-900/30 dark:to-pink-800/20 rounded-xl p-4 border border-pink-200 dark:border-pink-800">
+                <div class="bg-gradient-to-br from-pink-50 to-pink-100 dark:from-pink-900/30 dark:to-pink-800/20 rounded-xl p-4 border border-pink-200 dark:border-pink-800 cursor-pointer hover:ring-2 hover:ring-pink-400 transition-all" onclick="openUniqueBuyersModal()">
                     <p class="text-xs font-medium text-pink-600 dark:text-pink-400 uppercase tracking-wider">Unique Buyers</p>
-                    <p class="text-lg font-bold text-pink-800 dark:text-pink-200 mt-1">{{ $completedStats['unique_buyers'] }}</p>
+                    <p class="text-lg font-bold text-pink-800 dark:text-pink-200 mt-1">{{ $completedStats['unique_buyers'] }} <svg class="w-3.5 h-3.5 inline-block ml-1 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></p>
                 </div>
             </div>
             @endif
@@ -808,5 +808,77 @@ function csvImport() {
         }
     };
 }
+</script>
+<div id="uniqueBuyersModal" class="fixed inset-0 z-50 hidden" role="dialog">
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" onclick="closeUniqueBuyersModal()"></div>
+    <div class="fixed inset-0 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">Unique Buyers</h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">All buyers with completed invoices, sorted by total amount</p>
+                </div>
+                <button onclick="closeUniqueBuyersModal()" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="overflow-auto flex-1 px-6 py-4" id="uniqueBuyersContent">
+                <div class="flex items-center justify-center py-12">
+                    <svg class="animate-spin h-8 w-8 text-emerald-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    <span class="ml-3 text-gray-500">Loading buyers...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function openUniqueBuyersModal() {
+    document.getElementById('uniqueBuyersModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    fetch('/invoices/unique-buyers', { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.json())
+        .then(buyers => {
+            if (!buyers.length) {
+                document.getElementById('uniqueBuyersContent').innerHTML = '<p class="text-center text-gray-500 py-8">No buyers found.</p>';
+                return;
+            }
+            let html = '<table class="w-full text-sm"><thead><tr class="border-b border-gray-200 dark:border-gray-700">';
+            html += '<th class="text-left py-2 px-2 text-xs font-medium text-gray-500 uppercase">#</th>';
+            html += '<th class="text-left py-2 px-2 text-xs font-medium text-gray-500 uppercase">Buyer Name</th>';
+            html += '<th class="text-left py-2 px-2 text-xs font-medium text-gray-500 uppercase">NTN</th>';
+            html += '<th class="text-center py-2 px-2 text-xs font-medium text-gray-500 uppercase">Invoices</th>';
+            html += '<th class="text-right py-2 px-2 text-xs font-medium text-gray-500 uppercase">Total Amount</th>';
+            html += '<th class="text-right py-2 px-2 text-xs font-medium text-gray-500 uppercase">Last Invoice</th>';
+            html += '</tr></thead><tbody>';
+            let grandTotal = 0;
+            buyers.forEach((b, i) => {
+                grandTotal += parseFloat(b.total_amount);
+                const lastDate = b.last_invoice_date ? new Date(b.last_invoice_date).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}) : '-';
+                html += '<tr class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">';
+                html += '<td class="py-2.5 px-2 text-gray-400">' + (i+1) + '</td>';
+                html += '<td class="py-2.5 px-2 font-medium text-gray-900 dark:text-white">' + (b.buyer_name || 'N/A') + '</td>';
+                html += '<td class="py-2.5 px-2 text-gray-600 dark:text-gray-400 font-mono text-xs">' + (b.buyer_ntn || '-') + '</td>';
+                html += '<td class="py-2.5 px-2 text-center"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">' + b.total_invoices + '</span></td>';
+                html += '<td class="py-2.5 px-2 text-right font-semibold text-gray-900 dark:text-white">PKR ' + Number(b.total_amount).toLocaleString() + '</td>';
+                html += '<td class="py-2.5 px-2 text-right text-gray-500 dark:text-gray-400 text-xs">' + lastDate + '</td>';
+                html += '</tr>';
+            });
+            html += '</tbody><tfoot><tr class="border-t-2 border-gray-300 dark:border-gray-600">';
+            html += '<td colspan="3" class="py-3 px-2 font-bold text-gray-700 dark:text-gray-300">Total: ' + buyers.length + ' buyers</td>';
+            html += '<td class="py-3 px-2 text-center font-bold text-gray-700 dark:text-gray-300">' + buyers.reduce((s,b) => s + parseInt(b.total_invoices), 0) + '</td>';
+            html += '<td class="py-3 px-2 text-right font-bold text-emerald-700 dark:text-emerald-400">PKR ' + grandTotal.toLocaleString() + '</td>';
+            html += '<td></td></tr></tfoot></table>';
+            document.getElementById('uniqueBuyersContent').innerHTML = html;
+        })
+        .catch(() => {
+            document.getElementById('uniqueBuyersContent').innerHTML = '<p class="text-center text-red-500 py-8">Failed to load buyers. Please try again.</p>';
+        });
+}
+function closeUniqueBuyersModal() {
+    document.getElementById('uniqueBuyersModal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeUniqueBuyersModal(); });
 </script>
 </x-app-layout>

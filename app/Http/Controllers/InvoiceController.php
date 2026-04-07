@@ -125,11 +125,27 @@ class InvoiceController extends Controller
                 'pending_count' => (clone $statsBase)->where('status', 'pending_verification')->count(),
                 'this_month_count' => (clone $statsBase)->whereRaw(\App\Helpers\DbCompat::dateFormat('invoice_date', 'YYYY-MM') . " = ?", [now()->format('Y-m')])->count(),
                 'this_month_amount' => (clone $statsBase)->whereRaw(\App\Helpers\DbCompat::dateFormat('invoice_date', 'YYYY-MM') . " = ?", [now()->format('Y-m')])->sum('total_amount'),
-                'unique_buyers' => (clone $statsBase)->distinct('buyer_ntn')->count('buyer_ntn'),
+                'unique_buyers' => (clone $statsBase)->whereNotNull('buyer_name')->where('buyer_name', '!=', '')->distinct('buyer_name')->count('buyer_name'),
             ];
         }
 
         return view('invoice.index', compact('invoices', 'tab', 'draftCount', 'failedCount', 'completedCount', 'completedStats'));
+    }
+
+    public function uniqueBuyers(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+
+        $buyers = Invoice::where('company_id', $companyId)
+            ->whereIn('status', ['locked', 'pending_verification'])
+            ->whereNotNull('buyer_name')
+            ->where('buyer_name', '!=', '')
+            ->selectRaw("buyer_name, MAX(buyer_ntn) as buyer_ntn, COUNT(*) as total_invoices, SUM(total_amount) as total_amount, MAX(invoice_date) as last_invoice_date")
+            ->groupBy('buyer_name')
+            ->orderByDesc('total_amount')
+            ->get();
+
+        return response()->json($buyers);
     }
 
     public function create()

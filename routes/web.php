@@ -158,6 +158,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
     Route::post('/billing/subscribe-custom', [BillingController::class, 'subscribeCustomPlan']);
 
     Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
+    Route::get('/invoices/unique-buyers', [InvoiceController::class, 'uniqueBuyers'])->name('invoices.unique-buyers');
 
     Route::middleware(['role:company_admin,employee'])->group(function () {
         Route::get('/invoice/create', [InvoiceController::class, 'create'])->name('invoice.create');

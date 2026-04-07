@@ -327,9 +327,9 @@
                         <thead class="bg-gradient-to-r from-gray-50 to-gray-100/80 dark:from-gray-800 dark:to-gray-800/80 sticky top-0 z-10">
                             <tr>
                                 @if($tab === 'completed')
-                                <th class="px-2 py-3 text-center w-8">#</th>
+                                <th class="px-1 py-2 text-center w-6 text-[10px]">#</th>
                                 @endif
-                                <th class="text-left">
+                                <th class="text-left px-2 py-2">
                                     @if($tab === 'completed')
                                     <a href="/invoices?tab=completed&sort=invoice_number&dir={{ request('sort') === 'invoice_number' && request('dir', 'desc') === 'asc' ? 'desc' : 'asc' }}&{{ http_build_query(request()->except(['sort','dir','page'])) }}" class="hover:text-emerald-600 inline-flex items-center gap-1">
                                         Invoice #
@@ -341,8 +341,8 @@
                                     Invoice #
                                     @endif
                                 </th>
-                                <th class="text-left">Type</th>
-                                <th class="text-left">
+                                <th class="text-left px-2 py-2">Type</th>
+                                <th class="text-left px-2 py-2">
                                     @if($tab === 'completed')
                                     <a href="/invoices?tab=completed&sort=buyer_name&dir={{ request('sort') === 'buyer_name' && request('dir', 'desc') === 'asc' ? 'desc' : 'asc' }}&{{ http_build_query(request()->except(['sort','dir','page'])) }}" class="hover:text-emerald-600 inline-flex items-center gap-1">
                                         Buyer
@@ -354,8 +354,8 @@
                                     Buyer
                                     @endif
                                 </th>
-                                <th class="text-left">NTN</th>
-                                <th class="text-left">
+                                <th class="text-left px-2 py-2">NTN</th>
+                                <th class="text-right px-2 py-2">
                                     @if($tab === 'completed')
                                     <a href="/invoices?tab=completed&sort=total_amount&dir={{ request('sort') === 'total_amount' && request('dir', 'desc') === 'desc' ? 'asc' : 'desc' }}&{{ http_build_query(request()->except(['sort','dir','page'])) }}" class="hover:text-emerald-600 inline-flex items-center gap-1">
                                         Amount
@@ -367,9 +367,9 @@
                                     Amount
                                     @endif
                                 </th>
-                                <th class="text-center">Items</th>
-                                <th class="text-left">Status</th>
-                                <th class="text-left">
+                                <th class="text-center px-1 py-2">Itm</th>
+                                <th class="text-left px-2 py-2">Status</th>
+                                <th class="text-left px-2 py-2">
                                     @if($tab === 'completed')
                                     <a href="/invoices?tab=completed&sort=invoice_date&dir={{ request('sort') === 'invoice_date' && request('dir', 'desc') === 'desc' ? 'asc' : 'desc' }}&{{ http_build_query(request()->except(['sort','dir','page'])) }}" class="hover:text-emerald-600 inline-flex items-center gap-1">
                                         Date
@@ -381,7 +381,7 @@
                                     Date
                                     @endif
                                 </th>
-                                <th class="text-left">Actions</th>
+                                <th class="text-center px-2 py-2">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -395,31 +395,31 @@
                                 data-download-url="/invoice/{{ $invoice->id }}/download"
                                 data-wht-locked="{{ $invoice->wht_locked ? '1' : '0' }}">
                                 @if($tab === 'completed')
-                                <td class="px-2 py-3 text-center text-xs text-gray-400 font-mono">{{ ($invoices->currentPage() - 1) * $invoices->perPage() + $index + 1 }}</td>
+                                <td class="px-1 py-2 text-center text-[10px] text-gray-400 font-mono">{{ ($invoices->currentPage() - 1) * $invoices->perPage() + $index + 1 }}</td>
                                 @endif
-                                <td class="px-4 py-3 whitespace-nowrap">
+                                <td class="px-2 py-2 whitespace-nowrap">
                                     @if($invoice->fbr_invoice_number)
-                                        <div class="text-sm font-semibold text-emerald-700">{{ $invoice->fbr_invoice_number }}</div>
-                                        <div class="text-xs text-gray-400">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number }}</div>
+                                        <div class="text-xs font-semibold text-emerald-700">{{ $invoice->fbr_invoice_number }}</div>
+                                        <div class="text-[10px] text-gray-400">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number }}</div>
                                     @else
-                                        <div class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-'.$invoice->id }}</div>
+                                        <div class="text-xs font-medium text-gray-900 dark:text-gray-100">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-'.$invoice->id }}</div>
                                     @endif
                                 </td>
-                                <td class="px-4 py-3 whitespace-nowrap text-xs">
+                                <td class="px-2 py-2 whitespace-nowrap text-[10px]">
                                     @if($invoice->document_type === 'Credit Note')
-                                        <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">CN</span>
+                                        <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">CN</span>
                                     @elseif($invoice->document_type === 'Debit Note')
-                                        <span class="px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-medium">DN</span>
+                                        <span class="px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 font-medium">DN</span>
                                     @else
-                                        <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-600 dark:text-gray-400 font-medium">INV</span>
+                                        <span class="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:text-gray-400 font-medium">INV</span>
                                     @endif
                                 </td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 max-w-[180px] truncate" title="{{ $invoice->buyer_name }}">{{ $invoice->buyer_name }}</td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-mono text-xs">{{ $invoice->buyer_ntn }}</td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-gray-100">PKR {{ number_format($invoice->total_amount, 2) }}</td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-center">{{ $invoice->items->count() }}</td>
-                                <td class="px-4 py-3 whitespace-nowrap">
-                                    <span class="premium-badge
+                                <td class="px-2 py-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 max-w-[140px] truncate" title="{{ $invoice->buyer_name }}">{{ $invoice->buyer_name }}</td>
+                                <td class="px-2 py-2 whitespace-nowrap text-[10px] text-gray-500 dark:text-gray-400 font-mono">{{ $invoice->buyer_ntn }}</td>
+                                <td class="px-2 py-2 whitespace-nowrap text-xs font-semibold text-gray-900 dark:text-gray-100 text-right">PKR {{ number_format($invoice->total_amount, 2) }}</td>
+                                <td class="px-1 py-2 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400 text-center">{{ $invoice->items->count() }}</td>
+                                <td class="px-2 py-2 whitespace-nowrap">
+                                    <span class="premium-badge text-[10px] px-1.5 py-0.5
                                         @if($invoice->status === 'draft') bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200
                                         @elseif($invoice->status === 'failed') bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300
                                         @elseif($invoice->status === 'locked') bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300
@@ -428,14 +428,14 @@
                                         {{ $invoice->status === 'pending_verification' ? 'Pending' : ucfirst($invoice->status) }}
                                     </span>
                                     @if($invoice->fbr_status && $invoice->fbr_status !== 'pending')
-                                    <span class="premium-badge ml-1
+                                    <span class="premium-badge text-[10px] px-1.5 py-0.5 ml-0.5
                                         @if($invoice->fbr_status === 'production') bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300
                                         @elseif($invoice->fbr_status === 'validated') bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300
                                         @elseif($invoice->fbr_status === 'failed' || $invoice->fbr_status === 'validation_failed') bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300
                                         @elseif($invoice->fbr_status === 'sandbox') bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300
                                         @else bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300
                                         @endif">
-                                        {{ $invoice->fbr_status === 'production' ? 'Production' : ($invoice->fbr_status === 'validation_failed' ? 'Val. Failed' : ucfirst($invoice->fbr_status)) }}
+                                        {{ $invoice->fbr_status === 'production' ? 'Prod' : ($invoice->fbr_status === 'validation_failed' ? 'Val.Fail' : ucfirst($invoice->fbr_status)) }}
                                     </span>
                                     @endif
                                     @if($invoice->status === 'draft' && $invoice->fbr_status === 'failed')
@@ -453,11 +453,11 @@
                                         }
                                     @endphp
                                     @if($failReason)
-                                    <p class="text-xs text-red-600 mt-1 max-w-[200px] truncate" title="{{ $failReason }}">{{ $failReason }}</p>
+                                    <p class="text-[10px] text-red-600 mt-0.5 max-w-[150px] truncate" title="{{ $failReason }}">{{ $failReason }}</p>
                                     @endif
                                     @endif
                                     @if($invoice->status === 'locked' && $invoice->fbr_invoice_number)
-                                    <p class="text-xs text-emerald-600 mt-1 max-w-[200px] truncate" title="{{ $invoice->fbr_invoice_number }}">FBR: {{ $invoice->fbr_invoice_number }}</p>
+                                    <p class="text-[10px] text-emerald-600 mt-0.5 max-w-[150px] truncate" title="{{ $invoice->fbr_invoice_number }}">FBR: {{ $invoice->fbr_invoice_number }}</p>
                                     @elseif(in_array($invoice->status, ['locked', 'pending_verification']) && !$invoice->fbr_invoice_number && in_array(auth()->user()->role, ['company_admin', 'super_admin']))
                                     <div x-data="{ showInput: false }" class="mt-1">
                                         <button x-show="!showInput" @click.stop="showInput = true" class="text-xs text-blue-600 hover:text-blue-800 underline">+ FBR #</button>
@@ -469,11 +469,11 @@
                                     </div>
                                     @endif
                                 </td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $invoice->invoice_date ? \Carbon\Carbon::parse($invoice->invoice_date)->format('d M Y') : $invoice->created_at->format('d M Y') }}</td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm" @click.stop>
-                                    <div class="flex items-center gap-2">
-                                        <a href="/invoice/{{ $invoice->id }}" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 transition" title="View Invoice (Enter)">
-                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                <td class="px-2 py-2 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">{{ $invoice->invoice_date ? \Carbon\Carbon::parse($invoice->invoice_date)->format('d M y') : $invoice->created_at->format('d M y') }}</td>
+                                <td class="px-2 py-2 whitespace-nowrap text-xs" @click.stop>
+                                    <div class="flex items-center gap-1.5">
+                                        <a href="/invoice/{{ $invoice->id }}" class="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg text-[10px] font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 transition" title="View Invoice (Enter)">
+                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                                             View
                                         </a>
                                     @if($tab === 'draft')
@@ -497,14 +497,14 @@
                                         @endif
                                         <div x-data="{ showWhtModal: false, pdfWhtRate: {{ $invoice->wht_rate ?? 0 }}, whtLocked: {{ $invoice->wht_locked ? 'true' : 'false' }}, saving: false }" class="inline-block">
                                             <template x-if="whtLocked">
-                                                <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 transition" title="Download PDF (D)">
-                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                                <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg text-[10px] font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 transition" title="Download PDF (D)">
+                                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                                     PDF
                                                 </a>
                                             </template>
                                             <template x-if="!whtLocked">
-                                                <button @click="showWhtModal = true" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 transition" title="Download PDF (D)">
-                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                                <button @click="showWhtModal = true" class="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg text-[10px] font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 transition" title="Download PDF (D)">
+                                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                                     PDF
                                                 </button>
                                             </template>

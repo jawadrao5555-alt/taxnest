@@ -1129,6 +1129,7 @@ class InvoiceController extends Controller
             $invoice->save();
 
             $company->update(['last_successful_submission' => now()]);
+            $this->createLedgerEntry($invoice);
 
             InvoiceActivityService::log($invoice->id, $invoice->company_id, 'resubmitted_success', [
                 'fbr_invoice_number' => $fbrNum,
@@ -1240,6 +1241,8 @@ class InvoiceController extends Controller
 
             $invoice->integrity_hash = IntegrityHashService::generate($invoice);
             $invoice->save();
+
+            $this->createLedgerEntry($invoice);
 
             InvoiceActivityService::log($invoice->id, $invoice->company_id, 'manually_confirmed', [
                 'confirmed_by' => $user->name,
@@ -2026,6 +2029,8 @@ class InvoiceController extends Controller
                     }
                     $invoice->save();
 
+                    $this->createLedgerEntry($invoice);
+
                     InvoiceActivityService::log($invoice->id, $invoice->company_id, 'auto_recovered', [
                         'fbr_invoice_number' => $fbrNum,
                         'success_log_id' => $successLog->id,
@@ -2119,25 +2124,7 @@ class InvoiceController extends Controller
                 'mode' => 'sync',
             ]);
 
-            try {
-                $lastEntry = CustomerLedger::where('company_id', $invoice->company_id)
-                    ->where('customer_ntn', $invoice->buyer_ntn)
-                    ->orderBy('id', 'desc')->first();
-                $lastBalance = $lastEntry ? $lastEntry->balance_after : 0;
-                CustomerLedger::create([
-                    'company_id' => $invoice->company_id,
-                    'customer_name' => $invoice->buyer_name,
-                    'customer_ntn' => $invoice->buyer_ntn ?? '',
-                    'invoice_id' => $invoice->id,
-                    'debit' => $invoice->total_amount,
-                    'credit' => 0,
-                    'balance_after' => $lastBalance + $invoice->total_amount,
-                    'type' => 'invoice',
-                    'notes' => 'Invoice ' . $invoice->invoice_number . ' locked',
-                ]);
-            } catch (\Exception $e) {
-                Log::warning("Ledger entry failed for invoice #{$invoice->id}: " . $e->getMessage());
-            }
+            $this->createLedgerEntry($invoice);
 
             $company->update(['last_successful_submission' => now()]);
             HsUsagePatternService::recordSuccess($invoice);
@@ -2203,6 +2190,36 @@ class InvoiceController extends Controller
             'failure_type' => $response['failure_type'] ?? 'unknown',
             'execution_ms' => $executionMs,
         ];
+    }
+
+    private function createLedgerEntry(Invoice $invoice): void
+    {
+        try {
+            $ledgerNtn = $invoice->buyer_ntn ?: ('WALK-IN-' . strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', $invoice->buyer_name)));
+            $exists = CustomerLedger::where('company_id', $invoice->company_id)
+                ->where('invoice_id', $invoice->id)
+                ->where('type', 'invoice')
+                ->exists();
+            if ($exists) return;
+
+            $lastEntry = CustomerLedger::where('company_id', $invoice->company_id)
+                ->where('customer_ntn', $ledgerNtn)
+                ->orderBy('id', 'desc')->first();
+            $lastBalance = $lastEntry ? $lastEntry->balance_after : 0;
+            CustomerLedger::create([
+                'company_id' => $invoice->company_id,
+                'customer_name' => $invoice->buyer_name,
+                'customer_ntn' => $ledgerNtn,
+                'invoice_id' => $invoice->id,
+                'debit' => $invoice->total_amount,
+                'credit' => 0,
+                'balance_after' => $lastBalance + $invoice->total_amount,
+                'type' => 'invoice',
+                'notes' => 'Invoice ' . ($invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-'.$invoice->id) . ' locked',
+            ]);
+        } catch (\Exception $e) {
+            \Log::warning("Ledger entry failed for invoice #{$invoice->id}: " . $e->getMessage());
+        }
     }
 
 }

@@ -123,8 +123,8 @@ class InvoiceController extends Controller
                 'total_tax' => (clone $statsBase)->sum('total_sales_tax'),
                 'production_count' => (clone $statsBase)->where('fbr_status', 'production')->count(),
                 'pending_count' => (clone $statsBase)->where('status', 'pending_verification')->count(),
-                'this_month_count' => (clone $statsBase)->whereMonth('invoice_date', now()->month)->whereYear('invoice_date', now()->year)->count(),
-                'this_month_amount' => (clone $statsBase)->whereMonth('invoice_date', now()->month)->whereYear('invoice_date', now()->year)->sum('total_amount'),
+                'this_month_count' => (clone $statsBase)->whereRaw(\App\Helpers\DbCompat::dateFormat('invoice_date', 'YYYY-MM') . " = ?", [now()->format('Y-m')])->count(),
+                'this_month_amount' => (clone $statsBase)->whereRaw(\App\Helpers\DbCompat::dateFormat('invoice_date', 'YYYY-MM') . " = ?", [now()->format('Y-m')])->sum('total_amount'),
                 'unique_buyers' => (clone $statsBase)->distinct('buyer_ntn')->count('buyer_ntn'),
             ];
         }

@@ -608,65 +608,71 @@
                     </div>
                 </div>
 
+                @php
+                    $hasMrp = $invoice->items->contains(fn($i) => $i->schedule_type === '3rd_schedule' && $i->mrp);
+                    $hasStWht = $invoice->items->contains(fn($i) => $i->st_withheld_at_source);
+                    $hasPetLevy = $invoice->items->contains(fn($i) => $i->petroleum_levy > 0);
+                    $hasFurtherTax = $invoice->items->sum('further_tax') > 0;
+                    $extraCols = ($hasMrp ? 1 : 0) + ($hasStWht ? 1 : 0) + ($hasPetLevy ? 1 : 0) + ($hasFurtherTax ? 1 : 0);
+                    $footColspan = 6 + $extraCols;
+                @endphp
                 <div class="overflow-x-auto">
-                    <table class="min-w-full premium-table">
+                    <table class="w-full premium-table" style="table-layout: auto;">
                         <thead class="bg-gradient-to-r from-gray-50 to-gray-100/80 dark:from-gray-800 dark:to-gray-800/80">
                             <tr>
-                                <th class="text-left">#</th>
+                                <th class="text-left" style="width:30px">#</th>
                                 <th class="text-left">HS Code</th>
                                 <th class="text-left">Description</th>
                                 <th class="text-right">Qty</th>
-                                <th class="text-right">Price</th>
+                                <th class="text-right">Rate</th>
                                 <th class="text-right">Tax</th>
-                                <th class="text-right">MRP</th>
-                                <th class="text-center">ST WHT</th>
-                                <th class="text-right">Pet. Levy</th>
-                                <th class="text-right" style="color: var(--tw-orange-500, #f97316)">Further Tax</th>
+                                @if($hasMrp)<th class="text-right">MRP</th>@endif
+                                @if($hasStWht)<th class="text-center">ST WHT</th>@endif
+                                @if($hasPetLevy)<th class="text-right">Pet. Levy</th>@endif
+                                @if($hasFurtherTax)<th class="text-right" style="color:#f97316">F. Tax</th>@endif
                                 <th class="text-right">Total</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                             @foreach($invoice->items as $index => $item)
                             <tr>
-                                <td class="px-3 py-2.5 text-xs text-gray-500 dark:text-gray-400">{{ $index + 1 }}</td>
-                                <td class="px-3 py-2.5 text-xs font-mono text-gray-700 dark:text-gray-300">{{ $item->hs_code }}</td>
-                                <td class="px-3 py-2.5 text-xs text-gray-700 dark:text-gray-300 max-w-[180px] truncate" title="{{ $item->description }}">{{ $item->description }}</td>
-                                <td class="px-3 py-2.5 text-xs text-gray-700 dark:text-gray-300 text-right">{{ $item->quantity }}</td>
-                                <td class="px-3 py-2.5 text-xs text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{{ number_format($item->price, 2) }}</td>
-                                <td class="px-3 py-2.5 text-xs text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{{ number_format($item->tax, 2) }}</td>
-                                <td class="px-3 py-2.5 text-xs text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{{ ($item->schedule_type === '3rd_schedule' && $item->mrp) ? number_format($item->mrp, 2) : '—' }}</td>
-                                <td class="px-3 py-2.5 text-xs text-center">
-                                    @if($item->st_withheld_at_source) <span class="text-emerald-600 font-medium">Yes</span> @else <span class="text-gray-400">—</span> @endif
-                                </td>
-                                <td class="px-3 py-2.5 text-xs text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{{ $item->petroleum_levy ? number_format($item->petroleum_levy, 2) : '—' }}</td>
-                                <td class="px-3 py-2.5 text-xs text-orange-600 text-right whitespace-nowrap">{{ ($item->further_tax ?? 0) > 0 ? number_format($item->further_tax, 2) : '—' }}</td>
-                                <td class="px-3 py-2.5 text-xs font-bold text-gray-900 dark:text-white text-right whitespace-nowrap">{{ number_format(($item->price * $item->quantity) + $item->tax, 2) }}</td>
+                                <td class="px-2 py-2 text-xs text-gray-500 dark:text-gray-400">{{ $index + 1 }}</td>
+                                <td class="px-2 py-2 text-xs font-mono text-gray-700 dark:text-gray-300">{{ $item->hs_code }}</td>
+                                <td class="px-2 py-2 text-xs text-gray-700 dark:text-gray-300 max-w-[200px] truncate" title="{{ $item->description }}">{{ $item->description }}</td>
+                                <td class="px-2 py-2 text-xs text-gray-700 dark:text-gray-300 text-right">{{ $item->quantity }}</td>
+                                <td class="px-2 py-2 text-xs text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{{ number_format($item->price, 2) }}</td>
+                                <td class="px-2 py-2 text-xs text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{{ number_format($item->tax, 2) }}</td>
+                                @if($hasMrp)<td class="px-2 py-2 text-xs text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{{ ($item->schedule_type === '3rd_schedule' && $item->mrp) ? number_format($item->mrp, 2) : '—' }}</td>@endif
+                                @if($hasStWht)<td class="px-2 py-2 text-xs text-center">@if($item->st_withheld_at_source)<span class="text-emerald-600 font-medium">Yes</span>@else<span class="text-gray-400">—</span>@endif</td>@endif
+                                @if($hasPetLevy)<td class="px-2 py-2 text-xs text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{{ $item->petroleum_levy ? number_format($item->petroleum_levy, 2) : '—' }}</td>@endif
+                                @if($hasFurtherTax)<td class="px-2 py-2 text-xs text-orange-600 text-right whitespace-nowrap">{{ ($item->further_tax ?? 0) > 0 ? number_format($item->further_tax, 2) : '—' }}</td>@endif
+                                <td class="px-2 py-2 text-xs font-bold text-gray-900 dark:text-white text-right whitespace-nowrap">{{ number_format(($item->price * $item->quantity) + $item->tax, 2) }}</td>
                             </tr>
                             @endforeach
                         </tbody>
                         <tfoot class="bg-gray-50 dark:bg-gray-800">
                             <tr>
-                                <td colspan="10" class="px-3 py-2.5 text-right text-xs text-gray-600 dark:text-gray-400">Value Excl. ST</td>
-                                <td class="px-3 py-2.5 text-right text-xs font-bold text-gray-800 dark:text-gray-100 whitespace-nowrap">PKR {{ number_format($invoice->total_value_excluding_st ?? ($invoice->total_amount - $invoice->items->sum('tax')), 2) }}</td>
+                                <td colspan="{{ $footColspan }}" class="px-2 py-2 text-right text-xs text-gray-600 dark:text-gray-400">Value Excl. ST</td>
+                                <td class="px-2 py-2 text-right text-xs font-bold text-gray-800 dark:text-gray-100 whitespace-nowrap">PKR {{ number_format($invoice->total_value_excluding_st ?? ($invoice->total_amount - $invoice->items->sum('tax')), 2) }}</td>
                             </tr>
                             <tr>
-                                <td colspan="10" class="px-3 py-2.5 text-right text-xs text-gray-600 dark:text-gray-400">Total Sales Tax</td>
-                                <td class="px-3 py-2.5 text-right text-xs font-bold text-gray-800 dark:text-gray-100 whitespace-nowrap">PKR {{ number_format($invoice->total_sales_tax ?? $invoice->items->sum('tax'), 2) }}</td>
+                                <td colspan="{{ $footColspan }}" class="px-2 py-2 text-right text-xs text-gray-600 dark:text-gray-400">Total Sales Tax</td>
+                                <td class="px-2 py-2 text-right text-xs font-bold text-gray-800 dark:text-gray-100 whitespace-nowrap">PKR {{ number_format($invoice->total_sales_tax ?? $invoice->items->sum('tax'), 2) }}</td>
                             </tr>
                             @php $totalFurtherTax = $invoice->items->sum('further_tax'); @endphp
                             @if($totalFurtherTax > 0)
                             <tr>
-                                <td colspan="10" class="px-3 py-2.5 text-right text-xs text-orange-600">Further Tax (4%)</td>
-                                <td class="px-3 py-2.5 text-right text-xs font-bold text-orange-600 whitespace-nowrap">PKR {{ number_format($totalFurtherTax, 2) }}</td>
+                                <td colspan="{{ $footColspan }}" class="px-2 py-2 text-right text-xs text-orange-600">Further Tax (4%)</td>
+                                <td class="px-2 py-2 text-right text-xs font-bold text-orange-600 whitespace-nowrap">PKR {{ number_format($totalFurtherTax, 2) }}</td>
                             </tr>
                             @endif
                             <tr>
-                                <td colspan="10" class="px-3 py-2.5 text-right text-sm font-extrabold text-gray-700 dark:text-gray-300 uppercase border-t-2 border-emerald-500">Grand Total</td>
-                                <td class="px-3 py-2.5 text-right text-base font-extrabold text-emerald-600 border-t-2 border-emerald-500 whitespace-nowrap">PKR {{ number_format($invoice->total_amount, 2) }}</td>
+                                <td colspan="{{ $footColspan }}" class="px-2 py-2 text-right text-sm font-extrabold text-gray-700 dark:text-gray-300 uppercase border-t-2 border-emerald-500">Grand Total</td>
+                                <td class="px-2 py-2 text-right text-base font-extrabold text-emerald-600 border-t-2 border-emerald-500 whitespace-nowrap">PKR {{ number_format($invoice->total_amount, 2) }}</td>
                             </tr>
                             @if($invoice->wht_locked)
                             <tr x-data="whtCorrectionHandler()" id="whtCorrectionRow">
-                                <td colspan="10" class="px-3 py-2 text-right text-xs text-blue-600">
+                                <td colspan="{{ $footColspan }}" class="px-2 py-2 text-right text-xs text-blue-600">
                                     WHT (<span x-text="currentRate"></span>%)
                                     <svg class="w-3.5 h-3.5 inline-block ml-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                                     <button @click="showCorrection = true" class="ml-2 text-xs text-amber-600 hover:text-amber-800 underline font-medium">Correct</button>
@@ -715,11 +721,11 @@
                                         </div>
                                     </div>
                                 </td>
-                                <td class="px-3 py-2 text-right text-xs font-bold text-blue-600 whitespace-nowrap">+ PKR <span x-text="parseFloat(currentAmount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span></td>
+                                <td class="px-2 py-2 text-right text-xs font-bold text-blue-600 whitespace-nowrap">+ PKR <span x-text="parseFloat(currentAmount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span></td>
                             </tr>
                             <tr>
-                                <td colspan="10" class="px-3 py-2.5 text-right text-sm font-extrabold text-emerald-700">Net Receivable</td>
-                                <td class="px-3 py-2.5 text-right text-base font-extrabold text-emerald-700 whitespace-nowrap" id="netReceivableCell">PKR <span x-data="{ val: {{ $invoice->net_receivable ?? $invoice->total_amount }} }" x-text="parseFloat(val).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span></td>
+                                <td colspan="{{ $footColspan }}" class="px-2 py-2 text-right text-sm font-extrabold text-emerald-700">Net Receivable</td>
+                                <td class="px-2 py-2 text-right text-base font-extrabold text-emerald-700 whitespace-nowrap" id="netReceivableCell">PKR <span x-data="{ val: {{ $invoice->net_receivable ?? $invoice->total_amount }} }" x-text="parseFloat(val).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span></td>
                             </tr>
                             <script>
                             function whtCorrectionHandler() {

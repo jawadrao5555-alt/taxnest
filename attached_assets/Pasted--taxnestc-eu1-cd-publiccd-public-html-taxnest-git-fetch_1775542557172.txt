@@ -1,0 +1,48 @@
+[taxnestc@eu1 ~]$ cd ~/publiccd ~/public_html/taxnest && git fetch origin && git reset --hard origin/main && php artisan optimize:clear && php artisan cache:clear && php artisan migrate --force
+remote: Enumerating objects: 191, done.
+remote: Counting objects: 100% (191/191), done.
+remote: Compressing objects: 100% (22/22), done.
+remote: Total 158 (delta 137), reused 157 (delta 136), pack-reused 0 (from 0)
+Receiving objects: 100% (158/158), 921.88 KiB | 7.38 MiB/s, done.
+Resolving deltas: 100% (137/137), completed with 29 local objects.
+From https://github.com/jawadrao5555-alt/taxnest
+   f801787..82efdef  main       -> origin/main
+HEAD is now at 82efdef Add production data export and invoice date fixes for deployment
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 1.82ms DONE
+  cache ......................................................... 21.76ms DONE
+  compiled ....................................................... 1.05ms DONE
+  events ......................................................... 0.35ms DONE
+  routes ......................................................... 0.35ms DONE
+  views .......................................................... 8.52ms DONE
+
+
+   INFO  Application cache cleared successfully.
+
+   INFO  Running migrations.
+
+  2026_04_04_102645_add_tax_type_to_products_table ............... 6.76ms DONE
+  2026_04_04_103541_make_hs_code_nullable_in_products_table ...... 4.62ms DONE
+                                                                                                        cd ~/public_html/taxnest && mysql -u YOUR_DB_
+USER -p YOUR_DB_NAME < database/production_data_export.sql-u YOUR_DB_USER -p YOUR_DB_NAME < database/production_data_export.sql
+Enter password:
+ERROR 1045 (28000): Access denied for user 'YOUR_DB_USER'@'localhost' (using password: NO)              cd ~/public_html/taxnest && mysql -u taxnestc
+_user -p taxnestc_db < database/production_data_export.sql-u taxnestc_user -p taxnestc_db < database/production_data_export.sql
+Enter password:
+ERROR 1045 (28000): Access denied for user 'taxnestc_user'@'localhost' (using password: NO)
+[taxnestc@eu1 taxnest]$ grep DB_ ~/public_html/taxnest/.env
+DB_CONNECTION=mysql
+DB_HOST=localhost
+DB_PORT=3306
+DB_DATABASE=taxnestc_db
+DB_USERNAME=taxnestc_jawadrao5555
+DB_PASSWORD=N2fFzzBVmSZMmysql -u taxnestc_jawadrao5555 -pN2fFzzBVmSZM1KjLZwCj taxnestc_db < ~/public_html/taxnest/database/production_data_export.sql
+[taxnestc@eu1 taxnest]$ mysql -u taxnestc_jawadrao5555 -pN2fFzzBVmSZM1KjLZwCj taxnestc_db < ~/public_htmcd ~/public_html/taxnest && mysql -u taxnestc
+_user -p taxnestc_db < database/production_data_export.sql-u taxnestc_user -p taxnestc_db < database/production_data_export.sql
+Enter password:
+ERROR 1045 (28000): Access denied for user 'taxnestc_user'@'localhost' (using password: YES)
+[taxnestc@eu1 taxnest]$ N2fFzzBVmSZM1KjLZwCj
+bash: N2fFzzBVmSZM1KjLZwCj: command not found
+[taxnestc@eu1 taxnest]$

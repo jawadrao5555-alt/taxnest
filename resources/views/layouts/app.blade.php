@@ -148,11 +148,12 @@
                 letter-spacing: 0.05em;
                 font-size: 0.68rem;
                 color: #6b7280;
-                padding: 0.75rem 1rem;
+                padding: 0.6rem 0.75rem;
                 border-bottom: 2px solid #e5e7eb;
+                white-space: nowrap;
             }
             .dark .premium-table th { color: #9ca3af; border-bottom-color: #374151; }
-            .premium-table td { padding: 0.75rem 1rem; }
+            .premium-table td { padding: 0.6rem 0.75rem; }
             .premium-table tbody tr { transition: all 0.15s ease; }
             .premium-table tbody tr:hover { background-color: rgba(16,185,129,0.04); }
             .dark .premium-table tbody tr:hover { background-color: rgba(16,185,129,0.08); }

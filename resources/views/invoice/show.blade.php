@@ -404,7 +404,7 @@
     </x-slot>
 
     <div class="py-8">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             @if($invoice->status === 'locked')
             <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6" x-data="{ editingFbr: false, fbrNum: '{{ $invoice->fbr_invoice_number ?? '' }}' }">
                 <div class="flex items-start gap-3">
@@ -628,45 +628,45 @@
                         <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                             @foreach($invoice->items as $index => $item)
                             <tr>
-                                <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{{ $index + 1 }}</td>
-                                <td class="px-6 py-4 text-sm font-mono text-gray-700 dark:text-gray-300">{{ $item->hs_code }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{{ $item->description }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 text-right">{{ $item->quantity }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 text-right">PKR {{ number_format($item->price, 2) }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 text-right">PKR {{ number_format($item->tax, 2) }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 text-right">{{ ($item->schedule_type === '3rd_schedule' && $item->mrp) ? 'PKR ' . number_format($item->mrp, 2) : '—' }}</td>
-                                <td class="px-6 py-4 text-sm text-center">
+                                <td class="px-3 py-2.5 text-xs text-gray-500 dark:text-gray-400">{{ $index + 1 }}</td>
+                                <td class="px-3 py-2.5 text-xs font-mono text-gray-700 dark:text-gray-300">{{ $item->hs_code }}</td>
+                                <td class="px-3 py-2.5 text-xs text-gray-700 dark:text-gray-300 max-w-[180px] truncate" title="{{ $item->description }}">{{ $item->description }}</td>
+                                <td class="px-3 py-2.5 text-xs text-gray-700 dark:text-gray-300 text-right">{{ $item->quantity }}</td>
+                                <td class="px-3 py-2.5 text-xs text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{{ number_format($item->price, 2) }}</td>
+                                <td class="px-3 py-2.5 text-xs text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{{ number_format($item->tax, 2) }}</td>
+                                <td class="px-3 py-2.5 text-xs text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{{ ($item->schedule_type === '3rd_schedule' && $item->mrp) ? number_format($item->mrp, 2) : '—' }}</td>
+                                <td class="px-3 py-2.5 text-xs text-center">
                                     @if($item->st_withheld_at_source) <span class="text-emerald-600 font-medium">Yes</span> @else <span class="text-gray-400">—</span> @endif
                                 </td>
-                                <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 text-right">{{ $item->petroleum_levy ? 'PKR ' . number_format($item->petroleum_levy, 2) : '—' }}</td>
-                                <td class="px-6 py-4 text-sm text-orange-600 text-right">{{ ($item->further_tax ?? 0) > 0 ? 'PKR ' . number_format($item->further_tax, 2) : '—' }}</td>
-                                <td class="px-6 py-4 text-sm font-semibold text-gray-900 text-right">PKR {{ number_format(($item->price * $item->quantity) + $item->tax, 2) }}</td>
+                                <td class="px-3 py-2.5 text-xs text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{{ $item->petroleum_levy ? number_format($item->petroleum_levy, 2) : '—' }}</td>
+                                <td class="px-3 py-2.5 text-xs text-orange-600 text-right whitespace-nowrap">{{ ($item->further_tax ?? 0) > 0 ? number_format($item->further_tax, 2) : '—' }}</td>
+                                <td class="px-3 py-2.5 text-xs font-bold text-gray-900 dark:text-white text-right whitespace-nowrap">{{ number_format(($item->price * $item->quantity) + $item->tax, 2) }}</td>
                             </tr>
                             @endforeach
                         </tbody>
                         <tfoot class="bg-gray-50 dark:bg-gray-800">
                             <tr>
-                                <td colspan="9" class="px-6 py-3 text-right text-sm text-gray-600 dark:text-gray-400">Value Excl. ST</td>
-                                <td class="px-6 py-3 text-right text-sm font-semibold text-gray-800 dark:text-gray-100">PKR {{ number_format($invoice->total_value_excluding_st ?? ($invoice->total_amount - $invoice->items->sum('tax')), 2) }}</td>
+                                <td colspan="10" class="px-3 py-2.5 text-right text-xs text-gray-600 dark:text-gray-400">Value Excl. ST</td>
+                                <td class="px-3 py-2.5 text-right text-xs font-bold text-gray-800 dark:text-gray-100 whitespace-nowrap">PKR {{ number_format($invoice->total_value_excluding_st ?? ($invoice->total_amount - $invoice->items->sum('tax')), 2) }}</td>
                             </tr>
                             <tr>
-                                <td colspan="9" class="px-6 py-3 text-right text-sm text-gray-600 dark:text-gray-400">Total Sales Tax</td>
-                                <td class="px-6 py-3 text-right text-sm font-semibold text-gray-800 dark:text-gray-100">PKR {{ number_format($invoice->total_sales_tax ?? $invoice->items->sum('tax'), 2) }}</td>
+                                <td colspan="10" class="px-3 py-2.5 text-right text-xs text-gray-600 dark:text-gray-400">Total Sales Tax</td>
+                                <td class="px-3 py-2.5 text-right text-xs font-bold text-gray-800 dark:text-gray-100 whitespace-nowrap">PKR {{ number_format($invoice->total_sales_tax ?? $invoice->items->sum('tax'), 2) }}</td>
                             </tr>
                             @php $totalFurtherTax = $invoice->items->sum('further_tax'); @endphp
                             @if($totalFurtherTax > 0)
                             <tr>
-                                <td colspan="9" class="px-6 py-3 text-right text-sm text-orange-600">Further Tax (4%)</td>
-                                <td class="px-6 py-3 text-right text-sm font-semibold text-orange-600">PKR {{ number_format($totalFurtherTax, 2) }}</td>
+                                <td colspan="10" class="px-3 py-2.5 text-right text-xs text-orange-600">Further Tax (4%)</td>
+                                <td class="px-3 py-2.5 text-right text-xs font-bold text-orange-600 whitespace-nowrap">PKR {{ number_format($totalFurtherTax, 2) }}</td>
                             </tr>
                             @endif
                             <tr>
-                                <td colspan="9" class="px-6 py-3 text-right text-sm font-bold text-gray-700 dark:text-gray-300 uppercase border-t-2 border-emerald-500">Grand Total</td>
-                                <td class="px-6 py-3 text-right text-lg font-bold text-emerald-600 border-t-2 border-emerald-500">PKR {{ number_format($invoice->total_amount, 2) }}</td>
+                                <td colspan="10" class="px-3 py-2.5 text-right text-sm font-extrabold text-gray-700 dark:text-gray-300 uppercase border-t-2 border-emerald-500">Grand Total</td>
+                                <td class="px-3 py-2.5 text-right text-base font-extrabold text-emerald-600 border-t-2 border-emerald-500 whitespace-nowrap">PKR {{ number_format($invoice->total_amount, 2) }}</td>
                             </tr>
                             @if($invoice->wht_locked)
                             <tr x-data="whtCorrectionHandler()" id="whtCorrectionRow">
-                                <td colspan="9" class="px-6 py-2 text-right text-sm text-blue-600">
+                                <td colspan="10" class="px-3 py-2 text-right text-xs text-blue-600">
                                     WHT (<span x-text="currentRate"></span>%)
                                     <svg class="w-3.5 h-3.5 inline-block ml-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                                     <button @click="showCorrection = true" class="ml-2 text-xs text-amber-600 hover:text-amber-800 underline font-medium">Correct</button>
@@ -715,11 +715,11 @@
                                         </div>
                                     </div>
                                 </td>
-                                <td class="px-6 py-2 text-right text-sm font-semibold text-blue-600">+ PKR <span x-text="parseFloat(currentAmount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span></td>
+                                <td class="px-3 py-2 text-right text-xs font-bold text-blue-600 whitespace-nowrap">+ PKR <span x-text="parseFloat(currentAmount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span></td>
                             </tr>
                             <tr>
-                                <td colspan="9" class="px-6 py-3 text-right text-sm font-bold text-emerald-700">Net Receivable</td>
-                                <td class="px-6 py-3 text-right text-lg font-bold text-emerald-700" id="netReceivableCell">PKR <span x-data="{ val: {{ $invoice->net_receivable ?? $invoice->total_amount }} }" x-text="parseFloat(val).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span></td>
+                                <td colspan="10" class="px-3 py-2.5 text-right text-sm font-extrabold text-emerald-700">Net Receivable</td>
+                                <td class="px-3 py-2.5 text-right text-base font-extrabold text-emerald-700 whitespace-nowrap" id="netReceivableCell">PKR <span x-data="{ val: {{ $invoice->net_receivable ?? $invoice->total_amount }} }" x-text="parseFloat(val).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span></td>
                             </tr>
                             <script>
                             function whtCorrectionHandler() {

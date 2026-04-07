@@ -85,15 +85,15 @@ class InvoiceController extends Controller
             }
             $dateFrom = $request->get('date_from');
             if ($dateFrom && preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) {
-                $query->whereDate('created_at', '>=', $dateFrom);
+                $query->whereDate('invoice_date', '>=', $dateFrom);
             }
             $dateTo = $request->get('date_to');
             if ($dateTo && preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
-                $query->whereDate('created_at', '<=', $dateTo);
+                $query->whereDate('invoice_date', '<=', $dateTo);
             }
             $month = $request->get('month');
             if ($month && preg_match('/^\d{4}-\d{2}$/', $month)) {
-                $dateExpr = \App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM');
+                $dateExpr = \App\Helpers\DbCompat::dateFormat('invoice_date', 'YYYY-MM');
                 $query->whereRaw("{$dateExpr} = ?", [$month]);
             }
             $docType = $request->get('doc_type');
@@ -105,10 +105,10 @@ class InvoiceController extends Controller
         $perPage = (int) $request->get('per_page', $tab === 'completed' ? 25 : 15);
         $perPage = in_array($perPage, [15, 25, 50, 100]) ? $perPage : 25;
 
-        $sortBy = $request->get('sort', 'created_at');
+        $sortBy = $request->get('sort', 'invoice_date');
         $sortDir = $request->get('dir', 'desc');
-        $allowedSorts = ['created_at', 'total_amount', 'buyer_name', 'invoice_number'];
-        if (!in_array($sortBy, $allowedSorts)) $sortBy = 'created_at';
+        $allowedSorts = ['invoice_date', 'created_at', 'total_amount', 'buyer_name', 'invoice_number'];
+        if (!in_array($sortBy, $allowedSorts)) $sortBy = 'invoice_date';
         if (!in_array($sortDir, ['asc', 'desc'])) $sortDir = 'desc';
 
         $invoices = $query->orderBy($sortBy, $sortDir)->paginate($perPage)->appends($request->query());
@@ -123,8 +123,8 @@ class InvoiceController extends Controller
                 'total_tax' => (clone $statsBase)->sum('total_sales_tax'),
                 'production_count' => (clone $statsBase)->where('fbr_status', 'production')->count(),
                 'pending_count' => (clone $statsBase)->where('status', 'pending_verification')->count(),
-                'this_month_count' => (clone $statsBase)->whereMonth('created_at', now()->month)->whereYear('created_at', now()->year)->count(),
-                'this_month_amount' => (clone $statsBase)->whereMonth('created_at', now()->month)->whereYear('created_at', now()->year)->sum('total_amount'),
+                'this_month_count' => (clone $statsBase)->whereMonth('invoice_date', now()->month)->whereYear('invoice_date', now()->year)->count(),
+                'this_month_amount' => (clone $statsBase)->whereMonth('invoice_date', now()->month)->whereYear('invoice_date', now()->year)->sum('total_amount'),
                 'unique_buyers' => (clone $statsBase)->distinct('buyer_ntn')->count('buyer_ntn'),
             ];
         }

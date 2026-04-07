@@ -306,9 +306,9 @@
                                 @endif
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                     @if($tab === 'completed')
-                                    <a href="/invoices?tab=completed&sort=created_at&dir={{ request('sort') === 'created_at' && request('dir', 'desc') === 'desc' ? 'asc' : 'desc' }}&{{ http_build_query(request()->except(['sort','dir','page'])) }}" class="hover:text-emerald-600 inline-flex items-center gap-1">
+                                    <a href="/invoices?tab=completed&sort=invoice_number&dir={{ request('sort') === 'invoice_number' && request('dir', 'desc') === 'asc' ? 'desc' : 'asc' }}&{{ http_build_query(request()->except(['sort','dir','page'])) }}" class="hover:text-emerald-600 inline-flex items-center gap-1">
                                         Invoice #
-                                        @if(request('sort', 'created_at') === 'created_at')
+                                        @if(request('sort') === 'invoice_number')
                                         <svg class="w-3 h-3 {{ request('dir', 'desc') === 'asc' ? 'rotate-180' : '' }}" fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
                                         @endif
                                     </a>
@@ -344,7 +344,18 @@
                                 </th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Items</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                    @if($tab === 'completed')
+                                    <a href="/invoices?tab=completed&sort=invoice_date&dir={{ request('sort') === 'invoice_date' && request('dir', 'desc') === 'desc' ? 'asc' : 'desc' }}&{{ http_build_query(request()->except(['sort','dir','page'])) }}" class="hover:text-emerald-600 inline-flex items-center gap-1">
+                                        Date
+                                        @if(request('sort', 'invoice_date') === 'invoice_date')
+                                        <svg class="w-3 h-3 {{ request('dir', 'desc') === 'asc' ? 'rotate-180' : '' }}" fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+                                        @endif
+                                    </a>
+                                    @else
+                                    Date
+                                    @endif
+                                </th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
@@ -433,7 +444,7 @@
                                     </div>
                                     @endif
                                 </td>
-                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $invoice->created_at->format('d M Y') }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $invoice->invoice_date ? \Carbon\Carbon::parse($invoice->invoice_date)->format('d M Y') : $invoice->created_at->format('d M Y') }}</td>
                                 <td class="px-4 py-3 whitespace-nowrap text-sm" @click.stop>
                                     <div class="flex items-center gap-2">
                                         <a href="/invoice/{{ $invoice->id }}" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 transition" title="View Invoice (Enter)">

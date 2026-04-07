@@ -2,19 +2,19 @@
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-                <nav class="flex items-center text-xs text-gray-400 mb-1">
-                    <a href="{{ route('dashboard') }}" class="hover:text-emerald-600 transition">Dashboard</a>
-                    <svg class="w-3.5 h-3.5 mx-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                    <a href="/invoices?tab={{ in_array($invoice->status, ['draft', 'failed']) ? ($invoice->status === 'failed' ? 'failed' : 'draft') : 'completed' }}" class="hover:text-emerald-600 transition">Invoices</a>
-                    <svg class="w-3.5 h-3.5 mx-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                    <span class="text-gray-600 dark:text-gray-300 font-medium">{{ $invoice->display_invoice_number }}</span>
+                <nav class="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-1.5">
+                    <a href="{{ route('dashboard') }}" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition font-medium">Dashboard</a>
+                    <svg class="w-3.5 h-3.5 mx-1.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <a href="/invoices?tab={{ in_array($invoice->status, ['draft', 'failed']) ? ($invoice->status === 'failed' ? 'failed' : 'draft') : 'completed' }}" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition font-medium">Invoices</a>
+                    <svg class="w-3.5 h-3.5 mx-1.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <span class="text-gray-800 dark:text-gray-200 font-semibold">{{ $invoice->display_invoice_number }}</span>
                 </nav>
                 <div class="flex items-center space-x-3">
-                    <a href="/invoices?tab={{ in_array($invoice->status, ['draft', 'failed']) ? ($invoice->status === 'failed' ? 'failed' : 'draft') : 'completed' }}" class="inline-flex items-center text-gray-500 dark:text-gray-400 hover:text-emerald-600 transition text-sm">
+                    <a href="/invoices?tab={{ in_array($invoice->status, ['draft', 'failed']) ? ($invoice->status === 'failed' ? 'failed' : 'draft') : 'completed' }}" class="inline-flex items-center text-gray-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition text-sm font-medium">
                         <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                         Back to Invoices
                     </a>
-                    <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Invoice {{ $invoice->display_invoice_number }}</h2>
+                    <h2 class="font-extrabold text-2xl text-gray-900 dark:text-white leading-tight tracking-tight">Invoice {{ $invoice->display_invoice_number }}</h2>
                 </div>
             </div>
             <div class="flex items-center flex-wrap gap-2" id="actionButtonsBlock">
@@ -509,11 +509,11 @@
                 </div>
             </div>
             @endif
-            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden mb-8">
-                <div class="p-6 border-b border-gray-100">
+            <div class="premium-card overflow-hidden mb-8">
+                <div class="p-6 border-b border-gray-100 dark:border-gray-800">
                     <div class="flex items-center justify-between mb-6">
                         <div>
-                            <h3 class="text-2xl font-bold text-gray-900">{{ $invoice->company->name ?? 'Company' }}</h3>
+                            <h3 class="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">{{ $invoice->company->name ?? 'Company' }}</h3>
                             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">NTN: {{ $invoice->company->ntn ?? 'N/A' }}</p>
                             @if($invoice->company->registration_no)
                             <p class="text-xs text-gray-400">Reg #: {{ $invoice->company->registration_no }}</p>
@@ -609,20 +609,20 @@
                 </div>
 
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead class="bg-gray-50 dark:bg-gray-800">
+                    <table class="min-w-full premium-table">
+                        <thead class="bg-gradient-to-r from-gray-50 to-gray-100/80 dark:from-gray-800 dark:to-gray-800/80">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">#</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">HS Code</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Description</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Qty</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Price</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Tax</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">MRP</th>
-                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">ST WHT</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Pet. Levy</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-orange-500 uppercase">Further Tax</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
+                                <th class="text-left">#</th>
+                                <th class="text-left">HS Code</th>
+                                <th class="text-left">Description</th>
+                                <th class="text-right">Qty</th>
+                                <th class="text-right">Price</th>
+                                <th class="text-right">Tax</th>
+                                <th class="text-right">MRP</th>
+                                <th class="text-center">ST WHT</th>
+                                <th class="text-right">Pet. Levy</th>
+                                <th class="text-right" style="color: var(--tw-orange-500, #f97316)">Further Tax</th>
+                                <th class="text-right">Total</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -783,9 +783,9 @@
             </div>
 
             @if(!($invoice->status === 'locked' && $invoice->fbr_status === 'production') && !empty($riskAnalysis) && $riskAnalysis['risk_count'] > 0)
-            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border {{ $riskAnalysis['risk_color']['border'] }} overflow-hidden mb-8">
+            <div class="premium-card {{ $riskAnalysis['risk_color']['border'] }} overflow-hidden mb-8">
                 <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
+                    <h3 class="text-sm font-extrabold text-gray-900 dark:text-white uppercase tracking-wider flex items-center space-x-2">
                         <svg class="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         <span>Intelligence Risk Analysis</span>
                     </h3>
@@ -825,9 +825,9 @@
             @endif
 
             @if(!($invoice->status === 'locked' && $invoice->fbr_status === 'production') && !empty($sroSuggestions) && count($sroSuggestions) > 0)
-            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-blue-200 overflow-hidden mb-8">
+            <div class="premium-card border-blue-200 dark:border-blue-800 overflow-hidden mb-8">
                 <div class="px-6 py-4 border-b border-blue-100 flex items-center justify-between">
-                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
+                    <h3 class="text-sm font-extrabold text-gray-900 dark:text-white uppercase tracking-wider flex items-center space-x-2">
                         <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
                         <span>SRO Suggestions</span>
                     </h3>
@@ -854,9 +854,9 @@
             @endif
 
             @if(!($invoice->status === 'locked' && $invoice->fbr_status === 'production') && !empty($vendorRisk) && $vendorRisk->vendor_score < 70)
-            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-orange-200 overflow-hidden mb-8">
+            <div class="premium-card border-orange-200 dark:border-orange-800 overflow-hidden mb-8">
                 <div class="px-6 py-4 border-b border-orange-100 flex items-center justify-between">
-                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
+                    <h3 class="text-sm font-extrabold text-gray-900 dark:text-white uppercase tracking-wider flex items-center space-x-2">
                         <svg class="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                         <span>Vendor Risk Alert</span>
                     </h3>
@@ -888,9 +888,9 @@
             @endif
 
             @if(!($invoice->status === 'locked' && $invoice->fbr_status === 'production'))
-            <div x-data="{ rejResult: null, rejLoading: false }" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 dark:border-gray-700 p-6 mb-8">
+            <div x-data="{ rejResult: null, rejLoading: false }" class="premium-card p-6 mb-8">
                 <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
+                    <h3 class="text-sm font-extrabold text-gray-900 dark:text-white uppercase tracking-wider flex items-center space-x-2">
                         <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
                         <span>Rejection Probability Shield</span>
                     </h3>
@@ -936,9 +936,9 @@
                 $preFlags = $complianceReport->pre_validation_flags ?? [];
                 $panelBorder = $isFbrValidated ? 'border-emerald-200' : ($complianceReport->risk_level === 'CRITICAL' ? 'border-red-200' : ($complianceReport->risk_level === 'HIGH' ? 'border-orange-200' : 'border-gray-100'));
             @endphp
-            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border {{ $panelBorder }} overflow-hidden mb-8">
+            <div class="premium-card {{ $panelBorder }} overflow-hidden mb-8">
                 <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between flex-wrap gap-2">
-                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
+                    <h3 class="text-sm font-extrabold text-gray-900 dark:text-white uppercase tracking-wider flex items-center space-x-2">
                         <svg class="w-5 h-5 {{ $isFbrValidated ? 'text-emerald-600' : 'text-indigo-600' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
                         <span>Compliance Analysis</span>
                     </h3>
@@ -999,9 +999,9 @@
             @endif
 
             @if($invoice->activityLogs && $invoice->activityLogs->count() > 0)
-            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
+            <div class="premium-card overflow-hidden">
                 <div class="px-6 py-4 border-b border-gray-100">
-                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Invoice Timeline</h3>
+                    <h3 class="text-sm font-extrabold text-gray-900 dark:text-white uppercase tracking-wider">Invoice Timeline</h3>
                 </div>
                 <div class="p-6">
                     <div class="relative">

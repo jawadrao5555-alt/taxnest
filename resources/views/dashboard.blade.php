@@ -201,7 +201,7 @@
             @endif
 
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-                <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-5 shadow-lg shadow-blue-500/15">
+                <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 p-5 shadow-lg shadow-blue-600/25 hover:shadow-xl hover:shadow-blue-600/30 hover:-translate-y-0.5 transition-all duration-200">
                     <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
                     <div class="relative">
                         <div class="flex items-center justify-between mb-3">
@@ -219,7 +219,7 @@
                     </div>
                 </div>
 
-                <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 shadow-lg shadow-emerald-500/15">
+                <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 p-5 shadow-lg shadow-emerald-600/25 hover:shadow-xl hover:shadow-emerald-600/30 hover:-translate-y-0.5 transition-all duration-200">
                     <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
                     <div class="relative">
                         <div class="flex items-center justify-between mb-3">
@@ -232,7 +232,7 @@
                     </div>
                 </div>
 
-                <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 p-5 shadow-lg shadow-purple-500/15">
+                <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-500 via-purple-600 to-purple-700 p-5 shadow-lg shadow-purple-600/25 hover:shadow-xl hover:shadow-purple-600/30 hover:-translate-y-0.5 transition-all duration-200">
                     <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
                     <div class="relative">
                         <div class="flex items-center justify-between mb-3">
@@ -245,7 +245,7 @@
                     </div>
                 </div>
 
-                <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 p-5 shadow-lg shadow-indigo-500/15">
+                <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-indigo-700 p-5 shadow-lg shadow-indigo-600/25 hover:shadow-xl hover:shadow-indigo-600/30 hover:-translate-y-0.5 transition-all duration-200">
                     <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
                     <div class="relative">
                         <div class="flex items-center justify-between mb-3">
@@ -258,7 +258,7 @@
                     </div>
                 </div>
 
-                <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 p-5 shadow-lg shadow-orange-500/15">
+                <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 via-orange-600 to-orange-700 p-5 shadow-lg shadow-orange-600/25 hover:shadow-xl hover:shadow-orange-600/30 hover:-translate-y-0.5 transition-all duration-200">
                     <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
                     <div class="relative">
                         <div class="flex items-center justify-between mb-3">
@@ -281,20 +281,20 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 relative overflow-hidden">
-                    <div class="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-indigo-500 to-purple-500"></div>
-                    <div class="relative pl-3">
+                <div class="premium-card p-6 relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-indigo-500 via-purple-500 to-violet-500 rounded-full"></div>
+                    <div class="relative pl-4">
                         <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 flex items-center space-x-2 uppercase tracking-wider">
+                            <h3 class="text-xs font-extrabold text-gray-900 dark:text-white flex items-center space-x-2 uppercase tracking-widest">
                                 <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                 <span>Compliance Score</span>
                             </h3>
                             @if($hybridScore >= 80)
-                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Compliant</span>
+                            <span class="premium-badge bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">Compliant</span>
                             @elseif($hybridScore >= 50)
-                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">Needs Attention</span>
+                            <span class="premium-badge bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Needs Attention</span>
                             @else
-                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">At Risk</span>
+                            <span class="premium-badge bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">At Risk</span>
                             @endif
                         </div>
                         <div class="flex items-center space-x-5">
@@ -327,10 +327,10 @@
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 relative overflow-hidden">
-                    <div class="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-emerald-500 to-teal-500"></div>
-                    <div class="relative pl-3">
-                        <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center space-x-2 uppercase tracking-wider">
+                <div class="premium-card p-6 relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-emerald-500 via-teal-500 to-cyan-500 rounded-full"></div>
+                    <div class="relative pl-4">
+                        <h3 class="text-xs font-extrabold text-gray-900 dark:text-white mb-4 flex items-center space-x-2 uppercase tracking-widest">
                             <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                             <span>Payment Summary</span>
                         </h3>
@@ -353,38 +353,38 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 p-5 hover:shadow-md transition-shadow duration-300">
+                <div class="premium-card p-5">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Compliance %</p>
-                            <p class="text-2xl font-extrabold mt-1 {{ $kpis['compliance_percent'] >= 70 ? 'text-emerald-600 dark:text-emerald-400' : ($kpis['compliance_percent'] >= 40 ? 'text-orange-600 dark:text-orange-400' : 'text-red-600 dark:text-red-400') }}">{{ $kpis['compliance_percent'] }}%</p>
-                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1 font-medium">Locked / Total</p>
+                            <p class="text-[10px] font-extrabold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Compliance %</p>
+                            <p class="text-2xl font-extrabold mt-1.5 {{ $kpis['compliance_percent'] >= 70 ? 'text-emerald-600 dark:text-emerald-400' : ($kpis['compliance_percent'] >= 40 ? 'text-orange-600 dark:text-orange-400' : 'text-red-600 dark:text-red-400') }}">{{ $kpis['compliance_percent'] }}%</p>
+                            <p class="text-xs text-gray-600 dark:text-gray-400 mt-1 font-medium">Locked / Total</p>
                         </div>
-                        <div class="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl">
+                        <div class="p-3.5 bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-900/40 dark:to-emerald-800/20 rounded-2xl">
                             <svg class="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
                     </div>
                 </div>
-                <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 p-5 hover:shadow-md transition-shadow duration-300">
+                <div class="premium-card p-5">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Avg Invoice</p>
-                            <p class="text-2xl font-extrabold text-gray-900 dark:text-white mt-1">PKR {{ number_format($kpis['avg_invoice_value']) }}</p>
-                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1 font-medium">Per invoice avg</p>
+                            <p class="text-[10px] font-extrabold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Avg Invoice</p>
+                            <p class="text-2xl font-extrabold text-gray-900 dark:text-white mt-1.5">PKR {{ number_format($kpis['avg_invoice_value']) }}</p>
+                            <p class="text-xs text-gray-600 dark:text-gray-400 mt-1 font-medium">Per invoice avg</p>
                         </div>
-                        <div class="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
-                            <span class="text-sm font-bold text-blue-600 dark:text-blue-400">PKR</span>
+                        <div class="p-3.5 bg-gradient-to-br from-blue-100 to-blue-50 dark:from-blue-900/40 dark:to-blue-800/20 rounded-2xl">
+                            <span class="text-sm font-extrabold text-blue-600 dark:text-blue-400">PKR</span>
                         </div>
                     </div>
                 </div>
-                <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 p-5 hover:shadow-md transition-shadow duration-300">
+                <div class="premium-card p-5">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Rejection Rate</p>
-                            <p class="text-2xl font-extrabold mt-1 {{ $kpis['rejection_rate'] <= 10 ? 'text-emerald-600 dark:text-emerald-400' : ($kpis['rejection_rate'] <= 30 ? 'text-orange-600 dark:text-orange-400' : 'text-red-600 dark:text-red-400') }}">{{ $kpis['rejection_rate'] }}%</p>
-                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1 font-medium">Failed / Total</p>
+                            <p class="text-[10px] font-extrabold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Rejection Rate</p>
+                            <p class="text-2xl font-extrabold mt-1.5 {{ $kpis['rejection_rate'] <= 10 ? 'text-emerald-600 dark:text-emerald-400' : ($kpis['rejection_rate'] <= 30 ? 'text-orange-600 dark:text-orange-400' : 'text-red-600 dark:text-red-400') }}">{{ $kpis['rejection_rate'] }}%</p>
+                            <p class="text-xs text-gray-600 dark:text-gray-400 mt-1 font-medium">Failed / Total</p>
                         </div>
-                        <div class="p-3 bg-red-100 dark:bg-red-900/30 rounded-xl">
+                        <div class="p-3.5 bg-gradient-to-br from-red-100 to-red-50 dark:from-red-900/40 dark:to-red-800/20 rounded-2xl">
                             <svg class="w-5 h-5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
                         </div>
                     </div>
@@ -392,22 +392,22 @@
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-                <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 p-5 hover:shadow-md transition-shadow duration-300">
-                    <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3 uppercase tracking-wider flex items-center space-x-2">
+                <div class="premium-card p-5">
+                    <h3 class="text-xs font-extrabold text-gray-900 dark:text-white mb-3 uppercase tracking-widest flex items-center space-x-2">
                         <span class="w-2 h-2 bg-amber-500 rounded-full"></span>
                         <span>Invoice Status</span>
                     </h3>
                     <div style="height: 160px;"><canvas id="statusChart"></canvas></div>
                 </div>
-                <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 p-5 hover:shadow-md transition-shadow duration-300">
-                    <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3 uppercase tracking-wider flex items-center space-x-2">
+                <div class="premium-card p-5">
+                    <h3 class="text-xs font-extrabold text-gray-900 dark:text-white mb-3 uppercase tracking-widest flex items-center space-x-2">
                         <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
                         <span>Monthly Invoices</span>
                     </h3>
                     <div style="height: 160px;"><canvas id="monthlyChart"></canvas></div>
                 </div>
-                <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 p-5 hover:shadow-md transition-shadow duration-300">
-                    <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3 uppercase tracking-wider flex items-center space-x-2">
+                <div class="premium-card p-5">
+                    <h3 class="text-xs font-extrabold text-gray-900 dark:text-white mb-3 uppercase tracking-widest flex items-center space-x-2">
                         <span class="w-2 h-2 bg-indigo-500 rounded-full"></span>
                         <span>Compliance Trend</span>
                     </h3>
@@ -428,8 +428,8 @@
 
             @if($planTier !== 'retail')
             @if(count($smartInsights) > 0)
-            <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 p-5 mb-5">
-                <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3 flex items-center space-x-2 uppercase tracking-wider">
+            <div class="premium-card p-5 mb-5">
+                <h3 class="text-xs font-extrabold text-gray-900 dark:text-white mb-3 flex items-center space-x-2 uppercase tracking-widest">
                     <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
                     <span>Smart Insights</span>
                 </h3>
@@ -456,8 +456,8 @@
             @endif
             @endif
 
-            <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 p-5 mb-5">
-                <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-3 uppercase tracking-wider flex items-center space-x-2">
+            <div class="premium-card p-5 mb-5">
+                <h3 class="text-xs font-extrabold text-gray-900 dark:text-white mb-3 uppercase tracking-widest flex items-center space-x-2">
                     <svg class="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <span>Draft Aging</span>
                 </h3>
@@ -478,17 +478,17 @@
             </div>
 
             @if(in_array($planTier, ['business', 'enterprise']) && $topCustomers->count() > 0)
-            <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden mb-5">
-                <div class="px-5 py-4 border-b border-gray-100/80 dark:border-gray-700/50 flex items-center justify-between">
-                    <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wider">Top 5 Customers</h3>
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100/80 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">{{ $topCustomers->count() }} customers</span>
+            <div class="premium-card overflow-hidden mb-5">
+                <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white dark:from-gray-800/60 dark:to-gray-900">
+                    <h3 class="text-xs font-extrabold text-gray-900 dark:text-white uppercase tracking-widest">Top 5 Customers</h3>
+                    <span class="premium-badge bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">{{ $topCustomers->count() }} customers</span>
                 </div>
-                <table class="min-w-full divide-y divide-gray-100 dark:divide-gray-700/50">
-                    <thead class="bg-gray-50/80 dark:bg-gray-700/30">
+                <table class="min-w-full premium-table">
+                    <thead class="bg-gradient-to-r from-gray-50 to-gray-100/80 dark:from-gray-800 dark:to-gray-800/80">
                         <tr>
-                            <th class="px-5 py-2.5 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Customer</th>
-                            <th class="px-5 py-2.5 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Revenue</th>
-                            <th class="px-5 py-2.5 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Invoices</th>
+                            <th class="text-left">Customer</th>
+                            <th class="text-right">Revenue</th>
+                            <th class="text-right">Invoices</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-50 dark:divide-gray-700/30">
@@ -505,16 +505,16 @@
             @endif
 
             @if($planTier === 'enterprise' && $branchComparison->count() > 0)
-            <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden mb-5">
-                <div class="px-5 py-4 border-b border-gray-100/80 dark:border-gray-700/50">
-                    <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wider">Branch Comparison</h3>
+            <div class="premium-card overflow-hidden mb-5">
+                <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800/60 dark:to-gray-900">
+                    <h3 class="text-xs font-extrabold text-gray-900 dark:text-white uppercase tracking-widest">Branch Comparison</h3>
                 </div>
-                <table class="min-w-full divide-y divide-gray-100 dark:divide-gray-700/50">
-                    <thead class="bg-gray-50/80 dark:bg-gray-700/30">
+                <table class="min-w-full premium-table">
+                    <thead class="bg-gradient-to-r from-gray-50 to-gray-100/80 dark:from-gray-800 dark:to-gray-800/80">
                         <tr>
-                            <th class="px-5 py-2.5 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Branch</th>
-                            <th class="px-5 py-2.5 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Invoices</th>
-                            <th class="px-5 py-2.5 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Revenue</th>
+                            <th class="text-left">Branch</th>
+                            <th class="text-right">Invoices</th>
+                            <th class="text-right">Revenue</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-50 dark:divide-gray-700/30">
@@ -534,9 +534,9 @@
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
-                <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-md transition-shadow duration-300">
-                    <div class="px-5 py-4 border-b border-gray-100/80 dark:border-gray-700/50 flex items-center justify-between">
-                        <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wider flex items-center space-x-2">
+                <div class="premium-card overflow-hidden">
+                    <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white dark:from-gray-800/60 dark:to-gray-900">
+                        <h3 class="text-xs font-extrabold text-gray-900 dark:text-white uppercase tracking-widest flex items-center space-x-2">
                             <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
                             <span>Recent Invoices</span>
                         </h3>
@@ -568,9 +568,9 @@
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-md transition-shadow duration-300">
-                    <div class="px-5 py-4 border-b border-gray-100/80 dark:border-gray-700/50">
-                        <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wider flex items-center space-x-2">
+                <div class="premium-card overflow-hidden">
+                    <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800/60 dark:to-gray-900">
+                        <h3 class="text-xs font-extrabold text-gray-900 dark:text-white uppercase tracking-widest flex items-center space-x-2">
                             <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
                             <span>Recent Activity</span>
                         </h3>

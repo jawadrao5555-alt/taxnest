@@ -1,19 +1,19 @@
 <x-app-layout>
     <div class="py-8 pb-36">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
-            <nav class="flex items-center text-xs text-gray-400 mb-1">
-                <a href="{{ route('dashboard') }}" class="hover:text-emerald-600 transition">Dashboard</a>
-                <svg class="w-3.5 h-3.5 mx-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                <a href="/invoices" class="hover:text-emerald-600 transition">Invoices</a>
-                <svg class="w-3.5 h-3.5 mx-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                <span class="text-gray-600 dark:text-gray-300 font-medium">Create</span>
+            <nav class="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-1.5">
+                <a href="{{ route('dashboard') }}" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition font-medium">Dashboard</a>
+                <svg class="w-3.5 h-3.5 mx-1.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                <a href="/invoices" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition font-medium">Invoices</a>
+                <svg class="w-3.5 h-3.5 mx-1.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                <span class="text-gray-800 dark:text-gray-200 font-semibold">Create</span>
             </nav>
             <div class="flex items-center space-x-3">
-                <a href="/invoices" class="inline-flex items-center text-gray-500 dark:text-gray-400 hover:text-emerald-600 transition text-sm">
+                <a href="/invoices" class="inline-flex items-center text-gray-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition text-sm font-medium">
                     <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                     Back to Invoices
                 </a>
-                <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Create Invoice</h2>
+                <h2 class="font-extrabold text-2xl text-gray-900 dark:text-white leading-tight tracking-tight">Create Invoice</h2>
             </div>
         </div>
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -37,8 +37,8 @@
                 @endif
 
                 @if(isset($branches) && $branches->count() > 0)
-                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Branch</h3>
+                <div class="premium-card p-6">
+                    <h3 class="text-sm font-extrabold text-gray-900 dark:text-white mb-4 uppercase tracking-wider">Branch</h3>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Branch (Optional)</label>
                         <select name="branch_id" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
@@ -54,8 +54,8 @@
                 </div>
                 @endif
 
-                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Document Information</h3>
+                <div class="premium-card p-6">
+                    <h3 class="text-sm font-extrabold text-gray-900 dark:text-white mb-4 uppercase tracking-wider">Document Information</h3>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Document Type</label>
@@ -79,8 +79,8 @@
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Buyer Information</h3>
+                <div class="premium-card p-6">
+                    <h3 class="text-sm font-extrabold text-gray-900 dark:text-white mb-4 uppercase tracking-wider">Buyer Information</h3>
 
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer Lookup</label>
@@ -152,9 +152,9 @@
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+                <div class="premium-card p-6">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Invoice Items</h3>
+                        <h3 class="text-sm font-extrabold text-gray-900 dark:text-white uppercase tracking-wider">Invoice Items</h3>
                         <button type="button" @click="addItem()" class="inline-flex items-center px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-100 transition">
                             + Add Item
                         </button>
@@ -423,9 +423,9 @@
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+                <div class="premium-card p-6">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Live Compliance Check</h3>
+                        <h3 class="text-sm font-extrabold text-gray-900 dark:text-white uppercase tracking-wider">Live Compliance Check</h3>
                         <button type="button" @click="checkCompliance()" :disabled="complianceLoading" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-50">
                             <svg x-show="complianceLoading" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                             Check Compliance
@@ -465,9 +465,9 @@
                     <p x-show="!complianceResult && !complianceLoading" class="text-sm text-gray-400 dark:text-gray-500">Click "Check Compliance" to preview compliance status before submitting.</p>
                 </div>
 
-                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+                <div class="premium-card p-6">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Rejection Probability</h3>
+                        <h3 class="text-sm font-extrabold text-gray-900 dark:text-white uppercase tracking-wider">Rejection Probability</h3>
                         <button type="button" @click="checkRejectionProbability()" :disabled="rejectionLoading" class="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 transition disabled:opacity-50">
                             <svg x-show="rejectionLoading" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                             Analyze Risk

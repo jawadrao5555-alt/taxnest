@@ -48,8 +48,10 @@
         <script>if(document.documentElement.classList.contains('dark')){document.documentElement.style.colorScheme='dark';}</script>
         <style>
             :root {
-                --card-radius: 12px;
-                --card-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                --card-radius: 14px;
+                --card-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04);
+                --card-shadow-hover: 0 4px 16px rgba(0,0,0,0.10), 0 8px 24px rgba(0,0,0,0.06);
+                --emerald-glow: 0 0 20px rgba(16,185,129,0.15);
             }
             html, body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
             body { letter-spacing: -0.011em; }
@@ -57,27 +59,137 @@
             .dark body { color: #f1f5f9; }
             .dark .text-gray-400 { color: #cbd5e1 !important; }
             .dark .text-gray-500 { color: #94a3b8 !important; }
-            @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+            @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
             @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-            .page-fade { animation: fadeIn 0.15s ease-out; }
-            .premium-hover { transition: all 0.15s ease; }
-            .premium-hover:hover { transform: translateY(-1px); }
-            .btn-premium { transition: all 0.15s ease; }
-            .btn-premium:hover { transform: scale(1.02); }
-            .btn-premium:active { transform: scale(0.98); }
+            @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+            @keyframes pulseGlow { 0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.2); } 50% { box-shadow: 0 0 12px 2px rgba(16,185,129,0.15); } }
+
+            .page-fade { animation: fadeIn 0.2s ease-out; }
+
+            .premium-card {
+                background: white;
+                border: 1px solid rgba(229,231,235,0.8);
+                border-radius: var(--card-radius);
+                box-shadow: var(--card-shadow);
+                transition: all 0.2s ease;
+            }
+            .premium-card:hover {
+                box-shadow: var(--card-shadow-hover);
+                transform: translateY(-1px);
+            }
+            .dark .premium-card {
+                background: rgba(17,24,39,0.7);
+                border-color: rgba(55,65,81,0.6);
+            }
+            .dark .premium-card:hover { border-color: rgba(16,185,129,0.3); }
+
+            .stat-card {
+                border-radius: 16px;
+                padding: 1.25rem;
+                transition: all 0.2s ease;
+                position: relative;
+                overflow: hidden;
+            }
+            .stat-card::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                right: 0;
+                width: 60px;
+                height: 60px;
+                border-radius: 0 0 0 100%;
+                opacity: 0.08;
+                background: currentColor;
+            }
+            .stat-card:hover { transform: translateY(-2px); box-shadow: var(--card-shadow-hover); }
+
+            .premium-hover { transition: all 0.2s ease; }
+            .premium-hover:hover { transform: translateY(-2px); box-shadow: var(--card-shadow-hover); }
+
+            .btn-premium {
+                transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+            .btn-premium:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+            .btn-premium:active { transform: translateY(0); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+
             .btn-loading { position: relative; pointer-events: none; opacity: 0.7; }
             .btn-loading::after { content: ''; position: absolute; right: 8px; top: 50%; width: 14px; height: 14px; margin-top: -7px; border: 2px solid transparent; border-top-color: currentColor; border-radius: 50%; animation: spin 0.6s linear infinite; }
+
             .sidebar-scroll::-webkit-scrollbar { width: 4px; }
             .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(156,163,175,0.3); border-radius: 4px; }
             .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
             .main-scroll::-webkit-scrollbar { width: 6px; }
-            .main-scroll::-webkit-scrollbar-thumb { background: rgba(156,163,175,0.3); border-radius: 4px; }
+            .main-scroll::-webkit-scrollbar-thumb { background: rgba(156,163,175,0.25); border-radius: 6px; }
+            .main-scroll::-webkit-scrollbar-thumb:hover { background: rgba(156,163,175,0.45); }
             .main-scroll::-webkit-scrollbar-track { background: transparent; }
-            .sidebar-link { transition: all 0.15s ease; }
-            .sidebar-link:hover { background-color: rgba(249,250,251,0.8); }
-            .dark .sidebar-link:hover { background-color: rgba(55,65,81,0.5); }
-            .sidebar-link.active { background: linear-gradient(90deg, rgba(16,185,129,0.08) 0%, transparent 100%); font-weight: 600; border-left: 3px solid #10b981; padding-left: 13px; }
-            .dark .sidebar-link.active { background: linear-gradient(90deg, rgba(16,185,129,0.15) 0%, transparent 100%); border-left: 3px solid #10b981; padding-left: 13px; }
+
+            .sidebar-link { transition: all 0.2s ease; border-radius: 10px; }
+            .sidebar-link:hover { background-color: rgba(249,250,251,0.9); }
+            .dark .sidebar-link:hover { background-color: rgba(55,65,81,0.6); }
+            .sidebar-link.active {
+                background: linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(20,184,166,0.06) 100%);
+                font-weight: 600;
+                border-left: 3px solid #10b981;
+                padding-left: 13px;
+                color: #047857;
+            }
+            .dark .sidebar-link.active {
+                background: linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(20,184,166,0.08) 100%);
+                border-left: 3px solid #34d399;
+                padding-left: 13px;
+                color: #6ee7b7;
+            }
+
+            .premium-table th {
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                font-size: 0.68rem;
+                color: #6b7280;
+                padding: 0.75rem 1rem;
+                border-bottom: 2px solid #e5e7eb;
+            }
+            .dark .premium-table th { color: #9ca3af; border-bottom-color: #374151; }
+            .premium-table td { padding: 0.75rem 1rem; }
+            .premium-table tbody tr { transition: all 0.15s ease; }
+            .premium-table tbody tr:hover { background-color: rgba(16,185,129,0.04); }
+            .dark .premium-table tbody tr:hover { background-color: rgba(16,185,129,0.08); }
+
+            .premium-badge {
+                display: inline-flex;
+                align-items: center;
+                padding: 0.25rem 0.75rem;
+                border-radius: 9999px;
+                font-size: 0.7rem;
+                font-weight: 700;
+                letter-spacing: 0.02em;
+            }
+
+            .premium-input {
+                border-radius: 10px;
+                border: 1.5px solid #e5e7eb;
+                transition: all 0.2s ease;
+                font-size: 0.875rem;
+            }
+            .premium-input:focus {
+                border-color: #10b981;
+                box-shadow: 0 0 0 3px rgba(16,185,129,0.12);
+                outline: none;
+            }
+            .dark .premium-input { border-color: #374151; background: #111827; }
+            .dark .premium-input:focus { border-color: #34d399; box-shadow: 0 0 0 3px rgba(52,211,153,0.15); }
+
+            .section-heading {
+                font-size: 0.65rem;
+                font-weight: 800;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+                color: #9ca3af;
+            }
+            .dark .section-heading { color: #6b7280; }
+
             [x-cloak] { display: none !important; }
         </style>
     </head>

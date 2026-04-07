@@ -1,41 +1,42 @@
-@extends('layouts.app')
-
-@section('title', 'WHT Manager')
-
-@section('content')
+<x-app-layout>
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="flex items-center justify-between mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-gray-800 dark:text-white">WHT Manager</h1>
+            <nav class="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-1.5">
+                <a href="{{ route('dashboard') }}" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition font-medium">Dashboard</a>
+                <svg class="w-3.5 h-3.5 mx-1.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                <span class="text-gray-800 dark:text-gray-200 font-semibold">WHT Manager</span>
+            </nav>
+            <h1 class="font-extrabold text-2xl text-gray-900 dark:text-white tracking-tight">WHT Manager</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">View and correct Withholding Tax rates on all locked invoices</p>
         </div>
     </div>
 
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Locked</p>
-            <p class="text-2xl font-bold text-gray-800 dark:text-white mt-1">{{ $stats['total_locked'] }}</p>
+        <div class="premium-card p-4">
+            <p class="text-xs font-extrabold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Locked</p>
+            <p class="text-2xl font-extrabold text-gray-800 dark:text-white mt-1">{{ $stats['total_locked'] }}</p>
         </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">With WHT</p>
-            <p class="text-2xl font-bold text-blue-600 mt-1">{{ $stats['with_wht'] }}</p>
+        <div class="premium-card p-4">
+            <p class="text-xs font-extrabold text-gray-500 dark:text-gray-400 uppercase tracking-wider">With WHT</p>
+            <p class="text-2xl font-extrabold text-blue-600 mt-1">{{ $stats['with_wht'] }}</p>
         </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">No WHT (0%)</p>
-            <p class="text-2xl font-bold text-emerald-600 mt-1">{{ $stats['no_wht'] }}</p>
+        <div class="premium-card p-4">
+            <p class="text-xs font-extrabold text-gray-500 dark:text-gray-400 uppercase tracking-wider">No WHT (0%)</p>
+            <p class="text-2xl font-extrabold text-emerald-600 mt-1">{{ $stats['no_wht'] }}</p>
         </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total WHT Amount</p>
-            <p class="text-2xl font-bold text-amber-600 mt-1">PKR {{ number_format($stats['total_wht_amount'], 2) }}</p>
+        <div class="premium-card p-4">
+            <p class="text-xs font-extrabold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total WHT Amount</p>
+            <p class="text-2xl font-extrabold text-amber-600 mt-1">PKR {{ number_format($stats['total_wht_amount'], 2) }}</p>
         </div>
     </div>
 
-    <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+    <div class="premium-card overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
             <form method="GET" action="/wht-management" class="flex flex-col sm:flex-row gap-3">
                 <div class="flex-1">
                     <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by buyer name, invoice number..."
-                        class="w-full px-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                        class="w-full premium-input">
                 </div>
                 <div class="flex gap-2">
                     <select name="filter" class="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white">
@@ -43,7 +44,7 @@
                         <option value="with_wht" {{ request('filter') === 'with_wht' ? 'selected' : '' }}>With WHT</option>
                         <option value="no_wht" {{ request('filter') === 'no_wht' ? 'selected' : '' }}>No WHT (0%)</option>
                     </select>
-                    <button type="submit" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">Search</button>
+                    <button type="submit" class="btn-premium">Search</button>
                     @if(request('search') || request('filter'))
                     <a href="/wht-management" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition">Clear</a>
                     @endif
@@ -52,23 +53,23 @@
         </div>
 
         <div class="overflow-x-auto">
-            <table class="min-w-full">
-                <thead>
-                    <tr class="bg-gray-50 dark:bg-gray-800">
-                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Invoice #</th>
-                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">FBR #</th>
-                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Buyer</th>
-                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
-                        <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
-                        <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">WHT Rate</th>
-                        <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">WHT Amount</th>
-                        <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+            <table class="min-w-full premium-table">
+                <thead class="bg-gradient-to-r from-gray-50 to-gray-100/80 dark:from-gray-800 dark:to-gray-800/80">
+                    <tr>
+                        <th class="text-left">Invoice #</th>
+                        <th class="text-left">FBR #</th>
+                        <th class="text-left">Buyer</th>
+                        <th class="text-left">Date</th>
+                        <th class="text-right">Total</th>
+                        <th class="text-center">WHT Rate</th>
+                        <th class="text-right">WHT Amount</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-center">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     @forelse($invoices as $invoice)
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:hover:bg-gray-800/50 transition {{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-900/50' : '' }}"
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition {{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-900/50' : '' }}"
                         x-data="whtRow_{{ $invoice->id }}()" id="whtRow{{ $invoice->id }}">
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-white">
                             <a href="/invoice/{{ $invoice->id }}" class="text-emerald-600 hover:text-emerald-700 hover:underline">
@@ -82,18 +83,18 @@
                         <td class="px-6 py-4 whitespace-nowrap text-center">
                             <span x-text="currentRate + '%'"
                                 :class="currentRate > 0 ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700'"
-                                class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border"></span>
+                                class="premium-badge border"></span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-medium" :class="currentRate > 0 ? 'text-blue-600' : 'text-gray-400'">
                             PKR <span x-text="parseFloat(currentAmount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-center">
                             @if($invoice->status === 'locked' && $invoice->fbr_status === 'production')
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">FBR Locked</span>
+                            <span class="premium-badge bg-emerald-100 text-emerald-700 border border-emerald-200">FBR Locked</span>
                             @elseif($invoice->status === 'draft')
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">Draft</span>
+                            <span class="premium-badge bg-amber-100 text-amber-700 border border-amber-200">Draft</span>
                             @else
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700">{{ ucfirst($invoice->status) }}</span>
+                            <span class="premium-badge bg-gray-100 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700">{{ ucfirst($invoice->status) }}</span>
                             @endif
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-center">
@@ -215,4 +216,4 @@
         @endif
     </div>
 </div>
-@endsection
+</x-app-layout>

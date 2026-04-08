@@ -1446,7 +1446,7 @@ class InvoiceController extends Controller
         $pdf->setPaper('A4', 'portrait');
         $filename = 'invoice-' . ($invoice->fbr_invoice_number ?? $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id) . '.pdf';
 
-        return $pdf->stream($filename);
+        return $pdf->stream($filename)->header('X-Frame-Options', 'SAMEORIGIN');
     }
 
     public function download(Invoice $invoice)

@@ -1050,9 +1050,9 @@
         </div>
     </div>
 
-<div id="fbrSuccessModal" style="display:none;" class="fixed inset-0 z-[60] flex items-center justify-center transition-all duration-400 opacity-0">
-    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-400" onclick="closeFbrSuccessModal()"></div>
-    <div id="fbrSuccessCard" class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden transition-all duration-400 ease-out" style="transform: scale(0.85) translateY(30px); opacity: 0;">
+<div id="fbrSuccessModal" style="display:none;" class="fixed inset-0 z-[60] flex items-center justify-center transition-all duration-[400ms] opacity-0">
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-[400ms]" onclick="closeFbrSuccessModal()"></div>
+    <div id="fbrSuccessCard" class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden transition-all duration-[400ms] ease-out" style="transform: scale(0.85) translateY(30px); opacity: 0;">
         <div class="bg-gradient-to-r from-emerald-600 to-emerald-700 px-6 py-6 text-center">
             <div class="flex items-center justify-center w-16 h-16 rounded-full bg-white/20 mx-auto mb-3">
                 <svg class="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -1124,9 +1124,9 @@
     </div>
 </div>
 
-<div id="fbrPendingModal" style="display:none;" class="fixed inset-0 z-[60] flex items-center justify-center transition-all duration-400 opacity-0">
-    <div class="absolute inset-0 bg-black/40 transition-opacity duration-400" onclick="closeFbrPendingModal()"></div>
-    <div id="fbrPendingCard" class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden transition-all duration-400 ease-out" style="transform: scale(0.85) translateY(30px); opacity: 0;">
+<div id="fbrPendingModal" style="display:none;" class="fixed inset-0 z-[60] flex items-center justify-center transition-all duration-[400ms] opacity-0">
+    <div class="absolute inset-0 bg-black/40 transition-opacity duration-[400ms]" onclick="closeFbrPendingModal()"></div>
+    <div id="fbrPendingCard" class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden transition-all duration-[400ms] ease-out" style="transform: scale(0.85) translateY(30px); opacity: 0;">
         <div class="px-6 py-5 border-b border-amber-100 bg-amber-50">
             <div class="flex items-center gap-3">
                 <div class="flex items-center justify-center w-10 h-10 rounded-full bg-amber-100">

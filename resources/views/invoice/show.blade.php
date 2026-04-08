@@ -1051,75 +1051,98 @@
     </div>
 
 <div id="fbrSuccessModal" style="display:none; opacity:0; transition: opacity 400ms ease;" class="fixed inset-0 z-[60] flex items-center justify-center">
-    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" style="transition: opacity 400ms ease;" onclick="closeFbrSuccessModal()"></div>
-    <div id="fbrSuccessCard" class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden" style="transform: scale(0.85) translateY(30px); opacity: 0; transition: transform 400ms cubic-bezier(0.34,1.56,0.64,1), opacity 400ms ease;">
-        <div class="bg-gradient-to-r from-emerald-600 to-emerald-700 px-6 py-6 text-center">
-            <div class="flex items-center justify-center w-16 h-16 rounded-full bg-white/20 mx-auto mb-3">
-                <svg class="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" style="transition: opacity 400ms ease;" onclick="closeFbrSuccessModal()"></div>
+    <div id="fbrSuccessCard" class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-3xl mx-4 overflow-hidden" style="transform: scale(0.85) translateY(30px); opacity: 0; transition: transform 400ms cubic-bezier(0.34,1.56,0.64,1), opacity 400ms ease; max-height: 90vh;">
+        <div class="bg-gradient-to-r from-emerald-600 to-emerald-700 px-5 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="flex items-center justify-center w-9 h-9 rounded-full bg-white/20">
+                    <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-white">FBR Production Successful</h3>
+                    <p class="text-emerald-200 text-xs" id="modalFbrNumber"></p>
+                </div>
             </div>
-            <h3 class="text-xl font-bold text-white mb-1">FBR Production Successful</h3>
-            <p class="text-emerald-100 text-sm" id="modalFbrNumber"></p>
-            <p class="text-emerald-200 text-xs mt-1" id="modalTimestamp"></p>
+            <div class="flex items-center gap-2">
+                <p class="text-emerald-200 text-xs hidden sm:block" id="modalTimestamp"></p>
+                <button onclick="closeFbrSuccessModal()" class="text-white/80 hover:text-white transition p-1">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
         </div>
-
-        <div class="px-6 py-5">
-            <div id="modalWhtSection" class="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-                <div id="modalWhtSelector">
-                    <div class="flex items-center justify-between mb-3">
-                        <p class="text-sm font-bold text-gray-800 dark:text-gray-200">
-                            <svg class="w-4 h-4 inline mr-1 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                            Select WHT Rate
-                        </p>
-                        <span class="text-xs text-gray-500 dark:text-gray-400">Lock before printing</span>
-                    </div>
-                    <div class="flex flex-wrap gap-2 mb-3">
-                        <label class="modal-wht-opt flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-xs font-bold transition">
-                            <input type="radio" name="modal_wht" value="0" checked class="text-emerald-500"> 0%
-                        </label>
-                        <label class="modal-wht-opt flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-xs font-bold transition">
-                            <input type="radio" name="modal_wht" value="0.5" class="text-amber-500"> 0.5%
-                        </label>
-                        <label class="modal-wht-opt flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-xs font-bold transition">
-                            <input type="radio" name="modal_wht" value="1" class="text-blue-500"> 1%
-                        </label>
-                        <label class="modal-wht-opt flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-xs font-bold transition">
-                            <input type="radio" name="modal_wht" value="2" class="text-orange-500"> 2%
-                        </label>
-                        <label class="modal-wht-opt flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-xs font-bold transition">
-                            <input type="radio" name="modal_wht" value="2.5" class="text-red-500"> 2.5%
-                        </label>
-                    </div>
-                    <button onclick="lockWhtInModal()" id="modalWhtLockBtn" class="w-full px-4 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-bold hover:bg-amber-700 transition">
-                        Lock WHT Rate
-                    </button>
-                </div>
-                <div id="modalWhtLocked" style="display:none;" class="flex items-center justify-center gap-2">
-                    <span class="inline-flex items-center px-4 py-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-sm font-bold">
-                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                        WHT <span id="modalWhtRateText">0</span>% Locked
-                    </span>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-                <a href="/invoice/{{ $invoice->id }}/pdf" target="_blank" class="flex flex-col items-center gap-2 px-4 py-4 bg-indigo-600 text-white rounded-xl text-center font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none">
-                    <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                    <span class="text-sm">View & Print</span>
-                </a>
-                <a href="/invoice/{{ $invoice->id }}/download" class="flex flex-col items-center gap-2 px-4 py-4 bg-emerald-600 text-white rounded-xl text-center font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 dark:shadow-none">
-                    <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                    <span class="text-sm">Download PDF</span>
-                </a>
-                <a href="https://wa.me/?text={{ urlencode('Invoice ' . ($invoice->display_invoice_number ?? '') . "\nDownload: " . url('/share/invoice/' . ($invoice->share_uuid ?? '') . '/pdf')) }}" target="_blank" class="flex flex-col items-center gap-2 px-4 py-4 bg-green-500 text-white rounded-xl text-center font-bold hover:bg-green-600 transition shadow-lg shadow-green-200 dark:shadow-none">
-                    <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.75.75 0 00.917.918l4.462-1.494A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.4 0-4.637-.734-6.482-1.988l-.452-.305-2.971.993.994-2.969-.316-.461A9.955 9.955 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
-                    <span class="text-sm">WhatsApp</span>
+        <div style="height: calc(90vh - 120px); min-height: 400px;">
+            <iframe id="invoicePdfPreview" src="" class="w-full h-full border-0" style="background: #f3f4f6;"></iframe>
+        </div>
+        <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2 flex-wrap">
+                <button onclick="openWhtThenPrint()" class="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition shadow-md">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                    View & Print
+                </button>
+                <button onclick="openWhtThenDownload()" class="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition shadow-md">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    Download
+                </button>
+                <a href="https://wa.me/?text={{ urlencode('Invoice ' . ($invoice->display_invoice_number ?? '') . "\nDownload: " . url('/share/invoice/' . ($invoice->share_uuid ?? '') . '/pdf')) }}" target="_blank" class="inline-flex items-center gap-2 px-4 py-2.5 bg-green-500 text-white rounded-lg text-sm font-bold hover:bg-green-600 transition shadow-md">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.75.75 0 00.917.918l4.462-1.494A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.4 0-4.637-.734-6.482-1.988l-.452-.305-2.971.993.994-2.969-.316-.461A9.955 9.955 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
+                    WhatsApp
                 </a>
             </div>
-
-            <button onclick="closeFbrSuccessModal()" class="w-full px-4 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition">
+            <button onclick="closeFbrSuccessModal()" class="px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition">
                 Close
             </button>
-            <p class="text-xs text-gray-400 mt-3 text-center">Protected by TaxNest Idempotency Shield</p>
+        </div>
+    </div>
+</div>
+
+<div id="whtModal" style="display:none; opacity:0; transition: opacity 300ms ease;" class="fixed inset-0 z-[70] flex items-center justify-center">
+    <div class="absolute inset-0 bg-black/50" style="transition: opacity 300ms ease;" onclick="closeWhtModal()"></div>
+    <div id="whtModalCard" class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" style="transform: scale(0.9) translateY(20px); opacity: 0; transition: transform 300ms cubic-bezier(0.34,1.56,0.64,1), opacity 300ms ease;">
+        <div class="px-6 py-4 border-b border-amber-100 bg-amber-50 dark:bg-amber-900/20">
+            <div class="flex items-center gap-3">
+                <div class="flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-800/30">
+                    <svg class="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-amber-900 dark:text-amber-200">Select WHT Rate</h3>
+                    <p class="text-xs text-amber-700 dark:text-amber-300">Lock WHT before printing</p>
+                </div>
+            </div>
+        </div>
+        <div class="px-6 py-5">
+            <div id="whtModalSelector">
+                <div class="flex flex-wrap gap-2 mb-4">
+                    <label class="wht-modal-opt flex items-center gap-1.5 px-4 py-3 rounded-lg border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-bold transition">
+                        <input type="radio" name="wht_modal_rate" value="0" checked class="text-emerald-500"> 0%
+                    </label>
+                    <label class="wht-modal-opt flex items-center gap-1.5 px-4 py-3 rounded-lg border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-bold transition">
+                        <input type="radio" name="wht_modal_rate" value="0.5" class="text-amber-500"> 0.5%
+                    </label>
+                    <label class="wht-modal-opt flex items-center gap-1.5 px-4 py-3 rounded-lg border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-bold transition">
+                        <input type="radio" name="wht_modal_rate" value="1" class="text-blue-500"> 1%
+                    </label>
+                    <label class="wht-modal-opt flex items-center gap-1.5 px-4 py-3 rounded-lg border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-bold transition">
+                        <input type="radio" name="wht_modal_rate" value="2" class="text-orange-500"> 2%
+                    </label>
+                    <label class="wht-modal-opt flex items-center gap-1.5 px-4 py-3 rounded-lg border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-bold transition">
+                        <input type="radio" name="wht_modal_rate" value="2.5" class="text-red-500"> 2.5%
+                    </label>
+                </div>
+                <button onclick="lockWhtAndProceed()" id="whtModalLockBtn" class="w-full px-4 py-3 bg-amber-600 text-white rounded-lg text-sm font-bold hover:bg-amber-700 transition">
+                    Lock WHT & Continue
+                </button>
+            </div>
+            <div id="whtModalLocked" style="display:none;" class="text-center py-3">
+                <span class="inline-flex items-center px-4 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-sm font-bold">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    WHT <span id="whtModalRateText">0</span>% Locked — Processing...
+                </span>
+            </div>
+        </div>
+        <div class="px-6 py-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800">
+            <button onclick="closeWhtModal()" class="w-full px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition">
+                Cancel
+            </button>
         </div>
     </div>
 </div>
@@ -1281,11 +1304,14 @@ function handleFbrResponse(data) {
     }
 }
 
+let _whtAction = 'print';
+
 function openFbrSuccessModal(data) {
     _fbrPdfUrl = data.pdf_url || '/invoice/{{ $invoice->id }}/pdf';
     _lastFbrNumber = data.fbr_invoice_number || '';
     document.getElementById('modalFbrNumber').textContent = 'FBR #: ' + _lastFbrNumber;
     document.getElementById('modalTimestamp').textContent = 'Submitted: ' + new Date().toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' });
+    document.getElementById('invoicePdfPreview').src = '/invoice/{{ $invoice->id }}/pdf';
     const modal = document.getElementById('fbrSuccessModal');
     const card = document.getElementById('fbrSuccessCard');
     modal.style.display = 'flex';
@@ -1310,9 +1336,100 @@ function closeFbrSuccessModal() {
     card.style.opacity = '0';
     setTimeout(() => {
         modal.style.display = 'none';
+        document.getElementById('invoicePdfPreview').src = '';
         document.body.style.overflow = '';
         smartRefreshInvoiceStatus();
     }, 400);
+}
+
+function openWhtThenPrint() {
+    _whtAction = 'print';
+    openWhtModal();
+}
+
+function openWhtThenDownload() {
+    _whtAction = 'download';
+    openWhtModal();
+}
+
+function openWhtModal() {
+    const modal = document.getElementById('whtModal');
+    const card = document.getElementById('whtModalCard');
+    document.getElementById('whtModalSelector').style.display = 'block';
+    document.getElementById('whtModalLocked').style.display = 'none';
+    const btn = document.getElementById('whtModalLockBtn');
+    btn.disabled = false;
+    btn.textContent = 'Lock WHT & Continue';
+    modal.style.display = 'flex';
+    modal.style.opacity = '0';
+    card.style.transform = 'scale(0.9) translateY(20px)';
+    card.style.opacity = '0';
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            modal.style.opacity = '1';
+            card.style.transform = 'scale(1) translateY(0)';
+            card.style.opacity = '1';
+        });
+    });
+}
+
+function closeWhtModal() {
+    const modal = document.getElementById('whtModal');
+    const card = document.getElementById('whtModalCard');
+    modal.style.opacity = '0';
+    card.style.transform = 'scale(0.92) translateY(20px)';
+    card.style.opacity = '0';
+    setTimeout(() => {
+        modal.style.display = 'none';
+    }, 300);
+}
+
+async function lockWhtAndProceed() {
+    const btn = document.getElementById('whtModalLockBtn');
+    const selectedRadio = document.querySelector('input[name="wht_modal_rate"]:checked');
+    const whtRate = selectedRadio ? parseFloat(selectedRadio.value) : 0;
+    btn.disabled = true;
+    btn.textContent = 'Locking...';
+    try {
+        const body = new FormData();
+        body.append('_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
+        body.append('wht_rate', whtRate);
+        const res = await fetch('/invoice/{{ $invoice->id }}/update-wht-ajax', {
+            method: 'POST',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: body
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+            document.getElementById('whtModalSelector').style.display = 'none';
+            document.getElementById('whtModalLocked').style.display = 'block';
+            document.getElementById('whtModalRateText').textContent = whtRate;
+            setTimeout(() => {
+                closeWhtModal();
+                setTimeout(() => {
+                    if (_whtAction === 'print') {
+                        window.open('/invoice/{{ $invoice->id }}/pdf', '_blank');
+                    } else {
+                        const a = document.createElement('a');
+                        a.href = '/invoice/{{ $invoice->id }}/download';
+                        a.download = '';
+                        a.style.display = 'none';
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                    }
+                }, 350);
+            }, 800);
+        } else {
+            alert(data.message || 'Failed to lock WHT rate');
+            btn.disabled = false;
+            btn.textContent = 'Lock WHT & Continue';
+        }
+    } catch(e) {
+        alert('Network error. Please try again.');
+        btn.disabled = false;
+        btn.textContent = 'Lock WHT & Continue';
+    }
 }
 
 async function smartRefreshInvoiceStatus() {
@@ -1398,38 +1515,6 @@ function showSuccessToast(fbrNumber) {
     }, 4000);
 }
 
-async function lockWhtInModal() {
-    const btn = document.getElementById('modalWhtLockBtn');
-    const selectedRadio = document.querySelector('input[name="modal_wht"]:checked');
-    const whtRate = selectedRadio ? parseFloat(selectedRadio.value) : 0;
-    btn.disabled = true;
-    btn.textContent = 'Locking...';
-    try {
-        const body = new FormData();
-        body.append('_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
-        body.append('wht_rate', whtRate);
-        const res = await fetch('/invoice/{{ $invoice->id }}/update-wht-ajax', {
-            method: 'POST',
-            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-            body: body
-        });
-        const data = await res.json();
-        if (data.status === 'ok') {
-            document.getElementById('modalWhtSelector').style.display = 'none';
-            document.getElementById('modalWhtLocked').style.display = 'flex';
-            document.getElementById('modalWhtRateText').textContent = whtRate;
-            _fbrPdfUrl = '/invoice/{{ $invoice->id }}/pdf';
-        } else {
-            alert(data.message || 'Failed to lock WHT rate');
-            btn.disabled = false;
-            btn.textContent = 'Lock WHT Rate';
-        }
-    } catch(e) {
-        alert('Network error. Please try again.');
-        btn.disabled = false;
-        btn.textContent = 'Lock WHT Rate';
-    }
-}
 
 function printFbrPdf() {
     const url = _fbrPdfUrl || '/invoice/{{ $invoice->id }}/pdf';

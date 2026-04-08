@@ -1050,9 +1050,9 @@
         </div>
     </div>
 
-<div id="fbrSuccessModal" style="display:none;" class="fixed inset-0 z-[60] flex items-center justify-center transition-opacity duration-300 opacity-0">
-    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeFbrSuccessModal()"></div>
-    <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+<div id="fbrSuccessModal" style="display:none;" class="fixed inset-0 z-[60] flex items-center justify-center transition-all duration-400 opacity-0">
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-400" onclick="closeFbrSuccessModal()"></div>
+    <div id="fbrSuccessCard" class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden transition-all duration-400 ease-out" style="transform: scale(0.85) translateY(30px); opacity: 0;">
         <div class="bg-gradient-to-r from-emerald-600 to-emerald-700 px-6 py-6 text-center">
             <div class="flex items-center justify-center w-16 h-16 rounded-full bg-white/20 mx-auto mb-3">
                 <svg class="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -1124,9 +1124,9 @@
     </div>
 </div>
 
-<div id="fbrPendingModal" style="display:none;" class="fixed inset-0 z-[60] flex items-center justify-center transition-opacity duration-300 opacity-0">
-    <div class="absolute inset-0 bg-black/40" onclick="closeFbrPendingModal()"></div>
-    <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+<div id="fbrPendingModal" style="display:none;" class="fixed inset-0 z-[60] flex items-center justify-center transition-all duration-400 opacity-0">
+    <div class="absolute inset-0 bg-black/40 transition-opacity duration-400" onclick="closeFbrPendingModal()"></div>
+    <div id="fbrPendingCard" class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden transition-all duration-400 ease-out" style="transform: scale(0.85) translateY(30px); opacity: 0;">
         <div class="px-6 py-5 border-b border-amber-100 bg-amber-50">
             <div class="flex items-center gap-3">
                 <div class="flex items-center justify-center w-10 h-10 rounded-full bg-amber-100">
@@ -1153,13 +1153,13 @@
     </div>
 </div>
 
-<div id="fbrErrorToast" style="display:none;" class="fixed top-4 right-4 z-[60] max-w-md w-full">
+<div id="fbrErrorToast" style="display:none; opacity:0; transform:translateX(2rem);" class="fixed top-4 right-4 z-[60] max-w-md w-full transition-all duration-300 ease-out">
     <div class="bg-red-50 border-2 border-red-300 rounded-xl p-4 shadow-xl flex items-start gap-3">
         <svg class="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         <div class="flex-1">
             <p class="text-sm font-bold text-red-800">FBR Submission Failed</p>
             <p class="text-xs text-red-700 mt-1" id="errorMessage"></p>
-            <button onclick="document.getElementById('fbrErrorToast').style.display='none'" class="mt-2 text-xs text-red-600 hover:text-red-800 font-medium underline">Dismiss</button>
+            <button onclick="dismissFbrErrorToast()" class="mt-2 text-xs text-red-600 hover:text-red-800 font-medium underline">Dismiss</button>
         </div>
     </div>
 </div>
@@ -1287,20 +1287,33 @@ function openFbrSuccessModal(data) {
     document.getElementById('modalFbrNumber').textContent = 'FBR #: ' + _lastFbrNumber;
     document.getElementById('modalTimestamp').textContent = 'Submitted: ' + new Date().toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' });
     const modal = document.getElementById('fbrSuccessModal');
+    const card = document.getElementById('fbrSuccessCard');
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
-    requestAnimationFrame(() => { modal.classList.remove('opacity-0'); modal.classList.add('opacity-100'); });
+    card.style.transform = 'scale(0.85) translateY(30px)';
+    card.style.opacity = '0';
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            modal.classList.remove('opacity-0');
+            modal.classList.add('opacity-100');
+            card.style.transform = 'scale(1) translateY(0)';
+            card.style.opacity = '1';
+        });
+    });
 }
 
 function closeFbrSuccessModal() {
     const modal = document.getElementById('fbrSuccessModal');
+    const card = document.getElementById('fbrSuccessCard');
     modal.classList.remove('opacity-100');
     modal.classList.add('opacity-0');
+    card.style.transform = 'scale(0.92) translateY(20px)';
+    card.style.opacity = '0';
     setTimeout(() => {
         modal.style.display = 'none';
         document.body.style.overflow = '';
         smartRefreshInvoiceStatus();
-    }, 250);
+    }, 400);
 }
 
 async function smartRefreshInvoiceStatus() {
@@ -1347,8 +1360,13 @@ function patchStatusBadge(status, fbrStatus) {
 }
 
 function patchActionButtons(status, fbrStatus, fbrInvoiceNumber, shareUuid, displayNumber, whtRate, whtLocked) {
-    if (status === 'locked' && fbrStatus === 'production') {
-        window.location.reload();
+    if (status === 'locked' || status === 'pending_verification') {
+        document.body.style.transition = 'opacity 300ms ease';
+        document.body.style.opacity = '0';
+        setTimeout(() => {
+            window.location.reload();
+            setTimeout(() => { document.body.style.opacity = '1'; }, 3000);
+        }, 300);
     }
 }
 
@@ -1481,26 +1499,63 @@ function printInlinePdf() {
 function showFbrPending(message) {
     document.getElementById('pendingMessage').textContent = message || 'FBR returned an ambiguous response. Please verify on FBR portal.';
     const modal = document.getElementById('fbrPendingModal');
+    const card = document.getElementById('fbrPendingCard');
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
-    requestAnimationFrame(() => { modal.classList.remove('opacity-0'); modal.classList.add('opacity-100'); });
+    card.style.transform = 'scale(0.85) translateY(30px)';
+    card.style.opacity = '0';
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            modal.classList.remove('opacity-0');
+            modal.classList.add('opacity-100');
+            card.style.transform = 'scale(1) translateY(0)';
+            card.style.opacity = '1';
+        });
+    });
 }
 
 function closeFbrPendingModal() {
     const modal = document.getElementById('fbrPendingModal');
+    const card = document.getElementById('fbrPendingCard');
     modal.classList.remove('opacity-100');
     modal.classList.add('opacity-0');
+    card.style.transform = 'scale(0.92) translateY(20px)';
+    card.style.opacity = '0';
     setTimeout(() => {
         modal.style.display = 'none';
         document.body.style.overflow = '';
         smartRefreshInvoiceStatus();
-    }, 250);
+    }, 400);
 }
 
+let _errorToastTimer = null;
+let _errorToastHideTimer = null;
 function showFbrError(message) {
+    if (_errorToastTimer) clearTimeout(_errorToastTimer);
+    if (_errorToastHideTimer) clearTimeout(_errorToastHideTimer);
     document.getElementById('errorMessage').textContent = message || 'FBR submission failed. Please try again.';
-    document.getElementById('fbrErrorToast').style.display = 'block';
-    setTimeout(() => { document.getElementById('fbrErrorToast').style.display = 'none'; }, 10000);
+    const toast = document.getElementById('fbrErrorToast');
+    toast.style.display = 'block';
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(2rem)';
+    toast.style.transition = 'all 300ms ease-out';
+    requestAnimationFrame(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateX(0)';
+    });
+    _errorToastTimer = setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(2rem)';
+        _errorToastHideTimer = setTimeout(() => { toast.style.display = 'none'; }, 300);
+    }, 10000);
+}
+function dismissFbrErrorToast() {
+    if (_errorToastTimer) clearTimeout(_errorToastTimer);
+    if (_errorToastHideTimer) clearTimeout(_errorToastHideTimer);
+    const toast = document.getElementById('fbrErrorToast');
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(2rem)';
+    _errorToastHideTimer = setTimeout(() => { toast.style.display = 'none'; }, 300);
 }
 
 document.addEventListener('keydown', function(e) {

@@ -132,16 +132,18 @@
                                     <option value="service">Service</option>
                                 </select>
                             </div>
-                            <div class="sm:col-span-4 relative" x-data="{ open: false, search: '' }" x-init="search = item.name || ''">
+                            <div class="sm:col-span-4 relative" x-data="{ open: false, search: '', hlIdx: -1, getFiltered() { return item.type === 'product' ? products.filter(pr => !this.search || pr.name.toLowerCase().includes(this.search.toLowerCase())) : services.filter(sv => !this.search || sv.name.toLowerCase().includes(this.search.toLowerCase())); }, selectProduct(p) { this.search = p.name; item.name = p.name; item.item_id = p.id; item.unit_price = parseFloat(p.price || p.unit_price || 0); item.is_tax_exempt = !!p.is_tax_exempt; item._isNew = false; this.open = false; this.hlIdx = -1; recalculate(); }, scrollToActive() { this.$nextTick(() => { const el = this.$refs['dd'+index]; if(el) { const active = el.querySelector('[data-active=true]'); if(active) active.scrollIntoView({block:'nearest'}); } }); } }" x-init="search = item.name || ''">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Item Name</label>
                                 <div class="relative">
                                     <input type="text"
                                         x-model="search"
-                                        @input="open = true; item.name = search; item.item_id = ''; item._isNew = true; recalculate()"
-                                        @focus="open = true"
-                                        @click.away="open = false"
-                                        @keydown.escape="open = false"
-                                        @keydown.arrow-down.prevent="$refs['dd'+index] && $refs['dd'+index].querySelector('[role=option]')?.focus()"
+                                        @input="open = true; hlIdx = 0; item.name = search; item.item_id = ''; item._isNew = true; recalculate()"
+                                        @focus="open = true; hlIdx = -1"
+                                        @click.away="open = false; hlIdx = -1"
+                                        @keydown.escape="open = false; hlIdx = -1"
+                                        @keydown.arrow-down.prevent="if(!open){open=true;hlIdx=0}else{let f=getFiltered();if(hlIdx<f.length-1){hlIdx++;scrollToActive()}}"
+                                        @keydown.arrow-up.prevent="if(hlIdx>0){hlIdx--;scrollToActive()}"
+                                        @keydown.enter.prevent="if(open && hlIdx>=0){let f=getFiltered();if(f[hlIdx])selectProduct(f[hlIdx])}"
                                         placeholder="Type or search product..."
                                         class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 pr-8 focus:ring-2 focus:ring-emerald-500 transition">
                                     <div class="absolute inset-y-0 right-0 flex items-center pr-2">
@@ -159,16 +161,19 @@
                                     class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-48 overflow-y-auto">
                                     <template x-if="item.type === 'product'">
                                         <div>
-                                            <template x-for="p in products.filter(pr => !search || pr.name.toLowerCase().includes(search.toLowerCase()))" :key="p.id">
+                                            <template x-for="(p, pIdx) in getFiltered()" :key="p.id">
                                                 <button type="button"
                                                     role="option"
-                                                    @click="search = p.name; item.name = p.name; item.item_id = p.id; item.unit_price = parseFloat(p.price || p.unit_price || 0); item.is_tax_exempt = !!p.is_tax_exempt; item._isNew = false; open = false; recalculate()"
-                                                    class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50 dark:hover:bg-emerald-900/20 flex justify-between items-center transition">
+                                                    :data-active="hlIdx === pIdx"
+                                                    @click="selectProduct(p)"
+                                                    @mouseenter="hlIdx = pIdx"
+                                                    class="w-full text-left px-3 py-2 text-sm flex justify-between items-center transition"
+                                                    :class="hlIdx === pIdx ? 'bg-emerald-100 dark:bg-emerald-900/40 ring-1 ring-emerald-400' : 'hover:bg-emerald-50 dark:hover:bg-emerald-900/20'">
                                                     <span class="flex items-center gap-1.5">
-                                                        <span class="text-gray-900 dark:text-gray-100 font-medium" x-text="p.name"></span>
+                                                        <span class="font-medium" :class="hlIdx === pIdx ? 'text-emerald-900 dark:text-emerald-200' : 'text-gray-900 dark:text-gray-100'" x-text="p.name"></span>
                                                         <span x-show="p.is_tax_exempt" class="inline-flex px-1 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">EXEMPT</span>
                                                     </span>
-                                                    <span class="text-xs text-gray-500" x-text="'Rs ' + Number(p.price || p.unit_price || 0).toLocaleString()"></span>
+                                                    <span class="text-xs" :class="hlIdx === pIdx ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-500'" x-text="'Rs ' + Number(p.price || p.unit_price || 0).toLocaleString()"></span>
                                                 </button>
                                             </template>
                                             <template x-if="search.length > 0 && products.filter(pr => pr.name.toLowerCase().includes(search.toLowerCase())).length === 0">
@@ -187,16 +192,19 @@
                                     </template>
                                     <template x-if="item.type === 'service'">
                                         <div>
-                                            <template x-for="s in services.filter(sv => !search || sv.name.toLowerCase().includes(search.toLowerCase()))" :key="s.id">
+                                            <template x-for="(s, sIdx) in getFiltered()" :key="s.id">
                                                 <button type="button"
                                                     role="option"
-                                                    @click="search = s.name; item.name = s.name; item.item_id = s.id; item.unit_price = parseFloat(s.price || 0); item.is_tax_exempt = !!s.is_tax_exempt; item._isNew = false; open = false; recalculate()"
-                                                    class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50 dark:hover:bg-emerald-900/20 flex justify-between items-center transition">
+                                                    :data-active="hlIdx === sIdx"
+                                                    @click="selectProduct(s)"
+                                                    @mouseenter="hlIdx = sIdx"
+                                                    class="w-full text-left px-3 py-2 text-sm flex justify-between items-center transition"
+                                                    :class="hlIdx === sIdx ? 'bg-emerald-100 dark:bg-emerald-900/40 ring-1 ring-emerald-400' : 'hover:bg-emerald-50 dark:hover:bg-emerald-900/20'">
                                                     <span class="flex items-center gap-1.5">
-                                                        <span class="text-gray-900 dark:text-gray-100 font-medium" x-text="s.name"></span>
+                                                        <span class="font-medium" :class="hlIdx === sIdx ? 'text-emerald-900 dark:text-emerald-200' : 'text-gray-900 dark:text-gray-100'" x-text="s.name"></span>
                                                         <span x-show="s.is_tax_exempt" class="inline-flex px-1 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">EXEMPT</span>
                                                     </span>
-                                                    <span class="text-xs text-gray-500" x-text="'Rs ' + Number(s.price || 0).toLocaleString()"></span>
+                                                    <span class="text-xs" :class="hlIdx === sIdx ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-500'" x-text="'Rs ' + Number(s.price || 0).toLocaleString()"></span>
                                                 </button>
                                             </template>
                                             <template x-if="services.filter(sv => !search || sv.name.toLowerCase().includes(search.toLowerCase())).length === 0">

@@ -1205,7 +1205,17 @@ function restaurantPos() {
             this.cartAnimating = true; setTimeout(() => this.cartAnimating = false, 300);
             this.scrollToCartItem(this.activeCartIndex);
         },
-        updateQty(index, delta) { this.cart[index].quantity = Math.max(0.01, parseFloat(this.cart[index].quantity) + delta); },
+        updateQty(index, delta) {
+            if (this._qtyUpdating) return;
+            this._qtyUpdating = true;
+            let current = Number(this.cart[index].quantity) || 0;
+            if (Number.isInteger(current)) {
+                this.cart[index].quantity = Math.max(1, current + delta);
+            } else {
+                this.cart[index].quantity = Math.max(0.01, Math.round((current + delta) * 100) / 100);
+            }
+            setTimeout(() => { this._qtyUpdating = false; }, 50);
+        },
         setQty(index, val) { const v = parseFloat(val); if (v > 0) this.cart[index].quantity = v; },
         removeFromCart(index) {
             const el = this.$refs.cartList?.querySelector(`[data-cart-index="${index}"]`);

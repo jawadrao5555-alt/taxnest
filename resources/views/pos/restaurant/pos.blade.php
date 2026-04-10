@@ -300,6 +300,18 @@ window.addEventListener('popstate', function() {
                     <span x-show="cart.length > 0" class="text-xs opacity-80" x-text="'Rs. ' + Number(totalAmount).toLocaleString()"></span>
                 </button>
             </div>
+
+            <button x-show="cart.length > 0 && !cartMode" @click="enterCartMode(); mobileView = 'cart';"
+                style="position:fixed; bottom:24px; right:400px; z-index:60; background:linear-gradient(135deg,#7c3aed,#6d28d9); color:white; border:none; border-radius:16px; padding:10px 20px; font-size:13px; font-weight:700; cursor:pointer; box-shadow:0 8px 24px rgba(124,58,237,0.4), 0 2px 8px rgba(0,0,0,0.15); display:flex; align-items:center; gap:8px; transition:all 0.2s;"
+                x-transition
+                title="Jump to Cart & Edit (Shortcut: Ctrl+E)"
+                @mouseenter="this.style.transform='scale(1.05)'; this.style.boxShadow='0 12px 32px rgba(124,58,237,0.5)'"
+                @mouseleave="this.style.transform='scale(1)'; this.style.boxShadow='0 8px 24px rgba(124,58,237,0.4)'">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
+                <span>Edit Cart</span>
+                <span style="background:rgba(255,255,255,0.25); padding:2px 8px; border-radius:8px; font-size:11px; font-weight:800;" x-text="cart.length"></span>
+                <span style="font-size:10px; opacity:0.7; margin-left:2px;" x-text="'Rs.' + Number(totalAmount).toLocaleString()"></span>
+            </button>
         </div>
 
         <div class="w-full md:w-[340px] lg:w-[380px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl" :class="mobileView === 'cart' ? 'flex' : 'hidden md:flex'">
@@ -1006,6 +1018,7 @@ function restaurantPos() {
                 if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
                 if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) this.showPayModal = true; return; }
                 if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
+                if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode(); this.mobileView = 'cart'; } return; }
                 if ((e.ctrlKey || e.metaKey) && e.key === 'c') { if (!window.getSelection().toString()) { e.preventDefault(); this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); return; } }
                 if (e.key === 'Escape') {
                     if (this.showNewCustomerModal) { this.showNewCustomerModal = false; return; }

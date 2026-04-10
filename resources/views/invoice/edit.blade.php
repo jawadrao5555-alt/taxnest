@@ -110,7 +110,7 @@
                     </div>
 
                     <input type="hidden" name="buyer_registration_type" :value="buyerRegType">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer Name *</label>
                             <input type="text" name="buyer_name" x-model="buyer_name" required
@@ -118,20 +118,20 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer NTN</label>
-                            <input type="text" name="buyer_ntn" x-model="buyer_ntn" placeholder="Optional for unregistered"
+                            <input type="text" name="buyer_ntn" x-model="buyer_ntn" placeholder="Optional"
                                 class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                            <p class="text-xs mt-1 font-medium" :class="buyerRegType === 'Registered' ? 'text-emerald-600' : 'text-amber-600'">
-                                <span x-text="buyerRegType === 'Registered' ? '&#9989; FBR Registered' : '&#9888; Unregistered Buyer'"></span>
-                            </p>
                         </div>
-                    </div>
-                    <div x-show="buyerRegType === 'Registered'" x-cloak class="grid grid-cols-1 gap-4 mt-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buyer CNIC</label>
-                            <input type="text" name="buyer_cnic" x-model="buyer_cnic" maxlength="15" placeholder="xxxxx-xxxxxxx-x"
+                            <input type="text" name="buyer_cnic" x-model="buyer_cnic" maxlength="15" placeholder="Optional"
                                 class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             @error('buyer_cnic') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
+                    </div>
+                    <div class="mt-2">
+                        <p class="text-xs font-medium" :class="buyerRegType === 'Registered' ? 'text-emerald-600' : 'text-amber-600'">
+                            <span x-text="buyerRegType === 'Registered' ? '&#9989; FBR Registered (NTN/CNIC detected)' : '&#9888; Unregistered Buyer (enter NTN or CNIC to mark as registered)'"></span>
+                        </p>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <div>
@@ -432,10 +432,16 @@
                 reduced: 'Reduced Rate: SRO and Serial No required.',
             };
 
-            function detectRegType(ntn) {
-                if (!ntn) return 'Unregistered';
-                let clean = ntn.replace(/[^0-9]/g, '');
-                return clean.length >= 7 ? 'Registered' : 'Unregistered';
+            function detectRegType(ntn, cnic) {
+                if (ntn) {
+                    let clean = ntn.replace(/[^0-9]/g, '');
+                    if (clean.length >= 7) return 'Registered';
+                }
+                if (cnic) {
+                    let clean = cnic.replace(/[^0-9]/g, '');
+                    if (clean.length >= 13) return 'Registered';
+                }
+                return 'Unregistered';
             }
 
             function getScheduleRules(scheduleType, taxRate) {
@@ -517,7 +523,7 @@
 
                 get buyerRegType() {
                     if (this.buyer_reg_type) return this.buyer_reg_type;
-                    return detectRegType(this.buyer_ntn);
+                    return detectRegType(this.buyer_ntn, this.buyer_cnic);
                 },
 
                 applyScheduleRules(item) {

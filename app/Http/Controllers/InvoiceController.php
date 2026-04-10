@@ -181,13 +181,12 @@ class InvoiceController extends Controller
 
         $buyerRegTypeInput = $request->input('buyer_registration_type');
         if (!$buyerRegTypeInput || !in_array($buyerRegTypeInput, ['Registered', 'Unregistered'])) {
-            $buyerRegTypeInput = self::detectBuyerRegistrationType($request->buyer_ntn);
+            $buyerRegTypeInput = self::detectBuyerRegistrationType($request->buyer_ntn, $request->buyer_cnic);
         }
-        $isRegistered = $buyerRegTypeInput === 'Registered';
 
         $request->validate([
             'buyer_name' => 'required|string|max:255',
-            'buyer_ntn' => $isRegistered ? 'required|string|max:50' : 'nullable|string|max:50',
+            'buyer_ntn' => 'nullable|string|max:50',
             'buyer_cnic' => 'nullable|string|max:15',
             'buyer_address' => 'required|string|max:500',
             'branch_id' => 'nullable|exists:branches,id',
@@ -214,7 +213,6 @@ class InvoiceController extends Controller
             'document_type.required' => 'Document type is required.',
             'destination_province.required' => 'Destination Province is required.',
             'reference_invoice_number.required' => 'Reference Invoice is required for Credit/Debit Notes.',
-            'buyer_ntn.required' => 'NTN is required for registered buyers.',
         ]);
 
         $itemsWithTaxRate = collect($request->items)->map(function ($item) {
@@ -363,11 +361,16 @@ class InvoiceController extends Controller
         }
     }
 
-    public static function detectBuyerRegistrationType(?string $buyerNtn): string
+    public static function detectBuyerRegistrationType(?string $buyerNtn, ?string $buyerCnic = null): string
     {
-        if (empty($buyerNtn)) return 'Unregistered';
-        $clean = preg_replace('/[^0-9]/', '', $buyerNtn);
-        if (strlen($clean) >= 7) return 'Registered';
+        if (!empty($buyerNtn)) {
+            $clean = preg_replace('/[^0-9]/', '', $buyerNtn);
+            if (strlen($clean) >= 7) return 'Registered';
+        }
+        if (!empty($buyerCnic)) {
+            $clean = preg_replace('/[^0-9]/', '', $buyerCnic);
+            if (strlen($clean) >= 13) return 'Registered';
+        }
         return 'Unregistered';
     }
 
@@ -444,14 +447,13 @@ class InvoiceController extends Controller
 
         $buyerRegTypeInput = $request->input('buyer_registration_type');
         if (!$buyerRegTypeInput || !in_array($buyerRegTypeInput, ['Registered', 'Unregistered'])) {
-            $buyerRegTypeInput = self::detectBuyerRegistrationType($request->buyer_ntn);
+            $buyerRegTypeInput = self::detectBuyerRegistrationType($request->buyer_ntn, $request->buyer_cnic);
         }
-        $isRegistered = $buyerRegTypeInput === 'Registered';
 
         $request->validate([
             'buyer_name' => 'required|string|max:255',
-            'buyer_ntn' => $isRegistered ? 'required|string|max:50' : 'nullable|string|max:50',
-            'buyer_cnic' => $isRegistered ? 'required|string|max:15' : 'nullable|string|max:15',
+            'buyer_ntn' => 'nullable|string|max:50',
+            'buyer_cnic' => 'nullable|string|max:15',
             'buyer_address' => 'required|string|max:500',
             'branch_id' => 'nullable|exists:branches,id',
             'document_type' => 'required|string|in:Sale Invoice,Credit Note,Debit Note',
@@ -477,8 +479,6 @@ class InvoiceController extends Controller
             'document_type.required' => 'Document type is required.',
             'destination_province.required' => 'Destination Province is required.',
             'reference_invoice_number.required' => 'Reference Invoice is required for Credit/Debit Notes.',
-            'buyer_cnic.required' => 'CNIC is required for registered buyers.',
-            'buyer_ntn.required' => 'NTN is required for registered buyers.',
         ]);
 
         $itemsWithTaxRate = collect($request->items)->map(function ($item) {

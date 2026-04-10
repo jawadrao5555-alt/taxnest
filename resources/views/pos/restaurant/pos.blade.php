@@ -309,6 +309,12 @@ window.addEventListener('popstate', function() {
                 </button>
                 <svg class="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
                 <span class="text-sm font-bold text-gray-900 dark:text-white flex-1">Current Order</span>
+                <button x-show="cart.length > 0" @click="enterCartMode()" class="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-all"
+                    :style="cartMode ? 'background:#7c3aed; color:white; box-shadow:0 2px 8px rgba(124,58,237,0.3);' : 'background:#f3e8ff; color:#7c3aed;'"
+                    :title="cartMode ? 'Cart Edit Mode ON — ↑↓ navigate, +/- qty, Del remove, Esc exit' : 'Enter Cart Edit Mode'">
+                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    <span x-text="cartMode ? 'Editing' : 'Edit'"></span>
+                </button>
                 <template x-if="priorityOrder"><span class="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold">RUSH</span></template>
                 <span class="text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full font-semibold" x-text="orderType.replace('_', ' ').toUpperCase()"></span>
                 <template x-if="selectedTable">
@@ -340,8 +346,16 @@ window.addEventListener('popstate', function() {
                         <p class="text-xs mt-1 text-gray-300">Add products to begin</p>
                     </div>
                 </template>
+                <template x-if="cartMode && cart.length > 0">
+                    <div style="background:linear-gradient(90deg,#7c3aed,#6d28d9); padding:6px 12px; display:flex; align-items:center; gap:8px;">
+                        <svg class="w-3.5 h-3.5" style="color:white; flex-shrink:0;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        <span style="color:rgba(255,255,255,0.9); font-size:10px; font-weight:600;">↑↓ Navigate &nbsp; +/− Qty &nbsp; 0-9 Set Qty &nbsp; Del Remove &nbsp; Esc Exit</span>
+                    </div>
+                </template>
                 <template x-for="(item, index) in cart" :key="index">
-                    <div class="cart-item cart-item-enter px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 cursor-pointer relative" :class="activeCartIndex === index ? 'bg-purple-50 dark:bg-purple-900/15 ring-2 ring-purple-400 dark:ring-purple-600 ring-inset' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'" @click="activeCartIndex = index" :data-cart-index="index">
+                    <div class="cart-item cart-item-enter px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 cursor-pointer relative"
+                        :style="activeCartIndex === index ? 'background:#f3e8ff; outline:2px solid #7c3aed; outline-offset:-2px; border-radius:8px; margin:2px;' : ''"
+                        @click="activeCartIndex = index; cartMode = true;" :data-cart-index="index">
                         <div class="flex items-center gap-2.5">
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-bold text-gray-900 dark:text-white truncate" x-text="item.item_name"></p>

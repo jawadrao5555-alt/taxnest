@@ -69,7 +69,7 @@ class PraIntegrationService
 
         $items = $transaction->items
             ->filter(function ($item) {
-                return (float) $item->unit_price > 0 && (float) $item->quantity > 0;
+                return (float) $item->unit_price > 0 && (float) $item->quantity > 0 && !$item->is_tax_exempt;
             })
             ->values()
             ->map(function ($item, $index) use ($itemsSubtotal, $totalDiscount, $taxRate) {
@@ -143,6 +143,14 @@ class PraIntegrationService
 
         if ($transaction->pra_status === 'local') {
             return ['success' => false, 'message' => 'Local invoice cannot be synced to PRA'];
+        }
+
+        $allExempt = $transaction->items->every(fn($item) => $item->is_tax_exempt);
+        if ($allExempt) {
+            Log::info("PRA submission skipped: Transaction #{$transaction->id} — all items are tax-exempt. Internal only.");
+            $transaction->pra_status = 'exempt_internal';
+            $transaction->save();
+            return ['success' => true, 'message' => 'All items are tax-exempt — not reported to PRA. Locked internally.', 'exempt_only' => true];
         }
 
         if ($transaction->submission_hash) {

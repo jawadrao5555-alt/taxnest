@@ -1109,17 +1109,14 @@ class InvoiceController extends Controller
         }
 
         if ($response['status'] === 'success') {
-            $isExemptOnly = !empty($response['exempt_only']);
             $fbrNum = $response['fbr_invoice_number'] ?? null;
             if ($fbrNum) {
                 $invoice->fbr_invoice_number = $fbrNum;
                 $invoice->fbr_invoice_id = $fbrNum;
                 $invoice->fbr_submission_date = now();
             }
-            if (!$isExemptOnly) {
-                $invoice->status = 'locked';
-                $invoice->fbr_status = 'production';
-            }
+            $invoice->status = 'locked';
+            $invoice->fbr_status = 'production';
             $invoice->is_fbr_processing = false;
             $invoice->integrity_hash = \App\Services\IntegrityHashService::generate($invoice);
             $invoice->qr_data = json_encode([
@@ -1133,7 +1130,7 @@ class InvoiceController extends Controller
             $company->update(['last_successful_submission' => now()]);
             $this->createLedgerEntry($invoice);
 
-            InvoiceActivityService::log($invoice->id, $invoice->company_id, $isExemptOnly ? 'exempt_locked' : 'resubmitted_success', [
+            InvoiceActivityService::log($invoice->id, $invoice->company_id, 'resubmitted_success', [
                 'fbr_invoice_number' => $fbrNum,
                 'environment' => $company->fbr_environment,
                 'resubmitted_by' => $user->name,

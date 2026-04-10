@@ -132,82 +132,83 @@
                                     <option value="service">Service</option>
                                 </select>
                             </div>
-                            <div class="sm:col-span-4 relative" x-data="{ open: false, search: '', hlIdx: -1, getFiltered() { return item.type === 'product' ? products.filter(pr => !this.search || pr.name.toLowerCase().includes(this.search.toLowerCase())) : services.filter(sv => !this.search || sv.name.toLowerCase().includes(this.search.toLowerCase())); }, selectProduct(p) { this.search = p.name; item.name = p.name; item.item_id = p.id; item.unit_price = parseFloat(p.price || p.unit_price || 0); item.is_tax_exempt = !!p.is_tax_exempt; item._isNew = false; this.open = false; this.hlIdx = -1; recalculate(); }, scrollToActive() { this.$nextTick(() => { const el = this.$refs['dd'+index]; if(el) { const active = el.querySelector('[data-active=true]'); if(active) active.scrollIntoView({block:'nearest'}); } }); } }" x-init="search = item.name || ''">
+                            <div class="sm:col-span-4 relative" x-init="ddSearch[index] = ddSearch[index] || item.name || ''; ddOpen[index] = ddOpen[index] || false; ddHlIdx[index] = ddHlIdx[index] ?? -1">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Item Name</label>
                                 <div class="relative">
                                     <input type="text"
-                                        x-model="search"
-                                        @input="open = true; hlIdx = 0; item.name = search; item.item_id = ''; item._isNew = true; recalculate()"
-                                        @focus="open = true; hlIdx = -1"
-                                        @click.away="open = false; hlIdx = -1"
-                                        @keydown.escape="open = false; hlIdx = -1"
-                                        @keydown.arrow-down.prevent="if(!open){open=true;hlIdx=0}else{let f=getFiltered();if(hlIdx<f.length-1){hlIdx++;scrollToActive()}}"
-                                        @keydown.arrow-up.prevent="if(hlIdx>0){hlIdx--;scrollToActive()}"
-                                        @keydown.enter.prevent="if(open && hlIdx>=0){let f=getFiltered();if(f[hlIdx])selectProduct(f[hlIdx])}"
+                                        :value="ddSearch[index]"
+                                        @input="ddSearch[index] = $event.target.value; ddOpen[index] = true; ddHlIdx[index] = 0; item.name = ddSearch[index]; item.item_id = ''; item._isNew = true; recalculate()"
+                                        @focus="ddOpen[index] = true; ddHlIdx[index] = -1"
+                                        @click.away="ddOpen[index] = false; ddHlIdx[index] = -1"
+                                        @keydown.escape="ddOpen[index] = false; ddHlIdx[index] = -1"
+                                        @keydown.arrow-down.prevent="ddKeyDown(index)"
+                                        @keydown.arrow-up.prevent="ddKeyUp(index)"
+                                        @keydown.enter.prevent="ddKeyEnter(index)"
                                         placeholder="Type or search product..."
                                         class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 pr-8 focus:ring-2 focus:ring-emerald-500 transition">
                                     <div class="absolute inset-y-0 right-0 flex items-center pr-2">
                                         <template x-if="item.item_id && !item._isNew">
                                             <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                         </template>
-                                        <template x-if="item._isNew && search.length > 0 && item.type === 'product'">
+                                        <template x-if="item._isNew && (ddSearch[index] || '').length > 0 && item.type === 'product'">
                                             <span class="text-[9px] font-bold text-purple-500 uppercase">New</span>
                                         </template>
                                     </div>
                                 </div>
-                                <div x-show="open"
+                                <div x-show="ddOpen[index]"
                                     x-transition
-                                    :x-ref="'dd'+index"
+                                    :id="'pos-dd-' + index"
                                     class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-48 overflow-y-auto">
                                     <template x-if="item.type === 'product'">
                                         <div>
-                                            <template x-for="(p, pIdx) in getFiltered()" :key="p.id">
+                                            <template x-for="(p, pIdx) in ddGetFiltered(index)" :key="p.id">
                                                 <button type="button"
                                                     role="option"
-                                                    :data-active="hlIdx === pIdx"
-                                                    @click="selectProduct(p)"
-                                                    @mouseenter="hlIdx = pIdx"
-                                                    class="w-full text-left px-3 py-2 text-sm flex justify-between items-center transition"
-                                                    :class="hlIdx === pIdx ? 'bg-emerald-100 dark:bg-emerald-900/40 ring-1 ring-emerald-400' : 'hover:bg-emerald-50 dark:hover:bg-emerald-900/20'">
+                                                    :data-hl="ddHlIdx[index] === pIdx ? 'true' : 'false'"
+                                                    @click="ddSelect(index, p)"
+                                                    @mouseenter="ddHlIdx[index] = pIdx"
+                                                    class="w-full text-left px-3 py-2 text-sm flex justify-between items-center"
+                                                    :style="ddHlIdx[index] === pIdx ? 'background: #d1fae5; outline: 2px solid #34d399;' : ''"
+                                                    @mouseleave="if(ddHlIdx[index] === pIdx) {}">
                                                     <span class="flex items-center gap-1.5">
-                                                        <span class="font-medium" :class="hlIdx === pIdx ? 'text-emerald-900 dark:text-emerald-200' : 'text-gray-900 dark:text-gray-100'" x-text="p.name"></span>
+                                                        <span class="font-medium" :style="ddHlIdx[index] === pIdx ? 'color: #064e3b;' : ''" x-text="p.name"></span>
                                                         <span x-show="p.is_tax_exempt" class="inline-flex px-1 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">EXEMPT</span>
                                                     </span>
-                                                    <span class="text-xs" :class="hlIdx === pIdx ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-500'" x-text="'Rs ' + Number(p.price || p.unit_price || 0).toLocaleString()"></span>
+                                                    <span class="text-xs" :style="ddHlIdx[index] === pIdx ? 'color: #047857;' : 'color: #6b7280;'" x-text="'Rs ' + Number(p.price || p.unit_price || 0).toLocaleString()"></span>
                                                 </button>
                                             </template>
-                                            <template x-if="search.length > 0 && products.filter(pr => pr.name.toLowerCase().includes(search.toLowerCase())).length === 0">
+                                            <template x-if="(ddSearch[index] || '').length > 0 && products.filter(pr => pr.name.toLowerCase().includes((ddSearch[index] || '').toLowerCase())).length === 0">
                                                 <div class="px-3 py-2 text-xs text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
                                                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                                                    "<span x-text="search" class="font-semibold"></span>" will be added as new product
+                                                    "<span x-text="ddSearch[index]" class="font-semibold"></span>" will be added as new product
                                                 </div>
                                             </template>
-                                            <template x-if="search.length > 0 && products.filter(pr => pr.name.toLowerCase() === search.toLowerCase()).length === 0 && products.filter(pr => pr.name.toLowerCase().includes(search.toLowerCase())).length > 0">
+                                            <template x-if="(ddSearch[index] || '').length > 0 && products.filter(pr => pr.name.toLowerCase() === (ddSearch[index] || '').toLowerCase()).length === 0 && products.filter(pr => pr.name.toLowerCase().includes((ddSearch[index] || '').toLowerCase())).length > 0">
                                                 <div class="border-t border-gray-100 dark:border-gray-700 px-3 py-2 text-xs text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
                                                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                                                    Or add "<span x-text="search" class="font-semibold"></span>" as new product
+                                                    Or add "<span x-text="ddSearch[index]" class="font-semibold"></span>" as new product
                                                 </div>
                                             </template>
                                         </div>
                                     </template>
                                     <template x-if="item.type === 'service'">
                                         <div>
-                                            <template x-for="(s, sIdx) in getFiltered()" :key="s.id">
+                                            <template x-for="(s, sIdx) in ddGetFiltered(index)" :key="s.id">
                                                 <button type="button"
                                                     role="option"
-                                                    :data-active="hlIdx === sIdx"
-                                                    @click="selectProduct(s)"
-                                                    @mouseenter="hlIdx = sIdx"
-                                                    class="w-full text-left px-3 py-2 text-sm flex justify-between items-center transition"
-                                                    :class="hlIdx === sIdx ? 'bg-emerald-100 dark:bg-emerald-900/40 ring-1 ring-emerald-400' : 'hover:bg-emerald-50 dark:hover:bg-emerald-900/20'">
+                                                    :data-hl="ddHlIdx[index] === sIdx ? 'true' : 'false'"
+                                                    @click="ddSelect(index, s)"
+                                                    @mouseenter="ddHlIdx[index] = sIdx"
+                                                    class="w-full text-left px-3 py-2 text-sm flex justify-between items-center"
+                                                    :style="ddHlIdx[index] === sIdx ? 'background: #d1fae5; outline: 2px solid #34d399;' : ''">
                                                     <span class="flex items-center gap-1.5">
-                                                        <span class="font-medium" :class="hlIdx === sIdx ? 'text-emerald-900 dark:text-emerald-200' : 'text-gray-900 dark:text-gray-100'" x-text="s.name"></span>
+                                                        <span class="font-medium" :style="ddHlIdx[index] === sIdx ? 'color: #064e3b;' : ''" x-text="s.name"></span>
                                                         <span x-show="s.is_tax_exempt" class="inline-flex px-1 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">EXEMPT</span>
                                                     </span>
-                                                    <span class="text-xs" :class="hlIdx === sIdx ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-500'" x-text="'Rs ' + Number(s.price || 0).toLocaleString()"></span>
+                                                    <span class="text-xs" :style="ddHlIdx[index] === sIdx ? 'color: #047857;' : 'color: #6b7280;'" x-text="'Rs ' + Number(s.price || 0).toLocaleString()"></span>
                                                 </button>
                                             </template>
-                                            <template x-if="services.filter(sv => !search || sv.name.toLowerCase().includes(search.toLowerCase())).length === 0">
+                                            <template x-if="ddGetFiltered(index).length === 0">
                                                 <div class="px-3 py-2 text-xs text-gray-400">No matching services found</div>
                                             </template>
                                         </div>
@@ -383,6 +384,57 @@
                 items: [
                     { type: 'product', item_id: '', name: '', quantity: 1, unit_price: 0, _isNew: false, is_tax_exempt: false }
                 ],
+
+                ddOpen: {},
+                ddSearch: {},
+                ddHlIdx: {},
+
+                ddGetFiltered(idx) {
+                    let s = (this.ddSearch[idx] || '').toLowerCase();
+                    if (this.items[idx].type === 'product') {
+                        return this.products.filter(pr => !s || pr.name.toLowerCase().includes(s));
+                    }
+                    return this.services.filter(sv => !s || sv.name.toLowerCase().includes(s));
+                },
+
+                ddSelect(idx, p) {
+                    this.ddSearch[idx] = p.name;
+                    this.items[idx].name = p.name;
+                    this.items[idx].item_id = p.id;
+                    this.items[idx].unit_price = parseFloat(p.price || p.unit_price || 0);
+                    this.items[idx].is_tax_exempt = !!p.is_tax_exempt;
+                    this.items[idx]._isNew = false;
+                    this.ddOpen[idx] = false;
+                    this.ddHlIdx[idx] = -1;
+                    this.recalculate();
+                },
+
+                ddScrollTo(idx) {
+                    this.$nextTick(() => {
+                        const container = document.getElementById('pos-dd-' + idx);
+                        if (container) {
+                            const active = container.querySelector('[data-hl="true"]');
+                            if (active) active.scrollIntoView({ block: 'nearest' });
+                        }
+                    });
+                },
+
+                ddKeyDown(idx) {
+                    if (!this.ddOpen[idx]) { this.ddOpen[idx] = true; this.ddHlIdx[idx] = 0; return; }
+                    let f = this.ddGetFiltered(idx);
+                    if ((this.ddHlIdx[idx] || 0) < f.length - 1) { this.ddHlIdx[idx] = (this.ddHlIdx[idx] || 0) + 1; this.ddScrollTo(idx); }
+                },
+
+                ddKeyUp(idx) {
+                    if ((this.ddHlIdx[idx] || 0) > 0) { this.ddHlIdx[idx]--; this.ddScrollTo(idx); }
+                },
+
+                ddKeyEnter(idx) {
+                    if (this.ddOpen[idx] && (this.ddHlIdx[idx] || 0) >= 0) {
+                        let f = this.ddGetFiltered(idx);
+                        if (f[this.ddHlIdx[idx]]) this.ddSelect(idx, f[this.ddHlIdx[idx]]);
+                    }
+                },
 
                 discountType: 'percentage',
                 discountValue: 0,
@@ -585,11 +637,26 @@
                 },
 
                 addItem() {
+                    let idx = this.items.length;
                     this.items.push({ type: 'product', item_id: '', name: '', quantity: 1, unit_price: 0, _isNew: false, is_tax_exempt: false });
+                    this.ddSearch[idx] = '';
+                    this.ddOpen[idx] = false;
+                    this.ddHlIdx[idx] = -1;
                 },
 
                 removeItem(index) {
                     this.items.splice(index, 1);
+                    let newSearch = {};
+                    let newOpen = {};
+                    let newHl = {};
+                    this.items.forEach((it, i) => {
+                        newSearch[i] = this.ddSearch[i >= index ? i + 1 : i] || '';
+                        newOpen[i] = false;
+                        newHl[i] = -1;
+                    });
+                    this.ddSearch = newSearch;
+                    this.ddOpen = newOpen;
+                    this.ddHlIdx = newHl;
                     this.recalculate();
                 },
 
@@ -599,6 +666,9 @@
                     this.items[index].unit_price = 0;
                     this.items[index].is_tax_exempt = false;
                     this.items[index]._isNew = false;
+                    this.ddSearch[index] = '';
+                    this.ddOpen[index] = false;
+                    this.ddHlIdx[index] = -1;
                     this.recalculate();
                 },
 

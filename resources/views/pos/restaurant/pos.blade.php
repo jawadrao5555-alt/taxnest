@@ -145,25 +145,25 @@ window.addEventListener('popstate', function() {
                 <template x-for="(s, i) in searchSuggestions" :key="s.id + s.type">
                     <button @click="quickAddItem(s)" @mouseenter="highlightIndex = i"
                         :data-hl="i === highlightIndex ? 'true' : 'false'"
-                        class="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all"
-                        :style="i === highlightIndex ? 'background: linear-gradient(90deg,#f3e8ff,#ede9fe); outline: 2px solid #a855f7; outline-offset: -2px; border-radius: 8px;' : ''">
+                        class="w-full flex items-center gap-3 px-3 py-2.5 text-left"
+                        :style="i === highlightIndex ? 'background:#7c3aed !important; border-radius:10px; margin:2px 4px; width:calc(100% - 8px); box-shadow:0 4px 12px rgba(124,58,237,0.4);' : 'margin:2px 4px; width:calc(100% - 8px);'">
                         <template x-if="s.image">
-                            <img :src="s.image" class="w-8 h-8 rounded-lg object-cover flex-shrink-0">
+                            <img :src="s.image" class="w-8 h-8 rounded-lg object-cover flex-shrink-0" :style="i === highlightIndex ? 'outline:2px solid white; outline-offset:1px;' : ''">
                         </template>
                         <template x-if="!s.image">
                             <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                                :style="i === highlightIndex ? 'background: linear-gradient(135deg,#c084fc,#a855f7); color: white;' : 'background: linear-gradient(135deg,#f3e8ff,#ede9fe); color: #7c3aed;'">
+                                :style="i === highlightIndex ? 'background:white; color:#7c3aed;' : 'background:linear-gradient(135deg,#f3e8ff,#ede9fe); color:#7c3aed;'">
                                 <span class="text-xs font-bold" x-text="s.name.charAt(0)"></span>
                             </div>
                         </template>
                         <div class="flex-1 min-w-0">
-                            <span class="text-sm font-medium truncate block" :style="i === highlightIndex ? 'color: #581c87;' : ''" x-text="s.name"></span>
+                            <span class="text-sm font-semibold truncate block" :style="i === highlightIndex ? 'color:white;' : 'color:#1f2937;'" x-text="s.name"></span>
                             <div class="flex items-center gap-1.5">
-                                <span class="text-[10px] text-gray-400" x-text="s.type === 'service' ? 'Service' : s.category"></span>
+                                <span class="text-[10px]" :style="i === highlightIndex ? 'color:rgba(255,255,255,0.7);' : 'color:#9ca3af;'" x-text="s.type === 'service' ? 'Service' : s.category"></span>
                                 <template x-if="s.stockStatus"><span class="stock-dot" :class="'stock-' + s.stockStatus"></span></template>
                             </div>
                         </div>
-                        <span class="text-sm font-bold" :style="i === highlightIndex ? 'color: #7c3aed;' : 'color: #9333ea;'" x-text="'Rs. ' + Number(s.price).toLocaleString()"></span>
+                        <span class="text-sm font-extrabold" :style="i === highlightIndex ? 'color:white;' : 'color:#9333ea;'" x-text="'Rs. ' + Number(s.price).toLocaleString()"></span>
                     </button>
                 </template>
             </div>

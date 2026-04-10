@@ -1052,7 +1052,7 @@
 
 <div id="fbrSuccessModal" style="display:none; opacity:0; transition: opacity 400ms ease;" class="fixed inset-0 z-[60] flex items-center justify-center">
     <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" style="transition: opacity 400ms ease;" onclick="closeFbrSuccessModal()"></div>
-    <div id="fbrSuccessCard" class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-3xl mx-4 overflow-hidden" style="transform: scale(0.85) translateY(30px); opacity: 0; transition: transform 400ms cubic-bezier(0.34,1.56,0.64,1), opacity 400ms ease; max-height: 90vh;">
+    <div id="fbrSuccessCard" class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden" style="transform: scale(0.85) translateY(30px); opacity: 0; transition: transform 400ms cubic-bezier(0.34,1.56,0.64,1), opacity 400ms ease;">
         <div class="bg-gradient-to-r from-emerald-600 to-emerald-700 px-5 py-3 flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <div class="flex items-center justify-center w-9 h-9 rounded-full bg-white/20">
@@ -1070,13 +1070,31 @@
                 </button>
             </div>
         </div>
-        <div class="relative" style="height: calc(90vh - 120px); min-height: 400px;">
-            <div id="pdfLoadingSpinner" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-800 z-10">
-                <div style="width:48px;height:48px;border:4px solid #d1d5db;border-top-color:#10b981;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-4 font-medium">Loading Invoice Preview...</p>
+        <div class="px-6 py-6">
+            <div class="flex items-center justify-center mb-5">
+                <div class="w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                    <svg class="w-12 h-12 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
             </div>
-            <iframe id="invoicePdfPreview" src="" class="w-full h-full border-0" style="background: #f3f4f6; opacity: 0; transition: opacity 500ms ease;" onload="onPdfPreviewLoaded()" onerror="onPdfPreviewError()"></iframe>
-            <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+            <div class="grid grid-cols-2 gap-3 mb-5">
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 text-center">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Invoice #</p>
+                    <p class="text-sm font-bold text-gray-800 dark:text-gray-200">{{ $invoice->display_invoice_number ?? $invoice->invoice_number ?? '-' }}</p>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 text-center">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Buyer</p>
+                    <p class="text-sm font-bold text-gray-800 dark:text-gray-200 truncate">{{ $invoice->buyer_name ?? 'Walk-in' }}</p>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 text-center">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Amount</p>
+                    <p class="text-sm font-bold text-emerald-600">PKR {{ number_format($invoice->total_amount ?? 0, 2) }}</p>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 text-center">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Sales Tax</p>
+                    <p class="text-sm font-bold text-blue-600">PKR {{ number_format($invoice->total_sales_tax ?? 0, 2) }}</p>
+                </div>
+            </div>
+            <p class="text-xs text-gray-400 text-center">Protected by TaxNest Idempotency Shield</p>
         </div>
         <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-between gap-3">
             <div class="flex items-center gap-2 flex-wrap">
@@ -1311,46 +1329,11 @@ function handleFbrResponse(data) {
 
 let _whtAction = 'print';
 
-function onPdfPreviewLoaded() {
-    const iframe = document.getElementById('invoicePdfPreview');
-    const spinner = document.getElementById('pdfLoadingSpinner');
-    if (iframe.src && iframe.src !== '' && iframe.src !== 'about:blank') {
-        spinner.style.opacity = '0';
-        spinner.style.transition = 'opacity 300ms ease';
-        iframe.style.opacity = '1';
-        setTimeout(() => { spinner.style.display = 'none'; }, 300);
-    }
-}
-
-function onPdfPreviewError() {
-    const spinner = document.getElementById('pdfLoadingSpinner');
-    spinner.innerHTML = '<div class="text-center"><svg class="w-12 h-12 text-red-400 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg><p class="text-sm text-gray-600 font-medium">Could not load preview</p><button onclick="retryPdfPreview()" class="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition">Retry</button></div>';
-}
-
-function retryPdfPreview() {
-    const iframe = document.getElementById('invoicePdfPreview');
-    const spinner = document.getElementById('pdfLoadingSpinner');
-    spinner.style.display = 'flex';
-    spinner.style.opacity = '1';
-    spinner.innerHTML = '<div style="width:48px;height:48px;border:4px solid #d1d5db;border-top-color:#10b981;border-radius:50%;animation:spin 0.8s linear infinite;"></div><p class="text-sm text-gray-500 mt-4 font-medium">Loading Invoice Preview...</p>';
-    iframe.style.opacity = '0';
-    iframe.src = '/invoice/{{ $invoice->id }}/pdf?t=' + Date.now();
-}
-
 function openFbrSuccessModal(data) {
     _fbrPdfUrl = data.pdf_url || '/invoice/{{ $invoice->id }}/pdf';
     _lastFbrNumber = data.fbr_invoice_number || '';
     document.getElementById('modalFbrNumber').textContent = 'FBR #: ' + _lastFbrNumber;
     document.getElementById('modalTimestamp').textContent = 'Submitted: ' + new Date().toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' });
-
-    const spinner = document.getElementById('pdfLoadingSpinner');
-    const iframe = document.getElementById('invoicePdfPreview');
-    spinner.style.display = 'flex';
-    spinner.style.opacity = '1';
-    spinner.innerHTML = '<div style="width:48px;height:48px;border:4px solid #d1d5db;border-top-color:#10b981;border-radius:50%;animation:spin 0.8s linear infinite;"></div><p class="text-sm text-gray-500 dark:text-gray-400 mt-4 font-medium">Loading Invoice Preview...</p>';
-    iframe.style.opacity = '0';
-    iframe.src = '/invoice/{{ $invoice->id }}/pdf?t=' + Date.now();
-
     const modal = document.getElementById('fbrSuccessModal');
     const card = document.getElementById('fbrSuccessCard');
     modal.style.display = 'flex';
@@ -1375,7 +1358,6 @@ function closeFbrSuccessModal() {
     card.style.opacity = '0';
     setTimeout(() => {
         modal.style.display = 'none';
-        document.getElementById('invoicePdfPreview').src = '';
         document.body.style.overflow = '';
         smartRefreshInvoiceStatus();
     }, 400);

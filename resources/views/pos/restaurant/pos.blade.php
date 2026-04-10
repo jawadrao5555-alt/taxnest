@@ -141,25 +141,29 @@ window.addEventListener('popstate', function() {
             <button x-show="searchQuery" @click="searchQuery = ''; showSearchDropdown = false; filterProducts(); $refs.searchInput.focus()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
-            <div x-show="showSearchDropdown && searchSuggestions.length > 0" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 max-h-64 overflow-y-auto">
+            <div x-show="showSearchDropdown && searchSuggestions.length > 0" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 max-h-64 overflow-y-auto" x-ref="searchDropdown">
                 <template x-for="(s, i) in searchSuggestions" :key="s.id + s.type">
-                    <button @click="quickAddItem(s)" class="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-purple-50 dark:hover:bg-purple-900/20 transition" :class="i === highlightIndex ? 'bg-purple-50 dark:bg-purple-900/20' : ''">
+                    <button @click="quickAddItem(s)" @mouseenter="highlightIndex = i"
+                        :data-hl="i === highlightIndex ? 'true' : 'false'"
+                        class="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all"
+                        :style="i === highlightIndex ? 'background: linear-gradient(90deg,#f3e8ff,#ede9fe); outline: 2px solid #a855f7; outline-offset: -2px; border-radius: 8px;' : ''">
                         <template x-if="s.image">
                             <img :src="s.image" class="w-8 h-8 rounded-lg object-cover flex-shrink-0">
                         </template>
                         <template x-if="!s.image">
-                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-100 to-purple-50 dark:from-purple-900/30 dark:to-purple-800/20 flex items-center justify-center flex-shrink-0">
-                                <span class="text-xs font-bold text-purple-600 dark:text-purple-400" x-text="s.name.charAt(0)"></span>
+                            <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                                :style="i === highlightIndex ? 'background: linear-gradient(135deg,#c084fc,#a855f7); color: white;' : 'background: linear-gradient(135deg,#f3e8ff,#ede9fe); color: #7c3aed;'">
+                                <span class="text-xs font-bold" x-text="s.name.charAt(0)"></span>
                             </div>
                         </template>
                         <div class="flex-1 min-w-0">
-                            <span class="text-sm font-medium text-gray-900 dark:text-white truncate block" x-text="s.name"></span>
+                            <span class="text-sm font-medium truncate block" :style="i === highlightIndex ? 'color: #581c87;' : ''" x-text="s.name"></span>
                             <div class="flex items-center gap-1.5">
                                 <span class="text-[10px] text-gray-400" x-text="s.type === 'service' ? 'Service' : s.category"></span>
                                 <template x-if="s.stockStatus"><span class="stock-dot" :class="'stock-' + s.stockStatus"></span></template>
                             </div>
                         </div>
-                        <span class="text-sm font-bold text-purple-600 dark:text-purple-400" x-text="'Rs. ' + Number(s.price).toLocaleString()"></span>
+                        <span class="text-sm font-bold" :style="i === highlightIndex ? 'color: #7c3aed;' : 'color: #9333ea;'" x-text="'Rs. ' + Number(s.price).toLocaleString()"></span>
                     </button>
                 </template>
             </div>
@@ -1123,6 +1127,13 @@ function restaurantPos() {
         moveHighlight(dir) {
             if (!this.showSearchDropdown || this.searchSuggestions.length === 0) return;
             this.highlightIndex = Math.max(0, Math.min(this.searchSuggestions.length - 1, this.highlightIndex + dir));
+            this.$nextTick(() => {
+                const dd = this.$refs.searchDropdown;
+                if (dd) {
+                    const active = dd.querySelector('[data-hl="true"]');
+                    if (active) active.scrollIntoView({ block: 'nearest' });
+                }
+            });
         },
         addHighlightedItem() { if (this.showSearchDropdown && this.searchSuggestions.length > 0) this.quickAddItem(this.searchSuggestions[this.highlightIndex]); },
         quickAddItem(item) {

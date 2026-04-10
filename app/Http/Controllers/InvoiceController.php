@@ -188,7 +188,7 @@ class InvoiceController extends Controller
         $request->validate([
             'buyer_name' => 'required|string|max:255',
             'buyer_ntn' => $isRegistered ? 'required|string|max:50' : 'nullable|string|max:50',
-            'buyer_cnic' => $isRegistered ? 'required|string|max:15' : 'nullable|string|max:15',
+            'buyer_cnic' => 'nullable|string|max:15',
             'buyer_address' => 'required|string|max:500',
             'branch_id' => 'nullable|exists:branches,id',
             'document_type' => 'required|string|in:Sale Invoice,Credit Note,Debit Note',
@@ -214,7 +214,6 @@ class InvoiceController extends Controller
             'document_type.required' => 'Document type is required.',
             'destination_province.required' => 'Destination Province is required.',
             'reference_invoice_number.required' => 'Reference Invoice is required for Credit/Debit Notes.',
-            'buyer_cnic.required' => 'CNIC is required for registered buyers.',
             'buyer_ntn.required' => 'NTN is required for registered buyers.',
         ]);
 

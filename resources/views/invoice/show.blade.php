@@ -1098,11 +1098,11 @@
         </div>
         <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-between gap-3">
             <div class="flex items-center gap-2 flex-wrap">
-                <button onclick="openWhtThenPrint()" class="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition shadow-md">
+                <button onclick="successModalPrint()" class="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition shadow-md">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                     View & Print
                 </button>
-                <button onclick="openWhtThenDownload()" class="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition shadow-md">
+                <button onclick="successModalDownload()" class="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition shadow-md">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                     Download
                 </button>
@@ -1361,6 +1361,26 @@ function closeFbrSuccessModal() {
         document.body.style.overflow = '';
         smartRefreshInvoiceStatus();
     }, 400);
+}
+
+function successModalPrint() {
+    closeFbrSuccessModal();
+    setTimeout(() => {
+        window.open('/invoice/{{ $invoice->id }}/pdf', '_blank');
+    }, 450);
+}
+
+function successModalDownload() {
+    closeFbrSuccessModal();
+    setTimeout(() => {
+        const a = document.createElement('a');
+        a.href = '/invoice/{{ $invoice->id }}/download';
+        a.download = '';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    }, 450);
 }
 
 function openWhtThenPrint() {

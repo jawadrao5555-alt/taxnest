@@ -1,4 +1,8 @@
 <x-pos-layout>
+    <style>
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+        @keyframes priceGlow{0%{box-shadow:0 0 0 2px rgba(168,85,247,0.3)}50%{box-shadow:0 0 0 4px rgba(168,85,247,0.15)}100%{box-shadow:0 0 0 2px rgba(168,85,247,0.3)}}
+    </style>
     <div class="pb-36" x-data="posInvoice()">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
 
@@ -124,7 +128,8 @@
                     </div>
 
                     <template x-for="(item, index) in items" :key="index">
-                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 mb-3 p-3 sm:p-1 bg-gray-50 dark:bg-gray-800/50 sm:bg-transparent sm:dark:bg-transparent rounded-lg sm:rounded-none border sm:border-0 border-gray-200 dark:border-gray-700">
+                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 mb-3 p-3 sm:py-2 sm:px-2 rounded-lg border transition-all"
+                            :style="item._isNew && (ddSearch[index] || '').length > 0 ? 'border-left: 3px solid #a855f7; background: rgba(168,85,247,0.04);' : 'border-color: transparent;'">
                             <div class="sm:col-span-2">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Type</label>
                                 <select x-model="item.type" @change="onTypeChange(index)" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition">
@@ -144,21 +149,30 @@
                                         @keydown.arrow-down.prevent="ddKeyDown(index)"
                                         @keydown.arrow-up.prevent="ddKeyUp(index)"
                                         @keydown.enter.prevent="ddKeyEnter(index)"
+                                        @keydown.tab="if(item._isNew && (ddSearch[index]||'').length>0){ ddOpen[index]=false; ddHlIdx[index]=-1; $nextTick(()=>{ const el=document.getElementById('price-'+index); if(el) el.focus(); }); }"
                                         placeholder="Type or search product..."
-                                        class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 pr-8 focus:ring-2 focus:ring-emerald-500 transition">
-                                    <div class="absolute inset-y-0 right-0 flex items-center pr-2">
+                                        class="w-full rounded-lg border text-sm px-3 py-2 pr-16 transition"
+                                        :style="item._isNew && (ddSearch[index]||'').length > 0 ? 'border-color: #a855f7; box-shadow: 0 0 0 2px rgba(168,85,247,0.15);' : 'border-color: #d1d5db;'"
+                                        :class="'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500'">
+                                    <div class="absolute inset-y-0 right-0 flex items-center pr-2 gap-1">
                                         <template x-if="item.item_id && !item._isNew">
-                                            <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                            <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold" style="background:#d1fae5;color:#047857;">
+                                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                                Saved
+                                            </span>
                                         </template>
                                         <template x-if="item._isNew && (ddSearch[index] || '').length > 0 && item.type === 'product'">
-                                            <span class="text-[9px] font-bold text-purple-500 uppercase">New</span>
+                                            <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold" style="background:#f3e8ff;color:#7c3aed;animation:pulse 2s infinite;">
+                                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                                NEW
+                                            </span>
                                         </template>
                                     </div>
                                 </div>
                                 <div x-show="ddOpen[index]"
                                     x-transition
                                     :id="'pos-dd-' + index"
-                                    class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                                    class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl max-h-52 overflow-y-auto">
                                     <template x-if="item.type === 'product'">
                                         <div>
                                             <template x-for="(p, pIdx) in ddGetFiltered(index)" :key="p.id">
@@ -167,27 +181,31 @@
                                                     :data-hl="ddHlIdx[index] === pIdx ? 'true' : 'false'"
                                                     @click="ddSelect(index, p)"
                                                     @mouseenter="ddHlIdx[index] = pIdx"
-                                                    class="w-full text-left px-3 py-2 text-sm flex justify-between items-center"
-                                                    :style="ddHlIdx[index] === pIdx ? 'background: #d1fae5; outline: 2px solid #34d399;' : ''"
-                                                    @mouseleave="if(ddHlIdx[index] === pIdx) {}">
+                                                    class="w-full text-left px-3 py-2.5 text-sm flex justify-between items-center"
+                                                    :style="ddHlIdx[index] === pIdx ? 'background: linear-gradient(90deg,#d1fae5,#ecfdf5); outline: 2px solid #34d399; outline-offset:-2px; border-radius:6px;' : ''">
                                                     <span class="flex items-center gap-1.5">
+                                                        <svg class="w-3.5 h-3.5 flex-shrink-0" :style="ddHlIdx[index] === pIdx ? 'color:#059669;' : 'color:#9ca3af;'" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                                                         <span class="font-medium" :style="ddHlIdx[index] === pIdx ? 'color: #064e3b;' : ''" x-text="p.name"></span>
                                                         <span x-show="p.is_tax_exempt" class="inline-flex px-1 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">EXEMPT</span>
                                                     </span>
-                                                    <span class="text-xs" :style="ddHlIdx[index] === pIdx ? 'color: #047857;' : 'color: #6b7280;'" x-text="'Rs ' + Number(p.price || p.unit_price || 0).toLocaleString()"></span>
+                                                    <span class="text-xs font-semibold" :style="ddHlIdx[index] === pIdx ? 'color: #047857;' : 'color: #6b7280;'" x-text="'Rs ' + Number(p.price || p.unit_price || 0).toLocaleString()"></span>
                                                 </button>
                                             </template>
-                                            <template x-if="(ddSearch[index] || '').length > 0 && products.filter(pr => pr.name.toLowerCase().includes((ddSearch[index] || '').toLowerCase())).length === 0">
-                                                <div class="px-3 py-2 text-xs text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
-                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                                                    "<span x-text="ddSearch[index]" class="font-semibold"></span>" will be added as new product
-                                                </div>
-                                            </template>
-                                            <template x-if="(ddSearch[index] || '').length > 0 && products.filter(pr => pr.name.toLowerCase() === (ddSearch[index] || '').toLowerCase()).length === 0 && products.filter(pr => pr.name.toLowerCase().includes((ddSearch[index] || '').toLowerCase())).length > 0">
-                                                <div class="border-t border-gray-100 dark:border-gray-700 px-3 py-2 text-xs text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
-                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                                                    Or add "<span x-text="ddSearch[index]" class="font-semibold"></span>" as new product
-                                                </div>
+                                            <template x-if="(ddSearch[index] || '').length > 0 && ddIsNewProduct(index)">
+                                                <button type="button"
+                                                    @click="ddConfirmNew(index)"
+                                                    class="w-full text-left px-3 py-3 flex items-center gap-2 border-t border-gray-100 dark:border-gray-700 transition-all"
+                                                    style="background: linear-gradient(90deg,#faf5ff,#f3e8ff); cursor:pointer;"
+                                                    @mouseenter="this.style.background='linear-gradient(90deg,#f3e8ff,#ede9fe)'"
+                                                    @mouseleave="this.style.background='linear-gradient(90deg,#faf5ff,#f3e8ff)'">
+                                                    <span class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center" style="background:#7c3aed;color:white;">
+                                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                                                    </span>
+                                                    <span class="flex flex-col">
+                                                        <span class="text-sm font-semibold" style="color:#7c3aed;">Add "<span x-text="ddSearch[index]" class="font-bold"></span>" as new product</span>
+                                                        <span class="text-[10px]" style="color:#9ca3af;">Set price & quantity below — details can be added later</span>
+                                                    </span>
+                                                </button>
                                             </template>
                                         </div>
                                     </template>
@@ -199,13 +217,14 @@
                                                     :data-hl="ddHlIdx[index] === sIdx ? 'true' : 'false'"
                                                     @click="ddSelect(index, s)"
                                                     @mouseenter="ddHlIdx[index] = sIdx"
-                                                    class="w-full text-left px-3 py-2 text-sm flex justify-between items-center"
-                                                    :style="ddHlIdx[index] === sIdx ? 'background: #d1fae5; outline: 2px solid #34d399;' : ''">
+                                                    class="w-full text-left px-3 py-2.5 text-sm flex justify-between items-center"
+                                                    :style="ddHlIdx[index] === sIdx ? 'background: linear-gradient(90deg,#d1fae5,#ecfdf5); outline: 2px solid #34d399; outline-offset:-2px; border-radius:6px;' : ''">
                                                     <span class="flex items-center gap-1.5">
+                                                        <svg class="w-3.5 h-3.5 flex-shrink-0" :style="ddHlIdx[index] === sIdx ? 'color:#059669;' : 'color:#9ca3af;'" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 13.255A23.193 23.193 0 0112 15c-3.183 0-6.22-.64-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                                                         <span class="font-medium" :style="ddHlIdx[index] === sIdx ? 'color: #064e3b;' : ''" x-text="s.name"></span>
                                                         <span x-show="s.is_tax_exempt" class="inline-flex px-1 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">EXEMPT</span>
                                                     </span>
-                                                    <span class="text-xs" :style="ddHlIdx[index] === sIdx ? 'color: #047857;' : 'color: #6b7280;'" x-text="'Rs ' + Number(s.price || 0).toLocaleString()"></span>
+                                                    <span class="text-xs font-semibold" :style="ddHlIdx[index] === sIdx ? 'color: #047857;' : 'color: #6b7280;'" x-text="'Rs ' + Number(s.price || 0).toLocaleString()"></span>
                                                 </button>
                                             </template>
                                             <template x-if="ddGetFiltered(index).length === 0">
@@ -221,7 +240,10 @@
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Unit Price</label>
-                                <input type="number" x-model.number="item.unit_price" min="0" step="0.01" @input="recalculate()" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition">
+                                <input type="number" :id="'price-'+index" x-model.number="item.unit_price" min="0" step="0.01" @input="recalculate()"
+                                    class="w-full rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 transition"
+                                    :style="item._isNew && item.unit_price === 0 && (ddSearch[index]||'').length > 0 ? 'border-color:#a855f7; box-shadow: 0 0 0 2px rgba(168,85,247,0.2); animation: pulse 1.5s ease-in-out 3;' : 'border-color:#d1d5db;'"
+                                    :class="'focus:ring-2 focus:ring-emerald-500'">
                             </div>
                             <div class="sm:col-span-1 flex flex-col items-start gap-1">
                                 <div class="flex items-center gap-1">
@@ -432,8 +454,31 @@
                 ddKeyEnter(idx) {
                     if (this.ddOpen[idx] && (this.ddHlIdx[idx] || 0) >= 0) {
                         let f = this.ddGetFiltered(idx);
-                        if (f[this.ddHlIdx[idx]]) this.ddSelect(idx, f[this.ddHlIdx[idx]]);
+                        if (f[this.ddHlIdx[idx]]) { this.ddSelect(idx, f[this.ddHlIdx[idx]]); return; }
                     }
+                    if (this.items[idx]._isNew && (this.ddSearch[idx] || '').length > 0) {
+                        this.ddConfirmNew(idx);
+                    }
+                },
+
+                ddIsNewProduct(idx) {
+                    let s = (this.ddSearch[idx] || '').toLowerCase();
+                    if (!s) return false;
+                    return this.items[idx].type === 'product'
+                        ? !this.products.some(pr => pr.name.toLowerCase() === s)
+                        : false;
+                },
+
+                ddConfirmNew(idx) {
+                    this.items[idx]._isNew = true;
+                    this.items[idx].name = this.ddSearch[idx];
+                    this.items[idx].item_id = '';
+                    this.ddOpen[idx] = false;
+                    this.ddHlIdx[idx] = -1;
+                    this.$nextTick(() => {
+                        const el = document.getElementById('price-' + idx);
+                        if (el) { el.focus(); el.select(); }
+                    });
                 },
 
                 discountType: 'percentage',

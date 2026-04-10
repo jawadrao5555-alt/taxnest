@@ -1050,10 +1050,10 @@
         </div>
     </div>
 
-<div id="fbrSuccessModal" style="display:none; opacity:0; transition: opacity 400ms ease;" class="fixed inset-0 z-[60] flex items-center justify-center">
+<div id="fbrSuccessModal" style="display:none; opacity:0; transition: opacity 400ms ease;" class="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-6">
     <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" style="transition: opacity 400ms ease;" onclick="closeFbrSuccessModal()"></div>
-    <div id="fbrSuccessCard" class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden" style="transform: scale(0.85) translateY(30px); opacity: 0; transition: transform 400ms cubic-bezier(0.34,1.56,0.64,1), opacity 400ms ease;">
-        <div class="bg-gradient-to-r from-emerald-600 to-emerald-700 px-5 py-3 flex items-center justify-between">
+    <div id="fbrSuccessCard" class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col" style="transform: scale(0.85) translateY(30px); opacity: 0; transition: transform 400ms cubic-bezier(0.34,1.56,0.64,1), opacity 400ms ease; max-height: 95vh;">
+        <div class="bg-gradient-to-r from-emerald-600 to-emerald-700 px-5 py-3 flex items-center justify-between flex-shrink-0">
             <div class="flex items-center gap-3">
                 <div class="flex items-center justify-center w-9 h-9 rounded-full bg-white/20">
                     <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -1070,37 +1070,40 @@
                 </button>
             </div>
         </div>
-        <div class="px-6 py-6">
-            <div class="flex items-center justify-center mb-5">
-                <div class="w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                    <svg class="w-12 h-12 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <div class="px-4 py-3 flex-shrink-0">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-2.5 text-center">
+                    <p class="text-[10px] text-gray-500 dark:text-gray-400 mb-0.5">Invoice #</p>
+                    <p class="text-xs font-bold text-gray-800 dark:text-gray-200 truncate">{{ $invoice->display_invoice_number ?? $invoice->invoice_number ?? '-' }}</p>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-2.5 text-center">
+                    <p class="text-[10px] text-gray-500 dark:text-gray-400 mb-0.5">Buyer</p>
+                    <p class="text-xs font-bold text-gray-800 dark:text-gray-200 truncate">{{ $invoice->buyer_name ?? 'Walk-in' }}</p>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-2.5 text-center">
+                    <p class="text-[10px] text-gray-500 dark:text-gray-400 mb-0.5">Total Amount</p>
+                    <p class="text-xs font-bold text-emerald-600">PKR {{ number_format($invoice->total_amount ?? 0, 2) }}</p>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-2.5 text-center">
+                    <p class="text-[10px] text-gray-500 dark:text-gray-400 mb-0.5">Sales Tax</p>
+                    <p class="text-xs font-bold text-blue-600">PKR {{ number_format($invoice->total_sales_tax ?? 0, 2) }}</p>
                 </div>
             </div>
-            <div class="grid grid-cols-2 gap-3 mb-5">
-                <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 text-center">
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Invoice #</p>
-                    <p class="text-sm font-bold text-gray-800 dark:text-gray-200">{{ $invoice->display_invoice_number ?? $invoice->invoice_number ?? '-' }}</p>
-                </div>
-                <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 text-center">
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Buyer</p>
-                    <p class="text-sm font-bold text-gray-800 dark:text-gray-200 truncate">{{ $invoice->buyer_name ?? 'Walk-in' }}</p>
-                </div>
-                <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 text-center">
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Amount</p>
-                    <p class="text-sm font-bold text-emerald-600">PKR {{ number_format($invoice->total_amount ?? 0, 2) }}</p>
-                </div>
-                <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 text-center">
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Sales Tax</p>
-                    <p class="text-sm font-bold text-blue-600">PKR {{ number_format($invoice->total_sales_tax ?? 0, 2) }}</p>
-                </div>
-            </div>
-            <p class="text-xs text-gray-400 text-center">Protected by TaxNest Idempotency Shield</p>
         </div>
-        <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-between gap-3">
+        <div class="flex-1 min-h-0 px-4 pb-2 relative">
+            <div id="pdfLoading" class="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-800 rounded-xl mx-4 z-10">
+                <div class="text-center">
+                    <svg class="animate-spin h-10 w-10 text-emerald-500 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 font-medium">Loading Invoice Preview...</p>
+                </div>
+            </div>
+            <iframe id="pdfPreviewFrame" class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white" style="height: 100%; min-height: 350px;" frameborder="0"></iframe>
+        </div>
+        <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-between gap-3 flex-shrink-0">
             <div class="flex items-center gap-2 flex-wrap">
                 <button onclick="successModalPrint()" class="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition shadow-md">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                    View & Print
+                    Print
                 </button>
                 <button onclick="successModalDownload()" class="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition shadow-md">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
@@ -1336,6 +1339,10 @@ function openFbrSuccessModal(data) {
     document.getElementById('modalTimestamp').textContent = 'Submitted: ' + new Date().toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' });
     const modal = document.getElementById('fbrSuccessModal');
     const card = document.getElementById('fbrSuccessCard');
+    const frame = document.getElementById('pdfPreviewFrame');
+    const loading = document.getElementById('pdfLoading');
+    if (loading) loading.style.display = 'flex';
+    frame.src = '';
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
     card.style.transform = 'scale(0.92) translateY(20px)';
@@ -1348,39 +1355,49 @@ function openFbrSuccessModal(data) {
             card.style.opacity = '1';
         });
     });
+    setTimeout(() => {
+        frame.onload = function() {
+            if (loading) loading.style.display = 'none';
+        };
+        frame.src = _fbrPdfUrl;
+    }, 500);
 }
 
 function closeFbrSuccessModal() {
     const modal = document.getElementById('fbrSuccessModal');
     const card = document.getElementById('fbrSuccessCard');
+    const frame = document.getElementById('pdfPreviewFrame');
     modal.style.opacity = '0';
     card.style.transform = 'scale(0.95) translateY(10px)';
     card.style.opacity = '0';
     setTimeout(() => {
         modal.style.display = 'none';
         document.body.style.overflow = '';
+        if (frame) frame.src = '';
         smartRefreshInvoiceStatus();
     }, 400);
 }
 
 function successModalPrint() {
-    closeFbrSuccessModal();
-    setTimeout(() => {
-        window.open('/invoice/{{ $invoice->id }}/pdf', '_blank');
-    }, 450);
+    const frame = document.getElementById('pdfPreviewFrame');
+    if (frame && frame.contentWindow) {
+        try {
+            frame.contentWindow.focus();
+            frame.contentWindow.print();
+        } catch(e) {
+            window.open('/invoice/{{ $invoice->id }}/pdf', '_blank');
+        }
+    }
 }
 
 function successModalDownload() {
-    closeFbrSuccessModal();
-    setTimeout(() => {
-        const a = document.createElement('a');
-        a.href = '/invoice/{{ $invoice->id }}/download';
-        a.download = '';
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-    }, 450);
+    const a = document.createElement('a');
+    a.href = '/invoice/{{ $invoice->id }}/download';
+    a.download = '';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
 }
 
 function openWhtThenPrint() {

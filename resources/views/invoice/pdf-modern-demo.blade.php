@@ -251,107 +251,101 @@
     <div style="font-size: 15px; font-weight: 900; color: #000000; margin-bottom: 6px; letter-spacing: 0.5px;">{{ $invoice->document_type ?? 'Sale Invoice' }}</div>
 
     {{-- ===== 3-COL INFO SECTION ===== --}}
-    <table class="info-block">
+    <table class="info-block" style="border: 1px solid #000000;">
         <tr>
-            <td style="width: 38%; padding-right: 8px;">
-                <div class="card">
-                    <div class="section-title">Bill To</div>
-                    <span class="tag {{ ($invoice->buyer_registration_type ?? '') === 'Registered' ? 'tag-registered' : 'tag-unregistered' }}">
-                        {{ $invoice->buyer_registration_type ?? 'UNREGISTERED' }}
-                    </span>
-                    <div class="card-name">{{ $invoice->buyer_name }}</div>
-                    <div class="card-row">
-                        @if($invoice->buyer_ntn)
-                        <strong>NTN:</strong> {{ $invoice->buyer_ntn }}<br>
-                        @endif
-                        @if($invoice->buyer_cnic)
-                        <strong>CNIC:</strong> {{ $invoice->buyer_cnic }}<br>
-                        @endif
-                        @if($invoice->buyer_address)
-                        {{ $invoice->buyer_address }}<br>
-                        @endif
-                        @if($invoice->destination_province)
-                        {{ $invoice->destination_province }}, Pakistan
-                        @else
-                        Pakistan
-                        @endif
-                    </div>
+            <td style="width: 38%; border-right: 1px solid #000000; padding: 8px 10px; vertical-align: top;">
+                <div class="section-title">Bill To</div>
+                <span class="tag {{ ($invoice->buyer_registration_type ?? '') === 'Registered' ? 'tag-registered' : 'tag-unregistered' }}">
+                    {{ $invoice->buyer_registration_type ?? 'UNREGISTERED' }}
+                </span>
+                <div class="card-name">{{ $invoice->buyer_name }}</div>
+                <div class="card-row">
+                    @if($invoice->buyer_ntn)
+                    <strong>NTN:</strong> {{ $invoice->buyer_ntn }}<br>
+                    @endif
+                    @if($invoice->buyer_cnic)
+                    <strong>CNIC:</strong> {{ $invoice->buyer_cnic }}<br>
+                    @endif
+                    @if($invoice->buyer_address)
+                    {{ $invoice->buyer_address }}<br>
+                    @endif
+                    @if($invoice->destination_province)
+                    {{ $invoice->destination_province }}, Pakistan
+                    @else
+                    Pakistan
+                    @endif
                 </div>
             </td>
-            <td style="width: 34%; padding-right: 8px;">
-                <div class="card">
-                    <div class="section-title">Invoice Details</div>
-                    <table class="dtable">
-                        @if($invoice->fbr_invoice_number)
-                        <tr>
-                            <td class="dl" style="color: #000000; font-weight: 800;">FBR Invoice #</td>
-                            <td class="dv" style="color: #000000; font-size: 8.5px; font-weight: 800;">{{ $invoice->fbr_invoice_number }}</td>
-                        </tr>
-                        <tr>
-                            <td class="dl" style="color: #000000; font-weight: 800;">Internal Ref #</td>
-                            <td class="dv" style="color: #000000; font-size: 8.5px; font-weight: 800;">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</td>
-                        </tr>
-                        @else
-                        <tr>
-                            <td class="dl" style="color: #000000; font-weight: 800;">Invoice No.</td>
-                            <td class="dv" style="color: #000000; font-weight: 800;">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</td>
-                        </tr>
-                        @endif
-                        <tr>
-                            <td class="dl">Date</td>
-                            <td class="dv">{{ $invoice->created_at->format('d M Y') }}</td>
-                        </tr>
-                        <tr>
-                            <td class="dl">Status</td>
-                            <td class="dv">{{ $invoice->fbr_invoice_number ? 'FBR Verified' : ($invoice->status === 'locked' ? 'Production' : ucfirst($invoice->status)) }}</td>
-                        </tr>
-                        @if($invoice->document_type && $invoice->document_type !== 'Sale Invoice')
-                        <tr>
-                            <td class="dl">Type</td>
-                            <td class="dv">{{ $invoice->document_type }}</td>
-                        </tr>
-                        @endif
-                        @if($invoice->reference_invoice_number)
-                        <tr>
-                            <td class="dl">Ref Invoice</td>
-                            <td class="dv">{{ $invoice->reference_invoice_number }}</td>
-                        </tr>
-                        @endif
-                        <tr>
-                            <td class="dl">NTN</td>
-                            <td class="dv">{{ $invoice->company->ntn ?? 'N/A' }}</td>
-                        </tr>
-                        @if($invoice->supplier_province)
-                        <tr>
-                            <td class="dl">From</td>
-                            <td class="dv">{{ $invoice->supplier_province }}</td>
-                        </tr>
-                        @endif
-                    </table>
-                </div>
+            <td style="width: 34%; border-right: 1px solid #000000; padding: 8px 10px; vertical-align: top;">
+                <div class="section-title">Invoice Details</div>
+                <table class="dtable">
+                    @if($invoice->fbr_invoice_number)
+                    <tr>
+                        <td class="dl" style="color: #000000; font-weight: 800;">FBR Invoice #</td>
+                        <td class="dv" style="color: #000000; font-size: 8.5px; font-weight: 800;">{{ $invoice->fbr_invoice_number }}</td>
+                    </tr>
+                    <tr>
+                        <td class="dl" style="color: #000000; font-weight: 800;">Internal Ref #</td>
+                        <td class="dv" style="color: #000000; font-size: 8.5px; font-weight: 800;">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</td>
+                    </tr>
+                    @else
+                    <tr>
+                        <td class="dl" style="color: #000000; font-weight: 800;">Invoice No.</td>
+                        <td class="dv" style="color: #000000; font-weight: 800;">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</td>
+                    </tr>
+                    @endif
+                    <tr>
+                        <td class="dl">Date</td>
+                        <td class="dv">{{ $invoice->created_at->format('d M Y') }}</td>
+                    </tr>
+                    <tr>
+                        <td class="dl">Status</td>
+                        <td class="dv">{{ $invoice->fbr_invoice_number ? 'FBR Verified' : ($invoice->status === 'locked' ? 'Production' : ucfirst($invoice->status)) }}</td>
+                    </tr>
+                    @if($invoice->document_type && $invoice->document_type !== 'Sale Invoice')
+                    <tr>
+                        <td class="dl">Type</td>
+                        <td class="dv">{{ $invoice->document_type }}</td>
+                    </tr>
+                    @endif
+                    @if($invoice->reference_invoice_number)
+                    <tr>
+                        <td class="dl">Ref Invoice</td>
+                        <td class="dv">{{ $invoice->reference_invoice_number }}</td>
+                    </tr>
+                    @endif
+                    <tr>
+                        <td class="dl">NTN</td>
+                        <td class="dv">{{ $invoice->company->ntn ?? 'N/A' }}</td>
+                    </tr>
+                    @if($invoice->supplier_province)
+                    <tr>
+                        <td class="dl">From</td>
+                        <td class="dv">{{ $invoice->supplier_province }}</td>
+                    </tr>
+                    @endif
+                </table>
             </td>
-            <td style="width: 28%;">
-                <div class="card">
-                    <div class="section-title">Summary</div>
-                    <table class="dtable">
-                        <tr>
-                            <td class="dl">Items</td>
-                            <td class="dv">{{ $invoice->items->count() }}</td>
-                        </tr>
-                        <tr>
-                            <td class="dl">Sub Total</td>
-                            <td class="dv">{{ number_format($subtotal, 0) }}</td>
-                        </tr>
-                        <tr>
-                            <td class="dl">Tax</td>
-                            <td class="dv">{{ number_format($totalTax, 0) }}</td>
-                        </tr>
-                        <tr>
-                            <td class="dl" style="color: #000000; font-weight: 800;">Total</td>
-                            <td class="dv" style="color: #000000; font-weight: 800;">{{ number_format($invoice->total_amount, 0) }}</td>
-                        </tr>
-                    </table>
-                </div>
+            <td style="width: 28%; padding: 8px 10px; vertical-align: top;">
+                <div class="section-title">Summary</div>
+                <table class="dtable">
+                    <tr>
+                        <td class="dl">Items</td>
+                        <td class="dv">{{ $invoice->items->count() }}</td>
+                    </tr>
+                    <tr>
+                        <td class="dl">Sub Total</td>
+                        <td class="dv">{{ number_format($subtotal, 0) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="dl">Tax</td>
+                        <td class="dv">{{ number_format($totalTax, 0) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="dl" style="color: #000000; font-weight: 800;">Total</td>
+                        <td class="dv" style="color: #000000; font-weight: 800;">{{ number_format($invoice->total_amount, 0) }}</td>
+                    </tr>
+                </table>
             </td>
         </tr>
     </table>

@@ -18,19 +18,20 @@
         }
 
         .top-band {
-            background: #0f172a;
-            color: #ffffff;
+            background: #ffffff;
+            color: #000000;
             padding: 16px 20px 14px 20px;
+            border-bottom: 2px solid #000000;
         }
         .top-band table { width: 100%; border-collapse: collapse; }
         .top-band td { vertical-align: middle; }
-        .b-name { font-size: 22px; font-weight: 900; letter-spacing: 1px; color: #ffffff; }
-        .b-sub { font-size: 9px; color: #cbd5e1; margin-top: 2px; line-height: 1.6; }
-        .b-sub strong { color: #ffffff; }
-        .inv-label { font-size: 24px; font-weight: 900; color: #38bdf8; letter-spacing: 2px; text-align: right; }
-        .inv-num { font-size: 10px; color: #cbd5e1; text-align: right; margin-top: 2px; font-weight: 600; }
+        .b-name { font-size: 22px; font-weight: 900; letter-spacing: 1px; color: #000000; }
+        .b-sub { font-size: 9px; color: #000000; margin-top: 2px; line-height: 1.6; }
+        .b-sub strong { color: #000000; }
+        .inv-label { font-size: 24px; font-weight: 900; color: #000000; letter-spacing: 2px; text-align: right; }
+        .inv-num { font-size: 10px; color: #000000; text-align: right; margin-top: 2px; font-weight: 600; }
 
-        .color-bar { height: 4px; background: #0ea5e9; }
+        .color-bar { height: 0px; }
 
         .section-title {
             font-size: 8px;
@@ -62,16 +63,18 @@
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.8px;
-            color: #ffffff;
+            color: #000000;
             margin-bottom: 4px;
+            border: 1px solid #000000;
+            background: #ffffff;
         }
-        .tag-verified { background: #059669; }
-        .tag-registered { background: #0ea5e9; }
-        .tag-unregistered { background: #64748b; }
-        .tag-draft { background: #94a3b8; }
-        .tag-production { background: #3b82f6; }
-        .tag-failed { background: #ef4444; }
-        .tag-pending { background: #f59e0b; }
+        .tag-verified { }
+        .tag-registered { }
+        .tag-unregistered { }
+        .tag-draft { }
+        .tag-production { }
+        .tag-failed { }
+        .tag-pending { }
 
         .dtable { width: 100%; border-collapse: collapse; }
         .dtable td { padding: 3px 0; font-size: 9.5px; border-bottom: 1px dashed #cccccc; }
@@ -344,8 +347,8 @@
                             <td class="dv">{{ number_format($totalTax, 0) }}</td>
                         </tr>
                         <tr>
-                            <td class="dl" style="color: #0f172a; font-weight: 800;">Total</td>
-                            <td class="dv" style="color: #0ea5e9; font-weight: 800;">{{ number_format($invoice->total_amount, 0) }}</td>
+                            <td class="dl" style="color: #000000; font-weight: 800;">Total</td>
+                            <td class="dv" style="color: #000000; font-weight: 800;">{{ number_format($invoice->total_amount, 0) }}</td>
                         </tr>
                     </table>
                 </div>

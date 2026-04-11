@@ -68,6 +68,11 @@ $pdf1->setPaper('A4', 'portrait');
 $pdf1->save($outputDir . '/REAL-MODERN-FORMAT.pdf');
 echo "Generated: REAL-MODERN-FORMAT.pdf (Modern Design)\n";
 
+$pdf3 = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-modern-demo', $data);
+$pdf3->setPaper('A4', 'portrait');
+$pdf3->save($outputDir . '/REAL-MODERN-FBR-PRIMARY.pdf');
+echo "Generated: REAL-MODERN-FBR-PRIMARY.pdf (FBR Number Primary Demo)\n";
+
 $pdf2 = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-professional', $data);
 $pdf2->setPaper('A4', 'portrait');
 $pdf2->save($outputDir . '/REAL-CURRENT-FORMAT.pdf');

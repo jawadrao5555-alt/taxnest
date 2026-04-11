@@ -5,128 +5,78 @@ $app = require_once __DIR__ . '/bootstrap/app.php';
 $kernel = $app->make(\Illuminate\Contracts\Console\Kernel::class);
 $kernel->bootstrap();
 
-use SimpleSoftwareIO\QrCode\Facades\QrCode;
+$invoice = \App\Models\Invoice::with(['items', 'company'])->find(592);
 
-function generateQrBase64($text) {
-    $svg = QrCode::format('svg')
-        ->size(200)
-        ->margin(1)
-        ->errorCorrection('M')
-        ->generate($text);
-    return 'data:image/svg+xml;base64,' . base64_encode($svg);
+if (!$invoice) {
+    echo "Invoice 592 not found!\n";
+    exit(1);
 }
 
-$fakeCompany = new \stdClass();
-$fakeCompany->name = 'ZIA CORPORATION';
-$fakeCompany->ntn = '3620291786117';
-$fakeCompany->address = 'Main Market, Commercial Area';
-$fakeCompany->city = 'Lahore';
-$fakeCompany->cnic = null;
-$fakeCompany->registration_no = '3620291786117';
-$fakeCompany->phone = '042-35761234';
-$fakeCompany->mobile = '0300-1234567';
-$fakeCompany->email = 'info@ziacorp.pk';
+$company = $invoice->company;
+$subtotal = $invoice->items->sum(fn($item) => $item->price * $item->quantity);
+$totalTax = $invoice->items->sum('tax');
 
-$items = [];
-
-$item1 = new \stdClass();
-$item1->hs_code = '8471.3010';
-$item1->description = 'Laptop Computer (Dell Latitude 5540)';
-$item1->default_uom = 'PCS';
-$item1->quantity = 5;
-$item1->price = 185000;
-$item1->tax_rate = 18;
-$item1->tax = 166500;
-$item1->further_tax = 37000;
-$item1->schedule_type = 'third_schedule';
-$item1->sro_schedule_no = 'SRO 1125(I)/2011';
-$item1->serial_no = '49';
-$items[] = $item1;
-
-$item2 = new \stdClass();
-$item2->hs_code = '8443.3210';
-$item2->description = 'Laser Printer (HP LaserJet Pro)';
-$item2->default_uom = 'PCS';
-$item2->quantity = 10;
-$item2->price = 45000;
-$item2->tax_rate = 18;
-$item2->tax = 81000;
-$item2->further_tax = 18000;
-$item2->schedule_type = 'third_schedule';
-$item2->sro_schedule_no = 'SRO 1125(I)/2011';
-$item2->serial_no = '52';
-$items[] = $item2;
-
-$item3 = new \stdClass();
-$item3->hs_code = '8544.4210';
-$item3->description = 'Network Cable CAT-6 (per meter)';
-$item3->default_uom = 'MTR';
-$item3->quantity = 500;
-$item3->price = 85;
-$item3->tax_rate = 18;
-$item3->tax = 7650;
-$item3->further_tax = 0;
-$item3->schedule_type = null;
-$item3->sro_schedule_no = null;
-$item3->serial_no = null;
-$items[] = $item3;
-
-$subtotal = 0;
-$totalTax = 0;
-foreach ($items as $it) {
-    $subtotal += $it->price * $it->quantity;
-    $totalTax += $it->tax;
+if ($invoice->status === 'locked' && $invoice->fbr_status === 'production') {
+    $whtRate = $invoice->wht_rate ?? 0;
+    $whtAmount = $invoice->wht_amount ?? 0;
+    $netReceivable = $invoice->net_receivable ?? $invoice->total_amount;
+} else {
+    $whtRate = floatval($invoice->wht_rate ?? 0);
+    $whtAmount = round($subtotal * ($whtRate / 100), 2);
+    $netReceivable = round(($subtotal + $totalTax) + $whtAmount, 2);
 }
-$totalFurtherTax = array_sum(array_map(fn($i) => $i->further_tax, $items));
-$grandTotal = $subtotal + $totalTax + $totalFurtherTax;
 
-$fbrNumber = 'ZC20260000145';
-$qrContent = "NTN:{$fakeCompany->ntn}|INV:DI-2026-0145|DATE:15-Mar-2026|TOTAL:{$grandTotal}|FBR:{$fbrNumber}";
-$qrBase64 = generateQrBase64($qrContent);
+$qrBase64 = '';
+$fbrLogoBase64 = '';
 
-$fakeInvoice = new \stdClass();
-$fakeInvoice->id = 145;
-$fakeInvoice->invoice_number = 'DI-2026-0145';
-$fakeInvoice->internal_invoice_number = 'DI-2026-0145';
-$fakeInvoice->fbr_invoice_number = $fbrNumber;
-$fakeInvoice->status = 'locked';
-$fakeInvoice->document_type = 'Sale Invoice';
-$fakeInvoice->buyer_name = 'PAKISTAN ENGINEERING CO.';
-$fakeInvoice->buyer_ntn = '1234567-8';
-$fakeInvoice->buyer_cnic = '35202-1234567-1';
-$fakeInvoice->buyer_address = 'Plot 45, Industrial Estate, Multan Road';
-$fakeInvoice->buyer_registration_type = 'Registered';
-$fakeInvoice->destination_province = 'Punjab';
-$fakeInvoice->supplier_province = 'Punjab';
-$fakeInvoice->reference_invoice_number = null;
-$fakeInvoice->total_amount = $grandTotal;
-$fakeInvoice->wht_rate = 0;
-$fakeInvoice->wht_amount = 0;
-$fakeInvoice->net_receivable = $grandTotal;
-$fakeInvoice->created_at = \Carbon\Carbon::createFromFormat('d-M-Y h:i A', '15-Mar-2026 02:30 PM');
-$fakeInvoice->company = $fakeCompany;
-$fakeInvoice->items = collect($items);
+if ($invoice->fbr_invoice_number) {
+    $qrData = json_encode([
+        'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $company->fbr_registration_no ?: ($company->ntn ?? '')),
+        'fbr_invoice_number' => $invoice->fbr_invoice_number,
+        'invoiceDate' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
+        'totalValues' => $invoice->total_amount,
+    ]);
+    $qrOptions = new \chillerlan\QRCode\QROptions([
+        'outputType' => \chillerlan\QRCode\Output\QROutputInterface::GDIMAGE_PNG,
+        'scale' => 10,
+    ]);
+    $qrBase64 = (new \chillerlan\QRCode\QRCode($qrOptions))->render($qrData);
+
+    $logoPath = public_path('images/fbr-digital-invoice-logo.png');
+    if (file_exists($logoPath)) {
+        $fbrLogoBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));
+    }
+}
 
 $data = [
-    'invoice' => $fakeInvoice,
+    'invoice' => $invoice,
     'showWatermark' => false,
-    'isDraft' => false,
+    'isDraft' => $invoice->status === 'draft',
     'subtotal' => $subtotal,
     'totalTax' => $totalTax,
-    'wht_rate' => 0,
-    'wht_amount' => 0,
-    'net_receivable' => $grandTotal,
+    'wht_rate' => $whtRate,
+    'wht_amount' => $whtAmount,
+    'net_receivable' => $netReceivable,
     'qrBase64' => $qrBase64,
+    'fbrLogoBase64' => $fbrLogoBase64,
 ];
 
-$pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-modern', $data);
-$pdf->setPaper('A4', 'portrait');
-
 $outputDir = storage_path('app/annex-invoices');
-$pdf->save($outputDir . '/SAMPLE-MODERN-DI.pdf');
 
-echo "Generated: SAMPLE-MODERN-DI.pdf\n";
+$pdf1 = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-modern', $data);
+$pdf1->setPaper('A4', 'portrait');
+$pdf1->save($outputDir . '/REAL-MODERN-FORMAT.pdf');
+echo "Generated: REAL-MODERN-FORMAT.pdf (Modern Design)\n";
+
+$pdf2 = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-professional', $data);
+$pdf2->setPaper('A4', 'portrait');
+$pdf2->save($outputDir . '/REAL-CURRENT-FORMAT.pdf');
+echo "Generated: REAL-CURRENT-FORMAT.pdf (Current Design)\n";
+
+echo "\nInvoice #592 - {$company->name}\n";
+echo "FBR#: {$invoice->fbr_invoice_number}\n";
+echo "Buyer: {$invoice->buyer_name}\n";
 echo "Subtotal: " . number_format($subtotal) . "\n";
 echo "Tax: " . number_format($totalTax) . "\n";
-echo "Further Tax: " . number_format($totalFurtherTax) . "\n";
-echo "Grand Total: " . number_format($grandTotal) . "\n";
+echo "Total: " . number_format($invoice->total_amount) . "\n";
+echo "Items: " . $invoice->items->count() . "\n";

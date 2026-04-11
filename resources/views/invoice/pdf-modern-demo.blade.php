@@ -52,8 +52,8 @@
             padding: 8px 10px;
         }
         .card-name { font-size: 12px; font-weight: 800; color: #0f172a; margin-bottom: 2px; }
-        .card-row { font-size: 9.5px; color: #334155; line-height: 1.6; }
-        .card-row strong { color: #0f172a; font-weight: 700; }
+        .card-row { font-size: 9.5px; color: #1e293b; line-height: 1.6; }
+        .card-row strong { color: #0f172a; font-weight: 800; }
 
         .tag {
             display: inline-block;
@@ -75,7 +75,7 @@
 
         .dtable { width: 100%; border-collapse: collapse; }
         .dtable td { padding: 3px 0; font-size: 9.5px; border-bottom: 1px dashed #e2e8f0; }
-        .dtable .dl { color: #475569; font-weight: 600; }
+        .dtable .dl { color: #1e293b; font-weight: 700; }
         .dtable .dv { color: #0f172a; font-weight: 700; text-align: right; }
 
         .fbr-section {
@@ -105,7 +105,7 @@
         .items tbody td {
             padding: 6px;
             font-size: 10px;
-            color: #334155;
+            color: #1e293b;
             border: 1px solid #e2e8f0;
         }
         .items tbody tr:nth-child(even) td { background: #f8fafc; }
@@ -119,7 +119,7 @@
         .totals-box { border: 1px solid #e2e8f0; overflow: hidden; }
         .totals-box table { width: 100%; border-collapse: collapse; }
         .totals-box td { padding: 5px 10px; font-size: 10px; }
-        .totals-box .tl { text-align: right; color: #475569; font-weight: 600; width: 55%; }
+        .totals-box .tl { text-align: right; color: #1e293b; font-weight: 700; width: 55%; }
         .totals-box .tv { text-align: right; color: #0f172a; font-weight: 700; width: 45%; white-space: nowrap; }
         .totals-box tr { border-bottom: 1px solid #f1f5f9; }
         .totals-box tr.grand { background: #0f172a; }
@@ -127,13 +127,13 @@
         .totals-box tr.grand .tl { color: #94a3b8; font-size: 12px; font-weight: 800; }
         .totals-box tr.grand .tv { color: #38bdf8; font-size: 14px; font-weight: 900; }
 
-        .sched { font-size: 9px; color: #475569; line-height: 1.5; margin-top: 4px; }
-        .sched strong { color: #334155; font-weight: 700; }
+        .sched { font-size: 9px; color: #1e293b; line-height: 1.5; margin-top: 4px; }
+        .sched strong { color: #0f172a; font-weight: 800; }
 
         .sig-section { width: 100%; border-collapse: collapse; margin-top: 14px; }
         .sig-section td { vertical-align: bottom; padding: 0; }
         .sig-line { border-top: 1px solid #334155; width: 160px; margin-top: 30px; }
-        .sig-label { font-size: 8px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-top: 3px; }
+        .sig-label { font-size: 8px; color: #334155; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-top: 3px; }
 
         .foot {
             margin-top: 14px;
@@ -141,7 +141,7 @@
             border-top: 2px solid #0f172a;
             text-align: center;
         }
-        .foot-line { font-size: 8px; color: #94a3b8; }
+        .foot-line { font-size: 8px; color: #64748b; }
         .foot-brand { font-size: 9px; color: #0f172a; font-weight: 800; margin-top: 2px; letter-spacing: 0.5px; }
 
         .watermark {
@@ -199,32 +199,25 @@
                 <td style="width: 42%;">
                     <div class="inv-label">INVOICE</div>
                     @if($invoice->fbr_invoice_number)
-                    <div class="inv-num" style="font-size: 10px; font-weight: 700;"># {{ $invoice->fbr_invoice_number }}</div>
-                    <div style="text-align: right; margin-top: 1px;">
-                        <span style="font-size: 7.5px; color: #94a3b8;">Ref: {{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</span>
-                    </div>
-                    <div style="text-align: right; margin-top: 3px;">
+                    <div style="text-align: right; margin-top: 6px;">
                         <span class="tag tag-verified">FBR VERIFIED</span>
                     </div>
-                    @else
-                    <div class="inv-num"># {{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</div>
-                    @if($invoice->status === 'draft')
-                    <div style="text-align: right; margin-top: 4px;">
+                    @elseif($invoice->status === 'draft')
+                    <div style="text-align: right; margin-top: 6px;">
                         <span class="tag tag-draft">DRAFT</span>
                     </div>
                     @elseif($invoice->status === 'locked')
-                    <div style="text-align: right; margin-top: 4px;">
+                    <div style="text-align: right; margin-top: 6px;">
                         <span class="tag tag-production">PRODUCTION</span>
                     </div>
                     @elseif($invoice->status === 'failed')
-                    <div style="text-align: right; margin-top: 4px;">
+                    <div style="text-align: right; margin-top: 6px;">
                         <span class="tag tag-failed">FAILED</span>
                     </div>
                     @elseif($invoice->status === 'pending_verification')
-                    <div style="text-align: right; margin-top: 4px;">
+                    <div style="text-align: right; margin-top: 6px;">
                         <span class="tag tag-pending">PENDING</span>
                     </div>
-                    @endif
                     @endif
                 </td>
             </tr>
@@ -288,17 +281,17 @@
                     <table class="dtable">
                         @if($invoice->fbr_invoice_number)
                         <tr>
-                            <td class="dl">FBR Invoice</td>
-                            <td class="dv" style="font-size: 8px;">{{ $invoice->fbr_invoice_number }}</td>
+                            <td class="dl" style="color: #0f172a; font-weight: 800;">FBR Invoice #</td>
+                            <td class="dv" style="color: #0f172a; font-size: 8.5px; font-weight: 800;">{{ $invoice->fbr_invoice_number }}</td>
                         </tr>
                         <tr>
-                            <td class="dl" style="color: #94a3b8; font-weight: 500;">Internal Ref</td>
-                            <td class="dv" style="color: #94a3b8; font-size: 8px; font-weight: 500;">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</td>
+                            <td class="dl" style="color: #0f172a; font-weight: 700;">Internal Ref #</td>
+                            <td class="dv" style="color: #334155; font-size: 8.5px; font-weight: 700;">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</td>
                         </tr>
                         @else
                         <tr>
-                            <td class="dl">Invoice No.</td>
-                            <td class="dv">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</td>
+                            <td class="dl" style="color: #0f172a; font-weight: 800;">Invoice No.</td>
+                            <td class="dv" style="color: #0f172a; font-weight: 800;">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</td>
                         </tr>
                         @endif
                         <tr>

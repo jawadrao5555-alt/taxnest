@@ -386,6 +386,189 @@ class RestaurantPosController extends Controller
         }
     }
 
+    public function quickPay(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $user = Auth::guard('pos')->user();
+
+        $request->validate([
+            'items' => 'required|array|min:1',
+            'payment_method' => 'required|string|in:cash,card,online,split',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $resolvedItems = $this->resolveItemExemptions($request->items, $companyId);
+            $subtotal = collect($resolvedItems)->sum('subtotal');
+
+            $discountType = $request->discount_type ?? 'percentage';
+            $discountValue = (float)($request->discount_value ?? 0);
+            $discountAmount = (float)($request->discount_amount ?? 0);
+            if ($discountAmount > $subtotal) $discountAmount = $subtotal;
+
+            $paymentMethod = $request->payment_method;
+            $taxRate = PosTaxRule::getRateForMethod($paymentMethod);
+            $discountRatio = $subtotal > 0 ? ($subtotal - $discountAmount) / $subtotal : 1;
+            $taxableSubtotal = collect($resolvedItems)->where('is_tax_exempt', false)->sum('subtotal');
+            $adjustedTaxable = round($taxableSubtotal * max(0, $discountRatio), 2);
+            $taxAmount = round($adjustedTaxable * $taxRate / 100, 2);
+            $totalAmount = round($subtotal - $discountAmount + $taxAmount, 2);
+
+            $orderNumber = 'R-' . strtoupper(substr(md5($companyId . microtime()), 0, 6));
+            if ($request->recalled_order_id) {
+                $old = RestaurantOrder::where('company_id', $companyId)->find($request->recalled_order_id);
+                if ($old && $old->status !== 'completed') {
+                    $orderNumber = $old->order_number;
+                    $old->items()->delete();
+                    $old->delete();
+                }
+            }
+
+            $recipeLookup = [];
+            $productIds = collect($resolvedItems)->where('item_type', 'product')->pluck('item_id')->unique()->values()->all();
+            if (!empty($productIds)) {
+                $recipes = \App\Models\Recipe::where('company_id', $companyId)->whereIn('product_id', $productIds)->with('ingredient')->get();
+                foreach ($recipes as $r) { $recipeLookup[$r->product_id][] = $r; }
+            }
+            $estimatedCost = 0;
+            foreach ($resolvedItems as $ri) {
+                if ($ri['item_type'] === 'product' && isset($recipeLookup[$ri['item_id']])) {
+                    foreach ($recipeLookup[$ri['item_id']] as $recipe) {
+                        $ing = $recipe->ingredient;
+                        if ($ing) $estimatedCost += (float)$recipe->quantity_needed * (float)($ing->cost_per_unit ?? 0) * $ri['quantity'];
+                    }
+                }
+            }
+
+            $order = RestaurantOrder::create([
+                'company_id' => $companyId,
+                'order_number' => $orderNumber,
+                'table_id' => $request->table_id,
+                'order_type' => $request->order_type ?? 'dine_in',
+                'status' => 'completed',
+                'customer_id' => $request->customer_id,
+                'customer_name' => $request->customer_name,
+                'customer_phone' => $request->customer_phone,
+                'subtotal' => $subtotal,
+                'discount_type' => $discountType,
+                'discount_value' => $discountValue,
+                'discount_amount' => $discountAmount,
+                'tax_amount' => $taxAmount,
+                'total_amount' => $totalAmount,
+                'payment_method' => $paymentMethod,
+                'estimated_cost' => round($estimatedCost, 2),
+                'kitchen_notes' => $request->kitchen_notes,
+                'priority' => (bool)($request->priority ?? false),
+                'created_by' => $user->id,
+            ]);
+
+            foreach ($resolvedItems as $item) {
+                RestaurantOrderItem::create(array_merge($item, ['order_id' => $order->id]));
+            }
+
+            $stockErrors = $this->validateStockForOrder($companyId, $order->load('items'), true);
+            if (!empty($stockErrors)) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'stock_error' => true, 'message' => 'Insufficient stock: ' . implode(', ', $stockErrors)], 400);
+            }
+
+            $praEnabled = (bool) $company->pra_reporting_enabled;
+            $invoiceMode = $praEnabled ? 'pra' : 'local';
+            $invoiceNumber = $invoiceMode === 'local' ? $this->generateLocalInvoiceNumber($companyId) : $this->generateInvoiceNumber($companyId);
+            $submissionHash = hash('sha256', $companyId . '|' . $invoiceNumber . '|' . $totalAmount . '|' . now()->timestamp);
+
+            $transaction = PosTransaction::create([
+                'company_id' => (int) $companyId,
+                'invoice_number' => $invoiceNumber,
+                'invoice_mode' => $invoiceMode,
+                'customer_id' => $order->customer_id ? (int) $order->customer_id : null,
+                'customer_name' => $order->customer_name,
+                'customer_phone' => $order->customer_phone,
+                'subtotal' => (float) $subtotal,
+                'discount_type' => $order->discount_type ?? 'amount',
+                'discount_value' => (float)($order->discount_value ?? 0),
+                'discount_amount' => (float) $discountAmount,
+                'tax_rate' => (float) $taxRate,
+                'tax_amount' => (float) $taxAmount,
+                'exempt_amount' => (float) ($subtotal - $taxableSubtotal),
+                'total_amount' => (float) $totalAmount,
+                'payment_method' => $paymentMethod,
+                'status' => 'completed',
+                'pra_status' => $praEnabled ? 'pending' : 'local',
+                'submission_hash' => $submissionHash,
+                'created_by' => (int) $user->id,
+            ]);
+
+            foreach ($order->items as $item) {
+                $lineAfterOrderDisc = $subtotal > 0 ? round($item->subtotal * max(0, $discountRatio), 2) : $item->subtotal;
+                $lineTax = $item->is_tax_exempt ? 0 : round($lineAfterOrderDisc * $taxRate / 100, 2);
+                $itemQty = max(1, (int) $item->quantity);
+                PosTransactionItem::create([
+                    'transaction_id' => (int) $transaction->id,
+                    'item_type' => $item->item_type,
+                    'item_id' => (int) $item->item_id,
+                    'item_name' => (string) $item->item_name,
+                    'quantity' => $itemQty,
+                    'unit_price' => (float) $item->unit_price,
+                    'subtotal' => (float) $item->subtotal,
+                    'is_tax_exempt' => (bool) $item->is_tax_exempt,
+                    'tax_rate' => $item->is_tax_exempt ? 0 : (float) $taxRate,
+                    'tax_amount' => (float) $lineTax,
+                    'item_discount_type' => $item->item_discount_type ?? 'percentage',
+                    'item_discount_value' => (float) ($item->item_discount_value ?? 0),
+                    'item_discount_amount' => (float) ($item->item_discount_amount ?? 0),
+                ]);
+            }
+
+            $order->update(['pos_transaction_id' => $transaction->id]);
+            $this->deductInventoryForOrder($companyId, $order, $transaction->id, $invoiceNumber, $user->id);
+
+            if ($request->table_id) {
+                $otherActive = RestaurantOrder::where('company_id', $companyId)->where('table_id', $request->table_id)->where('id', '!=', $order->id)->whereNotIn('status', ['completed', 'cancelled'])->exists();
+                if (!$otherActive) {
+                    RestaurantTable::where('company_id', $companyId)->where('id', $request->table_id)->update(['status' => 'available', 'locked_by_user_id' => null, 'locked_at' => null]);
+                }
+            }
+
+            if ($order->customer_id) { $this->updateCustomerStats($order->customer_id, $totalAmount); }
+
+            DB::commit();
+
+            if ($praEnabled) {
+                try {
+                    $praService = new \App\Services\PraIntegrationService($company);
+                    $praResult = $praService->sendInvoice($transaction);
+                    if ($praResult && isset($praResult['success']) && $praResult['success']) {
+                        $transaction->update(['pra_status' => 'submitted', 'pra_invoice_number' => $praResult['pra_invoice_number'] ?? null, 'pra_response_code' => $praResult['response_code'] ?? null]);
+                    }
+                } catch (\Throwable $e) {
+                    $transaction->update(['pra_status' => 'offline']);
+                    Log::warning('PRA submission failed: ' . $e->getMessage());
+                }
+            }
+
+            try {
+                AuditLogService::log('order_quick_paid', 'restaurant_order', $order->id, null, [
+                    'order_number' => $orderNumber, 'invoice_number' => $invoiceNumber, 'total' => $totalAmount, 'payment_method' => $paymentMethod,
+                ], $companyId, $user->id);
+            } catch (\Exception $e) {}
+
+            return response()->json([
+                'success' => true,
+                'message' => "Payment received. Invoice: {$invoiceNumber}",
+                'transaction_id' => $transaction->id,
+                'order_id' => $order->id,
+                'invoice_number' => $invoiceNumber,
+                'total_amount' => $totalAmount,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Quick pay failed: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Payment failed: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function payOrder(Request $request, $orderId)
     {
         $companyId = app('currentCompanyId');

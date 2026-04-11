@@ -485,6 +485,7 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::middleware('restaurant.only')->group(function () {
     Route::get('/restaurant/pos', [RestaurantPosController::class, 'pos'])->name('pos.restaurant.pos');
     Route::post('/restaurant/orders/hold', [RestaurantPosController::class, 'holdOrder'])->name('pos.restaurant.orders.hold');
+    Route::post('/restaurant/orders/quick-pay', [RestaurantPosController::class, 'quickPay'])->name('pos.restaurant.orders.quick-pay');
     Route::post('/restaurant/orders/{id}/pay', [RestaurantPosController::class, 'payOrder'])->name('pos.restaurant.orders.pay');
     Route::post('/restaurant/orders/{id}/delete', [RestaurantPosController::class, 'deleteOrder'])->name('pos.restaurant.orders.delete');
     Route::get('/restaurant/orders/by-table/{tableId}', [RestaurantPosController::class, 'getOrdersByTable'])->name('pos.restaurant.orders.by-table');

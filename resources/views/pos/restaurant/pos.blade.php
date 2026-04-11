@@ -1573,15 +1573,22 @@ function restaurantPos() {
             this.lastPayTime = now;
             this.submitting = true; this.stockError = '';
             try {
-                const holdRes = await fetch('{{ route("pos.restaurant.orders.hold") }}', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount }),
-                });
-                const holdData = await holdRes.json();
-                if (!holdData.success) { this.showToast(holdData.message || 'Failed', 'error'); this.submitting = false; return; }
                 const savedTotal = this.totalAmount;
-                await this.payHeldOrderDirect(holdData.order.id, method, savedTotal);
-                this.clearCart();
+                const res = await fetch('{{ route("pos.restaurant.orders.quick-pay") }}', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount, payment_method: method }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.lastInvoiceNumber = data.invoice_number || ''; this.lastTransactionId = data.transaction_id || null;
+                    this.lastOrderId = data.order_id || null;
+                    this.lastTotal = savedTotal || data.total_amount || 0; this.lastPaymentMethod = method; this.showReceipt = true;
+                    this.$nextTick(() => { setTimeout(() => this.triggerConfetti(), 300); });
+                    this.clearCart();
+                } else {
+                    if (data.stock_error) { this.stockError = data.message; }
+                    this.showToast(data.message || 'Payment failed', 'error');
+                }
             } catch (e) { this.showToast('Network error', 'error'); }
             this.showPayModal = false; this.submitting = false;
         },
@@ -1624,24 +1631,15 @@ function restaurantPos() {
             const oid = orderId || this.lastOrderId;
             if (!oid) return;
             const url = '/pos/restaurant/orders/' + oid + '/kitchen-ticket';
-            let kotFrame = document.getElementById('print-kot-frame');
-            if (!kotFrame) {
-                kotFrame = document.createElement('iframe');
-                kotFrame.id = 'print-kot-frame';
-                kotFrame.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;top:-9999px;';
-                document.body.appendChild(kotFrame);
+            const kotWin = window.open(url, 'kot_print', 'width=350,height=600,scrollbars=yes,resizable=yes');
+            if (kotWin) {
+                kotWin.onload = () => { setTimeout(() => { try { kotWin.print(); } catch(e) {} }, 600); };
             }
-            kotFrame.onload = () => {
-                setTimeout(() => {
-                    try { kotFrame.contentWindow.print(); } catch(e) { window.open(url, '_blank', 'width=350,height=600'); }
-                }, 500);
-            };
-            kotFrame.src = url;
         },
 
         autoPrintKOT(orderId) {
             if (!orderId) return;
-            setTimeout(() => { this.printKOT(orderId); }, 800);
+            setTimeout(() => { this.printKOT(orderId); }, 1000);
         },
 
         async deleteHeldOrder(orderId) {

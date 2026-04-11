@@ -84,3 +84,9 @@ id = "4BiIh3EXIfkTeBndeBIgn"
 uri = "file://public/annex-invoices/INV-NISR10.pdf"
 type = "pdf"
 title = "INV-NISR10 - 10 Jan 2026, 03:20 PM - Rs.215,849"
+
+[[outputs]]
+id = "z-cPiEydHGWUJvQOEf3iv"
+uri = "file://public/annex-invoices/SAMPLE-MODERN-DI.pdf"
+type = "pdf"
+title = "SAMPLE - Modern DI Format (ZIA CORPORATION)"

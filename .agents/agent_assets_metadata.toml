@@ -108,3 +108,9 @@ id = "2iPDNlMHj-wfV-Enr5_Kb"
 uri = "file://public/annex-invoices/REAL-MODERN-FBR-PRIMARY.pdf"
 type = "pdf"
 title = "100% Black & White - No Colors, Print Ready"
+
+[[outputs]]
+id = "zJABVnwHoK3rqxHifrqiK"
+uri = "file://public/annex-invoices/FULL-DEMO-INVOICE.pdf"
+type = "pdf"
+title = "Full Demo - 3 Items + WHT + Further Tax + All Fields"

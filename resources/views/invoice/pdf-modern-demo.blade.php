@@ -424,7 +424,7 @@
                         @if($totalFurtherTax > 0)
                         <tr>
                             <td class="tl">Further Tax (4%)</td>
-                            <td class="tv" style="color: #f97316;">PKR {{ number_format($totalFurtherTax, 2) }}</td>
+                            <td class="tv">PKR {{ number_format($totalFurtherTax, 2) }}</td>
                         </tr>
                         @endif
                         @if(($wht_rate ?? 0) > 0)

@@ -95,10 +95,10 @@ title = "SAMPLE - Modern DI Format (ZIA CORPORATION)"
 id = "51ZYcuHW7SHNEfmugvSqg"
 uri = "file://public/annex-invoices/REAL-MODERN-FORMAT.pdf"
 type = "pdf"
-title = "NEW Modern Design - ZIA CORPORATION Real Invoice"
+title = "MODERN Design - Real Invoice (ZIA CORPORATION #592)"
 
 [[outputs]]
 id = "bK92IQ0mj2REKaQjm2kGh"
 uri = "file://public/annex-invoices/REAL-CURRENT-FORMAT.pdf"
 type = "pdf"
-title = "CURRENT Design - ZIA CORPORATION Real Invoice (comparison)"
+title = "CURRENT Design - Same Invoice (comparison)"

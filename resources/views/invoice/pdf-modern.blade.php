@@ -25,8 +25,8 @@
         .top-band table { width: 100%; border-collapse: collapse; }
         .top-band td { vertical-align: middle; }
         .b-name { font-size: 22px; font-weight: 900; letter-spacing: 1px; color: #ffffff; }
-        .b-sub { font-size: 9px; color: #94a3b8; margin-top: 2px; line-height: 1.6; }
-        .b-sub strong { color: #cbd5e1; }
+        .b-sub { font-size: 9px; color: #cbd5e1; margin-top: 2px; line-height: 1.6; }
+        .b-sub strong { color: #ffffff; }
         .inv-label { font-size: 24px; font-weight: 900; color: #38bdf8; letter-spacing: 2px; text-align: right; }
         .inv-num { font-size: 10px; color: #cbd5e1; text-align: right; margin-top: 2px; font-weight: 600; }
 
@@ -52,8 +52,8 @@
             padding: 8px 10px;
         }
         .card-name { font-size: 12px; font-weight: 800; color: #0f172a; margin-bottom: 2px; }
-        .card-row { font-size: 9.5px; color: #475569; line-height: 1.6; }
-        .card-row strong { color: #1e293b; font-weight: 700; }
+        .card-row { font-size: 9.5px; color: #334155; line-height: 1.6; }
+        .card-row strong { color: #0f172a; font-weight: 700; }
 
         .tag {
             display: inline-block;
@@ -75,7 +75,7 @@
 
         .dtable { width: 100%; border-collapse: collapse; }
         .dtable td { padding: 3px 0; font-size: 9.5px; border-bottom: 1px dashed #e2e8f0; }
-        .dtable .dl { color: #64748b; font-weight: 600; }
+        .dtable .dl { color: #475569; font-weight: 600; }
         .dtable .dv { color: #0f172a; font-weight: 700; text-align: right; }
 
         .fbr-section {
@@ -119,7 +119,7 @@
         .totals-box { border: 1px solid #e2e8f0; overflow: hidden; }
         .totals-box table { width: 100%; border-collapse: collapse; }
         .totals-box td { padding: 5px 10px; font-size: 10px; }
-        .totals-box .tl { text-align: right; color: #64748b; font-weight: 600; width: 55%; }
+        .totals-box .tl { text-align: right; color: #475569; font-weight: 600; width: 55%; }
         .totals-box .tv { text-align: right; color: #0f172a; font-weight: 700; width: 45%; white-space: nowrap; }
         .totals-box tr { border-bottom: 1px solid #f1f5f9; }
         .totals-box tr.grand { background: #0f172a; }
@@ -127,8 +127,8 @@
         .totals-box tr.grand .tl { color: #94a3b8; font-size: 12px; font-weight: 800; }
         .totals-box tr.grand .tv { color: #38bdf8; font-size: 14px; font-weight: 900; }
 
-        .sched { font-size: 9px; color: #64748b; line-height: 1.5; margin-top: 4px; }
-        .sched strong { color: #475569; font-weight: 700; }
+        .sched { font-size: 9px; color: #475569; line-height: 1.5; margin-top: 4px; }
+        .sched strong { color: #334155; font-weight: 700; }
 
         .sig-section { width: 100%; border-collapse: collapse; margin-top: 14px; }
         .sig-section td { vertical-align: bottom; padding: 0; }

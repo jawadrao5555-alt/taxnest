@@ -5,6 +5,79 @@ $app = require_once __DIR__ . '/bootstrap/app.php';
 $kernel = $app->make(\Illuminate\Contracts\Console\Kernel::class);
 $kernel->bootstrap();
 
+function generateDummyQrBase64($text) {
+    $size = 200;
+    $img = imagecreatetruecolor($size, $size);
+    $white = imagecolorallocate($img, 255, 255, 255);
+    $black = imagecolorallocate($img, 0, 0, 0);
+    $green = imagecolorallocate($img, 22, 101, 52);
+    $gray = imagecolorallocate($img, 200, 200, 200);
+
+    imagefill($img, 0, 0, $white);
+
+    imagerectangle($img, 0, 0, $size-1, $size-1, $gray);
+
+    $moduleSize = 6;
+    $modules = 25;
+    $offset = ($size - ($modules * $moduleSize)) / 2;
+
+    for ($i = 0; $i < 7; $i++) {
+        for ($j = 0; $j < 7; $j++) {
+            if ($i == 0 || $i == 6 || $j == 0 || $j == 6 || ($i >= 2 && $i <= 4 && $j >= 2 && $j <= 4)) {
+                imagefilledrectangle($img,
+                    $offset + $j * $moduleSize, $offset + $i * $moduleSize,
+                    $offset + ($j+1) * $moduleSize - 1, $offset + ($i+1) * $moduleSize - 1,
+                    $black);
+            }
+        }
+    }
+
+    $tlX = $modules - 7;
+    for ($i = 0; $i < 7; $i++) {
+        for ($j = 0; $j < 7; $j++) {
+            if ($i == 0 || $i == 6 || $j == 0 || $j == 6 || ($i >= 2 && $i <= 4 && $j >= 2 && $j <= 4)) {
+                imagefilledrectangle($img,
+                    $offset + ($tlX + $j) * $moduleSize, $offset + $i * $moduleSize,
+                    $offset + ($tlX + $j + 1) * $moduleSize - 1, $offset + ($i+1) * $moduleSize - 1,
+                    $black);
+            }
+        }
+    }
+
+    $blY = $modules - 7;
+    for ($i = 0; $i < 7; $i++) {
+        for ($j = 0; $j < 7; $j++) {
+            if ($i == 0 || $i == 6 || $j == 0 || $j == 6 || ($i >= 2 && $i <= 4 && $j >= 2 && $j <= 4)) {
+                imagefilledrectangle($img,
+                    $offset + $j * $moduleSize, $offset + ($blY + $i) * $moduleSize,
+                    $offset + ($j+1) * $moduleSize - 1, $offset + ($blY + $i + 1) * $moduleSize - 1,
+                    $black);
+            }
+        }
+    }
+
+    srand(crc32($text));
+    for ($i = 8; $i < $modules - 1; $i++) {
+        for ($j = 8; $j < $modules - 1; $j++) {
+            if ($i < 7 && $j >= $modules - 7) continue;
+            if ($i >= $modules - 7 && $j < 7) continue;
+            if (rand(0, 100) > 55) {
+                imagefilledrectangle($img,
+                    $offset + $j * $moduleSize, $offset + $i * $moduleSize,
+                    $offset + ($j+1) * $moduleSize - 1, $offset + ($i+1) * $moduleSize - 1,
+                    $black);
+            }
+        }
+    }
+
+    ob_start();
+    imagepng($img);
+    $pngData = ob_get_clean();
+    imagedestroy($img);
+
+    return 'data:image/png;base64,' . base64_encode($pngData);
+}
+
 $invoices = [
     [
         'serial' => 22,
@@ -57,8 +130,11 @@ $invoices = [
 ];
 
 $seller = [
-    'name' => 'MUHAMMAD RAMZAN',
-    'ntn' => '3620317950351',
+    'name' => 'CHOUDHARY TRADERS',
+    'ntn' => '0807585-9',
+    'registration_no' => '3620317950351',
+    'address' => 'NEAR LARI ADDA, STREET SUMBAL BAKERS WALI',
+    'city' => 'Lodhran',
     'tax_period' => 'Jan 2026',
 ];
 
@@ -80,10 +156,10 @@ foreach ($invoices as $inv) {
     $fakeCompany = new \stdClass();
     $fakeCompany->name = $seller['name'];
     $fakeCompany->ntn = $seller['ntn'];
-    $fakeCompany->address = null;
-    $fakeCompany->city = null;
+    $fakeCompany->address = $seller['address'];
+    $fakeCompany->city = $seller['city'];
     $fakeCompany->cnic = null;
-    $fakeCompany->registration_no = null;
+    $fakeCompany->registration_no = $seller['registration_no'];
     $fakeCompany->phone = null;
     $fakeCompany->mobile = null;
     $fakeCompany->email = null;
@@ -102,11 +178,15 @@ foreach ($invoices as $inv) {
     $fakeItem->sro_schedule_no = null;
     $fakeItem->serial_no = null;
 
+    $dummyFbrNumber = 'CT' . date('Y', strtotime($inv['date'])) . str_pad($inv['serial'], 6, '0', STR_PAD_LEFT);
+
+    $qrBase64 = generateDummyQrBase64($seller['ntn'] . '-' . $inv['invoice_number'] . '-' . $inv['total']);
+
     $fakeInvoice = new \stdClass();
     $fakeInvoice->id = $inv['serial'];
     $fakeInvoice->invoice_number = $inv['invoice_number'];
     $fakeInvoice->internal_invoice_number = $inv['invoice_number'];
-    $fakeInvoice->fbr_invoice_number = null;
+    $fakeInvoice->fbr_invoice_number = $dummyFbrNumber;
     $fakeInvoice->status = 'locked';
     $fakeInvoice->fbr_status = null;
     $fakeInvoice->document_type = 'Sale Invoice';
@@ -136,7 +216,7 @@ foreach ($invoices as $inv) {
         'wht_rate' => 0,
         'wht_amount' => 0,
         'net_receivable' => $inv['total'],
-        'qrBase64' => '',
+        'qrBase64' => $qrBase64,
         'fbrLogoBase64' => '',
     ];
 
@@ -146,7 +226,7 @@ foreach ($invoices as $inv) {
     $filename = $inv['invoice_number'] . '.pdf';
     $pdf->save($outputDir . '/' . $filename);
 
-    echo "Generated: {$filename}\n";
+    echo "Generated: {$filename} (FBR#: {$dummyFbrNumber})\n";
 }
 
 echo "\nAll 4 invoices generated in: {$outputDir}\n";

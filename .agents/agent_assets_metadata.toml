@@ -53,22 +53,22 @@ title = "6. FBR POS Login (Blue Theme)"
 id = "PYCY7gEPBfJxw_9UlCC_K"
 uri = "file://public/annex-invoices/INV-RAM01.pdf"
 type = "pdf"
-title = "Invoice INV-RAM01 (Serial 22) - 01 Jan 2026"
+title = "INV-RAM01 (Serial 22) - 01 Jan 2026 - Rs.236,000"
 
 [[outputs]]
 id = "O7NUXAsdI3FRODJt0D9vy"
 uri = "file://public/annex-invoices/INV-RAM02.pdf"
 type = "pdf"
-title = "Invoice INV-RAM02 (Serial 21) - 02 Jan 2026"
+title = "INV-RAM02 (Serial 21) - 02 Jan 2026 - Rs.236,000"
 
 [[outputs]]
 id = "T9FEaQe8eN7gEuD5WHwMZ"
 uri = "file://public/annex-invoices/INV-RAM03.pdf"
 type = "pdf"
-title = "Invoice INV-RAM03 (Serial 20) - 03 Jan 2026"
+title = "INV-RAM03 (Serial 20) - 03 Jan 2026 - Rs.236,000"
 
 [[outputs]]
 id = "HDxaftWMIDiPTLZRg1-27"
 uri = "file://public/annex-invoices/INV-RAM04.pdf"
 type = "pdf"
-title = "Invoice INV-RAM04 (Serial 19) - 04 Jan 2026"
+title = "INV-RAM04 (Serial 19) - 04 Jan 2026 - Rs.236,000"

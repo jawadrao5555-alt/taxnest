@@ -360,7 +360,7 @@
 
     {{-- ===== FOOTER ===== --}}
     <div class="footer">
-        <div class="footer-text">This is a computer-generated invoice. | {{ now()->format('d M Y, h:i A') }}</div>
+        <div class="footer-text">This is a computer-generated invoice. | {{ $invoice->created_at->format('d M Y, h:i A') }}</div>
         <div class="footer-brand">TaxNest — Tax &amp; Invoice Management System</div>
     </div>
 

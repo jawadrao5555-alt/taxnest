@@ -11,7 +11,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'DejaVu Sans', 'Helvetica', Arial, sans-serif;
-            color: #1e293b;
+            color: #000000;
             font-size: 11px;
             line-height: 1.5;
             width: 100%;
@@ -51,9 +51,9 @@
             border: 1px solid #e2e8f0;
             padding: 8px 10px;
         }
-        .card-name { font-size: 12px; font-weight: 800; color: #0f172a; margin-bottom: 2px; }
-        .card-row { font-size: 9.5px; color: #1e293b; line-height: 1.6; }
-        .card-row strong { color: #0f172a; font-weight: 800; }
+        .card-name { font-size: 12px; font-weight: 800; color: #000000; margin-bottom: 2px; }
+        .card-row { font-size: 9.5px; color: #000000; line-height: 1.6; }
+        .card-row strong { color: #000000; font-weight: 800; }
 
         .tag {
             display: inline-block;
@@ -75,8 +75,8 @@
 
         .dtable { width: 100%; border-collapse: collapse; }
         .dtable td { padding: 3px 0; font-size: 9.5px; border-bottom: 1px dashed #e2e8f0; }
-        .dtable .dl { color: #1e293b; font-weight: 700; }
-        .dtable .dv { color: #0f172a; font-weight: 700; text-align: right; }
+        .dtable .dl { color: #000000; font-weight: 700; }
+        .dtable .dv { color: #000000; font-weight: 700; text-align: right; }
 
         .fbr-section {
             text-align: center;
@@ -86,7 +86,7 @@
         }
         .fbr-section table { margin: 0 auto; border-collapse: collapse; }
         .fbr-section td { vertical-align: middle; }
-        .fbr-inv-label { font-size: 10px; color: #0f172a; font-weight: 800; margin-top: 4px; letter-spacing: 0.2px; }
+        .fbr-inv-label { font-size: 10px; color: #000000; font-weight: 800; margin-top: 4px; letter-spacing: 0.2px; }
 
         .items { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
         .items thead th {
@@ -105,35 +105,35 @@
         .items tbody td {
             padding: 6px;
             font-size: 10px;
-            color: #1e293b;
+            color: #000000;
             border: 1px solid #e2e8f0;
         }
         .items tbody tr:nth-child(even) td { background: #f8fafc; }
-        .items tbody td.ar { text-align: right; font-weight: 700; color: #0f172a; }
+        .items tbody td.ar { text-align: right; font-weight: 700; color: #000000; }
         .items tbody td.ac { text-align: center; }
-        .items tbody td.hs { font-weight: 700; color: #0f172a; letter-spacing: 0.3px; font-size: 10px; }
-        .items tbody td.desc { font-weight: 600; color: #1e293b; }
+        .items tbody td.hs { font-weight: 700; color: #000000; letter-spacing: 0.3px; font-size: 10px; }
+        .items tbody td.desc { font-weight: 600; color: #000000; }
 
         .totals-wrap { width: 100%; border-collapse: collapse; }
         .totals-wrap td { vertical-align: top; }
         .totals-box { border: 1px solid #e2e8f0; overflow: hidden; }
         .totals-box table { width: 100%; border-collapse: collapse; }
         .totals-box td { padding: 5px 10px; font-size: 10px; }
-        .totals-box .tl { text-align: right; color: #1e293b; font-weight: 700; width: 55%; }
-        .totals-box .tv { text-align: right; color: #0f172a; font-weight: 700; width: 45%; white-space: nowrap; }
+        .totals-box .tl { text-align: right; color: #000000; font-weight: 700; width: 55%; }
+        .totals-box .tv { text-align: right; color: #000000; font-weight: 700; width: 45%; white-space: nowrap; }
         .totals-box tr { border-bottom: 1px solid #f1f5f9; }
         .totals-box tr.grand { background: #0f172a; }
         .totals-box tr.grand td { border-bottom: none; padding: 9px 10px; }
         .totals-box tr.grand .tl { color: #94a3b8; font-size: 12px; font-weight: 800; }
         .totals-box tr.grand .tv { color: #38bdf8; font-size: 14px; font-weight: 900; }
 
-        .sched { font-size: 9px; color: #1e293b; line-height: 1.5; margin-top: 4px; }
-        .sched strong { color: #0f172a; font-weight: 800; }
+        .sched { font-size: 9px; color: #000000; line-height: 1.5; margin-top: 4px; }
+        .sched strong { color: #000000; font-weight: 800; }
 
         .sig-section { width: 100%; border-collapse: collapse; margin-top: 14px; }
         .sig-section td { vertical-align: bottom; padding: 0; }
-        .sig-line { border-top: 1px solid #334155; width: 160px; margin-top: 30px; }
-        .sig-label { font-size: 8px; color: #334155; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-top: 3px; }
+        .sig-line { border-top: 1px solid #000000; width: 160px; margin-top: 30px; }
+        .sig-label { font-size: 8px; color: #000000; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-top: 3px; }
 
         .foot {
             margin-top: 14px;
@@ -141,8 +141,8 @@
             border-top: 2px solid #0f172a;
             text-align: center;
         }
-        .foot-line { font-size: 8px; color: #64748b; }
-        .foot-brand { font-size: 9px; color: #0f172a; font-weight: 800; margin-top: 2px; letter-spacing: 0.5px; }
+        .foot-line { font-size: 8px; color: #000000; }
+        .foot-brand { font-size: 9px; color: #000000; font-weight: 800; margin-top: 2px; letter-spacing: 0.5px; }
 
         .watermark {
             position: fixed;
@@ -245,7 +245,7 @@
     @endif
 
     {{-- ===== DOCUMENT TITLE ===== --}}
-    <div style="font-size: 15px; font-weight: 900; color: #0f172a; margin-bottom: 6px; letter-spacing: 0.5px;">{{ $invoice->document_type ?? 'Sale Invoice' }}</div>
+    <div style="font-size: 15px; font-weight: 900; color: #000000; margin-bottom: 6px; letter-spacing: 0.5px;">{{ $invoice->document_type ?? 'Sale Invoice' }}</div>
 
     {{-- ===== 3-COL INFO SECTION ===== --}}
     <table class="info-block">
@@ -281,17 +281,17 @@
                     <table class="dtable">
                         @if($invoice->fbr_invoice_number)
                         <tr>
-                            <td class="dl" style="color: #0f172a; font-weight: 800;">FBR Invoice #</td>
-                            <td class="dv" style="color: #0f172a; font-size: 8.5px; font-weight: 800;">{{ $invoice->fbr_invoice_number }}</td>
+                            <td class="dl" style="color: #000000; font-weight: 800;">FBR Invoice #</td>
+                            <td class="dv" style="color: #000000; font-size: 8.5px; font-weight: 800;">{{ $invoice->fbr_invoice_number }}</td>
                         </tr>
                         <tr>
-                            <td class="dl" style="color: #0f172a; font-weight: 800;">Internal Ref #</td>
-                            <td class="dv" style="color: #0f172a; font-size: 8.5px; font-weight: 800;">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</td>
+                            <td class="dl" style="color: #000000; font-weight: 800;">Internal Ref #</td>
+                            <td class="dv" style="color: #000000; font-size: 8.5px; font-weight: 800;">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</td>
                         </tr>
                         @else
                         <tr>
-                            <td class="dl" style="color: #0f172a; font-weight: 800;">Invoice No.</td>
-                            <td class="dv" style="color: #0f172a; font-weight: 800;">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</td>
+                            <td class="dl" style="color: #000000; font-weight: 800;">Invoice No.</td>
+                            <td class="dv" style="color: #000000; font-weight: 800;">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</td>
                         </tr>
                         @endif
                         <tr>

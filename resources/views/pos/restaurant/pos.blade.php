@@ -1098,6 +1098,7 @@ function restaurantPos() {
             this.$watch('cart', () => { this.saveCart(); this.recalcDiscount(); }, { deep: true });
             this.$watch('kitchenNotes', () => { this.saveCart(); });
             this.cacheProductData();
+            document.addEventListener('keyup', (e) => { if (e.key === 'F1') { e.preventDefault(); e.stopPropagation(); } });
             document.addEventListener('keydown', (e) => {
                 const tag = document.activeElement?.tagName;
                 const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';

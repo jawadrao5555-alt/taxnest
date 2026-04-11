@@ -72,3 +72,15 @@ id = "HDxaftWMIDiPTLZRg1-27"
 uri = "file://public/annex-invoices/INV-RAM04.pdf"
 type = "pdf"
 title = "INV-RAM04 - 04 Jan 2026, 04:10 PM"
+
+[[outputs]]
+id = "DdhW_nJBYZkZk8IR0HO6A"
+uri = "file://public/annex-invoices/INV-NISR23.pdf"
+type = "pdf"
+title = "INV-NISR23 - 23 Jan 2026, 09:40 AM - Rs.215,849"
+
+[[outputs]]
+id = "4BiIh3EXIfkTeBndeBIgn"
+uri = "file://public/annex-invoices/INV-NISR10.pdf"
+type = "pdf"
+title = "INV-NISR10 - 10 Jan 2026, 03:20 PM - Rs.215,849"

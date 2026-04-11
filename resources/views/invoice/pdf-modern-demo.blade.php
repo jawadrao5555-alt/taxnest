@@ -35,10 +35,10 @@
         .section-title {
             font-size: 8px;
             text-transform: uppercase;
-            color: #0ea5e9;
+            color: #000000;
             font-weight: 800;
             letter-spacing: 1.5px;
-            border-bottom: 2px solid #0ea5e9;
+            border-bottom: 2px solid #000000;
             padding-bottom: 3px;
             margin-bottom: 5px;
         }
@@ -47,8 +47,8 @@
         .info-block > tbody > tr > td { vertical-align: top; padding: 0; }
 
         .card {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
+            background: #ffffff;
+            border: 1px solid #000000;
             padding: 8px 10px;
         }
         .card-name { font-size: 12px; font-weight: 800; color: #000000; margin-bottom: 2px; }
@@ -74,7 +74,7 @@
         .tag-pending { background: #f59e0b; }
 
         .dtable { width: 100%; border-collapse: collapse; }
-        .dtable td { padding: 3px 0; font-size: 9.5px; border-bottom: 1px dashed #e2e8f0; }
+        .dtable td { padding: 3px 0; font-size: 9.5px; border-bottom: 1px dashed #cccccc; }
         .dtable .dl { color: #000000; font-weight: 700; }
         .dtable .dv { color: #000000; font-weight: 700; text-align: right; }
 
@@ -82,7 +82,7 @@
             text-align: center;
             padding: 8px 0;
             margin-bottom: 6px;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid #000000;
         }
         .fbr-section table { margin: 0 auto; border-collapse: collapse; }
         .fbr-section td { vertical-align: middle; }
@@ -90,15 +90,15 @@
 
         .items { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
         .items thead th {
-            background: #0f172a;
+            background: #ffffff;
             padding: 7px 6px;
             font-size: 8px;
             text-transform: uppercase;
-            color: #e2e8f0;
+            color: #000000;
             font-weight: 800;
             letter-spacing: 0.8px;
             text-align: left;
-            border: 1px solid #0f172a;
+            border: 1px solid #000000;
         }
         .items thead th.ar { text-align: right; }
         .items thead th.ac { text-align: center; }
@@ -106,9 +106,9 @@
             padding: 6px;
             font-size: 10px;
             color: #000000;
-            border: 1px solid #e2e8f0;
+            border: 1px solid #000000;
         }
-        .items tbody tr:nth-child(even) td { background: #f8fafc; }
+        .items tbody tr:nth-child(even) td { background: #ffffff; }
         .items tbody td.ar { text-align: right; font-weight: 700; color: #000000; }
         .items tbody td.ac { text-align: center; }
         .items tbody td.hs { font-weight: 700; color: #000000; letter-spacing: 0.3px; font-size: 10px; }
@@ -116,16 +116,16 @@
 
         .totals-wrap { width: 100%; border-collapse: collapse; }
         .totals-wrap td { vertical-align: top; }
-        .totals-box { border: 1px solid #e2e8f0; overflow: hidden; }
+        .totals-box { border: 1px solid #000000; overflow: hidden; }
         .totals-box table { width: 100%; border-collapse: collapse; }
         .totals-box td { padding: 5px 10px; font-size: 10px; }
         .totals-box .tl { text-align: right; color: #000000; font-weight: 700; width: 55%; }
         .totals-box .tv { text-align: right; color: #000000; font-weight: 700; width: 45%; white-space: nowrap; }
-        .totals-box tr { border-bottom: 1px solid #f1f5f9; }
-        .totals-box tr.grand { background: #0f172a; }
+        .totals-box tr { border-bottom: 1px solid #cccccc; }
+        .totals-box tr.grand { background: #ffffff; border-top: 2px solid #000000; }
         .totals-box tr.grand td { border-bottom: none; padding: 9px 10px; }
-        .totals-box tr.grand .tl { color: #94a3b8; font-size: 12px; font-weight: 800; }
-        .totals-box tr.grand .tv { color: #38bdf8; font-size: 14px; font-weight: 900; }
+        .totals-box tr.grand .tl { color: #000000; font-size: 12px; font-weight: 900; }
+        .totals-box tr.grand .tv { color: #000000; font-size: 14px; font-weight: 900; }
 
         .sched { font-size: 9px; color: #000000; line-height: 1.5; margin-top: 4px; }
         .sched strong { color: #000000; font-weight: 800; }
@@ -138,7 +138,7 @@
         .foot {
             margin-top: 14px;
             padding-top: 8px;
-            border-top: 2px solid #0f172a;
+            border-top: 2px solid #000000;
             text-align: center;
         }
         .foot-line { font-size: 8px; color: #000000; }

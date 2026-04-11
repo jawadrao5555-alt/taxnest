@@ -5,77 +5,16 @@ $app = require_once __DIR__ . '/bootstrap/app.php';
 $kernel = $app->make(\Illuminate\Contracts\Console\Kernel::class);
 $kernel->bootstrap();
 
-function generateDummyQrBase64($text) {
-    $size = 200;
-    $img = imagecreatetruecolor($size, $size);
-    $white = imagecolorallocate($img, 255, 255, 255);
-    $black = imagecolorallocate($img, 0, 0, 0);
-    $green = imagecolorallocate($img, 22, 101, 52);
-    $gray = imagecolorallocate($img, 200, 200, 200);
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
-    imagefill($img, 0, 0, $white);
+function generateQrBase64($text) {
+    $svg = QrCode::format('svg')
+        ->size(200)
+        ->margin(1)
+        ->errorCorrection('M')
+        ->generate($text);
 
-    imagerectangle($img, 0, 0, $size-1, $size-1, $gray);
-
-    $moduleSize = 6;
-    $modules = 25;
-    $offset = ($size - ($modules * $moduleSize)) / 2;
-
-    for ($i = 0; $i < 7; $i++) {
-        for ($j = 0; $j < 7; $j++) {
-            if ($i == 0 || $i == 6 || $j == 0 || $j == 6 || ($i >= 2 && $i <= 4 && $j >= 2 && $j <= 4)) {
-                imagefilledrectangle($img,
-                    $offset + $j * $moduleSize, $offset + $i * $moduleSize,
-                    $offset + ($j+1) * $moduleSize - 1, $offset + ($i+1) * $moduleSize - 1,
-                    $black);
-            }
-        }
-    }
-
-    $tlX = $modules - 7;
-    for ($i = 0; $i < 7; $i++) {
-        for ($j = 0; $j < 7; $j++) {
-            if ($i == 0 || $i == 6 || $j == 0 || $j == 6 || ($i >= 2 && $i <= 4 && $j >= 2 && $j <= 4)) {
-                imagefilledrectangle($img,
-                    $offset + ($tlX + $j) * $moduleSize, $offset + $i * $moduleSize,
-                    $offset + ($tlX + $j + 1) * $moduleSize - 1, $offset + ($i+1) * $moduleSize - 1,
-                    $black);
-            }
-        }
-    }
-
-    $blY = $modules - 7;
-    for ($i = 0; $i < 7; $i++) {
-        for ($j = 0; $j < 7; $j++) {
-            if ($i == 0 || $i == 6 || $j == 0 || $j == 6 || ($i >= 2 && $i <= 4 && $j >= 2 && $j <= 4)) {
-                imagefilledrectangle($img,
-                    $offset + $j * $moduleSize, $offset + ($blY + $i) * $moduleSize,
-                    $offset + ($j+1) * $moduleSize - 1, $offset + ($blY + $i + 1) * $moduleSize - 1,
-                    $black);
-            }
-        }
-    }
-
-    srand(crc32($text));
-    for ($i = 8; $i < $modules - 1; $i++) {
-        for ($j = 8; $j < $modules - 1; $j++) {
-            if ($i < 7 && $j >= $modules - 7) continue;
-            if ($i >= $modules - 7 && $j < 7) continue;
-            if (rand(0, 100) > 55) {
-                imagefilledrectangle($img,
-                    $offset + $j * $moduleSize, $offset + $i * $moduleSize,
-                    $offset + ($j+1) * $moduleSize - 1, $offset + ($i+1) * $moduleSize - 1,
-                    $black);
-            }
-        }
-    }
-
-    ob_start();
-    imagepng($img);
-    $pngData = ob_get_clean();
-    imagedestroy($img);
-
-    return 'data:image/png;base64,' . base64_encode($pngData);
+    return 'data:image/svg+xml;base64,' . base64_encode($svg);
 }
 
 $invoices = [
@@ -180,7 +119,8 @@ foreach ($invoices as $inv) {
 
     $dummyFbrNumber = 'CT' . date('Y', strtotime($inv['date'])) . str_pad($inv['serial'], 6, '0', STR_PAD_LEFT);
 
-    $qrBase64 = generateDummyQrBase64($seller['ntn'] . '-' . $inv['invoice_number'] . '-' . $inv['total']);
+    $qrContent = "NTN:{$seller['ntn']}|INV:{$inv['invoice_number']}|DATE:{$inv['date']}|TOTAL:{$inv['total']}|TAX:{$inv['tax']}|BUYER:{$inv['buyer_ntn']}";
+    $qrBase64 = generateQrBase64($qrContent);
 
     $fakeInvoice = new \stdClass();
     $fakeInvoice->id = $inv['serial'];
@@ -217,16 +157,17 @@ foreach ($invoices as $inv) {
         'wht_amount' => 0,
         'net_receivable' => $inv['total'],
         'qrBase64' => $qrBase64,
-        'fbrLogoBase64' => '',
+        'fbrLogoBase64' => 'HIDE',
+        'hideFbrBadge' => true,
     ];
 
-    $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-professional', $data);
+    $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-annex', $data);
     $pdf->setPaper('A4', 'portrait');
 
     $filename = $inv['invoice_number'] . '.pdf';
     $pdf->save($outputDir . '/' . $filename);
 
-    echo "Generated: {$filename} (FBR#: {$dummyFbrNumber})\n";
+    echo "Generated: {$filename}\n";
 }
 
 echo "\nAll 4 invoices generated in: {$outputDir}\n";

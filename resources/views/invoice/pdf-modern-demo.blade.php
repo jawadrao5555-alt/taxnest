@@ -44,8 +44,8 @@
             margin-bottom: 5px;
         }
 
-        .info-block { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 8px; }
-        .info-block > tbody > tr > td { vertical-align: top; padding: 0; }
+        .info-block { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 8px; border: 1px solid #000000; }
+        .info-block > tbody > tr > td { vertical-align: top; }
 
         .card {
             background: #ffffff;
@@ -251,9 +251,9 @@
     <div style="font-size: 15px; font-weight: 900; color: #000000; margin-bottom: 6px; letter-spacing: 0.5px;">{{ $invoice->document_type ?? 'Sale Invoice' }}</div>
 
     {{-- ===== 3-COL INFO SECTION ===== --}}
-    <table class="info-block" style="border: 1px solid #000000;">
+    <table class="info-block">
         <tr>
-            <td style="width: 38%; border-right: 1px solid #000000; padding: 8px 10px; vertical-align: top;">
+            <td style="width: 38%; border: 1px solid #000000; padding: 8px 10px; vertical-align: top;">
                 <div class="section-title">Bill To</div>
                 <span class="tag {{ ($invoice->buyer_registration_type ?? '') === 'Registered' ? 'tag-registered' : 'tag-unregistered' }}">
                     {{ $invoice->buyer_registration_type ?? 'UNREGISTERED' }}
@@ -276,7 +276,7 @@
                     @endif
                 </div>
             </td>
-            <td style="width: 34%; border-right: 1px solid #000000; padding: 8px 10px; vertical-align: top;">
+            <td style="width: 34%; border: 1px solid #000000; padding: 8px 10px; vertical-align: top;">
                 <div class="section-title">Invoice Details</div>
                 <table class="dtable">
                     @if($invoice->fbr_invoice_number)
@@ -326,7 +326,7 @@
                     @endif
                 </table>
             </td>
-            <td style="width: 28%; padding: 8px 10px; vertical-align: top;">
+            <td style="width: 28%; border: 1px solid #000000; padding: 8px 10px; vertical-align: top;">
                 <div class="section-title">Summary</div>
                 <table class="dtable">
                     <tr>

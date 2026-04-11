@@ -285,8 +285,8 @@
                             <td class="dv" style="color: #0f172a; font-size: 8.5px; font-weight: 800;">{{ $invoice->fbr_invoice_number }}</td>
                         </tr>
                         <tr>
-                            <td class="dl" style="color: #0f172a; font-weight: 700;">Internal Ref #</td>
-                            <td class="dv" style="color: #334155; font-size: 8.5px; font-weight: 700;">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</td>
+                            <td class="dl" style="color: #0f172a; font-weight: 800;">Internal Ref #</td>
+                            <td class="dv" style="color: #0f172a; font-size: 8.5px; font-weight: 800;">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</td>
                         </tr>
                         @else
                         <tr>

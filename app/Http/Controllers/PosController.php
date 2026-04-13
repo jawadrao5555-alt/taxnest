@@ -302,28 +302,33 @@ class PosController extends Controller
             return back()->withInput()->with('error', 'Failed to create invoice: ' . $e->getMessage());
         }
 
-        try {
-            PosInventoryController::deductStockForInvoice(
-                $companyId,
-                $request->items,
-                $transaction->id,
-                $invoiceNumber,
-                auth('pos')->id()
-            );
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::warning('Inventory deduction failed for invoice ' . $invoiceNumber . ': ' . $e->getMessage());
-        }
+        $inventoryResult = PosInventoryController::deductStockForInvoice(
+            $companyId,
+            $request->items,
+            $transaction->id,
+            $invoiceNumber,
+            auth('pos')->id()
+        );
 
         $praMessage = '';
-        try {
-            if ($praEnabled) {
-                $praMessage = ' | PRA sync queued — invoice will be submitted automatically.';
-                dispatch(new \App\Jobs\SyncPosOfflineInvoicesJob());
-            } else {
-                $praMessage = ' | Local invoice (PRA reporting is off).';
+        if ($praEnabled) {
+            try {
+                $praService = new PraIntegrationService($company);
+                $praResult = $praService->sendInvoice($transaction);
+                $transaction->refresh();
+
+                if ($praResult['success']) {
+                    $praMessage = ' | PRA Fiscal Invoice Number: ' . ($transaction->pra_invoice_number ?? 'N/A');
+                } else {
+                    $transaction->update(['pra_status' => 'offline']);
+                    $praMessage = ' | Offline Mode: Invoice saved locally and will sync automatically.';
+                }
+            } catch (\Exception $e) {
+                $transaction->update(['pra_status' => 'offline']);
+                $praMessage = ' | Offline Mode: Invoice saved locally and will sync automatically.';
             }
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::warning('PRA dispatch failed for invoice ' . $invoiceNumber . ': ' . $e->getMessage());
+        } else {
+            $praMessage = ' | Local invoice (PRA reporting is off).';
         }
 
         return redirect()->route('pos.transaction.show', $transaction->id)

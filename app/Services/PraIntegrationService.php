@@ -193,8 +193,8 @@ class PraIntegrationService
                 CURLOPT_POST => true,
                 CURLOPT_POSTFIELDS => $jsonPayload,
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 10,
-                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_CONNECTTIMEOUT => 15,
                 CURLOPT_HTTPHEADER => [
                     'Content-Type: application/json',
                     'Accept: application/json',
@@ -204,12 +204,27 @@ class PraIntegrationService
                 CURLOPT_SSL_VERIFYHOST => 0,
                 CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
                 CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                CURLOPT_DNS_CACHE_TIMEOUT => 120,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_MAXREDIRS => 3,
             ]);
 
             $curlResult = curl_exec($ch);
             $curlError = curl_error($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlInfo = curl_getinfo($ch);
             curl_close($ch);
+
+            Log::info('PRA cURL diagnostics', [
+                'transaction_id' => $transaction->id,
+                'http_code' => $httpCode,
+                'total_time' => $curlInfo['total_time'] ?? 0,
+                'connect_time' => $curlInfo['connect_time'] ?? 0,
+                'namelookup_time' => $curlInfo['namelookup_time'] ?? 0,
+                'primary_ip' => $curlInfo['primary_ip'] ?? 'unknown',
+                'ssl_verify_result' => $curlInfo['ssl_verify_result'] ?? -1,
+                'curl_error' => $curlError ?: 'none',
+            ]);
 
             if ($curlResult !== false && !$curlError) {
                 $responseBody = $curlResult;

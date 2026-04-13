@@ -14,8 +14,8 @@ class AuditLogService
         ]));
 
         AuditLog::create([
-            'company_id' => $companyId ?? auth()->user()?->company_id ?? app('currentCompanyId', null),
-            'user_id' => $userId ?? auth()->id() ?? auth('pos')->id(),
+            'company_id' => $companyId ?? auth()->user()?->company_id ?? (app()->bound('currentCompanyId') ? app('currentCompanyId') : null),
+            'user_id' => $userId ?? auth()->id() ?? (auth('pos')->check() ? auth('pos')->id() : null),
             'action' => $action,
             'entity_type' => $entityType,
             'entity_id' => $entityId,

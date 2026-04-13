@@ -193,8 +193,8 @@ class PraIntegrationService
                 CURLOPT_POST => true,
                 CURLOPT_POSTFIELDS => $jsonPayload,
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 30,
-                CURLOPT_CONNECTTIMEOUT => 15,
+                CURLOPT_TIMEOUT => 10,
+                CURLOPT_CONNECTTIMEOUT => 5,
                 CURLOPT_HTTPHEADER => [
                     'Content-Type: application/json',
                     'Accept: application/json',

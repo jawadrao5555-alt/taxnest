@@ -842,6 +842,71 @@ class RestaurantPosController extends Controller
         }
     }
 
+    private function resolveItemExemptions(array $requestItems, int $companyId): array
+    {
+        $resolved = [];
+        foreach ($requestItems as $item) {
+            $itemType = $item['type'] ?? 'product';
+            $itemId = $item['item_id'] ?? null;
+            $itemName = trim($item['name'] ?? '');
+            $itemPrice = (float) ($item['unit_price'] ?? 0);
+            $qty = (float) ($item['quantity'] ?? 0);
+            $isExempt = !empty($item['is_tax_exempt']);
+
+            if ($itemId) {
+                if ($itemType === 'product') {
+                    $obj = PosProduct::where('company_id', $companyId)->where('id', $itemId)->first();
+                    if ($obj) {
+                        $isExempt = (bool) $obj->is_tax_exempt;
+                    } else {
+                        $itemId = null;
+                    }
+                } else {
+                    $obj = PosService::where('company_id', $companyId)->where('id', $itemId)->first();
+                    if ($obj) {
+                        $isExempt = (bool) $obj->is_tax_exempt;
+                    } else {
+                        $itemId = null;
+                    }
+                }
+            }
+
+            if (!$itemId && $itemType === 'product' && $itemName !== '') {
+                $existing = PosProduct::where('company_id', $companyId)
+                    ->whereRaw('LOWER(name) = ?', [strtolower($itemName)])
+                    ->first();
+                if ($existing) {
+                    $itemId = $existing->id;
+                    $isExempt = (bool) $existing->is_tax_exempt;
+                } else {
+                    $userExempt = !empty($item['is_tax_exempt']);
+                    $newProduct = PosProduct::create([
+                        'company_id' => $companyId,
+                        'name' => $itemName,
+                        'price' => $itemPrice,
+                        'tax_rate' => 0,
+                        'uom' => 'NOS',
+                        'is_active' => true,
+                        'is_tax_exempt' => $userExempt,
+                    ]);
+                    $itemId = $newProduct->id;
+                    $isExempt = $userExempt;
+                }
+            }
+
+            $resolved[] = [
+                'item_type' => $itemType,
+                'item_id' => $itemId,
+                'item_name' => $itemName,
+                'unit_price' => $itemPrice,
+                'quantity' => $qty,
+                'subtotal' => round($qty * $itemPrice, 2),
+                'is_tax_exempt' => $isExempt,
+            ];
+        }
+        return $resolved;
+    }
+
     private function generateInvoiceNumber($companyId)
     {
         $year = date('Y');

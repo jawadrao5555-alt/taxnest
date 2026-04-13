@@ -1,0 +1,75 @@
+[taxnestc@eu1 ~]$ grep "Recipe" ~/public_html/taxnest/app/Http/Controllers/RestaurantPosControllergrep "Recipe" ~/public_html/taxnest/app/Http/Controllers/RestaurantPosController.php
+use App\Models\ProductRecipe;
+        $recipeLookup = ProductRecipe::where('company_id', $companyId)
+        $recipes = ProductRecipe::where('company_id', $companyId)
+        foreach ($recipes as $productId => $productRecipes) {
+            foreach ($productRecipes as $recipe) {
+        foreach ($recipes as $productId => $productRecipes) {
+            foreach ($productRecipes as $recipe) {
+            $recipeLookup = ProductRecipe::where('company_id', $companyId)->with('ingredient')->get()->groupBy('product_id');
+                $recipes = \App\Models\Recipe::where('company_id', $companyId)->whereIn('product_id', $productIds)->with('ingredient')->get();
+            $recipes = ProductRecipe::where('company_id', $companyId)
+            $recipes = ProductRecipe::where('company_id', $companyId)
+                            'notes' => "Recipe: {$ingredient->name} for {$item->item_name}",
+        $recipes = ProductRecipe::where('company_id', $companyId)                                 echo "" > ~/public_html/taxnest/storage/logs/laravel.log && echo "LOG CLEARED" ~/public_html/taxnest/storage/logs/laravel.log && echo "LOG CLEARED"
+LOG CLEARED
+[taxnestc@eu1 ~]$ cat ~/public_html/taxnest/storage/logs/laravel.log
+
+[2026-04-13 15:50:07] production.ERROR: Class "App\Models\Recipe" not found {"exception":"[object] (Error(code: 0): Class \"App\\Models\\Recipe\" not found at /home/taxnestc/public_html/taxnest/app/Http/Controllers/RestaurantPosController.php:431)
+[stacktrace]
+#0 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Routing/ControllerDispatcher.php(46): App\\Http\\Controllers\\RestaurantPosController->quickPay()
+#1 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Routing/Route.php(265): Illuminate\\Routing\\ControllerDispatcher->dispatch()
+#2 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Routing/Route.php(211): Illuminate\\Routing\\Route->runController()
+#3 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Routing/Router.php(822): Illuminate\\Routing\\Route->run()
+#4 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(180): Illuminate\\Routing\\Router->{closure:Illuminate\\Routing\\Router::runRouteWithinStack():821}()
+#5 /home/taxnestc/public_html/taxnest/app/Http/Middleware/RestaurantOnly.php(23): Illuminate\\Pipeline\\Pipeline->{closure:Illuminate\\Pipeline\\Pipeline::prepareDestination():178}()
+#6 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): App\\Http\\Middleware\\RestaurantOnly->handle()
+#7 /home/taxnestc/public_html/taxnest/app/Http/Middleware/PosAuth.php(45): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#8 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): App\\Http\\Middleware\\PosAuth->handle()
+#9 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php(50): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#10 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle()
+#11 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/VerifyCsrfToken.php(87): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#12 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\VerifyCsrfToken->handle()
+#13 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/View/Middleware/ShareErrorsFromSession.php(48): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#14 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\View\\Middleware\\ShareErrorsFromSession->handle()
+#15 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Session/Middleware/StartSession.php(120): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#16 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Session/Middleware/StartSession.php(63): Illuminate\\Session\\Middleware\\StartSession->handleStatefulRequest()
+#17 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Session\\Middleware\\StartSession->handle()
+#18 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Cookie/Middleware/AddQueuedCookiesToResponse.php(36): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#19 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Cookie\\Middleware\\AddQueuedCookiesToResponse->handle()
+#20 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Cookie/Middleware/EncryptCookies.php(74): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#21 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Cookie\\Middleware\\EncryptCookies->handle()
+#22 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#23 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Routing/Router.php(821): Illuminate\\Pipeline\\Pipeline->then()
+#24 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Routing/Router.php(800): Illuminate\\Routing\\Router->runRouteWithinStack()
+#25 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Routing/Router.php(764): Illuminate\\Routing\\Router->runRoute()
+#26 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Routing/Router.php(753): Illuminate\\Routing\\Router->dispatchToRoute()
+#27 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(200): Illuminate\\Routing\\Router->dispatch()
+#28 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(180): Illuminate\\Foundation\\Http\\Kernel->{closure:Illuminate\\Foundation\\Http\\Kernel::dispatchToRouter():197}()
+#29 /home/taxnestc/public_html/taxnest/app/Http/Middleware/SecurityHeaders.php(13): Illuminate\\Pipeline\\Pipeline->{closure:Illuminate\\Pipeline\\Pipeline::prepareDestination():178}()
+#30 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): App\\Http\\Middleware\\SecurityHeaders->handle()
+#31 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#32 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle()
+#33 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull->handle()
+#34 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#35 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle()
+#36 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\TrimStrings->handle()
+#37 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#38 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Http\\Middleware\\ValidatePostSize->handle()
+#39 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(109):Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#40 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle()
+#41 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(61): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#42 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Http\\Middleware\\HandleCors->handle()
+#43 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#44 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Http\\Middleware\\TrustProxies->handle()
+#45 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#46 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks->handle()
+#47 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePathEncoding.php(26): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#48 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Http\\Middleware\\ValidatePathEncoding->handle()
+#49 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#50 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(175): Illuminate\\Pipeline\\Pipeline->then()
+#51 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(144): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter()
+#52 /home/taxnestc/public_html/index.php(48): Illuminate\\Foundation\\Http\\Kernel->handle()
+#53 {main}
+"}
+[taxnestc@eu1 ~]$

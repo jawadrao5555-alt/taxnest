@@ -1,0 +1,27 @@
+[taxnestc@eu1 ~]$ mysql -u taxnestc_jawadrao5555 -pN2fFzzBVmSZM1KjLZwCj taxnestc_db -e "SELECT id, invoice_numysql -u taxnestc_jawadrao5555 -pN2fFzzBVmSZM1KjLZwCj taxnestc_db -e "SELECT id, invoice_number, pra_status, pra_invoice_number, created_at FROM pos_mysql -u taxnestc_jawadrao5555 -pN2fFzzBVmSZM1KjLZwCj taxnestc_db -e "SELECT id, invoice_number, pra_status, pra_invoice_number, created_at FROM pos_transactions WHERE company_id = 11 AND invoice_number IN ('POS-2026-00046','POS-2026-00047');"FzzBVmSZM1KjLZwCj taxnestc_db -e "SELECT id, invoice_number, pra_status, pra_invoice_number, cr[taxnestc@eu1 ~]$ mysql -u taxnestc_jawadrao5555 -pN2fFzzBVmSZM1KjLZwCj taxnestc_db -e "SELECT id, invoice_number, pra_status, pra_invoice_number, created_at FROM pos_transactions WHERE company_id = 11 ORDER BY id DESC LIMIT 15;"_db -e "SELECT id, invoice_number, pra_status, pra_invoice_number, cr+----+----------------+------------+--------------------+---------------------+"
+| id | invoice_number | pra_status | pra_invoice_number | created_at          |
++----+----------------+------------+--------------------+---------------------+
+| 24 | POS-2026-00001 | local      | NULL               | 2026-03-19 10:40:13 |                              mysql -u taxnestc_jawadrao5555 -pN2fFzzBVmSZM1KjLZwCj taxnestc_db -e "SELECT id, name, pra_pos_id, pra_environment, pra_reporting_enabled FROM companies WHERE name LIKE '%Malik%' OR name LIKE '%Chicken%' OR pra_pos_id = '191963';"rao5555 -pN2fFzzBVmSZM1KjLZwCj taxnestc_db -e "SELECT id, name, pra_pos_id, pra_environment, pra_reporting_e+----+----------------------+------------+-----------------+-----------------------+id = '191963';"
+| id | name                 | pra_pos_id | pra_environment | pra_reporting_enabled |
++----+----------------------+------------+-----------------+-----------------------+
+| 13 | MALIK CHICKEN BROAST | 191963     | production      |                     1 |
++----+------------mysql -u taxnestc_jawadrao5555 -pN2fFzzBVmSZM1KjLZwCj taxnestc_db -e "SELECT id, invoice_number, pra_status, pra_invoice_number, created_at FROM pos_transactions WHERE company_id = 13 ORDER BY id DESC LIMIT 15;"_db -e "SELECT id, invoice_number, pra_status, pra_invoice_number, cr+----+----------------+------------+--------------------+---------------------+"
+| id | invoice_number | pra_status | pra_invoice_number | created_at          |
++----+----------------+------------+--------------------+---------------------+
+| 77 | POS-2026-00054 | offline    | NULL               | 2026-04-13 17:49:58 |
+| 76 | POS-2026-00053 | offline    | NULL               | 2026-04-13 17:44:26 |
+| 74 | POS-2026-00052 | offline    | NULL               | 2026-04-13 15:53:46 |
+| 73 | POS-2026-00051 | offline    | NULL               | 2026-04-13 10:55:06 |
+| 72 | POS-2026-00050 | offline    | NULL               | 2026-04-13 10:50:13 |
+| 71 | POS-2026-00049 | offline    | NULL               | 2026-04-11 11:06:30 |
+| 70 | POS-2026-00048 | offline    | NULL               | 2026-04-10 16:48:18 |
+| 69 | POS-2026-00047 | offline    | NULL               | 2026-04-10 16:39:23 |
+| 68 | POS-2026-00046 | submitted  | 191963FDDO2578937  | 2026-04-10 15:03:38 |
+| 67 | POS-2026-00045 | submitted  | 191963FD3O30201069 | 2026-04-03 15:30:49 |
+| 66 | POS-2026-00044 | submitted  | 191963FD3O17577289 | 2026-04-03 15:18:15 |
+| 65 | POS-2026-00043 | submitted  | 191963FD2P6208761  | 2026-04-02 16:06:38 |
+| 64 | POS-2026-00042 | submitted  | 191963FD2O58227020 | 2026-04-02 15:58:40 |
+| 63 | POS-2026-00041 | submitted  | 191963FD2N57532205 | 2026-04-02 14:58:12 |
+| 62 | POS-2026-00040 | submitted  | 191963FD2L308424   | 2026-04-02 12:03:17 |
++----+----------------+------------+--------------------+---------------------+
+[taxnestc@eu1 ~]$

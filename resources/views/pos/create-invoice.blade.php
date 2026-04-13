@@ -240,17 +240,16 @@
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Qty</label>
                                 <div class="flex items-center gap-1">
                                     <button type="button" @click="changeQty(index, -1)" class="w-8 h-9 flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 hover:bg-red-50 hover:border-red-300 dark:hover:bg-red-900/20 text-gray-600 dark:text-gray-400 hover:text-red-600 transition text-lg font-bold">−</button>
-                                    <input type="text" inputmode="decimal"
+                                    <input type="number" inputmode="decimal"
                                         :id="'qty-'+index"
                                         :data-idx="index"
-                                        :value="item.quantity"
-                                        @focus="setTimeout(() => $el.select(), 10)"
-                                        @input="handleQtyInput($event, index)"
-                                        @blur="finalizeQty($event, index)"
-                                        @keyup.enter="$el.blur()"
-                                        @keydown.arrow-up.prevent="changeQty(index, 1)"
-                                        @keydown.arrow-down.prevent="changeQty(index, -1)"
-                                        class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition text-center font-semibold">
+                                        x-model.number="item.quantity"
+                                        min="0.01" step="any"
+                                        @focus="$event.target.select()"
+                                        @click="$event.target.select()"
+                                        @input="recalculate()"
+                                        @keyup.enter="$event.target.blur()"
+                                        class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition text-center font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
                                     <button type="button" @click="changeQty(index, 1)" class="w-8 h-9 flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 hover:bg-emerald-50 hover:border-emerald-300 dark:hover:bg-emerald-900/20 text-gray-600 dark:text-gray-400 hover:text-emerald-600 transition text-lg font-bold">+</button>
                                 </div>
                             </div>
@@ -499,27 +498,9 @@
                     });
                 },
 
-                handleQtyInput(event, index) {
-                    let raw = event.target.value;
-                    if (raw === '' || raw === '.' || raw === '0.') return;
-                    let v = parseFloat(raw);
-                    if (!isNaN(v) && v > 0) {
-                        this.items[index].quantity = v;
-                        this.recalculate();
-                    }
-                },
-
-                finalizeQty(event, index) {
-                    let v = parseFloat(event.target.value);
-                    if (isNaN(v) || v <= 0) v = 1;
-                    this.items[index].quantity = v;
-                    event.target.value = v;
-                    this.recalculate();
-                },
-
                 changeQty(index, delta) {
                     let current = parseFloat(this.items[index].quantity) || 1;
-                    let newVal = Math.max(1, current + delta);
+                    let newVal = Math.round(Math.max(0.01, current + delta) * 100) / 100;
                     this.items[index].quantity = newVal;
                     this.recalculate();
                 },
@@ -876,16 +857,13 @@
                     return null;
                 },
 
-                syncQtyFields() {
-                    document.querySelectorAll('[data-idx]').forEach(el => {
-                        const idx = parseInt(el.dataset.idx);
-                        if (this.items[idx]) {
-                            const v = parseFloat(el.value);
-                            if (!isNaN(v) && v > 0) {
-                                this.items[idx].quantity = v;
-                            } else {
-                                this.items[idx].quantity = 1;
-                            }
+                validateItems() {
+                    this.items.forEach((item, i) => {
+                        if (!item.quantity || isNaN(item.quantity) || item.quantity <= 0) {
+                            this.items[i].quantity = 1;
+                        }
+                        if (!item.unit_price || isNaN(item.unit_price)) {
+                            this.items[i].unit_price = 0;
                         }
                     });
                     this.recalculate();
@@ -908,7 +886,7 @@
 
                     localStorage.removeItem('pos_draft_invoice');
 
-                    this.syncQtyFields();
+                    this.validateItems();
 
                     const csrfResult = await this.refreshCsrfToken();
 

@@ -129,7 +129,9 @@
 
                     <template x-for="(item, index) in items" :key="index">
                         <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 mb-3 p-3 sm:py-2 sm:px-2 rounded-lg border transition-all"
-                            :style="item._isNew && (ddSearch[index] || '').length > 0 ? 'border-left: 3px solid #a855f7; background: rgba(168,85,247,0.04);' : 'border-color: transparent;'">
+                            :id="'cart-row-'+index"
+                            @click="selectedItemIndex = index"
+                            :style="(selectedItemIndex === index ? 'border-color: #10b981; background: rgba(16,185,129,0.06);' : '') + (item._isNew && (ddSearch[index] || '').length > 0 ? 'border-left: 3px solid #a855f7; background: rgba(168,85,247,0.04);' : (selectedItemIndex !== index ? 'border-color: transparent;' : ''))">
                             <div class="sm:col-span-2">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Type</label>
                                 <select x-model="item.type" @change="onTypeChange(index)" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition">
@@ -236,7 +238,10 @@
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Qty</label>
-                                <input type="number" x-model.number="item.quantity" min="0.01" step="0.01" @input="recalculate()" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition text-center">
+                                <input type="number" :value="item.quantity" min="0.01" step="0.01"
+                                    @focus="$event.target.select()"
+                                    @input="item.quantity = parseFloat($event.target.value) || 0; recalculate()"
+                                    class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition text-center">
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Unit Price</label>
@@ -407,6 +412,8 @@
                     { type: 'product', item_id: '', name: '', quantity: 1, unit_price: 0, _isNew: false, is_tax_exempt: false }
                 ],
 
+                selectedItemIndex: 0,
+
                 ddOpen: {},
                 ddSearch: {},
                 ddHlIdx: {},
@@ -522,6 +529,34 @@
                         if (!this.submitting) {
                             this.saveToLocalStorage();
                         }
+                    });
+
+                    window.addEventListener('keydown', (e) => {
+                        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+                        if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            if (this.selectedItemIndex > 0) {
+                                this.selectedItemIndex--;
+                                this.scrollToCartRow(this.selectedItemIndex);
+                            }
+                        } else if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            if (this.selectedItemIndex < this.items.length - 1) {
+                                this.selectedItemIndex++;
+                                this.scrollToCartRow(this.selectedItemIndex);
+                            }
+                        } else if (e.key === 'Enter' && this.selectedItemIndex >= 0) {
+                            e.preventDefault();
+                            const qtyInput = document.querySelector('#cart-row-' + this.selectedItemIndex + ' input[type="number"]');
+                            if (qtyInput) qtyInput.focus();
+                        }
+                    });
+                },
+
+                scrollToCartRow(idx) {
+                    this.$nextTick(() => {
+                        const row = document.getElementById('cart-row-' + idx);
+                        if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                     });
                 },
 

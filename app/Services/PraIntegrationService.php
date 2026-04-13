@@ -69,7 +69,7 @@ class PraIntegrationService
 
         $items = $transaction->items
             ->filter(function ($item) {
-                return (float) $item->unit_price > 0 && (float) $item->quantity > 0 && !$item->is_tax_exempt;
+                return (float) $item->unit_price > 0 && (float) $item->quantity > 0;
             })
             ->values()
             ->map(function ($item, $index) use ($itemsSubtotal, $totalDiscount, $taxRate) {

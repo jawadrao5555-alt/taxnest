@@ -302,20 +302,28 @@ class PosController extends Controller
             return back()->withInput()->with('error', 'Failed to create invoice: ' . $e->getMessage());
         }
 
-        $inventoryResult = PosInventoryController::deductStockForInvoice(
-            $companyId,
-            $request->items,
-            $transaction->id,
-            $invoiceNumber,
-            auth('pos')->id()
-        );
+        try {
+            PosInventoryController::deductStockForInvoice(
+                $companyId,
+                $request->items,
+                $transaction->id,
+                $invoiceNumber,
+                auth('pos')->id()
+            );
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Inventory deduction failed for invoice ' . $invoiceNumber . ': ' . $e->getMessage());
+        }
 
         $praMessage = '';
-        if ($praEnabled) {
-            $praMessage = ' | PRA sync queued — invoice will be submitted automatically.';
-            dispatch(new \App\Jobs\SyncPosOfflineInvoicesJob());
-        } else {
-            $praMessage = ' | Local invoice (PRA reporting is off).';
+        try {
+            if ($praEnabled) {
+                $praMessage = ' | PRA sync queued — invoice will be submitted automatically.';
+                dispatch(new \App\Jobs\SyncPosOfflineInvoicesJob());
+            } else {
+                $praMessage = ' | Local invoice (PRA reporting is off).';
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('PRA dispatch failed for invoice ' . $invoiceNumber . ': ' . $e->getMessage());
         }
 
         return redirect()->route('pos.transaction.show', $transaction->id)

@@ -238,14 +238,21 @@
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Qty</label>
-                                <input type="text" inputmode="decimal"
-                                    :id="'qty-'+index"
-                                    :data-idx="index"
-                                    x-init="$el.value = item.quantity"
-                                    @focus="$el.select()"
-                                    @blur="let v = parseFloat($el.value) || 1; item.quantity = v; $el.value = v; recalculate()"
-                                    @keyup.enter="$el.blur()"
-                                    class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition text-center">
+                                <div class="flex items-center gap-1">
+                                    <button type="button" @click="changeQty(index, -1)" class="w-8 h-9 flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 hover:bg-red-50 hover:border-red-300 dark:hover:bg-red-900/20 text-gray-600 dark:text-gray-400 hover:text-red-600 transition text-lg font-bold">−</button>
+                                    <input type="text" inputmode="decimal"
+                                        :id="'qty-'+index"
+                                        :data-idx="index"
+                                        :value="item.quantity"
+                                        @focus="setTimeout(() => $el.select(), 10)"
+                                        @input="handleQtyInput($event, index)"
+                                        @blur="finalizeQty($event, index)"
+                                        @keyup.enter="$el.blur()"
+                                        @keydown.arrow-up.prevent="changeQty(index, 1)"
+                                        @keydown.arrow-down.prevent="changeQty(index, -1)"
+                                        class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition text-center font-semibold">
+                                    <button type="button" @click="changeQty(index, 1)" class="w-8 h-9 flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 hover:bg-emerald-50 hover:border-emerald-300 dark:hover:bg-emerald-900/20 text-gray-600 dark:text-gray-400 hover:text-emerald-600 transition text-lg font-bold">+</button>
+                                </div>
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Unit Price</label>
@@ -492,6 +499,31 @@
                     });
                 },
 
+                handleQtyInput(event, index) {
+                    let raw = event.target.value;
+                    if (raw === '' || raw === '.' || raw === '0.') return;
+                    let v = parseFloat(raw);
+                    if (!isNaN(v) && v > 0) {
+                        this.items[index].quantity = v;
+                        this.recalculate();
+                    }
+                },
+
+                finalizeQty(event, index) {
+                    let v = parseFloat(event.target.value);
+                    if (isNaN(v) || v <= 0) v = 1;
+                    this.items[index].quantity = v;
+                    event.target.value = v;
+                    this.recalculate();
+                },
+
+                changeQty(index, delta) {
+                    let current = parseFloat(this.items[index].quantity) || 1;
+                    let newVal = Math.max(1, current + delta);
+                    this.items[index].quantity = newVal;
+                    this.recalculate();
+                },
+
                 discountType: 'percentage',
                 discountValue: 0,
                 paymentMethod: 'cash',
@@ -554,6 +586,16 @@
                             if (qtyEl) qtyEl.focus();
                         } else if (e.key === 'Escape' && isInput) {
                             e.target.blur();
+                        } else if (e.key === 'Delete' && !isInput && self.selectedItemIndex >= 0 && self.items.length > 1) {
+                            e.preventDefault();
+                            self.removeItem(self.selectedItemIndex);
+                            self.selectedItemIndex = Math.min(self.selectedItemIndex, self.items.length - 1);
+                        } else if ((e.key === '+' || e.key === '=') && !isInput && self.selectedItemIndex >= 0) {
+                            e.preventDefault();
+                            self.changeQty(self.selectedItemIndex, 1);
+                        } else if (e.key === '-' && !isInput && self.selectedItemIndex >= 0) {
+                            e.preventDefault();
+                            self.changeQty(self.selectedItemIndex, -1);
                         }
                     });
                 },
@@ -824,13 +866,40 @@
                                 document.querySelector('meta[name="csrf-token"]')?.setAttribute('content', data.token);
                                 const hiddenInput = document.querySelector('input[name="_token"]');
                                 if (hiddenInput) hiddenInput.value = data.token;
+                                return true;
                             }
                         }
+                        if (resp.status === 401 || resp.status === 302 || resp.redirected) {
+                            return false;
+                        }
                     } catch (e) {}
+                    return null;
+                },
+
+                syncQtyFields() {
+                    document.querySelectorAll('[data-idx]').forEach(el => {
+                        const idx = parseInt(el.dataset.idx);
+                        if (this.items[idx]) {
+                            const v = parseFloat(el.value);
+                            if (!isNaN(v) && v > 0) {
+                                this.items[idx].quantity = v;
+                            } else {
+                                this.items[idx].quantity = 1;
+                            }
+                        }
+                    });
+                    this.recalculate();
                 },
 
                 async submitForm(event) {
                     if (this.items.length === 0) return;
+
+                    let hasValidItem = this.items.some(i => i.name && i.name.trim() !== '' && i.unit_price > 0);
+                    if (!hasValidItem) {
+                        alert('Please add at least one item with a name and price.');
+                        return;
+                    }
+
                     this.submitting = true;
 
                     if (this.autoSaveTimer) {
@@ -839,7 +908,16 @@
 
                     localStorage.removeItem('pos_draft_invoice');
 
-                    await this.refreshCsrfToken();
+                    this.syncQtyFields();
+
+                    const csrfResult = await this.refreshCsrfToken();
+
+                    if (csrfResult === false) {
+                        this.submitting = false;
+                        alert('Your session has expired. The page will reload — please try again.');
+                        window.location.reload();
+                        return;
+                    }
 
                     this.$nextTick(() => {
                         event.target.submit();

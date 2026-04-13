@@ -846,9 +846,9 @@ class RestaurantPosController extends Controller
     {
         $resolved = [];
         foreach ($requestItems as $item) {
-            $itemType = $item['type'] ?? 'product';
+            $itemType = $item['item_type'] ?? ($item['type'] ?? 'product');
             $itemId = $item['item_id'] ?? null;
-            $itemName = trim($item['name'] ?? '');
+            $itemName = trim($item['item_name'] ?? ($item['name'] ?? ''));
             $itemPrice = (float) ($item['unit_price'] ?? 0);
             $qty = (float) ($item['quantity'] ?? 0);
             $isExempt = !empty($item['is_tax_exempt']);

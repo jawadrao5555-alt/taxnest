@@ -175,7 +175,7 @@ class PraIntegrationService
         try {
             $apiUrl = $this->getApiUrl();
             $token = $this->getToken();
-            $relayUrl = $this->company->pra_proxy_url ?? null;
+            $relayUrl = !empty($this->company->pra_proxy_url) ? $this->company->pra_proxy_url : null;
 
             Log::info('PRA: Submitting invoice to PRAL IMS', [
                 'transaction_id' => $transaction->id,

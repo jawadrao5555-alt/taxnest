@@ -238,13 +238,13 @@
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Qty</label>
-                                <input type="number" min="0.01" step="0.01"
+                                <input type="text" inputmode="decimal"
                                     :id="'qty-'+index"
+                                    :data-idx="index"
                                     x-init="$el.value = item.quantity"
-                                    x-effect="if(document.activeElement !== $el) $el.value = item.quantity"
                                     @focus="$el.select()"
-                                    @change="item.quantity = parseFloat($el.value) || 1; recalculate()"
-                                    @input="item.quantity = parseFloat($el.value) || 0; recalculate()"
+                                    @blur="let v = parseFloat($el.value) || 1; item.quantity = v; $el.value = v; recalculate()"
+                                    @keyup.enter="$el.blur()"
                                     class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition text-center">
                             </div>
                             <div class="sm:col-span-2">

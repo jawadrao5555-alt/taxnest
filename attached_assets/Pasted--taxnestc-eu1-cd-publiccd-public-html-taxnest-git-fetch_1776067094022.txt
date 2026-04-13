@@ -1,0 +1,81 @@
+[taxnestc@eu1 ~]$ cd ~/publiccd ~/public_html/taxnest && git fetch origin && git reset --hard origin/main && php artisan optimize:clear && php artisan cache:clear && php artisan view:clear
+remote: Enumerating objects: 14, done.
+remote: Counting objects: 100% (14/14), done.
+remote: Compressing objects: 100% (2/2), done.
+remote: Total 12 (delta 10), reused 12 (delta 10), pack-reused 0 (from 0)
+Unpacking objects: 100% (12/12), 5.17 KiB | 1.03 MiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+   f7a1026..303e17a  main       -> origin/main
+HEAD is now at 303e17a Deploy latest code and clear application caches
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.81ms DONE
+  cache .......................................................... 2.12ms DONE
+  compiled ....................................................... 0.77ms DONE
+  events ......................................................... 0.33ms DONE
+  routes ......................................................... 0.32ms DONE
+  views .......................................................... 3.59ms DONE
+
+
+   INFO  Application cache cleared successfully.
+   INFO  Compiled views cleared successfully.
+                                   cd ~/public_html/taxnest && git fetch origin && git reset --hard origin/main && php artisan optimize:clear && php
+artisan cache:clear && php artisan view:clearest && git fetch origin && git reset --hard origin/main && php artisan optimize:clear && php artisan cacremote: Enumerating objects: 19, done.
+remote: Counting objects: 100% (19/19), done.
+remote: Compressing objects: 100% (2/2), done.
+remote: Total 10 (delta 8), reused 10 (delta 8), pack-reused 0 (from 0)
+Unpacking objects: 100% (10/10), 2.57 KiB | 658.00 KiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+   303e17a..72286cf  main       -> origin/main
+HEAD is now at 72286cf Improve invoice creation and payment processing
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.83ms DONE
+  cache .......................................................... 1.96ms DONE
+  compiled ....................................................... 0.72ms DONE
+  events ......................................................... 0.86ms DONE
+  routes ......................................................... 0.43ms DONE
+  views .......................................................... 3.19ms DONE
+
+
+   INFO  Application cache cleared successfully.
+
+
+   INFO  Compiled views cleared successfully.
+                                                                                                        cd ~/public_html/taxnest && tail -30 storage/
+logs/laravel.logxnest]$ cd ~/public_html/taxnest && tail -30 storage/logs/laravel.log
+#25 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Routing/Router.php(764): Illuminate\\Routing\\Router->runRoute()
+#26 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Routing/Router.php(753): Illuminate\\Routing\\Router->dispatchToRoute()
+#27 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(200): Illuminate\\Routing\\Router->dispatch()
+#28 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(180): Illuminate\\Foundation\\Http\\Kernel->{closure:Illuminate\\Foundation\\Http\\Kernel::dispatchToRouter():197}()
+#29 /home/taxnestc/public_html/taxnest/app/Http/Middleware/SecurityHeaders.php(13): Illuminate\\Pipeline\\Pipeline->{closure:Illuminate\\Pipeline\\Pipeline::prepareDestination():178}()
+#30 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): App\\Http\\Middleware\\SecurityHeaders->handle()
+#31 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#32 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle()
+#33 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull->handle()
+#34 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#35 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle()
+#36 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\TrimStrings->handle()
+#37 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#38 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Http\\Middleware\\ValidatePostSize->handle()
+#39 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(109):Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#40 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle()
+#41 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(61): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#42 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Http\\Middleware\\HandleCors->handle()
+#43 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#44 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Http\\Middleware\\TrustProxies->handle()
+#45 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#46 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks->handle()
+#47 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePathEncoding.php(26): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#48 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\\Http\\Middleware\\ValidatePathEncoding->handle()
+#49 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():194}:195}()
+#50 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(175): Illuminate\\Pipeline\\Pipeline->then()
+#51 /home/taxnestc/public_html/taxnest/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(144): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter()
+#52 /home/taxnestc/public_html/index.php(48): Illuminate\\Foundation\\Http\\Kernel->handle()
+#53 {main}
+"}
+[taxnestc@eu1 taxnest]$ cd ~/public_html/taxnest && git log --oneline -1
+72286cf (HEAD -> main, origin/main, origin/HEAD) Improve invoice creation and payment processing
+[taxnestc@eu1 taxnest]$

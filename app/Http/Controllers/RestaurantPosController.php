@@ -428,7 +428,7 @@ class RestaurantPosController extends Controller
             $recipeLookup = [];
             $productIds = collect($resolvedItems)->where('item_type', 'product')->pluck('item_id')->unique()->values()->all();
             if (!empty($productIds)) {
-                $recipes = \App\Models\Recipe::where('company_id', $companyId)->whereIn('product_id', $productIds)->with('ingredient')->get();
+                $recipes = ProductRecipe::where('company_id', $companyId)->whereIn('product_id', $productIds)->with('ingredient')->get();
                 foreach ($recipes as $r) { $recipeLookup[$r->product_id][] = $r; }
             }
             $estimatedCost = 0;

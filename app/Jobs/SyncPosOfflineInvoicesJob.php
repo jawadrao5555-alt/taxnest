@@ -16,6 +16,10 @@ class SyncPosOfflineInvoicesJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public $tries = 3;
+    public $timeout = 60;
+    public $backoff = [60, 300, 900];
+
     public function handle(): void
     {
         $transactions = PosTransaction::whereIn('pra_status', ['offline', 'pending'])
@@ -61,5 +65,12 @@ class SyncPosOfflineInvoicesJob implements ShouldQueue
                 ]);
             }
         }
+    }
+
+    public function failed(\Throwable $exception): void
+    {
+        Log::error('SyncPosOfflineInvoicesJob failed permanently', [
+            'error' => $exception->getMessage(),
+        ]);
     }
 }

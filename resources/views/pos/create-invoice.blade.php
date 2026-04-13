@@ -238,9 +238,13 @@
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Qty</label>
-                                <input type="number" :value="item.quantity" min="0.01" step="0.01"
-                                    @focus="$event.target.select()"
-                                    @input="item.quantity = parseFloat($event.target.value) || 0; recalculate()"
+                                <input type="number" min="0.01" step="0.01"
+                                    :id="'qty-'+index"
+                                    x-init="$el.value = item.quantity"
+                                    x-effect="if(document.activeElement !== $el) $el.value = item.quantity"
+                                    @focus="$el.select()"
+                                    @change="item.quantity = parseFloat($el.value) || 1; recalculate()"
+                                    @input="item.quantity = parseFloat($el.value) || 0; recalculate()"
                                     class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition text-center">
                             </div>
                             <div class="sm:col-span-2">
@@ -531,24 +535,25 @@
                         }
                     });
 
-                    window.addEventListener('keydown', (e) => {
-                        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
-                        if (e.key === 'ArrowUp') {
+                    const self = this;
+                    document.addEventListener('keydown', function(e) {
+                        const tag = e.target.tagName;
+                        const isInput = (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA');
+
+                        if (e.key === 'ArrowUp' && !isInput) {
                             e.preventDefault();
-                            if (this.selectedItemIndex > 0) {
-                                this.selectedItemIndex--;
-                                this.scrollToCartRow(this.selectedItemIndex);
-                            }
-                        } else if (e.key === 'ArrowDown') {
+                            self.selectedItemIndex = Math.max(0, self.selectedItemIndex - 1);
+                            self.scrollToCartRow(self.selectedItemIndex);
+                        } else if (e.key === 'ArrowDown' && !isInput) {
                             e.preventDefault();
-                            if (this.selectedItemIndex < this.items.length - 1) {
-                                this.selectedItemIndex++;
-                                this.scrollToCartRow(this.selectedItemIndex);
-                            }
-                        } else if (e.key === 'Enter' && this.selectedItemIndex >= 0) {
+                            self.selectedItemIndex = Math.min(self.items.length - 1, self.selectedItemIndex + 1);
+                            self.scrollToCartRow(self.selectedItemIndex);
+                        } else if (e.key === 'Enter' && !isInput && self.selectedItemIndex >= 0) {
                             e.preventDefault();
-                            const qtyInput = document.querySelector('#cart-row-' + this.selectedItemIndex + ' input[type="number"]');
-                            if (qtyInput) qtyInput.focus();
+                            const qtyEl = document.getElementById('qty-' + self.selectedItemIndex);
+                            if (qtyEl) qtyEl.focus();
+                        } else if (e.key === 'Escape' && isInput) {
+                            e.target.blur();
                         }
                     });
                 },

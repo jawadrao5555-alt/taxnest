@@ -312,21 +312,8 @@ class PosController extends Controller
 
         $praMessage = '';
         if ($praEnabled) {
-            try {
-                $praService = new PraIntegrationService($company);
-                $praResult = $praService->sendInvoice($transaction);
-                $transaction->refresh();
-
-                if ($praResult['success']) {
-                    $praMessage = ' | PRA Fiscal Invoice Number: ' . ($transaction->pra_invoice_number ?? 'N/A');
-                } else {
-                    $transaction->update(['pra_status' => 'offline']);
-                    $praMessage = ' | Offline Mode: Invoice saved locally and will sync automatically.';
-                }
-            } catch (\Exception $e) {
-                $transaction->update(['pra_status' => 'offline']);
-                $praMessage = ' | Offline Mode: Invoice saved locally and will sync automatically.';
-            }
+            $praMessage = ' | PRA sync queued — invoice will be submitted automatically.';
+            dispatch(new \App\Jobs\SyncPosOfflineInvoicesJob());
         } else {
             $praMessage = ' | Local invoice (PRA reporting is off).';
         }

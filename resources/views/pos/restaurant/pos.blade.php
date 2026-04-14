@@ -113,7 +113,7 @@ window.addEventListener('popstate', function() {
         <div class="relative flex-shrink-0" style="min-width:180px;max-width:220px;">
             <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
             <input type="search" x-ref="customerPhoneInput" x-model="customerPhoneQuery" @input="onCustomerPhoneInput()" @keydown.enter.prevent="onCustomerPhoneEnter()" @keydown.escape.prevent="customerPhoneDropdown = false" @keydown.tab.prevent="$refs.searchInput?.focus()" @click.away="customerPhoneDropdown = false" inputmode="tel" placeholder="Customer mobile..." class="w-full pl-9 pr-7 py-2.5 rounded-xl text-sm border-2 transition shadow-sm font-medium" :class="selectedCustomer ? 'border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200' : 'border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400'" autocomplete="one-time-code" name="pos_customer_phone_nofill" data-lpignore="true" data-form-type="other">
-            <kbd x-show="!customerPhoneQuery && !selectedCustomer" class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded font-mono">F7</kbd>
+            <kbd x-show="!customerPhoneQuery && !selectedCustomer" class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded font-mono">Ctrl+C</kbd>
             <button x-show="customerPhoneQuery || selectedCustomer" @click="clearCustomerInput()" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
@@ -141,29 +141,25 @@ window.addEventListener('popstate', function() {
             <button x-show="searchQuery" @click="searchQuery = ''; showSearchDropdown = false; filterProducts(); $refs.searchInput.focus()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
-            <div x-show="showSearchDropdown && searchSuggestions.length > 0" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 max-h-64 overflow-y-auto" x-ref="searchDropdown">
+            <div x-show="showSearchDropdown && searchSuggestions.length > 0" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 max-h-64 overflow-y-auto">
                 <template x-for="(s, i) in searchSuggestions" :key="s.id + s.type">
-                    <button @click="quickAddItem(s)" @mouseenter="highlightIndex = i"
-                        :data-hl="i === highlightIndex ? 'true' : 'false'"
-                        class="w-full flex items-center gap-3 px-3 py-2.5 text-left"
-                        :style="i === highlightIndex ? 'background:#7c3aed !important; border-radius:10px; margin:2px 4px; width:calc(100% - 8px); box-shadow:0 4px 12px rgba(124,58,237,0.4);' : 'margin:2px 4px; width:calc(100% - 8px);'">
+                    <button @click="quickAddItem(s)" class="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-purple-50 dark:hover:bg-purple-900/20 transition" :class="i === highlightIndex ? 'bg-purple-50 dark:bg-purple-900/20' : ''">
                         <template x-if="s.image">
-                            <img :src="s.image" class="w-8 h-8 rounded-lg object-cover flex-shrink-0" :style="i === highlightIndex ? 'outline:2px solid white; outline-offset:1px;' : ''">
+                            <img :src="s.image" class="w-8 h-8 rounded-lg object-cover flex-shrink-0">
                         </template>
                         <template x-if="!s.image">
-                            <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                                :style="i === highlightIndex ? 'background:white; color:#7c3aed;' : 'background:linear-gradient(135deg,#f3e8ff,#ede9fe); color:#7c3aed;'">
-                                <span class="text-xs font-bold" x-text="s.name.charAt(0)"></span>
+                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-100 to-purple-50 dark:from-purple-900/30 dark:to-purple-800/20 flex items-center justify-center flex-shrink-0">
+                                <span class="text-xs font-bold text-purple-600 dark:text-purple-400" x-text="s.name.charAt(0)"></span>
                             </div>
                         </template>
                         <div class="flex-1 min-w-0">
-                            <span class="text-sm font-semibold truncate block" :style="i === highlightIndex ? 'color:white;' : 'color:#1f2937;'" x-text="s.name"></span>
+                            <span class="text-sm font-medium text-gray-900 dark:text-white truncate block" x-text="s.name"></span>
                             <div class="flex items-center gap-1.5">
-                                <span class="text-[10px]" :style="i === highlightIndex ? 'color:rgba(255,255,255,0.7);' : 'color:#9ca3af;'" x-text="s.type === 'service' ? 'Service' : s.category"></span>
+                                <span class="text-[10px] text-gray-400" x-text="s.type === 'service' ? 'Service' : s.category"></span>
                                 <template x-if="s.stockStatus"><span class="stock-dot" :class="'stock-' + s.stockStatus"></span></template>
                             </div>
                         </div>
-                        <span class="text-sm font-extrabold" :style="i === highlightIndex ? 'color:white;' : 'color:#9333ea;'" x-text="'Rs. ' + Number(s.price).toLocaleString()"></span>
+                        <span class="text-sm font-bold text-purple-600 dark:text-purple-400" x-text="'Rs. ' + Number(s.price).toLocaleString()"></span>
                     </button>
                 </template>
             </div>
@@ -186,11 +182,6 @@ window.addEventListener('popstate', function() {
         <button @click="priorityOrder = !priorityOrder" class="hidden sm:flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-semibold border transition" :class="priorityOrder ? 'bg-red-50 dark:bg-red-900/20 border-red-300 text-red-600' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50'">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
             <span>Rush</span>
-        </button>
-
-        <button @click="showShortcuts = true" style="background:linear-gradient(135deg,#7c3aed,#6d28d9); color:white; border:none; border-radius:12px; padding:6px 14px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; box-shadow:0 2px 8px rgba(124,58,237,0.3); transition:all 0.2s; flex-shrink:0;" title="Keyboard Shortcuts" onmouseenter="this.style.boxShadow='0 4px 16px rgba(124,58,237,0.5)'; this.style.transform='scale(1.05)'" onmouseleave="this.style.boxShadow='0 2px 8px rgba(124,58,237,0.3)'; this.style.transform='scale(1)'">
-            <svg style="width:16px; height:16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
-            <span>Keys</span>
         </button>
 
         <button @click="newSale()" class="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 hover:bg-green-100 transition">
@@ -305,19 +296,6 @@ window.addEventListener('popstate', function() {
                     <span x-show="cart.length > 0" class="text-xs opacity-80" x-text="'Rs. ' + Number(totalAmount).toLocaleString()"></span>
                 </button>
             </div>
-
-            <button x-show="cart.length > 0 && !cartMode" @click="enterCartMode(); mobileView = 'cart';"
-                style="position:fixed; bottom:24px; right:400px; z-index:60; background:linear-gradient(135deg,#7c3aed,#6d28d9); color:white; border:none; border-radius:16px; padding:10px 20px; font-size:13px; font-weight:700; cursor:pointer; box-shadow:0 8px 24px rgba(124,58,237,0.4), 0 2px 8px rgba(0,0,0,0.15); display:flex; align-items:center; gap:8px; transition:all 0.2s;"
-                x-transition
-                title="Jump to Cart & Edit (F6)"
-                @mouseenter="this.style.transform='scale(1.05)'; this.style.boxShadow='0 12px 32px rgba(124,58,237,0.5)'"
-                @mouseleave="this.style.transform='scale(1)'; this.style.boxShadow='0 8px 24px rgba(124,58,237,0.4)'">
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
-                <span>Edit Cart</span>
-                <span style="background:rgba(255,255,255,0.25); padding:2px 8px; border-radius:8px; font-size:11px; font-weight:800;" x-text="cart.length"></span>
-                <span style="font-size:10px; opacity:0.7; margin-left:2px;" x-text="'Rs.' + Number(totalAmount).toLocaleString()"></span>
-                <span style="background:rgba(255,255,255,0.15); padding:2px 6px; border-radius:6px; font-size:9px; font-weight:700; letter-spacing:0.5px; border:1px solid rgba(255,255,255,0.25);">F6</span>
-            </button>
         </div>
 
         <div class="w-full md:w-[340px] lg:w-[380px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl" :class="mobileView === 'cart' ? 'flex' : 'hidden md:flex'">
@@ -327,12 +305,6 @@ window.addEventListener('popstate', function() {
                 </button>
                 <svg class="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
                 <span class="text-sm font-bold text-gray-900 dark:text-white flex-1">Current Order</span>
-                <button x-show="cart.length > 0" @click="enterCartMode()" class="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-all"
-                    :style="cartMode ? 'background:#7c3aed; color:white; box-shadow:0 2px 8px rgba(124,58,237,0.3);' : 'background:#f3e8ff; color:#7c3aed;'"
-                    :title="cartMode ? 'Cart Edit Mode ON — ↑↓ navigate, +/- qty, Del remove, Esc exit' : 'Enter Cart Edit Mode'">
-                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                    <span x-text="cartMode ? 'Editing' : 'Edit'"></span>
-                </button>
                 <template x-if="priorityOrder"><span class="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold">RUSH</span></template>
                 <span class="text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full font-semibold" x-text="orderType.replace('_', ' ').toUpperCase()"></span>
                 <template x-if="selectedTable">
@@ -364,16 +336,8 @@ window.addEventListener('popstate', function() {
                         <p class="text-xs mt-1 text-gray-300">Add products to begin</p>
                     </div>
                 </template>
-                <template x-if="cartMode && cart.length > 0">
-                    <div style="background:linear-gradient(90deg,#7c3aed,#6d28d9); padding:6px 12px; display:flex; align-items:center; gap:8px;">
-                        <svg class="w-3.5 h-3.5" style="color:white; flex-shrink:0;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                        <span style="color:rgba(255,255,255,0.9); font-size:10px; font-weight:600;">↑↓ Navigate &nbsp; +/− Qty &nbsp; 0-9 Set Qty &nbsp; Del Remove &nbsp; Esc Exit</span>
-                    </div>
-                </template>
                 <template x-for="(item, index) in cart" :key="index">
-                    <div class="cart-item cart-item-enter px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 cursor-pointer relative"
-                        :style="activeCartIndex === index ? 'background:#f3e8ff; outline:2px solid #7c3aed; outline-offset:-2px; border-radius:8px; margin:2px;' : ''"
-                        @click="activeCartIndex = index; cartMode = true;" :data-cart-index="index">
+                    <div class="cart-item cart-item-enter px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 cursor-pointer relative" :class="activeCartIndex === index ? 'bg-purple-50 dark:bg-purple-900/15 ring-2 ring-purple-400 dark:ring-purple-600 ring-inset' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'" @click="activeCartIndex = index" :data-cart-index="index">
                         <div class="flex items-center gap-2.5">
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-bold text-gray-900 dark:text-white truncate" x-text="item.item_name"></p>
@@ -665,114 +629,6 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
-    <div x-show="showShortcuts" x-transition.opacity @click.self="showShortcuts = false" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" style="display:none;">
-        <div x-show="showShortcuts" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" @click.stop style="max-width:520px; width:100%; max-height:85vh; overflow-y:auto; background:white; border-radius:20px; box-shadow:0 25px 60px rgba(0,0,0,0.3);" class="dark:bg-gray-900">
-            <div style="background:linear-gradient(135deg,#7c3aed,#6d28d9); padding:20px 24px; border-radius:20px 20px 0 0; display:flex; align-items:center; justify-content:space-between;">
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <div style="width:36px; height:36px; background:rgba(255,255,255,0.2); border-radius:10px; display:flex; align-items:center; justify-content:center;">
-                        <svg style="width:20px; height:20px; color:white;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3C6.5 3 2 6.58 2 11c0 2.24 1.12 4.27 2.94 5.72L4 21l4.28-2.55c1.15.35 2.4.55 3.72.55 5.5 0 10-3.58 10-8s-4.5-8-10-8z"/></svg>
-                    </div>
-                    <div>
-                        <h3 style="color:white; font-size:16px; font-weight:800; margin:0;">Keyboard Shortcuts</h3>
-                        <p style="color:rgba(255,255,255,0.7); font-size:11px; margin:0;">Click "Keys" button to open this panel</p>
-                    </div>
-                </div>
-                <button @click="showShortcuts = false" style="width:28px; height:28px; background:rgba(255,255,255,0.15); border:none; border-radius:8px; color:white; cursor:pointer; display:flex; align-items:center; justify-content:center;">
-                    <svg style="width:16px; height:16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-            </div>
-            <div style="padding:16px 24px 24px;">
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-                    <div>
-                        <p style="font-size:10px; font-weight:800; color:#7c3aed; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Quick Actions</p>
-                        <div style="display:flex; flex-direction:column; gap:6px;">
-                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
-                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Shortcuts Panel</span>
-                                <span style="background:linear-gradient(135deg,#7c3aed,#6d28d9); color:white; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">Keys btn</span>
-                            </div>
-                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
-                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Order Type Cycle</span>
-                                <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">F2</kbd>
-                            </div>
-                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
-                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Held Orders</span>
-                                <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">F3</kbd>
-                            </div>
-                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
-                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Clear Cart</span>
-                                <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">F4</kbd>
-                            </div>
-                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
-                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Hold Order</span>
-                                <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">F5</kbd>
-                            </div>
-                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
-                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Jump to Cart</span>
-                                <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">F6</kbd>
-                            </div>
-                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
-                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Customer Select</span>
-                                <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">F7</kbd>
-                            </div>
-                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
-                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Pay / Checkout</span>
-                                <kbd style="background:linear-gradient(135deg,#16a34a,#15803d); color:white; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">F8</kbd>
-                            </div>
-                        </div>
-                    </div>
-                    <div>
-                        <p style="font-size:10px; font-weight:800; color:#7c3aed; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Navigation</p>
-                        <div style="display:flex; flex-direction:column; gap:6px;">
-                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
-                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Product Search</span>
-                                <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">Ctrl+S</kbd>
-                            </div>
-                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
-                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Edit Cart Mode</span>
-                                <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">Ctrl+E</kbd>
-                            </div>
-                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
-                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Customer Field</span>
-                                <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">Ctrl+C</kbd>
-                            </div>
-                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
-                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Grid Navigate</span>
-                                <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">Tab</kbd>
-                            </div>
-                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
-                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Close / Back</span>
-                                <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">Esc</kbd>
-                            </div>
-                        </div>
-                        <p style="font-size:10px; font-weight:800; color:#7c3aed; text-transform:uppercase; letter-spacing:1px; margin:14px 0 8px;">Cart Edit Mode</p>
-                        <div style="display:flex; flex-direction:column; gap:6px;">
-                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
-                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Navigate Items</span>
-                                <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">&#8593; &#8595;</kbd>
-                            </div>
-                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
-                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Qty Up / Down</span>
-                                <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">+ / -</kbd>
-                            </div>
-                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
-                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Set Qty Direct</span>
-                                <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">0-9</kbd>
-                            </div>
-                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
-                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Remove Item</span>
-                                <kbd style="background:#fecaca; color:#dc2626; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">Del</kbd>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div style="margin-top:16px; padding:10px 14px; background:linear-gradient(135deg,#f3e8ff,#ede9fe); border-radius:10px; display:flex; align-items:center; gap:8px;" class="dark:bg-purple-900/20">
-                    <svg style="width:14px; height:14px; color:#7c3aed; flex-shrink:0;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <p style="font-size:11px; color:#6b21a8; margin:0; font-weight:500;" class="dark:text-purple-300">Type any letter to start searching products instantly. Payment modal: Press 1 for Cash, 2 for Card.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <div x-show="showReceipt" x-transition.opacity @keydown.escape.window="if(showReceipt) { showReceipt = false; }" @click.self="showReceipt = false" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="receipt-modal-enter bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" style="max-height:92vh;" x-transition.scale.90>
             <div class="relative p-5 text-center bg-gradient-to-b from-green-50 to-white dark:from-green-900/20 dark:to-gray-900 flex-shrink-0" id="confettiContainer">
@@ -795,21 +651,17 @@ window.addEventListener('popstate', function() {
                 <iframe x-ref="receiptIframe" class="w-full h-full border-0" :src="lastTransactionId ? '/pos/restaurant/receipt/' + lastTransactionId : ''" style="min-height:300px;"></iframe>
             </div>
             <div class="p-3 space-y-2 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
-                <div class="grid grid-cols-4 gap-2">
-                    <button @click="printReceipt()" class="py-3 text-center rounded-xl bg-gradient-to-br from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800 text-white text-sm font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-1">
+                <div class="grid grid-cols-3 gap-2">
+                    <button @click="printReceipt()" class="py-3 text-center rounded-xl bg-gradient-to-br from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800 text-white text-sm font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-1.5">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                        <span class="text-xs">Print</span> <kbd class="text-[8px] bg-purple-500/40 px-1 rounded font-mono">P</kbd>
+                        Print <kbd class="text-[8px] bg-purple-500/40 px-1 rounded font-mono">P</kbd>
                     </button>
-                    <button @click="printKOT()" class="py-3 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white text-sm font-bold transition shadow-md shadow-orange-500/20 flex items-center justify-center gap-1">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
-                        <span class="text-xs">KOT</span> <kbd class="text-[8px] bg-orange-400/40 px-1 rounded font-mono">K</kbd>
-                    </button>
-                    <button @click="startNewAfterPayment()" class="py-3 text-center rounded-xl bg-gradient-to-br from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white text-sm font-bold transition shadow-md shadow-green-600/20 flex items-center justify-center gap-1">
+                    <button @click="startNewAfterPayment()" class="py-3 text-center rounded-xl bg-gradient-to-br from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white text-sm font-bold transition shadow-md shadow-green-600/20 flex items-center justify-center gap-1.5">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-                        <span class="text-xs">New</span> <kbd class="text-[8px] bg-green-500/40 px-1 rounded font-mono">Enter</kbd>
+                        New <kbd class="text-[8px] bg-green-500/40 px-1 rounded font-mono">Enter</kbd>
                     </button>
-                    <button @click="showReceipt = false" class="py-3 text-center rounded-xl bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 text-sm font-semibold transition flex items-center justify-center gap-1">
-                        <span class="text-xs">Close</span> <kbd class="text-[8px] bg-gray-300 dark:bg-gray-600 px-1 rounded font-mono">Esc</kbd>
+                    <button @click="showReceipt = false" class="py-3 text-center rounded-xl bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 text-sm font-semibold transition flex items-center justify-center gap-1.5">
+                        Close <kbd class="text-[8px] bg-gray-300 dark:bg-gray-600 px-1 rounded font-mono">Esc</kbd>
                     </button>
                 </div>
             </div>
@@ -1036,10 +888,8 @@ function restaurantPos() {
         showPayModal: false,
         showHeldOrders: false,
         showReceipt: false,
-        showShortcuts: false,
         lastInvoiceNumber: '',
         lastTransactionId: null,
-        lastOrderId: null,
         lastTotal: 0,
         lastPaymentMethod: '',
         submitting: false,
@@ -1102,7 +952,6 @@ function restaurantPos() {
             this.$watch('cart', () => { this.saveCart(); this.recalcDiscount(); }, { deep: true });
             this.$watch('kitchenNotes', () => { this.saveCart(); });
             this.cacheProductData();
-            document.addEventListener('keyup', (e) => { if (e.key === 'F1') { e.preventDefault(); e.stopPropagation(); } });
             document.addEventListener('keydown', (e) => {
                 const tag = document.activeElement?.tagName;
                 const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
@@ -1111,7 +960,6 @@ function restaurantPos() {
                     if (e.key === 'Escape') { e.preventDefault(); this.showReceipt = false; return; }
                     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); return; }
                     if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.printReceipt(); return; }
-                    if (e.key === 'k' || e.key === 'K') { e.preventDefault(); this.printKOT(); return; }
                     return;
                 }
                 if (this.showPayModal) {
@@ -1134,19 +982,14 @@ function restaurantPos() {
                     return;
                 }
 
-                if (e.key === 'F1') { e.preventDefault(); e.stopPropagation(); return; }
                 if (e.key === 'F2') { e.preventDefault(); const types = ['dine_in', 'takeaway', 'delivery']; const idx = types.indexOf(this.orderType); this.orderType = types[(idx + 1) % types.length]; return; }
                 if (e.key === 'F3') { e.preventDefault(); this.activeHeldIndex = 0; this.showHeldOrders = true; return; }
                 if (e.key === 'F4') { e.preventDefault(); if (this.cart.length && confirm('Clear entire cart?')) { this.clearCart(); } return; }
                 if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
-                if (e.key === 'F6') { e.preventDefault(); if (this.cart.length > 0) { this.cartMode = true; this.activeCartIndex = this.cart.length - 1; this.mobileView = 'cart'; } return; }
-                if (e.key === 'F7') { e.preventDefault(); this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); return; }
                 if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) this.showPayModal = true; return; }
                 if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
-                if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode(); this.mobileView = 'cart'; } return; }
                 if ((e.ctrlKey || e.metaKey) && e.key === 'c') { if (!window.getSelection().toString()) { e.preventDefault(); this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); return; } }
                 if (e.key === 'Escape') {
-                    if (this.showShortcuts) { this.showShortcuts = false; return; }
                     if (this.showNewCustomerModal) { this.showNewCustomerModal = false; return; }
                     if (this.showLowStockPopup) { this.showLowStockPopup = false; return; }
                     if (this.showHeldOrders) { this.showHeldOrders = false; return; }
@@ -1280,13 +1123,6 @@ function restaurantPos() {
         moveHighlight(dir) {
             if (!this.showSearchDropdown || this.searchSuggestions.length === 0) return;
             this.highlightIndex = Math.max(0, Math.min(this.searchSuggestions.length - 1, this.highlightIndex + dir));
-            this.$nextTick(() => {
-                const dd = this.$refs.searchDropdown;
-                if (dd) {
-                    const active = dd.querySelector('[data-hl="true"]');
-                    if (active) active.scrollIntoView({ block: 'nearest' });
-                }
-            });
         },
         addHighlightedItem() { if (this.showSearchDropdown && this.searchSuggestions.length > 0) this.quickAddItem(this.searchSuggestions[this.highlightIndex]); },
         quickAddItem(item) {
@@ -1328,17 +1164,7 @@ function restaurantPos() {
             this.cartAnimating = true; setTimeout(() => this.cartAnimating = false, 300);
             this.scrollToCartItem(this.activeCartIndex);
         },
-        updateQty(index, delta) {
-            if (this._qtyUpdating) return;
-            this._qtyUpdating = true;
-            let current = Number(this.cart[index].quantity) || 0;
-            if (Number.isInteger(current)) {
-                this.cart[index].quantity = Math.max(1, current + delta);
-            } else {
-                this.cart[index].quantity = Math.max(0.01, Math.round((current + delta) * 100) / 100);
-            }
-            setTimeout(() => { this._qtyUpdating = false; }, 50);
-        },
+        updateQty(index, delta) { this.cart[index].quantity = Math.max(0.01, parseFloat(this.cart[index].quantity) + delta); },
         setQty(index, val) { const v = parseFloat(val); if (v > 0) this.cart[index].quantity = v; },
         removeFromCart(index) {
             const el = this.$refs.cartList?.querySelector(`[data-cart-index="${index}"]`);
@@ -1550,7 +1376,7 @@ function restaurantPos() {
                 if (data.success) {
                     this.showToast(data.message, 'success'); this.heldOrders.unshift(data.order); this.clearCart();
                     this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
-                    this.autoPrintKOT(data.order.id);
+                    if (this.kitchenSettings.print_on_hold) { window.open('/pos/restaurant/orders/' + data.order.id + '/kitchen-ticket', '_blank', 'width=350,height=600'); }
                 } else { this.showToast(data.message || 'Failed', 'error'); }
             } catch (e) { this.showToast('Network error', 'error'); }
             this.submitting = false;
@@ -1573,22 +1399,15 @@ function restaurantPos() {
             this.lastPayTime = now;
             this.submitting = true; this.stockError = '';
             try {
-                const savedTotal = this.totalAmount;
-                const res = await fetch('{{ route("pos.restaurant.orders.quick-pay") }}', {
+                const holdRes = await fetch('{{ route("pos.restaurant.orders.hold") }}', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount, payment_method: method }),
+                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount }),
                 });
-                const data = await res.json();
-                if (data.success) {
-                    this.lastInvoiceNumber = data.invoice_number || ''; this.lastTransactionId = data.transaction_id || null;
-                    this.lastOrderId = data.order_id || null;
-                    this.lastTotal = savedTotal || data.total_amount || 0; this.lastPaymentMethod = method; this.showReceipt = true;
-                    this.$nextTick(() => { setTimeout(() => this.triggerConfetti(), 300); });
-                    this.clearCart();
-                } else {
-                    if (data.stock_error) { this.stockError = data.message; }
-                    this.showToast(data.message || 'Payment failed', 'error');
-                }
+                const holdData = await holdRes.json();
+                if (!holdData.success) { this.showToast(holdData.message || 'Failed', 'error'); this.submitting = false; return; }
+                const savedTotal = this.totalAmount;
+                await this.payHeldOrderDirect(holdData.order.id, method, savedTotal);
+                this.clearCart();
             } catch (e) { this.showToast('Network error', 'error'); }
             this.showPayModal = false; this.submitting = false;
         },
@@ -1627,21 +1446,6 @@ function restaurantPos() {
             printFrame.src = url;
         },
 
-        printKOT(orderId) {
-            const oid = orderId || this.lastOrderId;
-            if (!oid) return;
-            const url = '/pos/restaurant/orders/' + oid + '/kitchen-ticket';
-            const kotWin = window.open(url, 'kot_print', 'width=350,height=600,scrollbars=yes,resizable=yes');
-            if (kotWin) {
-                kotWin.onload = () => { setTimeout(() => { try { kotWin.print(); } catch(e) {} }, 600); };
-            }
-        },
-
-        autoPrintKOT(orderId) {
-            if (!orderId) return;
-            setTimeout(() => { this.printKOT(orderId); }, 1000);
-        },
-
         async deleteHeldOrder(orderId) {
             try {
                 const res = await fetch(`/pos/restaurant/orders/${orderId}/delete`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' } });
@@ -1662,10 +1466,8 @@ function restaurantPos() {
                 if (data.success) {
                     this.heldOrders = this.heldOrders.filter(o => o.id !== orderId);
                     this.lastInvoiceNumber = data.invoice_number || ''; this.lastTransactionId = data.transaction_id || null;
-                    this.lastOrderId = orderId;
                     this.lastTotal = savedTotal || data.total_amount || 0; this.lastPaymentMethod = method; this.showReceipt = true;
                     this.$nextTick(() => { setTimeout(() => this.triggerConfetti(), 300); });
-                    this.autoPrintKOT(orderId);
                 } else { if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; } this.showToast(data.message || 'Payment failed', 'error'); }
             } catch (e) { this.showToast('Payment error', 'error'); }
         },

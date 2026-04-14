@@ -485,7 +485,6 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::middleware('restaurant.only')->group(function () {
     Route::get('/restaurant/pos', [RestaurantPosController::class, 'pos'])->name('pos.restaurant.pos');
     Route::post('/restaurant/orders/hold', [RestaurantPosController::class, 'holdOrder'])->name('pos.restaurant.orders.hold');
-    Route::post('/restaurant/orders/quick-pay', [RestaurantPosController::class, 'quickPay'])->name('pos.restaurant.orders.quick-pay');
     Route::post('/restaurant/orders/{id}/pay', [RestaurantPosController::class, 'payOrder'])->name('pos.restaurant.orders.pay');
     Route::post('/restaurant/orders/{id}/delete', [RestaurantPosController::class, 'deleteOrder'])->name('pos.restaurant.orders.delete');
     Route::get('/restaurant/orders/by-table/{tableId}', [RestaurantPosController::class, 'getOrdersByTable'])->name('pos.restaurant.orders.by-table');
@@ -538,38 +537,6 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/all-users', [AdminController::class, 'storeUser']);
     Route::get('/fbr-logs', [AdminController::class, 'fbrLogs']);
     Route::get('/system-health', [AdminController::class, 'systemHealth']);
-    Route::get('/system-diagnostics', function () {
-        $data = [];
-        $data['recent_pos_transactions'] = \App\Models\PosTransaction::orderBy('id', 'desc')
-            ->limit(10)
-            ->get(['id', 'invoice_number', 'status', 'pra_status', 'pra_invoice_number', 'total_amount', 'created_at']);
-
-        $data['failed_jobs_count'] = \DB::table('failed_jobs')->count();
-        $data['failed_jobs'] = \DB::table('failed_jobs')
-            ->orderBy('id', 'desc')
-            ->limit(5)
-            ->get(['id', 'queue', 'failed_at', \DB::raw("SUBSTRING(exception, 1, 500) as exception_preview")]);
-
-        $data['pending_jobs_count'] = \DB::table('jobs')->count();
-        $data['pending_jobs'] = \DB::table('jobs')
-            ->orderBy('id', 'desc')
-            ->limit(10)
-            ->get(['id', 'queue', 'attempts', 'created_at']);
-
-        $data['recent_invoices'] = \App\Models\Invoice::orderBy('id', 'desc')
-            ->limit(10)
-            ->get(['id', 'invoice_number', 'fbr_invoice_number', 'status', 'total_amount', 'created_at']);
-
-        $logFile = storage_path('logs/laravel.log');
-        if (file_exists($logFile)) {
-            $lines = file($logFile);
-            $data['recent_log_lines'] = array_slice($lines, -50);
-        } else {
-            $data['recent_log_lines'] = ['Log file not found'];
-        }
-
-        return response()->json($data, 200, [], JSON_PRETTY_PRINT);
-    })->name('admin.system-diagnostics');
     Route::get('/security-logs', [AdminController::class, 'securityLogs']);
     Route::get('/audit/export', [AdminController::class, 'auditExport'])->name('admin.audit.export');
     Route::get('/old-audit-logs', [AdminController::class, 'auditLogs'])->name('admin.audit-logs');

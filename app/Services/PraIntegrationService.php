@@ -165,38 +165,67 @@ class PraIntegrationService
         ]);
 
         try {
-            Log::info('PRA Direct: Submitting invoice to PRAL IMS', [
+            $apiUrl = $this->getApiUrl();
+            $token = $this->getToken();
+            $relayUrl = !empty($this->company->pra_proxy_url) ? rtrim($this->company->pra_proxy_url, '/') : null;
+
+            Log::info('PRA: Submitting invoice to PRAL IMS', [
                 'transaction_id' => $transaction->id,
-                'url' => $this->getApiUrl(),
+                'url' => $apiUrl,
+                'relay' => $relayUrl ? 'yes' : 'direct',
                 'pos_id' => $payload['POSID'],
                 'environment' => $this->company->pra_environment ?? 'sandbox',
             ]);
 
-            $apiUrl = $this->getApiUrl();
-            $token = $this->getToken();
-            $jsonPayload = json_encode($payload);
-
             $responseBody = null;
             $httpCode = 0;
-            $method = 'curl-direct';
+            $method = $relayUrl ? 'relay' : 'curl-direct';
 
-            $ch = curl_init($apiUrl);
-            curl_setopt_array($ch, [
-                CURLOPT_POST => true,
-                CURLOPT_POSTFIELDS => $jsonPayload,
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 30,
-                CURLOPT_CONNECTTIMEOUT => 15,
-                CURLOPT_HTTPHEADER => [
-                    'Content-Type: application/json',
-                    'Accept: application/json',
-                    'Authorization: Bearer ' . $token,
-                ],
-                CURLOPT_SSL_VERIFYPEER => false,
-                CURLOPT_SSL_VERIFYHOST => 0,
-                CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
-                CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-            ]);
+            if ($relayUrl) {
+                $relayPayload = $payload;
+                $relayPayload['_pra_token'] = $token;
+                $relayPayload['_pra_url'] = $apiUrl;
+                $jsonPayload = json_encode($relayPayload);
+
+                $ch = curl_init($relayUrl);
+                curl_setopt_array($ch, [
+                    CURLOPT_POST => true,
+                    CURLOPT_POSTFIELDS => $jsonPayload,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 45,
+                    CURLOPT_CONNECTTIMEOUT => 10,
+                    CURLOPT_HTTPHEADER => [
+                        'Content-Type: application/json',
+                        'Accept: application/json',
+                        'X-Relay-Token: taxnest-pra-relay-2026',
+                        'ngrok-skip-browser-warning: true',
+                    ],
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_SSL_VERIFYHOST => 0,
+                    CURLOPT_FOLLOWLOCATION => true,
+                    CURLOPT_MAXREDIRS => 3,
+                ]);
+            } else {
+                $jsonPayload = json_encode($payload);
+
+                $ch = curl_init($apiUrl);
+                curl_setopt_array($ch, [
+                    CURLOPT_POST => true,
+                    CURLOPT_POSTFIELDS => $jsonPayload,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 30,
+                    CURLOPT_CONNECTTIMEOUT => 15,
+                    CURLOPT_HTTPHEADER => [
+                        'Content-Type: application/json',
+                        'Accept: application/json',
+                        'Authorization: Bearer ' . $token,
+                    ],
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_SSL_VERIFYHOST => 0,
+                    CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
+                    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                ]);
+            }
 
             $curlResult = curl_exec($ch);
             $curlError = curl_error($ch);
@@ -204,6 +233,12 @@ class PraIntegrationService
             curl_close($ch);
 
             if ($curlResult !== false && !$curlError) {
+                if ($method === 'relay') {
+                    $relayData = json_decode($curlResult, true);
+                    if (isset($relayData['relay_error'])) {
+                        throw new \Exception('PRA relay error: ' . ($relayData['error'] ?? 'Unknown relay error'));
+                    }
+                }
                 $responseBody = $curlResult;
             } else {
                 throw new \Exception('PRA connection failed: ' . ($curlError ?: 'No response'));

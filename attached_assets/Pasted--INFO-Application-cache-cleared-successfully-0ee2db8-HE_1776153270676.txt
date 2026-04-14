@@ -1,0 +1,31 @@
+ INFO  Application cache cleared successfully.
+
+0ee2db8 (HEAD -> main, origin/main,mysql -u taxnestc_jawadrao5555 -pN2fFzzBVmSZM1KjLZwCj taxnestc_db -e "UPDATE companies SET pra_proxy_url = 'https:
+//well-nonstriking-teodora.ngrok-frcd ~/public_html/taxnest && git fetch origin && git reset --hard origin/main && php artisan optimize:clear && phpartisan cache:clear && git log --oneline -1xnest && git fetch origin && git reset --hard origin/main && php artisan optimize:clear && php artisan cacremote: Enumerating objects: 14, done.
+remote: Counting objects: 100% (14/14), done.
+remote: Compressing objects: 100% (2/2), done.
+remote: Total 9 (delta 7), reused 9 (delta 7), pack-reused 0 (from 0)
+Unpacking objects: 100% (9/9), 61.14 KiB | 1.25 MiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+   0ee2db8..b224250  main       -> origin/main
+HEAD is now at b224250 Add relay setup instructions and integrate proxy URL for tax service
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.75ms DONE
+  cache .......................................................... 2.21ms DONE
+  compiled ....................................................... 0.74ms DONE
+  events ......................................................... 0.31ms DONE
+  routes ......................................................... 0.30ms DONE
+  views .......................................................... 2.55ms DONE
+
+
+   INFO  Application cache cleared successfully.
+                                                                                                                   mysql -u taxnestc_jawadrao5555 -pN
+2fFzzBVmSZM1KjLZwCj taxnestc_db -e "UPDATE companies SET pra_proxy_url = 'https://well-nonstriking-teodora.ngrok-free.dev' WHERE id = 13; SELECT id,
+name, pra_proxy_url FROM companies WHERE id = 13;"5555 -pN2fFzzBVmSZM1KjLZwCj taxnestc_db -e "UPDATE companies SET pra_proxy_url = 'https://well-nons+----+----------------------+-------------------------------------------------+ROM companies WHERE id = 13;"
+| id | name                 | pra_proxy_url                                   |
++----+----------------------+-------------------------------------------------+
+| 13 | MALIK CHICKEN BROAST | https://well-nonstriking-teodora.ngrok-free.dev |
++----+----------------------+-------------------------------------------------+
+[taxnestc@eu1 taxnest]$

@@ -175,7 +175,16 @@ class PraIntegrationService
         try {
             $apiUrl = $this->getApiUrl();
             $token = $this->getToken();
-            $relayUrl = !empty($this->company->pra_proxy_url) ? rtrim($this->company->pra_proxy_url, '/') : null;
+            $rawProxy = $this->company->pra_proxy_url;
+            $relayUrl = !empty($rawProxy) ? rtrim($rawProxy, '/') : null;
+
+            Log::info('PRA DEBUG: relay check', [
+                'company_id' => $this->company->id,
+                'raw_proxy' => $rawProxy,
+                'relay_url' => $relayUrl,
+                'relay_active' => $relayUrl ? 'YES' : 'NO',
+                'company_class' => get_class($this->company),
+            ]);
 
             Log::info('PRA: Submitting invoice to PRAL IMS', [
                 'transaction_id' => $transaction->id,

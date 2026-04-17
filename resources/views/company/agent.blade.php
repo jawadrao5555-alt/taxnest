@@ -1,4 +1,4 @@
-<x-app-layout>
+<x-pos-layout>
     <div class="py-8">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="mb-6">
@@ -106,20 +106,20 @@
                     {{-- Action Buttons --}}
                     <div class="flex flex-wrap gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
                         @if(!$company->agent_api_key)
-                            <form method="POST" action="{{ route('company.agent.generate') }}">
+                            <form method="POST" action="{{ route('pos.agent.generate') }}">
                                 @csrf
                                 <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold">
                                     🔑 Generate Key
                                 </button>
                             </form>
                         @else
-                            <form method="POST" action="{{ route('company.agent.regenerate') }}" onsubmit="return confirm('Regenerating will disconnect existing agents. Continue?')">
+                            <form method="POST" action="{{ route('pos.agent.regenerate') }}" onsubmit="return confirm('Regenerating will disconnect existing agents. Continue?')">
                                 @csrf
                                 <button type="submit" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-semibold">
                                     🔄 Regenerate Key
                                 </button>
                             </form>
-                            <form method="POST" action="{{ route('company.agent.toggle') }}">
+                            <form method="POST" action="{{ route('pos.agent.toggle') }}">
                                 @csrf
                                 <button type="submit" class="px-5 py-2 {{ $company->agent_enabled ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700' }} text-white rounded-lg font-semibold">
                                     {{ $company->agent_enabled ? '⏸ Disable Agent' : '▶ Enable Agent' }}
@@ -135,7 +135,7 @@
                 <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Download TaxNest Agent</h3>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <a href="{{ route('company.agent.download') }}" class="flex flex-col items-center p-6 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition">
+                    <a href="{{ route('pos.agent.download') }}" class="flex flex-col items-center p-6 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition">
                         <div class="text-5xl mb-2">🪟</div>
                         <div class="font-semibold text-gray-800 dark:text-gray-100">Windows</div>
                         <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">.exe Installer</div>
@@ -194,4 +194,4 @@
             });
         }
     </script>
-</x-app-layout>
+</x-pos-layout>

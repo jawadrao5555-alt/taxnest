@@ -1,103 +1,104 @@
 # TaxNest PRA Sync Agent
 
-Desktop companion app that runs on a company's local Pakistani PC to submit POS invoices directly to PRA — no relay or proxy needed on the server.
+A standalone Windows desktop application that auto-syncs your NestPOS invoices to **PRA (Punjab Revenue Authority)** from your local Pakistani PC — no relay, no proxy, no SSH required.
 
-## Architecture
+## How It Works
 
 ```
-TaxNest Server (any country)
-        ↓ (pull pending)
-   Local PC Agent (Pakistan IP)
-        ↓ (submit)
-       PRA (PRAL IMS)
-        ↓ (response)
-   Local PC Agent
-        ↓ (report success)
-TaxNest Server
+┌──────────────────┐    HTTPS     ┌──────────────────┐    HTTPS    ┌─────────────┐
+│  TaxNest Server  │  ◄────────►  │  Your PC (PK IP) │  ────────►  │   PRA API   │
+│ taxnest.com.pk   │   poll/30s   │  TaxNest Agent   │  submit     │  pra.gop.pk │
+└──────────────────┘              └──────────────────┘             └─────────────┘
 ```
 
-## How it works
+1. Agent polls TaxNest server every **30 seconds** for pending PRA invoices
+2. Submits them directly to PRA from your local Pakistani IP
+3. Reports success/fail back to TaxNest server
+4. Sends heartbeat every **60 seconds** so the panel shows ONLINE status
 
-1. Company logs into TaxNest, goes to **PRA Sync Agent** menu, generates an API key.
-2. Downloads & installs the agent on a Pakistan-based PC.
-3. Enters Server URL + Company ID + API Key in the agent.
-4. Agent runs in the system tray, polls every 30 sec for pending invoices.
-5. Pulls payload + PRA token from server, submits to PRA from the local IP.
-6. Reports success/failure back to the server.
+---
 
-## Build instructions (developer)
+## Build the `.exe` Installer (on a Windows PC)
 
-### Prerequisites
-- Node.js 18+ installed
-- Windows PC (for `.exe` build) or Mac/Linux for those targets
+### Pre-requisites
+- Windows 10 / 11 (64-bit)
+- [Node.js 20+ LTS](https://nodejs.org/en/download/) installed
+- Internet connection (to download Electron binaries — ~150 MB)
 
-### Install dependencies
-```bash
-cd pra-agent
+### Steps
+
+```powershell
+# 1. Clone or download the pra-agent folder to your Windows PC
+git clone https://github.com/jawadrao5555-alt/taxnest.git
+cd taxnest\pra-agent
+
+# 2. Install dependencies (downloads Electron — first time only)
 npm install
-```
 
-### Run in development
-```bash
-npm start
-```
-
-### Build Windows installer (.exe)
-```bash
+# 3. Build the Windows .exe installer
 npm run build:win
 ```
-Output: `dist/TaxNest Agent Setup 1.0.0.exe`
 
-### Build for all platforms
+After ~3 minutes you'll find the installer at:
+
+```
+pra-agent\dist\TaxNest-Agent-Setup-1.0.0.exe
+```
+
+### Distributing to Companies
+
+Upload the `.exe` to your TaxNest server:
+
 ```bash
-npm run build
+# On the cPanel terminal:
+mkdir -p ~/public_html/taxnest/public/downloads
+# Then upload TaxNest-Agent-Setup-1.0.0.exe via cPanel File Manager into:
+#   public_html/taxnest/public/downloads/TaxNest-Agent-Setup.exe
 ```
 
-## Deploy to companies
+Companies download it from the **POS → PRA Sync Agent** page.
 
-After building, upload the installer to:
+---
+
+## Installation (End User on Pakistani PC)
+
+1. Download `TaxNest-Agent-Setup.exe` from the POS panel
+2. Double-click to install (accepts standard NSIS installer)
+3. Launch **TaxNest PRA Agent** from Start Menu / Desktop
+4. Paste the **3 credentials** shown on the POS panel:
+   - **Server URL:** `https://taxnest.com.pk/api/agent`
+   - **Company ID:** (your numeric ID, e.g. `13`)
+   - **API Key:** (the `tnk_…` key you generated)
+5. Click **Test Connection** → should show ✅
+6. Click **Save & Connect** → agent starts syncing
+7. Close the window — agent runs silently in the **system tray**
+
+The agent **auto-starts on Windows boot**. To quit, right-click the tray icon → **Quit Agent**.
+
+---
+
+## Files
+
 ```
-public_html/taxnest/public/downloads/TaxNest-Agent-Setup.exe
+pra-agent/
+├── main.js          # Electron main process (window, tray, IPC)
+├── preload.js       # Secure context-bridge for renderer
+├── index.html       # Renderer UI (config + status)
+├── src/agent.js     # Sync engine (poll, submit, heartbeat)
+├── package.json     # Build config (electron-builder NSIS)
+└── assets/          # Icons (icon.ico for Windows)
 ```
 
-Then companies can download from the **PRA Sync Agent** page in their dashboard.
+## Server-side API (already deployed)
 
-## Configuration
+| Endpoint                          | Method | Description                          |
+|-----------------------------------|--------|--------------------------------------|
+| `/api/agent/heartbeat`            | POST   | Agent → server (every 60s)           |
+| `/api/agent/pending-invoices`     | GET    | Server → agent (returns queue)       |
+| `/api/agent/submit-result`        | POST   | Agent → server (PRA result)          |
 
-Companies enter:
-- **Server URL**: `https://taxnest.com.pk/api/agent`
-- **Company ID**: shown in their dashboard (e.g. `13`)
-- **API Key**: generated in their dashboard (e.g. `tnk_a3f9b2e1c8d7...`)
+All endpoints require `Authorization: Bearer <agent_api_key>`.
 
-## Features
+---
 
-- ✅ System tray (runs in background)
-- ✅ Auto-start on Windows boot
-- ✅ Heartbeat every 60 sec (online status)
-- ✅ Sync poll every 30 sec
-- ✅ Live status UI with stats
-- ✅ Test connection button
-- ✅ Encrypted local config (electron-store)
-- ✅ Auto-retry on failures
-
-## Server API
-
-All endpoints require `Authorization: Bearer <api_key>` header.
-
-### POST `/api/agent/heartbeat`
-Body: `{ version, company_id }`
-Response: `{ ok, company: { id, name, pra_pos_id, pra_environment }, server_time }`
-
-### GET `/api/agent/pending-invoices`
-Response: `{ count, invoices: [{ transaction_id, invoice_number, payload, created_at }], pra_endpoint, pra_token }`
-
-### POST `/api/agent/submit-result`
-Body: `{ transaction_id, success, pra_invoice_number, response, error }`
-Response: `{ ok }`
-
-## Security
-
-- API key is per-company (regenerate anytime from dashboard)
-- Server enforces company-level isolation (transaction_id must belong to company)
-- Agent stores credentials in OS-secured electron-store
-- All communication over HTTPS
+**This agent is exclusively for the NestPOS PRA module.** It has no relationship with the Digital Invoice (DI) or FBR submission flows — those use server-side FBR API directly and are not IP-restricted.

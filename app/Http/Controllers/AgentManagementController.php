@@ -8,15 +8,15 @@ use App\Models\Company;
 
 class AgentManagementController extends Controller
 {
-    private function currentUser()
+    private function posUser()
     {
-        return auth()->user() ?: auth('pos')->user() ?: auth('fbrpos')->user();
+        return auth('pos')->user();
     }
 
     public function show(Request $request)
     {
-        $user = $this->currentUser();
-        abort_unless($user, 403);
+        $user = $this->posUser();
+        abort_unless($user, 403, 'POS authentication required.');
         $company = Company::findOrFail($user->company_id);
 
         $stats = [
@@ -38,14 +38,14 @@ class AgentManagementController extends Controller
         ];
 
         $isOnline = $company->agent_last_seen
-            && $company->agent_last_seen->gt(now()->subMinutes(2));
+            && \Carbon\Carbon::parse($company->agent_last_seen)->gt(now()->subMinutes(2));
 
         return view('company.agent', compact('company', 'stats', 'isOnline'));
     }
 
     public function generateKey(Request $request)
     {
-        $user = $this->currentUser();
+        $user = $this->posUser();
         abort_unless($user, 403);
         $company = Company::findOrFail($user->company_id);
 
@@ -59,7 +59,7 @@ class AgentManagementController extends Controller
 
     public function regenerateKey(Request $request)
     {
-        $user = $this->currentUser();
+        $user = $this->posUser();
         abort_unless($user, 403);
         $company = Company::findOrFail($user->company_id);
 
@@ -72,7 +72,7 @@ class AgentManagementController extends Controller
 
     public function toggle(Request $request)
     {
-        $user = $this->currentUser();
+        $user = $this->posUser();
         abort_unless($user, 403);
         $company = Company::findOrFail($user->company_id);
 
@@ -90,9 +90,9 @@ class AgentManagementController extends Controller
         $path = public_path('downloads/TaxNest-Agent-Setup.exe');
 
         if (!file_exists($path)) {
-            return back()->with('error', 'Agent installer not yet available. Coming soon!');
+            return back()->with('error', 'Agent installer not yet available. Please contact support.');
         }
 
-        return response()->download($path);
+        return response()->download($path, 'TaxNest-PRA-Agent-Setup.exe');
     }
 }

@@ -1,30 +1,31 @@
 {
-  "name": "taxnest-agent",
+  "name": "taxnest-pra-agent",
   "version": "1.0.0",
-  "description": "TaxNest PRA Sync Agent - Auto-syncs POS invoices to PRA from your local Pakistani PC",
+  "description": "TaxNest PRA Sync Agent — auto-syncs your POS invoices to PRA from your local Pakistani PC.",
   "main": "main.js",
-  "author": "TaxNest",
+  "author": "TaxNest (Pvt) Ltd",
   "license": "Proprietary",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder",
-    "build:win": "electron-builder --win",
-    "build:mac": "electron-builder --mac",
-    "build:linux": "electron-builder --linux"
+    "build:win": "electron-builder --win --x64",
+    "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
-    "axios": "^1.7.0",
+    "axios": "^1.7.7",
     "electron-store": "^8.2.0"
   },
   "devDependencies": {
-    "electron": "^31.0.0",
+    "electron": "^31.7.0",
     "electron-builder": "^24.13.3"
   },
   "build": {
-    "appId": "com.taxnest.agent",
-    "productName": "TaxNest Agent",
+    "appId": "com.taxnest.pra-agent",
+    "productName": "TaxNest PRA Agent",
+    "copyright": "Copyright (c) 2026 TaxNest",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "assets"
     },
     "files": [
       "main.js",
@@ -40,24 +41,17 @@
           "arch": ["x64"]
         }
       ],
-      "icon": "assets/icon.ico"
+      "artifactName": "TaxNest-Agent-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
+      "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "TaxNest Agent"
-    },
-    "mac": {
-      "target": "dmg",
-      "icon": "assets/icon.icns",
-      "category": "public.app-category.business"
-    },
-    "linux": {
-      "target": "AppImage",
-      "icon": "assets/icon.png",
-      "category": "Office"
+      "shortcutName": "TaxNest PRA Agent",
+      "uninstallDisplayName": "TaxNest PRA Agent",
+      "deleteAppDataOnUninstall": false
     }
   }
 }

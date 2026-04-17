@@ -1,0 +1,38 @@
+[taxnestc@eu1 ~]$ cd ~/publiccd ~/public_html/taxnest && git fetch origin && git reset --hard origin/main && git log --oneline -1 && php artisan view:clear && php artisan optimize:clear
+HEAD is now at 6be0b53 Remove agent navigation from digital invoice and fix dashboard style picker
+6be0b53 (HEAD -> main, origin/main, origin/HEAD) Remove agent navigation from digital invoice and fix dashboard style picker
+
+   INFO  Compiled views cleared successfully.
+
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.77ms DONE
+  cache .......................................................... 1.90ms DONE
+  compiled ....................................................... 0.74ms DONE
+  events ......................................................... 0.30ms DONE
+  routes ......................................................... 0.44ms DONE
+  views .......................................................... 2.67ms DONE
+                                   cd ~/public_html/taxnest && git fetch origin && git reset --hard origin/main && git log --oneline -1 && php artisan view:clear && php artisan optimize:clearaxnest && git fetch origin && git reset --hard origin/main && git log --oneline -1 && php artisan view:clearemote: Enumerating objects: 16, done.
+remote: Counting objects: 100% (16/16), done.
+remote: Compressing objects: 100% (2/2), done.
+remote: Total 9 (delta 7), reused 9 (delta 7), pack-reused 0 (from 0)
+Unpacking objects: 100% (9/9), 24.36 KiB | 209.00 KiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+   6be0b53..b1cdfa1  main       -> origin/main
+HEAD is now at b1cdfa1 Fix error causing the entire dashboard to become blank
+b1cdfa1 (HEAD -> main, origin/main, origin/HEAD) Fix error causing the entire dashboard to become blank
+
+   INFO  Compiled views cleared successfully.
+
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.84ms DONE
+  cache .......................................................... 2.08ms DONE
+  compiled ....................................................... 0.76ms DONE
+  events ......................................................... 0.32ms DONE
+  routes ......................................................... 0.28ms DONE
+  views .......................................................... 2.71ms DONE
+
+[taxnestc@eu1 taxnest]$

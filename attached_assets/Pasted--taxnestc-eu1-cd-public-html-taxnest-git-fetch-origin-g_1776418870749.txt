@@ -1,0 +1,42 @@
+[taxnestc@eu1 ~]$ cd ~/public_html/taxnest && git fetch origin && git reset --hard origin/main && git log --oneline -1 && php artisan view:clear && php artisan route:clear && php artisan optimize:clear
+HEAD is now at 9c00817 Add agent link to user dropdown in POS interface
+9c00817 (HEAD -> main, origin/main, origin/HEAD) Add agent link to user dropdown in POS interface
+
+   INFO  Compiled views cleared successfully.
+
+
+   INFO  Route cache cleared successfully.
+
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.75ms DONE
+  cache .......................................................... 1.77ms DONE
+  compiled ....................................................... 0.68ms DONE
+  events ......................................................... 0.30ms DONE
+  routes ......................................................... 0.26ms DONE
+  views .......................................................... 2.72ms DONE
+                                   cd ~/public_html/taxnest && git fetch origin && git reset --hard origin/main && git log --oneline -1 && php artisan view:clear && php artisan route:clear && php artisan optimize:clear&& git reset --hard origin/main && git log --oneline -1 && php artisan view:clearemote: Enumerating objects: 32, done.
+remote: Counting objects: 100% (32/32), done.
+remote: Compressing objects: 100% (4/4), done.
+remote: Total 20 (delta 16), reused 20 (delta 16), pack-reused 0 (from 0)
+Unpacking objects: 100% (20/20), 108.53 KiB | 1.21 MiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+   9c00817..dfb627b  main       -> origin/main
+HEAD is now at dfb627b Allow POS users to access agent features within the POS interface
+dfb627b (HEAD -> main, origin/main, origin/HEAD) Allow POS users to access agent features within the POS interface
+
+   INFO  Compiled views cleared successfully.
+
+
+   INFO  Route cache cleared successfully.
+
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 6.04ms DONE
+  cache .......................................................... 2.38ms DONE
+  compiled ....................................................... 0.93ms DONE
+  events ......................................................... 0.36ms DONE
+  routes ......................................................... 0.30ms DONE
+  views .......................................................... 2.86ms DONE

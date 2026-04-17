@@ -1,0 +1,97 @@
+[taxnestc@eu1 ~]$ cd ~/publiccd ~/public_html/taxnest && git fetch origin && git reset --hard origin/main && php artisan migrate --force && php artisan optimize:clear && php artisan view:clear
+HEAD is now at 6a97c54 Restore previous POS interface and keyboard shortcut features
+
+   INFO  Nothing to migrate.
+
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 1.76ms DONE
+  cache .......................................................... 6.03ms DONE
+  compiled ....................................................... 0.51ms DONE
+  events ......................................................... 0.28ms DONE
+  routes ......................................................... 0.57ms DONE
+  views .......................................................... 4.18ms DONE
+
+
+   INFO  Compiled views cleared successfully.
+
+[taxnestc@eu1 taxnest]$ git clone <repo>
+cd pra-agent
+npm installnpm run build:win
+bash: syntax error near unexpected token `newline'
+bash: cd: pra-agent: No such file or directory
+bash: npm: command not found
+bash: npm: command not found       cd /home/taxnestc/public_html/taxnest && /usr/local/bin/php artisan migrate --force && /usr/local/bin/php artisan
+optimize:clear && /usr/local/bin/php artisan view:clearaxnest && /usr/local/bin/php artisan migrate --force && /usr/local/bin/php artisan optimize:clear && /usr/local/bin/php artisan view:clear
+   INFO  Nothing to migrate.
+
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.74ms DONE
+  cache .......................................................... 1.82ms DONE
+  compiled ....................................................... 0.68ms DONE
+  events ......................................................... 0.28ms DONE
+  routes ......................................................... 0.32ms DONE
+  views .......................................................... 2.55ms DONE
+
+
+   INFO  Compiled views cleared successfully.
+                                   cd /home/taxnestc/public_html/taxnest && /usr/local/bin/php artisan migrate --force && /usr/local/bin/php artisan
+optimize:clear && /usr/local/bin/php artisan view:clearaxnest && /usr/local/bin/php artisan migrate --force && /usr/local/bin/php artisan optimize:clear && /usr/local/bin/php artisan view:clear
+   INFO  Nothing to migrate.
+
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 1.77ms DONE
+  cache .......................................................... 1.89ms DONE
+  compiled ....................................................... 0.71ms DONE
+  events ......................................................... 0.30ms DONE
+  routes ......................................................... 0.28ms DONE
+  views .......................................................... 2.63ms DONE
+
+
+   INFO  Compiled views cleared successfully.
+                        cd /home/taxnestc/public_html/taxnest && /usr/local/bin/php artisan migrate --force && /usr/local/bin/php artisan optimize:cl
+ear && /usr/local/bin/php artisan view:clear && /usr/local/bin/php artisan route:cleartisan migrate --force && /usr/local/bin/php artisan optimize:clear && /usr/local/bin/php artisan view:clear && /usr/local/bin/php artisan route:clear
+   INFO  Nothing to migrate.
+
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.83ms DONE
+  cache .......................................................... 1.80ms DONE
+  compiled ....................................................... 0.70ms DONE
+  events ......................................................... 0.34ms DONE
+  routes ......................................................... 0.31ms DONE
+  views .......................................................... 3.31ms DONE
+
+
+   INFO  Compiled views cleared successfully.
+
+
+   INFO  Route cache cleared successfully.
+                                   cd ~/public_html/taxnest && php artisan migrate --force && php artisan optimize:clear && php artisan view:clear &&
+ php artisan route:clearcd ~/public_html/taxnest && php artisan migrate --force && php artisan optimize:clear && php artisan view:clear && php artisan route:clear
+   INFO  Nothing to migrate.
+
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.77ms DONE
+  cache .......................................................... 1.85ms DONE
+  compiled ....................................................... 0.69ms DONE
+  events ......................................................... 0.29ms DONE
+  routes ......................................................... 0.28ms DONE
+  views .......................................................... 2.96ms DONE
+
+
+   INFO  Compiled views cleared successfully.
+
+
+   INFO  Route cache cleared successfully.
+
+[taxnestc@eu1 taxnest]$ ^C
+[taxnestc@eu1 taxnest]$

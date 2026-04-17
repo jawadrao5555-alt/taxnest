@@ -87,12 +87,14 @@ class AgentManagementController extends Controller
 
     public function downloadAgent()
     {
-        $path = public_path('downloads/TaxNest-Agent-Setup.exe');
+        $localPath = public_path('downloads/TaxNest-PRA-Agent-Windows.zip');
 
-        if (!file_exists($path)) {
-            return back()->with('error', 'Agent installer not yet available. Please contact support.');
+        if (file_exists($localPath)) {
+            return response()->download($localPath, 'TaxNest-PRA-Agent-Windows.zip');
         }
 
-        return response()->download($path, 'TaxNest-PRA-Agent-Setup.exe');
+        return redirect()->away(
+            'https://github.com/jawadrao5555-alt/taxnest/releases/download/agent-v1.0.0/TaxNest-PRA-Agent-Windows.zip'
+        );
     }
 }

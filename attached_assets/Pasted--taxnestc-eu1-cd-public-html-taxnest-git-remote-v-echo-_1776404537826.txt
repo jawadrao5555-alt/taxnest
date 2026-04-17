@@ -1,0 +1,36 @@
+[taxnestc@eu1 ~]$ cd ~/public_html/taxnest && git remote -v && echo '---' && git fetch --all 2>&1 && echo '---' && git log origin/main --oneline -3
+origin  https://github.com/jawadrao5555-alt/taxnest.git (fetch)
+origin  https://github.com/jawadrao5555-alt/taxnest.git (push)
+---
+remote: Enumerating objects: 74, done.
+remote: Counting objects: 100% (74/74), done.
+remote: Compressing objects: 100% (19/19), done.
+remote: Total 52 (delta 31), reused 52 (delta 31), pack-reused 0 (from 0)
+Unpacking objects: 100% (52/52), 410.24 KiB | 2.83 MiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+   6a97c54..a0ad368  main       -> origin/main
+---
+a0ad368 (origin/main, origin/HEAD) Add a desktop agent for automatic invoice synchronization and submission to PRA
+55fd3e0 Add command to clear OPcache and show recent error logs
+a8cfe22 Add screenshots of successfcd ~/public_html/taxnest && git fetch origin main && git reset --hard a0ad368 && php artisan migrate --force && php artisan optimize:clear && php artisan view:clear& git fetch origin main && git reset --hard a0ad368 && php artisan migrate --force && php artisan oFrom https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+HEAD is now at a0ad368 Add a desktop agent for automatic invoice synchronization and submission to PRA
+
+   INFO  Running migrations.
+
+  2026_04_17_101448_add_agent_fields_to_companies_table ......... 17.99ms DONE
+
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.67ms DONE
+  cache .......................................................... 1.69ms DONE
+  compiled ....................................................... 0.63ms DONE
+  events ......................................................... 0.29ms DONE
+  routes ......................................................... 0.32ms DONE
+  views .......................................................... 2.90ms DONE
+
+
+   INFO  Compiled views cleared successfully.
+
+[taxnestc@eu1 taxnest]$

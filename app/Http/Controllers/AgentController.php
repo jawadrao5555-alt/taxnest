@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\Company;
+use App\Models\PosTransaction;
+use App\Services\PraIntegrationService;
 
 class AgentController extends Controller
 {
@@ -36,35 +38,39 @@ class AgentController extends Controller
 
         $company->update(['agent_last_seen' => now()]);
 
-        $pending = DB::table('pos_transactions')
-            ->where('company_id', $company->id)
+        $pending = PosTransaction::where('company_id', $company->id)
             ->whereIn('pra_status', ['offline', 'pending', 'failed'])
             ->whereNull('pra_invoice_number')
             ->orderBy('id', 'asc')
             ->limit(20)
-            ->get([
-                'id',
-                'invoice_number',
-                'pra_payload',
-                'pra_status',
-                'created_at',
-            ]);
+            ->get();
 
-        $invoices = $pending->map(function ($t) {
-            return [
-                'transaction_id' => $t->id,
-                'invoice_number' => $t->invoice_number,
-                'payload' => is_string($t->pra_payload) ? json_decode($t->pra_payload, true) : $t->pra_payload,
-                'created_at' => $t->created_at,
-            ];
-        });
+        $praService = app(PraIntegrationService::class);
+
+        $invoices = [];
+        foreach ($pending as $txn) {
+            try {
+                $payload = $praService->generatePayload($txn);
+                $invoices[] = [
+                    'transaction_id' => $txn->id,
+                    'invoice_number' => $txn->invoice_number,
+                    'payload' => $payload,
+                    'created_at' => $txn->created_at?->toIso8601String(),
+                ];
+            } catch (\Throwable $e) {
+                Log::warning('Agent: payload generation failed', [
+                    'transaction_id' => $txn->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         return response()->json([
-            'count' => $invoices->count(),
+            'count' => count($invoices),
             'invoices' => $invoices,
             'pra_endpoint' => $company->pra_environment === 'production'
                 ? 'https://ims.pral.com.pk/ims/production/api/Live/PostData'
-                : 'https://gw.fbr.gov.pk/imsp/v1/api/Live/PostData',
+                : 'https://ims.pral.com.pk/ims/sandbox/api/Live/PostData',
             'pra_token' => $company->pra_production_token,
         ]);
     }
@@ -97,7 +103,6 @@ class AgentController extends Controller
                 'pra_status' => 'submitted',
                 'pra_invoice_number' => $request->input('pra_invoice_number'),
                 'pra_response' => json_encode($request->input('response')),
-                'pra_submitted_at' => now(),
                 'updated_at' => now(),
             ]);
 

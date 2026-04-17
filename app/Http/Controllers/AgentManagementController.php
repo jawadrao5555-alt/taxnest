@@ -28,7 +28,7 @@ class AgentManagementController extends Controller
             'submitted_today' => \DB::table('pos_transactions')
                 ->where('company_id', $company->id)
                 ->where('pra_status', 'submitted')
-                ->whereDate('pra_submitted_at', today())
+                ->whereDate('updated_at', today())
                 ->count(),
             'failed_today' => \DB::table('pos_transactions')
                 ->where('company_id', $company->id)

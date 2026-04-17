@@ -1,0 +1,93 @@
+[taxnestc@eu1 ~]$ cd ~/public_html/taxnest && git remote -v && echo '---' && git fetch --all 2>&1 && echo '---' && git log origin/main --oneline -3
+origin  https://github.com/jawadrao5555-alt/taxnest.git (fetch)
+origin  https://github.com/jawadrao5555-alt/taxnest.git (push)
+---
+remote: Enumerating objects: 74, done.
+remote: Counting objects: 100% (74/74), done.
+remote: Compressing objects: 100% (19/19), done.
+remote: Total 52 (delta 31), reused 52 (delta 31), pack-reused 0 (from 0)
+Unpacking objects: 100% (52/52), 410.24 KiB | 2.83 MiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+   6a97c54..a0ad368  main       -> origin/main
+---
+a0ad368 (origin/main, origin/HEAD) Add a desktop agent for automatic invoice synchronization and submission to PRA
+55fd3e0 Add command to clear OPcache and show recent error logs
+a8cfe22 Add screenshots of successfcd ~/public_html/taxnest && git fetch origin main && git reset --hard a0ad368 && php artisan migrate --force && php artisan optimize:clear && php artisan view:clear& git fetch origin main && git reset --hard a0ad368 && php artisan migrate --force && php artisan oFrom https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+HEAD is now at a0ad368 Add a desktop agent for automatic invoice synchronization and submission to PRA
+
+   INFO  Running migrations.
+  2026_04_17_101448_add_agent_fields_to_companies_table ......... 17.99ms DONE
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.67ms DONE
+  cache .......................................................... 1.69ms DONE
+  compiled ....................................................... 0.63ms DONE
+  events ......................................................... 0.29ms DONE
+  routes ......................................................... 0.32ms DONE
+  views .......................................................... 2.90ms DONE
+
+
+   INFO  Compiled views cleared successfully.
+
+[taxnestc@eu1 taxnest]$ cd ~/public_html/taxnest && git fetch origin && git reset --hard origin/main && php artisan view:clear && php artisan optimize:clear
+remote: Enumerating objects: 10, done.
+remote: Counting objects: 100% (10/10), done.
+remote: Compressing objects: 100% (3/3), done.
+remote: Total 8 (delta 5), reused 8 (delta 5), pack-reused 0 (from 0)
+Unpacking objects: 100% (8/8), 2.43 KiB | 621.00 KiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+   a0ad368..1f5cd62  main       -> origin/main
+HEAD is now at 1f5cd62 Update the system to correctly deploy the latest code changes
+
+   INFO  Compiled views cleared successfully.
+
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.70ms DONE
+  cache .......................................................... 1.70ms DONE
+  compiled ....................................................... 0.61ms DONE
+  events ......................................................... 0.28ms DONE
+  routes ......................................................... 0.54ms DONE
+  views .......................................................... 3.49ms DONE
+
+[taxnestc@eu1 taxnest]$ cd ~/public_html/taxnest && git fetch origin && git reset --hard origin/main && php artisan view:clear && php artisan optimize:clear
+HEAD is now at 1f5cd62 Update the system to correctly deploy the latest code changes
+
+   INFO  Compiled views cleared successfully.
+
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.79ms DONE
+  cache .......................................................... 2.23ms DONE
+  compiled ....................................................... 0.97ms DONE
+  events ......................................................... 0.36ms DONE
+  routes ......................................................... 0.34ms DONE
+  views .......................................................... 3.14ms DONE
+                                   cd ~/public_html/taxnest && git fetch origin && git reset --hard origin/main && git log --oneline -1 && php artisa
+n view:clear && php artisan optimize:clearaxnest && git fetch origin && git reset --hard origin/main && git log --oneline -1 && php artisan view:clearemote: Enumerating objects: 18, done.
+remote: Counting objects: 100% (18/18), done.
+remote: Compressing objects: 100% (3/3), done.
+remote: Total 12 (delta 9), reused 12 (delta 9), pack-reused 0 (from 0)
+Unpacking objects: 100% (12/12), 263.97 KiB | 2.90 MiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+   1f5cd62..82274ea  main       -> origin/main
+HEAD is now at 82274ea Add PRA Sync Agent menu to POS sidebar
+82274ea (HEAD -> main, origin/main, origin/HEAD) Add PRA Sync Agent menu to POS sidebar
+
+   INFO  Compiled views cleared successfully.
+
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.67ms DONE
+  cache .......................................................... 1.73ms DONE
+  compiled ....................................................... 0.66ms DONE
+  events ......................................................... 0.29ms DONE
+  routes ......................................................... 0.27ms DONE
+  views .......................................................... 2.67ms DONE
+
+[taxnestc@eu1 taxnest]$

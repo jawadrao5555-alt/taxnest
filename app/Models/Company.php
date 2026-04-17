@@ -62,6 +62,10 @@ class Company extends Model
         'pra_access_code',
         'pra_production_token',
         'pra_proxy_url',
+        'agent_api_key',
+        'agent_last_seen',
+        'agent_version',
+        'agent_enabled',
         'receipt_printer_size',
         'confidential_pin',
         'next_local_invoice_number',
@@ -94,6 +98,8 @@ class Company extends Model
         'pra_reporting_enabled' => 'boolean',
         'fbr_pos_enabled' => 'boolean',
         'fbr_reporting_enabled' => 'boolean',
+        'agent_enabled' => 'boolean',
+        'agent_last_seen' => 'datetime',
     ];
 
     protected $hidden = [

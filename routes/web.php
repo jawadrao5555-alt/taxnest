@@ -220,6 +220,12 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         Route::post('/company/test-connection', [CompanySettingsController::class, 'testConnection']);
         Route::post('/company/sandbox-test/{type}', [CompanySettingsController::class, 'sandboxTest']);
 
+        Route::get('/company/agent', [\App\Http\Controllers\AgentManagementController::class, 'show'])->name('company.agent');
+        Route::post('/company/agent/generate-key', [\App\Http\Controllers\AgentManagementController::class, 'generateKey'])->name('company.agent.generate');
+        Route::post('/company/agent/regenerate-key', [\App\Http\Controllers\AgentManagementController::class, 'regenerateKey'])->name('company.agent.regenerate');
+        Route::post('/company/agent/toggle', [\App\Http\Controllers\AgentManagementController::class, 'toggle'])->name('company.agent.toggle');
+        Route::get('/company/agent/download', [\App\Http\Controllers\AgentManagementController::class, 'downloadAgent'])->name('company.agent.download');
+
         Route::get('/branches', [BranchController::class, 'index'])->name('branches.index');
         Route::get('/branches/create', [BranchController::class, 'create'])->name('branches.create');
         Route::post('/branches', [BranchController::class, 'store'])->name('branches.store');
@@ -698,6 +704,16 @@ Route::get('/setup-seed-xK9mP2', function () {
     } catch (\Exception $e) {
         return '<pre>Error: ' . $e->getMessage() . '</pre>';
     }
+});
+
+// =====================================================
+// AGENT API (TaxNest Desktop Sync Agent)
+// Bearer token auth, no CSRF
+// =====================================================
+Route::prefix('api/agent')->middleware(['agent.auth'])->group(function () {
+    Route::post('/heartbeat', [\App\Http\Controllers\AgentController::class, 'heartbeat']);
+    Route::get('/pending-invoices', [\App\Http\Controllers\AgentController::class, 'pendingInvoices']);
+    Route::post('/submit-result', [\App\Http\Controllers\AgentController::class, 'submitResult']);
 });
 
 require __DIR__.'/auth.php';

@@ -69,6 +69,13 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **FBR Reporting Toggle:** Admin-only toggle for FBR reporting with corresponding invoice prefixes.
 - **Local Tabs & Confidential PIN System:** Provides PIN-protected access to local invoice data.
 
+**TaxNest PRA Sync Agent (Desktop Companion App):**
+- **Architecture:** Electron-based `.exe` desktop app installed on company's local Pakistani PC. Eliminates need for server-side Pakistani IP, relays, or proxies.
+- **Server endpoints** (Bearer auth via `agent_api_key`): `POST /api/agent/heartbeat`, `GET /api/agent/pending-invoices`, `POST /api/agent/submit-result`
+- **Per-company credentials:** `companies.agent_api_key`, `agent_last_seen`, `agent_version`, `agent_enabled` columns. UI at `/company/agent` for key generation/regeneration/toggle/download.
+- **Agent flow:** Polls server every 30s for pending invoices, submits to PRA from local IP, reports results back. Heartbeat every 60s. Runs in system tray with auto-start.
+- **Source:** `pra-agent/` folder — Electron + Node.js + axios + electron-store. Build via `npm run build:win`.
+
 **UI/UX Design:**
 - **Layout:** Responsive sidebar with a single scrollable content area.
 - **Styling:** Consistent dark/light modes, standardized components, emerald-600 primary color palette.

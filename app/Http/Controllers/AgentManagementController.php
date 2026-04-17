@@ -8,9 +8,16 @@ use App\Models\Company;
 
 class AgentManagementController extends Controller
 {
+    private function currentUser()
+    {
+        return auth()->user() ?: auth('pos')->user() ?: auth('fbrpos')->user();
+    }
+
     public function show(Request $request)
     {
-        $company = Company::findOrFail(auth()->user()->company_id);
+        $user = $this->currentUser();
+        abort_unless($user, 403);
+        $company = Company::findOrFail($user->company_id);
 
         $stats = [
             'pending' => \DB::table('pos_transactions')
@@ -38,7 +45,9 @@ class AgentManagementController extends Controller
 
     public function generateKey(Request $request)
     {
-        $company = Company::findOrFail(auth()->user()->company_id);
+        $user = $this->currentUser();
+        abort_unless($user, 403);
+        $company = Company::findOrFail($user->company_id);
 
         $company->update([
             'agent_api_key' => 'tnk_' . Str::random(48),
@@ -50,7 +59,9 @@ class AgentManagementController extends Controller
 
     public function regenerateKey(Request $request)
     {
-        $company = Company::findOrFail(auth()->user()->company_id);
+        $user = $this->currentUser();
+        abort_unless($user, 403);
+        $company = Company::findOrFail($user->company_id);
 
         $company->update([
             'agent_api_key' => 'tnk_' . Str::random(48),
@@ -61,7 +72,9 @@ class AgentManagementController extends Controller
 
     public function toggle(Request $request)
     {
-        $company = Company::findOrFail(auth()->user()->company_id);
+        $user = $this->currentUser();
+        abort_unless($user, 403);
+        $company = Company::findOrFail($user->company_id);
 
         $company->update([
             'agent_enabled' => !$company->agent_enabled,

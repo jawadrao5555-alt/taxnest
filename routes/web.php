@@ -395,6 +395,12 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
+    Route::get('/agent', [\App\Http\Controllers\AgentManagementController::class, 'show'])->name('pos.agent');
+    Route::post('/agent/generate-key', [\App\Http\Controllers\AgentManagementController::class, 'generateKey'])->name('pos.agent.generate');
+    Route::post('/agent/regenerate-key', [\App\Http\Controllers\AgentManagementController::class, 'regenerateKey'])->name('pos.agent.regenerate');
+    Route::post('/agent/toggle', [\App\Http\Controllers\AgentManagementController::class, 'toggle'])->name('pos.agent.toggle');
+    Route::get('/agent/download', [\App\Http\Controllers\AgentManagementController::class, 'downloadAgent'])->name('pos.agent.download');
+
     Route::get('/dashboard', [PosController::class, 'dashboard'])->name('pos.dashboard');
     Route::post('/settings/theme', [PosController::class, 'updateTheme'])->name('pos.settings.theme');
     Route::post('/settings/dashboard-style', [PosController::class, 'updateDashboardStyle'])->name('pos.settings.dashboard-style');

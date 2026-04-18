@@ -16,6 +16,9 @@ const status = {
   serverInfo: null,
 };
 
+const failedTxnIds = new Set();
+const submittedTxnIds = new Set();
+
 function getStatus() {
   return { ...status };
 }
@@ -107,18 +110,27 @@ async function submitToPra(invoice, praEndpoint, praToken) {
     if (success && praInvoiceNumber) {
       log(`✅ PRA accepted txn ${invoice.transaction_id}: ${praInvoiceNumber}`);
       await reportResult(invoice.transaction_id, true, praInvoiceNumber, data, null);
-      status.submittedCount++;
+      if (failedTxnIds.has(invoice.transaction_id)) {
+        failedTxnIds.delete(invoice.transaction_id);
+        status.failedCount = failedTxnIds.size;
+      }
+      if (!submittedTxnIds.has(invoice.transaction_id)) {
+        submittedTxnIds.add(invoice.transaction_id);
+        status.submittedCount = submittedTxnIds.size;
+      }
     } else {
       const err = data?.Response || data?.message || JSON.stringify(data);
       log(`❌ PRA rejected txn ${invoice.transaction_id}: ${err}`);
       await reportResult(invoice.transaction_id, false, null, data, err);
-      status.failedCount++;
+      failedTxnIds.add(invoice.transaction_id);
+      status.failedCount = failedTxnIds.size;
     }
   } catch (e) {
     const errMsg = e.response?.data ? JSON.stringify(e.response.data) : e.message;
     log(`❌ PRA error txn ${invoice.transaction_id}: ${errMsg}`);
     await reportResult(invoice.transaction_id, false, null, e.response?.data, errMsg);
-    status.failedCount++;
+    failedTxnIds.add(invoice.transaction_id);
+    status.failedCount = failedTxnIds.size;
   }
 }
 
@@ -159,7 +171,7 @@ function startAgent(config, onStatusChange) {
   syncOnce();
 
   heartbeatInterval = setInterval(heartbeat, 60000);
-  pollInterval = setInterval(syncOnce, 30000);
+  pollInterval = setInterval(syncOnce, 10000);
 }
 
 function stopAgent() {

@@ -41,7 +41,9 @@
           "arch": ["x64"]
         }
       ],
-      "artifactName": "TaxNest-Agent-Setup-${version}.${ext}"
+      "artifactName": "TaxNest-Agent-Setup-${version}.${ext}",
+      "signAndEditExecutable": false,
+      "signingHashAlgorithms": null
     },
     "nsis": {
       "oneClick": false,

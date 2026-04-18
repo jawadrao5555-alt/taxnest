@@ -2075,6 +2075,46 @@ class PosController extends Controller
         return back()->with('success', $customer->is_active ? 'Customer activated.' : 'Customer deactivated.');
     }
 
+    public function getLastOrder(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $userId = auth()->id();
+
+        $last = \App\Models\PosTransaction::where('company_id', $companyId)
+            ->when($userId, fn($q) => $q->where('user_id', $userId))
+            ->whereNotIn('status', ['draft', 'cancelled'])
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$last) {
+            return response()->json(['success' => false, 'message' => 'No previous order found.']);
+        }
+
+        $items = \DB::table('pos_transaction_items')
+            ->where('transaction_id', $last->id)
+            ->get()
+            ->map(function ($it) {
+                return [
+                    'type' => $it->item_type ?? 'product',
+                    'item_id' => $it->item_id ?? '',
+                    'name' => $it->item_name ?? '',
+                    'quantity' => (float) ($it->quantity ?? 1),
+                    'unit_price' => (float) ($it->unit_price ?? 0),
+                    'is_tax_exempt' => (bool) ($it->is_tax_exempt ?? false),
+                    '_isNew' => false,
+                ];
+            })->values();
+
+        return response()->json([
+            'success' => true,
+            'invoice_number' => $last->invoice_number,
+            'customer_name' => $last->customer_name,
+            'customer_phone' => $last->customer_phone,
+            'payment_method' => $last->payment_method,
+            'items' => $items,
+        ]);
+    }
+
     public function saveDraft(Request $request)
     {
         $companyId = app('currentCompanyId');

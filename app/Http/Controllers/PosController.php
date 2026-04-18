@@ -312,20 +312,27 @@ class PosController extends Controller
 
         $praMessage = '';
         if ($praEnabled) {
-            try {
-                $praService = new PraIntegrationService($company);
-                $praResult = $praService->sendInvoice($transaction);
-                $transaction->refresh();
+            // ENTERPRISE SAFE MODE — Phase 1: when desktop agent is enrolled, skip server-side direct submission.
+            // The agent (running on the company's local Pakistani PC) will pick this up via /api/agent/pending-invoices.
+            if ($company->agent_enabled) {
+                $transaction->update(['pra_status' => 'pending']);
+                $praMessage = ' | 🟡 Awaiting Sync: Desktop agent will submit to PRA from your local PC.';
+            } else {
+                try {
+                    $praService = new PraIntegrationService($company);
+                    $praResult = $praService->sendInvoice($transaction);
+                    $transaction->refresh();
 
-                if ($praResult['success']) {
-                    $praMessage = ' | PRA Fiscal Invoice Number: ' . ($transaction->pra_invoice_number ?? 'N/A');
-                } else {
+                    if ($praResult['success']) {
+                        $praMessage = ' | PRA Fiscal Invoice Number: ' . ($transaction->pra_invoice_number ?? 'N/A');
+                    } else {
+                        $transaction->update(['pra_status' => 'offline']);
+                        $praMessage = ' | Offline Mode: Invoice saved locally and will sync automatically.';
+                    }
+                } catch (\Exception $e) {
                     $transaction->update(['pra_status' => 'offline']);
                     $praMessage = ' | Offline Mode: Invoice saved locally and will sync automatically.';
                 }
-            } catch (\Exception $e) {
-                $transaction->update(['pra_status' => 'offline']);
-                $praMessage = ' | Offline Mode: Invoice saved locally and will sync automatically.';
             }
         } else {
             $praMessage = ' | Local invoice (PRA reporting is off).';
@@ -462,21 +469,27 @@ class PosController extends Controller
 
         $praMessage = '';
         if ($company->pra_reporting_enabled) {
-            try {
+            // ENTERPRISE SAFE MODE — Phase 1: agent-enabled companies bypass server-side submission.
+            if ($company->agent_enabled) {
                 $transaction->update(['pra_status' => 'pending', 'pra_response_code' => null]);
-                $praService = new PraIntegrationService($company);
-                $praResult = $praService->sendInvoice($transaction);
-                $transaction->refresh();
+                $praMessage = ' | 🟡 Awaiting Sync (desktop agent).';
+            } else {
+                try {
+                    $transaction->update(['pra_status' => 'pending', 'pra_response_code' => null]);
+                    $praService = new PraIntegrationService($company);
+                    $praResult = $praService->sendInvoice($transaction);
+                    $transaction->refresh();
 
-                if ($praResult['success']) {
-                    $praMessage = ' | PRA Fiscal #: ' . ($transaction->pra_invoice_number ?? 'N/A');
-                } else {
+                    if ($praResult['success']) {
+                        $praMessage = ' | PRA Fiscal #: ' . ($transaction->pra_invoice_number ?? 'N/A');
+                    } else {
+                        $transaction->update(['pra_status' => 'offline']);
+                        $praMessage = ' | Offline: Will sync automatically.';
+                    }
+                } catch (\Exception $e) {
                     $transaction->update(['pra_status' => 'offline']);
                     $praMessage = ' | Offline: Will sync automatically.';
                 }
-            } catch (\Exception $e) {
-                $transaction->update(['pra_status' => 'offline']);
-                $praMessage = ' | Offline: Will sync automatically.';
             }
         }
 
@@ -537,6 +550,12 @@ class PosController extends Controller
             return back()->with('error', 'PRA reporting is currently disabled. Enable it from PRA Settings first.');
         }
 
+        // ENTERPRISE SAFE MODE — Phase 1: agent-enabled companies just re-queue; the agent polls every 10s.
+        if ($company->agent_enabled) {
+            $transaction->update(['pra_status' => 'pending', 'pra_response_code' => null]);
+            return back()->with('success', '🟡 Re-queued for desktop agent — will sync within seconds.');
+        }
+
         try {
             $praService = new PraIntegrationService($company);
             $praResult = $praService->sendInvoice($transaction);
@@ -570,6 +589,16 @@ class PosController extends Controller
 
         if ($pendingInvoices->isEmpty()) {
             return back()->with('info', 'No failed or offline invoices to retry.');
+        }
+
+        // ENTERPRISE SAFE MODE — Phase 1: agent-enabled companies just bulk re-queue; the agent will pick them up.
+        if ($company->agent_enabled) {
+            $count = $pendingInvoices->count();
+            DB::table('pos_transactions')
+                ->where('company_id', $companyId)
+                ->whereIn('id', $pendingInvoices->pluck('id'))
+                ->update(['pra_status' => 'pending', 'pra_response_code' => null, 'updated_at' => now()]);
+            return back()->with('success', "🟡 {$count} invoice(s) re-queued for desktop agent.");
         }
 
         $praService = new PraIntegrationService($company);

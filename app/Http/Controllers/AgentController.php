@@ -20,6 +20,7 @@ class AgentController extends Controller
             'agent_version' => $request->input('version', $company->agent_version),
         ]);
 
+        // Phase 5a — self-heal: rows that already have a fiscal # but never got their status flipped.
         $healed = DB::table('pos_transactions')
             ->where('company_id', $company->id)
             ->whereNotNull('pra_invoice_number')
@@ -30,10 +31,31 @@ class AgentController extends Controller
                 'updated_at' => now(),
             ]);
 
-        if ($healed > 0) {
-            Log::info('Agent heartbeat: self-healed transactions', [
+        // Phase 1b — auto-promote any stale 'offline' rows back to 'pending' so the agent re-picks them up.
+        $repromoted = DB::table('pos_transactions')
+            ->where('company_id', $company->id)
+            ->where('pra_status', 'offline')
+            ->whereNull('pra_invoice_number')
+            ->update([
+                'pra_status' => 'pending',
+                'updated_at' => now(),
+            ]);
+
+        // Phase 5b — provide a snapshot of stuck rows so the agent can confirm none are forgotten.
+        $stuckIds = DB::table('pos_transactions')
+            ->where('company_id', $company->id)
+            ->whereIn('pra_status', ['pending', 'failed', 'offline'])
+            ->whereNull('pra_invoice_number')
+            ->orderByDesc('id')
+            ->limit(50)
+            ->pluck('id');
+
+        if ($healed > 0 || $repromoted > 0) {
+            Log::info('Agent heartbeat: self-heal sweep', [
                 'company_id' => $company->id,
                 'healed_count' => $healed,
+                'repromoted_count' => $repromoted,
+                'stuck_count' => $stuckIds->count(),
             ]);
         }
 
@@ -46,6 +68,8 @@ class AgentController extends Controller
                 'pra_environment' => $company->pra_environment,
             ],
             'healed' => $healed,
+            'repromoted' => $repromoted,
+            'stuck_transaction_ids' => $stuckIds,
             'server_time' => now()->toIso8601String(),
         ]);
     }

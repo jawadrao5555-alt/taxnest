@@ -1,4 +1,7 @@
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 
 let pollInterval = null;
 let heartbeatInterval = null;
@@ -13,11 +16,78 @@ const status = {
   pendingCount: 0,
   submittedCount: 0,
   failedCount: 0,
+  pendingCallbacks: 0,
   serverInfo: null,
 };
 
 const failedTxnIds = new Set();
 const submittedTxnIds = new Set();
+
+// Phase 4 — persistent callback retry queue.
+// When `submit-result` fails (network/server blip), we save the payload to disk and replay it on every heartbeat.
+const QUEUE_DIR = path.join(os.homedir(), '.taxnest-pra-agent');
+const QUEUE_FILE = path.join(QUEUE_DIR, 'pending-callbacks.json');
+
+function ensureQueueDir() {
+  try { if (!fs.existsSync(QUEUE_DIR)) fs.mkdirSync(QUEUE_DIR, { recursive: true }); } catch (e) {}
+}
+function loadQueue() {
+  try {
+    ensureQueueDir();
+    if (!fs.existsSync(QUEUE_FILE)) return [];
+    return JSON.parse(fs.readFileSync(QUEUE_FILE, 'utf8') || '[]');
+  } catch (e) { return []; }
+}
+function saveQueue(queue) {
+  try {
+    ensureQueueDir();
+    fs.writeFileSync(QUEUE_FILE, JSON.stringify(queue, null, 2));
+  } catch (e) { log('Queue save failed:', e.message); }
+}
+function enqueueCallback(payload) {
+  const q = loadQueue();
+  // Dedupe by transaction_id — keep latest payload only
+  const filtered = q.filter(p => p.transaction_id !== payload.transaction_id);
+  filtered.push({ ...payload, _enqueuedAt: new Date().toISOString(), _attempts: 0 });
+  saveQueue(filtered);
+  status.pendingCallbacks = filtered.length;
+}
+async function flushCallbackQueue() {
+  if (!currentConfig) return;
+  let q = loadQueue();
+  if (q.length === 0) {
+    status.pendingCallbacks = 0;
+    return;
+  }
+  log(`Flushing ${q.length} pending callback(s)…`);
+  const remaining = [];
+  for (const item of q) {
+    try {
+      await axios.post(
+        `${currentConfig.serverUrl}/submit-result`,
+        {
+          transaction_id: item.transaction_id,
+          success: item.success,
+          pra_invoice_number: item.pra_invoice_number,
+          response: item.response,
+          error: item.error,
+        },
+        { headers: { Authorization: `Bearer ${currentConfig.apiKey}` }, timeout: 10000 }
+      );
+      log(`✅ Replayed callback for txn ${item.transaction_id}`);
+    } catch (e) {
+      const attempts = (item._attempts || 0) + 1;
+      // Drop after 50 attempts to avoid unbounded growth
+      if (attempts < 50) {
+        remaining.push({ ...item, _attempts: attempts });
+      } else {
+        log(`⚠️ Dropping callback for txn ${item.transaction_id} after 50 failed attempts`);
+      }
+    }
+  }
+  saveQueue(remaining);
+  status.pendingCallbacks = remaining.length;
+}
 
 function getStatus() {
   return { ...status };
@@ -45,7 +115,19 @@ async function heartbeat() {
     status.connected = true;
     status.serverInfo = res.data.company;
     status.lastError = null;
-    log('Heartbeat OK');
+
+    const healed = res.data.healed || 0;
+    const repromoted = res.data.repromoted || 0;
+    const stuck = (res.data.stuck_transaction_ids || []).length;
+    log(`Heartbeat OK · healed=${healed} repromoted=${repromoted} stuck=${stuck}`);
+
+    // Phase 4 — replay any callbacks that previously failed
+    await flushCallbackQueue();
+
+    // Phase 5 — if server reports stuck rows, trigger an immediate sync sweep
+    if (stuck > 0 || repromoted > 0) {
+      syncOnce().catch(() => {});
+    }
   } catch (e) {
     status.connected = false;
     status.lastError = `Heartbeat failed: ${e.message}`;
@@ -135,23 +217,28 @@ async function submitToPra(invoice, praEndpoint, praToken) {
 }
 
 async function reportResult(txnId, success, praInvoiceNumber, response, error) {
+  const payload = {
+    transaction_id: txnId,
+    success,
+    pra_invoice_number: praInvoiceNumber,
+    response,
+    error,
+  };
   try {
     await axios.post(
       `${currentConfig.serverUrl}/submit-result`,
-      {
-        transaction_id: txnId,
-        success,
-        pra_invoice_number: praInvoiceNumber,
-        response,
-        error,
-      },
+      payload,
       {
         headers: { Authorization: `Bearer ${currentConfig.apiKey}` },
         timeout: 10000,
       }
     );
   } catch (e) {
-    log(`Failed to report result for txn ${txnId}:`, e.message);
+    // Phase 4 — never lose a successful PRA result.
+    // Persist the callback so we can replay it on the next heartbeat.
+    log(`⚠️ Callback to server failed for txn ${txnId} (${e.message}) — queued for retry`);
+    enqueueCallback(payload);
+    notify();
   }
 }
 

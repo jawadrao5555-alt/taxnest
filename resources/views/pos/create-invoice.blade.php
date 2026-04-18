@@ -150,6 +150,33 @@
              :class="toast.type === 'error' ? 'bg-red-500 text-white' : (toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-gray-800 text-white')"
              x-text="toast.message"></div>
 
+        @php
+            $__agentEnabled = $company->agent_enabled ?? false;
+            $__agentLastSeen = $company->agent_last_seen ?? null;
+            $__agentOnline = $__agentEnabled && $__agentLastSeen && \Carbon\Carbon::parse($__agentLastSeen)->gt(now()->subMinutes(3));
+        @endphp
+
+        @if($__agentEnabled)
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mb-3">
+            <div class="flex items-center gap-2 text-xs px-3 py-1.5 rounded-md border
+                        {{ $__agentOnline ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-300'
+                                          : 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300' }}">
+                <span class="relative flex h-2 w-2">
+                    @if($__agentOnline)
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    @else
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    @endif
+                </span>
+                <span class="font-semibold">{{ $__agentOnline ? '🟢 Agent Online — Auto-syncing to PRA' : '🔴 Agent Offline' }}</span>
+                @if($__agentLastSeen)
+                    <span class="text-[11px] opacity-70">· Last seen {{ \Carbon\Carbon::parse($__agentLastSeen)->diffForHumans() }}</span>
+                @endif
+            </div>
+        </div>
+        @endif
+
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
 
             <template x-if="showDraftRecovery">

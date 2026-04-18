@@ -45,7 +45,7 @@ class AgentController extends Controller
             ->limit(20)
             ->get();
 
-        $praService = app(PraIntegrationService::class);
+        $praService = new PraIntegrationService($company);
 
         $invoices = [];
         foreach ($pending as $txn) {

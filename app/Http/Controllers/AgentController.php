@@ -72,6 +72,7 @@ class AgentController extends Controller
                 ? 'https://ims.pral.com.pk/ims/production/api/Live/PostData'
                 : 'https://ims.pral.com.pk/ims/sandbox/api/Live/PostData',
             'pra_token' => $company->pra_production_token,
+            'pra_pos_id' => $company->pra_pos_id,
         ]);
     }
 
@@ -99,10 +100,13 @@ class AgentController extends Controller
         }
 
         if ($request->boolean('success')) {
+            $response = $request->input('response');
+            $code = is_array($response) ? ($response['response_code'] ?? $response['code'] ?? '00') : '00';
+
             DB::table('pos_transactions')->where('id', $txnId)->update([
                 'pra_status' => 'submitted',
                 'pra_invoice_number' => $request->input('pra_invoice_number'),
-                'pra_response' => json_encode($request->input('response')),
+                'pra_response_code' => substr((string) $code, 0, 250),
                 'updated_at' => now(),
             ]);
 
@@ -110,21 +114,22 @@ class AgentController extends Controller
                 'company_id' => $company->id,
                 'transaction_id' => $txnId,
                 'pra_invoice' => $request->input('pra_invoice_number'),
+                'full_response' => $response,
             ]);
         } else {
+            $errMsg = (string) $request->input('error', 'PRA submission failed');
+
             DB::table('pos_transactions')->where('id', $txnId)->update([
                 'pra_status' => 'failed',
-                'pra_response' => json_encode([
-                    'error' => $request->input('error'),
-                    'response' => $request->input('response'),
-                ]),
+                'pra_response_code' => substr($errMsg, 0, 250),
                 'updated_at' => now(),
             ]);
 
             Log::warning('Agent: PRA submission failed', [
                 'company_id' => $company->id,
                 'transaction_id' => $txnId,
-                'error' => $request->input('error'),
+                'error' => $errMsg,
+                'response' => $request->input('response'),
             ]);
         }
 

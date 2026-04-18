@@ -312,12 +312,18 @@ class PraIntegrationService
 
             $this->storePraResponse($praLog, $transaction, ['error' => $errorMsg], '500', false, null);
 
-            $transaction->update(['pra_status' => 'offline']);
+            // ENTERPRISE SAFE MODE: agent-enabled companies should never go to 'offline' on TLS/transport errors —
+            // the desktop agent will pick up these rows and submit them from a Pakistani IP.
+            $fallbackStatus = ($this->company->agent_enabled ?? false) ? 'pending' : 'offline';
+            $transaction->update(['pra_status' => $fallbackStatus]);
 
             return [
                 'success' => false,
                 'response_code' => '500',
-                'message' => $userMessage,
+                'message' => $fallbackStatus === 'pending'
+                    ? 'Queued for desktop agent — will sync from local PC.'
+                    : $userMessage,
+                'queued_for_agent' => $fallbackStatus === 'pending',
             ];
         }
     }

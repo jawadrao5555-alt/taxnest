@@ -3,7 +3,180 @@
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
         @keyframes priceGlow{0%{box-shadow:0 0 0 2px rgba(168,85,247,0.3)}50%{box-shadow:0 0 0 4px rgba(168,85,247,0.15)}100%{box-shadow:0 0 0 2px rgba(168,85,247,0.3)}}
     </style>
-    <div class="pb-36" x-data="posInvoice()">
+    <div class="pb-36" x-data="posInvoice()"
+         @keydown.window.f2.prevent="focusFirstSearch()"
+         @keydown.window.f4.prevent="openParkedOrders()"
+         @keydown.window.f6.prevent="focusCart()"
+         @keydown.window.f7.prevent="repeatLastOrder()"
+         @keydown.window.f8.prevent="focusPayment()"
+         @keydown.window.f9.prevent="parkOrder()"
+         @keydown.window.f10.prevent="newSale()"
+         @keydown.window="handleGlobalKey($event)">
+
+        {{-- ENTERPRISE CUSTOMER MODAL (auto-opens on POS load) --}}
+        <div x-show="showCustomerModal" x-cloak
+             class="fixed inset-0 z-50 flex items-center justify-center p-4"
+             style="background: rgba(0,0,0,0.45);"
+             @keydown.escape.prevent.stop="confirmWalkIn()">
+            <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md p-6 border border-gray-200 dark:border-gray-700"
+                 @click.stop>
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg">
+                        <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                    </div>
+                    <div>
+                        <h2 class="text-base font-bold text-gray-900 dark:text-white">Customer Selection</h2>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">Walk-in selected by default · Press W or Enter to continue</p>
+                    </div>
+                </div>
+
+                <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Mobile Number <span class="text-gray-400 font-normal">(optional)</span></label>
+                <input type="text" x-ref="cmMobile" x-model="cmMobileInput"
+                       @input="cmFilterCustomers()"
+                       @keydown.arrow-down.prevent="cmHl = Math.min(cmHl + 1, cmFiltered.length - 1)"
+                       @keydown.arrow-up.prevent="cmHl = Math.max(cmHl - 1, -1)"
+                       @keydown.enter.prevent="cmConfirmSelection()"
+                       placeholder="03XX-XXXXXXX or leave empty for Walk-in"
+                       class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition mb-2">
+
+                <div x-show="cmMobileInput.length > 0 && cmFiltered.length > 0" class="max-h-40 overflow-y-auto border border-gray-100 dark:border-gray-800 rounded-lg mb-3">
+                    <template x-for="(c, idx) in cmFiltered" :key="c.id">
+                        <button type="button"
+                                @click="cmSelectExisting(c)"
+                                @mouseenter="cmHl = idx"
+                                class="w-full text-left px-3 py-2 text-sm flex justify-between items-center transition"
+                                :class="cmHl === idx ? 'bg-purple-50 dark:bg-purple-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'">
+                            <span class="font-medium text-gray-800 dark:text-gray-200" x-text="c.name || 'Unnamed'"></span>
+                            <span class="text-xs text-gray-500" x-text="c.phone || ''"></span>
+                        </button>
+                    </template>
+                </div>
+
+                <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 flex flex-wrap gap-2">
+                    <button type="button" @click="confirmWalkIn()"
+                            class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white text-sm font-bold rounded-lg shadow transition">
+                        <kbd class="px-1.5 py-0.5 bg-white/20 rounded text-[10px]">W</kbd>
+                        Walk-in Customer
+                    </button>
+                    <button type="button" @click="cmConfirmSelection()"
+                            class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white text-sm font-bold rounded-lg shadow transition">
+                        <kbd class="px-1.5 py-0.5 bg-white/20 rounded text-[10px]">⏎</kbd>
+                        Continue
+                    </button>
+                </div>
+
+                <div class="mt-3 text-center">
+                    <button type="button" @click="showHelpModal = true; showCustomerModal = false"
+                            class="text-[11px] text-gray-400 hover:text-purple-600 transition">
+                        Press <kbd class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-[10px]">?</kbd> to view all keyboard shortcuts
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {{-- EXIT CONFIRMATION MODAL --}}
+        <div x-show="showExitModal" x-cloak
+             class="fixed inset-0 z-50 flex items-center justify-center p-4"
+             style="background: rgba(0,0,0,0.5);"
+             @keydown.escape.prevent.stop="showExitModal = false; pendingExitUrl = null">
+            <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md p-6 border border-gray-200 dark:border-gray-700">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                    </div>
+                    <h2 class="text-base font-bold text-gray-900 dark:text-white">Exit POS?</h2>
+                </div>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    You have <span class="font-bold text-purple-600" x-text="items.filter(i => i.name && i.name.trim()).length"></span> item(s) in your current cart. Unsaved changes will be lost.
+                </p>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" @click="showExitModal = false; pendingExitUrl = null"
+                            class="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-semibold rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition">
+                        Stay (Esc)
+                    </button>
+                    <button type="button" @click="parkAndExit()"
+                            class="flex-1 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold rounded-lg transition">
+                        Park & Exit
+                    </button>
+                    <button type="button" @click="forceExit()"
+                            class="flex-1 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-lg transition">
+                        Exit
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {{-- KEYBOARD CHEAT SHEET --}}
+        <div x-show="showHelpModal" x-cloak
+             class="fixed inset-0 z-50 flex items-center justify-center p-4"
+             style="background: rgba(0,0,0,0.5);"
+             @click="showHelpModal = false"
+             @keydown.escape.prevent.stop="showHelpModal = false">
+            <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl p-6 border border-gray-200 dark:border-gray-700" @click.stop>
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-base font-bold text-gray-900 dark:text-white">⌨️ Keyboard Shortcuts</h2>
+                    <button @click="showHelpModal = false" class="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">✕</button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div class="space-y-2">
+                        <p class="text-[11px] font-bold uppercase tracking-wide text-purple-600 mb-1">Customer & Items</p>
+                        <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Walk-in customer</span><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-[10px] font-mono">W</kbd></div>
+                        <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Focus search</span><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-[10px] font-mono">F2</kbd></div>
+                        <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Focus cart</span><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-[10px] font-mono">F6</kbd></div>
+                        <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Quantity prefix</span><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-[10px] font-mono">5 burger ⏎</kbd></div>
+                    </div>
+                    <div class="space-y-2">
+                        <p class="text-[11px] font-bold uppercase tracking-wide text-purple-600 mb-1">Actions</p>
+                        <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Parked orders</span><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-[10px] font-mono">F4</kbd></div>
+                        <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Repeat last order</span><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-[10px] font-mono">F7</kbd></div>
+                        <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Go to payment</span><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-[10px] font-mono">F8</kbd></div>
+                        <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Park (save draft)</span><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-[10px] font-mono">F9</kbd></div>
+                        <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">New sale</span><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-[10px] font-mono">F10</kbd></div>
+                    </div>
+                </div>
+                <div class="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" x-model="soundEnabled" @change="saveSoundPref()" class="rounded text-purple-600 focus:ring-purple-500">
+                        <span class="text-xs text-gray-600 dark:text-gray-400">🔊 Sound feedback</span>
+                    </label>
+                    <span class="text-[10px] text-gray-400">Press <kbd class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">?</kbd> anytime</span>
+                </div>
+            </div>
+        </div>
+
+        {{-- TOAST FEEDBACK --}}
+        <div x-show="toast.visible" x-cloak x-transition
+             class="fixed top-4 right-4 z-[60] px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium"
+             :class="toast.type === 'error' ? 'bg-red-500 text-white' : (toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-gray-800 text-white')"
+             x-text="toast.message"></div>
+
+        @php
+            $__agentEnabled = $company->agent_enabled ?? false;
+            $__agentLastSeen = $company->agent_last_seen ?? null;
+            $__agentOnline = $__agentEnabled && $__agentLastSeen && \Carbon\Carbon::parse($__agentLastSeen)->gt(now()->subMinutes(3));
+        @endphp
+
+        @if($__agentEnabled)
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mb-3">
+            <div class="flex items-center gap-2 text-xs px-3 py-1.5 rounded-md border
+                        {{ $__agentOnline ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-300'
+                                          : 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300' }}">
+                <span class="relative flex h-2 w-2">
+                    @if($__agentOnline)
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    @else
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    @endif
+                </span>
+                <span class="font-semibold">{{ $__agentOnline ? '🟢 Agent Online — Auto-syncing to PRA' : '🔴 Agent Offline' }}</span>
+                @if($__agentLastSeen)
+                    <span class="text-[11px] opacity-70">· Last seen {{ \Carbon\Carbon::parse($__agentLastSeen)->diffForHumans() }}</span>
+                @endif
+            </div>
+        </div>
+        @endif
+
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
 
             <template x-if="showDraftRecovery">
@@ -187,6 +360,12 @@
                                                         <svg class="w-3.5 h-3.5 flex-shrink-0" :style="ddHlIdx[index] === pIdx ? 'color:#059669;' : 'color:#9ca3af;'" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                                                         <span class="font-medium" :style="ddHlIdx[index] === pIdx ? 'color: #064e3b;' : ''" x-text="p.name"></span>
                                                         <span x-show="p.is_tax_exempt" class="inline-flex px-1 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">EXEMPT</span>
+                                                        <span x-show="hasRecipe(p)" class="inline-flex px-1 py-0.5 rounded text-[9px]" title="Has recipe">📋</span>
+                                                        <template x-if="stockBadge(p)">
+                                                            <span class="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold"
+                                                                  :class="stockBadge(p).cls"
+                                                                  x-text="stockBadge(p).label"></span>
+                                                        </template>
                                                     </span>
                                                     <span class="text-xs font-semibold" :style="ddHlIdx[index] === pIdx ? 'color: #047857;' : 'color: #6b7280;'" x-text="'Rs ' + Number(p.price || p.unit_price || 0).toLocaleString()"></span>
                                                 </button>
@@ -397,11 +576,23 @@
                 products: @json($products),
                 services: @json($services),
                 taxRules: @json($taxRules),
+                posCustomers: @json($posCustomers ?? []),
                 praEnabled: {{ $company->pra_reporting_enabled ? 'true' : 'false' }},
 
                 customerName: '',
                 customerPhone: '',
                 terminalId: '',
+
+                showCustomerModal: true,
+                showExitModal: false,
+                showHelpModal: false,
+                pendingExitUrl: null,
+                cmMobileInput: '',
+                cmFiltered: [],
+                cmHl: -1,
+
+                soundEnabled: false,
+                toast: { visible: false, message: '', type: 'info', timer: null },
 
                 items: [
                     { type: 'product', item_id: '', name: '', quantity: 1, unit_price: 0, _isNew: false, is_tax_exempt: false }
@@ -518,12 +709,226 @@
                     this.recalculate();
                     this.startAutoSave();
 
-                    window.addEventListener('beforeunload', () => {
+                    try { this.soundEnabled = localStorage.getItem('pos_sound_enabled') === '1'; } catch(e) {}
+
+                    this.$nextTick(() => {
+                        if (this.showCustomerModal && this.$refs.cmMobile) {
+                            this.$refs.cmMobile.focus();
+                        }
+                    });
+
+                    document.querySelectorAll('a[href]:not([href^="#"]):not([target="_blank"])').forEach(link => {
+                        if (link.dataset.exitGuarded) return;
+                        link.dataset.exitGuarded = '1';
+                        link.addEventListener('click', (e) => {
+                            const href = link.getAttribute('href');
+                            if (!href || href.startsWith('javascript:')) return;
+                            const cartHasItems = this.items.some(i => i.name && i.name.trim());
+                            if (cartHasItems && !this.submitting) {
+                                e.preventDefault();
+                                this.pendingExitUrl = href;
+                                this.showExitModal = true;
+                            }
+                        });
+                    });
+
+                    window.addEventListener('beforeunload', (e) => {
                         if (!this.submitting) {
                             this.saveToLocalStorage();
+                            const cartHasItems = this.items.some(i => i.name && i.name.trim());
+                            if (cartHasItems) {
+                                e.preventDefault();
+                                e.returnValue = '';
+                                return '';
+                            }
                         }
                     });
                 },
+
+                // ============ ENTERPRISE KEYBOARD / CUSTOMER / SOUND SYSTEM ============
+                playSound(kind) {
+                    if (!this.soundEnabled) return;
+                    try {
+                        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                        const o = ctx.createOscillator();
+                        const g = ctx.createGain();
+                        o.connect(g); g.connect(ctx.destination);
+                        const f = kind === 'error' ? 220 : (kind === 'success' ? 880 : 660);
+                        o.frequency.value = f;
+                        o.type = 'sine';
+                        g.gain.setValueAtTime(0.08, ctx.currentTime);
+                        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.15);
+                        o.start(); o.stop(ctx.currentTime + 0.15);
+                    } catch(e) {}
+                },
+                saveSoundPref() {
+                    try { localStorage.setItem('pos_sound_enabled', this.soundEnabled ? '1' : '0'); } catch(e) {}
+                    this.showToast(this.soundEnabled ? '🔊 Sound enabled' : '🔇 Sound off', 'info');
+                },
+                showToast(msg, type = 'info') {
+                    if (this.toast.timer) clearTimeout(this.toast.timer);
+                    this.toast.message = msg;
+                    this.toast.type = type;
+                    this.toast.visible = true;
+                    this.toast.timer = setTimeout(() => { this.toast.visible = false; }, 2200);
+                },
+                cmFilterCustomers() {
+                    const q = (this.cmMobileInput || '').replace(/\D/g, '');
+                    if (!q || q.length < 3) { this.cmFiltered = []; this.cmHl = -1; return; }
+                    this.cmFiltered = (this.posCustomers || []).filter(c => {
+                        const ph = (c.phone || '').replace(/\D/g, '');
+                        return ph.includes(q);
+                    }).slice(0, 6);
+                    this.cmHl = this.cmFiltered.length > 0 ? 0 : -1;
+                },
+                cmSelectExisting(c) {
+                    this.customerName = c.name || '';
+                    this.customerPhone = c.phone || '';
+                    this.showCustomerModal = false;
+                    this.playSound('success');
+                    this.showToast('Customer: ' + (c.name || c.phone), 'success');
+                    this.$nextTick(() => this.focusFirstSearch());
+                },
+                cmConfirmSelection() {
+                    if (this.cmHl >= 0 && this.cmFiltered[this.cmHl]) {
+                        this.cmSelectExisting(this.cmFiltered[this.cmHl]);
+                        return;
+                    }
+                    if (this.cmMobileInput && this.cmMobileInput.replace(/\D/g, '').length >= 7) {
+                        this.customerPhone = this.cmMobileInput.trim();
+                        this.customerName = '';
+                        this.showCustomerModal = false;
+                        this.playSound('success');
+                        this.$nextTick(() => this.focusFirstSearch());
+                        return;
+                    }
+                    this.confirmWalkIn();
+                },
+                confirmWalkIn() {
+                    this.customerName = 'Walk-in Customer';
+                    this.customerPhone = '';
+                    this.showCustomerModal = false;
+                    this.playSound('info');
+                    this.$nextTick(() => this.focusFirstSearch());
+                },
+
+                handleGlobalKey(e) {
+                    if (e.key === '?' && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) {
+                        e.preventDefault();
+                        this.showHelpModal = true;
+                        return;
+                    }
+                    if ((e.key === 'w' || e.key === 'W') && this.showCustomerModal && document.activeElement !== this.$refs.cmMobile) {
+                        e.preventDefault();
+                        this.confirmWalkIn();
+                    }
+                },
+                focusFirstSearch() {
+                    this.$nextTick(() => {
+                        const inputs = document.querySelectorAll('input[x-ref^="ddInput"], [x-ref="ddInput0"]');
+                        const firstSearch = document.querySelector('.relative input[type="text"]');
+                        const target = (this.$refs.ddInput0) || firstSearch;
+                        if (target) { target.focus(); target.select && target.select(); }
+                    });
+                },
+                focusCart() {
+                    this.$nextTick(() => {
+                        const cart = document.querySelector('[x-ref="cartSection"]') || document.querySelector('table');
+                        if (cart) cart.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    });
+                },
+                focusPayment() {
+                    this.$nextTick(() => {
+                        const pay = document.querySelector('[x-ref="paymentSection"]') || document.querySelector('select');
+                        if (pay) {
+                            pay.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            setTimeout(() => pay.focus && pay.focus(), 300);
+                        }
+                    });
+                },
+                openParkedOrders() {
+                    if (typeof this.openDraftsModal === 'function') { this.openDraftsModal(); return; }
+                    window.location.href = "{{ route('pos.create-invoice') }}?drafts=1";
+                },
+                parkOrder() {
+                    if (typeof this.saveDraftNow === 'function') { this.saveDraftNow(); return; }
+                    if (typeof this.saveToLocalStorage === 'function') {
+                        this.saveToLocalStorage();
+                        this.showToast('🅿️ Order parked locally', 'success');
+                        this.playSound('success');
+                    }
+                },
+                newSale() {
+                    const cartHasItems = this.items.some(i => i.name && i.name.trim());
+                    if (cartHasItems) {
+                        if (!confirm('Start a new sale? Current cart will be cleared.')) return;
+                    }
+                    window.location.href = "{{ route('pos.create-invoice') }}";
+                },
+                async repeatLastOrder() {
+                    try {
+                        const res = await fetch("{{ route('pos.api.last-order') }}", {
+                            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                        });
+                        const data = await res.json();
+                        if (!data.success) {
+                            this.showToast(data.message || 'No previous order', 'error');
+                            this.playSound('error');
+                            return;
+                        }
+                        if (data.customer_name) this.customerName = data.customer_name;
+                        if (data.customer_phone) this.customerPhone = data.customer_phone;
+                        if (data.payment_method) this.paymentMethod = data.payment_method;
+                        if (data.items && data.items.length) {
+                            this.items = data.items.map(it => ({
+                                type: it.type || 'product',
+                                item_id: it.item_id || '',
+                                name: it.name || '',
+                                quantity: parseFloat(it.quantity) || 1,
+                                unit_price: parseFloat(it.unit_price) || 0,
+                                is_tax_exempt: !!it.is_tax_exempt,
+                                _isNew: false,
+                            }));
+                            if (this.ddSearch) {
+                                this.ddSearch = {};
+                                this.items.forEach((it, idx) => { this.ddSearch[idx] = it.name; });
+                            }
+                            this.recalculate();
+                            this.showToast('🔁 Last order loaded (' + data.items.length + ' items)', 'success');
+                            this.playSound('success');
+                        }
+                    } catch (err) {
+                        this.showToast('Failed to load last order', 'error');
+                        this.playSound('error');
+                    }
+                },
+
+                forceExit() {
+                    this.submitting = true;
+                    const url = this.pendingExitUrl || "{{ url('/pos') }}";
+                    this.pendingExitUrl = null;
+                    window.location.href = url;
+                },
+                parkAndExit() {
+                    this.parkOrder();
+                    setTimeout(() => this.forceExit(), 400);
+                },
+
+                hasRecipe(p) {
+                    return !!(p && (p.has_recipe || p.recipe_id || (p.recipes && p.recipes.length)));
+                },
+                stockBadge(p) {
+                    if (!p) return null;
+                    const s = p.stock_quantity ?? p.stock ?? p.current_stock;
+                    if (s === undefined || s === null || s === '') return null;
+                    const n = parseFloat(s);
+                    if (isNaN(n)) return null;
+                    if (n <= 0) return { label: 'OUT', cls: 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300' };
+                    if (n < 5) return { label: n + ' LOW', cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' };
+                    if (n < 20) return { label: String(n), cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' };
+                    return { label: String(n), cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' };
+                },
+                // ============ END ENTERPRISE EXTENSIONS ============
 
                 loadServerDraft(draft) {
                     this.draftId = draft.id;

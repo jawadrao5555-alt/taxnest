@@ -1,5 +1,38 @@
 <x-pos-layout>
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    @php
+        $__company = \App\Models\Company::find(app('currentCompanyId'));
+        $__agentEnabled = $__company && $__company->agent_enabled;
+        $__agentLastSeen = $__company?->agent_last_seen;
+        $__agentOnline = $__agentEnabled && $__agentLastSeen && \Carbon\Carbon::parse($__agentLastSeen)->gt(now()->subMinutes(3));
+    @endphp
+
+    {{-- Phase 6: Agent Status Banner (trust signal) --}}
+    @if($__agentEnabled)
+    <div class="mb-4 flex items-center justify-between gap-3 rounded-lg border px-4 py-2.5 text-sm
+                {{ $__agentOnline ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' }}">
+        <div class="flex items-center gap-2">
+            <span class="relative flex h-2.5 w-2.5">
+                @if($__agentOnline)
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                @else
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                @endif
+            </span>
+            <span class="font-semibold {{ $__agentOnline ? 'text-emerald-800 dark:text-emerald-300' : 'text-red-800 dark:text-red-300' }}">
+                {{ $__agentOnline ? '🟢 Desktop Agent Online — Auto-syncing to PRA' : '🔴 Desktop Agent Offline' }}
+            </span>
+            @if($__agentLastSeen)
+                <span class="text-xs text-gray-500 dark:text-gray-400">· Last seen {{ \Carbon\Carbon::parse($__agentLastSeen)->diffForHumans() }}</span>
+            @endif
+        </div>
+        @unless($__agentOnline)
+            <a href="{{ route('pos.agent') }}" class="text-xs font-semibold text-red-700 dark:text-red-300 hover:underline">Open agent settings →</a>
+        @endunless
+    </div>
+    @endif
+
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
             {{ ($tab ?? 'pra') === 'local' ? 'Local Transactions' : 'POS Transactions' }}
@@ -92,9 +125,22 @@
                             @elseif($txn->pra_status === 'failed')
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">Failed</span>
                             @elseif($txn->pra_status === 'pending')
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">Pending</span>
+                                @if($__agentEnabled)
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" title="Queued for desktop agent — typically syncs within 10 seconds">
+                                        🟡 Awaiting Sync
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">Pending</span>
+                                @endif
                             @elseif($txn->pra_status === 'offline')
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">Offline</span>
+                                @if($__agentEnabled)
+                                    {{-- Phase 3: agent-enabled companies should never display the alarming "Offline" badge --}}
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" title="Agent will retry on next poll">
+                                        🟡 Awaiting Sync
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">⚠️ Offline</span>
+                                @endif
                             @elseif($txn->pra_status === 'local')
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">Local</span>
                             @else

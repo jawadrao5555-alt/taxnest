@@ -15,10 +15,22 @@ set "SOURCE_DIR=%~dp0"
 echo Installing to: %INSTALL_DIR%
 echo.
 
+echo Stopping any running agent...
+taskkill /F /IM "TaxNest PRA Agent.exe" 2>nul
+timeout /t 2 /nobreak >nul
+
 if exist "%INSTALL_DIR%" (
-    echo Removing previous installation...
+    echo Existing installation detected - upgrading in place...
+    echo Backing up config...
+    if exist "%APPDATA%\taxnest-pra-agent\config.json" (
+        copy /Y "%APPDATA%\taxnest-pra-agent\config.json" "%TEMP%\taxnest-agent-config.bak" >nul 2>&1
+    )
     rmdir /S /Q "%INSTALL_DIR%" 2>nul
     timeout /t 1 /nobreak >nul
+    if exist "%TEMP%\taxnest-agent-config.bak" (
+        if not exist "%APPDATA%\taxnest-pra-agent" mkdir "%APPDATA%\taxnest-pra-agent"
+        copy /Y "%TEMP%\taxnest-agent-config.bak" "%APPDATA%\taxnest-pra-agent\config.json" >nul 2>&1
+    )
 )
 
 mkdir "%INSTALL_DIR%" 2>nul

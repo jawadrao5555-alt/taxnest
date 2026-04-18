@@ -20,6 +20,23 @@ class AgentController extends Controller
             'agent_version' => $request->input('version', $company->agent_version),
         ]);
 
+        $healed = DB::table('pos_transactions')
+            ->where('company_id', $company->id)
+            ->whereNotNull('pra_invoice_number')
+            ->where('pra_invoice_number', '!=', '')
+            ->whereIn('pra_status', ['offline', 'pending', 'failed'])
+            ->update([
+                'pra_status' => 'submitted',
+                'updated_at' => now(),
+            ]);
+
+        if ($healed > 0) {
+            Log::info('Agent heartbeat: self-healed transactions', [
+                'company_id' => $company->id,
+                'healed_count' => $healed,
+            ]);
+        }
+
         return response()->json([
             'ok' => true,
             'company' => [
@@ -28,6 +45,7 @@ class AgentController extends Controller
                 'pra_pos_id' => $company->pra_pos_id,
                 'pra_environment' => $company->pra_environment,
             ],
+            'healed' => $healed,
             'server_time' => now()->toIso8601String(),
         ]);
     }
@@ -99,13 +117,16 @@ class AgentController extends Controller
             return response()->json(['error' => 'Transaction not found'], 404);
         }
 
-        if ($request->boolean('success')) {
+        $praInvoiceNumber = $request->input('pra_invoice_number');
+        $treatAsSuccess = $request->boolean('success') || (!empty($praInvoiceNumber) && preg_match('/^\d{6}[A-Z]{4,6}\d{4,}$/', $praInvoiceNumber));
+
+        if ($treatAsSuccess && !empty($praInvoiceNumber)) {
             $response = $request->input('response');
-            $code = is_array($response) ? ($response['response_code'] ?? $response['code'] ?? '00') : '00';
+            $code = is_array($response) ? ($response['Code'] ?? $response['response_code'] ?? $response['code'] ?? '100') : '100';
 
             DB::table('pos_transactions')->where('id', $txnId)->update([
                 'pra_status' => 'submitted',
-                'pra_invoice_number' => $request->input('pra_invoice_number'),
+                'pra_invoice_number' => $praInvoiceNumber,
                 'pra_response_code' => substr((string) $code, 0, 250),
                 'updated_at' => now(),
             ]);

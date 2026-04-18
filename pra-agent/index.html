@@ -135,6 +135,17 @@
   <div class="header">
     <h1>🛡️ TaxNest PRA Sync Agent</h1>
     <p>Auto-syncs your POS invoices to PRA via your local Pakistani IP</p>
+    <p style="font-size:11px; color:#a78bfa; margin-top:4px;">Build: <span id="buildVer">—</span></p>
+  </div>
+
+  <div id="updateBanner" style="display:none; background:linear-gradient(135deg,#059669,#10b981); padding:14px 18px; border-radius:12px; margin-bottom:16px; color:#fff; box-shadow:0 4px 14px rgba(16,185,129,0.3);">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+      <div>
+        <div style="font-weight:700; font-size:14px;">🚀 New Update Available</div>
+        <div style="font-size:12px; opacity:0.9; margin-top:2px;" id="updateMsg">A newer version of the agent is available.</div>
+      </div>
+      <button id="updateBtn" style="background:#fff; color:#059669; border:none; padding:8px 16px; border-radius:8px; font-weight:700; cursor:pointer; font-size:13px;">⬇️ Download</button>
+    </div>
   </div>
 
   <div class="card">
@@ -276,6 +287,26 @@
   });
 
   window.agentAPI.onStatusUpdate(renderStatus);
+
+  function showUpdateBanner(info) {
+    if (info && info.available) {
+      $('updateBanner').style.display = 'block';
+      $('updateMsg').textContent = `New version ${info.latestBuild} is available (you have ${info.currentBuild}). Click to download.`;
+    }
+  }
+
+  window.agentAPI.onUpdateAvailable(showUpdateBanner);
+
+  $('updateBtn').addEventListener('click', async () => {
+    await window.agentAPI.openDownload();
+  });
+
+  (async () => {
+    const v = await window.agentAPI.getVersion();
+    $('buildVer').textContent = v.build;
+    const u = await window.agentAPI.checkUpdate();
+    showUpdateBanner(u);
+  })();
 
   loadConfig();
   window.agentAPI.getStatus().then(renderStatus);

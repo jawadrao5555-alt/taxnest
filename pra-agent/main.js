@@ -1,7 +1,43 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shell } = require('electron');
 const path = require('path');
+const axios = require('axios');
 const Store = require('electron-store');
 const { startAgent, stopAgent, getStatus } = require('./src/agent');
+
+const UPDATE_FEED_URL = 'https://api.github.com/repos/jawadrao5555-alt/taxnest/releases/tags/agent-v1.0.0';
+const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/taxnest/releases/download/agent-v1.0.0/TaxNest-PRA-Agent-Windows.zip';
+const BUILD_TIMESTAMP = '20260418-2';
+let updateInfo = null;
+
+async function checkForUpdates() {
+  try {
+    const res = await axios.get(UPDATE_FEED_URL, { timeout: 15000 });
+    const remoteTag = res.data?.body || '';
+    const match = remoteTag.match(/build:\s*([0-9\-A-Za-z]+)/);
+    const remoteBuild = match ? match[1] : null;
+    if (remoteBuild && remoteBuild !== BUILD_TIMESTAMP) {
+      updateInfo = {
+        available: true,
+        latestBuild: remoteBuild,
+        currentBuild: BUILD_TIMESTAMP,
+        downloadUrl: DOWNLOAD_URL,
+      };
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-available', updateInfo);
+      }
+      if (Notification.isSupported()) {
+        new Notification({
+          title: 'TaxNest Agent: Update Available',
+          body: `New version ${remoteBuild} is available. Open the agent window to download.`,
+        }).show();
+      }
+    } else {
+      updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
+    }
+  } catch (e) {
+    console.log('Update check failed:', e.message);
+  }
+}
 
 const store = new Store();
 let mainWindow = null;
@@ -91,6 +127,9 @@ app.whenReady().then(() => {
   if (config && config.serverUrl && config.apiKey && config.companyId) {
     startAgent(config, sendStatusUpdate);
   }
+
+  setTimeout(checkForUpdates, 5000);
+  setInterval(checkForUpdates, 60 * 60 * 1000);
 });
 
 app.on('window-all-closed', (e) => {
@@ -136,6 +175,18 @@ ipcMain.handle('toggle-agent', (event, enabled) => {
     return { ok: true, running: false };
   }
 });
+
+ipcMain.handle('check-update', async () => {
+  await checkForUpdates();
+  return updateInfo || { available: false, currentBuild: BUILD_TIMESTAMP };
+});
+
+ipcMain.handle('open-download', async () => {
+  await shell.openExternal(DOWNLOAD_URL);
+  return { ok: true };
+});
+
+ipcMain.handle('get-version', () => ({ build: BUILD_TIMESTAMP, version: app.getVersion() }));
 
 ipcMain.handle('test-connection', async (event, config) => {
   const axios = require('axios');

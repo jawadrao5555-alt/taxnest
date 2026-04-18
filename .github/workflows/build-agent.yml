@@ -1,0 +1,42 @@
+name: Build PRA Agent (Windows)
+
+on:
+  push:
+    tags:
+      - 'v2026*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: pra-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+      - run: npm run build:win
+      - name: Zip portable folder
+        shell: pwsh
+        run: |
+          if (Test-Path dist/win-unpacked) {
+            Compress-Archive -Path dist/win-unpacked/* -DestinationPath dist/TaxNest-PRA-Agent-Windows.zip -Force
+          }
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: TaxNest PRA Agent ${{ github.ref_name }}
+          body_path: pra-agent/CHANGELOG.md
+          files: |
+            pra-agent/dist/*.exe
+            pra-agent/dist/TaxNest-PRA-Agent-Windows.zip
+          draft: false
+          prerelease: false
+          make_latest: true

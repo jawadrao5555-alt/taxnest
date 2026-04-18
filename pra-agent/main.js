@@ -4,9 +4,9 @@ const axios = require('axios');
 const Store = require('electron-store');
 const { startAgent, stopAgent, getStatus } = require('./src/agent');
 
-const UPDATE_FEED_URL = 'https://api.github.com/repos/jawadrao5555-alt/taxnest/releases/tags/agent-v1.0.0';
-const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/taxnest/releases/download/agent-v1.0.0/TaxNest-PRA-Agent-Windows.zip';
-const BUILD_TIMESTAMP = '20260418-4';
+const UPDATE_FEED_URL = 'https://api.github.com/repos/jawadrao5555-alt/taxnest/releases/latest';
+const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/taxnest/releases/latest';
+const BUILD_TIMESTAMP = '20260418-5';
 let updateInfo = null;
 
 async function checkForUpdates() {

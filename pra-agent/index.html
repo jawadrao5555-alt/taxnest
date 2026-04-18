@@ -135,7 +135,10 @@
   <div class="header">
     <h1>🛡️ TaxNest PRA Sync Agent</h1>
     <p>Auto-syncs your POS invoices to PRA via your local Pakistani IP</p>
-    <p style="font-size:11px; color:#a78bfa; margin-top:4px;">Build: <span id="buildVer">—</span></p>
+    <p style="font-size:11px; color:#a78bfa; margin-top:4px;">
+      Build: <span id="buildVer">—</span>
+      <button id="checkUpdateBtn" title="Check for updates" style="background:rgba(167,139,250,0.15); border:1px solid rgba(167,139,250,0.3); color:#c4b5fd; cursor:pointer; padding:3px 10px; border-radius:6px; margin-left:8px; font-size:11px; vertical-align:middle;">↻ Check Updates</button>
+    </p>
   </div>
 
   <div id="updateBanner" style="display:none; background:linear-gradient(135deg,#059669,#10b981); padding:14px 18px; border-radius:12px; margin-bottom:16px; color:#fff; box-shadow:0 4px 14px rgba(16,185,129,0.3);">
@@ -144,8 +147,12 @@
         <div style="font-weight:700; font-size:14px;">🚀 New Update Available</div>
         <div style="font-size:12px; opacity:0.9; margin-top:2px;" id="updateMsg">A newer version of the agent is available.</div>
       </div>
-      <button id="updateBtn" style="background:#fff; color:#059669; border:none; padding:8px 16px; border-radius:8px; font-weight:700; cursor:pointer; font-size:13px;">⬇️ Download</button>
+      <button id="updateBtn" style="background:#fff; color:#059669; border:none; padding:8px 16px; border-radius:8px; font-weight:700; cursor:pointer; font-size:13px;">⬇ Download</button>
     </div>
+  </div>
+
+  <div id="upToDateBanner" style="display:none; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); padding:10px 14px; border-radius:10px; margin-bottom:12px; color:#10b981; font-size:12px; text-align:center;">
+    ✓ Agent is up to date
   </div>
 
   <div class="card">
@@ -291,9 +298,25 @@
   function showUpdateBanner(info) {
     if (info && info.available) {
       $('updateBanner').style.display = 'block';
+      $('upToDateBanner').style.display = 'none';
       $('updateMsg').textContent = `New version ${info.latestBuild} is available (you have ${info.currentBuild}). Click to download.`;
+    } else if (info) {
+      $('updateBanner').style.display = 'none';
+      $('upToDateBanner').style.display = 'block';
+      setTimeout(() => { $('upToDateBanner').style.display = 'none'; }, 4000);
     }
   }
+
+  $('checkUpdateBtn').addEventListener('click', async () => {
+    const btn = $('checkUpdateBtn');
+    const original = btn.textContent;
+    btn.textContent = '⟳ Checking...';
+    btn.disabled = true;
+    const u = await window.agentAPI.checkUpdate();
+    showUpdateBanner(u);
+    btn.textContent = original;
+    btn.disabled = false;
+  });
 
   window.agentAPI.onUpdateAvailable(showUpdateBanner);
 

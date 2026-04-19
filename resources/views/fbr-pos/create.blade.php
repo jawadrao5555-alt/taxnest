@@ -42,7 +42,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="lg:col-span-2 space-y-4">
                 <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-                    <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center justify-between mb-3">
                         <h3 class="font-semibold text-gray-900 dark:text-white">Items</h3>
                         <div class="flex items-center gap-3">
                             <div class="relative" x-data="{ searchOpen: false, searchQuery: '', searchResults: [] }">
@@ -62,7 +62,7 @@
                                             } else { searchResults = [] }
                                         "
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 mb-2"
-                                        placeholder="Type product name...">
+                                        placeholder="Type product name / barcode / SKU...">
                                     <div class="max-h-60 overflow-y-auto space-y-1">
                                         <template x-for="p in searchResults" :key="p.id">
                                             <button type="button" @click="addProductItem(p); searchOpen = false; searchQuery = ''; searchResults = [];"
@@ -73,6 +73,7 @@
                                                         <span x-text="'PKR ' + Number(p.default_price).toFixed(2)"></span>
                                                         <span class="mx-1">|</span>
                                                         <span x-text="p.hs_code || 'No HS'"></span>
+                                                        <template x-if="p.barcode"><span class="ml-1 font-mono text-[10px]" x-text="'· ' + p.barcode"></span></template>
                                                     </p>
                                                 </div>
                                                 <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
@@ -87,6 +88,16 @@
                             </div>
                             <button type="button" @click="addItem()" class="text-sm text-blue-600 hover:text-blue-700 font-medium">+ Add Manual</button>
                         </div>
+                    </div>
+
+                    <div class="mb-4 flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-2">
+                        <svg class="w-5 h-5 text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10m4-10v10m4-10v10m4-10v10m-12 0h16"/></svg>
+                        <input type="text" x-ref="barcodeInput" x-model="barcodeBuffer"
+                            @keydown.enter.prevent="scanBarcode()"
+                            autocomplete="off"
+                            class="flex-1 bg-transparent border-0 focus:ring-0 text-sm font-mono dark:text-white placeholder-gray-400"
+                            placeholder="Scan barcode here (or type code + Enter) — auto-adds product">
+                        <span x-show="scanStatus" :class="scanStatus.ok ? 'text-green-600' : 'text-red-600'" class="text-xs font-semibold" x-text="scanStatus.msg"></span>
                     </div>
 
                     <template x-for="(item, index) in items" :key="index">
@@ -123,30 +134,27 @@
                                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">UoM</label>
                                     <select :name="'items['+index+'][uom]'" x-model="item.uom"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                                        <option value="U">U</option>
-                                        <option value="KG">KG</option>
-                                        <option value="LTR">LTR</option>
-                                        <option value="MTR">MTR</option>
-                                        <option value="SQM">SQM</option>
-                                        <option value="PCS">PCS</option>
-                                        <option value="PKT">PKT</option>
-                                        <option value="DOZ">DOZ</option>
-                                        <option value="BOX">BOX</option>
-                                        <option value="SET">SET</option>
+                                        <template x-for="u in uomOptions" :key="u">
+                                            <option :value="u" x-text="u"></option>
+                                        </template>
                                     </select>
                                 </div>
                                 <div class="sm:col-span-1">
                                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Qty *</label>
-                                    <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6"
-                                        :name="'items['+index+'][quantity]'"
-                                        :value="item.quantity"
-                                        @input="item.quantity = ($event.target.value === '' ? '' : (parseInt($event.target.value.replace(/[^0-9]/g,'')) || 0))"
-                                        @focus="$nextTick(() => $event.target.select())"
-                                        @mousedown="if(document.activeElement !== $event.target){ $event.preventDefault(); $event.target.focus(); $event.target.select(); }"
-                                        @blur="if(!item.quantity || item.quantity < 1){ item.quantity = 1; }"
-                                        required
-                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 text-center font-semibold"
-                                        placeholder="1">
+                                    <div class="flex items-stretch">
+                                        <button type="button" tabindex="-1" @click="decQty(item)" class="px-1.5 rounded-l-lg border border-r-0 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100">−</button>
+                                        <input type="text" inputmode="decimal" autocomplete="off" maxlength="10"
+                                            :name="'items['+index+'][quantity]'"
+                                            :value="item.quantity"
+                                            @input="item.quantity = sanitizeQty($event.target.value)"
+                                            @focus="$nextTick(() => $event.target.select())"
+                                            @mousedown="if(document.activeElement !== $event.target){ $event.preventDefault(); $event.target.focus(); $event.target.select(); }"
+                                            @blur="if(!item.quantity || parseFloat(item.quantity) <= 0){ item.quantity = 1; }"
+                                            required
+                                            class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 text-center font-semibold"
+                                            placeholder="1">
+                                        <button type="button" tabindex="-1" @click="incQty(item)" class="px-1.5 rounded-r-lg border border-l-0 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100">+</button>
+                                    </div>
                                 </div>
                                 <div class="sm:col-span-2">
                                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Unit Price *</label>
@@ -162,12 +170,20 @@
                                         placeholder="18">
                                 </div>
                             </div>
-                            <div class="flex items-center justify-between mt-2">
-                                <label class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 cursor-pointer">
-                                    <input type="checkbox" :name="'items['+index+'][is_tax_exempt]'" x-model="item.is_tax_exempt" value="1"
-                                        class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
-                                    Tax Exempt
-                                </label>
+                            <div class="flex flex-wrap items-center justify-between mt-2 gap-3">
+                                <div class="flex items-center gap-3">
+                                    <label class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 cursor-pointer">
+                                        <input type="checkbox" :name="'items['+index+'][is_tax_exempt]'" x-model="item.is_tax_exempt" value="1"
+                                            class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
+                                        Tax Exempt
+                                    </label>
+                                    <label class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                        <span>Item Discount (PKR):</span>
+                                        <input type="number" :name="'items['+index+'][item_discount]'" x-model.number="item.item_discount" min="0" step="0.01"
+                                            class="w-24 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="0.00">
+                                    </label>
+                                </div>
                                 <span class="text-sm font-semibold text-gray-900 dark:text-white" x-text="'PKR ' + formatNum(lineTotal(item))"></span>
                             </div>
                         </div>
@@ -260,36 +276,97 @@
 <script>
 function fbrPosInvoice() {
     return {
-        items: [{ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false }],
+        uomOptions: ['U','PCS','KG','GM','LTR','ML','MTR','SQM','FT','IN','YDS','PKT','DOZ','BOX','CTN','BAG','BTL','TIN','CAN','BUN','ROL','SET'],
+        items: [{ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0 }],
         discountType: '',
         discountValue: 0,
+        barcodeBuffer: '',
+        scanStatus: null,
+        init() {
+            this.$nextTick(() => { this.$refs.barcodeInput && this.$refs.barcodeInput.focus(); });
+        },
+        sanitizeQty(v) {
+            if (v === '' || v === null || v === undefined) return '';
+            let s = String(v).replace(/[^0-9.]/g, '');
+            const parts = s.split('.');
+            if (parts.length > 2) s = parts[0] + '.' + parts.slice(1).join('');
+            return s;
+        },
+        incQty(item) {
+            let cur = parseFloat(item.quantity) || 0;
+            item.quantity = (cur + 1).toString();
+        },
+        decQty(item) {
+            let cur = parseFloat(item.quantity) || 0;
+            let next = cur - 1;
+            if (next < 1) next = 1;
+            item.quantity = next.toString();
+        },
         addItem() {
-            this.items.push({ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false });
+            this.items.push({ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0 });
         },
         addProductItem(p) {
             let isExempt = p.tax_type === 'exempt';
             let taxRate = isExempt ? 0 : (parseFloat(p.default_tax_rate) || 18);
+            // If same product already in cart, just increment qty
+            const existing = this.items.find(it => it.product_id && p.id && it.product_id === p.id);
+            if (existing) {
+                existing.quantity = (parseFloat(existing.quantity) || 0) + 1;
+                return;
+            }
+            // If first row is empty, fill it instead of adding new
+            if (this.items.length === 1 && !this.items[0].item_name && !this.items[0].product_id) {
+                this.items[0] = {
+                    item_name: p.name, hs_code: p.hs_code || '', uom: p.uom || 'U',
+                    quantity: 1, unit_price: parseFloat(p.default_price) || 0,
+                    tax_rate: taxRate, is_tax_exempt: isExempt, item_discount: 0, product_id: p.id
+                };
+                return;
+            }
             this.items.push({
-                item_name: p.name,
-                hs_code: p.hs_code || '',
-                uom: p.uom || 'U',
-                quantity: 1,
-                unit_price: parseFloat(p.default_price) || 0,
-                tax_rate: taxRate,
-                is_tax_exempt: isExempt,
-                product_id: p.id
+                item_name: p.name, hs_code: p.hs_code || '', uom: p.uom || 'U',
+                quantity: 1, unit_price: parseFloat(p.default_price) || 0,
+                tax_rate: taxRate, is_tax_exempt: isExempt, item_discount: 0, product_id: p.id
             });
+        },
+        async scanBarcode() {
+            const code = (this.barcodeBuffer || '').trim();
+            if (!code) return;
+            try {
+                const res = await fetch('{{ route('fbrpos.api.products.barcode') }}?code=' + encodeURIComponent(code));
+                const data = await res.json();
+                if (data.found) {
+                    this.addProductItem(data.product);
+                    this.scanStatus = { ok: true, msg: '✓ ' + data.product.name };
+                } else {
+                    this.scanStatus = { ok: false, msg: 'Not found: ' + code };
+                }
+            } catch (e) {
+                this.scanStatus = { ok: false, msg: 'Lookup failed' };
+            }
+            this.barcodeBuffer = '';
+            setTimeout(() => { this.scanStatus = null; }, 2500);
+            this.$nextTick(() => { this.$refs.barcodeInput && this.$refs.barcodeInput.focus(); });
         },
         removeItem(index) {
             this.items.splice(index, 1);
+            if (this.items.length === 0) this.addItem();
+        },
+        lineGross(item) {
+            return (parseFloat(item.quantity) || 0) * (parseFloat(item.unit_price) || 0);
+        },
+        lineNet(item) {
+            const gross = this.lineGross(item);
+            const disc = Math.min(parseFloat(item.item_discount) || 0, gross);
+            return gross - disc;
         },
         lineTotal(item) {
-            let sub = (item.quantity || 0) * (item.unit_price || 0);
-            let taxRate = item.is_tax_exempt ? 0 : (item.tax_rate || 0);
-            return sub + (sub * taxRate / 100);
+            const net = this.lineNet(item);
+            const taxRate = item.is_tax_exempt ? 0 : (parseFloat(item.tax_rate) || 0);
+            return net + (net * taxRate / 100);
         },
         calcSubtotal() {
-            return this.items.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unit_price || 0)), 0);
+            return this.items.reduce((sum, item) => sum + this.lineNet(item), 0);
         },
         calcDiscount() {
             let sub = this.calcSubtotal();
@@ -299,9 +376,9 @@ function fbrPosInvoice() {
         },
         calcTax() {
             return this.items.reduce((sum, item) => {
-                let sub = (item.quantity || 0) * (item.unit_price || 0);
-                let taxRate = item.is_tax_exempt ? 0 : (item.tax_rate || 0);
-                return sum + (sub * taxRate / 100);
+                const net = this.lineNet(item);
+                const taxRate = item.is_tax_exempt ? 0 : (parseFloat(item.tax_rate) || 0);
+                return sum + (net * taxRate / 100);
             }, 0);
         },
         calcTotal() {

@@ -683,6 +683,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth'])->group(function () {
     Route::post('/products/{id}/toggle', [FbrPosController::class, 'toggleProduct'])->name('fbrpos.products.toggle');
     Route::delete('/products/{id}', [FbrPosController::class, 'destroyProduct'])->name('fbrpos.products.destroy');
     Route::get('/api/products/search', [FbrPosController::class, 'searchProducts'])->name('fbrpos.api.products.search');
+    Route::get('/api/products/barcode', [FbrPosController::class, 'lookupByBarcode'])->name('fbrpos.api.products.barcode');
 });
 
 Route::get('/setup-migrate-xK9mP2', function () {

@@ -19,7 +19,16 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-        <meta name="theme-color" content="#1e1b4b">
+        <meta name="theme-color" content="#7c3aed">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+        <meta name="apple-mobile-web-app-title" content="NestPOS">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="application-name" content="NestPOS">
+        <link rel="manifest" href="/manifest-pos.json">
+        <link rel="apple-touch-icon" href="/icons/icon-192.png">
+        <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+        <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
         <title>NestPOS — {{ config('app.name', 'TaxNest') }}</title>
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -130,6 +139,14 @@
             .dark .cmd-icon { background: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.2); color: hsla(var(--accent-h), var(--accent-s), 75%, 1); }
             .cmd-kbd { font-family: 'SF Mono', Menlo, monospace; font-size: 10px; background: rgba(148,163,184,0.18); padding: 2px 6px; border-radius: 4px; color: inherit; }
         </style>
+        {{-- PWA service worker (NestPOS scope) --}}
+        <script>
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(()=>{});
+                });
+            }
+        </script>
     </head>
     <body class="h-screen overflow-hidden antialiased" data-theme="{{ $posTheme }}">
         <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false, themeOpen: false, currentTheme: '{{ $posTheme }}' }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false">

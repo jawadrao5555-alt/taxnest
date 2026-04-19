@@ -15,6 +15,15 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
         <meta name="theme-color" content="#1e3a5f">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+        <meta name="apple-mobile-web-app-title" content="FBR POS">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="application-name" content="TaxNest FBR POS">
+        <link rel="manifest" href="/manifest-fbrpos.json">
+        <link rel="apple-touch-icon" href="/icons/icon-192.png">
+        <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+        <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
         <title>FBR POS — {{ config('app.name', 'TaxNest') }}</title>
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -66,6 +75,14 @@
             .dark .menu-link:hover { background: rgba(59,130,246,0.15); }
             [x-cloak] { display: none !important; }
         </style>
+        {{-- PWA service worker (FBR POS scope) --}}
+        <script>
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(()=>{});
+                });
+            }
+        </script>
     </head>
     <body class="h-screen overflow-hidden antialiased">
         <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false">

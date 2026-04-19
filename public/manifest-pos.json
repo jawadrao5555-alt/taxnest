@@ -1,0 +1,26 @@
+{
+    "name": "NestPOS - Restaurant & Retail POS",
+    "short_name": "NestPOS",
+    "description": "Mall-grade POS for Pakistani retail with PRA fiscal integration",
+    "start_url": "/pos/dashboard",
+    "scope": "/pos/",
+    "display": "standalone",
+    "background_color": "#1e1b4b",
+    "theme_color": "#7c3aed",
+    "orientation": "any",
+    "id": "/pos/",
+    "icons": [
+        { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+        { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    ],
+    "categories": ["business", "finance", "productivity"],
+    "lang": "en",
+    "dir": "ltr",
+    "shortcuts": [
+        { "name": "New Sale", "short_name": "Sale", "url": "/pos/create-invoice", "icons": [{"src": "/icons/icon-192.png", "sizes": "192x192"}] },
+        { "name": "Dashboard", "short_name": "Dashboard", "url": "/pos/dashboard", "icons": [{"src": "/icons/icon-192.png", "sizes": "192x192"}] },
+        { "name": "Completed Invoices", "short_name": "Invoices", "url": "/pos/completed-invoices", "icons": [{"src": "/icons/icon-192.png", "sizes": "192x192"}] },
+        { "name": "Products", "short_name": "Products", "url": "/pos/products", "icons": [{"src": "/icons/icon-192.png", "sizes": "192x192"}] }
+    ],
+    "prefer_related_applications": false
+}

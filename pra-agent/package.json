@@ -1,6 +1,6 @@
 {
   "name": "taxnest-pra-agent",
-  "version": "1.0.0",
+  "version": "1.0.5",
   "description": "TaxNest PRA Sync Agent — auto-syncs your POS invoices to PRA from your local Pakistani PC.",
   "main": "main.js",
   "author": "TaxNest (Pvt) Ltd",
@@ -8,12 +8,14 @@
   "scripts": {
     "start": "electron .",
     "build": "electron-builder",
-    "build:win": "electron-builder --win --x64",
+    "build:win": "electron-builder --win --x64 --publish never",
+    "publish:win": "electron-builder --win --x64 --publish always",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
     "axios": "^1.7.7",
-    "electron-store": "^8.2.0"
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.3.9"
   },
   "devDependencies": {
     "electron": "^31.7.0",
@@ -33,6 +35,14 @@
       "index.html",
       "src/**/*",
       "assets/**/*"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "jawadrao5555-alt",
+        "repo": "taxnest",
+        "releaseType": "release"
+      }
     ],
     "win": {
       "target": [

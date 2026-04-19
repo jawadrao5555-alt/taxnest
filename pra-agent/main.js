@@ -1,39 +1,108 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shell, dialog } = require('electron');
 const path = require('path');
 const axios = require('axios');
 const Store = require('electron-store');
+const { autoUpdater } = require('electron-updater');
 const { startAgent, stopAgent, getStatus } = require('./src/agent');
 
-const UPDATE_FEED_URL = 'https://api.github.com/repos/jawadrao5555-alt/taxnest/releases/latest';
 const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/taxnest/releases/latest';
-const BUILD_TIMESTAMP = '20260418-5';
-let updateInfo = null;
+const BUILD_TIMESTAMP = '20260418-6';
+let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
+
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
+autoUpdater.allowPrerelease = false;
+autoUpdater.logger = { info: (m) => console.log('[updater]', m), warn: (m) => console.log('[updater warn]', m), error: (m) => console.log('[updater err]', m), debug: () => {} };
+
+autoUpdater.on('checking-for-update', () => {
+  updateInfo = { ...updateInfo, checking: true };
+  sendUpdateState();
+});
+
+autoUpdater.on('update-available', (info) => {
+  updateInfo = {
+    available: true,
+    checking: false,
+    downloading: true,
+    latestBuild: info.version,
+    currentBuild: BUILD_TIMESTAMP,
+    downloadUrl: DOWNLOAD_URL,
+    progress: 0,
+  };
+  sendUpdateState();
+  if (Notification.isSupported()) {
+    new Notification({
+      title: 'TaxNest Agent: Update Found',
+      body: `Downloading version ${info.version} in the background…`,
+    }).show();
+  }
+});
+
+autoUpdater.on('update-not-available', () => {
+  updateInfo = { available: false, checking: false, currentBuild: BUILD_TIMESTAMP };
+  sendUpdateState();
+});
+
+autoUpdater.on('download-progress', (p) => {
+  updateInfo = { ...updateInfo, downloading: true, progress: Math.round(p.percent || 0) };
+  sendUpdateState();
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  updateInfo = {
+    available: true,
+    checking: false,
+    downloading: false,
+    downloaded: true,
+    latestBuild: info.version,
+    currentBuild: BUILD_TIMESTAMP,
+    progress: 100,
+  };
+  sendUpdateState();
+  if (Notification.isSupported()) {
+    new Notification({
+      title: 'TaxNest Agent: Update Ready',
+      body: `Version ${info.version} is ready. Click to restart and install now.`,
+    }).show();
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      buttons: ['Restart Now', 'Install on Quit'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'Update Ready',
+      message: `TaxNest PRA Agent ${info.version} has been downloaded.`,
+      detail: 'Restart now to install the update, or it will be installed automatically the next time you quit the app.',
+    }).then((res) => {
+      if (res.response === 0) {
+        isQuitting = true;
+        stopAgent();
+        autoUpdater.quitAndInstall(false, true);
+      }
+    }).catch(() => {});
+  }
+});
+
+autoUpdater.on('error', (err) => {
+  console.log('[updater] error:', err && err.message);
+  updateInfo = { ...updateInfo, checking: false, downloading: false, error: (err && err.message) || 'Update failed' };
+  sendUpdateState();
+});
+
+function sendUpdateState() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('update-available', updateInfo);
+  }
+}
 
 async function checkForUpdates() {
   try {
-    const res = await axios.get(UPDATE_FEED_URL, { timeout: 15000 });
-    const remoteTag = res.data?.body || '';
-    const match = remoteTag.match(/build:\s*([0-9\-A-Za-z]+)/);
-    const remoteBuild = match ? match[1] : null;
-    if (remoteBuild && remoteBuild !== BUILD_TIMESTAMP) {
-      updateInfo = {
-        available: true,
-        latestBuild: remoteBuild,
-        currentBuild: BUILD_TIMESTAMP,
-        downloadUrl: DOWNLOAD_URL,
-      };
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('update-available', updateInfo);
-      }
-      if (Notification.isSupported()) {
-        new Notification({
-          title: 'TaxNest Agent: Update Available',
-          body: `New version ${remoteBuild} is available. Open the agent window to download.`,
-        }).show();
-      }
-    } else {
-      updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
+    if (!app.isPackaged) {
+      console.log('[updater] skipped: not packaged');
+      return;
     }
+    await autoUpdater.checkForUpdates();
   } catch (e) {
     console.log('Update check failed:', e.message);
   }
@@ -184,6 +253,16 @@ ipcMain.handle('check-update', async () => {
 ipcMain.handle('open-download', async () => {
   await shell.openExternal(DOWNLOAD_URL);
   return { ok: true };
+});
+
+ipcMain.handle('install-update-now', async () => {
+  if (updateInfo && updateInfo.downloaded) {
+    isQuitting = true;
+    stopAgent();
+    autoUpdater.quitAndInstall(false, true);
+    return { ok: true };
+  }
+  return { ok: false, error: 'No update downloaded yet' };
 });
 
 ipcMain.handle('get-version', () => ({ build: BUILD_TIMESTAMP, version: app.getVersion() }));

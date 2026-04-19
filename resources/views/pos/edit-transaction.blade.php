@@ -141,7 +141,7 @@
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Qty</label>
-                                <input type="number" x-model.number="item.quantity" min="0.01" step="0.01" @input="recalculate()" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition text-center">
+                                <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6" :value="item.quantity" @input="item.quantity = ($event.target.value === '' ? '' : (parseInt($event.target.value.replace(/[^0-9]/g,'')) || 0)); recalculate()" @focus="$nextTick(() => $event.target.select())" @mousedown="if(document.activeElement !== $event.target){ $event.preventDefault(); $event.target.focus(); $event.target.select(); }" @blur="if(!item.quantity || item.quantity < 1){ item.quantity = 1; recalculate(); }" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition text-center font-semibold">
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Unit Price</label>

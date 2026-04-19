@@ -30,12 +30,7 @@ autoUpdater.on('update-available', (info) => {
     progress: 0,
   };
   sendUpdateState();
-  if (Notification.isSupported()) {
-    new Notification({
-      title: 'TaxNest Agent: Update Found',
-      body: `Downloading version ${info.version} in the background…`,
-    }).show();
-  }
+  console.log('[updater] Update found, downloading silently in background:', info.version);
 });
 
 autoUpdater.on('update-not-available', () => {
@@ -59,28 +54,9 @@ autoUpdater.on('update-downloaded', (info) => {
     progress: 100,
   };
   sendUpdateState();
-  if (Notification.isSupported()) {
-    new Notification({
-      title: 'TaxNest Agent: Update Ready',
-      body: `Version ${info.version} is ready. Click to restart and install now.`,
-    }).show();
-  }
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      buttons: ['Restart Now', 'Install on Quit'],
-      defaultId: 0,
-      cancelId: 1,
-      title: 'Update Ready',
-      message: `TaxNest PRA Agent ${info.version} has been downloaded.`,
-      detail: 'Restart now to install the update, or it will be installed automatically the next time you quit the app.',
-    }).then((res) => {
-      if (res.response === 0) {
-        isQuitting = true;
-        stopAgent();
-        autoUpdater.quitAndInstall(false, true);
-      }
-    }).catch(() => {});
+  console.log('[updater] Update downloaded silently. Will install on next app quit:', info.version);
+  if (tray) {
+    try { tray.setToolTip(`TaxNest PRA Sync Agent — v${info.version} ready (auto-installs on next start)`); } catch (e) {}
   }
 });
 
@@ -198,7 +174,7 @@ app.whenReady().then(() => {
   }
 
   setTimeout(checkForUpdates, 5000);
-  setInterval(checkForUpdates, 60 * 60 * 1000);
+  setInterval(checkForUpdates, 30 * 60 * 1000);
 });
 
 app.on('window-all-closed', (e) => {

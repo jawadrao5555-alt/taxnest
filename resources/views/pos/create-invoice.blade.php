@@ -418,8 +418,8 @@
                                 <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6"
                                     :value="item.quantity"
                                     @input="item.quantity = ($event.target.value === '' ? '' : (parseInt($event.target.value.replace(/[^0-9]/g,'')) || 0)); recalculate()"
-                                    @focus="setTimeout(() => $event.target.select(), 0)"
-                                    @click="$event.target.select()"
+                                    @focus="$nextTick(() => $event.target.select())"
+                                    @mousedown="if(document.activeElement !== $event.target){ $event.preventDefault(); $event.target.focus(); $event.target.select(); }"
                                     @blur="if(!item.quantity || item.quantity < 1){ item.quantity = 1; recalculate(); }"
                                     class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition text-center font-semibold">
                             </div>
@@ -428,8 +428,8 @@
                                 <input type="text" inputmode="decimal" pattern="[0-9]*\.?[0-9]*" autocomplete="off" :id="'price-'+index"
                                     :value="item.unit_price"
                                     @input="item.unit_price = ($event.target.value === '' ? '' : (parseFloat($event.target.value.replace(/[^0-9.]/g,'')) || 0)); recalculate()"
-                                    @focus="setTimeout(() => $event.target.select(), 0)"
-                                    @click="$event.target.select()"
+                                    @focus="$nextTick(() => $event.target.select())"
+                                    @mousedown="if(document.activeElement !== $event.target){ $event.preventDefault(); $event.target.focus(); $event.target.select(); }"
                                     @blur="if(item.unit_price === '' || item.unit_price < 0){ item.unit_price = 0; recalculate(); }"
                                     class="w-full rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 transition"
                                     :style="item._isNew && item.unit_price === 0 && (ddSearch[index]||'').length > 0 ? 'border-color:#a855f7; box-shadow: 0 0 0 2px rgba(168,85,247,0.2); animation: pulse 1.5s ease-in-out 3;' : 'border-color:#d1d5db;'"

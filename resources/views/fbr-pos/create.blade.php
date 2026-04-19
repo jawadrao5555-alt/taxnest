@@ -137,8 +137,15 @@
                                 </div>
                                 <div class="sm:col-span-1">
                                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Qty *</label>
-                                    <input type="number" :name="'items['+index+'][quantity]'" x-model.number="item.quantity" min="1" required
-                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                    <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6"
+                                        :name="'items['+index+'][quantity]'"
+                                        :value="item.quantity"
+                                        @input="item.quantity = ($event.target.value === '' ? '' : (parseInt($event.target.value.replace(/[^0-9]/g,'')) || 0))"
+                                        @focus="$nextTick(() => $event.target.select())"
+                                        @mousedown="if(document.activeElement !== $event.target){ $event.preventDefault(); $event.target.focus(); $event.target.select(); }"
+                                        @blur="if(!item.quantity || item.quantity < 1){ item.quantity = 1; }"
+                                        required
+                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 text-center font-semibold"
                                         placeholder="1">
                                 </div>
                                 <div class="sm:col-span-2">

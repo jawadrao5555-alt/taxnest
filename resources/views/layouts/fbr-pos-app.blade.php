@@ -17,9 +17,9 @@
         <meta name="theme-color" content="#1e3a5f">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-        <meta name="apple-mobile-web-app-title" content="FBR POS">
+        <meta name="apple-mobile-web-app-title" content="Nest FBR Pos">
         <meta name="mobile-web-app-capable" content="yes">
-        <meta name="application-name" content="TaxNest FBR POS">
+        <meta name="application-name" content="Nest FBR Pos">
         <link rel="manifest" href="/manifest-fbrpos.json">
         <link rel="apple-touch-icon" href="/icons/icon-192.png">
         <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">

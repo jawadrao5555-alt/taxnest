@@ -22,9 +22,9 @@
         <meta name="theme-color" content="#7c3aed">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-        <meta name="apple-mobile-web-app-title" content="NestPOS">
+        <meta name="apple-mobile-web-app-title" content="Nest Pra Pos">
         <meta name="mobile-web-app-capable" content="yes">
-        <meta name="application-name" content="NestPOS">
+        <meta name="application-name" content="Nest Pra Pos">
         <link rel="manifest" href="/manifest-pos.json">
         <link rel="apple-touch-icon" href="/icons/icon-192.png">
         <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">

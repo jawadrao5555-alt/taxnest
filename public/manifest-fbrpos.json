@@ -1,6 +1,6 @@
 {
-    "name": "TaxNest FBR POS - Mall-Grade Cashier",
-    "short_name": "FBR POS",
+    "name": "Nest FBR Pos - Mall-Grade Cashier",
+    "short_name": "Nest FBR Pos",
     "description": "FBR-integrated POS for Pakistani retail with direct fiscal submission",
     "start_url": "/fbr-pos/create",
     "scope": "/fbr-pos/",

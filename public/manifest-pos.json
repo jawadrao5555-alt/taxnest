@@ -1,6 +1,6 @@
 {
-    "name": "NestPOS - Restaurant & Retail POS",
-    "short_name": "NestPOS",
+    "name": "Nest Pra Pos - Retail & Restaurant",
+    "short_name": "Nest Pra Pos",
     "description": "Mall-grade POS for Pakistani retail with PRA fiscal integration",
     "start_url": "/pos/dashboard",
     "scope": "/pos/",

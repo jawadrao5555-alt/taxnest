@@ -50,6 +50,12 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                            @php
+                                $fmtQty = function($q) {
+                                    $f = (float) $q;
+                                    return $f == (int) $f ? (string) (int) $f : rtrim(rtrim(number_format($f, 3, '.', ''), '0'), '.');
+                                };
+                            @endphp
                             @foreach($transaction->items as $item)
                             <tr>
                                 <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">
@@ -57,10 +63,13 @@
                                     @if($item->is_tax_exempt)
                                     <span class="ml-1 text-xs text-amber-600">(Exempt)</span>
                                     @endif
+                                    @if(($item->item_discount ?? 0) > 0)
+                                    <span class="ml-1 text-xs text-red-600">−PKR {{ number_format($item->item_discount, 2) }}</span>
+                                    @endif
                                 </td>
                                 <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">{{ $item->hs_code ?? '—' }}</td>
                                 <td class="px-4 py-3 text-sm text-center text-gray-500 dark:text-gray-400 hidden sm:table-cell">{{ $item->uom ?? 'U' }}</td>
-                                <td class="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{{ $item->quantity }}</td>
+                                <td class="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{{ $fmtQty($item->quantity) }}</td>
                                 <td class="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">PKR {{ number_format($item->unit_price, 2) }}</td>
                                 <td class="px-4 py-3 text-sm text-right text-gray-500 dark:text-gray-400 hidden sm:table-cell">{{ $item->tax_rate }}%</td>
                                 <td class="px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-white">PKR {{ number_format($item->total, 2) }}</td>

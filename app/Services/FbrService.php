@@ -1406,10 +1406,15 @@ class FbrService
             $unitPrice = floatval($item->unit_price);
             $isExempt = (bool) $item->is_tax_exempt;
             $taxRate = $isExempt ? 0 : floatval($item->tax_rate);
-            $valueSalesExcludingST = round($unitPrice * $quantity, 2);
+            $grossLine = round($unitPrice * $quantity, 2);
+            // Prefer per-line item_discount (PKR amount). Legacy `discount` is per-unit; multiply by qty.
+            $itemDiscount = round(floatval($item->item_discount ?? 0), 2);
+            $legacyDiscount = round(floatval($item->discount ?? 0) * $quantity, 2);
+            $discount = $itemDiscount > 0 ? $itemDiscount : $legacyDiscount;
+            if ($discount > $grossLine) { $discount = $grossLine; }
+            $valueSalesExcludingST = round($grossLine - $discount, 2);
             $salesTaxApplicable = $isExempt ? 0.00 : round(($valueSalesExcludingST * $taxRate) / 100, 2);
-            $discount = round(floatval($item->discount ?? 0), 2);
-            $totalValues = round($valueSalesExcludingST + $salesTaxApplicable - $discount, 2);
+            $totalValues = round($valueSalesExcludingST + $salesTaxApplicable, 2);
 
             $rateValue = $isExempt ? '0%' : (($taxRate == intval($taxRate)) ? intval($taxRate) . '%' : round($taxRate, 2) . '%');
 

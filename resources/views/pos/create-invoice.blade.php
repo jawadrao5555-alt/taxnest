@@ -859,7 +859,7 @@
                 },
                 openParkedOrders() {
                     if (typeof this.openDraftsModal === 'function') { this.openDraftsModal(); return; }
-                    window.location.href = "{{ route('pos.create-invoice') }}?drafts=1";
+                    window.location.href = "{{ route('pos.invoice.create') }}?drafts=1";
                 },
                 parkOrder() {
                     if (typeof this.saveDraftNow === 'function') { this.saveDraftNow(); return; }
@@ -874,7 +874,7 @@
                     if (cartHasItems) {
                         if (!confirm('Start a new sale? Current cart will be cleared.')) return;
                     }
-                    window.location.href = "{{ route('pos.create-invoice') }}";
+                    window.location.href = "{{ route('pos.invoice.create') }}";
                 },
                 async repeatLastOrder() {
                     try {

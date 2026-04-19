@@ -14,7 +14,7 @@ class PosTransactionItem extends Model
     ];
 
     protected $casts = [
-        'quantity' => 'integer',
+        'quantity' => 'decimal:3',
         'unit_price' => 'decimal:2',
         'subtotal' => 'decimal:2',
         'is_tax_exempt' => 'boolean',

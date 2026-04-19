@@ -161,11 +161,22 @@
                 </tr>
             </thead>
             <tbody>
+                @php
+                    $fmtQty = function($q) {
+                        $f = (float) $q;
+                        return $f == (int) $f ? (string) (int) $f : rtrim(rtrim(number_format($f, 3, '.', ''), '0'), '.');
+                    };
+                @endphp
                 @foreach($transaction->items as $item)
                 <tr>
-                    <td>{{ $item->item_name }}</td>
+                    <td>
+                        {{ $item->item_name }}
+                        @if(($item->item_discount ?? 0) > 0)
+                        <div style="font-size: 9px; color: #b91c1c;">↳ Item Discount: -PKR {{ number_format($item->item_discount, 2) }}</div>
+                        @endif
+                    </td>
                     <td class="c">{{ $item->uom ?? 'U' }}</td>
-                    <td class="c">{{ $item->quantity }}</td>
+                    <td class="c">{{ $fmtQty($item->quantity) }}</td>
                     <td class="r">{{ $item->is_tax_exempt ? 'Exempt' : number_format($item->tax_rate, 0) . '%' }}</td>
                     <td class="r">{{ number_format($item->unit_price, 2) }}</td>
                     <td class="r">{{ number_format($item->subtotal, 2) }}</td>

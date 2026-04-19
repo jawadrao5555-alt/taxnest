@@ -159,14 +159,26 @@
             </tr>
         </thead>
         <tbody>
+            @php
+                $fmtQty = function($q) {
+                    $f = (float) $q;
+                    return $f == (int) $f ? (string) (int) $f : rtrim(rtrim(number_format($f, 3, '.', ''), '0'), '.');
+                };
+            @endphp
             @foreach($transaction->items as $item)
             <tr>
                 <td class="col-item">{{ $item->item_name }}</td>
                 <td class="col-uom">{{ $item->uom ?? 'U' }}</td>
-                <td class="col-qty">{{ $item->quantity }}</td>
+                <td class="col-qty">{{ $fmtQty($item->quantity) }}</td>
                 <td class="col-price">{{ number_format($item->unit_price, 0) }}</td>
                 <td class="col-total">{{ number_format($item->subtotal, 0) }}</td>
             </tr>
+            @if(($item->item_discount ?? 0) > 0)
+            <tr>
+                <td class="col-item" colspan="4" style="font-size: 0.85em; color: #b91c1c; padding-left: 8px;">↳ Item Discount</td>
+                <td class="col-total" style="font-size: 0.85em; color: #b91c1c;">-{{ number_format($item->item_discount, 0) }}</td>
+            </tr>
+            @endif
             @endforeach
         </tbody>
     </table>

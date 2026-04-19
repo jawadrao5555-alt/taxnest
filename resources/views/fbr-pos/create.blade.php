@@ -1,5 +1,61 @@
 <x-fbr-pos-layout>
-<div class="max-w-5xl mx-auto" x-data="fbrPosInvoice()">
+<style>
+@keyframes scanPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.5); } 50% { box-shadow: 0 0 0 8px rgba(59,130,246,0); } }
+.scan-pulse { animation: scanPulse 1.5s ease-in-out infinite; }
+@keyframes toastIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.toast-in { animation: toastIn 0.25s ease-out; }
+.cart-flash { animation: cartFlash 0.4s ease; }
+@keyframes cartFlash { 0% { background-color: rgb(187 247 208); } 100% { background-color: transparent; } }
+</style>
+<div class="max-w-5xl mx-auto pb-20" x-data="fbrPosInvoice()" @click="userActivity()">
+    {{-- 🎯 Sticky Premium Total Banner --}}
+    <div class="sticky top-0 z-40 -mx-4 px-4 py-2 mb-3 bg-gradient-to-r from-slate-900 via-blue-900 to-slate-900 text-white shadow-lg flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <div class="text-[10px] uppercase tracking-wider text-blue-200">Items</div>
+            <div class="text-2xl font-black tabular-nums" x-text="items.filter(i => parseFloat(i.unit_price)>0).length"></div>
+            <div class="text-[10px] uppercase tracking-wider text-blue-200 ml-3">Qty</div>
+            <div class="text-2xl font-black tabular-nums" x-text="totalQty()"></div>
+        </div>
+        <div class="text-center">
+            <div class="text-[10px] uppercase tracking-wider text-emerald-200">Grand Total</div>
+            <div class="text-3xl font-black tabular-nums text-emerald-300" x-text="'Rs ' + formatNum(calcTotal())"></div>
+        </div>
+        <div class="flex items-center gap-2">
+            <button type="button" @click="numpadOpen = true" title="On-screen numpad (F3)" class="p-2 bg-white/10 hover:bg-white/20 rounded text-white text-xs">⌨ Pad</button>
+            <button type="button" @click="reprintLast()" title="Reprint last receipt (F8)" class="p-2 bg-white/10 hover:bg-white/20 rounded text-white text-xs">🖨 Last</button>
+            <button type="button" @click="toggleFullscreen()" title="Fullscreen (F11)" class="p-2 bg-white/10 hover:bg-white/20 rounded text-white text-xs">⛶</button>
+            <button type="button" @click="soundOn = !soundOn; toast(soundOn ? 'Sound ON' : 'Sound OFF', 'info')" title="Toggle sound" class="p-2 bg-white/10 hover:bg-white/20 rounded text-white text-xs" x-text="soundOn ? '🔊' : '🔇'"></button>
+        </div>
+    </div>
+
+    {{-- Toast Container --}}
+    <div class="fixed top-20 right-4 z-50 space-y-2" style="pointer-events:none;">
+        <template x-for="t in toasts" :key="t.id">
+            <div class="toast-in px-4 py-3 rounded-lg shadow-2xl text-sm font-semibold text-white min-w-[200px]"
+                :class="{ 'bg-emerald-600': t.type==='success', 'bg-red-600': t.type==='error', 'bg-blue-600': t.type==='info', 'bg-amber-600': t.type==='warn' }"
+                x-text="t.msg"></div>
+        </template>
+    </div>
+
+    {{-- 🎹 Floating Numpad Modal --}}
+    <div x-show="numpadOpen" x-cloak @click.self="numpadOpen = false" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-5 w-80">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-bold dark:text-white text-lg">Numpad → Cash</h3>
+                <button @click="numpadOpen = false" class="text-gray-500 hover:text-red-600 text-xl">✕</button>
+            </div>
+            <input type="text" readonly :value="'Rs ' + formatNum(cashReceived || 0)" class="w-full mb-3 text-right text-3xl font-black bg-gray-100 dark:bg-gray-900 dark:text-white rounded-lg px-3 py-3 tabular-nums">
+            <div class="grid grid-cols-3 gap-2">
+                <template x-for="k in ['7','8','9','4','5','6','1','2','3','0','00','.']" :key="k">
+                    <button type="button" @click="numpadKey(k)" class="py-4 bg-gray-100 hover:bg-blue-100 dark:bg-gray-700 dark:hover:bg-blue-800 dark:text-white rounded-lg font-bold text-xl active:scale-95 transition" x-text="k"></button>
+                </template>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-2">
+                <button type="button" @click="cashReceived = 0" class="py-3 bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/40 dark:text-red-300 rounded-lg font-bold">Clear</button>
+                <button type="button" @click="numpadOpen = false; $refs.completeBtn && $refs.completeBtn.click()" class="py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold">✓ Pay</button>
+            </div>
+        </div>
+    </div>
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">New FBR POS Sale</h1>
@@ -138,13 +194,14 @@
                         </div>
                     </div>
 
-                    <div class="mb-4 flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-2">
-                        <svg class="w-5 h-5 text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10m4-10v10m4-10v10m4-10v10m-12 0h16"/></svg>
+                    <div class="mb-4 flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-lg p-2 scan-pulse">
+                        <svg class="w-5 h-5 text-blue-600 flex-shrink-0 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10m4-10v10m4-10v10m4-10v10m-12 0h16"/></svg>
                         <input type="text" x-ref="barcodeInput" x-model="barcodeBuffer"
                             @keydown.enter.prevent="scanBarcode()"
                             autocomplete="off"
-                            class="flex-1 bg-transparent border-0 focus:ring-0 text-sm font-mono dark:text-white placeholder-gray-400"
-                            placeholder="Scan barcode here (or type code + Enter) — auto-adds product">
+                            class="flex-1 bg-transparent border-0 focus:ring-0 text-sm font-mono dark:text-white placeholder-gray-400 font-semibold"
+                            placeholder="📡 Scanner Active — Scan or type code + Enter">
+                        <span class="text-[10px] font-bold px-2 py-0.5 bg-blue-600 text-white rounded">READY</span>
                         <span x-show="scanStatus" :class="scanStatus.ok ? 'text-green-600' : 'text-red-600'" class="text-xs font-semibold" x-text="scanStatus.msg"></span>
                     </div>
 
@@ -389,6 +446,27 @@
             </div>
         </div>
     </form>
+
+    {{-- 🟢 Premium Bottom Status Bar --}}
+    <div class="fixed bottom-0 left-0 right-0 z-30 bg-slate-900 text-white border-t border-slate-700 px-4 py-1.5 flex items-center justify-between text-xs">
+        <div class="flex items-center gap-4">
+            <span class="flex items-center gap-1.5">
+                <span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+                <span class="font-semibold">{{ auth('fbrpos')->user()->name ?? 'Cashier' }}</span>
+            </span>
+            <span class="text-slate-400">|</span>
+            <span class="text-slate-300">{{ $company->company_name ?? 'POS' }}</span>
+            @if($currentShift)
+                <span class="text-slate-400">|</span>
+                <span class="text-emerald-300">Shift #{{ $currentShift->id }}</span>
+            @endif
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="text-slate-400">F2 Cash · F3 Pad · F4 Hold · F5 Recall · F8 Reprint · F9 Pay</span>
+            <span class="text-slate-400">|</span>
+            <span x-text="new Date().toLocaleTimeString()" x-init="setInterval(() => $el.textContent = new Date().toLocaleTimeString(), 1000)" class="font-mono font-bold text-emerald-300"></span>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -416,18 +494,72 @@ function fbrPosInvoice() {
         promoMessage: '',
         promoOk: false,
         cashReceived: 0,
+        cardAmount: 0,
+        splitPayment: false,
         recallOpen: false,
         heldList: [],
+        // Premium UI state
+        numpadOpen: false,
+        toasts: [],
+        toastSeq: 0,
+        soundOn: localStorage.getItem('fbrpos_sound') !== '0',
+        lastSaleId: localStorage.getItem('fbrpos_last_sale') || '',
+        audioCtx: null,
         init() {
             this.$nextTick(() => { this.$refs.barcodeInput && this.$refs.barcodeInput.focus(); });
             this.loadHeld();
-            // Global keyboard shortcuts: F9 = complete sale, F2 = focus cash, Esc = clear cash
+            // Global keyboard shortcuts
             window.addEventListener('keydown', (e) => {
+                if (e.target.tagName === 'INPUT' && ['F2','F3','F4','F5','F8','F9','F11'].indexOf(e.key) === -1) return;
                 if (e.key === 'F9') { e.preventDefault(); this.$refs.completeBtn && this.$refs.completeBtn.click(); }
                 else if (e.key === 'F2') { e.preventDefault(); this.cashReceived = this.calcTotal(); this.$refs.cashInput && this.$refs.cashInput.focus(); }
+                else if (e.key === 'F3') { e.preventDefault(); this.numpadOpen = !this.numpadOpen; }
                 else if (e.key === 'F4') { e.preventDefault(); this.holdSale(); }
                 else if (e.key === 'F5') { e.preventDefault(); this.openRecall(); }
+                else if (e.key === 'F8') { e.preventDefault(); this.reprintLast(); }
+                else if (e.key === 'F11') { e.preventDefault(); this.toggleFullscreen(); }
             });
+            this.toast('POS Ready · Scanner active', 'success');
+        },
+        // ====== Premium helpers ======
+        userActivity() { /* refocus scanner if no input has focus */
+            if (document.activeElement === document.body && this.$refs.barcodeInput) this.$refs.barcodeInput.focus();
+        },
+        totalQty() { return this.items.reduce((s,i) => s + (parseFloat(i.quantity)||0), 0); },
+        toast(msg, type) {
+            const id = ++this.toastSeq;
+            this.toasts.push({ id, msg, type: type || 'info' });
+            setTimeout(() => { this.toasts = this.toasts.filter(t => t.id !== id); }, 2500);
+        },
+        beep(freq, dur) {
+            if (!this.soundOn) return;
+            try {
+                if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = this.audioCtx.createOscillator();
+                const gain = this.audioCtx.createGain();
+                osc.connect(gain); gain.connect(this.audioCtx.destination);
+                osc.type = 'sine'; osc.frequency.value = freq || 880;
+                gain.gain.setValueAtTime(0.15, this.audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.audioCtx.currentTime + (dur||0.1));
+                osc.start(); osc.stop(this.audioCtx.currentTime + (dur||0.1));
+            } catch(e) {}
+            try { localStorage.setItem('fbrpos_sound', this.soundOn ? '1' : '0'); } catch(e) {}
+        },
+        chime() { this.beep(660,0.08); setTimeout(()=>this.beep(990,0.12),90); setTimeout(()=>this.beep(1320,0.15),200); },
+        numpadKey(k) {
+            const cur = String(this.cashReceived || 0);
+            if (k === '.' && cur.indexOf('.') >= 0) return;
+            const next = (cur === '0' && k !== '.') ? k : (cur + k);
+            this.cashReceived = parseFloat(next) || 0;
+            this.beep(1200, 0.04);
+        },
+        toggleFullscreen() {
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+            else document.exitFullscreen?.();
+        },
+        reprintLast() {
+            if (!this.lastSaleId) { this.toast('No previous sale found', 'warn'); return; }
+            window.open('/fbr-pos/' + this.lastSaleId + '/receipt', '_blank');
         },
         async loadHeld() {
             try { const r = await fetch("{{ route('fbrpos.phase2.held.list') }}"); this.heldList = await r.json(); } catch(e) {}
@@ -553,6 +685,8 @@ function fbrPosInvoice() {
         addProductItem(p) {
             let isExempt = p.tax_type === 'exempt';
             let taxRate = isExempt ? 0 : (parseFloat(p.default_tax_rate) || 18);
+            this.beep(880, 0.06);
+            this.toast('+ ' + p.name, 'success');
             // If same product already in cart, just increment qty
             const existing = this.items.find(it => it.product_id && p.id && it.product_id === p.id);
             if (existing) {
@@ -585,6 +719,7 @@ function fbrPosInvoice() {
                     this.scanStatus = { ok: true, msg: '✓ ' + data.product.name };
                 } else {
                     this.scanStatus = { ok: false, msg: 'Not found: ' + code };
+                    this.beep(220, 0.25); this.toast('Barcode not found: ' + code, 'error');
                 }
             } catch (e) {
                 this.scanStatus = { ok: false, msg: 'Lookup failed' };

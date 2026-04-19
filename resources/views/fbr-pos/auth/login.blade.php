@@ -25,14 +25,13 @@
             <div class="relative z-10">
                 <div class="text-center mb-6">
                     <a href="/fbr-pos-landing" class="inline-block">
-                        <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-blue-400 to-blue-700 flex items-center justify-center shadow-2xl shadow-blue-500/30 ring-1 ring-white/10">
-                            <svg class="h-9 w-9 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
-                            </svg>
-                        </div>
+                        <img src="/icons/nest-fbr/icon-192.png" alt="Nest FBR Pos" class="w-20 h-20 mx-auto rounded-2xl shadow-2xl shadow-blue-500/40 ring-1 ring-white/10">
                     </a>
-                    <h1 class="mt-4 text-2xl font-extrabold text-gray-900 tracking-tight">FBR POS</h1>
-                    <p class="text-blue-800/60 text-sm mt-1">FBR Point of Sale System</p>
+                    <h1 class="mt-4 text-2xl font-extrabold text-gray-900 tracking-tight">Nest FBR Pos</h1>
+                    <p class="text-blue-800/60 text-sm mt-1">FBR-Integrated Mall-Grade POS</p>
+                    <div class="mt-3 flex justify-center">
+                        <x-pwa-install color="blue" label="Install Nest FBR Pos" />
+                    </div>
                 </div>
 
                 <div class="w-full max-w-md mx-auto px-4">

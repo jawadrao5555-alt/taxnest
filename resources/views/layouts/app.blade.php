@@ -18,7 +18,9 @@
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
         <meta name="apple-mobile-web-app-title" content="Tax DI">
         <link rel="manifest" href="/manifest.json">
-        <link rel="apple-touch-icon" href="/icons/icon-192.png">
+        <link rel="apple-touch-icon" href="/icons/tax-di/icon-192.png">
+        <link rel="icon" type="image/png" sizes="192x192" href="/icons/tax-di/icon-192.png">
+        <link rel="icon" type="image/png" sizes="512x512" href="/icons/tax-di/icon-512.png">
 
         <title>{{ config('app.name', 'TaxNest') }}</title>
 
@@ -327,11 +329,6 @@
             Offline
         </div>
 
-        <div id="sw-update-banner" class="hidden fixed top-0 left-0 right-0 z-50 bg-indigo-600 text-white text-xs font-bold text-center py-2 shadow-md cursor-pointer" onclick="location.reload()">
-            <svg class="w-3.5 h-3.5 inline mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-            Update Available — Click to Refresh
-        </div>
-
         <script>
             function toggleSidebar() {
                 document.getElementById('sidebarDrawer').classList.toggle('-translate-x-full');
@@ -354,19 +351,7 @@
             });
 
             if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/sw.js').then(reg => {
-                    reg.addEventListener('updatefound', () => {
-                        const newWorker = reg.installing;
-                        if (newWorker) {
-                            newWorker.addEventListener('statechange', () => {
-                                if (newWorker.state === 'activated') {
-                                    const banner = document.getElementById('sw-update-banner');
-                                    if (banner) banner.classList.remove('hidden');
-                                }
-                            });
-                        }
-                    });
-                }).catch(() => {});
+                navigator.serviceWorker.register('/sw.js').catch(() => {});
             }
             let deferredPrompt;
             window.addEventListener('beforeinstallprompt', (e) => {
@@ -471,5 +456,6 @@
                 </div>
             </template>
         </div>
+        <x-pwa-update color="emerald" />
     </body>
 </html>

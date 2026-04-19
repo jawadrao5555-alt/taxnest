@@ -753,4 +753,12 @@ Route::prefix('api/agent')->middleware(['agent.auth'])->group(function () {
     Route::post('/submit-result', [\App\Http\Controllers\AgentController::class, 'submitResult']);
 });
 
+// === PWA Push Notification subscription endpoints (works for any auth guard) ===
+Route::post('/api/push/subscribe', [\App\Http\Controllers\PushSubscriptionController::class, 'store'])
+    ->middleware('throttle:30,1')
+    ->name('push.subscribe');
+Route::post('/api/push/unsubscribe', [\App\Http\Controllers\PushSubscriptionController::class, 'destroy'])
+    ->middleware('throttle:30,1')
+    ->name('push.unsubscribe');
+
 require __DIR__.'/auth.php';

@@ -26,9 +26,9 @@
         <meta name="mobile-web-app-capable" content="yes">
         <meta name="application-name" content="Nest Pra Pos">
         <link rel="manifest" href="/manifest-pos.json">
-        <link rel="apple-touch-icon" href="/icons/icon-192.png">
-        <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
-        <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
+        <link rel="apple-touch-icon" href="/icons/nest-pra/icon-192.png">
+        <link rel="icon" type="image/png" sizes="192x192" href="/icons/nest-pra/icon-192.png">
+        <link rel="icon" type="image/png" sizes="512x512" href="/icons/nest-pra/icon-512.png">
         <title>NestPOS — {{ config('app.name', 'TaxNest') }}</title>
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -562,5 +562,6 @@
             });
         </script>
         @stack('scripts')
+        <x-pwa-update color="purple" />
     </body>
 </html>

@@ -2,6 +2,8 @@
 
 <div class="w-full overflow-x-hidden">
     <div class="px-4 sm:px-6 py-4 max-w-7xl mx-auto">
+        <x-pwa-banner color="purple" appName="Nest Pra Pos" />
+        <x-pwa-push scope="pos" />
         @include('pos.dashboard-styles.' . ($dashboardStyle ?? 'default'))
         @include('pos.dashboard-styles._drafts-section')
     </div>

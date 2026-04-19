@@ -3,12 +3,13 @@
 
     <div class="mb-6 text-center">
         <div class="flex justify-center mb-3">
-            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-            </div>
+            <img src="/icons/tax-di/icon-192.png" alt="Tax DI" class="w-16 h-16 rounded-xl shadow-lg shadow-emerald-500/30">
         </div>
         <h2 class="text-xl font-bold" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Welcome Back</h2>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Login to your TaxNest account</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Login to your Tax DI account</p>
+        <div class="mt-3 flex justify-center">
+            <x-pwa-install color="emerald" label="Install Tax DI" />
+        </div>
     </div>
 
     <form method="POST" action="{{ route('login') }}" id="loginForm">

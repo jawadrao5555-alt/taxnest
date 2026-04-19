@@ -25,14 +25,13 @@
             <div class="relative z-10">
                 <div class="text-center mb-6">
                     <a href="/pos" class="inline-block">
-                        <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-purple-400 to-violet-600 flex items-center justify-center shadow-2xl shadow-purple-500/30 ring-1 ring-white/10">
-                            <svg class="h-9 w-9 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                            </svg>
-                        </div>
+                        <img src="/icons/nest-pra/icon-192.png" alt="Nest Pra Pos" class="w-20 h-20 mx-auto rounded-2xl shadow-2xl shadow-purple-500/40 ring-1 ring-white/10">
                     </a>
-                    <h1 class="mt-4 text-2xl font-extrabold text-white tracking-tight">NestPOS</h1>
-                    <p class="text-purple-200/60 text-sm mt-1">Enterprise Point of Sale</p>
+                    <h1 class="mt-4 text-2xl font-extrabold text-white tracking-tight">Nest Pra Pos</h1>
+                    <p class="text-purple-200/60 text-sm mt-1">Mall-Grade Retail &amp; Restaurant POS</p>
+                    <div class="mt-3 flex justify-center">
+                        <x-pwa-install color="purple" label="Install Nest Pra Pos" />
+                    </div>
                 </div>
 
                 <div class="w-full max-w-md mx-auto px-4">

@@ -94,3 +94,18 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **Chart.js:** Data visualization.
 - **PRA (Punjab Revenue Authority):** POS fiscal device integration via PRAL IMS API v1.2.
 - **Unsplash / Picsum:** (Fallback) for `ProductImageService`.
+
+## PWA / Mall-Grade "exe-look" Suite (Phase C)
+- **Three Independent PWAs:** Each product is installable as its own desktop app:
+  - **Tax DI** — `manifest.json` (emerald, scope `/`)
+  - **Nest Pra Pos** — `manifest-pos.json` (purple, scope `/pos`)
+  - **Nest FBR Pos** — `manifest-fbrpos.json` (blue, scope `/fbr-pos`)
+- **Branded Icons:** `public/icons/{tax-di,nest-pra,nest-fbr}/icon-{192,512}.png` — premium family-style icons (dark header bar + bold letters + product artwork).
+- **Service Worker (`public/sw.js`, v12):** Stale-while-revalidate for static assets, network-first for HTML, in-memory offline splash, auto-skips auth/API/admin paths, push notification handler ready.
+- **Blade Components:**
+  - `<x-pwa-install color label />` — install button (login pages, hidden until `beforeinstallprompt` fires)
+  - `<x-pwa-banner color appName />` — dismissable install banner (dashboards)
+  - `<x-pwa-update color />` — auto-update toast (in all 3 layouts, checks every 30 min)
+  - `<x-pwa-push scope />` — soft notification permission prompt + subscribe (dashboards)
+- **Push Subscriptions:** `push_subscriptions` table (user_id, company_id, scope, endpoint, p256dh, auth_key). Endpoints `POST /api/push/subscribe` and `POST /api/push/unsubscribe` (works for any guard: web/pos/fbrpos). VAPID public key from `VAPID_PUBLIC_KEY` env (optional; local notifications work without it via `window.tnNotify(title, body, opts)`).
+- **Login Page Branding:** Tax DI modal in `di-landing.blade.php`, plus `pos/auth/login.blade.php` and `fbr-pos/auth/login.blade.php` all show branded PNG icons + install button in the header.

@@ -3,6 +3,9 @@
     <div class="py-4">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
+            <x-pwa-banner color="emerald" appName="Tax DI" />
+            <x-pwa-push scope="di" />
+
             @if(isset($announcements) && $announcements->count() > 0)
             <div class="mb-4 space-y-2">
                 @foreach($announcements as $ann)

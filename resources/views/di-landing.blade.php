@@ -81,17 +81,18 @@
             <div class="relative px-6 py-5">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/10">
-                            <svg class="w-5 h-5 text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                        </div>
+                        <img src="/icons/tax-di/icon-192.png" alt="Tax DI" class="w-12 h-12 rounded-xl ring-1 ring-white/10 shadow-lg shadow-emerald-500/20">
                         <div>
-                            <h3 class="text-lg font-bold text-white">Digital Invoice</h3>
-                            <p class="text-emerald-200/50 text-xs">FBR Compliance Dashboard</p>
+                            <h3 class="text-lg font-bold text-white">Tax DI</h3>
+                            <p class="text-emerald-200/60 text-xs">Mall-Grade FBR Invoicing</p>
                         </div>
                     </div>
-                    <button @click="showLoginModal = false" class="text-white/40 hover:text-white transition p-1">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <x-pwa-install color="emerald" label="Install" />
+                        <button @click="showLoginModal = false" class="text-white/40 hover:text-white transition p-1">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
                 </div>
             </div>
             <form method="POST" action="/login" class="relative px-6 pb-6 space-y-4">

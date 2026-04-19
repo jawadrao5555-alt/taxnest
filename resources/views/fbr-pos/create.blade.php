@@ -345,21 +345,46 @@
                         </div>
                     </div>
 
-                    {{-- Cash received & Change due --}}
+                    {{-- ⚡ Fast Payment Section --}}
                     <div class="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700 space-y-2">
                         <div>
-                            <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Cash Received</label>
-                            <input type="number" name="cash_received" x-model.number="cashReceived" step="0.01" min="0" placeholder="Tendered" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-base font-bold py-2 px-3 shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center justify-between">
+                                <span>💵 Cash Received</span>
+                                <button type="button" @click="cashReceived = calcTotal(); $nextTick(() => $refs.cashInput && $refs.cashInput.focus())" class="text-emerald-600 hover:text-emerald-800 text-xs font-bold underline">EXACT</button>
+                            </label>
+                            <input type="number" name="cash_received" x-model.number="cashReceived" x-ref="cashInput"
+                                @keydown.enter.prevent="$refs.completeBtn && $refs.completeBtn.click()"
+                                step="0.01" min="0" placeholder="Tendered (Enter = pay)"
+                                class="w-full rounded-lg border-2 border-emerald-400 dark:border-emerald-600 dark:bg-gray-800 dark:text-white text-xl font-bold py-3 px-3 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
                         </div>
-                        <div class="flex justify-between font-bold text-base" :class="changeDue() >= 0 ? 'text-emerald-700' : 'text-red-700'">
-                            <span>Change Due</span>
-                            <span x-text="'PKR ' + formatNum(Math.abs(changeDue()))"></span>
+                        {{-- Quick tender buttons --}}
+                        <div class="grid grid-cols-4 gap-1">
+                            <button type="button" @click="addTender(100)" class="py-2 bg-gray-200 hover:bg-emerald-200 dark:bg-gray-700 dark:hover:bg-emerald-800 text-gray-900 dark:text-white rounded font-bold text-xs">+100</button>
+                            <button type="button" @click="addTender(500)" class="py-2 bg-gray-200 hover:bg-emerald-200 dark:bg-gray-700 dark:hover:bg-emerald-800 text-gray-900 dark:text-white rounded font-bold text-xs">+500</button>
+                            <button type="button" @click="addTender(1000)" class="py-2 bg-gray-200 hover:bg-emerald-200 dark:bg-gray-700 dark:hover:bg-emerald-800 text-gray-900 dark:text-white rounded font-bold text-xs">+1K</button>
+                            <button type="button" @click="addTender(5000)" class="py-2 bg-gray-200 hover:bg-emerald-200 dark:bg-gray-700 dark:hover:bg-emerald-800 text-gray-900 dark:text-white rounded font-bold text-xs">+5K</button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-1 mt-1">
+                            <button type="button" @click="setNote(500)" class="py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded font-bold text-xs">500 note</button>
+                            <button type="button" @click="setNote(1000)" class="py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded font-bold text-xs">1000 note</button>
+                            <button type="button" @click="setNote(5000)" class="py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded font-bold text-xs">5000 note</button>
+                            <button type="button" @click="cashReceived = 0" class="py-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-700 dark:text-red-300 rounded font-bold text-xs">Clear</button>
+                        </div>
+                        {{-- HUGE Change Due display --}}
+                        <div class="mt-2 p-3 rounded-lg text-center"
+                            :class="cashReceived <= 0 ? 'bg-gray-100 dark:bg-gray-800' : (changeDue() >= 0 ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-red-100 dark:bg-red-900/40')">
+                            <div class="text-xs font-semibold uppercase" :class="changeDue() >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'"
+                                x-text="cashReceived <= 0 ? 'CHANGE DUE' : (changeDue() >= 0 ? 'CHANGE TO RETURN' : 'STILL OWED')"></div>
+                            <div class="text-3xl font-black tabular-nums tracking-tight"
+                                :class="cashReceived <= 0 ? 'text-gray-400' : (changeDue() >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300')"
+                                x-text="'Rs ' + formatNum(Math.abs(changeDue()))"></div>
                         </div>
                     </div>
                 </div>
 
-                <button type="submit" class="w-full py-4 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition text-base shadow-lg">
-                    💳 COMPLETE SALE
+                <button type="submit" x-ref="completeBtn"
+                    class="w-full py-5 bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white font-black rounded-xl transition text-lg shadow-xl tracking-wide">
+                    ✓ COMPLETE SALE <span class="opacity-70 text-xs font-normal">(F9 / Enter)</span>
                 </button>
             </div>
         </div>
@@ -396,6 +421,13 @@ function fbrPosInvoice() {
         init() {
             this.$nextTick(() => { this.$refs.barcodeInput && this.$refs.barcodeInput.focus(); });
             this.loadHeld();
+            // Global keyboard shortcuts: F9 = complete sale, F2 = focus cash, Esc = clear cash
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'F9') { e.preventDefault(); this.$refs.completeBtn && this.$refs.completeBtn.click(); }
+                else if (e.key === 'F2') { e.preventDefault(); this.cashReceived = this.calcTotal(); this.$refs.cashInput && this.$refs.cashInput.focus(); }
+                else if (e.key === 'F4') { e.preventDefault(); this.holdSale(); }
+                else if (e.key === 'F5') { e.preventDefault(); this.openRecall(); }
+            });
         },
         async loadHeld() {
             try { const r = await fetch("{{ route('fbrpos.phase2.held.list') }}"); this.heldList = await r.json(); } catch(e) {}
@@ -486,6 +518,17 @@ function fbrPosInvoice() {
         },
         changeDue() {
             return Math.round((parseFloat(this.cashReceived || 0) - this.calcTotal()) * 100) / 100;
+        },
+        addTender(amount) {
+            const cur = parseFloat(this.cashReceived || 0);
+            this.cashReceived = Math.round((cur + amount) * 100) / 100;
+            this.$nextTick(() => this.$refs.cashInput && this.$refs.cashInput.focus());
+        },
+        setNote(amount) {
+            const total = this.calcTotal();
+            const notes = Math.ceil(total / amount);
+            this.cashReceived = notes * amount;
+            this.$nextTick(() => this.$refs.cashInput && this.$refs.cashInput.focus());
         },
         sanitizeQty(v) {
             if (v === '' || v === null || v === undefined) return '';

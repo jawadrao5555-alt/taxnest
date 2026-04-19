@@ -415,11 +415,22 @@
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Qty</label>
-                                <input type="number" x-model.number="item.quantity" min="0.01" step="any" inputmode="decimal" @focus="$event.target.select()" @click="$event.target.select()" @input="recalculate()" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition text-center">
+                                <input type="text" inputmode="decimal" pattern="[0-9]*\.?[0-9]*" autocomplete="off"
+                                    :value="item.quantity"
+                                    @input="item.quantity = ($event.target.value === '' ? '' : (parseFloat($event.target.value.replace(/[^0-9.]/g,'')) || 0)); recalculate()"
+                                    @focus="setTimeout(() => $event.target.select(), 0)"
+                                    @click="$event.target.select()"
+                                    @blur="if(!item.quantity || item.quantity < 0.01){ item.quantity = 1; recalculate(); }"
+                                    class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition text-center">
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Unit Price</label>
-                                <input type="number" :id="'price-'+index" x-model.number="item.unit_price" min="0" step="any" inputmode="decimal" @focus="$event.target.select()" @click="$event.target.select()" @input="recalculate()"
+                                <input type="text" inputmode="decimal" pattern="[0-9]*\.?[0-9]*" autocomplete="off" :id="'price-'+index"
+                                    :value="item.unit_price"
+                                    @input="item.unit_price = ($event.target.value === '' ? '' : (parseFloat($event.target.value.replace(/[^0-9.]/g,'')) || 0)); recalculate()"
+                                    @focus="setTimeout(() => $event.target.select(), 0)"
+                                    @click="$event.target.select()"
+                                    @blur="if(item.unit_price === '' || item.unit_price < 0){ item.unit_price = 0; recalculate(); }"
                                     class="w-full rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 transition"
                                     :style="item._isNew && item.unit_price === 0 && (ddSearch[index]||'').length > 0 ? 'border-color:#a855f7; box-shadow: 0 0 0 2px rgba(168,85,247,0.2); animation: pulse 1.5s ease-in-out 3;' : 'border-color:#d1d5db;'"
                                     :class="'focus:ring-2 focus:ring-emerald-500'">

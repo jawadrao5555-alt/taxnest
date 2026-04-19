@@ -187,8 +187,8 @@
     <label>Server URL</label>
     <input type="text" id="serverUrl" placeholder="https://taxnest.com.pk/api/agent">
 
-    <label>Company ID</label>
-    <input type="text" id="companyId" placeholder="13">
+    <label>Company ID <span style="font-size:10px; color:#a78bfa; font-weight:normal;">(auto-detected from API key)</span></label>
+    <input type="text" id="companyId" placeholder="Auto" autocomplete="off" inputmode="numeric">
 
     <label>API Key</label>
     <input type="password" id="apiKey" placeholder="tnk_xxxxxxxxxxxxx">
@@ -264,6 +264,9 @@
     if (res.ok) {
       tr.style.color = '#10b981';
       tr.textContent = `✅ Connected to ${res.data.company.name} (POS ID: ${res.data.company.pra_pos_id})`;
+      if (res.data.company && res.data.company.id) {
+        $('companyId').value = res.data.company.id;
+      }
     } else {
       tr.style.color = '#fca5a5';
       tr.textContent = `❌ ${res.error}`;
@@ -277,13 +280,13 @@
       apiKey: $('apiKey').value.trim(),
     };
     const tr = $('testResult');
-    if (!cfg.serverUrl || !cfg.companyId || !cfg.apiKey) {
+    if (!cfg.serverUrl || !cfg.apiKey) {
       tr.style.color = '#fca5a5';
-      tr.textContent = '⚠ Please fill in all fields (Server URL, Company ID, API Key)';
-      const empty = !cfg.companyId ? 'companyId' : (!cfg.apiKey ? 'apiKey' : 'serverUrl');
-      $(empty).focus();
+      tr.textContent = '⚠ Please enter Server URL and API Key (Company ID auto-detects)';
+      $(!cfg.apiKey ? 'apiKey' : 'serverUrl').focus();
       return;
     }
+    if (!cfg.companyId) cfg.companyId = 'auto';
     await window.agentAPI.saveConfig(cfg);
     tr.style.color = '#10b981';
     tr.textContent = '✅ Configuration saved. Agent connecting...';

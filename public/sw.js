@@ -1,4 +1,4 @@
-const CACHE_NAME = 'taxnest-v10';
+const CACHE_NAME = 'taxnest-v11';
 const OFFLINE_PAGE = '/offline-splash';
 const ASSETS_TO_CACHE = [
     '/manifest.json',

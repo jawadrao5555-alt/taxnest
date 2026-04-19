@@ -97,12 +97,13 @@ class FbrPosController extends Controller
         $request->validate([
             'items' => 'required|array|min:1',
             'items.*.item_name' => 'required|string|max:255',
-            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.quantity' => 'required|numeric|min:0.001',
             'items.*.unit_price' => 'required|numeric|min:0.01',
             'items.*.hs_code' => 'nullable|string|max:20',
-            'items.*.uom' => 'nullable|string|in:U,KG,LTR,MTR,SQM,PCS,PKT,DOZ,BOX,SET',
+            'items.*.uom' => 'nullable|string|in:U,KG,GM,LTR,ML,MTR,SQM,PCS,PKT,DOZ,BOX,SET,BAG,BTL,CTN,ROL,FT,IN,YDS,TIN,CAN,BUN',
             'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
             'items.*.is_tax_exempt' => 'nullable|boolean',
+            'items.*.item_discount' => 'nullable|numeric|min:0',
             'customer_name' => 'nullable|string|max:255',
             'customer_phone' => 'nullable|string|max:20',
             'customer_ntn' => 'nullable|string|max:30',
@@ -123,13 +124,17 @@ class FbrPosController extends Controller
                 $defaultTaxRate = 18;
 
                 foreach ($request->items as $item) {
-                    $qty = (int) $item['quantity'];
+                    $qty = round((float) $item['quantity'], 3);
+                    if ($qty <= 0) { $qty = 1; }
                     $price = (float) $item['unit_price'];
                     $isExempt = !empty($item['is_tax_exempt']);
                     $taxRate = $isExempt ? 0 : (float) ($item['tax_rate'] ?? $defaultTaxRate);
-                    $lineSubtotal = round($price * $qty, 2);
+                    $itemDiscount = round((float) ($item['item_discount'] ?? 0), 2);
+                    $grossLine = round($price * $qty, 2);
+                    if ($itemDiscount > $grossLine) { $itemDiscount = $grossLine; }
+                    $lineSubtotal = round($grossLine - $itemDiscount, 2);
                     $lineTax = round($lineSubtotal * $taxRate / 100, 2);
-                    $lineTotal = $lineSubtotal + $lineTax;
+                    $lineTotal = round($lineSubtotal + $lineTax, 2);
 
                     $subtotal += $lineSubtotal;
                     $totalTax += $lineTax;
@@ -142,6 +147,7 @@ class FbrPosController extends Controller
                         'quantity' => $qty,
                         'unit_price' => $price,
                         'discount' => 0,
+                        'item_discount' => $itemDiscount,
                         'tax_rate' => $taxRate,
                         'tax_amount' => $lineTax,
                         'subtotal' => $lineSubtotal,
@@ -927,6 +933,8 @@ class FbrPosController extends Controller
             'default_price' => 'required|numeric|min:0',
             'hs_code' => 'nullable|string|max:50',
             'uom' => 'nullable|string|max:20',
+            'barcode' => 'nullable|string|max:64',
+            'sku' => 'nullable|string|max:64',
             'tax_type' => 'required|in:taxable,exempt,custom',
             'default_tax_rate' => 'nullable|numeric|min:0|max:100',
         ]);
@@ -937,6 +945,8 @@ class FbrPosController extends Controller
         Product::create([
             'company_id' => app('currentCompanyId'),
             'name' => $request->name,
+            'barcode' => $request->barcode ?: null,
+            'sku' => $request->sku ?: null,
             'default_price' => $request->default_price,
             'hs_code' => $request->hs_code,
             'uom' => $request->uom ?? 'U',
@@ -966,6 +976,8 @@ class FbrPosController extends Controller
             'default_price' => 'required|numeric|min:0',
             'hs_code' => 'nullable|string|max:50',
             'uom' => 'nullable|string|max:20',
+            'barcode' => 'nullable|string|max:64',
+            'sku' => 'nullable|string|max:64',
             'tax_type' => 'required|in:taxable,exempt,custom',
             'default_tax_rate' => 'nullable|numeric|min:0|max:100',
         ]);
@@ -975,6 +987,8 @@ class FbrPosController extends Controller
 
         $product->update([
             'name' => $request->name,
+            'barcode' => $request->barcode ?: null,
+            'sku' => $request->sku ?: null,
             'default_price' => $request->default_price,
             'hs_code' => $request->hs_code,
             'uom' => $request->uom ?? 'U',
@@ -1007,17 +1021,39 @@ class FbrPosController extends Controller
     public function searchProducts(Request $request)
     {
         $companyId = app('currentCompanyId');
-        $q = $request->get('q', '');
+        $q = trim((string) $request->get('q', ''));
         $like = \App\Helpers\DbCompat::like();
         $products = Product::where('company_id', $companyId)
             ->where('is_active', true)
             ->where(function ($query) use ($q, $like) {
                 $query->where('name', $like, "%{$q}%")
-                      ->orWhere('hs_code', $like, "%{$q}%");
+                      ->orWhere('hs_code', $like, "%{$q}%")
+                      ->orWhere('barcode', $like, "%{$q}%")
+                      ->orWhere('sku', $like, "%{$q}%");
             })
             ->take(15)
-            ->get(['id', 'name', 'hs_code', 'default_price', 'default_tax_rate', 'tax_type', 'uom']);
+            ->get(['id', 'name', 'hs_code', 'barcode', 'sku', 'default_price', 'default_tax_rate', 'tax_type', 'uom']);
 
         return response()->json($products);
+    }
+
+    public function lookupByBarcode(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $code = trim((string) $request->get('code', ''));
+        if ($code === '') {
+            return response()->json(['found' => false]);
+        }
+        $product = Product::where('company_id', $companyId)
+            ->where('is_active', true)
+            ->where(function ($q) use ($code) {
+                $q->where('barcode', $code)->orWhere('sku', $code);
+            })
+            ->first(['id', 'name', 'hs_code', 'barcode', 'sku', 'default_price', 'default_tax_rate', 'tax_type', 'uom']);
+
+        if (!$product) {
+            return response()->json(['found' => false]);
+        }
+        return response()->json(['found' => true, 'product' => $product]);
     }
 }

@@ -46,17 +46,49 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">UoM</label>
                     <select name="uom" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                        @php $currentUom = old('uom', $product->uom ?? 'U'); @endphp
-                        <option value="U" {{ $currentUom == 'U' ? 'selected' : '' }}>Units</option>
-                        <option value="KG" {{ $currentUom == 'KG' ? 'selected' : '' }}>KG</option>
-                        <option value="LTR" {{ $currentUom == 'LTR' ? 'selected' : '' }}>Liters</option>
-                        <option value="MTR" {{ $currentUom == 'MTR' ? 'selected' : '' }}>Meters</option>
-                        <option value="PCS" {{ $currentUom == 'PCS' ? 'selected' : '' }}>Pieces</option>
-                        <option value="PKT" {{ $currentUom == 'PKT' ? 'selected' : '' }}>Packets</option>
-                        <option value="DOZ" {{ $currentUom == 'DOZ' ? 'selected' : '' }}>Dozen</option>
-                        <option value="BOX" {{ $currentUom == 'BOX' ? 'selected' : '' }}>Box</option>
-                        <option value="SET" {{ $currentUom == 'SET' ? 'selected' : '' }}>Set</option>
+                        @php
+                            $currentUom = old('uom', $product->uom ?? 'U');
+                            $uomList = [
+                                'U' => 'Units',
+                                'PCS' => 'Pieces',
+                                'KG' => 'Kilogram',
+                                'GM' => 'Gram',
+                                'LTR' => 'Liter',
+                                'ML' => 'Milliliter',
+                                'MTR' => 'Meter',
+                                'SQM' => 'Square Meter',
+                                'FT' => 'Feet',
+                                'IN' => 'Inch',
+                                'YDS' => 'Yards',
+                                'PKT' => 'Packet',
+                                'DOZ' => 'Dozen',
+                                'BOX' => 'Box',
+                                'CTN' => 'Carton',
+                                'BAG' => 'Bag',
+                                'BTL' => 'Bottle',
+                                'TIN' => 'Tin',
+                                'CAN' => 'Can',
+                                'BUN' => 'Bundle',
+                                'ROL' => 'Roll',
+                                'SET' => 'Set',
+                            ];
+                        @endphp
+                        @foreach($uomList as $code => $label)
+                            <option value="{{ $code }}" {{ $currentUom == $code ? 'selected' : '' }}>{{ $code }} — {{ $label }}</option>
+                        @endforeach
                     </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Barcode <span class="text-gray-400 text-xs">(EAN/UPC, Optional)</span></label>
+                    <input type="text" name="barcode" value="{{ old('barcode', $product->barcode ?? '') }}"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono"
+                        placeholder="Scan or type barcode">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">SKU <span class="text-gray-400 text-xs">(Internal, Optional)</span></label>
+                    <input type="text" name="sku" value="{{ old('sku', $product->sku ?? '') }}"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono"
+                        placeholder="e.g., SKU-1001">
                 </div>
             </div>
         </div>

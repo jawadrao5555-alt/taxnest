@@ -254,6 +254,22 @@
                 </div>
             </template>
         </div>
+        <script>
+        // Smart prefetch of FBR POS sale screen — skip on slow/save-data connections
+        (function(){
+            try {
+                var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                if (c && (c.saveData || /2g/.test(c.effectiveType || ''))) return;
+                if (location.pathname.indexOf('/fbr-pos/create') === 0) return;
+                var run = function(){
+                    var l = document.createElement('link');
+                    l.rel = 'prefetch'; l.href = '/fbr-pos/create'; l.as = 'document';
+                    document.head.appendChild(l);
+                };
+                ('requestIdleCallback' in window) ? requestIdleCallback(run, {timeout: 4000}) : setTimeout(run, 2500);
+            } catch(_){}
+        })();
+        </script>
         <x-pwa-update color="blue" />
     </body>
 </html>

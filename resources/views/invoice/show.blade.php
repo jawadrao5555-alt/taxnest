@@ -1323,10 +1323,13 @@ async function resubmitToFbr(el) {
 function handleFbrResponse(data) {
     if (data.status === 'success') {
         openFbrSuccessModal(data);
+        if (window.tnNotify) window.tnNotify('FBR Submission Successful', 'Invoice ' + (data.fbr_invoice_number || '') + ' submitted to FBR.', { tag: 'fbr-success', icon: '/icons/tax-di/icon-192.png' });
     } else if (data.status === 'pending_verification') {
         showFbrPending(data.message);
+        if (window.tnNotify) window.tnNotify('FBR Pending Verification', data.message || 'Awaiting FBR confirmation.', { tag: 'fbr-pending', icon: '/icons/tax-di/icon-192.png' });
     } else {
         showFbrError(data.error_details || data.message || 'Unknown error');
+        if (window.tnNotify) window.tnNotify('FBR Submission Failed', (data.error_details || data.message || 'Submission failed').toString().slice(0, 140), { tag: 'fbr-failed', icon: '/icons/tax-di/icon-192.png' });
     }
 }
 

@@ -753,6 +753,12 @@ Route::prefix('api/agent')->middleware(['agent.auth'])->group(function () {
     Route::post('/submit-result', [\App\Http\Controllers\AgentController::class, 'submitResult']);
 });
 
+// === PWA Diagnostics page (public — no sensitive data, only client-side checks) ===
+Route::get('/pwa-status', function () {
+    return response()->view('pwa-status')
+        ->header('Cache-Control', 'no-store');
+})->name('pwa.status');
+
 // === PWA Push Notification subscription endpoints (works for any auth guard) ===
 Route::post('/api/push/subscribe', [\App\Http\Controllers\PushSubscriptionController::class, 'store'])
     ->middleware('throttle:30,1')

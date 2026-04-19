@@ -7,7 +7,7 @@ Usage on dashboards: <x-pwa-push scope="di" />  scope: di | pos | fbrpos
 --}}
 @props(['scope' => 'di'])
 @php
-    $vapidPublic = config('services.vapid.public_key', env('VAPID_PUBLIC_KEY', ''));
+    $vapidPublic = config('services.vapid.public', env('VAPID_PUBLIC_KEY', ''));
 @endphp
 <script>
 (function(){

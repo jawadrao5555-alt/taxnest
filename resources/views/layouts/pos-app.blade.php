@@ -562,6 +562,22 @@
             });
         </script>
         @stack('scripts')
+        <script>
+        // Smart prefetch of POS sale screen (offline-ready) — skip on slow/save-data connections
+        (function(){
+            try {
+                var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                if (c && (c.saveData || /2g/.test(c.effectiveType || ''))) return;
+                if (location.pathname.indexOf('/pos/create-invoice') === 0) return;
+                var run = function(){
+                    var l = document.createElement('link');
+                    l.rel = 'prefetch'; l.href = '/pos/create-invoice'; l.as = 'document';
+                    document.head.appendChild(l);
+                };
+                ('requestIdleCallback' in window) ? requestIdleCallback(run, {timeout: 4000}) : setTimeout(run, 2500);
+            } catch(_){}
+        })();
+        </script>
         <x-pwa-update color="purple" />
     </body>
 </html>

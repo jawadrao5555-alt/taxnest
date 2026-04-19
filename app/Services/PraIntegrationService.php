@@ -209,18 +209,28 @@ class PraIntegrationService
                     CURLOPT_POST => true,
                     CURLOPT_POSTFIELDS => $jsonPayload,
                     CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 45,
-                    CURLOPT_CONNECTTIMEOUT => 10,
+                    CURLOPT_TIMEOUT => 25,           // was 45 — PRA usually responds in 2-5s
+                    CURLOPT_CONNECTTIMEOUT => 6,     // was 10 — fail fast on dead connection
                     CURLOPT_HTTPHEADER => [
                         'Content-Type: application/json',
                         'Accept: application/json',
+                        'Accept-Encoding: gzip, deflate',
                         'X-Relay-Token: taxnest-pra-relay-2026',
                         'ngrok-skip-browser-warning: true',
+                        'Connection: keep-alive',
                     ],
                     CURLOPT_SSL_VERIFYPEER => false,
                     CURLOPT_SSL_VERIFYHOST => 0,
                     CURLOPT_FOLLOWLOCATION => true,
                     CURLOPT_MAXREDIRS => 3,
+                    CURLOPT_ENCODING => 'gzip',          // auto-decompress
+                    CURLOPT_TCP_NODELAY => 1,            // no Nagle delay
+                    CURLOPT_TCP_KEEPALIVE => 1,
+                    CURLOPT_TCP_KEEPIDLE => 60,
+                    CURLOPT_TCP_KEEPINTVL => 15,
+                    CURLOPT_DNS_CACHE_TIMEOUT => 600,    // 10min DNS cache
+                    CURLOPT_FORBID_REUSE => false,
+                    CURLOPT_FRESH_CONNECT => false,
                 ]);
             } else {
                 $jsonPayload = json_encode($payload);
@@ -230,17 +240,27 @@ class PraIntegrationService
                     CURLOPT_POST => true,
                     CURLOPT_POSTFIELDS => $jsonPayload,
                     CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 30,
-                    CURLOPT_CONNECTTIMEOUT => 15,
+                    CURLOPT_TIMEOUT => 20,           // was 30 — production tuned
+                    CURLOPT_CONNECTTIMEOUT => 6,     // was 15 — fail fast
                     CURLOPT_HTTPHEADER => [
                         'Content-Type: application/json',
                         'Accept: application/json',
+                        'Accept-Encoding: gzip, deflate',
                         'Authorization: Bearer ' . $token,
+                        'Connection: keep-alive',
                     ],
                     CURLOPT_SSL_VERIFYPEER => false,
                     CURLOPT_SSL_VERIFYHOST => 0,
                     CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
                     CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                    CURLOPT_ENCODING => 'gzip',
+                    CURLOPT_TCP_NODELAY => 1,
+                    CURLOPT_TCP_KEEPALIVE => 1,
+                    CURLOPT_TCP_KEEPIDLE => 60,
+                    CURLOPT_TCP_KEEPINTVL => 15,
+                    CURLOPT_DNS_CACHE_TIMEOUT => 600,
+                    CURLOPT_FORBID_REUSE => false,
+                    CURLOPT_FRESH_CONNECT => false,
                 ]);
             }
 

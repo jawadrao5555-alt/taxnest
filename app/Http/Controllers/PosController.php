@@ -168,6 +168,7 @@ class PosController extends Controller
             'payment_method' => 'required|in:cash,debit_card,credit_card,qr_payment',
             'discount_type' => 'required|in:percentage,amount',
             'discount_value' => 'nullable|numeric|min:0',
+            'cash_received' => 'nullable|numeric|min:0',
         ]);
 
         $companyItems = $this->resolveItemExemptions($request->items, $companyId);
@@ -262,6 +263,8 @@ class PosController extends Controller
                     'exempt_amount' => $exemptAfterDiscount,
                     'total_amount' => $totalAmount,
                     'payment_method' => $request->payment_method,
+                    'cash_received' => $request->payment_method === 'cash' ? ($request->cash_received ?: $totalAmount) : null,
+                    'change_due' => $request->payment_method === 'cash' && $request->cash_received ? max(0, round($request->cash_received - $totalAmount, 2)) : null,
                     'status' => 'completed',
                     'pra_status' => $initialPraStatus,
                     'submission_hash' => $submissionHash,
@@ -391,6 +394,7 @@ class PosController extends Controller
             'payment_method' => 'required|in:cash,debit_card,credit_card,qr_payment',
             'discount_type' => 'required|in:percentage,amount',
             'discount_value' => 'nullable|numeric|min:0',
+            'cash_received' => 'nullable|numeric|min:0',
         ]);
 
         $companyItems = $this->resolveItemExemptions($request->items, $companyId);

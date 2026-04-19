@@ -495,6 +495,39 @@
                                 </button>
                             </template>
                         </div>
+
+                        {{-- ⚡ Fast Cash Tender (only for cash payment) --}}
+                        <div x-show="paymentMethod === 'cash'" x-transition class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                            <label class="flex items-center justify-between text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                <span>💵 Cash Received</span>
+                                <button type="button" @click="cashReceived = total; $nextTick(() => $refs.posCashInput && $refs.posCashInput.focus())" class="text-emerald-600 hover:text-emerald-800 text-xs font-bold underline">EXACT</button>
+                            </label>
+                            <input type="number" x-ref="posCashInput" name="cash_received" x-model.number="cashReceived"
+                                @keydown.enter.prevent="$el.closest('form').requestSubmit()"
+                                step="0.01" min="0" placeholder="Tendered (Enter = pay)"
+                                class="w-full rounded-xl border-2 border-emerald-400 dark:border-emerald-600 dark:bg-gray-800 dark:text-white text-xl font-bold py-3 px-3 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                            <div class="grid grid-cols-4 gap-1 mt-2">
+                                <button type="button" @click="cashReceived = (parseFloat(cashReceived||0) + 100)" class="py-2 bg-gray-200 hover:bg-emerald-200 dark:bg-gray-700 dark:hover:bg-emerald-800 dark:text-white rounded font-bold text-xs">+100</button>
+                                <button type="button" @click="cashReceived = (parseFloat(cashReceived||0) + 500)" class="py-2 bg-gray-200 hover:bg-emerald-200 dark:bg-gray-700 dark:hover:bg-emerald-800 dark:text-white rounded font-bold text-xs">+500</button>
+                                <button type="button" @click="cashReceived = (parseFloat(cashReceived||0) + 1000)" class="py-2 bg-gray-200 hover:bg-emerald-200 dark:bg-gray-700 dark:hover:bg-emerald-800 dark:text-white rounded font-bold text-xs">+1K</button>
+                                <button type="button" @click="cashReceived = (parseFloat(cashReceived||0) + 5000)" class="py-2 bg-gray-200 hover:bg-emerald-200 dark:bg-gray-700 dark:hover:bg-emerald-800 dark:text-white rounded font-bold text-xs">+5K</button>
+                            </div>
+                            <div class="grid grid-cols-3 gap-1 mt-1">
+                                <button type="button" @click="cashReceived = Math.ceil(total/500)*500" class="py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded font-bold text-xs">500 note</button>
+                                <button type="button" @click="cashReceived = Math.ceil(total/1000)*1000" class="py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded font-bold text-xs">1000 note</button>
+                                <button type="button" @click="cashReceived = Math.ceil(total/5000)*5000" class="py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded font-bold text-xs">5000 note</button>
+                            </div>
+                            {{-- HUGE Change Due Display --}}
+                            <div class="mt-3 p-3 rounded-xl text-center transition"
+                                :class="(parseFloat(cashReceived||0) <= 0) ? 'bg-gray-100 dark:bg-gray-800' : ((parseFloat(cashReceived||0) - total) >= 0 ? 'bg-emerald-100 dark:bg-emerald-900/40 ring-2 ring-emerald-400' : 'bg-red-100 dark:bg-red-900/40 ring-2 ring-red-400')">
+                                <div class="text-[10px] font-bold uppercase tracking-wider"
+                                    :class="(parseFloat(cashReceived||0) <= 0) ? 'text-gray-500' : ((parseFloat(cashReceived||0) - total) >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300')"
+                                    x-text="(parseFloat(cashReceived||0) <= 0) ? 'CHANGE DUE' : ((parseFloat(cashReceived||0) - total) >= 0 ? 'CHANGE TO RETURN' : 'STILL OWED')"></div>
+                                <div class="text-3xl font-black tabular-nums tracking-tight"
+                                    :class="(parseFloat(cashReceived||0) <= 0) ? 'text-gray-400' : ((parseFloat(cashReceived||0) - total) >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300')"
+                                    x-text="'Rs ' + Math.abs(parseFloat(cashReceived||0) - total).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -686,6 +719,7 @@
                 discountType: 'percentage',
                 discountValue: 0,
                 paymentMethod: 'cash',
+                cashReceived: 0,
 
                 subtotal: 0,
                 discountAmount: 0,

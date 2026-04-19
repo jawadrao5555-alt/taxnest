@@ -29,8 +29,8 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         <script>
             setTimeout(function(){
-                if(!window.__alpineStarted){
-                    window.__alpineStarted=true;
+                if(!window.Alpine && !window.__alpineStarted && !window.__alpineFallbackLoading){
+                    window.__alpineFallbackLoading=true;
                     var c=document.createElement('script');
                     c.src='https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.14.8/dist/cdn.min.js';
                     document.head.appendChild(c);
@@ -40,7 +40,7 @@
                         document.head.appendChild(s);
                     };
                 }
-            }, 2000);
+            }, 1500);
         </script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
         <script>if(document.documentElement.classList.contains('dark')){document.documentElement.style.colorScheme='dark';}</script>
@@ -97,6 +97,38 @@
             .theme-swatch:hover { transform: scale(1.15); }
             .theme-swatch.active-theme { border-color: white; box-shadow: 0 0 0 2px rgba(255,255,255,0.3); }
             [x-cloak] { display: none !important; }
+
+            /* Desktop-app polish */
+            html, body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+            .topnav-bar, .topnav-bar * , .nav-pill, .profile-dropdown, kbd { -webkit-user-select: none; user-select: none; }
+            input, textarea, [contenteditable], .allow-select, .allow-select * { -webkit-user-select: text; user-select: text; }
+            ::-webkit-scrollbar { width: 8px; height: 8px; }
+            ::-webkit-scrollbar-track { background: transparent; }
+            ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.4); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+            ::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.7); border: 2px solid transparent; background-clip: content-box; }
+            .dark ::-webkit-scrollbar-thumb { background: rgba(71,85,105,0.6); border: 2px solid transparent; background-clip: content-box; }
+            html { scrollbar-width: thin; scrollbar-color: rgba(148,163,184,0.5) transparent; }
+
+            /* Fullscreen mode polish */
+            body.is-fullscreen { background: #0a0a0a; }
+            body.is-fullscreen .topnav-bar { box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+
+            /* Network/PRA status pulse */
+            @keyframes statusPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(0.85); } }
+            .status-dot-live { animation: statusPulse 2s ease-in-out infinite; }
+
+            /* Command palette */
+            .cmd-palette-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,0.55); backdrop-filter: blur(8px); z-index: 9998; display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; }
+            .dark .cmd-palette-backdrop { background: rgba(0,0,0,0.7); }
+            .cmd-palette-card { width: min(640px, 92vw); background: white; border-radius: 16px; box-shadow: 0 25px 60px -10px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,0,0,0.05); overflow: hidden; animation: cmdPaletteIn 0.18s cubic-bezier(0.16, 1, 0.3, 1); }
+            .dark .cmd-palette-card { background: #0f172a; box-shadow: 0 25px 60px -10px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06); }
+            @keyframes cmdPaletteIn { from { opacity: 0; transform: translateY(-12px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+            .cmd-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; cursor: pointer; transition: background 0.1s ease; font-size: 13px; }
+            .cmd-item:hover, .cmd-item.cmd-active { background: hsla(var(--accent-h), var(--accent-s), 95%, 0.6); }
+            .dark .cmd-item:hover, .dark .cmd-item.cmd-active { background: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.18); }
+            .cmd-icon { width: 28px; height: 28px; border-radius: 8px; background: hsla(var(--accent-h), var(--accent-s), 92%, 1); color: hsla(var(--accent-h), var(--accent-s), 35%, 1); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+            .dark .cmd-icon { background: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.2); color: hsla(var(--accent-h), var(--accent-s), 75%, 1); }
+            .cmd-kbd { font-family: 'SF Mono', Menlo, monospace; font-size: 10px; background: rgba(148,163,184,0.18); padding: 2px 6px; border-radius: 4px; color: inherit; }
         </style>
     </head>
     <body class="h-screen overflow-hidden antialiased" data-theme="{{ $posTheme }}">
@@ -135,12 +167,39 @@
                         </nav>
                     </div>
 
-                    <div class="flex items-center gap-2">
-                        <div class="hidden lg:flex items-center gap-2 mr-2">
-                            <span class="w-1.5 h-1.5 rounded-full {{ $praEnabledLayout ? 'bg-green-400' : 'bg-amber-400' }}" style="box-shadow: 0 0 6px {{ $praEnabledLayout ? 'rgba(16,185,129,0.5)' : 'rgba(245,158,11,0.5)' }}"></span>
-                            <span class="text-[9px] {{ $praEnabledLayout ? 'text-green-300' : 'text-amber-300' }} font-medium">PRA {{ $praEnabledLayout ? 'Online' : 'Offline' }}</span>
-                            <span class="text-[9px] font-mono ml-2" style="color: var(--meta-color)">{{ now()->format('H:i') }}</span>
+                    <div class="flex items-center gap-2" x-data="{ online: navigator.onLine, isFs: false, clock: '{{ now()->format('H:i') }}' }"
+                         x-init="
+                            window.addEventListener('online', () => online = true);
+                            window.addEventListener('offline', () => online = false);
+                            document.addEventListener('fullscreenchange', () => isFs = !!document.fullscreenElement);
+                            isFs = !!document.fullscreenElement;
+                            setInterval(() => { const d = new Date(); clock = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }, 30000);
+                         ">
+                        <div class="hidden lg:flex items-center gap-3 mr-2 px-2 py-1 rounded-lg" style="background: rgba(255,255,255,0.06)">
+                            <div class="flex items-center gap-1.5" :title="online ? 'Network Online' : 'Network Offline — working locally'">
+                                <span class="w-1.5 h-1.5 rounded-full status-dot-live" :class="online ? 'bg-emerald-400' : 'bg-red-400'" :style="online ? 'box-shadow:0 0 6px rgba(16,185,129,0.6)' : 'box-shadow:0 0 6px rgba(239,68,68,0.6)'"></span>
+                                <span class="text-[9px] font-bold uppercase tracking-wider" :class="online ? 'text-emerald-300' : 'text-red-300'" x-text="online ? 'Net' : 'Off'"></span>
+                            </div>
+                            <div class="w-px h-3 bg-white/15"></div>
+                            <div class="flex items-center gap-1.5" title="PRA reporting status">
+                                <span class="w-1.5 h-1.5 rounded-full {{ $praEnabledLayout ? 'bg-green-400 status-dot-live' : 'bg-amber-400' }}" style="box-shadow: 0 0 6px {{ $praEnabledLayout ? 'rgba(16,185,129,0.5)' : 'rgba(245,158,11,0.5)' }}"></span>
+                                <span class="text-[9px] {{ $praEnabledLayout ? 'text-green-300' : 'text-amber-300' }} font-bold uppercase tracking-wider">PRA</span>
+                            </div>
+                            <div class="w-px h-3 bg-white/15"></div>
+                            <span class="text-[10px] font-mono font-semibold" style="color: var(--meta-color)" x-text="clock"></span>
                         </div>
+
+                        <button @click="$dispatch('open-cmd-palette')" class="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-white hover:bg-white/15 transition group" title="Quick Command (Ctrl+K)">
+                            <svg class="w-3.5 h-3.5 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                            <span class="text-[10px] font-medium opacity-80">Search</span>
+                            <kbd class="text-[9px] font-mono bg-white/10 px-1.5 py-0.5 rounded opacity-90 group-hover:opacity-100">⌘K</kbd>
+                        </button>
+
+                        <button @click="if(!document.fullscreenElement){document.documentElement.requestFullscreen().catch(()=>{}); document.body.classList.add('is-fullscreen');} else {document.exitFullscreen(); document.body.classList.remove('is-fullscreen');}"
+                                class="p-2 rounded-lg text-white hover:bg-white/15 transition" :title="isFs ? 'Exit Fullscreen (F11)' : 'Fullscreen (F11)'">
+                            <svg x-show="!isFs" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+                            <svg x-show="isFs" x-cloak class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9V5m0 4H5m10 0V5m0 4h4M9 15v4m0-4H5m10 0v4m0-4h4"/></svg>
+                        </button>
 
                         <div class="relative">
                             <button @click="themeOpen = !themeOpen; profileOpen = false" class="p-2 rounded-lg text-white hover:bg-white/15 transition" title="Change Theme">
@@ -380,6 +439,87 @@
                 <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Loading...</span>
             </div>
         </div>
+
+        {{-- Command Palette (Ctrl+K / Cmd+K) --}}
+        <div x-data="{
+                open: false,
+                q: '',
+                idx: 0,
+                items: @js([
+                    ['label' => 'New Sale', 'url' => $isRestaurantLayout ? route('pos.restaurant.pos') : route('pos.invoice.create'), 'icon' => '+', 'kbd' => ''],
+                    ['label' => 'Dashboard', 'url' => $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard'), 'icon' => '◧', 'kbd' => ''],
+                    ['label' => 'Orders / Transactions', 'url' => route('pos.transactions'), 'icon' => '☰', 'kbd' => ''],
+                    ['label' => 'Products', 'url' => route('pos.products'), 'icon' => '◫', 'kbd' => ''],
+                    ['label' => 'Customers', 'url' => route('pos.customers'), 'icon' => '◉', 'kbd' => ''],
+                    ['label' => 'Reports', 'url' => route('pos.reports'), 'icon' => '▤', 'kbd' => ''],
+                    ['label' => 'Day Close', 'url' => route('pos.day-close'), 'icon' => '◆', 'kbd' => ''],
+                    ['label' => 'Billing & Plan', 'url' => route('pos.billing'), 'icon' => '$', 'kbd' => ''],
+                    ['label' => 'Business Profile', 'url' => route('pos.business-profile'), 'icon' => '◎', 'kbd' => ''],
+                    ['label' => 'Toggle Fullscreen', 'action' => 'fullscreen', 'icon' => '⛶', 'kbd' => 'F11'],
+                    ['label' => 'Toggle Dark Mode', 'action' => 'darkmode', 'icon' => '☾', 'kbd' => ''],
+                ]),
+                get filtered() { return this.q.trim() === '' ? this.items : this.items.filter(i => i.label.toLowerCase().includes(this.q.toLowerCase())); },
+                run(item) {
+                    this.open = false; this.q = ''; this.idx = 0;
+                    if (item.action === 'fullscreen') {
+                        if (!document.fullscreenElement) { document.documentElement.requestFullscreen().catch(()=>{}); document.body.classList.add('is-fullscreen'); }
+                        else { document.exitFullscreen(); document.body.classList.remove('is-fullscreen'); }
+                    } else if (item.action === 'darkmode') {
+                        document.documentElement.classList.toggle('dark');
+                    } else if (item.url) {
+                        window.location.href = item.url;
+                    }
+                }
+             }"
+             @open-cmd-palette.window="open = true; q = ''; idx = 0; $nextTick(() => $refs.cmdInput && $refs.cmdInput.focus())"
+             @keydown.window.prevent.ctrl.k="open = true; q = ''; idx = 0; $nextTick(() => $refs.cmdInput && $refs.cmdInput.focus())"
+             @keydown.window.prevent.meta.k="open = true; q = ''; idx = 0; $nextTick(() => $refs.cmdInput && $refs.cmdInput.focus())"
+             @keydown.window.prevent.f11="if(!document.fullscreenElement){document.documentElement.requestFullscreen().catch(()=>{}); document.body.classList.add('is-fullscreen');} else {document.exitFullscreen(); document.body.classList.remove('is-fullscreen');}">
+            <div x-show="open" x-cloak class="cmd-palette-backdrop" @click.self="open = false" @keydown.escape.window="open = false">
+                <div class="cmd-palette-card">
+                    <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+                        <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <input x-ref="cmdInput" x-model="q" @input="idx = 0"
+                               @keydown.arrow-down.prevent="idx = Math.min(idx + 1, filtered.length - 1)"
+                               @keydown.arrow-up.prevent="idx = Math.max(0, idx - 1)"
+                               @keydown.enter.prevent="if(filtered[idx]) run(filtered[idx])"
+                               type="text" placeholder="Search actions, screens, settings..."
+                               class="flex-1 bg-transparent border-0 outline-none focus:ring-0 text-sm text-gray-900 dark:text-white placeholder-gray-400">
+                        <kbd class="cmd-kbd">ESC</kbd>
+                    </div>
+                    <div class="max-h-80 overflow-y-auto py-2">
+                        <template x-for="(item, i) in filtered" :key="item.label">
+                            <div class="cmd-item" :class="i === idx && 'cmd-active'" @click="run(item)" @mouseenter="idx = i">
+                                <div class="cmd-icon" x-text="item.icon"></div>
+                                <span class="flex-1 text-gray-800 dark:text-gray-200" x-text="item.label"></span>
+                                <kbd x-show="item.kbd" class="cmd-kbd" x-text="item.kbd"></kbd>
+                            </div>
+                        </template>
+                        <div x-show="filtered.length === 0" class="px-4 py-8 text-center text-xs text-gray-400">No matches</div>
+                    </div>
+                    <div class="px-4 py-2 border-t border-gray-100 dark:border-gray-800 flex items-center gap-3 text-[10px] text-gray-400">
+                        <span class="flex items-center gap-1"><kbd class="cmd-kbd">↑↓</kbd> navigate</span>
+                        <span class="flex items-center gap-1"><kbd class="cmd-kbd">↵</kbd> open</span>
+                        <span class="flex items-center gap-1 ml-auto"><kbd class="cmd-kbd">⌘K</kbd> anywhere</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // Disable browser context menu on chrome (header/nav) to feel native; allow on inputs/textareas everywhere
+            document.addEventListener('contextmenu', function(e) {
+                const t = e.target;
+                if (t.matches('input, textarea, [contenteditable], [contenteditable] *')) return;
+                if (t.closest('.topnav-bar') || t.closest('.profile-dropdown') || t.closest('.cmd-palette-backdrop')) {
+                    e.preventDefault();
+                }
+            });
+            // Track fullscreen state on body for styling
+            document.addEventListener('fullscreenchange', function() {
+                document.body.classList.toggle('is-fullscreen', !!document.fullscreenElement);
+            });
+        </script>
         <script>
             document.addEventListener('DOMContentLoaded', function() {
                 document.querySelectorAll('form:not(.no-auto-loading)').forEach(function(form) {

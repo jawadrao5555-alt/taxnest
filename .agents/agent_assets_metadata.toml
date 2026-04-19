@@ -114,3 +114,21 @@ id = "zJABVnwHoK3rqxHifrqiK"
 uri = "file://public/annex-invoices/FULL-DEMO-INVOICE.pdf"
 type = "pdf"
 title = "Complete Closed Boxes - Left & Right Sides Fixed"
+
+[[outputs]]
+id = "QYZ0Pyt-XRk8kJA1aecvr"
+uri = "file://.local/preview/tax-di.png"
+type = "image"
+title = "Tax DI Icon (Emerald)"
+
+[[outputs]]
+id = "_3W6tgoG5pgXA_0Uq6gsr"
+uri = "file://.local/preview/nest-pra.png"
+type = "image"
+title = "Nest Pra Pos Icon (Royal Purple)"
+
+[[outputs]]
+id = "btZ0vncMuPtTVTGl-YrVS"
+uri = "file://.local/preview/nest-fbr.png"
+type = "image"
+title = "Nest FBR Pos Icon (Navy Blue)"

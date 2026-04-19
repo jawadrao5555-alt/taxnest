@@ -384,7 +384,7 @@ window.addEventListener('popstate', function() {
                                 <button @click.stop="updateQty(index, -1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M20 12H4"/></svg>
                                 </button>
-                                <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6" :value="item.quantity" @input="setQty(index, ($event.target.value === '' ? 1 : (parseInt($event.target.value.replace(/[^0-9]/g,'')) || 1)))" @focus="$nextTick(() => $event.target.select())" @mousedown.stop="if(document.activeElement !== $event.target){ $event.preventDefault(); $event.target.focus(); $event.target.select(); }" @click.stop class="w-14 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner" :class="activeCartIndex === index ? 'qty-pop' : ''">
+                                <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6" :value="item.quantity" @input.stop="setQty(index, ($event.target.value === '' ? 1 : (parseInt($event.target.value.replace(/[^0-9]/g,'')) || 1)))" @keydown.stop @focus="qtyInputBuffer=''; $nextTick(() => $event.target.select())" @mousedown.stop="if(document.activeElement !== $event.target){ $event.preventDefault(); $event.target.focus(); $event.target.select(); }" @click.stop class="w-14 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner" :class="activeCartIndex === index ? 'qty-pop' : ''">
                                 <button @click.stop="updateQty(index, 1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M12 4v16m8-8H4"/></svg>
                                 </button>
@@ -1161,7 +1161,7 @@ function restaurantPos() {
                     if (e.key === '-' && ci >= 0) { e.preventDefault(); this.updateQty(ci, -1); this.animateQty(ci); return; }
                     if (e.key === 'Delete' && ci >= 0) { e.preventDefault(); this.removeFromCart(ci); if (this.cart.length === 0) { this.cartMode = false; this.activeCartIndex = -1; } else { this.activeCartIndex = Math.min(ci, this.cart.length - 1); } return; }
                     if (e.key === 'Escape') { e.preventDefault(); this.cartMode = false; this.activeCartIndex = -1; return; }
-                    if (/^[0-9]$/.test(e.key) && ci >= 0 && !e.ctrlKey && !e.metaKey) { e.preventDefault(); this.handleQtyDigit(e.key, ci); return; }
+                    if (/^[0-9]$/.test(e.key) && ci >= 0 && !e.ctrlKey && !e.metaKey && !isInput) { e.preventDefault(); this.handleQtyDigit(e.key, ci); return; }
                     if (/^[a-zA-Z]$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
                         e.preventDefault(); this.cartMode = false; this.activeCartIndex = -1;
                         this.searchQuery += e.key; this.$refs.searchInput?.focus();

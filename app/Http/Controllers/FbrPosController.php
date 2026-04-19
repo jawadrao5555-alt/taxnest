@@ -86,7 +86,20 @@ class FbrPosController extends Controller
         $products = Product::where('company_id', $companyId)->where('is_active', true)->orderBy('name')->get();
         $fbrReportingEnabled = (bool) $company->fbr_reporting_enabled;
 
-        return view('fbr-pos.create', compact('company', 'products', 'fbrReportingEnabled'));
+        // Phase 2: terminals, shift, loyalty, promotions
+        $terminals = \App\Models\FbrPosTerminal::where('company_id', $companyId)->where('is_active', true)->orderBy('terminal_name')->get();
+        $currentShift = \App\Models\FbrPosShift::where('company_id', $companyId)
+            ->where('user_id', Auth::guard('fbrpos')->id())
+            ->where('status', 'open')->latest('id')->first();
+        $loyaltySettings = \App\Models\FbrPosLoyaltySetting::forCompany($companyId);
+        $heldCount = \App\Models\FbrPosHeldSale::where('company_id', $companyId)->count();
+        $activePromos = \App\Models\FbrPosPromotion::where('company_id', $companyId)
+            ->where('is_active', true)->orderByDesc('id')->limit(20)->get();
+
+        return view('fbr-pos.create', compact(
+            'company', 'products', 'fbrReportingEnabled',
+            'terminals', 'currentShift', 'loyaltySettings', 'heldCount', 'activePromos'
+        ));
     }
 
     public function store(Request $request)
@@ -110,6 +123,15 @@ class FbrPosController extends Controller
             'payment_method' => 'required|in:cash,card,bank_transfer,online',
             'discount_type' => 'nullable|in:percentage,fixed',
             'discount_value' => 'nullable|numeric|min:0',
+            'terminal_id' => 'nullable|integer',
+            'customer_id' => 'nullable|integer',
+            'promotion_id' => 'nullable|integer',
+            'promotion_code' => 'nullable|string|max:50',
+            'loyalty_points_redeemed' => 'nullable|integer|min:0',
+            'cash_received' => 'nullable|numeric|min:0',
+            'payment_breakdown' => 'nullable|array',
+            'payment_breakdown.*.method' => 'required_with:payment_breakdown|string',
+            'payment_breakdown.*.amount' => 'required_with:payment_breakdown|numeric|min:0',
         ]);
 
         $fbrEnabled = (bool) $company->fbr_reporting_enabled;
@@ -166,7 +188,63 @@ class FbrPosController extends Controller
                 }
 
                 $fbrServiceCharge = $invoiceMode === 'fbr' ? 1.00 : 0.00;
-                $totalAmount = round($subtotal - $discountAmount + $totalTax + $fbrServiceCharge, 2);
+
+                // Phase 2: Promotion discount (cart-level, separate from manual discount)
+                $promotionDiscount = 0;
+                $promo = null;
+                if ($request->promotion_id) {
+                    $promo = \App\Models\FbrPosPromotion::where('company_id', $companyId)
+                        ->where('id', $request->promotion_id)->where('is_active', true)->first();
+                    if ($promo) {
+                        $check = $promo->isUsable($subtotal);
+                        if ($check['ok']) {
+                            $promotionDiscount = $promo->calcDiscount($subtotal);
+                            $discountAmount += $promotionDiscount;
+                        }
+                    }
+                }
+
+                // Phase 2: Loyalty redemption
+                $loyaltyRedemptionAmount = 0;
+                $loyaltyPointsRedeemed = (int) ($request->loyalty_points_redeemed ?? 0);
+                $loyaltySettings = \App\Models\FbrPosLoyaltySetting::forCompany($companyId);
+                if ($loyaltyPointsRedeemed > 0 && $loyaltySettings->is_enabled && $request->customer_id) {
+                    $customer = \App\Models\PosCustomer::where('company_id', $companyId)
+                        ->where('id', $request->customer_id)->first();
+                    if ($customer && $customer->loyalty_points >= $loyaltyPointsRedeemed
+                        && $loyaltyPointsRedeemed >= $loyaltySettings->min_redeem_points) {
+                        $loyaltyRedemptionAmount = round($loyaltyPointsRedeemed * $loyaltySettings->point_value, 2);
+                        // cap to remaining total
+                        $maxRedeem = max(0, $subtotal - $discountAmount + $totalTax);
+                        $loyaltyRedemptionAmount = min($loyaltyRedemptionAmount, $maxRedeem);
+                    } else {
+                        $loyaltyPointsRedeemed = 0;
+                    }
+                }
+
+                $totalAmount = round($subtotal - $discountAmount + $totalTax + $fbrServiceCharge - $loyaltyRedemptionAmount, 2);
+                if ($totalAmount < 0) $totalAmount = 0;
+
+                // Loyalty earn (1 point per rs_per_point on net total)
+                $loyaltyPointsEarned = 0;
+                if ($loyaltySettings->is_enabled && $request->customer_id && $loyaltySettings->rs_per_point > 0) {
+                    $loyaltyPointsEarned = (int) floor($totalAmount / (float) $loyaltySettings->rs_per_point);
+                }
+
+                // Cash received & change
+                $cashReceived = (float) ($request->cash_received ?? 0);
+                $changeDue = max(0, $cashReceived - $totalAmount);
+
+                // Payment breakdown
+                $paymentBreakdown = $request->payment_breakdown;
+                if (!$paymentBreakdown) {
+                    $paymentBreakdown = [['method' => $request->payment_method, 'amount' => $totalAmount]];
+                }
+
+                // Active shift
+                $shift = \App\Models\FbrPosShift::where('company_id', $companyId)
+                    ->where('user_id', Auth::guard('fbrpos')->id())
+                    ->where('status', 'open')->latest('id')->first();
 
                 $invoiceNumber = $invoiceMode === 'local'
                     ? $this->generateLocalInvoiceNumber($companyId)
@@ -174,24 +252,90 @@ class FbrPosController extends Controller
 
                 $transaction = FbrPosTransaction::create([
                     'company_id' => $companyId,
+                    'terminal_id' => $request->terminal_id,
+                    'shift_id' => $shift?->id,
                     'invoice_number' => $invoiceNumber,
                     'invoice_mode' => $invoiceMode,
+                    'transaction_type' => 'sale',
                     'customer_name' => $request->customer_name,
                     'customer_phone' => $request->customer_phone,
                     'customer_ntn' => $request->customer_ntn,
+                    'customer_id' => $request->customer_id,
                     'subtotal' => $subtotal,
                     'discount_type' => $discountType,
                     'discount_value' => $discountValue,
                     'discount_amount' => $discountAmount,
+                    'promotion_id' => $promo?->id,
+                    'promotion_code' => $promo?->code,
                     'tax_rate' => $defaultTaxRate,
                     'tax_amount' => $totalTax,
                     'fbr_service_charge' => $fbrServiceCharge,
+                    'loyalty_points_earned' => $loyaltyPointsEarned,
+                    'loyalty_points_redeemed' => $loyaltyPointsRedeemed,
+                    'loyalty_redemption_amount' => $loyaltyRedemptionAmount,
                     'total_amount' => $totalAmount,
                     'payment_method' => $request->payment_method,
+                    'payment_breakdown' => $paymentBreakdown,
+                    'cash_received' => $cashReceived,
+                    'change_due' => $changeDue,
                     'status' => 'completed',
                     'fbr_status' => $invoiceMode === 'local' ? 'local' : 'pending',
                     'created_by' => Auth::guard('fbrpos')->id(),
                 ]);
+
+                // Update promotion usage
+                if ($promo && $promotionDiscount > 0) {
+                    $promo->increment('usage_count');
+                }
+
+                // Update shift totals
+                if ($shift) {
+                    $cashTotal = 0; $cardTotal = 0; $otherTotal = 0;
+                    foreach ($paymentBreakdown as $pb) {
+                        $m = strtolower($pb['method'] ?? '');
+                        $a = (float) ($pb['amount'] ?? 0);
+                        if ($m === 'cash') $cashTotal += $a;
+                        elseif (in_array($m, ['card','credit_card','debit_card'])) $cardTotal += $a;
+                        else $otherTotal += $a;
+                    }
+                    $shift->sales_count = (int) $shift->sales_count + 1;
+                    $shift->total_sales = (float) $shift->total_sales + $totalAmount;
+                    $shift->total_cash = (float) $shift->total_cash + $cashTotal;
+                    $shift->total_card = (float) $shift->total_card + $cardTotal;
+                    $shift->total_other = (float) $shift->total_other + $otherTotal;
+                    $shift->save();
+                }
+
+                // Update customer loyalty + stats
+                if ($request->customer_id) {
+                    $customer = \App\Models\PosCustomer::find($request->customer_id);
+                    if ($customer) {
+                        $netPoints = $loyaltyPointsEarned - $loyaltyPointsRedeemed;
+                        $customer->loyalty_points = max(0, (int) $customer->loyalty_points + $netPoints);
+                        $customer->total_spent = (float) $customer->total_spent + $totalAmount;
+                        $customer->total_orders = (int) $customer->total_orders + 1;
+                        $customer->save();
+
+                        if ($loyaltyPointsRedeemed > 0) {
+                            \App\Models\FbrPosLoyaltyLedger::create([
+                                'company_id' => $companyId, 'customer_id' => $customer->id,
+                                'transaction_id' => $transaction->id, 'type' => 'redeem',
+                                'points' => -$loyaltyPointsRedeemed,
+                                'balance_after' => $customer->loyalty_points,
+                                'note' => "Redeemed on invoice {$invoiceNumber}",
+                            ]);
+                        }
+                        if ($loyaltyPointsEarned > 0) {
+                            \App\Models\FbrPosLoyaltyLedger::create([
+                                'company_id' => $companyId, 'customer_id' => $customer->id,
+                                'transaction_id' => $transaction->id, 'type' => 'earn',
+                                'points' => $loyaltyPointsEarned,
+                                'balance_after' => $customer->loyalty_points,
+                                'note' => "Earned on invoice {$invoiceNumber}",
+                            ]);
+                        }
+                    }
+                }
 
                 foreach ($itemsData as $itemData) {
                     $transaction->items()->create($itemData);

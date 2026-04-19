@@ -13,6 +13,11 @@ class FbrPosTransaction extends Model
         'status', 'fbr_invoice_number', 'fbr_status', 'fbr_response_code',
         'fbr_response', 'fbr_submission_hash', 'created_by',
         'share_token', 'share_token_created_at',
+        // Phase 2 fields
+        'terminal_id', 'shift_id', 'transaction_type', 'parent_transaction_id',
+        'customer_id', 'promotion_id', 'promotion_code',
+        'loyalty_points_earned', 'loyalty_points_redeemed', 'loyalty_redemption_amount',
+        'cash_received', 'change_due', 'payment_breakdown',
     ];
 
     protected $casts = [
@@ -25,6 +30,10 @@ class FbrPosTransaction extends Model
         'total_amount' => 'decimal:2',
         'fbr_response' => 'array',
         'share_token_created_at' => 'datetime',
+        'cash_received' => 'decimal:2',
+        'change_due' => 'decimal:2',
+        'loyalty_redemption_amount' => 'decimal:2',
+        'payment_breakdown' => 'array',
     ];
 
     public function company()

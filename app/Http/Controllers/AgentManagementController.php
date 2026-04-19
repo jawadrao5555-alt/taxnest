@@ -40,7 +40,9 @@ class AgentManagementController extends Controller
         $isOnline = $company->agent_last_seen
             && \Carbon\Carbon::parse($company->agent_last_seen)->gt(now()->subMinutes(2));
 
-        return view('company.agent', compact('company', 'stats', 'isOnline'));
+        $release = $this->latestVersionInfo();
+
+        return view('company.agent', compact('company', 'stats', 'isOnline', 'release'));
     }
 
     public function generateKey(Request $request)
@@ -85,16 +87,74 @@ class AgentManagementController extends Controller
             : 'Agent disabled.');
     }
 
-    public function downloadAgent()
+    public function downloadAgent(\Illuminate\Http\Request $request)
     {
-        $localPath = public_path('downloads/TaxNest-PRA-Agent-Windows.zip');
+        $type = $request->query('type', 'exe');
 
+        $assets = \Illuminate\Support\Facades\Cache::remember('taxnest_agent_latest_release', 600, function () {
+            try {
+                $resp = \Illuminate\Support\Facades\Http::timeout(6)
+                    ->withHeaders(['Accept' => 'application/vnd.github+json', 'User-Agent' => 'TaxNest'])
+                    ->get('https://api.github.com/repos/jawadrao5555-alt/taxnest/releases/latest');
+                if ($resp->successful()) {
+                    return [
+                        'tag' => $resp->json('tag_name'),
+                        'assets' => collect($resp->json('assets', []))->map(fn($a) => [
+                            'name' => $a['name'],
+                            'url' => $a['browser_download_url'],
+                            'size' => $a['size'] ?? 0,
+                        ])->values()->all(),
+                    ];
+                }
+            } catch (\Throwable $e) {}
+            return ['tag' => null, 'assets' => []];
+        });
+
+        $needle = $type === 'zip' ? '.zip' : '.exe';
+        $asset = collect($assets['assets'])->first(fn($a) => str_ends_with(strtolower($a['name']), $needle));
+
+        if ($asset) {
+            return redirect()->away($asset['url']);
+        }
+
+        $localPath = public_path('downloads/TaxNest-PRA-Agent-Windows.zip');
         if (file_exists($localPath)) {
             return response()->download($localPath, 'TaxNest-PRA-Agent-Windows.zip');
         }
 
-        return redirect()->away(
-            'https://github.com/jawadrao5555-alt/taxnest/releases/download/agent-v1.0.0/TaxNest-PRA-Agent-Windows.zip'
-        );
+        return redirect()->away('https://github.com/jawadrao5555-alt/taxnest/releases/latest');
+    }
+
+    public function latestVersionInfo()
+    {
+        $info = \Illuminate\Support\Facades\Cache::remember('taxnest_agent_latest_release', 600, function () {
+            try {
+                $resp = \Illuminate\Support\Facades\Http::timeout(6)
+                    ->withHeaders(['Accept' => 'application/vnd.github+json', 'User-Agent' => 'TaxNest'])
+                    ->get('https://api.github.com/repos/jawadrao5555-alt/taxnest/releases/latest');
+                if ($resp->successful()) {
+                    return [
+                        'tag' => $resp->json('tag_name'),
+                        'assets' => collect($resp->json('assets', []))->map(fn($a) => [
+                            'name' => $a['name'],
+                            'url' => $a['browser_download_url'],
+                            'size' => $a['size'] ?? 0,
+                        ])->values()->all(),
+                    ];
+                }
+            } catch (\Throwable $e) {}
+            return ['tag' => null, 'assets' => []];
+        });
+
+        $exe = collect($info['assets'])->first(fn($a) => str_ends_with(strtolower($a['name']), '.exe'));
+        $zip = collect($info['assets'])->first(fn($a) => str_ends_with(strtolower($a['name']), '.zip'));
+
+        return [
+            'tag' => $info['tag'],
+            'has_exe' => (bool) $exe,
+            'has_zip' => (bool) $zip,
+            'exe_size_mb' => $exe ? round($exe['size'] / 1024 / 1024, 1) : null,
+            'zip_size_mb' => $zip ? round($zip['size'] / 1024 / 1024, 1) : null,
+        ];
     }
 }

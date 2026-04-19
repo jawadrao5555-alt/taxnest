@@ -257,8 +257,8 @@ function startAgent(config, onStatusChange) {
   heartbeat();
   syncOnce();
 
-  heartbeatInterval = setInterval(heartbeat, 60000);
-  pollInterval = setInterval(syncOnce, 10000);
+  heartbeatInterval = setInterval(heartbeat, 30000);
+  pollInterval = setInterval(syncOnce, 5000);
 }
 
 function stopAgent() {

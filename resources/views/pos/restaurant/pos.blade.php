@@ -1223,11 +1223,19 @@ function restaurantPos() {
         },
 
         calcGridCols() {
-            const w = this.$refs.gridContainer?.offsetWidth || 800;
-            if (w >= 1200) this.gridCols = 5;
-            else if (w >= 900) this.gridCols = 4;
-            else if (w >= 640) this.gridCols = 3;
-            else this.gridCols = 2;
+            this.$nextTick(() => {
+                const grid = this.$refs.gridContainer?.querySelector('.grid');
+                if (grid) {
+                    const cs = window.getComputedStyle(grid);
+                    const cols = (cs.getPropertyValue('grid-template-columns') || '').split(' ').filter(Boolean).length;
+                    if (cols > 0) { this.gridCols = cols; return; }
+                }
+                const w = this.$refs.gridContainer?.offsetWidth || 800;
+                if (w >= 1280) this.gridCols = 5;
+                else if (w >= 1024) this.gridCols = 4;
+                else if (w >= 640) this.gridCols = 3;
+                else this.gridCols = 2;
+            });
         },
 
         enterSearchMode() { this.gridFocusMode = false; this.$refs.searchInput?.focus(); },

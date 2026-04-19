@@ -26,6 +26,54 @@
     </div>
     @endif
 
+    {{-- ============ Phase 2 Top Action Bar ============ --}}
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3">
+        <div class="flex items-center gap-3 flex-wrap">
+            <div class="flex items-center gap-2">
+                <label class="text-xs font-semibold text-gray-700 dark:text-gray-300">Counter:</label>
+                <select x-model="terminalId" name="terminal_id" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1 shadow-sm">
+                    <option value="">-- Select --</option>
+                    @foreach($terminals as $t)
+                        <option value="{{ $t->id }}">{{ $t->terminal_name }}</option>
+                    @endforeach
+                </select>
+                <a href="{{ route('fbrpos.phase2.terminals') }}" class="text-xs text-blue-600 hover:underline">+ Add</a>
+            </div>
+            @if($currentShift)
+                <span class="px-2 py-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 rounded text-xs font-bold">
+                    SHIFT #{{ $currentShift->id }} OPEN · Rs {{ number_format($currentShift->opening_cash, 0) }}
+                </span>
+            @else
+                <a href="{{ route('fbrpos.phase2.shifts') }}" class="px-2 py-1 bg-red-100 text-red-700 hover:bg-red-200 rounded text-xs font-bold">⚠ NO SHIFT — Open Now</a>
+            @endif
+        </div>
+        <div class="flex items-center gap-2">
+            <button type="button" @click="holdSale()" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold shadow">⏸ Hold</button>
+            <button type="button" @click="openRecall()" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold shadow">⏵ Recall <span x-show="heldList.length > 0" class="ml-1 bg-white text-purple-700 rounded-full px-1.5 text-[10px]" x-text="heldList.length"></span></button>
+            <a href="{{ route('fbrpos.phase2.shifts') }}" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-800 text-white rounded-lg text-xs font-bold shadow">$ Drawer</a>
+        </div>
+    </div>
+
+    {{-- Recall Modal --}}
+    <div x-show="recallOpen" x-cloak @click.self="recallOpen = false" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full p-5 max-h-[80vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-3"><h3 class="font-bold dark:text-white">Held Sales</h3><button type="button" @click="recallOpen = false" class="text-gray-500 hover:text-gray-800">✕</button></div>
+            <template x-if="heldList.length === 0"><p class="text-sm text-gray-500 py-6 text-center">No held sales</p></template>
+            <template x-for="h in heldList" :key="h.id">
+                <div class="border dark:border-gray-700 rounded-lg p-3 mb-2 flex items-center justify-between">
+                    <div>
+                        <div class="font-semibold dark:text-white" x-text="h.hold_name"></div>
+                        <div class="text-xs text-gray-500" x-text="(h.customer_name || 'Walk-in') + ' · ' + new Date(h.created_at).toLocaleString()"></div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="button" @click="recallSale(h.id)" class="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-bold">Recall</button>
+                        <button type="button" @click="deleteHeld(h.id)" class="px-3 py-1 bg-red-600 text-white rounded text-xs">Delete</button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
     @if($errors->any())
     <div class="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
         <ul class="list-disc list-inside text-sm">
@@ -197,17 +245,42 @@
                     <div class="space-y-3">
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Name</label>
-                            <input type="text" name="customer_name" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Walk-in Customer">
+                            <input type="text" name="customer_name" x-model="customerName" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Walk-in Customer">
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Phone</label>
-                            <input type="text" name="customer_phone" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="0300-1234567">
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Phone <span class="text-emerald-600 text-[10px]" x-show="loyaltyEnabled">(loyalty lookup)</span></label>
+                            <div class="flex gap-1">
+                                <input type="text" name="customer_phone" x-model="customerPhone" @blur="lookupCustomer()" class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="0300-1234567">
+                                <button type="button" @click="lookupCustomer()" class="px-3 bg-blue-600 text-white rounded-lg text-sm">Find</button>
+                            </div>
+                            <input type="hidden" name="customer_id" x-model="customerId">
+                            <div x-show="customerPoints !== null" class="mt-2 bg-emerald-50 dark:bg-emerald-900/30 p-2 rounded text-xs">
+                                <strong x-text="customerName + ': ' + customerPoints + ' pts'"></strong>
+                                <template x-if="customerPoints >= loyaltyMinRedeem">
+                                    <div class="mt-1 flex items-center gap-1">
+                                        <input type="number" name="loyalty_points_redeemed" x-model.number="loyaltyRedeem" :max="customerPoints" min="0" class="w-20 border rounded px-1 py-0.5 text-xs" placeholder="Pts">
+                                        <span x-text="'= Rs ' + (loyaltyRedeem * loyaltyPointValue).toFixed(0)"></span>
+                                    </div>
+                                </template>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">NTN</label>
                             <input type="text" name="customer_ntn" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Optional">
                         </div>
                     </div>
+                </div>
+
+                {{-- Promo Code --}}
+                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
+                    <h3 class="font-semibold text-gray-900 dark:text-white mb-3">Promo Code</h3>
+                    <div class="flex gap-2">
+                        <input type="text" x-model="promoCode" placeholder="Enter code" class="flex-1 uppercase rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm">
+                        <button type="button" @click="applyPromo()" class="px-3 bg-emerald-600 text-white rounded-lg text-sm font-bold">Apply</button>
+                    </div>
+                    <input type="hidden" name="promotion_id" x-model="promotionId">
+                    <input type="hidden" name="promotion_code" x-model="promoCode">
+                    <div x-show="promoMessage" :class="promoOk ? 'text-emerald-700' : 'text-red-700'" class="text-xs mt-2 font-semibold" x-text="promoMessage"></div>
                 </div>
 
                 <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
@@ -248,6 +321,10 @@
                             <span>Discount</span>
                             <span class="text-red-600" x-text="'-PKR ' + formatNum(calcDiscount())"></span>
                         </div>
+                        <div class="flex justify-between text-gray-600 dark:text-gray-400" x-show="promoDiscount > 0">
+                            <span>Promo <span class="text-xs" x-text="'(' + promoCode + ')'"></span></span>
+                            <span class="text-emerald-600" x-text="'-PKR ' + formatNum(promoDiscount)"></span>
+                        </div>
                         <div class="flex justify-between text-gray-600 dark:text-gray-400">
                             <span>Tax</span>
                             <span x-text="'PKR ' + formatNum(calcTax())"></span>
@@ -258,15 +335,31 @@
                             <span>PKR 1.00</span>
                         </div>
                         @endif
+                        <div class="flex justify-between text-gray-600 dark:text-gray-400" x-show="loyaltyRedeem > 0">
+                            <span>Loyalty Redeemed <span class="text-xs" x-text="'(' + loyaltyRedeem + ' pts)'"></span></span>
+                            <span class="text-emerald-600" x-text="'-PKR ' + formatNum(loyaltyRedeem * loyaltyPointValue)"></span>
+                        </div>
                         <div class="flex justify-between font-bold text-lg text-blue-800 dark:text-blue-300 pt-2 border-t border-blue-200 dark:border-blue-700">
                             <span>Total</span>
                             <span x-text="'PKR ' + formatNum(calcTotal())"></span>
                         </div>
                     </div>
+
+                    {{-- Cash received & Change due --}}
+                    <div class="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700 space-y-2">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Cash Received</label>
+                            <input type="number" name="cash_received" x-model.number="cashReceived" step="0.01" min="0" placeholder="Tendered" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-base font-bold py-2 px-3 shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div class="flex justify-between font-bold text-base" :class="changeDue() >= 0 ? 'text-emerald-700' : 'text-red-700'">
+                            <span>Change Due</span>
+                            <span x-text="'PKR ' + formatNum(Math.abs(changeDue()))"></span>
+                        </div>
+                    </div>
                 </div>
 
-                <button type="submit" class="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition text-sm">
-                    Complete Sale
+                <button type="submit" class="w-full py-4 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition text-base shadow-lg">
+                    💳 COMPLETE SALE
                 </button>
             </div>
         </div>
@@ -282,8 +375,117 @@ function fbrPosInvoice() {
         discountValue: 0,
         barcodeBuffer: '',
         scanStatus: null,
+        // Phase 2 state
+        terminalId: @json($terminals->first()?->id ?? ''),
+        customerId: '',
+        customerName: '',
+        customerPhone: '',
+        customerPoints: null,
+        loyaltyEnabled: @json((bool) $loyaltySettings->is_enabled),
+        loyaltyPointValue: @json((float) $loyaltySettings->point_value),
+        loyaltyMinRedeem: @json((int) $loyaltySettings->min_redeem_points),
+        loyaltyRedeem: 0,
+        promoCode: '',
+        promotionId: '',
+        promoDiscount: 0,
+        promoMessage: '',
+        promoOk: false,
+        cashReceived: 0,
+        recallOpen: false,
+        heldList: [],
         init() {
             this.$nextTick(() => { this.$refs.barcodeInput && this.$refs.barcodeInput.focus(); });
+            this.loadHeld();
+        },
+        async loadHeld() {
+            try { const r = await fetch("{{ route('fbrpos.phase2.held.list') }}"); this.heldList = await r.json(); } catch(e) {}
+        },
+        openRecall() { this.loadHeld(); this.recallOpen = true; },
+        async holdSale() {
+            const name = prompt('Hold name (e.g. "Customer at Counter")', this.customerName || ('Hold ' + new Date().toLocaleTimeString()));
+            if (!name) return;
+            const cart = { items: this.items, discountType: this.discountType, discountValue: this.discountValue,
+                customer_name: this.customerName, customer_phone: this.customerPhone };
+            const fd = new FormData();
+            fd.append('hold_name', name);
+            fd.append('customer_name', this.customerName || '');
+            fd.append('customer_phone', this.customerPhone || '');
+            fd.append('terminal_id', this.terminalId || '');
+            fd.append('cart_data', JSON.stringify(cart));
+            // also send as nested keys
+            Object.keys(cart).forEach(k => { if (k !== 'items') fd.append('cart_data[' + k + ']', cart[k] || ''); });
+            cart.items.forEach((it, i) => {
+                Object.keys(it).forEach(k => fd.append('cart_data[items][' + i + '][' + k + ']', it[k] ?? ''));
+            });
+            try {
+                const r = await fetch("{{ route('fbrpos.phase2.hold') }}", { method: 'POST', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' }, body: fd });
+                if (r.ok) { alert('Sale held: ' + name); this.resetCart(); this.loadHeld(); }
+            } catch(e) { alert('Failed to hold: ' + e.message); }
+        },
+        async recallSale(id) {
+            try {
+                const r = await fetch("/fbr-pos/api/held/" + id + "/recall");
+                const data = await r.json();
+                if (data.success && data.cart) {
+                    this.items = data.cart.items || this.items;
+                    this.discountType = data.cart.discountType || '';
+                    this.discountValue = data.cart.discountValue || 0;
+                    this.customerName = data.cart.customer_name || '';
+                    this.customerPhone = data.cart.customer_phone || '';
+                    this.recallOpen = false;
+                    this.loadHeld();
+                    if (this.customerPhone) this.lookupCustomer();
+                }
+            } catch(e) {}
+        },
+        async deleteHeld(id) {
+            if (!confirm('Delete held sale?')) return;
+            await fetch("/fbr-pos/api/held/" + id, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' } });
+            this.loadHeld();
+        },
+        resetCart() {
+            this.items = [{ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0 }];
+            this.discountType = ''; this.discountValue = 0;
+            this.customerName = ''; this.customerPhone = ''; this.customerId = ''; this.customerPoints = null;
+            this.promoCode = ''; this.promotionId = ''; this.promoDiscount = 0; this.promoMessage = '';
+            this.loyaltyRedeem = 0; this.cashReceived = 0;
+        },
+        async lookupCustomer() {
+            if (!this.customerPhone || this.customerPhone.length < 4) { this.customerPoints = null; this.customerId = ''; return; }
+            try {
+                const r = await fetch("/fbr-pos/api/customer/" + encodeURIComponent(this.customerPhone) + "/points");
+                const d = await r.json();
+                if (d.ok) {
+                    this.customerId = d.id;
+                    this.customerName = this.customerName || d.name;
+                    this.customerPoints = d.points;
+                    this.loyaltyEnabled = d.enabled;
+                    this.loyaltyPointValue = d.point_value;
+                    this.loyaltyMinRedeem = d.min_redeem;
+                } else { this.customerPoints = null; this.customerId = ''; }
+            } catch(e) {}
+        },
+        async applyPromo() {
+            if (!this.promoCode) { this.promoMessage = 'Enter promo code'; this.promoOk = false; return; }
+            const fd = new FormData();
+            fd.append('code', this.promoCode);
+            fd.append('subtotal', this.calcSubtotal());
+            try {
+                const r = await fetch("{{ route('fbrpos.phase2.promo.validate') }}", { method: 'POST', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' }, body: fd });
+                const d = await r.json();
+                if (d.ok) {
+                    this.promotionId = d.promotion_id;
+                    this.promoDiscount = d.discount;
+                    this.promoMessage = '✓ ' + d.promotion_name + ' applied: -Rs ' + d.discount;
+                    this.promoOk = true;
+                } else {
+                    this.promotionId = ''; this.promoDiscount = 0;
+                    this.promoMessage = '✗ ' + (d.msg || 'Invalid'); this.promoOk = false;
+                }
+            } catch(e) { this.promoMessage = 'Error'; this.promoOk = false; }
+        },
+        changeDue() {
+            return Math.round((parseFloat(this.cashReceived || 0) - this.calcTotal()) * 100) / 100;
         },
         sanitizeQty(v) {
             if (v === '' || v === null || v === undefined) return '';

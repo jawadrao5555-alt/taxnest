@@ -10,6 +10,7 @@ class FbrPosTransactionItem extends Model
         'transaction_id', 'product_id', 'item_name', 'hs_code', 'uom',
         'quantity', 'unit_price', 'discount', 'item_discount', 'tax_rate',
         'tax_amount', 'subtotal', 'total', 'is_tax_exempt',
+        'returned_quantity', 'parent_item_id', 'promotion_discount',
     ];
 
     protected $casts = [

@@ -684,6 +684,41 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth'])->group(function () {
     Route::delete('/products/{id}', [FbrPosController::class, 'destroyProduct'])->name('fbrpos.products.destroy');
     Route::get('/api/products/search', [FbrPosController::class, 'searchProducts'])->name('fbrpos.api.products.search');
     Route::get('/api/products/barcode', [FbrPosController::class, 'lookupByBarcode'])->name('fbrpos.api.products.barcode');
+
+    // ============ Phase 2: Mall-Grade Universal Features ============
+    // Terminals (multi-counter)
+    Route::get('/terminals', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'terminals'])->name('fbrpos.phase2.terminals');
+    Route::post('/terminals', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'storeTerminal'])->name('fbrpos.phase2.terminals.store');
+    Route::post('/terminals/{id}/toggle', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'toggleTerminal'])->name('fbrpos.phase2.terminals.toggle');
+    Route::delete('/terminals/{id}', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'deleteTerminal'])->name('fbrpos.phase2.terminals.delete');
+
+    // Held sales / Park sale
+    Route::post('/api/hold', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'holdSale'])->name('fbrpos.phase2.hold');
+    Route::get('/api/held', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'listHeld'])->name('fbrpos.phase2.held.list');
+    Route::get('/api/held/{id}/recall', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'recallHeld'])->name('fbrpos.phase2.held.recall');
+    Route::delete('/api/held/{id}', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'deleteHeld'])->name('fbrpos.phase2.held.delete');
+
+    // Promotions
+    Route::get('/promotions', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'promotions'])->name('fbrpos.phase2.promotions');
+    Route::post('/promotions', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'storePromotion'])->name('fbrpos.phase2.promotions.store');
+    Route::post('/promotions/{id}/toggle', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'togglePromotion'])->name('fbrpos.phase2.promotions.toggle');
+    Route::delete('/promotions/{id}', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'deletePromotion'])->name('fbrpos.phase2.promotions.delete');
+    Route::post('/api/promo/validate', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'validatePromo'])->name('fbrpos.phase2.promo.validate');
+
+    // Loyalty
+    Route::match(['get', 'post'], '/loyalty', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'loyaltySettings'])->name('fbrpos.phase2.loyalty');
+    Route::get('/api/customer/{phone}/points', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'customerPoints'])->name('fbrpos.phase2.customer.points');
+
+    // Shifts / Cash drawer
+    Route::get('/shifts', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'shiftsIndex'])->name('fbrpos.phase2.shifts');
+    Route::post('/shifts/open', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'openShift'])->name('fbrpos.phase2.shift.open');
+    Route::post('/shifts/close', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'closeShift'])->name('fbrpos.phase2.shift.close');
+    Route::get('/shifts/{id}/report', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'shiftReport'])->name('fbrpos.phase2.shift.report');
+    Route::post('/shifts/cash-movement', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'cashMovement'])->name('fbrpos.phase2.shift.cash');
+
+    // Returns / Refunds
+    Route::get('/transactions/{id}/return', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'returnForm'])->name('fbrpos.phase2.return.form');
+    Route::post('/transactions/{id}/return', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'processReturn'])->name('fbrpos.phase2.return.process');
 });
 
 Route::get('/setup-migrate-xK9mP2', function () {

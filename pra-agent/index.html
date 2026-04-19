@@ -276,20 +276,26 @@
       companyId: $('companyId').value.trim(),
       apiKey: $('apiKey').value.trim(),
     };
+    const tr = $('testResult');
     if (!cfg.serverUrl || !cfg.companyId || !cfg.apiKey) {
-      alert('Please fill in all fields');
+      tr.style.color = '#fca5a5';
+      tr.textContent = '⚠ Please fill in all fields (Server URL, Company ID, API Key)';
+      const empty = !cfg.companyId ? 'companyId' : (!cfg.apiKey ? 'apiKey' : 'serverUrl');
+      $(empty).focus();
       return;
     }
     await window.agentAPI.saveConfig(cfg);
-    $('testResult').style.color = '#10b981';
-    $('testResult').textContent = '✅ Configuration saved. Agent connecting...';
+    tr.style.color = '#10b981';
+    tr.textContent = '✅ Configuration saved. Agent connecting...';
   });
 
   $('toggleBtn').addEventListener('click', async () => {
     const status = await window.agentAPI.getStatus();
     const res = await window.agentAPI.toggleAgent(!status.running);
     if (!res.ok && res.error) {
-      alert(res.error);
+      const tr = $('testResult');
+      tr.style.color = '#fca5a5';
+      tr.textContent = '⚠ ' + res.error;
     }
   });
 

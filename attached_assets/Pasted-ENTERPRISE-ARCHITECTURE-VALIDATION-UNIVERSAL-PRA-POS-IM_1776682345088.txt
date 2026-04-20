@@ -1,0 +1,97 @@
+ENTERPRISE ARCHITECTURE VALIDATION — UNIVERSAL PRA POS
+
+IMPORTANT:
+DO NOT WRITE CODE
+DO NOT MODIFY FILES
+ONLY ANALYZE AND CONFIRM FEASIBILITY + APPROACH
+
+GOAL:
+Convert current PRA POS into a SINGLE UNIVERSAL POS SYSTEM
+
+CURRENT STATE:
+- Multiple POS variations (simple POS, restaurant POS, etc.)
+- Duplicate UI, duplicate keyboard logic, inconsistent behavior
+- Bugs due to multiple implementations
+
+TARGET STATE:
+
+1. SINGLE PRA POS (UNIVERSAL)
+- One POS interface for ALL business types
+- No separate POS screens
+
+2. CATEGORY-BASED BEHAVIOR
+- On signup: company selects category (restaurant, retail, pharmacy, etc.)
+- OR admin can change category later
+- System dynamically enables features
+
+3. FEATURE FLAGS SYSTEM
+Example:
+- restaurant_mode
+- kot_enabled
+- inventory_enabled
+- table_management
+- delivery_mode
+
+4. UI STRATEGY
+- Use RESTAURANT POS UI as MASTER UI (premium, keyboard-friendly)
+- For non-restaurant:
+  - Hide tables, kitchen, etc.
+  - Keep same layout/design
+- NO separate views — only conditional components
+
+5. KEYBOARD SYSTEM
+- Replace all existing keyboard logic
+- Single, centralized keyboard controller
+- No duplicate listeners anywhere
+
+6. QUANTITY SYSTEM
+- Fully controlled input (no buffer hacks)
+- Stable, predictable behavior
+- No append/skip bugs
+
+7. DASHBOARD MERGE
+- Single dashboard design (restaurant-style premium UI)
+- Dynamically show widgets based on enabled features
+
+8. AGENT SYSTEM (CRITICAL)
+- Existing PRA Agent MUST continue working without change
+- No break in submission flow
+- No change in API contracts
+- Agent remains universal across all company types
+
+CONSTRAINTS:
+- DO NOT break:
+  - PRA submission
+  - Invoice generation
+  - Inventory logic
+  - Existing database schema (avoid major changes if possible)
+- FBR POS must remain completely separate (DO NOT TOUCH)
+
+TASK:
+
+1. CONFIRM:
+Can this architecture be implemented safely in current Laravel + Alpine setup?
+
+2. IDENTIFY:
+- What parts need refactor vs rewrite?
+- Which files/modules will be affected?
+
+3. RISK ANALYSIS:
+- What can break?
+- How to avoid downtime?
+
+4. MIGRATION PLAN:
+- Step-by-step safe rollout (no production break)
+
+5. PERFORMANCE IMPACT:
+- Will single POS improve or hurt performance?
+
+OUTPUT FORMAT:
+- Feasibility: YES / NO
+- High-level architecture
+- Migration plan (phased)
+- Risks + mitigation
+
+DO NOT WRITE CODE
+ONLY ANALYSIS
+WAIT FOR APPROVAL BEFORE IMPLEMENTATION

@@ -1,0 +1,37 @@
+~/workspace$ rm -f .git/index.lock .git/refs/heads/main.lock
+~/workspace$ git fetch origin main
+remote: Enumerating objects: 68, done.
+remote: Counting objects: 100% (67/67), done.
+remote: Compressing objects: 100% (62/62), done.
+remote: Total 68 (delta 41), reused 2 (delta 2), pack-reused 1 (from 1)
+Unpacking objects: 100% (68/68), 15.31 KiB | 1.09 MiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+error: cannot lock ref 'refs/remotes/origin/main': Unable to create '/home/runner/workspace/.git/refs/remotes/origin/main.lock': File exists.
+
+Another git process seems to be running in this repository, e.g.
+an editor opened by 'git commit'. Please make sure all processes
+are terminated then try again. If it still fails, a git process
+may have crashed in this repository earlier:
+remove the file manually to continue.
+ ! 82efdef..11a8339  main       -> origin/main  (unable to update local ref)
+~/workspace$ git pull origin main --no-rebase --no-edit
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+error: cannot lock ref 'refs/remotes/origin/main': Unable to create '/home/runner/workspace/.git/refs/remotes/origin/main.lock': File exists.
+
+Another git process seems to be running in this repository, e.g.
+an editor opened by 'git commit'. Please make sure all processes
+are terminated then try again. If it still fails, a git process
+may have crashed in this repository earlier:
+remove the file manually to continue.
+ ! 82efdef..11a8339  main       -> origin/main  (unable to update local ref)
+~/workspace$ git push origin main
+To https://github.com/jawadrao5555-alt/taxnest.git
+ ! [rejected]        main -> main (non-fast-forward)
+error: failed to push some refs to 'https://github.com/jawadrao5555-alt/taxnest.git'
+hint: Updates were rejected because the tip of your current branch is behind
+hint: its remote counterpart. If you want to integrate the remote changes,
+hint: use 'git pull' before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+~/workspace$ 

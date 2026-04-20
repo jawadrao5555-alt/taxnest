@@ -388,10 +388,10 @@ window.addEventListener('popstate', function() {
                                     data-qty-input="true"
                                     :value="item.quantity"
                                     @input.stop="$event.target.value = $event.target.value.replace(/[^0-9]/g,'').slice(0,6)"
-                                    @focus.stop="activeCartIndex = index; cartMode = true; setTimeout(() => $event.target.select(), 0)"
-                                    @click.stop="activeCartIndex = index; cartMode = true; $event.target.select()"
-                                    @change.stop="(() => { const n = parseInt($event.target.value.replace(/[^0-9]/g,'')) || 1; setQty(index, n); $event.target.value = n; })()"
-                                    @blur="(() => { const n = parseInt($event.target.value.replace(/[^0-9]/g,'')) || 1; setQty(index, n); $event.target.value = n; })()"
+                                    @focus.stop="activeCartIndex = index; cartMode = true; $event.target.value = ''"
+                                    @click.stop="activeCartIndex = index; cartMode = true; $event.target.value = ''"
+                                    @change.stop="(() => { const raw = $event.target.value.replace(/[^0-9]/g,''); const n = raw === '' ? item.quantity : (parseInt(raw) || item.quantity); setQty(index, n); $event.target.value = n; })()"
+                                    @blur="(() => { const raw = $event.target.value.replace(/[^0-9]/g,''); const n = raw === '' ? item.quantity : (parseInt(raw) || item.quantity); setQty(index, n); $event.target.value = n; })()"
                                     @keydown.up.stop.prevent="(() => { $event.target.blur(); const all = document.querySelectorAll('[data-qty-input]'); const i = Array.from(all).indexOf($event.target); if(i > 0){ setTimeout(() => { all[i-1].focus(); all[i-1].select(); }, 0); } })()"
                                     @keydown.down.stop.prevent="(() => { $event.target.blur(); const all = document.querySelectorAll('[data-qty-input]'); const i = Array.from(all).indexOf($event.target); if(i >= 0 && i < all.length - 1){ setTimeout(() => { all[i+1].focus(); all[i+1].select(); }, 0); } })()"
                                     @keydown.escape.stop.prevent="$event.target.value = item.quantity; $event.target.blur()"
@@ -1123,6 +1123,11 @@ function restaurantPos() {
                 // (qty input handles its own digits, arrows, enter, escape)
                 if (document.activeElement?.dataset?.qtyInput === 'true') {
                     return;
+                }
+
+                // Prevent native page-scroll on arrow keys when not in any input field
+                if (!isInput && this.cart.length > 0 && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+                    e.preventDefault();
                 }
 
                 if (this.showReceipt) {

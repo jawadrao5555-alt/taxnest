@@ -384,23 +384,16 @@ window.addEventListener('popstate', function() {
                                 <button @click.stop="updateQty(index, -1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M20 12H4"/></svg>
                                 </button>
-                                <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6"
-                                    data-qty-input="true"
-                                    :value="item.quantity"
-                                    @input.stop="$event.target.value = $event.target.value.replace(/[^0-9]/g,'').slice(0,6)"
-                                    @focus.stop="activeCartIndex = index; cartMode = true; $event.target.value = ''"
-                                    @click.stop="activeCartIndex = index; cartMode = true; $event.target.value = ''"
-                                    @change.stop="(() => { const raw = $event.target.value.replace(/[^0-9]/g,''); const n = raw === '' ? item.quantity : (parseInt(raw) || item.quantity); setQty(index, n); $event.target.value = n; })()"
-                                    @blur="(() => { const raw = $event.target.value.replace(/[^0-9]/g,''); const n = raw === '' ? item.quantity : (parseInt(raw) || item.quantity); setQty(index, n); $event.target.value = n; })()"
-                                    @keydown.up.stop.prevent="(() => { $event.target.blur(); const all = document.querySelectorAll('[data-qty-input]'); const i = Array.from(all).indexOf($event.target); if(i > 0){ setTimeout(() => { all[i-1].focus(); all[i-1].select(); }, 0); } })()"
-                                    @keydown.down.stop.prevent="(() => { $event.target.blur(); const all = document.querySelectorAll('[data-qty-input]'); const i = Array.from(all).indexOf($event.target); if(i >= 0 && i < all.length - 1){ setTimeout(() => { all[i+1].focus(); all[i+1].select(); }, 0); } })()"
-                                    @keydown.escape.stop.prevent="$event.target.value = item.quantity; $event.target.blur()"
-                                    @keydown.enter.stop.prevent="(() => { $event.target.blur(); const all = document.querySelectorAll('[data-qty-input]'); const i = Array.from(all).indexOf($event.target); if(i >= 0 && i < all.length - 1){ setTimeout(() => { all[i+1].focus(); all[i+1].select(); }, 0); } })()"
+                                <input type="number" min="1" max="999999" step="1"
+                                    x-model.number="item.quantity"
+                                    @focus.stop="activeCartIndex = index; cartMode = true"
+                                    @click.stop="activeCartIndex = index; cartMode = true"
+                                    @blur="if(!Number.isFinite(Number(item.quantity)) || Number(item.quantity) < 1) item.quantity = 1"
                                     @keydown.stop
                                     @keypress.stop
                                     @keyup.stop
                                     @mousedown.stop
-                                    class="w-14 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner"
+                                    class="w-14 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     :class="activeCartIndex === index ? 'qty-pop' : ''">
                                 <button @click.stop="updateQty(index, 1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M12 4v16m8-8H4"/></svg>
@@ -1035,8 +1028,7 @@ function restaurantPos() {
         highlightIndex: 0,
         activeCartIndex: -1,
         cartMode: false,
-        qtyInputBuffer: '',
-        qtyInputTimer: null,
+        get mode() { return this.cartMode ? 'cart' : 'search'; },
         activeHeldIndex: 0,
         gridFocusMode: false,
         gridFocusIndex: 0,
@@ -1076,16 +1068,17 @@ function restaurantPos() {
         },
 
         r2(v) { return Math.round((v + Number.EPSILON) * 100) / 100; },
+        _safeQty(q) { const n = Number(q); return Number.isFinite(n) && n > 0 ? n : 1; },
         getItemDiscount(item) {
-            const lineTotal = this.r2(item.quantity * item.unit_price);
+            const lineTotal = this.r2(this._safeQty(item.quantity) * item.unit_price);
             const dv = parseFloat(item.item_discount_value) || 0;
             if (dv <= 0) return 0;
             if ((item.item_discount_type || 'percentage') === 'percentage') return this.r2(lineTotal * Math.min(100, dv) / 100);
             return this.r2(Math.min(lineTotal, dv));
         },
-        getItemTotal(item) { return Math.max(0, this.r2(item.quantity * item.unit_price - this.getItemDiscount(item))); },
+        getItemTotal(item) { return Math.max(0, this.r2(this._safeQty(item.quantity) * item.unit_price - this.getItemDiscount(item))); },
         get itemDiscountsTotal() { return this.r2(this.cart.reduce((s, i) => s + this.getItemDiscount(i), 0)); },
-        get subtotal() { return this.r2(this.cart.reduce((s, i) => s + (i.quantity * i.unit_price), 0)); },
+        get subtotal() { return this.r2(this.cart.reduce((s, i) => s + (this._safeQty(i.quantity) * i.unit_price), 0)); },
         get effectiveSubtotal() { return Math.max(0, this.r2(this.subtotal - this.itemDiscountsTotal)); },
         get taxableSubtotal() {
             const taxable = this.cart.filter(i => !i.is_tax_exempt).reduce((s, i) => s + this.getItemTotal(i), 0);
@@ -1115,107 +1108,7 @@ function restaurantPos() {
             this.$watch('cart', () => { this.saveCart(); this.recalcDiscount(); }, { deep: true });
             this.$watch('kitchenNotes', () => { this.saveCart(); });
             this.cacheProductData();
-            document.addEventListener('keydown', (e) => {
-                const tag = document.activeElement?.tagName;
-                const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-
-                // BULLETPROOF: If user is in a qty input, NEVER intercept any key
-                // (qty input handles its own digits, arrows, enter, escape)
-                if (document.activeElement?.dataset?.qtyInput === 'true') {
-                    return;
-                }
-
-                // Prevent native page-scroll on arrow keys when not in any input field
-                if (!isInput && this.cart.length > 0 && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-                    e.preventDefault();
-                }
-
-                if (this.showReceipt) {
-                    if (e.key === 'Escape') { e.preventDefault(); this.showReceipt = false; return; }
-                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); return; }
-                    if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.printReceipt(); return; }
-                    return;
-                }
-                if (this.showPayModal) {
-                    if (e.key === '1') { e.preventDefault(); this.processPayment('cash'); return; }
-                    if (e.key === '2') { e.preventDefault(); this.processPayment('card'); return; }
-                    if (e.key === 'Escape') { e.preventDefault(); this.showPayModal = false; return; }
-                    return;
-                }
-                if (this.showHeldOrders && this.heldOrders.length > 0) {
-                    if (e.key === 'ArrowDown') { e.preventDefault(); this.activeHeldIndex = Math.min(this.activeHeldIndex + 1, this.heldOrders.length - 1); return; }
-                    if (e.key === 'ArrowUp') { e.preventDefault(); this.activeHeldIndex = Math.max(this.activeHeldIndex - 1, 0); return; }
-                    if (e.key === 'Enter') { e.preventDefault(); this.recallOrder(this.heldOrders[this.activeHeldIndex]); return; }
-                    if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.payHeldOrder(this.heldOrders[this.activeHeldIndex].id); return; }
-                    if (e.key === 'd' || e.key === 'D') { e.preventDefault(); this.deleteHeldOrder(this.heldOrders[this.activeHeldIndex].id); return; }
-                    if (e.key === 'Escape') { e.preventDefault(); this.showHeldOrders = false; return; }
-                    return;
-                }
-                if (this.showManagerPinModal) {
-                    if (e.key === 'Escape') { e.preventDefault(); this.showManagerPinModal = false; return; }
-                    return;
-                }
-
-                if (e.key === 'F1') { e.preventDefault(); this.showShortcuts = !this.showShortcuts; return; }
-                if (e.key === 'F2') { e.preventDefault(); const types = ['dine_in', 'takeaway', 'delivery']; const idx = types.indexOf(this.orderType); this.orderType = types[(idx + 1) % types.length]; return; }
-                if (e.key === 'F3') { e.preventDefault(); this.activeHeldIndex = 0; this.showHeldOrders = true; return; }
-                if (e.key === 'F4') { e.preventDefault(); if (this.cart.length && confirm('Clear entire cart?')) { this.clearCart(); } return; }
-                if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
-                if (e.key === 'F6') { e.preventDefault(); if (this.cart.length > 0) { this.cartMode = true; this.activeCartIndex = this.cart.length - 1; this.mobileView = 'cart'; } return; }
-                if (e.key === 'F7') { e.preventDefault(); this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); return; }
-                if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) this.showPayModal = true; return; }
-                if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
-                if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode(); this.mobileView = 'cart'; } return; }
-                if ((e.ctrlKey || e.metaKey) && e.key === 'c') { if (!window.getSelection().toString()) { e.preventDefault(); this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); return; } }
-                if (e.key === 'Escape') {
-                    if (this.showShortcuts) { this.showShortcuts = false; return; }
-                    if (this.showNewCustomerModal) { this.showNewCustomerModal = false; return; }
-                    if (this.showLowStockPopup) { this.showLowStockPopup = false; return; }
-                    if (this.showHeldOrders) { this.showHeldOrders = false; return; }
-                    if (this.showTablePicker) { this.showTablePicker = false; return; }
-                    if (this.showCustomerPicker) { this.showCustomerPicker = false; return; }
-                    if (this.showCustomerHistory) { this.showCustomerHistory = false; return; }
-                    if (this.customerPhoneDropdown) { this.customerPhoneDropdown = false; return; }
-                    if (this.gridFocusMode) { this.enterSearchMode(); return; }
-                    if (this.searchQuery) { this.searchQuery = ''; this.showSearchDropdown = false; this.filterProducts(); return; }
-                    if (this.activeCategory !== 'all') { this.activeCategory = 'all'; this.filterProducts(); return; }
-                }
-
-                if (this.cartMode && this.cart.length > 0) {
-                    const ci = this.activeCartIndex;
-                    if (e.key === 'ArrowDown') { e.preventDefault(); this.moveCartSelection(1); return; }
-                    if (e.key === 'ArrowUp') { e.preventDefault(); this.moveCartSelection(-1); return; }
-                    if ((e.key === '+' || e.key === '=') && ci >= 0) { e.preventDefault(); this.updateQty(ci, 1); this.animateQty(ci); return; }
-                    if (e.key === '-' && ci >= 0) { e.preventDefault(); this.updateQty(ci, -1); this.animateQty(ci); return; }
-                    if (e.key === 'Delete' && ci >= 0) { e.preventDefault(); this.removeFromCart(ci); if (this.cart.length === 0) { this.cartMode = false; this.activeCartIndex = -1; } else { this.activeCartIndex = Math.min(ci, this.cart.length - 1); } return; }
-                    if (e.key === 'Escape') { e.preventDefault(); this.cartMode = false; this.activeCartIndex = -1; return; }
-                    if (/^[0-9]$/.test(e.key) && ci >= 0 && !e.ctrlKey && !e.metaKey && !isInput) { e.preventDefault(); this.handleQtyDigit(e.key, ci); return; }
-                    if (/^[a-zA-Z]$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
-                        e.preventDefault(); this.cartMode = false; this.activeCartIndex = -1;
-                        this.searchQuery += e.key; this.$refs.searchInput?.focus();
-                        this.$nextTick(() => this.onSearchInput()); return;
-                    }
-                    return;
-                }
-
-                if (!isInput && !this.gridFocusMode && this.cart.length > 0) {
-                    if (e.key === 'ArrowDown') { e.preventDefault(); this.enterCartMode(); return; }
-                    if (e.key === '+' || e.key === '=') { e.preventDefault(); this.updateQty(this.cart.length - 1, 1); this.animateQty(this.cart.length - 1); return; }
-                    if (e.key === '-') { e.preventDefault(); this.updateQty(this.cart.length - 1, -1); this.animateQty(this.cart.length - 1); return; }
-                    if (e.key === 'Delete') { e.preventDefault(); this.removeFromCart(this.cart.length - 1); return; }
-                }
-
-                if (e.key === 'Tab' && !e.shiftKey && !this.gridFocusMode && document.activeElement === this.$refs.searchInput && !this.showSearchDropdown) {
-                    e.preventDefault(); this.enterGridMode();
-                }
-
-                if (!isInput && !this.gridFocusMode && e.key.length === 1 && /[a-zA-Z]/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                    e.preventDefault();
-                    this.searchQuery += e.key;
-                    this.$refs.searchInput?.focus();
-                    this.$nextTick(() => this.onSearchInput());
-                }
-            });
+            document.addEventListener('keydown', (e) => this.handleKey(e));
             this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
         },
 
@@ -1360,27 +1253,31 @@ function restaurantPos() {
         },
         updateQty(index, delta) {
             if (this._qtyUpdating) return;
+            if (!this.cart[index]) return;
             this._qtyUpdating = true;
-            let current = Number(this.cart[index].quantity) || 0;
+            let current = Number(this.cart[index].quantity);
+            if (!Number.isFinite(current) || current < 1) current = 1;
             if (Number.isInteger(current)) {
                 this.cart[index].quantity = Math.max(1, current + delta);
             } else {
-                this.cart[index].quantity = Math.max(0.01, Math.round((current + delta) * 100) / 100);
+                this.cart[index].quantity = Math.max(1, Math.round((current + delta) * 100) / 100);
             }
+            if (!Number.isFinite(this.cart[index].quantity) || this.cart[index].quantity < 1) this.cart[index].quantity = 1;
             setTimeout(() => { this._qtyUpdating = false; }, 50);
         },
-        setQty(index, val) { const v = parseFloat(val); if (v > 0) this.cart[index].quantity = v; },
+        setQty(index, val) {
+            if (!this.cart[index]) return;
+            let v = parseFloat(val);
+            if (!Number.isFinite(v) || v < 1) v = 1;
+            this.cart[index].quantity = v;
+        },
         removeFromCart(index) {
             const el = this.$refs.cartList?.querySelector(`[data-cart-index="${index}"]`);
             if (el) {
                 el.classList.add('cart-item-exit');
-                setTimeout(() => {
-                    this.cart.splice(index, 1);
-                    if (this.activeCartIndex >= this.cart.length) this.activeCartIndex = this.cart.length - 1;
-                }, 250);
+                setTimeout(() => { this.cart.splice(index, 1); this.fixCartIndex(); }, 250);
             } else {
-                this.cart.splice(index, 1);
-                if (this.activeCartIndex >= this.cart.length) this.activeCartIndex = this.cart.length - 1;
+                this.cart.splice(index, 1); this.fixCartIndex();
             }
         },
 
@@ -1394,12 +1291,115 @@ function restaurantPos() {
         },
 
         moveCartSelection(dir) {
-            if (this.cart.length === 0) return;
+            if (this.cart.length === 0) { this.activeCartIndex = -1; return; }
             let next = this.activeCartIndex + dir;
             if (next < 0) next = 0;
             if (next >= this.cart.length) next = this.cart.length - 1;
             this.activeCartIndex = next;
             this.scrollToCartItem(next);
+        },
+
+        fixCartIndex() {
+            if (this.cart.length === 0) { this.activeCartIndex = -1; this.cartMode = false; return; }
+            if (this.activeCartIndex < 0) this.activeCartIndex = 0;
+            if (this.activeCartIndex >= this.cart.length) this.activeCartIndex = this.cart.length - 1;
+        },
+
+        handleKey(e) {
+            const tag = document.activeElement?.tagName;
+            const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+            if (this.showReceipt) {
+                if (e.key === 'Escape') { e.preventDefault(); this.showReceipt = false; }
+                else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); }
+                else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.printReceipt(); }
+                return;
+            }
+            if (this.showPayModal) {
+                if (e.key === '1') { e.preventDefault(); this.processPayment('cash'); }
+                else if (e.key === '2') { e.preventDefault(); this.processPayment('card'); }
+                else if (e.key === 'Escape') { e.preventDefault(); this.showPayModal = false; }
+                return;
+            }
+            if (this.showHeldOrders && this.heldOrders.length > 0) {
+                if (e.key === 'ArrowDown') { e.preventDefault(); this.activeHeldIndex = Math.min(this.activeHeldIndex + 1, this.heldOrders.length - 1); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeHeldIndex = Math.max(this.activeHeldIndex - 1, 0); }
+                else if (e.key === 'Enter') { e.preventDefault(); this.recallOrder(this.heldOrders[this.activeHeldIndex]); }
+                else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.payHeldOrder(this.heldOrders[this.activeHeldIndex].id); }
+                else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); this.deleteHeldOrder(this.heldOrders[this.activeHeldIndex].id); }
+                else if (e.key === 'Escape') { e.preventDefault(); this.showHeldOrders = false; }
+                return;
+            }
+            if (this.showManagerPinModal) {
+                if (e.key === 'Escape') { e.preventDefault(); this.showManagerPinModal = false; }
+                return;
+            }
+
+            // 🔒 ISOLATION: User typing in any input → keyboard engine never runs
+            if (isInput) return;
+
+            if (e.key === 'F1') { e.preventDefault(); this.showShortcuts = !this.showShortcuts; return; }
+            if (e.key === 'F2') { e.preventDefault(); this.cartMode = false; this.activeCartIndex = -1; this.enterSearchMode(); return; }
+            if (e.key === 'F3') { e.preventDefault(); this.activeHeldIndex = 0; this.showHeldOrders = true; return; }
+            if (e.key === 'F4') { e.preventDefault(); if (this.cart.length && confirm('Clear entire cart?')) { this.clearCart(); } return; }
+            if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
+            if (e.key === 'F6') { e.preventDefault(); if (this.cart.length > 0) { this.cartMode = true; this.activeCartIndex = this.cart.length - 1; this.mobileView = 'cart'; } return; }
+            if (e.key === 'F7') { e.preventDefault(); this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); return; }
+            if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) this.showPayModal = true; return; }
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode(); this.mobileView = 'cart'; } return; }
+
+            if (e.key === 'Escape') {
+                if (this.showShortcuts) { this.showShortcuts = false; return; }
+                if (this.showNewCustomerModal) { this.showNewCustomerModal = false; return; }
+                if (this.showLowStockPopup) { this.showLowStockPopup = false; return; }
+                if (this.showTablePicker) { this.showTablePicker = false; return; }
+                if (this.showCustomerPicker) { this.showCustomerPicker = false; return; }
+                if (this.showCustomerHistory) { this.showCustomerHistory = false; return; }
+                if (this.customerPhoneDropdown) { this.customerPhoneDropdown = false; return; }
+                if (this.cartMode) { this.cartMode = false; this.activeCartIndex = -1; return; }
+                if (this.gridFocusMode) { this.enterSearchMode(); return; }
+                if (this.searchQuery) { this.searchQuery = ''; this.showSearchDropdown = false; this.filterProducts(); return; }
+                if (this.activeCategory !== 'all') { this.activeCategory = 'all'; this.filterProducts(); return; }
+                return;
+            }
+
+            // Prevent native page scroll on arrow keys (when not in input)
+            if (this.cart.length > 0 && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+                e.preventDefault();
+            }
+
+            // Mode-specific routing
+            if (this.cartMode && this.cart.length > 0) { this.handleCartKeys(e); return; }
+            this.handleSearchKeys(e);
+        },
+
+        handleCartKeys(e) {
+            const ci = this.activeCartIndex;
+            if (e.key === 'ArrowDown') { this.moveCartSelection(1); return; }
+            if (e.key === 'ArrowUp')   { this.moveCartSelection(-1); return; }
+            if ((e.key === '+' || e.key === '=') && ci >= 0) { this.updateQty(ci, 1); this.animateQty(ci); return; }
+            if (e.key === '-' && ci >= 0) { this.updateQty(ci, -1); this.animateQty(ci); return; }
+            if (e.key === 'Delete' && ci >= 0) { this.removeFromCart(ci); this.fixCartIndex(); return; }
+            if (e.key === 'Enter' && this.cart.length) { this.showPayModal = true; return; }
+            if (/^[a-zA-Z]$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
+                this.cartMode = false; this.activeCartIndex = -1;
+                this.searchQuery += e.key; this.$refs.searchInput?.focus();
+                this.$nextTick(() => this.onSearchInput());
+            }
+        },
+
+        handleSearchKeys(e) {
+            if (e.key === 'ArrowDown' && this.cart.length > 0 && !this.gridFocusMode) { this.enterCartMode(); return; }
+            if ((e.key === '+' || e.key === '=') && this.cart.length > 0) { this.updateQty(this.cart.length - 1, 1); this.animateQty(this.cart.length - 1); return; }
+            if (e.key === '-' && this.cart.length > 0) { this.updateQty(this.cart.length - 1, -1); this.animateQty(this.cart.length - 1); return; }
+            if (e.key === 'Delete' && this.cart.length > 0) { this.removeFromCart(this.cart.length - 1); this.fixCartIndex(); return; }
+            if (e.key === 'Tab' && !e.shiftKey && !this.gridFocusMode) { e.preventDefault(); this.enterGridMode(); return; }
+            if (e.key.length === 1 && /[a-zA-Z]/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey && !this.gridFocusMode) {
+                this.searchQuery += e.key;
+                this.$refs.searchInput?.focus();
+                this.$nextTick(() => this.onSearchInput());
+            }
         },
 
         scrollToCartItem(index) {
@@ -1409,14 +1409,6 @@ function restaurantPos() {
             });
         },
 
-        handleQtyDigit(digit, index) {
-            if (this.qtyInputTimer) clearTimeout(this.qtyInputTimer);
-            this.qtyInputBuffer += digit;
-            const val = parseInt(this.qtyInputBuffer);
-            if (val > 0) { this.cart[index].quantity = val; this.animateQty(index); }
-            this.qtyInputTimer = setTimeout(() => { this.qtyInputBuffer = ''; }, 800);
-        },
-
         animateQty(index) {
             this.$nextTick(() => {
                 const el = this.$refs.cartList?.querySelector(`[data-cart-index="${index}"] input[type="number"]`);
@@ -1424,7 +1416,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.qtyInputBuffer = ''; this.clearCartStorage(); },
+        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm('Current order has ' + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast('New sale started', 'success');

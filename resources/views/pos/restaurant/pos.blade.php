@@ -1,9 +1,7 @@
 <x-pos-layout>
 <style>
 *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-@keyframes cartPop { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(myuu  
-                                                                                                         1); }  k
-                    km mom}
+@keyframes cartPop { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }
 @keyframes slideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes slideOut { from { opacity: 1; transform: translateX(0); max-height: 120px; } to { opacity: 0; transform: translateX(60px); max-height: 0; padding-top:0; padding-bottom:0; margin:0; } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

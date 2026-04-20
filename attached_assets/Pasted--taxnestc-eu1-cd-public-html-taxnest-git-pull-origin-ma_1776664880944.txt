@@ -1,0 +1,70 @@
+[taxnestc@eu1 ~]$ cd ~/public_html/taxnest && git pull origin main && php artisan migrate --force && php articd ~/public_html/taxnest && git pull origin main && php artisan migrate --force && php artisan config:clear && php artisan view:clear && php artisan route:clear && php artisan config:cache&& php artisan route:cache && echo "===== ALL DONE ====="
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+
+   INFO  Running migrations.
+
+  2026_04_19_120000_upgrade_fbr_pos_to_mall_grade ................ 2.29ms FAIL
+
+In Connection.php line 838:
+
+  SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error i
+  n your SQL syntax; check the manual that corresponds to your MariaDB server
+   version for the right syntax to use near 'TYPE numeric(15,3) USING quantit
+  y::numeric(15,3)' at line 1 (Connection: mysql, Host: localhost, Port: 3306
+  , Database: taxnestc_db, SQL: ALTER TABLE fbr_pos_transaction_items ALTER C
+  OLUMN quantity TYPE numeric(15,3) USING quantity::numeric(15,3))
+
+In Connection.php line 578:
+  SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error i
+  n your SQL syntax; check the manual that corresponds to your MariaDB server
+   version for the right syntax to use near 'TYPE numeric(15,3) USING quantit
+  y::numeric(15,3)' at line 1
+                                                                                                                   cd ~/public_html/taxnest && git pu
+ll origin main && php artisan migrate --force && php artisan config:clear && php artisan view:clear && php artisan route:clear && php artisan config:
+cache && php artisan route:cache && echo "===== ALL DONE ====="igin main && php artisan migrate --force && php artisan config:clear && php artisan viremote: Enumerating objects: 18, done.
+remote: Counting objects: 100% (18/18), done.
+remote: Compressing objects: 100% (4/4), done.
+remote: Total 18 (delta 14), reused 18 (delta 14), pack-reused 0 (from 0)
+Unpacking objects: 100% (18/18), 2.33 MiB | 10.39 MiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+   2f417b2..7ec5c9c  main       -> origin/main
+Updating 2f417b2..7ec5c9c
+Fast-forward
+ attached_assets/Capture_1776660002734.JPG          | Bin 0 -> 358050 bytes
+ ...ml-taxnest-taxnestc-eu1-taxne_1776660372591.txt | 215 +++++++++++++++++++++
+ attached_assets/image_1776660064051.jpg            | Bin 0 -> 2297913 bytes
+ ..._04_19_120000_upgrade_fbr_pos_to_mall_grade.php |  22 ++-
+ ...30000_upgrade_pos_items_to_decimal_quantity.php |  10 +-
+ 5 files changed, 239 insertions(+), 8 deletions(-)
+ create mode 100644 attached_assets/Capture_1776660002734.JPG
+ create mode 100644 attached_assets/Pasted--taxnestc-eu1-cd-public-html-taxnest-taxnestc-eu1-taxne_1776660372591.txt
+ create mode 100644 attached_assets/image_1776660064051.jpg
+
+   INFO  Running migrations.
+
+  2026_04_19_120000_upgrade_fbr_pos_to_mall_grade .............. 123.24ms DONE
+  2026_04_19_130000_upgrade_pos_items_to_decimal_quantity ........ 7.71ms DONE
+  2026_04_19_140000_fbr_pos_phase2_universal_mall_grade ........ 156.47ms DONE
+  2026_04_19_150000_add_cash_received_to_pos_transactions ....... 12.11ms DONE
+  2026_04_19_160000_create_push_subscriptions_table ............. 22.17ms DONE
+
+
+   INFO  Configuration cache cleared successfully.
+
+
+   INFO  Compiled views cleared successfully.
+
+
+   INFO  Route cache cleared successfully.
+
+
+   INFO  Configuration cached successfully.
+
+
+   INFO  Routes cached successfully.
+
+===== ALL DONE =====
+[taxnestc@eu1 taxnest]$

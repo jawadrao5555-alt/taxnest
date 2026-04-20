@@ -385,15 +385,17 @@ window.addEventListener('popstate', function() {
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M20 12H4"/></svg>
                                 </button>
                                 <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6"
-                                    x-init="$el.value = item.quantity; $watch('item.quantity', v => { if(document.activeElement !== $el) $el.value = v; })"
-                                    @input.stop="setQty(index, (parseInt($event.target.value.replace(/[^0-9]/g,'')) || 1))"
-                                    @focus.stop="qtyInputBuffer=''; activeCartIndex = index; cartMode = true; $event.target.select()"
+                                    data-qty-input="true"
+                                    x-init="$el.value = item.quantity"
+                                    x-effect="if(document.activeElement !== $el){ $el.value = item.quantity; }"
+                                    @input.stop="(() => { const raw = $event.target.value.replace(/[^0-9]/g,''); if(raw === '') return; const n = parseInt(raw); if(!isNaN(n) && n > 0){ setQty(index, n); } })()"
+                                    @focus.stop="qtyInputBuffer=''; activeCartIndex = index; cartMode = true; setTimeout(() => $event.target.select(), 0)"
                                     @click.stop="activeCartIndex = index; cartMode = true; $event.target.select()"
-                                    @blur="$event.target.value = item.quantity"
-                                    @keydown.up.stop.prevent="$event.target.blur(); moveCartSelection(-1)"
-                                    @keydown.down.stop.prevent="$event.target.blur(); moveCartSelection(1)"
+                                    @blur="(() => { const n = parseInt($event.target.value.replace(/[^0-9]/g,'')) || 1; setQty(index, n); $event.target.value = n; })()"
+                                    @keydown.up.stop.prevent="(() => { const all = document.querySelectorAll('[data-qty-input]'); const i = Array.from(all).indexOf($event.target); if(i > 0){ all[i-1].focus(); all[i-1].select(); } })()"
+                                    @keydown.down.stop.prevent="(() => { const all = document.querySelectorAll('[data-qty-input]'); const i = Array.from(all).indexOf($event.target); if(i >= 0 && i < all.length - 1){ all[i+1].focus(); all[i+1].select(); } })()"
                                     @keydown.escape.stop.prevent="$event.target.blur()"
-                                    @keydown.enter.stop.prevent="$event.target.blur()"
+                                    @keydown.enter.stop.prevent="(() => { const all = document.querySelectorAll('[data-qty-input]'); const i = Array.from(all).indexOf($event.target); if(i >= 0 && i < all.length - 1){ all[i+1].focus(); all[i+1].select(); } else { $event.target.blur(); } })()"
                                     @mousedown.stop
                                     class="w-14 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner"
                                     :class="activeCartIndex === index ? 'qty-pop' : ''">

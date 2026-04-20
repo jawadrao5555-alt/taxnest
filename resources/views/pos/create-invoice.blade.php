@@ -416,11 +416,15 @@
                             <div class="sm:col-span-2">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Qty</label>
                                 <input type="text" inputmode="decimal" pattern="[0-9]*\.?[0-9]*" autocomplete="off" maxlength="10"
-                                    :value="item.quantity"
-                                    @input="(() => { let v = $event.target.value.replace(/[^0-9.]/g,''); const p = v.split('.'); if(p.length > 2) v = p[0] + '.' + p.slice(1).join(''); if(p[1] && p[1].length > 3) v = p[0] + '.' + p[1].slice(0,3); item.quantity = (v === '' || v === '.') ? '' : (parseFloat(v) || 0); $event.target.value = v; recalculate(); })()"
-                                    @focus="$nextTick(() => $event.target.select())"
-                                    @mousedown="if(document.activeElement !== $event.target){ $event.preventDefault(); $event.target.focus(); $event.target.select(); }"
-                                    @blur="if(item.quantity === '' || item.quantity === null || item.quantity < 0.001){ item.quantity = 1; recalculate(); }"
+                                    :data-qty-row="index"
+                                    x-init="$el.value = item.quantity; $watch('item.quantity', v => { if(document.activeElement !== $el) $el.value = (v === '' || v === null) ? '' : v; })"
+                                    @input.stop="(() => { let v = $event.target.value.replace(/[^0-9.]/g,''); const p = v.split('.'); if(p.length > 2) v = p[0] + '.' + p.slice(1).join(''); if(p[1] && p[1].length > 3) v = p[0] + '.' + p[1].slice(0,3); if(v !== $event.target.value){ const pos = $event.target.selectionStart; $event.target.value = v; try{ $event.target.setSelectionRange(pos, pos); }catch(e){} } item.quantity = (v === '' || v === '.') ? '' : (parseFloat(v) || 0); recalculate(); })()"
+                                    @focus="setTimeout(() => $event.target.select(), 0)"
+                                    @click.stop="$event.target.select()"
+                                    @blur="if(item.quantity === '' || item.quantity === null || item.quantity < 0.001){ item.quantity = 1; $event.target.value = 1; recalculate(); }"
+                                    @keydown.arrow-up.stop.prevent="(() => { const next = document.querySelector('[data-qty-row=\'' + (index - 1) + '\']'); if(next){ next.focus(); next.select(); } })()"
+                                    @keydown.arrow-down.stop.prevent="(() => { const next = document.querySelector('[data-qty-row=\'' + (index + 1) + '\']'); if(next){ next.focus(); next.select(); } })()"
+                                    @keydown.enter.stop.prevent="(() => { const next = document.querySelector('[data-qty-row=\'' + (index + 1) + '\']'); if(next){ next.focus(); next.select(); } else { $event.target.blur(); } })()"
                                     class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition text-center font-semibold">
                             </div>
                             <div class="sm:col-span-2">

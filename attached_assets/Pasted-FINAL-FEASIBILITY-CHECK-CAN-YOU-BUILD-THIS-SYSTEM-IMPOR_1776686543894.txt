@@ -1,0 +1,118 @@
+FINAL FEASIBILITY CHECK — CAN YOU BUILD THIS SYSTEM?
+
+IMPORTANT:
+NO CODE
+NO THEORY
+NO GENERIC ANSWERS
+ONLY PRACTICAL ENGINEERING CAPABILITY
+
+GOAL:
+Confirm if you (Replit Agent) can ACTUALLY IMPLEMENT this system end-to-end
+
+SYSTEM SUMMARY:
+
+We want to build a UNIVERSAL PRA POS with:
+
+- ONE POS view (no multiple views)
+- Feature flag system (companies.feature_flags JSON)
+- Category-based defaults + user override
+- Restaurant UI as master UI for all
+- Single keyboard system (handleKey)
+- Stable quantity system (no append bug)
+- Agent system unchanged
+- PRA submission unchanged
+- No database destructive changes
+
+EXISTING STACK:
+
+Backend: Laravel 12 (PHP)
+Frontend: Blade + Alpine.js
+Database: MySQL
+Multi-tenant: company_id based
+Agent: Node/Electron desktop app (already working)
+
+TASK:
+
+1. CAPABILITY CHECK
+
+Can you implement ALL of this:
+
+- Merge pos/create-invoice + pos/restaurant/pos into ONE universal view
+- Build PosFeatureService (feature flags + dependency engine)
+- Refactor controllers safely (PosController + RestaurantPosController)
+- Remove duplicate keyboard systems and create ONE stable handler
+- Replace quantity system completely with stable implementation
+- Keep PRA + Agent system untouched
+
+Answer ONLY:
+YES / PARTIAL / NO
+
+---
+
+2. COMPLEXITY BREAKDOWN
+
+Which parts are:
+
+- EASY
+- MEDIUM
+- HARD
+- RISKY
+
+---
+
+3. BIGGEST RISK
+
+What is the SINGLE biggest risk that could break production?
+
+---
+
+4. TIME ESTIMATE (REALISTIC)
+
+Give ACTUAL time:
+
+- Phase 0–1 (foundation)
+- Phase 2–3 (UI + logic)
+- Phase 4–7 (rollout)
+
+---
+
+5. FAILURE SCENARIOS
+
+Where can this fail?
+
+Examples:
+- keyboard system conflict
+- feature flags inconsistency
+- hidden dependency bugs
+
+---
+
+6. HONEST LIMITATION
+
+What part are you NOT confident about?
+
+(NO POLITE ANSWERS — be brutally honest)
+
+---
+
+7. FINAL ANSWER
+
+Should we:
+
+A) Proceed immediately  
+B) Fix current POS first, then build  
+C) Avoid this approach  
+
+---
+
+OUTPUT FORMAT:
+
+Capability: YES / PARTIAL / NO  
+Complexity:  
+Risks:  
+Time:  
+Recommendation: A / B / C  
+
+NO EXTRA TALK
+NO CODE
+NO EXPLANATION OUTSIDE FORMAT

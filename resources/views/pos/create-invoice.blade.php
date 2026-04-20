@@ -4,13 +4,6 @@
         @keyframes priceGlow{0%{box-shadow:0 0 0 2px rgba(168,85,247,0.3)}50%{box-shadow:0 0 0 4px rgba(168,85,247,0.15)}100%{box-shadow:0 0 0 2px rgba(168,85,247,0.3)}}
     </style>
     <div class="pb-36" x-data="posInvoice()"
-         @keydown.window.f2.prevent="focusFirstSearch()"
-         @keydown.window.f4.prevent="openParkedOrders()"
-         @keydown.window.f6.prevent="focusCart()"
-         @keydown.window.f7.prevent="repeatLastOrder()"
-         @keydown.window.f8.prevent="focusPayment()"
-         @keydown.window.f9.prevent="parkOrder()"
-         @keydown.window.f10.prevent="newSale()"
          @keydown.window="handleGlobalKey($event)">
 
         {{-- ENTERPRISE CUSTOMER MODAL (auto-opens on POS load) --}}
@@ -418,13 +411,17 @@
                                 <input type="text" inputmode="decimal" pattern="[0-9]*\.?[0-9]*" autocomplete="off" maxlength="10"
                                     :data-qty-row="index"
                                     x-init="$el.value = item.quantity; $watch('item.quantity', v => { if(document.activeElement !== $el) $el.value = (v === '' || v === null) ? '' : v; })"
-                                    @input.stop="(() => { let v = $event.target.value.replace(/[^0-9.]/g,''); const p = v.split('.'); if(p.length > 2) v = p[0] + '.' + p.slice(1).join(''); if(p[1] && p[1].length > 3) v = p[0] + '.' + p[1].slice(0,3); if(v !== $event.target.value){ const pos = $event.target.selectionStart; $event.target.value = v; try{ $event.target.setSelectionRange(pos, pos); }catch(e){} } item.quantity = (v === '' || v === '.') ? '' : (parseFloat(v) || 0); recalculate(); })()"
-                                    @focus="setTimeout(() => $event.target.select(), 0)"
-                                    @click.stop="$event.target.select()"
-                                    @blur="if(item.quantity === '' || item.quantity === null || item.quantity < 0.001){ item.quantity = 1; $event.target.value = 1; recalculate(); }"
-                                    @keydown.arrow-up.stop.prevent="(() => { const next = document.querySelector('[data-qty-row=\'' + (index - 1) + '\']'); if(next){ next.focus(); next.select(); } })()"
-                                    @keydown.arrow-down.stop.prevent="(() => { const next = document.querySelector('[data-qty-row=\'' + (index + 1) + '\']'); if(next){ next.focus(); next.select(); } })()"
-                                    @keydown.enter.stop.prevent="(() => { const next = document.querySelector('[data-qty-row=\'' + (index + 1) + '\']'); if(next){ next.focus(); next.select(); } else { $event.target.blur(); } })()"
+                                    @input.stop="$event.target.value = $event.target.value.replace(/[^0-9.]/g,'')"
+                                    @focus.stop="$event.target.dataset.prev = item.quantity; $event.target.value = ''"
+                                    @click.stop="$event.target.dataset.prev = item.quantity; $event.target.value = ''"
+                                    @blur="(() => { const raw = $event.target.value.replace(/[^0-9.]/g,''); const prev = parseFloat($event.target.dataset.prev) || 1; let n = raw === '' || raw === '.' ? prev : (parseFloat(raw) || prev); if(!isFinite(n) || n < 0.001) n = prev || 1; item.quantity = n; $event.target.value = n; recalculate(); })()"
+                                    @keydown.stop
+                                    @keypress.stop
+                                    @keyup.stop
+                                    @keydown.arrow-up.stop.prevent="(() => { $event.target.blur(); const next = document.querySelector('[data-qty-row=\'' + (index - 1) + '\']'); if(next){ setTimeout(() => { next.focus(); }, 0); } })()"
+                                    @keydown.arrow-down.stop.prevent="(() => { $event.target.blur(); const next = document.querySelector('[data-qty-row=\'' + (index + 1) + '\']'); if(next){ setTimeout(() => { next.focus(); }, 0); } })()"
+                                    @keydown.enter.stop.prevent="(() => { $event.target.blur(); const next = document.querySelector('[data-qty-row=\'' + (index + 1) + '\']'); if(next){ setTimeout(() => { next.focus(); }, 0); } })()"
+                                    @keydown.escape.stop.prevent="$event.target.value = $event.target.dataset.prev || item.quantity; $event.target.blur()"
                                     class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition text-center font-semibold">
                             </div>
                             <div class="sm:col-span-2">
@@ -862,15 +859,31 @@
                 },
 
                 handleGlobalKey(e) {
-                    if (e.key === '?' && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) {
-                        e.preventDefault();
-                        this.showHelpModal = true;
-                        return;
-                    }
+                    console.log('MAIN KEY HANDLER', e.key);
+                    const tag = document.activeElement?.tagName;
+                    const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+                    // 'w' shortcut for Walk-in modal
                     if ((e.key === 'w' || e.key === 'W') && this.showCustomerModal && document.activeElement !== this.$refs.cmMobile) {
                         e.preventDefault();
                         this.confirmWalkIn();
+                        return;
                     }
+
+                    // 🔒 ISOLATION: User typing in input/textarea/select → ignore everything else
+                    if (isInput) return;
+
+                    // '?' help shortcut
+                    if (e.key === '?') { e.preventDefault(); this.showHelpModal = true; return; }
+
+                    // Function keys (single source — no @keydown.window.f* duplicates)
+                    if (e.key === 'F2')  { e.preventDefault(); this.focusFirstSearch(); return; }
+                    if (e.key === 'F4')  { e.preventDefault(); this.openParkedOrders(); return; }
+                    if (e.key === 'F6')  { e.preventDefault(); this.focusCart(); return; }
+                    if (e.key === 'F7')  { e.preventDefault(); this.repeatLastOrder(); return; }
+                    if (e.key === 'F8')  { e.preventDefault(); this.focusPayment(); return; }
+                    if (e.key === 'F9')  { e.preventDefault(); this.parkOrder(); return; }
+                    if (e.key === 'F10') { e.preventDefault(); this.newSale(); return; }
                 },
                 focusFirstSearch() {
                     this.$nextTick(() => {

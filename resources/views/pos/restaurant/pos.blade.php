@@ -384,7 +384,19 @@ window.addEventListener('popstate', function() {
                                 <button @click.stop="updateQty(index, -1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M20 12H4"/></svg>
                                 </button>
-                                <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6" :value="item.quantity" @input.stop="setQty(index, ($event.target.value === '' ? 1 : (parseInt($event.target.value.replace(/[^0-9]/g,'')) || 1)))" @keydown="if(['ArrowUp','ArrowDown','Escape','Enter'].includes($event.key)){ if($event.key==='Enter'){ $event.target.blur(); } return; } $event.stopPropagation();" @focus="qtyInputBuffer=''; $event.target.select()" @click.stop="$event.target.select()" @mousedown.stop class="w-14 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner" :class="activeCartIndex === index ? 'qty-pop' : ''">
+                                <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6"
+                                    x-init="$el.value = item.quantity; $watch('item.quantity', v => { if(document.activeElement !== $el) $el.value = v; })"
+                                    @input.stop="setQty(index, (parseInt($event.target.value.replace(/[^0-9]/g,'')) || 1))"
+                                    @focus.stop="qtyInputBuffer=''; activeCartIndex = index; cartMode = true; $event.target.select()"
+                                    @click.stop="activeCartIndex = index; cartMode = true; $event.target.select()"
+                                    @blur="$event.target.value = item.quantity"
+                                    @keydown.up.stop.prevent="$event.target.blur(); moveCartSelection(-1)"
+                                    @keydown.down.stop.prevent="$event.target.blur(); moveCartSelection(1)"
+                                    @keydown.escape.stop.prevent="$event.target.blur()"
+                                    @keydown.enter.stop.prevent="$event.target.blur()"
+                                    @mousedown.stop
+                                    class="w-14 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner"
+                                    :class="activeCartIndex === index ? 'qty-pop' : ''">
                                 <button @click.stop="updateQty(index, 1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M12 4v16m8-8H4"/></svg>
                                 </button>

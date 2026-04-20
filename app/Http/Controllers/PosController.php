@@ -14,8 +14,14 @@ use App\Models\PosTransactionItem;
 use App\Models\PosPayment;
 use App\Models\PosTaxRule;
 use App\Models\PraLog;
+use App\Models\RestaurantTable;
+use App\Models\RestaurantOrder;
+use App\Models\ProductRecipe;
+use App\Models\Ingredient;
 use App\Services\PraIntegrationService;
+use App\Services\PosFeatureService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class PosController extends Controller
@@ -112,6 +118,10 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
+        if ($company && $company->use_universal_pos) {
+            return $this->universalCreateInvoice($request);
+        }
+
         if ($company && $company->restaurant_mode) {
             return app(RestaurantPosController::class)->pos($request);
         }
@@ -153,6 +163,129 @@ class PosController extends Controller
             ->get();
 
         return view('pos.create-invoice', compact('company', 'products', 'services', 'taxRules', 'terminals', 'draftInvoice', 'pendingDrafts', 'posCustomers'));
+    }
+
+    public function universalCreateInvoice(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $features = PosFeatureService::forCompany($company);
+
+        $products = PosProduct::where('company_id', $companyId)->where('is_active', true)->get();
+        $services = PosService::where('company_id', $companyId)->where('is_active', true)->get();
+        $categories = $products->pluck('category')->filter()->unique()->sort()->values();
+        $productIds = $products->pluck('id')->toArray();
+
+        $recipeLookup = [];
+        $stockStatus = [];
+        $ingredientCosts = [];
+        $lowStockAlerts = collect();
+        if ($features->recipes && class_exists(ProductRecipe::class)) {
+            $recipeLookup = ProductRecipe::where('company_id', $companyId)
+                ->whereIn('product_id', $productIds)->pluck('product_id')->unique()->toArray();
+            $recipes = ProductRecipe::where('company_id', $companyId)->with('ingredient')->get()->groupBy('product_id');
+            foreach ($recipes as $productId => $productRecipes) {
+                $status = 'available';
+                $cost = 0;
+                foreach ($productRecipes as $recipe) {
+                    $ing = $recipe->ingredient;
+                    if (!$ing || !$ing->is_active) continue;
+                    if ((float)$ing->current_stock < (float)$recipe->quantity_needed) { $status = 'out'; }
+                    elseif (method_exists($ing, 'isLowStock') && $ing->isLowStock()) { $status = 'low'; }
+                    $cost += (float)$recipe->quantity_needed * (float)($ing->cost_per_unit ?? 0);
+                }
+                $stockStatus[$productId] = $status;
+                $ingredientCosts[$productId] = round($cost, 2);
+            }
+            $lowStockAlerts = Ingredient::where('company_id', $companyId)
+                ->where('is_active', true)
+                ->whereColumn('current_stock', '<=', 'min_stock_level')
+                ->select('name', 'current_stock', 'min_stock_level', 'unit')->get();
+        }
+
+        $tables = collect();
+        $selectedTable = null;
+        if ($features->tables && class_exists(RestaurantTable::class)) {
+            $tables = RestaurantTable::where('company_id', $companyId)
+                ->where('is_active', true)->orderBy('sort_order')->get();
+            $tableId = $request->get('table_id');
+            $selectedTable = $tableId ? RestaurantTable::where('company_id', $companyId)->find($tableId) : null;
+        }
+
+        $heldOrders = collect();
+        if ($features->kot && class_exists(RestaurantOrder::class)) {
+            $heldOrders = RestaurantOrder::where('company_id', $companyId)
+                ->whereIn('status', ['held', 'preparing', 'ready'])
+                ->with(['table', 'items'])->orderBy('created_at', 'desc')->get();
+        }
+
+        $customers = PosCustomer::where('company_id', $companyId)->orderBy('name')->get();
+        $taxRate = PosTaxRule::getRateForMethod('cash');
+        $taxRules = PosTaxRule::where('is_active', true)->get()->keyBy('payment_method');
+        $blockOutOfStock = (bool)($company->block_out_of_stock ?? false);
+
+        $user = Auth::guard('pos')->user();
+        $posRole = $user->pos_role ?? 'pos_cashier';
+        $discountLimit = $posRole === 'pos_admin'
+            ? (float)($company->manager_discount_limit ?? 50)
+            : (float)($company->cashier_discount_limit ?? 10);
+        $hasManagerPin = !empty($company->manager_override_pin);
+
+        return view('pos.universal', compact(
+            'company', 'features', 'products', 'services', 'categories',
+            'recipeLookup', 'tables', 'selectedTable', 'heldOrders',
+            'customers', 'taxRate', 'taxRules', 'stockStatus', 'blockOutOfStock',
+            'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts',
+            'lowStockAlerts'
+        ));
+    }
+
+    public function featureSettings(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $features = PosFeatureService::forCompany($company);
+        $categories = PosFeatureService::categories();
+        $allFlags = PosFeatureService::ALL_FLAGS;
+        return view('pos.feature-settings', compact('company', 'features', 'categories', 'allFlags'));
+    }
+
+    public function updateFeatureSettings(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        if (!$company) { abort(404); }
+
+        $data = $request->validate([
+            'business_category' => 'nullable|string|max:60',
+            'use_universal_pos' => 'nullable|boolean',
+            'pos_ui_density'    => 'nullable|in:simple,standard,premium',
+            'feature_flags'     => 'nullable|array',
+        ]);
+
+        $flags = [];
+        foreach (PosFeatureService::ALL_FLAGS as $flag) {
+            $flags[$flag] = (bool) $request->input("feature_flags.$flag", false);
+        }
+
+        $company->update([
+            'business_category' => $data['business_category'] ?? $company->business_category,
+            'feature_flags'     => $flags,
+            'use_universal_pos' => (bool) ($data['use_universal_pos'] ?? false),
+            'pos_ui_density'    => $data['pos_ui_density'] ?? $company->pos_ui_density ?? 'standard',
+        ]);
+
+        return redirect()->route('pos.features')->with('success', 'POS features updated.');
+    }
+
+    public function resetFeaturesToCategory(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        if (!$company) { abort(404); }
+        $defaults = PosFeatureService::defaultsForCategory($company->business_category ?: 'retail');
+        $company->update(['feature_flags' => $defaults]);
+        return redirect()->route('pos.features')->with('success', 'Features reset to ' . $company->business_category . ' defaults.');
     }
 
     public function storeInvoice(Request $request)

@@ -52,6 +52,10 @@ class Company extends Model
         'kds_enabled',
         'restaurant_mode',
         'pos_type',
+        'business_category',
+        'feature_flags',
+        'use_universal_pos',
+        'pos_ui_density',
         'pos_theme',
         'pos_dashboard_style',
         'kitchen_printer_enabled',
@@ -100,6 +104,8 @@ class Company extends Model
         'fbr_reporting_enabled' => 'boolean',
         'agent_enabled' => 'boolean',
         'agent_last_seen' => 'datetime',
+        'feature_flags' => 'array',
+        'use_universal_pos' => 'boolean',
     ];
 
     protected $hidden = [

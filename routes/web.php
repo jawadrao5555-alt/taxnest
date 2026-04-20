@@ -399,6 +399,10 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::post('/settings/theme', [PosController::class, 'updateTheme'])->name('pos.settings.theme');
     Route::post('/settings/dashboard-style', [PosController::class, 'updateDashboardStyle'])->name('pos.settings.dashboard-style');
     Route::get('/invoice/create', [PosController::class, 'createInvoice'])->name('pos.invoice.create');
+    Route::get('/v2/invoice/create', [PosController::class, 'universalCreateInvoice'])->name('pos.v2.invoice.create');
+    Route::get('/features', [PosController::class, 'featureSettings'])->name('pos.features');
+    Route::post('/features', [PosController::class, 'updateFeatureSettings'])->name('pos.features.update');
+    Route::post('/features/reset', [PosController::class, 'resetFeaturesToCategory'])->name('pos.features.reset');
     Route::post('/invoice/store', [PosController::class, 'storeInvoice'])->name('pos.invoice.store');
     Route::get('/transactions', [PosController::class, 'transactions'])->name('pos.transactions');
     Route::get('/transaction/{id}', [PosController::class, 'transactionShow'])->name('pos.transaction.show');

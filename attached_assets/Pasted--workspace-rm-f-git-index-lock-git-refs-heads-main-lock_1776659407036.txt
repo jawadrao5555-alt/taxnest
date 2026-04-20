@@ -1,0 +1,130 @@
+~/workspace$ rm -f .git/index.lock .git/refs/heads/main.lock
+~/workspace$ git fetch origin main
+remote: Enumerating objects: 68, done.
+remote: Counting objects: 100% (67/67), done.
+remote: Compressing objects: 100% (62/62), done.
+remote: Total 68 (delta 41), reused 2 (delta 2), pack-reused 1 (from 1)
+Unpacking objects: 100% (68/68), 15.31 KiB | 1.09 MiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+error: cannot lock ref 'refs/remotes/origin/main': Unable to create '/home/runner/workspace/.git/refs/remotes/origin/main.lock': File exists.
+
+Another git process seems to be running in this repository, e.g.
+an editor opened by 'git commit'. Please make sure all processes
+are terminated then try again. If it still fails, a git process
+may have crashed in this repository earlier:
+remove the file manually to continue.
+ ! 82efdef..11a8339  main       -> origin/main  (unable to update local ref)
+~/workspace$ git pull origin main --no-rebase --no-edit
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+error: cannot lock ref 'refs/remotes/origin/main': Unable to create '/home/runner/workspace/.git/refs/remotes/origin/main.lock': File exists.
+
+Another git process seems to be running in this repository, e.g.
+an editor opened by 'git commit'. Please make sure all processes
+are terminated then try again. If it still fails, a git process
+may have crashed in this repository earlier:
+remove the file manually to continue.
+ ! 82efdef..11a8339  main       -> origin/main  (unable to update local ref)
+~/workspace$ git push origin main
+To https://github.com/jawadrao5555-alt/taxnest.git
+ ! [rejected]        main -> main (non-fast-forward)
+error: failed to push some refs to 'https://github.com/jawadrao5555-alt/taxnest.git'
+hint: Updates were rejected because the tip of your current branch is behind
+hint: its remote counterpart. If you want to integrate the remote changes,
+hint: use 'git pull' before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+~/workspace$ ~/workspace$ rm -f .git/index.lock .git/refs/heads/main.lock
+~/workspace$ git fetch origin main
+remote: Enumerating objects: 68, done.
+remote: Counting objects: 100% (67/67), done.
+remote: Compressing objects: 100% (62/62), done.
+remote: Total 68 (delta 41), reused 2 (delta 2), pack-reused 1 (from 1)
+Unpacking objects: 100% (68/68), 15.31 KiB | 1.09 MiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+error: cannot lock ref 'refs/remotes/origin/main': Unable to create '/home/runner/workspace/.git/refs/remotes/origin/main.lock': File exists.
+
+Another git process seems to be running in this repository, e.g.
+an editor opened by 'git commit'. Please make sure all processes
+are terminated then try again. If it still fails, a git process
+may have crashed in this repository earlier:
+remove the file manually to continue.
+ ! 82efdef..11a8339  main       -> origin/main  (unable to update local ref)
+~/workspace$ git pull origin main --no-rebase --no-edit
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+error: cannot lock ref 'refs/remotes/origin/main': Unable to create '/home/runner/workspace/.git/refs/remotes/origin/main.lock': File exists.
+
+Another git process seems to be running in this repository, e.g.
+an editor opened by 'git commit'. Please make sure all processes
+are terminated then try again. If it still fails, a git process
+may have crashed in this repository earlier:
+remove the file manually to continue.
+ ! 82efdef..11a8339  main       -> origin/main  (unable to update local ref)
+~/workspace$ git push origin main
+To https://github.com/jawadrao5555-alt/taxnest.git
+ ! [rejected]        main -> main (non-fast-forward)
+error: failed to push some refs to 'https://github.com/jawadrao5555-alt/taxnest.git'
+hint: Updates were rejected because the tip of your current branch is behind
+hint: its remote counterpart. If you want to integrate the remote changes,
+hint: use 'git pull' before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+~/workspace$ 
+bash: /home/runner/workspace$: No such file or directory
+bash: /home/runner/workspace$: No such file or directory
+bash: remote:: command not found
+bash: syntax error near unexpected token `('
+bash: syntax error near unexpected token `('
+bash: syntax error near unexpected token `('
+bash: syntax error near unexpected token `('
+bash: From: command not found
+bash: app: command not found
+bash: error:: command not found
+bash: Another: command not found
+an: command not installed, but was located via Nix.
+package: uwimap  2007f  UW IMAP toolkit - IMAP-supporting software developed by the UW
+Would you like to run an from Nix and add it to your project? [Yn]: rm -f .git/refs/remotes/origin/main.lock .git/refs/heads/main.lock .git/index.lock
+bash: are: command not found
+bash: may: command not found
+bash: remove: command not found
+bash: syntax error near unexpected token `('
+bash: /home/runner/workspace$: No such file or directory
+bash: From: command not found
+bash: app: command not found
+bash: error:: command not found
+bash: Another: command not found
+an: command not installed, but was located via Nix.
+package: uwimap  2007f  UW IMAP toolkit - IMAP-supporting software developed by the UW
+Would you like to run an from Nix and add it to your project? [Yn]: n       
+bash: are: command not found
+bash: may: command not found
+bash: remove: command not found
+bash: syntax error near unexpected token `('
+bash: /home/runner/workspace$: No such file or directory
+bash: To: command not found
+bash: syntax error near unexpected token `('
+bash: error:: command not found
+bash: hint:: command not found
+bash: hint:: command not found
+bash: hint:: command not found
+bash: hint:: command not found
+bash: /home/runner/workspace$: No such file or directory
+~/workspace$ rm -f .git/refs/remotes/origin/main.lock .git/refs/heads/main.lock .git/index.lock && git pull origin main --no-rebase --no-edit && git push origin main
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+   82efdef..11a8339  main       -> origin/main
+Auto-merging .github/workflows/build-agent.yml
+CONFLICT (add/add): Merge conflict in .github/workflows/build-agent.yml
+Auto-merging pra-agent/main.js
+CONFLICT (content): Merge conflict in pra-agent/main.js
+Auto-merging resources/views/layouts/pos-app.blade.php
+Auto-merging resources/views/pos/restaurant/pos.blade.php
+Auto-merging routes/web.php
+Automatic merge failed; fix conflicts and then commit the result.
+~/workspace$ rm -f .git/refs/remotes/origin/main.lock .git/refs/heads/main.lock .git/index.lock && git pull origin main --no-rebase --no-edit && git push origin main
+error: Pulling is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+~/workspace$ 

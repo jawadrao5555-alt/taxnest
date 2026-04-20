@@ -386,16 +386,19 @@ window.addEventListener('popstate', function() {
                                 </button>
                                 <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6"
                                     data-qty-input="true"
-                                    x-init="$el.value = item.quantity"
-                                    x-effect="if(document.activeElement !== $el){ $el.value = item.quantity; }"
-                                    @input.stop="(() => { const raw = $event.target.value.replace(/[^0-9]/g,''); if(raw === '') return; const n = parseInt(raw); if(!isNaN(n) && n > 0){ setQty(index, n); } })()"
-                                    @focus.stop="qtyInputBuffer=''; activeCartIndex = index; cartMode = true; setTimeout(() => $event.target.select(), 0)"
+                                    :value="item.quantity"
+                                    @input.stop="$event.target.value = $event.target.value.replace(/[^0-9]/g,'').slice(0,6)"
+                                    @focus.stop="activeCartIndex = index; cartMode = true; setTimeout(() => $event.target.select(), 0)"
                                     @click.stop="activeCartIndex = index; cartMode = true; $event.target.select()"
+                                    @change.stop="(() => { const n = parseInt($event.target.value.replace(/[^0-9]/g,'')) || 1; setQty(index, n); $event.target.value = n; })()"
                                     @blur="(() => { const n = parseInt($event.target.value.replace(/[^0-9]/g,'')) || 1; setQty(index, n); $event.target.value = n; })()"
-                                    @keydown.up.stop.prevent="(() => { const all = document.querySelectorAll('[data-qty-input]'); const i = Array.from(all).indexOf($event.target); if(i > 0){ all[i-1].focus(); all[i-1].select(); } })()"
-                                    @keydown.down.stop.prevent="(() => { const all = document.querySelectorAll('[data-qty-input]'); const i = Array.from(all).indexOf($event.target); if(i >= 0 && i < all.length - 1){ all[i+1].focus(); all[i+1].select(); } })()"
-                                    @keydown.escape.stop.prevent="$event.target.blur()"
-                                    @keydown.enter.stop.prevent="(() => { const all = document.querySelectorAll('[data-qty-input]'); const i = Array.from(all).indexOf($event.target); if(i >= 0 && i < all.length - 1){ all[i+1].focus(); all[i+1].select(); } else { $event.target.blur(); } })()"
+                                    @keydown.up.stop.prevent="(() => { $event.target.blur(); const all = document.querySelectorAll('[data-qty-input]'); const i = Array.from(all).indexOf($event.target); if(i > 0){ setTimeout(() => { all[i-1].focus(); all[i-1].select(); }, 0); } })()"
+                                    @keydown.down.stop.prevent="(() => { $event.target.blur(); const all = document.querySelectorAll('[data-qty-input]'); const i = Array.from(all).indexOf($event.target); if(i >= 0 && i < all.length - 1){ setTimeout(() => { all[i+1].focus(); all[i+1].select(); }, 0); } })()"
+                                    @keydown.escape.stop.prevent="$event.target.value = item.quantity; $event.target.blur()"
+                                    @keydown.enter.stop.prevent="(() => { $event.target.blur(); const all = document.querySelectorAll('[data-qty-input]'); const i = Array.from(all).indexOf($event.target); if(i >= 0 && i < all.length - 1){ setTimeout(() => { all[i+1].focus(); all[i+1].select(); }, 0); } })()"
+                                    @keydown.stop
+                                    @keypress.stop
+                                    @keyup.stop
                                     @mousedown.stop
                                     class="w-14 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner"
                                     :class="activeCartIndex === index ? 'qty-pop' : ''">
@@ -1115,6 +1118,12 @@ function restaurantPos() {
             document.addEventListener('keydown', (e) => {
                 const tag = document.activeElement?.tagName;
                 const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+                // BULLETPROOF: If user is in a qty input, NEVER intercept any key
+                // (qty input handles its own digits, arrows, enter, escape)
+                if (document.activeElement?.dataset?.qtyInput === 'true') {
+                    return;
+                }
 
                 if (this.showReceipt) {
                     if (e.key === 'Escape') { e.preventDefault(); this.showReceipt = false; return; }

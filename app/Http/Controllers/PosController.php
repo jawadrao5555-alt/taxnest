@@ -118,10 +118,14 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
-        if ($company && $company->use_universal_pos) {
-            return $this->universalCreateInvoice($request);
-        }
+        \Log::info('POS MODE ACTIVE', [
+            'company_id' => $company?->id,
+            'mode' => 'UNIVERSAL',
+        ]);
 
+        return $this->universalCreateInvoice($request);
+
+        // Legacy paths preserved (unreachable, kept for rollback reference)
         if ($company && $company->restaurant_mode) {
             return app(RestaurantPosController::class)->pos($request);
         }

@@ -10,8 +10,14 @@ return new class extends Migration
     {
         // NestPOS: widen quantity to decimal so 1.5 KG / 0.75 LTR work
         if (Schema::hasColumn('pos_transaction_items', 'quantity')) {
-            DB::statement('ALTER TABLE pos_transaction_items ALTER COLUMN quantity TYPE numeric(15,3) USING quantity::numeric(15,3)');
-            DB::statement("ALTER TABLE pos_transaction_items ALTER COLUMN quantity SET DEFAULT 1");
+            $driver = DB::connection()->getDriverName();
+            if ($driver === 'mysql' || $driver === 'mariadb') {
+                DB::statement('ALTER TABLE pos_transaction_items MODIFY COLUMN quantity DECIMAL(15,3) NOT NULL DEFAULT 1');
+            } elseif ($driver === 'pgsql') {
+                DB::statement('ALTER TABLE pos_transaction_items ALTER COLUMN quantity TYPE numeric(15,3) USING quantity::numeric(15,3)');
+                DB::statement("ALTER TABLE pos_transaction_items ALTER COLUMN quantity SET DEFAULT 1");
+            }
+            // sqlite: skip
         }
     }
 

@@ -25,7 +25,7 @@
         <meta name="apple-mobile-web-app-title" content="Nest Pra Pos">
         <meta name="mobile-web-app-capable" content="yes">
         <meta name="application-name" content="Nest Pra Pos">
-        <link rel="manifest" href="/manifest-pos.json">
+        <link rel="manifest" href="/manifest-pos.json?v=2">
         <link rel="apple-touch-icon" href="/icons/nest-pra/icon-192.png">
         <link rel="icon" type="image/png" sizes="192x192" href="/icons/nest-pra/icon-192.png">
         <link rel="icon" type="image/png" sizes="512x512" href="/icons/nest-pra/icon-512.png">

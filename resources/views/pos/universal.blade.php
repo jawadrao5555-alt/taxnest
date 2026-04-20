@@ -390,17 +390,10 @@ window.addEventListener('popstate', function() {
                                 <button @click.stop="updateQty(index, -1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M20 12H4"/></svg>
                                 </button>
-                                <input type="number" min="1" max="999999" step="1"
-                                    x-model.number="item.quantity"
-                                    @focus.stop="activeCartIndex = index; cartMode = true"
-                                    @click.stop="activeCartIndex = index; cartMode = true"
-                                    @blur="if(!Number.isFinite(Number(item.quantity)) || Number(item.quantity) < 1) item.quantity = 1"
-                                    @keydown.stop
-                                    @keypress.stop
-                                    @keyup.stop
-                                    @mousedown.stop
-                                    class="w-14 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                    :class="activeCartIndex === index ? 'qty-pop' : ''">
+                                <input type="number" min="1" step="1"
+                                    :value="item.quantity"
+                                    @input="item.quantity = Math.max(1, parseInt($event.target.value) || 1)"
+                                    class="w-14 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
                                 <button @click.stop="updateQty(index, 1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M12 4v16m8-8H4"/></svg>
                                 </button>
@@ -1350,7 +1343,9 @@ function restaurantPos() {
             }
 
             // 🔒 ISOLATION: User typing in any input → keyboard engine never runs
-            if (isInput) return;
+            // Exception: number inputs (qty) handle themselves natively
+            if (isInput && e.target.type !== 'number') return;
+            if (isInput && e.target.type === 'number') return;
 
             if (e.key === 'F1') { e.preventDefault(); this.showShortcuts = !this.showShortcuts; return; }
             if (e.key === 'F2') { e.preventDefault(); this.cartMode = false; this.activeCartIndex = -1; this.enterSearchMode(); return; }

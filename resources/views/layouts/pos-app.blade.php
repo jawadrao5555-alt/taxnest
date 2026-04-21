@@ -4,10 +4,10 @@
     $posUserLayout = auth('pos')->user();
     $isCashierLayout = $posUserLayout && $posUserLayout->isPosCashier();
     $companyLayout = \App\Models\Company::find(app('currentCompanyId'));
-    $__restaurantBizCats = ['restaurant', 'hotel', 'cafe', 'bakery', 'food', 'fast_food', 'fast-food', 'fine_dining', 'fine-dining'];
-    $__bizCat = strtolower(trim($companyLayout->business_category ?? ''));
-    $__isRestaurantBusiness = in_array($__bizCat, $__restaurantBizCats);
-    $isRestaurantLayout = $companyLayout && $__isRestaurantBusiness && ($companyLayout->pos_type === 'restaurant' || $companyLayout->restaurant_mode);
+    // Restaurant nav features (Tables, KDS, Ingredients, Recipes) gate.
+    // Single source of truth = companies.restaurant_mode (toggle in Business Profile).
+    // Disable that toggle → restaurant nav items disappear immediately, regardless of business_category or pos_type.
+    $isRestaurantLayout = $companyLayout && (bool) $companyLayout->restaurant_mode;
     $praEnabledLayout = $companyLayout && $companyLayout->pra_reporting_enabled;
     $inventoryEnabledLayout = $companyLayout && $companyLayout->inventory_enabled;
     $companyName = $companyLayout->name ?? 'My Business';

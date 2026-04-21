@@ -1,6 +1,6 @@
 // TaxNest Suite Service Worker — Tax DI / Nest Pra Pos / Nest FBR Pos
 // Strategy: Stale-while-revalidate for static assets, network-first for HTML, offline fallback.
-const CACHE_VERSION = 'taxnest-v20';
+const CACHE_VERSION = 'taxnest-v21';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const OFFLINE_PAGE = '/offline-splash';
@@ -46,7 +46,7 @@ self.addEventListener('fetch', e => {
     if (url.origin !== location.origin) return;
 
     // Never cache: auth, API, admin, agent, FBR submit, payment posting, livewire, debugbar
-    const skipPatterns = ['/api/', '/login', '/logout', '/register', '/admin/', '/agent/', '/livewire/', '/_debugbar/', '/setup-', '/sanctum/', '/broadcasting/'];
+    const skipPatterns = ['/api/', '/login', '/logout', '/register', '/admin/', '/agent/', '/livewire/', '/_debugbar/', '/setup-', '/sanctum/', '/broadcasting/', '/pos/invoice/create', '/pos/v2/invoice/create', '/pos/create-invoice'];
     if (skipPatterns.some(p => url.pathname.includes(p))) return;
 
     // HTML pages: network-first → cache → offline page

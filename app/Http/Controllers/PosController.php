@@ -235,13 +235,16 @@ class PosController extends Controller
             : (float)($company->cashier_discount_limit ?? 10);
         $hasManagerPin = !empty($company->manager_override_pin);
 
-        return view('pos.universal', compact(
+        return response(view('pos.universal', compact(
             'company', 'features', 'products', 'services', 'categories',
             'recipeLookup', 'tables', 'selectedTable', 'heldOrders',
             'customers', 'taxRate', 'taxRules', 'stockStatus', 'blockOutOfStock',
             'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts',
             'lowStockAlerts'
-        ));
+        )))
+        ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        ->header('Pragma', 'no-cache')
+        ->header('Expires', '0');
     }
 
     public function featureSettings(Request $request)

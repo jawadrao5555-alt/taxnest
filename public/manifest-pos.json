@@ -19,7 +19,7 @@
     "lang": "en",
     "dir": "ltr",
     "shortcuts": [
-        { "name": "New Sale", "short_name": "Sale", "url": "/pos/create-invoice", "icons": [{"src": "/icons/nest-pra/icon-192.png", "sizes": "192x192"}] },
+        { "name": "New Sale", "short_name": "Sale", "url": "/pos/invoice/create", "icons": [{"src": "/icons/nest-pra/icon-192.png", "sizes": "192x192"}] },
         { "name": "Dashboard", "short_name": "Dashboard", "url": "/pos/dashboard", "icons": [{"src": "/icons/nest-pra/icon-192.png", "sizes": "192x192"}] },
         { "name": "Completed Invoices", "short_name": "Invoices", "url": "/pos/completed-invoices", "icons": [{"src": "/icons/nest-pra/icon-192.png", "sizes": "192x192"}] },
         { "name": "Products", "short_name": "Products", "url": "/pos/products", "icons": [{"src": "/icons/nest-pra/icon-192.png", "sizes": "192x192"}] }

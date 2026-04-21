@@ -1,4 +1,10 @@
+@php
+    $__sp_user = auth('pos')->user() ?? auth()->user();
+    $__sp_role = $__sp_user->pos_role ?? $__sp_user->role ?? 'pos_cashier';
+    $__sp_isAdmin = in_array($__sp_role, ['pos_admin', 'company_admin']);
+@endphp
 <div class="flex items-center gap-3 flex-shrink-0" x-data="{ styleOpen: false, currentStyle: '{{ $dashboardStyle ?? 'default' }}' }">
+    @if($__sp_isAdmin)
     <div x-data="{ praEnabled: {{ ($praStatus ?? $company->pra_reporting_enabled ?? false) ? 'true' : 'false' }}, praLoading: false }" class="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 shadow-md">
         <span class="text-xs font-extrabold text-gray-900 dark:text-white uppercase tracking-wide">PRA Reporting</span>
         <button @click="praLoading=true; fetch('{{ route('pos.api.toggle-pra') }}', {method:'POST', headers:{'X-CSRF-TOKEN':'{{ csrf_token() }}','Content-Type':'application/json'}}).then(r=>r.json()).then(d=>{praEnabled=d.enabled; praLoading=false;})" :class="praEnabled ? 'bg-purple-600' : 'bg-gray-400 dark:bg-gray-500'" class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out" :disabled="praLoading">
@@ -6,6 +12,7 @@
         </button>
         <span x-text="praEnabled ? 'ON' : 'OFF'" :class="praEnabled ? 'text-purple-700 font-black' : 'text-gray-600 font-extrabold'" class="text-xs"></span>
     </div>
+    @endif
     <div class="relative">
         <button @click.stop="styleOpen = !styleOpen" class="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white hover:text-purple-600 dark:hover:text-purple-400 transition shadow-md" title="Dashboard Style">
             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>

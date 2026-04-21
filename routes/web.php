@@ -511,6 +511,7 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::get('/restaurant/api/live-orders', [RestaurantKdsController::class, 'liveOrders'])->name('pos.restaurant.live-orders');
     Route::get('/restaurant/orders/{id}/kitchen-ticket', [RestaurantPosController::class, 'kitchenTicket'])->name('pos.restaurant.kitchen-ticket');
     Route::post('/restaurant/orders/{id}/resend-kitchen', [RestaurantPosController::class, 'resendKitchen'])->name('pos.restaurant.orders.resend-kitchen');
+    Route::post('/api/toggle-auto-kot', [PosController::class, 'toggleAutoKot'])->name('pos.api.toggle-auto-kot');
     Route::get('/restaurant/dashboard', [RestaurantPosController::class, 'dashboard'])->name('pos.restaurant.dashboard');
     Route::get('/restaurant/receipt/{id}', [RestaurantPosController::class, 'receipt'])->name('pos.restaurant.receipt');
     Route::get('/restaurant/api/check-stock', [RestaurantPosController::class, 'checkStock'])->name('pos.restaurant.check-stock');

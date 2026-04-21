@@ -108,7 +108,7 @@ window.addEventListener('popstate', function() {
 
 <div x-data="restaurantPos()" x-init="init()" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
     <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-bold tracking-wider uppercase px-3 py-1 text-center shadow-sm">
-        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v11.1-KOT-FLOW
+        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v12-AUTO-KOT
     </div>
 
     {{-- PRA Reporting + Auto-Print toggles strip (visible to admin + cashier).
@@ -118,7 +118,8 @@ window.addEventListener('popstate', function() {
          x-data="{
             praEnabled: {{ ($company->pra_reporting_enabled ?? false) ? 'true' : 'false' }},
             praLoading: false,
-            autoPrintLoading: false
+            autoPrintLoading: false,
+            autoKotLoading: false
          }">
 
         {{-- PRA Reporting --}}
@@ -150,6 +151,25 @@ window.addEventListener('popstate', function() {
             <span x-text="autoPrintEnabled ? 'ON' : 'OFF'" :class="autoPrintEnabled ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-500 dark:text-gray-400'" class="text-[10px] font-black w-7"></span>
             <span x-show="autoPrintLoading" class="text-[10px] text-emerald-500 animate-pulse">…</span>
         </div>
+
+        @if($company->restaurant_mode ?? false)
+        <div class="w-px h-4 bg-purple-200 dark:bg-purple-800/40"></div>
+
+        {{-- Auto-KOT (Phase 5+) — when ON, the kitchen ticket print dialog also pops
+             open right after a successful payment of a held/restaurant order. --}}
+        <div class="flex items-center gap-2" title="When ON, the kitchen ticket auto-prints right after payment of a held order — counter prints receipt, kitchen prints KOT.">
+            <span class="text-[10px] uppercase tracking-wider font-extrabold text-orange-700 dark:text-orange-300">🍳 Auto-KOT</span>
+            <button type="button"
+                @click="autoKotLoading = true; fetch('{{ route('pos.api.toggle-auto-kot') }}', { method:'POST', headers:{ 'X-CSRF-TOKEN':'{{ csrf_token() }}', 'Content-Type':'application/json', 'Accept':'application/json' } }).then(r => r.json()).then(d => { if (d.success) { autoKotEnabled = !!d.enabled; window.tnNotify && window.tnNotify('Auto-KOT', autoKotEnabled ? 'Enabled' : 'Disabled'); } else { alert(d.message || 'Toggle failed'); } autoKotLoading = false; }).catch(() => { autoKotLoading = false; alert('Toggle failed'); })"
+                :disabled="autoKotLoading"
+                :class="autoKotEnabled ? 'bg-orange-600' : 'bg-gray-400 dark:bg-gray-600'"
+                class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out shadow-inner">
+                <span :class="autoKotEnabled ? 'translate-x-5' : 'translate-x-0.5'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5"></span>
+            </button>
+            <span x-text="autoKotEnabled ? 'ON' : 'OFF'" :class="autoKotEnabled ? 'text-orange-700 dark:text-orange-300' : 'text-gray-500 dark:text-gray-400'" class="text-[10px] font-black w-7"></span>
+            <span x-show="autoKotLoading" class="text-[10px] text-orange-500 animate-pulse">…</span>
+        </div>
+        @endif
     </div>
 
     <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0 shadow-sm">
@@ -886,7 +906,7 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
-    <div x-show="showReceipt" x-transition.opacity @keydown.escape.window="if(showReceipt) { showReceipt = false; }" @click.self="showReceipt = false" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div x-show="showReceipt" x-transition.opacity @keydown.escape.window="if(showReceipt) { cancelReceiptAutoClose(); showReceipt = false; }" @click.self="cancelReceiptAutoClose(); showReceipt = false;" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="receipt-modal-enter bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" style="max-height:92vh;" x-transition.scale.90>
             <div class="relative p-5 text-center bg-gradient-to-b from-green-50 to-white dark:from-green-900/20 dark:to-gray-900 flex-shrink-0" id="confettiContainer">
                 <div class="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center mb-3 shadow-lg shadow-green-600/30 success-icon-animate" style="animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)">
@@ -907,20 +927,16 @@ window.addEventListener('popstate', function() {
             <div class="flex-1 overflow-hidden bg-gray-50 dark:bg-gray-800/50 min-h-0" style="max-height: 45vh;">
                 <iframe x-ref="receiptIframe" class="w-full h-full border-0" :src="lastTransactionId ? ('/pos/restaurant/receipt/' + lastTransactionId + (autoPrintEnabled ? '?auto_print=1' : '')) : ''" style="min-height:300px;"></iframe>
             </div>
-            <div class="p-3 space-y-2 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
-                <div class="grid grid-cols-3 gap-2">
-                    <button @click="printReceipt()" class="py-3 text-center rounded-xl bg-gradient-to-br from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800 text-white text-sm font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-1.5">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                        Print <kbd class="text-[8px] bg-purple-500/40 px-1 rounded font-mono">P</kbd>
-                    </button>
-                    <button @click="startNewAfterPayment()" class="py-3 text-center rounded-xl bg-gradient-to-br from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white text-sm font-bold transition shadow-md shadow-green-600/20 flex items-center justify-center gap-1.5">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-                        New <kbd class="text-[8px] bg-green-500/40 px-1 rounded font-mono">Enter</kbd>
-                    </button>
-                    <button @click="showReceipt = false" class="py-3 text-center rounded-xl bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 text-sm font-semibold transition flex items-center justify-center gap-1.5">
-                        Close <kbd class="text-[8px] bg-gray-300 dark:bg-gray-600 px-1 rounded font-mono">Esc</kbd>
-                    </button>
-                </div>
+            {{-- Phase 5+ — simplified post-production view: only the receipt + a single Print action.
+                 'New Sale' and 'Close' buttons removed. Modal auto-dismisses (4s) so the cashier can chain
+                 sales hands-free; Esc / outside-click also dismiss; clicking Print cancels the auto-close. --}}
+            <div class="p-3 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
+                <button @click="cancelReceiptAutoClose(); printReceipt()" class="w-full py-3.5 text-center rounded-xl bg-gradient-to-br from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800 text-white text-base font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                    Print Receipt
+                    <kbd class="text-[10px] bg-purple-500/40 px-1.5 py-0.5 rounded font-mono ml-1">P</kbd>
+                </button>
+                <p class="text-[10px] text-center text-gray-400 dark:text-gray-500 mt-2 tracking-wide">Auto-dismissing in a few seconds · press <kbd class="font-mono bg-gray-100 dark:bg-gray-800 px-1 rounded">Esc</kbd> to close now</p>
             </div>
         </div>
     </div>
@@ -1150,6 +1166,10 @@ function restaurantPos() {
         showShortcuts: false,
         // Phase 4 — Auto-Print receipt on successful sale (mirrors companies.print_on_pay)
         autoPrintEnabled: {{ ($company->print_on_pay ?? true) ? 'true' : 'false' }},
+        // Phase 5+ — Auto-print kitchen ticket on successful sale (mirrors companies.auto_print_kot)
+        autoKotEnabled: {{ ($company->auto_print_kot ?? false) ? 'true' : 'false' }},
+        // Phase 5+ — auto-dismiss timer for the success modal so cashiers can chain sales hands-free
+        receiptAutoCloseTimer: null,
         lastInvoiceNumber: '',
         lastTransactionId: null,
         lastTotal: 0,
@@ -1447,9 +1467,11 @@ function restaurantPos() {
             }
 
             if (this.showReceipt) {
-                if (e.key === 'Escape') { e.preventDefault(); this.showReceipt = false; }
-                else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); }
-                else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.printReceipt(); }
+                // Phase 5+ — cancel the 4s auto-dismiss timer on any keyboard interaction
+                // so cashiers using the keyboard don't get the modal yanked away mid-action.
+                if (e.key === 'Escape') { e.preventDefault(); this.cancelReceiptAutoClose(); this.showReceipt = false; }
+                else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.cancelReceiptAutoClose(); this.startNewAfterPayment(); }
+                else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.cancelReceiptAutoClose(); this.printReceipt(); }
                 return;
             }
             if (this.showPayModal) {
@@ -1863,10 +1885,32 @@ function restaurantPos() {
                 if (data.success) {
                     this.heldOrders = this.heldOrders.filter(o => o.id !== orderId);
                     this.lastInvoiceNumber = data.invoice_number || ''; this.lastTransactionId = data.transaction_id || null;
-                    this.lastTotal = savedTotal || data.total_amount || 0; this.lastPaymentMethod = method; this.showReceipt = true;
+                    this.lastTotal = savedTotal || data.total_amount || 0; this.lastPaymentMethod = method;
+                    // Phase 5+ — Auto-KOT: print kitchen ticket alongside the receipt for restaurant orders.
+                    // Open inline (no setTimeout) — keeps the call as close to the originating user gesture
+                    // as possible so popup blockers are less likely to swallow it.
+                    if (this.autoKotEnabled && orderId) {
+                        window.open('/pos/restaurant/orders/' + orderId + '/kitchen-ticket?auto_print=1', '_blank', 'width=380,height=620');
+                    }
+                    this.showReceipt = true;
+                    this.scheduleReceiptAutoClose();
                     this.$nextTick(() => { setTimeout(() => this.triggerConfetti(), 300); });
                 } else { if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; } this.showToast(data.message || 'Payment failed', 'error'); }
             } catch (e) { this.showToast('Payment error', 'error'); }
+        },
+
+        // Phase 5+ — auto-dismiss the success modal after a short delay so the
+        // cashier can keep ringing up sales hands-free. Cancels itself if the
+        // user clicks Print or interacts with the modal.
+        scheduleReceiptAutoClose() {
+            if (this.receiptAutoCloseTimer) { clearTimeout(this.receiptAutoCloseTimer); }
+            this.receiptAutoCloseTimer = setTimeout(() => {
+                if (this.showReceipt) { this.startNewAfterPayment(); }
+            }, 4000);
+        },
+
+        cancelReceiptAutoClose() {
+            if (this.receiptAutoCloseTimer) { clearTimeout(this.receiptAutoCloseTimer); this.receiptAutoCloseTimer = null; }
         },
 
         recallOrder(order) {

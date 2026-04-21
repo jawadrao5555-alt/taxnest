@@ -61,6 +61,7 @@ class Company extends Model
         'kitchen_printer_enabled',
         'print_on_hold',
         'print_on_pay',
+        'auto_print_kot',
         'pra_environment',
         'pra_pos_id',
         'pra_access_code',

@@ -1588,6 +1588,33 @@ class PosController extends Controller
         ]);
     }
 
+    /**
+     * Phase 5+ — flip the "auto-print kitchen ticket on sale" setting.
+     * Only meaningful for restaurant_mode companies; we still persist the bit
+     * for everyone but the toggle pill is only rendered for restaurants.
+     */
+    public function toggleAutoKot(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        if (!($company->restaurant_mode ?? false)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Auto-KOT is only available in restaurant mode.',
+            ], 422);
+        }
+
+        $company->auto_print_kot = ! (bool) $company->auto_print_kot;
+        $company->save();
+
+        return response()->json([
+            'success' => true,
+            'enabled' => (bool) $company->auto_print_kot,
+            'message' => $company->auto_print_kot ? 'Auto-KOT enabled' : 'Auto-KOT disabled',
+        ]);
+    }
+
     public function terminals()
     {
         $companyId = app('currentCompanyId');

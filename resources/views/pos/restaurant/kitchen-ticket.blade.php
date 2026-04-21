@@ -78,8 +78,13 @@
 </head>
 <body>
     <div class="text-center">
+        @if(($order->kot_print_count ?? 0) > 1)
+            {{-- Phase 5 — re-send marker so kitchen knows items changed --}}
+            <p class="priority-badge" style="background:#b91c1c; border-color:#b91c1c; color:#fff;">*** UPDATED ***</p>
+            <p class="text-xs bold mt-1" style="color:#b91c1c;">REPRINT #{{ $order->kot_print_count }} — IGNORE PRIOR TICKET</p>
+        @endif
         @if($order->priority ?? false)
-            <p class="priority-badge">!!! RUSH !!!</p>
+            <p class="priority-badge mt-1">!!! RUSH !!!</p>
         @endif
         <p class="text-xl bold mt-1">*** KITCHEN ***</p>
         <p class="text-lg bold mt-1">{{ $order->order_number }}</p>

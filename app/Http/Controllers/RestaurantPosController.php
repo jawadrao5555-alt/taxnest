@@ -251,6 +251,9 @@ class RestaurantPosController extends Controller
 
         DB::beginTransaction();
         try {
+            // Phase 5 — KOT tracking. If this is a re-send (recalled order)
+            // carry the prior print count forward so the new ticket prints "UPDATED".
+            $carriedKotCount = 0;
             if ($request->recalled_order_id) {
                 $oldOrder = RestaurantOrder::where('id', $request->recalled_order_id)
                     ->where('company_id', $companyId)
@@ -258,6 +261,7 @@ class RestaurantPosController extends Controller
                     ->lockForUpdate()
                     ->first();
                 if ($oldOrder) {
+                    $carriedKotCount = (int) ($oldOrder->kot_print_count ?? 0);
                     $oldOrder->items()->delete();
                     $oldOrder->update(['status' => 'cancelled']);
                     if ($oldOrder->table_id) {
@@ -303,6 +307,10 @@ class RestaurantPosController extends Controller
                 'kitchen_notes' => $request->kitchen_notes,
                 'priority' => (bool)($request->priority ?? false),
                 'created_by' => $user->id,
+                // Phase 5 — every held order is implicitly "sent to kitchen".
+                // Carry kot_print_count forward on re-send so the ticket shows "UPDATED".
+                'kot_sent_at' => now(),
+                'kot_print_count' => $carriedKotCount + 1,
             ]);
 
             foreach ($resolvedItems as $item) {
@@ -821,6 +829,41 @@ class RestaurantPosController extends Controller
         $company = Company::find($companyId);
 
         return view('pos.restaurant.kitchen-ticket', compact('order', 'company'));
+    }
+
+    /**
+     * Phase 5 — Re-send an existing held order to the kitchen.
+     * Increments kot_print_count and refreshes kot_sent_at so the next
+     * printed ticket is marked "UPDATED". Does NOT touch items, totals,
+     * payment, PRA, or invoice numbers — pure KOT bookkeeping.
+     */
+    public function resendKitchen($orderId)
+    {
+        $companyId = app('currentCompanyId');
+
+        // Atomic single-statement update — protects against lost increments
+        // when two cashiers click "Re-send" on the same order at once.
+        $affected = RestaurantOrder::where('company_id', $companyId)
+            ->where('id', $orderId)
+            ->whereIn('status', ['held', 'preparing', 'ready'])
+            ->update([
+                'kot_sent_at' => now(),
+                'kot_print_count' => DB::raw('COALESCE(kot_print_count, 0) + 1'),
+                'updated_at' => now(),
+            ]);
+
+        if (!$affected) {
+            return response()->json(['success' => false, 'message' => 'Order not found or already completed'], 404);
+        }
+
+        $fresh = RestaurantOrder::where('company_id', $companyId)->find($orderId);
+
+        return response()->json([
+            'success' => true,
+            'order_id' => $fresh->id,
+            'kot_print_count' => (int) $fresh->kot_print_count,
+            'message' => 'Re-sent to kitchen',
+        ]);
     }
 
     public function checkStock(Request $request)

@@ -12,6 +12,7 @@ class RestaurantOrder extends Model
         'subtotal', 'discount_type', 'discount_value', 'discount_amount', 'tax_amount', 'total_amount',
         'payment_method', 'kitchen_notes', 'priority', 'pos_transaction_id', 'created_by',
         'estimated_cost',
+        'kot_sent_at', 'kot_print_count',
     ];
 
     protected $casts = [
@@ -20,6 +21,8 @@ class RestaurantOrder extends Model
         'tax_amount' => 'decimal:2',
         'total_amount' => 'decimal:2',
         'priority' => 'boolean',
+        'kot_sent_at' => 'datetime',
+        'kot_print_count' => 'integer',
     ];
 
     public function company()

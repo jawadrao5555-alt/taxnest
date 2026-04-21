@@ -108,7 +108,7 @@ window.addEventListener('popstate', function() {
 
 <div x-data="restaurantPos()" x-init="init()" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
     <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-bold tracking-wider uppercase px-3 py-1 text-center shadow-sm">
-        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v10.1-AUTOPRINT-LIVE
+        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v11.1-KOT-FLOW
     </div>
 
     {{-- PRA Reporting + Auto-Print toggles strip (visible to admin + cashier).
@@ -302,6 +302,15 @@ window.addEventListener('popstate', function() {
                 <svg x-show="submitting" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                 <span x-show="!submitting" class="text-[10px] bg-amber-400/30 px-1 rounded">F5</span> <span x-text="submitting ? 'Holding...' : 'Hold'"></span>
             </button>
+
+            {{-- Phase 5 — Send to Kitchen (visible only when restaurant_mode OR feature.kot is on) --}}
+            @if(($company->restaurant_mode ?? false) || ($features->kot ?? false))
+            <button @click="sendToKitchen()" :disabled="cart.length === 0 || submitting" title="Saves the order and prints the kitchen ticket without taking payment." class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 shadow-sm transition">
+                <span class="text-base leading-none">🍳</span>
+                <span x-text="submitting ? 'Sending...' : 'Send to Kitchen'"></span>
+            </button>
+            @endif
+
             <button @click="showPayModal = true" :disabled="cart.length === 0 || submitting" class="flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold bg-green-600 hover:bg-green-700 text-white disabled:opacity-40 shadow-lg shadow-green-600/20 transition">
                 <span x-show="!submitting" class="text-[10px] bg-green-500/30 px-1 rounded">F8</span> Pay
             </button>
@@ -690,7 +699,8 @@ window.addEventListener('popstate', function() {
                         <div class="flex gap-2 mt-2 ml-7">
                             <button @click="recallOrder(order)" class="flex-1 py-2 text-xs font-bold text-purple-600 border border-purple-300 rounded-xl hover:bg-purple-50 transition">Recall</button>
                             @if($features->kot)
-                            <a :href="'/pos/restaurant/orders/' + order.id + '/kitchen-ticket'" target="_blank" class="py-2 px-3 text-xs font-bold text-center text-orange-600 border border-orange-300 rounded-xl hover:bg-orange-50 transition">KOT</a>
+                            <a :href="'/pos/restaurant/orders/' + order.id + '/kitchen-ticket'" target="_blank" title="View / print kitchen ticket" class="py-2 px-2 text-xs font-bold text-center text-orange-600 border border-orange-300 rounded-xl hover:bg-orange-50 transition">KOT</a>
+                            <button @click="resendKitchen(order)" title="Re-send order to kitchen — the new ticket will be marked UPDATED." class="py-2 px-2 text-xs font-bold text-orange-700 border border-orange-400 rounded-xl bg-orange-50 hover:bg-orange-100 transition">↻ Re-send</button>
                             @endif
                             <button @click="payHeldOrder(order.id)" class="flex-1 py-2 text-xs font-bold text-white bg-green-600 rounded-xl hover:bg-green-700 transition">Pay</button>
                             <button @click="deleteHeldOrder(order.id)" class="py-2 px-3 text-xs font-bold text-red-500 border border-red-300 rounded-xl hover:bg-red-50 transition">Delete</button>
@@ -1708,12 +1718,14 @@ function restaurantPos() {
             this.$refs.customerPhoneInput?.focus();
         },
 
-        async holdOrder() {
-            if (this.cart.length === 0 || this.submitting) return;
+        async holdOrder(opts) {
+            opts = opts || {};
+            if (this.cart.length === 0 || this.submitting) return null;
             const now = Date.now();
-            if (now - this.lastHoldTime < 2000) return;
+            if (now - this.lastHoldTime < 2000) return null;
             this.lastHoldTime = now;
             this.submitting = true;
+            let result = null;
             try {
                 const res = await fetch('{{ route("pos.restaurant.orders.hold") }}', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
@@ -1721,12 +1733,47 @@ function restaurantPos() {
                 });
                 const data = await res.json();
                 if (data.success) {
-                    this.showToast(data.message, 'success'); this.heldOrders.unshift(data.order); this.clearCart();
+                    const successMsg = opts.successMessage || data.message;
+                    this.showToast(successMsg, 'success'); this.heldOrders.unshift(data.order); this.clearCart();
                     this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
-                    if (this.kitchenSettings.print_on_hold) { window.open('/pos/restaurant/orders/' + data.order.id + '/kitchen-ticket', '_blank', 'width=350,height=600'); }
+                    // Auto-print KOT when print_on_hold is enabled, OR when the caller explicitly asked
+                    // (e.g. "Send to Kitchen" button always prints a ticket).
+                    if (this.kitchenSettings.print_on_hold || opts.forcePrintKot) {
+                        window.open('/pos/restaurant/orders/' + data.order.id + '/kitchen-ticket?auto_print=1', '_blank', 'width=380,height=620');
+                    }
+                    result = data;
                 } else { this.showToast(data.message || 'Failed', 'error'); }
             } catch (e) { this.showToast('Network error', 'error'); }
             this.submitting = false;
+            return result;
+        },
+
+        // Phase 5 — explicit "Send to Kitchen" action.
+        // Same persistence as Hold, but always prints a KOT (no payment is taken).
+        async sendToKitchen() {
+            if (this.cart.length === 0) return;
+            await this.holdOrder({ forcePrintKot: true, successMessage: 'Order sent to kitchen' });
+        },
+
+        // Phase 5 — re-send an existing held order. Server bumps kot_print_count
+        // so the printed ticket is marked "*** UPDATED ***".
+        async resendKitchen(order) {
+            if (!order || !order.id) return;
+            try {
+                const res = await fetch('/pos/restaurant/orders/' + order.id + '/resend-kitchen', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.showToast('Re-sent to kitchen (#' + data.kot_print_count + ')', 'success');
+                    window.open('/pos/restaurant/orders/' + order.id + '/kitchen-ticket?auto_print=1', '_blank', 'width=380,height=620');
+                } else {
+                    this.showToast(data.message || 'Re-send failed', 'error');
+                }
+            } catch (e) {
+                this.showToast('Network error', 'error');
+            }
         },
 
         async processPayment(method) {

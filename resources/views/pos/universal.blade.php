@@ -108,7 +108,22 @@ window.addEventListener('popstate', function() {
 
 <div x-data="restaurantPos()" x-init="init()" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
     <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-bold tracking-wider uppercase px-3 py-1 text-center shadow-sm">
-        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v3-CART-FIX
+        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v4-QTY+PRA
+    </div>
+
+    {{-- PRA Reporting on/off toggle (universal) --}}
+    <div class="flex items-center justify-end gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-50 to-white dark:from-purple-900/10 dark:to-gray-900 border-b border-purple-100 dark:border-purple-900/30 flex-shrink-0"
+         x-data="{ praEnabled: {{ ($company->pra_reporting_enabled ?? false) ? 'true' : 'false' }}, praLoading: false }">
+        <span class="text-[10px] uppercase tracking-wider font-extrabold text-purple-700 dark:text-purple-300">PRA Reporting</span>
+        <button type="button"
+            @click="praLoading = true; fetch('{{ route('pos.api.toggle-pra') }}', { method:'POST', headers:{ 'X-CSRF-TOKEN':'{{ csrf_token() }}', 'Content-Type':'application/json', 'Accept':'application/json' } }).then(r => r.json()).then(d => { praEnabled = !!d.enabled; praLoading = false; window.tnNotify && window.tnNotify('PRA Reporting', praEnabled ? 'Enabled' : 'Disabled'); }).catch(() => { praLoading = false; alert('Toggle failed'); })"
+            :disabled="praLoading"
+            :class="praEnabled ? 'bg-purple-600' : 'bg-gray-400 dark:bg-gray-600'"
+            class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out shadow-inner">
+            <span :class="praEnabled ? 'translate-x-5' : 'translate-x-0.5'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5"></span>
+        </button>
+        <span x-text="praEnabled ? 'ON' : 'OFF'" :class="praEnabled ? 'text-purple-700 dark:text-purple-300' : 'text-gray-500 dark:text-gray-400'" class="text-[10px] font-black w-7"></span>
+        <span x-show="praLoading" class="text-[10px] text-purple-500 animate-pulse">…</span>
     </div>
 
     <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0 shadow-sm">
@@ -393,12 +408,15 @@ window.addEventListener('popstate', function() {
                                 <button @click.stop="updateQty(index, -1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M20 12H4"/></svg>
                                 </button>
-                                <input type="number" min="1" step="1"
-                                    :value="item.quantity"
+                                <input type="text" inputmode="numeric" pattern="[0-9]*"
+                                    data-qty-input
+                                    x-model="item.quantity"
+                                    @click.stop
+                                    @keydown.stop
                                     @focus="$event.target.select()"
-                                    @input="item.quantity = $event.target.value"
-                                    @blur="item.quantity = Math.max(1, parseInt(item.quantity) || 1)"
-                                    class="w-14 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                                    @keydown.enter.prevent="$event.target.blur()"
+                                    @blur="item.quantity = Math.max(1, parseInt(String(item.quantity).replace(/[^0-9]/g,'')) || 1)"
+                                    class="w-14 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner">
                                 <button @click.stop="updateQty(index, 1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M12 4v16m8-8H4"/></svg>
                                 </button>
@@ -1429,7 +1447,7 @@ function restaurantPos() {
 
         animateQty(index) {
             this.$nextTick(() => {
-                const el = this.$refs.cartList?.querySelector(`[data-cart-index="${index}"] input[type="number"]`);
+                const el = this.$refs.cartList?.querySelector(`[data-cart-index="${index}"] [data-qty-input]`);
                 if (el) { el.classList.remove('qty-pop'); void el.offsetWidth; el.classList.add('qty-pop'); }
             });
         },

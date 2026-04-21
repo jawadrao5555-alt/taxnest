@@ -4,7 +4,10 @@
     $posUserLayout = auth('pos')->user();
     $isCashierLayout = $posUserLayout && $posUserLayout->isPosCashier();
     $companyLayout = \App\Models\Company::find(app('currentCompanyId'));
-    $isRestaurantLayout = $companyLayout && ($companyLayout->pos_type === 'restaurant' || $companyLayout->restaurant_mode);
+    $__restaurantBizCats = ['restaurant', 'hotel', 'cafe', 'bakery', 'food', 'fast_food', 'fast-food', 'fine_dining', 'fine-dining'];
+    $__bizCat = strtolower(trim($companyLayout->business_category ?? ''));
+    $__isRestaurantBusiness = in_array($__bizCat, $__restaurantBizCats);
+    $isRestaurantLayout = $companyLayout && $__isRestaurantBusiness && ($companyLayout->pos_type === 'restaurant' || $companyLayout->restaurant_mode);
     $praEnabledLayout = $companyLayout && $companyLayout->pra_reporting_enabled;
     $inventoryEnabledLayout = $companyLayout && $companyLayout->inventory_enabled;
     $companyName = $companyLayout->name ?? 'My Business';

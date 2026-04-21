@@ -108,12 +108,10 @@ window.addEventListener('popstate', function() {
 
 <div x-data="restaurantPos()" x-init="init()" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
     <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-bold tracking-wider uppercase px-3 py-1 text-center shadow-sm">
-        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v5-PRA-ADMIN-ONLY
+        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v6-NAV-CATEGORY-GATE
     </div>
 
-    @php $__praToggleVisible = in_array($posRole ?? 'pos_cashier', ['pos_admin', 'company_admin']); @endphp
-    @if($__praToggleVisible)
-    {{-- PRA Reporting on/off toggle (admin-only, hidden for cashier) --}}
+    {{-- PRA Reporting on/off toggle (visible to admin + cashier) --}}
     <div class="flex items-center justify-end gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-50 to-white dark:from-purple-900/10 dark:to-gray-900 border-b border-purple-100 dark:border-purple-900/30 flex-shrink-0"
          x-data="{ praEnabled: {{ ($company->pra_reporting_enabled ?? false) ? 'true' : 'false' }}, praLoading: false }">
         <span class="text-[10px] uppercase tracking-wider font-extrabold text-purple-700 dark:text-purple-300">PRA Reporting</span>
@@ -127,7 +125,6 @@ window.addEventListener('popstate', function() {
         <span x-text="praEnabled ? 'ON' : 'OFF'" :class="praEnabled ? 'text-purple-700 dark:text-purple-300' : 'text-gray-500 dark:text-gray-400'" class="text-[10px] font-black w-7"></span>
         <span x-show="praLoading" class="text-[10px] text-purple-500 animate-pulse">…</span>
     </div>
-    @endif
 
     <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0 shadow-sm">
 

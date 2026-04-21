@@ -190,7 +190,7 @@ window.addEventListener('popstate', function() {
 
 <div x-data="restaurantPos()" x-init="init()" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
     <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-bold tracking-wider uppercase px-3 py-1 text-center shadow-sm">
-        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v13-PREMIUM-POLISH
+        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v14-INVENTORY-GATED
     </div>
 
     {{-- PRA Reporting + Auto-Print toggles strip (visible to admin + cashier).
@@ -347,7 +347,9 @@ window.addEventListener('popstate', function() {
                             <span class="text-sm font-semibold truncate block" :style="i === highlightIndex ? 'color:white;' : 'color:#1f2937;'" x-text="s.name"></span>
                             <div class="flex items-center gap-1.5">
                                 <span class="text-[10px]" :style="i === highlightIndex ? 'color:rgba(255,255,255,0.7);' : 'color:#9ca3af;'" x-text="s.type === 'service' ? 'Service' : s.category"></span>
-                                <template x-if="s.stockStatus"><span class="stock-dot" :class="'stock-' + s.stockStatus"></span></template>
+                                @if($company->inventory_enabled)
+                                <template x-if="s.stockStatus && s.stockStatus !== 'available'"><span class="stock-dot" :class="'stock-' + s.stockStatus"></span></template>
+                                @endif
                             </div>
                         </div>
                         <span class="text-sm font-extrabold" :style="i === highlightIndex ? 'color:white;' : 'color:#9333ea;'" x-text="'Rs. ' + Number(s.price).toLocaleString()"></span>
@@ -453,13 +455,18 @@ window.addEventListener('popstate', function() {
                                         <span class="text-4xl font-black text-white/90 select-none drop-shadow-sm" x-text="item.name ? item.name.charAt(0).toUpperCase() : '?'"></span>
                                         <span class="text-[9px] font-semibold text-white/60 mt-0.5 tracking-wider uppercase truncate max-w-[80%]" x-text="item.category || item.type"></span>
                                     </div>
+                                    {{-- Stock badges only render when company.inventory_enabled = true.
+                                         Green "available" dot removed permanently — exception-based UI: only show low/out. --}}
+                                    @if($company->inventory_enabled)
                                     <div class="absolute top-1.5 left-1.5 flex flex-col gap-1">
-                                        <template x-if="item.stockStatus === 'available'"><span class="stock-dot stock-available"></span></template>
                                         <template x-if="item.stockStatus === 'low'"><span class="stock-dot stock-low" title="Low stock"></span></template>
                                         <template x-if="item.stockStatus === 'out'"><span class="px-1.5 py-0.5 bg-red-500/90 text-white text-[8px] font-bold rounded-md">OUT</span></template>
                                     </div>
+                                    @endif
                                     <div class="absolute top-1.5 right-1.5 flex flex-col gap-1">
+                                        @if($company->inventory_enabled)
                                         <template x-if="item.hasRecipe"><span class="px-1.5 py-0.5 bg-orange-500/90 text-white text-[8px] font-bold rounded-md flex items-center gap-0.5"><span class="text-[9px]">&#x1F373;</span> Recipe</span></template>
+                                        @endif
                                         <template x-if="item.is_tax_exempt"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md">NO TAX</span></template>
                                     </div>
                                     <button @click.stop="handleProductClick(item)" class="quick-add absolute bottom-2 right-2 w-9 h-9 rounded-full bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-600/30 flex items-center justify-center transition-all">

@@ -184,6 +184,11 @@ class PosController extends Controller
         $stockStatus = [];
         $ingredientCosts = [];
         $lowStockAlerts = collect();
+        // Inventory master switch — when company has inventory_enabled = false, suppress
+        // ALL stock indicators (dots, OUT pills, low-stock popup) so the POS stays clean.
+        // Recipes/ingredient costing still computed for cost-of-sale reporting (admin only),
+        // but no UI badges are emitted.
+        $inventoryOn = (bool)($company->inventory_enabled ?? false);
         if ($features->recipes && class_exists(ProductRecipe::class)) {
             $recipeLookup = ProductRecipe::where('company_id', $companyId)
                 ->whereIn('product_id', $productIds)->pluck('product_id')->unique()->toArray();
@@ -201,10 +206,16 @@ class PosController extends Controller
                 $stockStatus[$productId] = $status;
                 $ingredientCosts[$productId] = round($cost, 2);
             }
-            $lowStockAlerts = Ingredient::where('company_id', $companyId)
-                ->where('is_active', true)
-                ->whereColumn('current_stock', '<=', 'min_stock_level')
-                ->select('name', 'current_stock', 'min_stock_level', 'unit')->get();
+            if ($inventoryOn) {
+                $lowStockAlerts = Ingredient::where('company_id', $companyId)
+                    ->where('is_active', true)
+                    ->whereColumn('current_stock', '<=', 'min_stock_level')
+                    ->select('name', 'current_stock', 'min_stock_level', 'unit')->get();
+            }
+        }
+        // Inventory OFF → wipe stock map so frontend renders no dots/OUT pills.
+        if (!$inventoryOn) {
+            $stockStatus = [];
         }
 
         $tables = collect();

@@ -1570,6 +1570,24 @@ class PosController extends Controller
         ]);
     }
 
+    /**
+     * Phase 4 — flip the "auto-print receipt on sale" setting.
+     * Reads/writes the existing companies.print_on_pay column (default true).
+     */
+    public function toggleAutoPrint(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $company->print_on_pay = ! (bool) $company->print_on_pay;
+        $company->save();
+
+        return response()->json([
+            'success' => true,
+            'enabled' => (bool) $company->print_on_pay,
+            'message' => $company->print_on_pay ? 'Auto-print enabled' : 'Auto-print disabled',
+        ]);
+    }
+
     public function terminals()
     {
         $companyId = app('currentCompanyId');

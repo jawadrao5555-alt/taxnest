@@ -108,22 +108,48 @@ window.addEventListener('popstate', function() {
 
 <div x-data="restaurantPos()" x-init="init()" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
     <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-bold tracking-wider uppercase px-3 py-1 text-center shadow-sm">
-        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v9-SPEED-FLOW
+        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v10.1-AUTOPRINT-LIVE
     </div>
 
-    {{-- PRA Reporting on/off toggle (visible to admin + cashier) --}}
-    <div class="flex items-center justify-end gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-50 to-white dark:from-purple-900/10 dark:to-gray-900 border-b border-purple-100 dark:border-purple-900/30 flex-shrink-0"
-         x-data="{ praEnabled: {{ ($company->pra_reporting_enabled ?? false) ? 'true' : 'false' }}, praLoading: false }">
-        <span class="text-[10px] uppercase tracking-wider font-extrabold text-purple-700 dark:text-purple-300">PRA Reporting</span>
-        <button type="button"
-            @click="praLoading = true; fetch('{{ route('pos.api.toggle-pra') }}', { method:'POST', headers:{ 'X-CSRF-TOKEN':'{{ csrf_token() }}', 'Content-Type':'application/json', 'Accept':'application/json' } }).then(r => r.json()).then(d => { praEnabled = !!d.enabled; praLoading = false; window.tnNotify && window.tnNotify('PRA Reporting', praEnabled ? 'Enabled' : 'Disabled'); }).catch(() => { praLoading = false; alert('Toggle failed'); })"
-            :disabled="praLoading"
-            :class="praEnabled ? 'bg-purple-600' : 'bg-gray-400 dark:bg-gray-600'"
-            class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out shadow-inner">
-            <span :class="praEnabled ? 'translate-x-5' : 'translate-x-0.5'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5"></span>
-        </button>
-        <span x-text="praEnabled ? 'ON' : 'OFF'" :class="praEnabled ? 'text-purple-700 dark:text-purple-300' : 'text-gray-500 dark:text-gray-400'" class="text-[10px] font-black w-7"></span>
-        <span x-show="praLoading" class="text-[10px] text-purple-500 animate-pulse">…</span>
+    {{-- PRA Reporting + Auto-Print toggles strip (visible to admin + cashier).
+         autoPrintEnabled lives on the parent restaurantPos() scope (mirrors kitchenSettings.print_on_pay)
+         so toggling immediately updates the receipt-iframe URL on the very next sale, no refresh needed. --}}
+    <div class="flex items-center justify-end gap-4 px-3 py-1.5 bg-gradient-to-r from-purple-50 to-white dark:from-purple-900/10 dark:to-gray-900 border-b border-purple-100 dark:border-purple-900/30 flex-shrink-0"
+         x-data="{
+            praEnabled: {{ ($company->pra_reporting_enabled ?? false) ? 'true' : 'false' }},
+            praLoading: false,
+            autoPrintLoading: false
+         }">
+
+        {{-- PRA Reporting --}}
+        <div class="flex items-center gap-2">
+            <span class="text-[10px] uppercase tracking-wider font-extrabold text-purple-700 dark:text-purple-300">PRA Reporting</span>
+            <button type="button"
+                @click="praLoading = true; fetch('{{ route('pos.api.toggle-pra') }}', { method:'POST', headers:{ 'X-CSRF-TOKEN':'{{ csrf_token() }}', 'Content-Type':'application/json', 'Accept':'application/json' } }).then(r => r.json()).then(d => { praEnabled = !!d.enabled; praLoading = false; window.tnNotify && window.tnNotify('PRA Reporting', praEnabled ? 'Enabled' : 'Disabled'); }).catch(() => { praLoading = false; alert('Toggle failed'); })"
+                :disabled="praLoading"
+                :class="praEnabled ? 'bg-purple-600' : 'bg-gray-400 dark:bg-gray-600'"
+                class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out shadow-inner">
+                <span :class="praEnabled ? 'translate-x-5' : 'translate-x-0.5'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5"></span>
+            </button>
+            <span x-text="praEnabled ? 'ON' : 'OFF'" :class="praEnabled ? 'text-purple-700 dark:text-purple-300' : 'text-gray-500 dark:text-gray-400'" class="text-[10px] font-black w-7"></span>
+            <span x-show="praLoading" class="text-[10px] text-purple-500 animate-pulse">…</span>
+        </div>
+
+        <div class="w-px h-4 bg-purple-200 dark:bg-purple-800/40"></div>
+
+        {{-- Auto-Print on Sale (Phase 4) — bound to parent restaurantPos() scope --}}
+        <div class="flex items-center gap-2" title="When ON, the receipt print dialog opens automatically right after a successful payment.">
+            <span class="text-[10px] uppercase tracking-wider font-extrabold text-emerald-700 dark:text-emerald-300">🖨️ Auto-Print</span>
+            <button type="button"
+                @click="autoPrintLoading = true; fetch('{{ route('pos.api.toggle-auto-print') }}', { method:'POST', headers:{ 'X-CSRF-TOKEN':'{{ csrf_token() }}', 'Content-Type':'application/json', 'Accept':'application/json' } }).then(r => r.json()).then(d => { autoPrintEnabled = !!d.enabled; kitchenSettings.print_on_pay = autoPrintEnabled; autoPrintLoading = false; window.tnNotify && window.tnNotify('Auto-Print Receipt', autoPrintEnabled ? 'Enabled' : 'Disabled'); }).catch(() => { autoPrintLoading = false; alert('Toggle failed'); })"
+                :disabled="autoPrintLoading"
+                :class="autoPrintEnabled ? 'bg-emerald-600' : 'bg-gray-400 dark:bg-gray-600'"
+                class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out shadow-inner">
+                <span :class="autoPrintEnabled ? 'translate-x-5' : 'translate-x-0.5'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5"></span>
+            </button>
+            <span x-text="autoPrintEnabled ? 'ON' : 'OFF'" :class="autoPrintEnabled ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-500 dark:text-gray-400'" class="text-[10px] font-black w-7"></span>
+            <span x-show="autoPrintLoading" class="text-[10px] text-emerald-500 animate-pulse">…</span>
+        </div>
     </div>
 
     <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0 shadow-sm">
@@ -869,7 +895,7 @@ window.addEventListener('popstate', function() {
                 </div>
             </div>
             <div class="flex-1 overflow-hidden bg-gray-50 dark:bg-gray-800/50 min-h-0" style="max-height: 45vh;">
-                <iframe x-ref="receiptIframe" class="w-full h-full border-0" :src="lastTransactionId ? '/pos/restaurant/receipt/' + lastTransactionId : ''" style="min-height:300px;"></iframe>
+                <iframe x-ref="receiptIframe" class="w-full h-full border-0" :src="lastTransactionId ? ('/pos/restaurant/receipt/' + lastTransactionId + (autoPrintEnabled ? '?auto_print=1' : '')) : ''" style="min-height:300px;"></iframe>
             </div>
             <div class="p-3 space-y-2 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
                 <div class="grid grid-cols-3 gap-2">
@@ -1112,6 +1138,8 @@ function restaurantPos() {
         showHeldOrders: false,
         showReceipt: false,
         showShortcuts: false,
+        // Phase 4 — Auto-Print receipt on successful sale (mirrors companies.print_on_pay)
+        autoPrintEnabled: {{ ($company->print_on_pay ?? true) ? 'true' : 'false' }},
         lastInvoiceNumber: '',
         lastTransactionId: null,
         lastTotal: 0,
@@ -1751,6 +1779,7 @@ function restaurantPos() {
 
         printReceipt() {
             if (!this.lastTransactionId) return;
+            // Manual button click → always force print, regardless of auto-print setting.
             const url = '/pos/restaurant/receipt/' + this.lastTransactionId + '?auto_print=1';
             let printFrame = document.getElementById('print-receipt-frame');
             if (!printFrame) {

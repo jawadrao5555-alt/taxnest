@@ -433,6 +433,7 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::post('/api/verify-pin', [PosController::class, 'verifyPin'])->name('pos.api.verify-pin');
     Route::get('/api/check-pin-session', [PosController::class, 'checkPinSession'])->name('pos.api.check-pin-session');
     Route::post('/api/toggle-pra', [PosController::class, 'togglePra'])->name('pos.api.toggle-pra');
+    Route::post('/api/toggle-auto-print', [PosController::class, 'toggleAutoPrint'])->name('pos.api.toggle-auto-print');
     Route::match(['get', 'post'], '/my-profile', [PosController::class, 'userProfile'])->name('pos.user-profile');
     Route::get('/products', [PosController::class, 'products'])->name('pos.products');
     Route::get('/customers', [PosController::class, 'customers'])->name('pos.customers');

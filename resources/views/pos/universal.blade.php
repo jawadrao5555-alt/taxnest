@@ -1318,8 +1318,20 @@ function restaurantPos() {
         },
 
         handleKey(e) {
-            const tag = document.activeElement?.tagName;
-            const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+            // 🔒 HARD SAFETY: any keystroke originating from a form field exits immediately
+            if (e.target.closest('input, textarea, select')) {
+                return;
+            }
+
+            const active = document.activeElement;
+            const isInput = active && (
+                active.tagName === 'INPUT' ||
+                active.tagName === 'TEXTAREA' ||
+                active.tagName === 'SELECT'
+            );
+            if (isInput) {
+                return;
+            }
 
             if (this.showReceipt) {
                 if (e.key === 'Escape') { e.preventDefault(); this.showReceipt = false; }
@@ -1346,11 +1358,6 @@ function restaurantPos() {
                 if (e.key === 'Escape') { e.preventDefault(); this.showManagerPinModal = false; }
                 return;
             }
-
-            // 🔒 ISOLATION: User typing in any input → keyboard engine never runs
-            // Exception: number inputs (qty) handle themselves natively
-            if (isInput && e.target.type !== 'number') return;
-            if (isInput && e.target.type === 'number') return;
 
             if (e.key === 'F1') { e.preventDefault(); this.showShortcuts = !this.showShortcuts; return; }
             if (e.key === 'F2') { e.preventDefault(); this.cartMode = false; this.activeCartIndex = -1; this.enterSearchMode(); return; }

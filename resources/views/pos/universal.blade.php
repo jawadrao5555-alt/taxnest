@@ -395,7 +395,9 @@ window.addEventListener('popstate', function() {
                                 </button>
                                 <input type="number" min="1" step="1"
                                     :value="item.quantity"
-                                    @input="item.quantity = Math.max(1, parseInt($event.target.value) || 1)"
+                                    @focus="$event.target.select()"
+                                    @input="item.quantity = $event.target.value"
+                                    @blur="item.quantity = Math.max(1, parseInt(item.quantity) || 1)"
                                     class="w-14 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
                                 <button @click.stop="updateQty(index, 1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M12 4v16m8-8H4"/></svg>

@@ -108,7 +108,7 @@ window.addEventListener('popstate', function() {
 
 <div x-data="restaurantPos()" x-init="init()" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
     <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-bold tracking-wider uppercase px-3 py-1 text-center shadow-sm">
-        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v7-RESTAURANT-MODE+QTY
+        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v8-INLINE-CUSTOMER-CRM
     </div>
 
     {{-- PRA Reporting on/off toggle (visible to admin + cashier) --}}
@@ -135,7 +135,7 @@ window.addEventListener('popstate', function() {
             <button x-show="customerPhoneQuery || selectedCustomer" @click="clearCustomerInput()" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
-            <div x-show="customerPhoneDropdown && customerPhoneResults.length > 0" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 max-h-52 overflow-y-auto" style="min-width:280px;">
+            <div x-show="customerPhoneDropdown && customerPhoneResults.length > 0 && !showNewCustomerInline" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 max-h-52 overflow-y-auto" style="min-width:280px;">
                 <template x-for="(cr, ci) in customerPhoneResults" :key="cr.id">
                     <button @click="selectCustomerFromPhone(cr)" class="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 transition border-b border-gray-50 dark:border-gray-800" :class="ci === 0 ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''">
                         <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-blue-600" x-text="cr.name.charAt(0)"></span></div>
@@ -147,6 +147,42 @@ window.addEventListener('popstate', function() {
                         <template x-if="cr.stats && cr.stats.is_frequent"><span class="freq-badge">VIP</span></template>
                     </button>
                 </template>
+            </div>
+
+            {{-- Inline "no match → quick add" hint (NO popup, INLINE only) --}}
+            <div x-show="customerPhoneDropdown && !showNewCustomerInline && customerPhoneResults.length === 0 && customerPhoneQuery.length >= 4 && /^[0-9]+$/.test(customerPhoneQuery.trim()) && !customerSearching" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-800 rounded-xl shadow-2xl z-50 overflow-hidden" style="min-width:280px;">
+                <button @click="openInlineNewCustomer()" class="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 transition">
+                    <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
+                        <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs font-bold text-blue-700 dark:text-blue-300">Add new customer</p>
+                        <p class="text-[10px] text-gray-500" x-text="customerPhoneQuery + ' · press Enter'"></p>
+                    </div>
+                </button>
+            </div>
+
+            {{-- Inline new-customer quick form (NO popup) --}}
+            <div x-show="showNewCustomerInline" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border-2 border-blue-400 dark:border-blue-600 rounded-xl shadow-2xl z-50 p-3 space-y-2" style="min-width:300px;" @keydown.escape.prevent="cancelInlineNewCustomer()">
+                <div class="flex items-center justify-between">
+                    <p class="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">+ New Customer</p>
+                    <button type="button" @click="cancelInlineNewCustomer()" class="text-gray-400 hover:text-red-500 text-[10px] font-semibold">Cancel</button>
+                </div>
+                <div class="text-[10px] font-semibold text-gray-600 dark:text-gray-400 px-2 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                    <span class="text-gray-400">Mobile:</span> <span class="text-gray-900 dark:text-white font-bold" x-text="newCustomerPhone"></span>
+                </div>
+                <input type="text" x-ref="newCustomerNameInput" x-model="newCustomerName"
+                    @keydown.enter.prevent="$refs.newCustomerAddressInput?.focus()"
+                    placeholder="Customer name *"
+                    class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400">
+                <input type="text" x-ref="newCustomerAddressInput" x-model="newCustomerAddress"
+                    @keydown.enter.prevent="saveNewCustomer()"
+                    placeholder="Address (optional)"
+                    class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400">
+                <button type="button" @click="saveNewCustomer()" :disabled="savingCustomer" class="w-full py-2 text-xs font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60 transition">
+                    <span x-show="!savingCustomer">Save & Select (Enter)</span>
+                    <span x-show="savingCustomer">Saving…</span>
+                </button>
             </div>
         </div>
 
@@ -366,16 +402,31 @@ window.addEventListener('popstate', function() {
             </div>
 
             <template x-if="selectedCustomer">
-                <div class="px-3 py-2 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/20 flex items-center gap-2">
-                    <div class="w-7 h-7 rounded-full bg-blue-200 dark:bg-blue-800 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-blue-700 dark:text-blue-300" x-text="selectedCustomer.name.charAt(0)"></span></div>
+                <div class="px-3 py-2 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/20 flex items-start gap-2">
+                    <div class="w-8 h-8 rounded-full bg-blue-200 dark:bg-blue-800 flex items-center justify-center flex-shrink-0 mt-0.5"><span class="text-xs font-bold text-blue-700 dark:text-blue-300" x-text="selectedCustomer.name.charAt(0)"></span></div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-xs font-semibold text-blue-800 dark:text-blue-200 truncate" x-text="selectedCustomer.name"></p>
-                        <p class="text-[10px] text-blue-600 dark:text-blue-400" x-text="(selectedCustomer.phone || 'No phone') + (selectedCustomer.address ? ' • ' + selectedCustomer.address : '')"></p>
+                        <div class="flex items-center gap-1.5">
+                            <p class="text-xs font-semibold text-blue-800 dark:text-blue-200 truncate" x-text="selectedCustomer.name"></p>
+                            <template x-if="customerStats && customerStats.is_frequent"><span class="freq-badge">VIP</span></template>
+                        </div>
+                        <p class="text-[10px] text-blue-600 dark:text-blue-400" x-text="selectedCustomer.phone || 'No phone'"></p>
+                        <template x-if="selectedCustomer.address">
+                            <p class="text-[10px] text-blue-500 dark:text-blue-400 truncate" x-text="'📍 ' + selectedCustomer.address"></p>
+                        </template>
                         <template x-if="customerStats">
-                            <p class="text-[10px] text-blue-500 dark:text-blue-500" x-text="customerStats.total_orders + ' orders • Rs. ' + Number(customerStats.total_spent).toLocaleString() + ' spent'"></p>
+                            <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                                <span class="text-[10px] font-semibold text-blue-700 dark:text-blue-300" x-text="(customerStats.total_orders || 0) + ' orders'"></span>
+                                <span class="text-[10px] text-gray-400">•</span>
+                                <span class="text-[10px] font-semibold text-blue-700 dark:text-blue-300" x-text="'Rs. ' + Number(customerStats.total_spent || 0).toLocaleString() + ' spent'"></span>
+                                <template x-if="customerStats.last_order_date">
+                                    <span class="text-[10px] text-gray-400">•</span>
+                                </template>
+                                <template x-if="customerStats.last_order_date">
+                                    <span class="text-[10px] text-blue-600 dark:text-blue-400" x-text="'Last: ' + customerStats.last_order_date"></span>
+                                </template>
+                            </div>
                         </template>
                     </div>
-                    <template x-if="customerStats && customerStats.is_frequent"><span class="freq-badge">VIP</span></template>
                 </div>
             </template>
 
@@ -619,32 +670,7 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
-    <div x-show="showNewCustomerModal" x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showNewCustomerModal = false" @keydown.escape.window="if(showNewCustomerModal) showNewCustomerModal = false">
-        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
-            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                <h3 class="text-base font-bold text-gray-900 dark:text-white">New Customer</h3>
-                <button @click="showNewCustomerModal = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
-            </div>
-            <div class="p-4 space-y-3">
-                <div>
-                    <label class="text-[10px] font-medium text-gray-500 block mb-1">Mobile Number</label>
-                    <input type="text" :value="newCustomerPhone" disabled class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-sm px-3 py-2 text-gray-600 dark:text-gray-400">
-                </div>
-                <div>
-                    <label class="text-[10px] font-medium text-gray-500 block mb-1">Customer Name <span class="text-red-500">*</span></label>
-                    <input type="text" x-ref="newCustomerNameInput" x-model="newCustomerName" @keydown.enter.prevent="saveNewCustomer()" placeholder="Enter customer name" class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400">
-                </div>
-                <div>
-                    <label class="text-[10px] font-medium text-gray-500 block mb-1">Address <span class="text-gray-400">(optional)</span></label>
-                    <input type="text" x-model="newCustomerAddress" @keydown.enter.prevent="saveNewCustomer()" placeholder="Delivery address" class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400">
-                </div>
-                <div class="flex gap-2 pt-1">
-                    <button @click="showNewCustomerModal = false" class="flex-1 py-2.5 text-xs font-semibold text-gray-500 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 transition">Cancel</button>
-                    <button @click="saveNewCustomer()" class="flex-1 py-2.5 text-xs font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition">Save & Select</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    {{-- Legacy popup new-customer modal removed — replaced by inline quick-add form below the phone input (Phase 2 spec: NO popups, INLINE only). --}}
 
     <div x-show="showCustomerPicker" x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showCustomerPicker = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden" x-transition.scale.90>
@@ -1056,7 +1082,10 @@ function restaurantPos() {
         customerPhoneResults: [],
         customerPhoneDropdown: false,
         customerPhoneTimer: null,
-        showNewCustomerModal: false,
+        showNewCustomerModal: false, // legacy, kept for backward compat — not used
+        showNewCustomerInline: false,
+        savingCustomer: false,
+        customerSearching: false,
         newCustomerPhone: '',
         newCustomerName: '',
         newCustomerAddress: '',
@@ -1533,28 +1562,46 @@ function restaurantPos() {
         },
 
         async searchCustomerByPhone(q) {
+            this.customerSearching = true;
             try {
                 const res = await fetch('/pos/restaurant/api/customer-search?q=' + encodeURIComponent(q));
                 const data = await res.json();
                 this.customerPhoneResults = data.customers || [];
-                this.customerPhoneDropdown = this.customerPhoneResults.length > 0;
+                // Always show dropdown so the inline "add new" hint can appear when results === 0
+                this.customerPhoneDropdown = true;
             } catch(e) { this.customerPhoneResults = []; this.customerPhoneDropdown = false; }
+            finally { this.customerSearching = false; }
         },
 
         onCustomerPhoneEnter() {
             const q = this.customerPhoneQuery.trim();
             if (!q) return;
-            if (this.customerPhoneDropdown && this.customerPhoneResults.length > 0) {
+            if (this.showNewCustomerInline) { this.saveNewCustomer(); return; }
+            if (this.customerPhoneResults.length > 0) {
                 this.selectCustomerFromPhone(this.customerPhoneResults[0]);
             } else if (q.length >= 4 && /^\d+$/.test(q)) {
-                this.newCustomerPhone = q;
-                this.newCustomerName = '';
-                this.newCustomerAddress = '';
-                this.showNewCustomerModal = true;
-                this.$nextTick(() => this.$refs.newCustomerNameInput?.focus());
+                this.openInlineNewCustomer();
             } else {
                 this.showToast('Enter a valid mobile number', 'error');
             }
+        },
+
+        openInlineNewCustomer() {
+            const q = this.customerPhoneQuery.trim();
+            if (q.length < 4 || !/^\d+$/.test(q)) { this.showToast('Enter a valid mobile number', 'error'); return; }
+            this.newCustomerPhone = q;
+            this.newCustomerName = '';
+            this.newCustomerAddress = '';
+            this.showNewCustomerInline = true;
+            this.customerPhoneDropdown = true;
+            this.$nextTick(() => this.$refs.newCustomerNameInput?.focus());
+        },
+
+        cancelInlineNewCustomer() {
+            this.showNewCustomerInline = false;
+            this.newCustomerName = '';
+            this.newCustomerAddress = '';
+            this.$nextTick(() => this.$refs.customerPhoneInput?.focus());
         },
 
         selectCustomerFromPhone(cr) {
@@ -1568,8 +1615,10 @@ function restaurantPos() {
         },
 
         async saveNewCustomer() {
+            if (this.savingCustomer) return;
             const name = this.newCustomerName.trim();
-            if (!name) { this.showToast('Customer name is required', 'error'); return; }
+            if (!name) { this.showToast('Customer name is required', 'error'); this.$refs.newCustomerNameInput?.focus(); return; }
+            this.savingCustomer = true;
             try {
                 const res = await fetch('{{ route("pos.restaurant.customer-store") }}', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
@@ -1578,21 +1627,28 @@ function restaurantPos() {
                 const data = await res.json();
                 if (data.success) {
                     this.selectedCustomer = { id: data.customer.id, name: data.customer.name, phone: data.customer.phone, address: data.customer.address };
-                    this.customerStats = { total_orders: 0, total_spent: 0, is_frequent: false };
+                    this.customerStats = { total_orders: 0, total_spent: 0, is_frequent: false, last_order_date: null };
                     this.customerPhoneQuery = data.customer.phone || data.customer.name;
+                    this.showNewCustomerInline = false;
                     this.showNewCustomerModal = false;
                     this.customerPhoneDropdown = false;
+                    this.customerPhoneResults = [];
                     if (this.allCustomers) this.allCustomers.push(data.customer);
-                    this.showToast('Customer created: ' + data.customer.name, 'success');
+                    this.showToast('New customer: ' + data.customer.name, 'success');
                     this.$nextTick(() => { this.$refs.searchInput?.focus(); });
-                } else { this.showToast(data.message || 'Failed', 'error'); }
+                } else { this.showToast(data.message || 'Failed to save customer', 'error'); }
             } catch(e) { this.showToast('Network error', 'error'); }
+            finally { this.savingCustomer = false; }
         },
 
         clearCustomerInput() {
             this.customerPhoneQuery = '';
             this.customerPhoneResults = [];
             this.customerPhoneDropdown = false;
+            this.showNewCustomerInline = false;
+            this.newCustomerName = '';
+            this.newCustomerAddress = '';
+            this.newCustomerPhone = '';
             this.selectedCustomer = null;
             this.customerStats = null;
             this.$refs.customerPhoneInput?.focus();

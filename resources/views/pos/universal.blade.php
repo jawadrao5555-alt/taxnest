@@ -108,7 +108,7 @@ window.addEventListener('popstate', function() {
 
 <div x-data="restaurantPos()" x-init="init()" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
     <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-bold tracking-wider uppercase px-3 py-1 text-center shadow-sm">
-        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v8-INLINE-CUSTOMER-CRM
+        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v9-SPEED-FLOW
     </div>
 
     {{-- PRA Reporting on/off toggle (visible to admin + cashier) --}}
@@ -131,8 +131,13 @@ window.addEventListener('popstate', function() {
         <div class="relative flex-shrink-0" style="min-width:180px;max-width:220px;">
             <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
             <input type="search" x-ref="customerPhoneInput" x-model="customerPhoneQuery" @input="onCustomerPhoneInput()" @keydown.enter.prevent="onCustomerPhoneEnter()" @keydown.escape.prevent="customerPhoneDropdown = false" @keydown.tab.prevent="$refs.searchInput?.focus()" @click.away="customerPhoneDropdown = false" inputmode="tel" placeholder="Customer mobile..." class="w-full pl-9 pr-7 py-2.5 rounded-xl text-sm border-2 transition shadow-sm font-medium" :class="selectedCustomer ? 'border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200' : 'border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400'" autocomplete="one-time-code" name="pos_customer_phone_nofill" data-lpignore="true" data-form-type="other">
-            <kbd x-show="!customerPhoneQuery && !selectedCustomer" class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded font-mono">F7</kbd>
-            <button x-show="customerPhoneQuery || selectedCustomer" @click="clearCustomerInput()" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition">
+            <kbd x-show="!customerPhoneQuery && !selectedCustomer && !customerSearching" class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded font-mono">F7</kbd>
+            {{-- Inline search spinner --}}
+            <svg x-show="customerSearching && !selectedCustomer" x-cloak class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            <button x-show="(customerPhoneQuery || selectedCustomer) && !customerSearching" @click="clearCustomerInput()" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
             <div x-show="customerPhoneDropdown && customerPhoneResults.length > 0 && !showNewCustomerInline" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 max-h-52 overflow-y-auto" style="min-width:280px;">
@@ -1169,10 +1174,12 @@ function restaurantPos() {
             this.calcGridCols();
             window.addEventListener('resize', () => this.calcGridCols());
             // Cart auto-restore disabled — every page load starts with an EMPTY cart.
-            // Saved cart is still written to localStorage as a safety net only.
+            // Saved cart is written to localStorage as a safety net only (debounced 400ms — see saveCart).
+            // recalcDiscount is O(1) when no discount → safe to leave inside the deep watcher.
             this.$watch('cart', () => { this.saveCart(); this.recalcDiscount(); }, { deep: true });
             this.$watch('kitchenNotes', () => { this.saveCart(); });
-            this.cacheProductData();
+            // Defer non-critical localStorage product cache off the init hot path → faster first paint.
+            setTimeout(() => this.cacheProductData(), 800);
             document.addEventListener('keydown', (e) => this.handleKey(e));
             this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
         },
@@ -1193,8 +1200,13 @@ function restaurantPos() {
 
         get storageKey() { return 'rpos_cart_{{ auth("pos")->id() ?? 0 }}_{{ app("currentCompanyId") ?? 0 }}'; },
         get notesKey() { return 'rpos_notes_{{ auth("pos")->id() ?? 0 }}_{{ app("currentCompanyId") ?? 0 }}'; },
+        _saveCartTimer: null,
         saveCart() {
-            try { localStorage.setItem(this.storageKey, JSON.stringify(this.cart)); localStorage.setItem(this.notesKey, this.kitchenNotes); } catch(e) {}
+            // Debounced localStorage write — avoids hot-path JSON.stringify on every qty keystroke / cart mutation.
+            if (this._saveCartTimer) clearTimeout(this._saveCartTimer);
+            this._saveCartTimer = setTimeout(() => {
+                try { localStorage.setItem(this.storageKey, JSON.stringify(this.cart)); localStorage.setItem(this.notesKey, this.kitchenNotes); } catch(e) {}
+            }, 400);
         },
         restoreCart() {
             try {
@@ -1256,14 +1268,28 @@ function restaurantPos() {
             return found ? found.quantity : 0;
         },
 
+        _searchDebounceTimer: null,
         onSearchInput() {
-            this.filterProducts();
+            // Toggle dropdown synchronously so empty-state hides instantly (no flicker).
             const q = this.searchQuery.trim().toLowerCase();
-            if (q.length > 0) {
-                let all = [...this.allProducts, ...this.allServices].filter(i => parseFloat(i.price) > 0 && i.name && i.name.trim().length > 0);
-                this.searchSuggestions = all.filter(i => i.name.toLowerCase().includes(q)).slice(0, 12);
-                this.highlightIndex = 0; this.showSearchDropdown = true;
-            } else { this.searchSuggestions = []; this.showSearchDropdown = false; }
+            if (q.length === 0) { this.searchSuggestions = []; this.showSearchDropdown = false; }
+            // Debounce the actual filter work (60ms) — fast enough to feel instant, prevents thrash on long pastes.
+            if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
+            this._searchDebounceTimer = setTimeout(() => {
+                this.filterProducts();
+                if (q.length > 0) {
+                    const all = [...this.allProducts, ...this.allServices];
+                    const out = [];
+                    for (let i = 0; i < all.length && out.length < 12; i++) {
+                        const it = all[i];
+                        if (!it.name || !(parseFloat(it.price) > 0)) continue;
+                        if (it.name.toLowerCase().includes(q)) out.push(it);
+                    }
+                    this.searchSuggestions = out;
+                    this.highlightIndex = 0;
+                    this.showSearchDropdown = true;
+                }
+            }, 60);
         },
         moveHighlight(dir) {
             if (!this.showSearchDropdown || this.searchSuggestions.length === 0) return;
@@ -1701,6 +1727,8 @@ function restaurantPos() {
                 const savedTotal = this.totalAmount;
                 await this.payHeldOrderDirect(holdData.order.id, method, savedTotal);
                 this.clearCart();
+                // Auto-focus phone input → ready for next sale, NO dead focus.
+                this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
             } catch (e) { this.showToast('Network error', 'error'); }
             this.showPayModal = false; this.submitting = false;
         },

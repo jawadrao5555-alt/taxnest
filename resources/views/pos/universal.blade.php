@@ -98,6 +98,88 @@
 .confetti-piece { position: absolute; width: 8px; height: 8px; border-radius: 2px; animation: confettiFall 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; pointer-events: none; }
 .receipt-modal-enter { animation: receiptSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
 .success-icon-animate { animation: successPulse 1.5s ease-out 0.3s; }
+
+/* ============================================================
+   Phase 6 — PREMIUM POLISH LAYER (v13)
+   Pure additive CSS. No HTML/JS structural changes.
+   Design tokens, refined hover states, tighter rhythm,
+   better numerics, consistent button feel, calmer chrome.
+   ============================================================ */
+
+:root {
+    --tn-radius:14px;
+    --tn-radius-sm:10px;
+    --tn-ease: cubic-bezier(0.16, 1, 0.3, 1);
+    --tn-dur-fast:.15s;
+    --tn-dur:.2s;
+    --tn-primary:#6366f1;       /* indigo-500 */
+    --tn-primary-strong:#4f46e5;/* indigo-600 */
+    --tn-accent:#a855f7;        /* purple-500 */
+    --tn-success:#16a34a;
+    --tn-success-strong:#15803d;
+    --tn-warning:#f59e0b;
+    --tn-danger:#ef4444;
+    --tn-surface:#ffffff;
+    --tn-ink:#0f172a;
+    --tn-mute:#64748b;
+}
+.dark :root, .dark { --tn-surface:#0b0f1a; --tn-ink:#f1f5f9; }
+
+/* Tabular numerics for ALL prices/totals — zero shift between digits */
+[x-text*="toLocaleString"], .tn-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+/* Universal button-press micro-interaction (additive — doesn't override per-button colors) */
+button { transition: transform var(--tn-dur-fast) var(--tn-ease), box-shadow var(--tn-dur) var(--tn-ease), background-color var(--tn-dur) var(--tn-ease), color var(--tn-dur) var(--tn-ease), opacity var(--tn-dur) var(--tn-ease); }
+button:not(:disabled):active { transform: translateY(1px) scale(0.98); }
+
+/* Cart row — softer hover + active accent stripe on the left */
+.cart-item { position: relative; border-radius: 10px; margin: 0 4px; border-bottom: none !important; }
+.cart-item + .cart-item { border-top: 1px solid rgba(148,163,184,.12); }
+.cart-item:hover { background: linear-gradient(90deg, rgba(124,58,237,.04), transparent); }
+.cart-item::before { content:""; position:absolute; left:0; top:8px; bottom:8px; width:3px; border-radius:3px; background: transparent; transition: background var(--tn-dur) var(--tn-ease); }
+.cart-item.cart-row-active::before { background: linear-gradient(180deg, var(--tn-accent), var(--tn-primary)); }
+.cart-item.cart-row-active { background: linear-gradient(90deg, rgba(168,85,247,.10), rgba(99,102,241,.04)) !important; outline: none !important; }
+
+/* Cart qty input — clearer & more touch-friendly */
+[data-qty-input] { font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+[data-qty-input]:focus { box-shadow: 0 0 0 3px rgba(99,102,241,.18) !important; }
+
+/* Larger, smoother total */
+.total-line { font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+
+/* Pay button — premium primary action */
+.pay-btn-premium {
+    background: linear-gradient(135deg, #16a34a 0%, #059669 60%, #047857 100%);
+    box-shadow: 0 10px 24px -10px rgba(5,150,105,.55), inset 0 1px 0 rgba(255,255,255,.18);
+    letter-spacing: .01em;
+}
+.pay-btn-premium:hover:not(:disabled) { box-shadow: 0 16px 32px -12px rgba(5,150,105,.65), inset 0 1px 0 rgba(255,255,255,.22); transform: translateY(-1px); }
+
+/* Section dividers — calmer, hairline, dark-mode aware */
+.tn-hairline { border-color: rgba(148,163,184,.16) !important; }
+.dark .tn-hairline { border-color: rgba(148,163,184,.12) !important; }
+
+/* Empty-state container — gentler tone, soft float */
+@keyframes tnFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.tn-empty { animation: fadeIn .35s var(--tn-ease) both; }
+.tn-empty-icon { animation: tnFloat 3s ease-in-out infinite; }
+
+/* Touch-friendly tap targets on tablets (>= sm, < lg) */
+@media (min-width: 640px) and (max-width: 1023px) {
+    .cart-item button, .cat-pill, .prod-card { min-height: 40px; }
+}
+
+/* Reduce visual clutter — strip default focus outlines on click, keep keyboard a11y */
+button:focus:not(:focus-visible) { outline: none; }
+input:focus:not(:focus-visible) { outline: none; }
+
+/* Modal backdrop — calmer, less heavy */
+.tn-modal-backdrop { background: rgba(15,23,42,.55); backdrop-filter: blur(8px); }
+
+/* Honor reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
 </style>
 <script>
 window.history.pushState(null, null, window.location.href);
@@ -108,7 +190,7 @@ window.addEventListener('popstate', function() {
 
 <div x-data="restaurantPos()" x-init="init()" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
     <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-bold tracking-wider uppercase px-3 py-1 text-center shadow-sm">
-        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v12-AUTO-KOT
+        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v13-PREMIUM-POLISH
     </div>
 
     {{-- PRA Reporting + Auto-Print toggles strip (visible to admin + cashier).
@@ -399,13 +481,13 @@ window.addEventListener('popstate', function() {
                 </template>
 
                 <template x-if="!loading && displayItems.length === 0">
-                    <div class="flex flex-col items-center justify-center py-24 text-gray-400 fade-in">
-                        <div class="w-24 h-24 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
-                            <svg class="w-12 h-12 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    <div class="tn-empty flex flex-col items-center justify-center py-24 px-6 text-gray-400 text-center">
+                        <div class="tn-empty-icon w-28 h-28 rounded-full bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 flex items-center justify-center mb-5 ring-1 ring-purple-100 dark:ring-purple-900/30">
+                            <svg class="w-14 h-14 text-purple-400 dark:text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
                         </div>
-                        <p class="text-base font-semibold text-gray-600 dark:text-gray-300">No products found</p>
-                        <p class="text-sm mt-1">Try a different category or search term</p>
-                        <button @click="activeCategory = 'all'; searchQuery = ''; filterProducts()" class="mt-4 px-4 py-2 text-sm font-semibold text-purple-600 bg-purple-50 dark:bg-purple-900/20 rounded-xl hover:bg-purple-100 transition">Show All Products</button>
+                        <p class="text-lg font-bold text-gray-700 dark:text-gray-200">No products match</p>
+                        <p class="text-sm mt-1.5 text-gray-400 dark:text-gray-500 max-w-[280px]">Try a different category or clear your search to see everything</p>
+                        <button @click="activeCategory = 'all'; searchQuery = ''; filterProducts()" class="mt-5 px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-xl shadow-md shadow-purple-600/20">Show All Products</button>
                     </div>
                 </template>
 
@@ -492,12 +574,12 @@ window.addEventListener('popstate', function() {
 
             <div class="flex-1 min-h-0 overflow-y-auto" x-ref="cartList">
                 <template x-if="cart.length === 0">
-                    <div class="flex flex-col items-center justify-center h-full text-gray-400 py-16">
-                        <div class="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
-                            <svg class="w-10 h-10 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4"/></svg>
+                    <div class="tn-empty flex flex-col items-center justify-center h-full text-gray-400 py-16 px-6 text-center">
+                        <div class="tn-empty-icon w-24 h-24 rounded-full bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 flex items-center justify-center mb-5 ring-1 ring-purple-100 dark:ring-purple-900/30">
+                            <svg class="w-12 h-12 text-purple-400 dark:text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
                         </div>
-                        <p class="text-sm font-medium">Empty order</p>
-                        <p class="text-xs mt-1 text-gray-300">Add products to begin</p>
+                        <p class="text-base font-bold text-gray-700 dark:text-gray-200">Your cart is empty</p>
+                        <p class="text-xs mt-1.5 text-gray-400 dark:text-gray-500 max-w-[220px]">Tap a product on the left, or scan a barcode to start a new sale</p>
                     </div>
                 </template>
                 <template x-if="cartMode && cart.length > 0">
@@ -507,8 +589,8 @@ window.addEventListener('popstate', function() {
                     </div>
                 </template>
                 <template x-for="(item, index) in cart" :key="item.cart_uid">
-                    <div class="cart-item cart-item-enter px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 cursor-pointer relative"
-                        :style="activeCartIndex === index ? 'background:#f3e8ff; outline:2px solid #7c3aed; outline-offset:-2px; border-radius:8px; margin:2px;' : ''"
+                    <div class="cart-item cart-item-enter px-3 py-2.5 cursor-pointer relative"
+                        :class="activeCartIndex === index ? 'cart-row-active' : ''"
                         @click="activeCartIndex = index; cartMode = true;" :data-cart-index="index">
                         <div class="flex items-center gap-2.5">
                             <div class="flex-1 min-w-0">
@@ -601,9 +683,9 @@ window.addEventListener('popstate', function() {
                     </div>
                     <div x-show="exemptAmount > 0" class="flex justify-between text-xs text-green-600 dark:text-green-400"><span>Tax-Exempt</span><span x-text="'-Rs. ' + Number(exemptAmount).toLocaleString()"></span></div>
                     <div class="flex justify-between text-xs text-gray-500"><span x-text="'Tax (' + taxRate + '%)'"></span><span x-text="'Rs. ' + Number(taxAmount).toLocaleString()"></span></div>
-                    <div class="flex justify-between text-lg font-extrabold text-gray-900 dark:text-white pt-1.5 border-t border-gray-200 dark:border-gray-700">
-                        <span>Total</span>
-                        <span class="total-animate" x-text="'Rs. ' + Number(totalAmount).toLocaleString()" :class="cartAnimating ? 'cart-pop' : ''" :style="totalAmount > 0 ? 'color: #059669' : ''"></span>
+                    <div class="flex items-baseline justify-between pt-2 mt-1 border-t tn-hairline">
+                        <span class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Total</span>
+                        <span class="total-animate total-line text-2xl font-black text-gray-900 dark:text-white" x-text="'Rs. ' + Number(totalAmount).toLocaleString()" :class="cartAnimating ? 'cart-pop' : ''" :style="totalAmount > 0 ? 'color: #059669' : ''"></span>
                     </div>
                     <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] text-gray-400 pt-0.5">
                         <span>Est. Cost</span><span x-text="'Rs. ' + r2(getCartCost()).toLocaleString()"></span>
@@ -625,7 +707,7 @@ window.addEventListener('popstate', function() {
                             <span x-show="heldOrders.length > 0" class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center held-badge-pulse shadow-sm shadow-red-500/50" x-text="heldOrders.length"></span>
                         </button>
                     </div>
-                    <button @click="showPayModal = true" :disabled="cart.length === 0 || submitting" class="btn-ripple w-full py-3.5 rounded-xl text-sm font-extrabold text-white bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:opacity-30 shadow-lg shadow-green-600/25 transition-all transform hover:scale-[1.01] active:scale-[0.98]">
+                    <button @click="showPayModal = true" :disabled="cart.length === 0 || submitting" class="pay-btn-premium btn-ripple w-full py-4 rounded-2xl text-base font-extrabold text-white disabled:opacity-30">
                         <span class="flex items-center justify-center gap-2">
                             <svg x-show="submitting" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                             <svg x-show="!submitting" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>

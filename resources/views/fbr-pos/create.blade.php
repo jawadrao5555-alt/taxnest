@@ -2,22 +2,28 @@
 <style>
 @keyframes scanPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.5); } 50% { box-shadow: 0 0 0 8px rgba(59,130,246,0); } }
 .scan-pulse { animation: scanPulse 1.5s ease-in-out infinite; }
-@keyframes toastIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-.toast-in { animation: toastIn 0.25s ease-out; }
-.cart-flash { animation: cartFlash 0.4s ease; }
-@keyframes cartFlash { 0% { background-color: rgb(187 247 208); } 100% { background-color: transparent; } }
+@keyframes toastIn { from { transform: translateX(20px) scale(0.95); opacity: 0; } to { transform: translateX(0) scale(1); opacity: 1; } }
+.toast-in { animation: toastIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1); }
 @keyframes rowIn { from { transform: translateY(-6px); opacity:0; } to { transform: translateY(0); opacity:1; } }
-.row-in { animation: rowIn 0.25s ease-out; }
-.item-card { transition: all 0.2s ease; position: relative; overflow: hidden; }
+.row-in { animation: rowIn 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
+.item-card { transition: box-shadow 0.18s ease, transform 0.18s ease; position: relative; overflow: hidden; contain: layout style; }
 .item-card.is-active { box-shadow: 0 0 0 2px rgba(59,130,246,0.5), 0 8px 24px -8px rgba(59,130,246,0.4); transform: translateY(-1px); }
 .item-card.is-active::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg,#3b82f6,#6366f1); }
 .item-num-badge { background: linear-gradient(135deg,#3b82f6,#6366f1); color: white; box-shadow: 0 4px 12px -2px rgba(59,130,246,0.5); }
-kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-size:10px; font-family:monospace; box-shadow:0 1px 0 rgba(0,0,0,0.3); border:1px solid #334155; }
+.sticky-banner { will-change: transform; backface-visibility: hidden; }
+input[type="text"], input[type="number"], select, textarea { transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; }
+button { transition: transform 0.12s ease, background-color 0.15s ease, box-shadow 0.15s ease; }
+button:active:not(:disabled) { transform: scale(0.97); }
+kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-size:10px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; box-shadow:0 1px 0 rgba(0,0,0,0.3); border:1px solid #334155; }
 .dark kbd { background:#475569; border-color:#64748b; }
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
 </style>
 <div class="max-w-7xl mx-auto pb-32 px-3 sm:px-4" x-data="fbrPosInvoice()" @click="userActivity()">
     {{-- 🎯 Sticky Premium Total Banner --}}
-    <div class="sticky top-0 z-40 -mx-3 sm:-mx-4 px-3 sm:px-5 py-2.5 mb-3 bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white shadow-xl flex items-center justify-between gap-3 backdrop-blur supports-[backdrop-filter]:bg-slate-900/85 border-b border-white/10">
+    <div class="sticky-banner sticky top-0 z-40 -mx-3 sm:-mx-4 px-3 sm:px-5 py-2.5 mb-3 bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white shadow-xl flex items-center justify-between gap-3 backdrop-blur supports-[backdrop-filter]:bg-slate-900/85 border-b border-white/10">
         <div class="flex items-center gap-3 sm:gap-5 min-w-0">
             <div class="flex items-center gap-1.5">
                 <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -606,7 +612,11 @@ function fbrPosInvoice() {
             this.toast('POS Ready · Scanner active', 'success');
         },
         // ====== Premium helpers ======
-        userActivity() { /* refocus scanner if no input has focus */
+        _lastActivity: 0,
+        userActivity() { /* throttled refocus — prevents per-click overhead */
+            const now = performance.now();
+            if (now - this._lastActivity < 200) return;
+            this._lastActivity = now;
             if (document.activeElement === document.body && this.$refs.barcodeInput) this.$refs.barcodeInput.focus();
         },
         totalQty() { return this.items.reduce((s,i) => s + (parseFloat(i.quantity)||0), 0); },

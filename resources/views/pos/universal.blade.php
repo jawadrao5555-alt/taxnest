@@ -190,7 +190,7 @@ window.addEventListener('popstate', function() {
 
 <div x-data="restaurantPos()" x-init="init()" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
     <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-bold tracking-wider uppercase px-3 py-1 text-center shadow-sm">
-        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v16-SMART-UPSELL
+        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v17-SMART-CREATE
     </div>
 
     {{-- PRA Reporting + Auto-Print toggles strip (visible to admin + cashier).
@@ -328,6 +328,41 @@ window.addEventListener('popstate', function() {
             <button x-show="searchQuery" @click="searchQuery = ''; showSearchDropdown = false; filterProducts(); $refs.searchInput.focus()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
+            {{-- Smart Product Creation — empty-state.
+                 SIMPLE MODE (inventory OFF): inline "+ Create '<name>' (Enter)" creates product on the fly.
+                 INVENTORY MODE (inventory ON): "Open Products" button — never auto-creates. --}}
+            <div x-show="searchQuery.trim().length > 0 && searchSuggestions.length === 0 && !quickCreating" x-transition
+                 class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                <template x-if="!isInventoryEnabled()">
+                    <button type="button" @click="quickCreateProduct()"
+                        class="w-full flex items-center gap-3 px-3 py-3 text-left hover:bg-purple-50 dark:hover:bg-purple-900/20 transition group">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex-shrink-0 shadow">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-bold text-gray-900 dark:text-white">Create "<span x-text="searchQuery"></span>"</p>
+                            <p class="text-[10px] text-gray-400">Adds to cart instantly · set price after</p>
+                        </div>
+                        <span class="text-[9px] font-mono bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 px-1.5 py-0.5 rounded border border-purple-200 dark:border-purple-800">⏎</span>
+                    </button>
+                </template>
+                <template x-if="isInventoryEnabled()">
+                    <div class="px-3 py-3">
+                        <p class="text-sm font-semibold text-gray-700 dark:text-gray-200">Product not found</p>
+                        <p class="text-[10px] text-gray-400 mb-2">Inventory mode requires you to add products from Product Management.</p>
+                        <a href="{{ route('pos.products') }}" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                            Open Products
+                        </a>
+                    </div>
+                </template>
+            </div>
+            <div x-show="quickCreating" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-purple-200 rounded-xl shadow-2xl z-50 px-3 py-3">
+                <p class="text-xs text-gray-500 flex items-center gap-2">
+                    <svg class="w-4 h-4 animate-spin text-purple-600" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                    Creating "<span x-text="searchQuery" class="font-semibold"></span>"…
+                </p>
+            </div>
             <div x-show="showSearchDropdown && searchSuggestions.length > 0" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 max-h-64 overflow-y-auto" x-ref="searchDropdown">
                 <template x-for="(s, i) in searchSuggestions" :key="s.id + s.type">
                     <button @click="quickAddItem(s)" @mouseenter="highlightIndex = i"
@@ -601,8 +636,35 @@ window.addEventListener('popstate', function() {
                         @click="activeCartIndex = index; cartMode = true;" :data-cart-index="index">
                         <div class="flex items-center gap-2.5">
                             <div class="flex-1 min-w-0">
-                                <p class="text-sm font-bold text-gray-900 dark:text-white truncate" x-text="item.item_name"></p>
-                                <p class="text-[11px] text-gray-400 mt-0.5" x-text="'Rs. ' + Number(item.unit_price).toLocaleString() + '/unit'"></p>
+                                <p class="text-sm font-bold text-gray-900 dark:text-white truncate flex items-center gap-1.5">
+                                    <span x-text="item.item_name"></span>
+                                    <template x-if="item._isQuickCreated">
+                                        <span class="text-[8px] font-bold uppercase tracking-wider text-purple-700 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 px-1.5 py-0.5 rounded">No Recipe</span>
+                                    </template>
+                                </p>
+                                {{-- Inline price editor — only shown when this row needs a price set (quick-created or zero-price).
+                                     Enter / blur saves to backend, updates cart unit_price + master allProducts. --}}
+                                <template x-if="quickPriceCartUid === item.cart_uid">
+                                    <div class="flex items-center gap-1.5 mt-1" @click.stop>
+                                        <span class="text-[10px] text-gray-500">Rs.</span>
+                                        <input type="number" min="0" step="any" x-ref="quickPriceInput"
+                                            x-model.number="quickPriceValue"
+                                            @keydown.enter.prevent="saveQuickPrice(index)"
+                                            @keydown.escape.prevent="cancelQuickPrice()"
+                                            @blur="saveQuickPrice(index)"
+                                            placeholder="Enter price"
+                                            class="w-24 text-xs font-bold bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-300 dark:border-purple-700 rounded-md px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                                        <span class="text-[9px] text-gray-400">⏎ Save · Esc Cancel</span>
+                                    </div>
+                                </template>
+                                <template x-if="quickPriceCartUid !== item.cart_uid">
+                                    <p class="text-[11px] text-gray-400 mt-0.5">
+                                        <span x-text="'Rs. ' + Number(item.unit_price).toLocaleString() + '/unit'"></span>
+                                        <template x-if="item._isQuickCreated && Number(item.unit_price) === 0">
+                                            <button @click.stop="openQuickPrice(item)" class="ml-1 text-purple-600 hover:underline font-semibold">Set price</button>
+                                        </template>
+                                    </p>
+                                </template>
                             </div>
                             <div class="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-xl p-0.5">
                                 <button @click.stop="updateQty(index, -1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
@@ -1623,6 +1685,86 @@ function restaurantPos() {
             if (this._upsellTimer) { clearTimeout(this._upsellTimer); this._upsellTimer = null; }
         },
         _upsellTimer: null,
+
+        // ──────────────────────────────────────────────────────────────
+        // SMART PRODUCT CREATION — Simple POS quick-create + inline price editor.
+        // - Only fires when isInventoryEnabled() is FALSE.
+        // - Backend route /pos/api/products/quick-create has its own server-side
+        //   guard (refuses 422 when inventory is on) — defense in depth.
+        // - Inventory ON path shows "Open Products" link instead.
+        // ──────────────────────────────────────────────────────────────
+        quickCreating: false,
+        quickPriceCartUid: null,    // cart_uid of row currently in price-edit mode
+        quickPriceValue: '',        // bound to the inline price input
+        async quickCreateProduct() {
+            if (this.isInventoryEnabled()) return; // belt + suspenders
+            const name = (this.searchQuery || '').trim();
+            if (!name || this.quickCreating) return;
+            this.quickCreating = true;
+            try {
+                const res = await fetch('{{ route('pos.api.products.quick-create') }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ name, price: 0 }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.ok) {
+                    this.showToast(data.error || 'Could not create', 'error');
+                    return;
+                }
+                const p = data.product;
+                this.allProducts.push(p);
+                // Add directly to cart, then mark row + open inline price editor
+                this.addToCart({ id: p.id, type: 'product', name: p.name, price: 0, is_tax_exempt: false });
+                const cartItem = this.cart[this.cart.length - 1];
+                if (cartItem) {
+                    cartItem._isQuickCreated = true;
+                    cartItem._productId = p.id;
+                    this.openQuickPrice(cartItem);
+                }
+                this.searchQuery = '';
+                this.searchSuggestions = [];
+                this.showSearchDropdown = false;
+                this.filterProducts();
+            } catch (e) {
+                this.showToast('Network error', 'error');
+            } finally {
+                this.quickCreating = false;
+            }
+        },
+        openQuickPrice(cartItem) {
+            this.quickPriceCartUid = cartItem.cart_uid;
+            this.quickPriceValue = cartItem.unit_price > 0 ? cartItem.unit_price : '';
+            this.$nextTick(() => { this.$refs.quickPriceInput?.focus(); this.$refs.quickPriceInput?.select(); });
+        },
+        cancelQuickPrice() {
+            this.quickPriceCartUid = null;
+            this.quickPriceValue = '';
+        },
+        async saveQuickPrice(cartIndex) {
+            // Guard: only save when this row is the one being edited, prevents double-fire on blur.
+            const item = this.cart[cartIndex];
+            if (!item || this.quickPriceCartUid !== item.cart_uid) return;
+            const newPrice = parseFloat(this.quickPriceValue);
+            if (!Number.isFinite(newPrice) || newPrice < 0) {
+                this.cancelQuickPrice();
+                return;
+            }
+            // Optimistic local update
+            item.unit_price = newPrice;
+            const productId = item._productId || item.item_id;
+            const masterIdx = this.allProducts.findIndex(p => p.id === productId);
+            if (masterIdx >= 0) this.allProducts[masterIdx].price = newPrice;
+            this.cancelQuickPrice();
+            // Persist to backend (silent — already reflected in UI)
+            try {
+                await fetch(`/pos/api/products/${productId}/quick-price`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ price: newPrice }),
+                });
+            } catch (e) { /* non-fatal — UI already updated */ }
+        },
         updateQty(index, delta) {
             if (this._qtyUpdating) return;
             if (!this.cart[index]) return;

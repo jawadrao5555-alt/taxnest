@@ -434,6 +434,9 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::get('/api/check-pin-session', [PosController::class, 'checkPinSession'])->name('pos.api.check-pin-session');
     Route::post('/api/toggle-pra', [PosController::class, 'togglePra'])->name('pos.api.toggle-pra');
     Route::post('/api/toggle-auto-print', [PosController::class, 'toggleAutoPrint'])->name('pos.api.toggle-auto-print');
+    // Smart Product Creation — Simple POS quick-create (refused server-side when inventory ON)
+    Route::post('/api/products/quick-create', [PosController::class, 'apiQuickCreate'])->name('pos.api.products.quick-create');
+    Route::post('/api/products/{id}/quick-price', [PosController::class, 'apiQuickUpdatePrice'])->name('pos.api.products.quick-price');
     Route::match(['get', 'post'], '/my-profile', [PosController::class, 'userProfile'])->name('pos.user-profile');
     Route::get('/products', [PosController::class, 'products'])->name('pos.products');
     Route::get('/customers', [PosController::class, 'customers'])->name('pos.customers');

@@ -1911,6 +1911,85 @@ class PosController extends Controller
         return view('pos.products', compact('products', 'posType', 'categoryFields'));
     }
 
+    /**
+     * Smart Quick-Create endpoint for Simple POS mode.
+     * Creates a minimal POS product on the fly when cashier types something
+     * not in catalog AND inventory is OFF. Defense in depth: refuses when
+     * inventory is enabled (UI must direct user to /pos/products instead).
+     *
+     * Inputs: name (required), price (optional, defaults 0)
+     * Returns: { ok, product:{...} } shaped to slot into Alpine `allProducts`.
+     */
+    public function apiQuickCreate(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = \App\Models\Company::find($companyId);
+        if (!$company) {
+            return response()->json(['ok' => false, 'error' => 'Company not found'], 404);
+        }
+        // Server-side inventory guard — quick-create only allowed in Simple Mode.
+        if (!empty($company->inventory_enabled)) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'Quick-create is disabled when inventory mode is on. Add product from Product Management.',
+                'reason' => 'inventory_enabled',
+            ], 422);
+        }
+        $data = $request->validate([
+            'name'  => 'required|string|max:255',
+            'price' => 'nullable|numeric|min:0',
+        ]);
+        $name = trim($data['name']);
+        if ($name === '') {
+            return response()->json(['ok' => false, 'error' => 'Name required'], 422);
+        }
+        $product = PosProduct::create([
+            'company_id'    => $companyId,
+            'name'          => $name,
+            'price'         => $data['price'] ?? 0,
+            'tax_rate'      => 0,
+            'is_active'     => true,
+            'is_tax_exempt' => false,
+            'category'      => 'Quick',
+            'sku'           => 'QC-' . substr((string) time(), -6) . '-' . strtoupper(substr(uniqid(), -3)),
+            'uom'           => 'NOS',
+        ]);
+        return response()->json([
+            'ok' => true,
+            'product' => [
+                'id'            => $product->id,
+                'name'          => $product->name,
+                'price'         => (float) $product->price,
+                'category'      => $product->category,
+                'type'          => 'product',
+                'image'         => null,
+                'is_tax_exempt' => false,
+                'hasRecipe'     => false,
+                'stockStatus'   => null,
+                'isQuickCreated'=> true,
+            ],
+        ]);
+    }
+
+    /**
+     * Inline price update for a freshly quick-created product.
+     * Cashier sets the price right after add; this persists it.
+     */
+    public function apiQuickUpdatePrice(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $data = $request->validate([
+            'price' => 'required|numeric|min:0',
+        ]);
+        $product = PosProduct::where('company_id', $companyId)->where('id', $id)->first();
+        if (!$product) {
+            return response()->json(['ok' => false, 'error' => 'Not found'], 404);
+        }
+        $product->price = $data['price'];
+        $product->save();
+        return response()->json(['ok' => true, 'price' => (float) $product->price]);
+    }
+
     public function storeProduct(Request $request)
     {
         $companyId = app('currentCompanyId');

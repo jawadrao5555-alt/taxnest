@@ -553,6 +553,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/all-users', [AdminController::class, 'users']);
     Route::post('/all-users', [AdminController::class, 'storeUser']);
     Route::get('/fbr-logs', [AdminController::class, 'fbrLogs']);
+    Route::get('/fbr-pos-logs', [AdminController::class, 'fbrPosLogs'])->name('admin.fbrPosLogs');
     Route::get('/system-health', [AdminController::class, 'systemHealth']);
     Route::get('/security-logs', [AdminController::class, 'securityLogs']);
     Route::get('/audit/export', [AdminController::class, 'auditExport'])->name('admin.audit.export');
@@ -667,6 +668,9 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth'])->group(function () {
     Route::get('/transactions', [FbrPosController::class, 'transactions'])->name('fbrpos.transactions');
     Route::get('/transactions/{id}', [FbrPosController::class, 'show'])->name('fbrpos.show');
     Route::post('/transactions/{id}/retry-fbr', [FbrPosController::class, 'retryFbr'])->name('fbrpos.retryFbr');
+    Route::get('/fail-queue', [FbrPosController::class, 'failQueue'])->name('fbrpos.failQueue');
+    Route::post('/fail-queue/retry-all', [FbrPosController::class, 'failQueueRetryAll'])->name('fbrpos.failQueue.retryAll');
+    Route::post('/fail-queue/{id}/retry', [FbrPosController::class, 'failQueueRetryOne'])->name('fbrpos.failQueue.retryOne');
     Route::match(['get', 'post'], '/settings', [FbrPosController::class, 'fbrSettings'])->name('fbrpos.settings');
     Route::post('/test-connection', [FbrPosController::class, 'testConnection'])->name('fbrpos.testConnection');
     Route::post('/api/toggle-fbr-reporting', [FbrPosController::class, 'toggleFbrReporting'])->name('fbrpos.api.toggle-fbr-reporting');

@@ -21,7 +21,14 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
     *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 </style>
-<div class="max-w-7xl mx-auto pb-32 px-3 sm:px-4" x-data="fbrPosInvoice()" @click="userActivity()">
+<div class="max-w-7xl mx-auto pb-32 px-3 sm:px-4" x-data="fbrPosInvoice()" @click="userActivity()"
+     x-init="window.addEventListener('online', () => isOnline = true); window.addEventListener('offline', () => isOnline = false);">
+    {{-- 🌐 Offline Banner — visible only when no internet --}}
+    <div x-show="!isOnline" x-cloak
+         class="sticky top-0 z-50 -mx-3 sm:-mx-4 px-4 py-2.5 mb-2 bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg flex items-center justify-center gap-3 font-bold text-sm">
+        <svg class="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m-2.829-9.9a5 5 0 010 7.072M9 12h.01M3 3l18 18"/></svg>
+        Internet required for FBR submission. Bill saving is disabled until you reconnect.
+    </div>
     {{-- 🎯 Sticky Premium Total Banner --}}
     <div class="sticky-banner sticky top-0 z-40 -mx-3 sm:-mx-4 px-3 sm:px-5 py-2.5 mb-3 bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white shadow-xl flex items-center justify-between gap-3 backdrop-blur supports-[backdrop-filter]:bg-slate-900/85 border-b border-white/10">
         <div class="flex items-center gap-3 sm:gap-5 min-w-0">
@@ -512,8 +519,12 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
                 </div>
 
                 <button type="submit" x-ref="completeBtn"
-                    class="w-full py-5 bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white font-black rounded-xl transition text-lg shadow-xl tracking-wide">
-                    ✓ COMPLETE SALE <span class="opacity-70 text-xs font-normal">(F9 / Ctrl+B)</span>
+                    :disabled="!isOnline"
+                    @click="if(!isOnline){ $event.preventDefault(); toast('Internet required for FBR submission. Please reconnect.', 'error'); return false; }"
+                    :class="isOnline ? 'bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white' : 'bg-gray-400 text-gray-200 cursor-not-allowed'"
+                    class="w-full py-5 font-black rounded-xl transition text-lg shadow-xl tracking-wide">
+                    <span x-show="isOnline">✓ COMPLETE SALE <span class="opacity-70 text-xs font-normal">(F9 / Ctrl+B)</span></span>
+                    <span x-show="!isOnline" x-cloak>⚠ OFFLINE — RECONNECT TO SUBMIT</span>
                 </button>
             </div>
         </div>
@@ -577,6 +588,7 @@ function fbrPosInvoice() {
         // Premium UI state
         numpadOpen: false,
         toasts: [],
+        isOnline: navigator.onLine,
         toastSeq: 0,
         soundOn: localStorage.getItem('fbrpos_sound') !== '0',
         lastSaleId: localStorage.getItem('fbrpos_last_sale') || '',

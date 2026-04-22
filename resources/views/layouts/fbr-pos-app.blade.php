@@ -154,6 +154,23 @@
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                                         Orders
                                     </a>
+                                    @php
+                                        $failQueueCount = 0;
+                                        try {
+                                            $cid = app('currentCompanyId');
+                                            $failQueueCount = \App\Models\FbrPosTransaction::where('company_id', $cid)
+                                                ->whereIn('fbr_status', ['failed', 'pending'])
+                                                ->where(function ($q) { $q->where('invoice_mode', 'fbr')->orWhereNull('invoice_mode'); })
+                                                ->count();
+                                        } catch (\Throwable $e) {}
+                                    @endphp
+                                    <a href="{{ route('fbrpos.failQueue') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+                                        <svg class="w-4 h-4 {{ $failQueueCount > 0 ? 'text-red-500' : 'text-gray-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.74-2.991l-7-12a2 2 0 00-3.48 0l-7 12A2 2 0 005 19z"/></svg>
+                                        <span class="flex-1">Fail Queue</span>
+                                        @if($failQueueCount > 0)
+                                            <span class="px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-bold">{{ $failQueueCount }}</span>
+                                        @endif
+                                    </a>
                                     <a href="{{ route('fbrpos.products') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                                         Products

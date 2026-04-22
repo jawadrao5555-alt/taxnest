@@ -349,6 +349,49 @@ class AdminController extends Controller
         return view('admin.fbr-logs', compact('logs'));
     }
 
+    public function fbrPosLogs(Request $request)
+    {
+        $query = \App\Models\FbrPosLog::with(['transaction', 'company'])
+            ->orderBy('created_at', 'desc');
+
+        if ($request->status) {
+            $query->where('status', $request->status);
+        }
+        if ($request->company_id) {
+            $query->where('company_id', $request->company_id);
+        }
+
+        $logs = $query->paginate(25)->withQueryString();
+
+        $since = now()->subDays(7);
+        $stats = \App\Models\FbrPosLog::where('created_at', '>=', $since)
+            ->selectRaw("
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success,
+                SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending
+            ")
+            ->first();
+
+        $txStats = \App\Models\FbrPosTransaction::selectRaw("
+                COUNT(*) as total_invoices,
+                SUM(CASE WHEN fbr_status = 'submitted' THEN 1 ELSE 0 END) as submitted,
+                SUM(CASE WHEN fbr_status = 'failed' THEN 1 ELSE 0 END) as failed,
+                SUM(CASE WHEN fbr_status = 'pending' THEN 1 ELSE 0 END) as pending,
+                SUM(CASE WHEN fbr_status = 'submitted' THEN total_amount ELSE 0 END) as submitted_amount
+            ")
+            ->where(function ($q) { $q->where('invoice_mode', 'fbr')->orWhereNull('invoice_mode'); })
+            ->first();
+
+        $successRate = ($stats->total ?? 0) > 0
+            ? round(($stats->success / $stats->total) * 100, 1)
+            : 0;
+
+        $companies = \App\Models\Company::orderBy('company_name')->get(['id', 'company_name']);
+
+        return view('admin.fbr-pos-logs', compact('logs', 'stats', 'txStats', 'successRate', 'companies'));
+    }
+
     public function systemHealth()
     {
         $pendingJobs = DB::table('jobs')->count();

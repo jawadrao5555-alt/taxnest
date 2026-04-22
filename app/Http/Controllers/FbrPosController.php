@@ -359,9 +359,28 @@ class FbrPosController extends Controller
             }
 
             $fbrErrors = implode(', ', $fbrResult['errors'] ?? ['Unknown error']);
+
+            // ============ AUTO-RETRY ENGINE ============
+            // For transient failures (curl/network/empty 200/timeout), schedule auto-retry job (10s, 20s, 30s, max 3 tries)
+            // For hard failures (token missing, validation), no retry — manual fix needed
+            $errorString = strtolower($fbrErrors);
+            $isTransient = $fbrResult['status'] === 'retry'
+                || str_contains($errorString, 'connection failed')
+                || str_contains($errorString, 'timeout')
+                || str_contains($errorString, 'empty response')
+                || str_contains($errorString, 'unexpected response')
+                || (isset($fbrResult['http_status']) && $fbrResult['http_status'] >= 500);
+
+            if ($isTransient) {
+                \App\Jobs\RetryFbrPosSubmissionJob::dispatch($transaction->id)->delay(now()->addSeconds(10));
+                return redirect()->route('fbrpos.show', $transaction->id)
+                    ->with('success', "Sale #{$transaction->invoice_number} saved (PKR " . number_format($transaction->total_amount, 2) . ").")
+                    ->with('warning', "FBR submission temporarily failed: {$fbrErrors}. Auto-retry scheduled (3 attempts, 10s apart).");
+            }
+
             return redirect()->route('fbrpos.show', $transaction->id)
                 ->with('success', "Sale #{$transaction->invoice_number} created (PKR " . number_format($transaction->total_amount, 2) . ").")
-                ->with('error', "FBR submission failed: {$fbrErrors}. You can retry from the transaction detail page.");
+                ->with('error', "FBR submission failed: {$fbrErrors}. Fix the issue and retry from Fail Queue or this page.");
 
         } catch (\Exception $e) {
             Log::error('FBR POS Store Error', ['error' => $e->getMessage()]);
@@ -470,6 +489,10 @@ class FbrPosController extends Controller
             return redirect()->route('fbrpos.show', $id)->with('error', 'This transaction is already submitted to FBR.');
         }
 
+        if ($transaction->invoice_mode === 'local') {
+            return redirect()->route('fbrpos.show', $id)->with('error', 'Local invoices cannot be submitted to FBR.');
+        }
+
         $transaction->fbr_submission_hash = null;
         $transaction->save();
 
@@ -485,6 +508,92 @@ class FbrPosController extends Controller
         $fbrErrors = implode(', ', $fbrResult['errors'] ?? ['Unknown error']);
         return redirect()->route('fbrpos.show', $id)
             ->with('error', "FBR retry failed: {$fbrErrors}");
+    }
+
+    /**
+     * Fail Queue — list of all failed/pending FBR POS transactions for this company
+     */
+    public function failQueue(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+
+        $query = FbrPosTransaction::where('company_id', $companyId)
+            ->whereIn('fbr_status', ['failed', 'pending'])
+            ->where(function ($q) {
+                $q->where('invoice_mode', 'fbr')->orWhereNull('invoice_mode');
+            })
+            ->with(['fbrLogs' => function ($q) {
+                $q->latest()->limit(1);
+            }]);
+
+        if ($request->search) {
+            $s = $request->search;
+            $query->where(function ($q) use ($s) {
+                $q->whereRaw('LOWER(invoice_number) LIKE ?', ['%' . strtolower($s) . '%'])
+                    ->orWhereRaw('LOWER(customer_name) LIKE ?', ['%' . strtolower($s) . '%']);
+            });
+        }
+
+        $transactions = $query->latest()->paginate(20)->withQueryString();
+
+        $stats = FbrPosTransaction::where('company_id', $companyId)
+            ->where(function ($q) {
+                $q->where('invoice_mode', 'fbr')->orWhereNull('invoice_mode');
+            })
+            ->selectRaw("
+                SUM(CASE WHEN fbr_status = 'failed' THEN 1 ELSE 0 END) as failed_count,
+                SUM(CASE WHEN fbr_status = 'pending' THEN 1 ELSE 0 END) as pending_count,
+                SUM(CASE WHEN fbr_status = 'submitted' THEN 1 ELSE 0 END) as submitted_count,
+                SUM(CASE WHEN fbr_status = 'failed' THEN total_amount ELSE 0 END) as failed_amount
+            ")
+            ->first();
+
+        return view('fbr-pos.fail-queue', compact('transactions', 'stats'));
+    }
+
+    /**
+     * Bulk retry — schedule auto-retry job for all failed invoices
+     */
+    public function failQueueRetryAll()
+    {
+        $companyId = app('currentCompanyId');
+
+        $failed = FbrPosTransaction::where('company_id', $companyId)
+            ->whereIn('fbr_status', ['failed', 'pending'])
+            ->where(function ($q) {
+                $q->where('invoice_mode', 'fbr')->orWhereNull('invoice_mode');
+            })
+            ->get();
+
+        $count = 0;
+        foreach ($failed as $tx) {
+            $tx->fbr_submission_hash = null;
+            $tx->save();
+            \App\Jobs\RetryFbrPosSubmissionJob::dispatch($tx->id)->delay(now()->addSeconds(10));
+            $count++;
+        }
+
+        return redirect()->route('fbrpos.failQueue')
+            ->with('success', "Scheduled auto-retry for {$count} failed invoice(s). Each will retry up to 3 times (10s/20s/30s apart).");
+    }
+
+    /**
+     * Schedule retry job for a single failed invoice
+     */
+    public function failQueueRetryOne($id)
+    {
+        $companyId = app('currentCompanyId');
+        $tx = FbrPosTransaction::where('company_id', $companyId)->findOrFail($id);
+
+        if ($tx->fbr_status === 'submitted') {
+            return back()->with('error', 'Already submitted to FBR.');
+        }
+
+        $tx->fbr_submission_hash = null;
+        $tx->save();
+        \App\Jobs\RetryFbrPosSubmissionJob::dispatch($tx->id)->delay(now()->addSeconds(5));
+
+        return back()->with('success', "Auto-retry scheduled for invoice #{$tx->invoice_number}.");
     }
 
     public function fbrSettings(Request $request)

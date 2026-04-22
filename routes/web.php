@@ -28,6 +28,7 @@ use App\Http\Controllers\PosInventoryController;
 use App\Http\Controllers\PosAuthController;
 use App\Http\Controllers\HsCodeMappingController;
 use App\Http\Controllers\BranchController;
+use App\Http\Controllers\BranchSwitchController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\TaxOverrideController;
 use App\Http\Controllers\CustomerProfileController;
@@ -141,6 +142,9 @@ Route::post('/pos/register', [PosAuthController::class, 'register']);
 Route::post('/pos/logout', [PosAuthController::class, 'logout'])->name('pos.logout');
 
 Route::get('/pos/invoice/share/{token}', [PosController::class, 'publicInvoicePdf'])->name('pos.invoice.share');
+
+// Branch switcher — accessible by ANY authenticated guard (web/pos/fbrpos)
+Route::middleware('web')->post('/branch/switch', [BranchSwitchController::class, 'switch'])->name('branch.switch');
 
 Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])->group(function () {
 

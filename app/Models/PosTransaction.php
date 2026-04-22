@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class PosTransaction extends Model
 {
     protected $fillable = [
-        'company_id', 'terminal_id', 'invoice_number', 'invoice_mode', 'customer_id', 'customer_name', 'customer_phone',
+        'company_id', 'branch_id', 'terminal_id', 'invoice_number', 'invoice_mode', 'customer_id', 'customer_name', 'customer_phone',
         'subtotal', 'discount_type', 'discount_value', 'discount_amount',
         'tax_rate', 'tax_amount', 'exempt_amount', 'total_amount', 'payment_method',
         'cash_received', 'change_due',

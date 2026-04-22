@@ -185,6 +185,10 @@
                             </a>
                             @endif
                         </nav>
+
+                        <div class="hidden md:block ml-1">
+                            <x-branch-switcher color="purple" />
+                        </div>
                     </div>
 
                     <div class="flex items-center gap-2" x-data="{ online: navigator.onLine, isFs: false, clock: '{{ now()->format('H:i') }}' }"

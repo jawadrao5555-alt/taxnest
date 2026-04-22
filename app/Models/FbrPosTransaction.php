@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class FbrPosTransaction extends Model
 {
     protected $fillable = [
-        'company_id', 'invoice_number', 'invoice_mode', 'customer_name', 'customer_phone', 'customer_ntn',
+        'company_id', 'branch_id', 'invoice_number', 'invoice_mode', 'customer_name', 'customer_phone', 'customer_ntn',
         'subtotal', 'discount_type', 'discount_value', 'discount_amount',
         'tax_rate', 'tax_amount', 'fbr_service_charge', 'total_amount', 'payment_method',
         'status', 'fbr_invoice_number', 'fbr_status', 'fbr_response_code',

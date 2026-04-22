@@ -36,29 +36,36 @@ class FbrPosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
+        $branchSvc = app(\App\Services\BranchContextService::class);
+        $branchScope = fn ($q) => $branchSvc->applyToQuery($q);
 
         $todayStats = FbrPosTransaction::where('company_id', $companyId)
+            ->tap($branchScope)
             ->whereDate('created_at', today())
             ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue, COALESCE(SUM(tax_amount), 0) as tax')
             ->first();
 
         $monthStats = FbrPosTransaction::where('company_id', $companyId)
+            ->tap($branchScope)
             ->whereYear('created_at', now()->year)
             ->whereMonth('created_at', now()->month)
             ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue, COALESCE(SUM(tax_amount), 0) as tax')
             ->first();
 
         $fbrSubmitted = FbrPosTransaction::where('company_id', $companyId)
+            ->tap($branchScope)
             ->where('invoice_mode', 'fbr')
             ->whereNotNull('fbr_invoice_number')
             ->count();
 
         $fbrPending = FbrPosTransaction::where('company_id', $companyId)
+            ->tap($branchScope)
             ->where('invoice_mode', 'fbr')
             ->where('fbr_status', 'pending')
             ->count();
 
         $recentTransactions = FbrPosTransaction::where('company_id', $companyId)
+            ->tap($branchScope)
             ->where(function ($q) {
                 $q->where('invoice_mode', 'fbr')->orWhereNull('invoice_mode');
             })
@@ -252,6 +259,7 @@ class FbrPosController extends Controller
 
                 $transaction = FbrPosTransaction::create([
                     'company_id' => $companyId,
+                    'branch_id' => app('currentBranchId'),
                     'terminal_id' => $request->terminal_id,
                     'shift_id' => $shift?->id,
                     'invoice_number' => $invoiceNumber,
@@ -394,7 +402,10 @@ class FbrPosController extends Controller
         $company = Company::find($companyId);
         $tab = $request->get('tab', 'fbr');
 
-        $query = FbrPosTransaction::where('company_id', $companyId)->with('creator');
+        $branchSvc = app(\App\Services\BranchContextService::class);
+        $query = FbrPosTransaction::where('company_id', $companyId)
+            ->tap(fn($q) => $branchSvc->applyToQuery($q))
+            ->with('creator');
 
         if ($tab === 'local') {
             if (!empty($company->confidential_pin) && !$this->isPinSessionValid()) {

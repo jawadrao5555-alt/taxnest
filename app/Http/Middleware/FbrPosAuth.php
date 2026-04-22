@@ -39,6 +39,12 @@ class FbrPosAuth
 
         app()->instance('currentCompanyId', $user->company_id);
 
+        // Resolve & bind active branch (returns null if no branches exist yet)
+        $branchId = app(\App\Services\BranchContextService::class)->getActiveBranchId();
+        app()->instance('currentBranchId', $branchId);
+        view()->share('currentBranchId', $branchId);
+        view()->share('currentBranch', $branchId ? \App\Models\Branch::find($branchId) : null);
+
         return $next($request);
     }
 }

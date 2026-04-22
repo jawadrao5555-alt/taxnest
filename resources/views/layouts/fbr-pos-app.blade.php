@@ -110,6 +110,10 @@
                                 New Sale
                             </a>
                         </nav>
+
+                        <div class="hidden md:block ml-1">
+                            <x-branch-switcher color="blue" />
+                        </div>
                     </div>
 
                     <div class="flex items-center gap-2">

@@ -1798,20 +1798,28 @@ function restaurantPos() {
             this.fixCartIndex();
         },
 
-        enterCartMode() {
+        enterCartMode(startAt) {
             if (this.cart.length === 0) return;
             this.cartMode = true;
             this.gridFocusMode = false;
-            this.activeCartIndex = this.cart.length - 1;
+            if (startAt === 'last') this.activeCartIndex = this.cart.length - 1;
+            else if (typeof startAt === 'number') this.activeCartIndex = Math.max(0, Math.min(startAt, this.cart.length - 1));
+            else this.activeCartIndex = 0;
             document.activeElement?.blur();
             this.scrollToCartItem(this.activeCartIndex);
         },
 
+        exitCartMode() {
+            this.cartMode = false;
+            this.activeCartIndex = -1;
+            this.$nextTick(() => { this.$refs.searchInput?.focus(); });
+        },
+
         moveCartSelection(dir) {
-            if (this.cart.length === 0) { this.activeCartIndex = -1; return; }
-            let next = this.activeCartIndex + dir;
-            if (next < 0) next = 0;
-            if (next >= this.cart.length) next = this.cart.length - 1;
+            if (this.cart.length === 0) { this.activeCartIndex = -1; this.cartMode = false; return; }
+            const next = this.activeCartIndex + dir;
+            if (next < 0) { this.exitCartMode(); return; }
+            if (next >= this.cart.length) { this.activeCartIndex = this.cart.length - 1; return; }
             this.activeCartIndex = next;
             this.scrollToCartItem(next);
         },
@@ -1871,7 +1879,7 @@ function restaurantPos() {
             if (e.key === 'F3') { e.preventDefault(); this.activeHeldIndex = 0; this.showHeldOrders = true; return; }
             if (e.key === 'F4') { e.preventDefault(); if (this.cart.length && confirm('Clear entire cart?')) { this.clearCart(); } return; }
             if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
-            if (e.key === 'F6') { e.preventDefault(); if (this.cart.length > 0) { this.cartMode = true; this.activeCartIndex = this.cart.length - 1; this.mobileView = 'cart'; } return; }
+            if (e.key === 'F6') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode('last'); this.mobileView = 'cart'; } return; }
             if (e.key === 'F7') { e.preventDefault(); this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); return; }
             if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) this.showPayModal = true; return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
@@ -1924,7 +1932,8 @@ function restaurantPos() {
         },
 
         handleSearchKeys(e) {
-            if (e.key === 'ArrowDown' && this.cart.length > 0 && !this.gridFocusMode) { this.enterCartMode(); return; }
+            if (e.key === 'ArrowDown' && this.cart.length > 0 && !this.gridFocusMode) { this.enterCartMode(0); return; }
+            if (e.key === 'ArrowUp' && this.cart.length > 0 && !this.gridFocusMode) { this.enterCartMode('last'); return; }
             if ((e.key === '+' || e.key === '=') && this.cart.length > 0) { this.updateQty(this.cart.length - 1, 1); this.animateQty(this.cart.length - 1); return; }
             if (e.key === '-' && this.cart.length > 0) { this.updateQty(this.cart.length - 1, -1); this.animateQty(this.cart.length - 1); return; }
             if (e.key === 'Delete' && this.cart.length > 0) { this.removeFromCart(this.cart.length - 1); this.fixCartIndex(); return; }

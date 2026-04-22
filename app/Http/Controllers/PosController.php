@@ -237,7 +237,12 @@ class PosController extends Controller
         $customers = PosCustomer::where('company_id', $companyId)->orderBy('name')->get();
         $taxRate = PosTaxRule::getRateForMethod('cash');
         $taxRules = PosTaxRule::where('is_active', true)->get()->keyBy('payment_method');
-        $blockOutOfStock = (bool)($company->block_out_of_stock ?? false);
+        // Inventory master switch governs ALL stock behavior. When OFF:
+        //   - block_out_of_stock is FORCED false (cannot block adds based on stock)
+        //   - lowStockAlerts is empty (popup cannot open)
+        //   - stockStatus is empty (no badges)
+        $inventoryEnabled = $inventoryOn;
+        $blockOutOfStock = $inventoryEnabled ? (bool)($company->block_out_of_stock ?? false) : false;
 
         $user = Auth::guard('pos')->user();
         $posRole = $user->pos_role ?? 'pos_cashier';
@@ -251,7 +256,7 @@ class PosController extends Controller
             'recipeLookup', 'tables', 'selectedTable', 'heldOrders',
             'customers', 'taxRate', 'taxRules', 'stockStatus', 'blockOutOfStock',
             'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts',
-            'lowStockAlerts'
+            'lowStockAlerts', 'inventoryEnabled'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         ->header('Pragma', 'no-cache')

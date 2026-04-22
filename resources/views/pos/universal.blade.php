@@ -190,7 +190,7 @@ window.addEventListener('popstate', function() {
 
 <div x-data="restaurantPos()" x-init="init()" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
     <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-bold tracking-wider uppercase px-3 py-1 text-center shadow-sm">
-        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v14-INVENTORY-GATED
+        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v15-INVENTORY-STRICT
     </div>
 
     {{-- PRA Reporting + Auto-Print toggles strip (visible to admin + cashier).
@@ -1115,8 +1115,9 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
-    {{-- Low Stock Alert Popup --}}
-    <div x-show="showLowStockPopup && lowStockAlerts.length > 0" x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    {{-- Low Stock Alert Popup — strictly gated by isInventoryEnabled().
+         Even if some downstream code flips showLowStockPopup, this guard keeps it hidden. --}}
+    <div x-show="isInventoryEnabled() && showLowStockPopup && lowStockAlerts.length > 0" x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" @click.outside="showLowStockPopup = false">
             <div class="p-4 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 flex items-center gap-3">
                 <div class="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
@@ -1190,6 +1191,11 @@ function restaurantPos() {
         allServices: @json($servicesJson),
         allCustomers: @json($customersJson),
         kitchenSettings: @json($kitchenSettings),
+        // Inventory master switch — single source of truth.
+        // When false, ALL stock UI/logic is suppressed (badges, popup, blocking).
+        // Use isInventoryEnabled() helper everywhere — never reference this directly.
+        inventoryEnabled: {{ ($inventoryEnabled ?? false) ? 'true' : 'false' }},
+        isInventoryEnabled() { return this.inventoryEnabled === true; },
         blockOutOfStock: {{ $blockOutOfStock ? 'true' : 'false' }},
         taxRate: {{ $taxRate }},
         taxRules: @json($taxRules->mapWithKeys(fn($r) => [$r->payment_method => (float) $r->tax_rate])),
@@ -1202,7 +1208,8 @@ function restaurantPos() {
         managerPinError: '',
         ingredientCosts: @json($ingredientCosts ?? []),
         lowStockAlerts: @json($lowStockAlerts ?? []),
-        showLowStockPopup: {{ ($lowStockAlerts ?? collect())->count() > 0 ? 'true' : 'false' }},
+        // Popup auto-open only when inventory is enabled AND there are real alerts.
+        showLowStockPopup: {{ (($inventoryEnabled ?? false) && ($lowStockAlerts ?? collect())->count() > 0) ? 'true' : 'false' }},
         customerHistory: null,
         showCustomerHistory: false,
         loadingCustomerHistory: false,
@@ -1402,7 +1409,9 @@ function restaurantPos() {
         },
 
         handleProductClick(item) {
-            if (item.stockStatus === 'out' && this.blockOutOfStock) {
+            // Stock blocking is the ONLY gate on add-to-cart, and it is itself gated
+            // by isInventoryEnabled() — when inventory is OFF, every product is addable.
+            if (this.isInventoryEnabled() && item.stockStatus === 'out' && this.blockOutOfStock) {
                 this.showToast(item.name + ' is out of stock', 'error');
                 return;
             }

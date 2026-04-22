@@ -112,6 +112,7 @@
                     </div>
 
                     <div class="flex items-center gap-2">
+                        <x-pwa-install color="blue" label="Install" />
                         <span class="hidden lg:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-blue-200 border border-white/10">
                             FBR POS
                         </span>
@@ -237,9 +238,14 @@
                     </div>
                 @endif
 
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 pt-3">
+                    <x-pwa-banner color="blue" appName="Nest FBR Pos" />
+                </div>
+
                 {{ $slot }}
             </main>
         </div>
+        <x-pwa-push scope="fbrpos" />
 
         @php
             $toastMessages = [];

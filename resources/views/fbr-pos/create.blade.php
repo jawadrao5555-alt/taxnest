@@ -15,25 +15,45 @@
 kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-size:10px; font-family:monospace; box-shadow:0 1px 0 rgba(0,0,0,0.3); border:1px solid #334155; }
 .dark kbd { background:#475569; border-color:#64748b; }
 </style>
-<div class="max-w-5xl mx-auto pb-20" x-data="fbrPosInvoice()" @click="userActivity()">
+<div class="max-w-7xl mx-auto pb-32 px-3 sm:px-4" x-data="fbrPosInvoice()" @click="userActivity()">
     {{-- 🎯 Sticky Premium Total Banner --}}
-    <div class="sticky top-0 z-40 -mx-4 px-4 py-2 mb-3 bg-gradient-to-r from-slate-900 via-blue-900 to-slate-900 text-white shadow-lg flex items-center justify-between">
-        <div class="flex items-center gap-4">
-            <div class="text-[10px] uppercase tracking-wider text-blue-200">Items</div>
-            <div class="text-2xl font-black tabular-nums" x-text="items.filter(i => parseFloat(i.unit_price)>0).length"></div>
-            <div class="text-[10px] uppercase tracking-wider text-blue-200 ml-3">Qty</div>
-            <div class="text-2xl font-black tabular-nums" x-text="totalQty()"></div>
+    <div class="sticky top-0 z-40 -mx-3 sm:-mx-4 px-3 sm:px-5 py-2.5 mb-3 bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white shadow-xl flex items-center justify-between gap-3 backdrop-blur supports-[backdrop-filter]:bg-slate-900/85 border-b border-white/10">
+        <div class="flex items-center gap-3 sm:gap-5 min-w-0">
+            <div class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <div>
+                    <div class="text-[9px] uppercase tracking-wider text-blue-200/80 leading-tight">Items</div>
+                    <div class="text-lg sm:text-xl font-black tabular-nums leading-tight" x-text="items.filter(i => parseFloat(i.unit_price)>0).length"></div>
+                </div>
+            </div>
+            <div class="hidden sm:block w-px h-8 bg-white/15"></div>
+            <div>
+                <div class="text-[9px] uppercase tracking-wider text-blue-200/80 leading-tight">Qty</div>
+                <div class="text-lg sm:text-xl font-black tabular-nums leading-tight" x-text="totalQty()"></div>
+            </div>
         </div>
-        <div class="text-center">
-            <div class="text-[10px] uppercase tracking-wider text-emerald-200">Grand Total</div>
-            <div class="text-3xl font-black tabular-nums text-emerald-300" x-text="'Rs ' + formatNum(calcTotal())"></div>
+        <div class="text-center px-3 py-1 rounded-lg bg-white/5 border border-emerald-400/20 min-w-0">
+            <div class="text-[9px] uppercase tracking-wider text-emerald-200/90 leading-tight">Grand Total</div>
+            <div class="text-xl sm:text-2xl md:text-3xl font-black tabular-nums text-emerald-300 leading-tight truncate" x-text="'Rs ' + formatNum(calcTotal())"></div>
         </div>
-        <div class="flex items-center gap-2">
-            <button type="button" @click="numpadOpen = true" title="On-screen numpad (F3)" class="p-2 bg-white/10 hover:bg-white/20 rounded text-white text-xs">⌨ Pad</button>
-            <button type="button" @click="reprintLast()" title="Reprint last receipt (F8)" class="p-2 bg-white/10 hover:bg-white/20 rounded text-white text-xs">🖨 Last</button>
-            <button type="button" @click="toggleFullscreen()" title="Fullscreen (F11)" class="p-2 bg-white/10 hover:bg-white/20 rounded text-white text-xs">⛶</button>
-            <button type="button" @click="soundOn = !soundOn; toast(soundOn ? 'Sound ON' : 'Sound OFF', 'info')" title="Toggle sound" class="p-2 bg-white/10 hover:bg-white/20 rounded text-white text-xs" x-text="soundOn ? '🔊' : '🔇'"></button>
+        <div class="flex items-center gap-1 sm:gap-1.5">
+            <button type="button" @click="numpadOpen = true" title="On-screen numpad (F3)" class="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-95 rounded-lg text-white text-base transition">⌨</button>
+            <button type="button" @click="reprintLast()" title="Reprint last receipt (F8)" class="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-95 rounded-lg text-white text-base transition">🖨</button>
+            <button type="button" @click="toggleFullscreen()" title="Fullscreen (F11)" class="hidden sm:flex w-9 h-9 sm:w-10 sm:h-10 items-center justify-center bg-white/10 hover:bg-white/20 active:scale-95 rounded-lg text-white text-base transition">⛶</button>
+            <button type="button" @click="soundOn = !soundOn; toast(soundOn ? 'Sound ON' : 'Sound OFF', 'info')" title="Toggle sound" class="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-95 rounded-lg text-white text-base transition" x-text="soundOn ? '🔊' : '🔇'"></button>
         </div>
+    </div>
+
+    {{-- 📱 Sticky Bottom Mobile Pay Bar (visible only on mobile/tablet) --}}
+    <div class="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-t-2 border-blue-200 dark:border-blue-800 px-3 py-2.5 shadow-2xl flex items-center gap-2">
+        <div class="flex-1 min-w-0">
+            <div class="text-[9px] uppercase tracking-wider text-gray-500 dark:text-gray-400 leading-tight">Total</div>
+            <div class="text-lg font-black tabular-nums text-emerald-600 dark:text-emerald-400 leading-tight truncate" x-text="'Rs ' + formatNum(calcTotal())"></div>
+        </div>
+        <button type="button" @click="$refs.completeBtn && $refs.completeBtn.click()"
+            class="flex-shrink-0 px-5 py-3 bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white font-black rounded-xl shadow-lg active:scale-95 transition text-sm">
+            ✓ COMPLETE
+        </button>
     </div>
 
     {{-- Toast Container --}}
@@ -151,9 +171,9 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
     <form method="POST" action="{{ route('fbrpos.store') }}">
         @csrf
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 items-start">
             <div class="lg:col-span-2 space-y-4">
-                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
+                <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-lg p-4 sm:p-5">
                     <div class="flex items-center justify-between mb-3">
                         <h3 class="font-semibold text-gray-900 dark:text-white">Items</h3>
                         <div class="flex items-center gap-3">
@@ -342,7 +362,7 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
                 </div>
             </div>
 
-            <div class="space-y-4">
+            <div class="space-y-4 lg:sticky lg:top-16 lg:self-start">
                 <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                     <h3 class="font-semibold text-gray-900 dark:text-white mb-4">Customer (Optional)</h3>
                     <div class="space-y-3">

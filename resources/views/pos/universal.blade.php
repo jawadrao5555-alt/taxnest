@@ -190,7 +190,7 @@ window.addEventListener('popstate', function() {
 
 <div x-data="restaurantPos()" x-init="init()" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
     <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-bold tracking-wider uppercase px-3 py-1 text-center shadow-sm">
-        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v17-SMART-CREATE
+        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v18-PROFIT-BI
     </div>
 
     {{-- PRA Reporting + Auto-Print toggles strip (visible to admin + cashier).
@@ -1264,6 +1264,7 @@ $productsJson = $products->map(function($p) use ($recipeLookup, $stockStatus) {
     return [
         'id' => $p->id, 'type' => 'product', 'name' => $p->name,
         'price' => $p->price ?? 0, 'category' => $p->category,
+        'cost_price' => (float) ($p->cost_price ?? 0),
         'is_tax_exempt' => $p->is_tax_exempt ?? false,
         'hasRecipe' => in_array($p->id, $recipeLookup ?? []),
         'image' => $p->image ? asset('storage/products/' . $p->image) : null,
@@ -2362,9 +2363,15 @@ function restaurantPos() {
             this.showCustomerHistory = false; this.showToast('Items added to cart', 'success');
         },
         getCartCost() {
+            // Profit engine: prefer recipe-based ingredient cost (most accurate for kitchens),
+            // fall back to product.cost_price for simple/retail items. Services have no cost.
             return this.cart.reduce((s, i) => {
                 if (i.item_type === 'service') return s;
-                const cost = this.ingredientCosts[i.item_id] || 0;
+                let cost = this.ingredientCosts[i.item_id] || 0;
+                if (cost === 0) {
+                    const p = (this.allProducts || []).find(x => x.id === i.item_id);
+                    if (p && Number(p.cost_price) > 0) cost = Number(p.cost_price);
+                }
                 return s + (cost * i.quantity);
             }, 0);
         },

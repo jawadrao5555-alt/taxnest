@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class PosProduct extends Model
 {
     protected $fillable = [
-        'company_id', 'name', 'description', 'price', 'tax_rate',
+        'company_id', 'name', 'description', 'price', 'cost_price', 'tax_rate',
         'hs_code', 'uom', 'category', 'image', 'sku', 'barcode', 'is_active', 'is_tax_exempt',
         'batch_number', 'expiry_date', 'drug_type', 'prescription_required',
         'weight_based', 'unit_type', 'size', 'color', 'season',
@@ -20,6 +20,7 @@ class PosProduct extends Model
 
     protected $casts = [
         'price' => 'float',
+        'cost_price' => 'float',
         'tax_rate' => 'float',
         'is_active' => 'boolean',
         'is_tax_exempt' => 'boolean',

@@ -55,7 +55,7 @@ class PosController extends Controller
         return response()->json(['success' => true, 'style' => $style]);
     }
 
-    public function dashboard()
+    public function dashboard(Request $request)
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
@@ -72,6 +72,101 @@ class PosController extends Controller
             ->where('created_at', '>=', now()->startOfMonth())
             ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue')
             ->first();
+
+        // ── PROFIT + BI ENGINE (v18) ─────────────────────────────────────────
+        // Period filter: ?period=today | week | month  (default: today)
+        $period = in_array($request->query('period'), ['today', 'week', 'month'], true)
+            ? $request->query('period') : 'today';
+        $periodStart = match ($period) {
+            'week'  => now()->startOfWeek(),
+            'month' => now()->startOfMonth(),
+            default => now()->startOfDay(),
+        };
+
+        // Cost / profit aggregation: JOIN items → products to read cost_price.
+        // unit_price kept from item (snapshot at time of sale).
+        // Profit = (item.subtotal - cost_price * quantity) summed across all completed orders in period.
+        $profitRow = \DB::table('pos_transactions as t')
+            ->join('pos_transaction_items as i', 'i.transaction_id', '=', 't.id')
+            ->leftJoin('pos_products as p', function ($j) {
+                $j->on('p.id', '=', 'i.item_id')->where('i.item_type', '=', 'product');
+            })
+            ->where('t.company_id', $companyId)
+            ->where('t.status', 'completed')
+            ->where('t.created_at', '>=', $periodStart)
+            ->selectRaw('
+                COALESCE(SUM(i.subtotal), 0) as gross_revenue,
+                COALESCE(SUM(COALESCE(p.cost_price, 0) * i.quantity), 0) as total_cost
+            ')->first();
+
+        $periodOrders = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->where('created_at', '>=', $periodStart)
+            ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue')
+            ->first();
+
+        $totalCost     = (float) ($profitRow->total_cost ?? 0);
+        $totalRevenue  = (float) ($periodOrders->revenue ?? 0);
+        $totalProfit   = max(0, $totalRevenue - $totalCost); // floor at 0 for display
+        $marginPct     = $totalRevenue > 0 ? round(($totalRevenue - $totalCost) / $totalRevenue * 100, 1) : 0;
+
+        $profitStats = [
+            'period'   => $period,
+            'orders'   => (int) ($periodOrders->count ?? 0),
+            'revenue'  => $totalRevenue,
+            'cost'     => $totalCost,
+            'profit'   => $totalProfit,
+            'margin'   => $marginPct,
+        ];
+
+        // Top products by quantity sold (period)
+        $topSold = \DB::table('pos_transactions as t')
+            ->join('pos_transaction_items as i', 'i.transaction_id', '=', 't.id')
+            ->where('t.company_id', $companyId)
+            ->where('t.status', 'completed')
+            ->where('t.created_at', '>=', $periodStart)
+            ->where('i.item_type', 'product')
+            ->selectRaw('i.item_id, MAX(i.item_name) as name, SUM(i.quantity) as qty, SUM(i.subtotal) as revenue')
+            ->groupBy('i.item_id')
+            ->orderByDesc('qty')
+            ->limit(5)
+            ->get();
+
+        // Top products by profit (period) — needs cost_price
+        $topProfit = \DB::table('pos_transactions as t')
+            ->join('pos_transaction_items as i', 'i.transaction_id', '=', 't.id')
+            ->join('pos_products as p', 'p.id', '=', 'i.item_id')
+            ->where('t.company_id', $companyId)
+            ->where('t.status', 'completed')
+            ->where('t.created_at', '>=', $periodStart)
+            ->where('i.item_type', 'product')
+            ->selectRaw('
+                i.item_id, MAX(i.item_name) as name,
+                SUM(i.subtotal) as revenue,
+                SUM(COALESCE(p.cost_price,0) * i.quantity) as cost,
+                SUM(i.subtotal - COALESCE(p.cost_price,0) * i.quantity) as profit
+            ')
+            ->groupBy('i.item_id')
+            ->orderByDesc('profit')
+            ->limit(5)
+            ->get();
+
+        // Low margin alert: products with cost_price > 0 AND (price - cost)/price < 15%
+        $lowMargin = PosProduct::where('company_id', $companyId)
+            ->where('is_active', true)
+            ->where('cost_price', '>', 0)
+            ->whereRaw('price > 0')
+            ->whereRaw('((price - cost_price) / price) < 0.15')
+            ->orderByRaw('((price - cost_price) / NULLIF(price,0)) asc')
+            ->limit(5)
+            ->get(['id', 'name', 'price', 'cost_price']);
+
+        // Coverage: how many active products have cost_price set (helps user understand accuracy)
+        $costCoverage = [
+            'with_cost' => PosProduct::where('company_id', $companyId)->where('is_active', true)->where('cost_price', '>', 0)->count(),
+            'total'     => PosProduct::where('company_id', $companyId)->where('is_active', true)->count(),
+        ];
+        // ─────────────────────────────────────────────────────────────────────
 
         $recentTransactions = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
@@ -109,7 +204,8 @@ class PosController extends Controller
 
         return view('pos.dashboard', compact(
             'company', 'todayStats', 'monthStats', 'recentTransactions', 'paymentBreakdown', 'praStatus', 'drafts', 'isCashier',
-            'dashboardStyle', 'isRestaurant', 'isAdmin'
+            'dashboardStyle', 'isRestaurant', 'isAdmin',
+            'profitStats', 'topSold', 'topProfit', 'lowMargin', 'costCoverage'
         ));
     }
 
@@ -1938,6 +2034,7 @@ class PosController extends Controller
         $data = $request->validate([
             'name'  => 'required|string|max:255',
             'price' => 'nullable|numeric|min:0',
+            'cost_price' => 'nullable|numeric|min:0',
         ]);
         $name = trim($data['name']);
         if ($name === '') {
@@ -1947,6 +2044,7 @@ class PosController extends Controller
             'company_id'    => $companyId,
             'name'          => $name,
             'price'         => $data['price'] ?? 0,
+            'cost_price'    => $data['cost_price'] ?? 0,
             'tax_rate'      => 0,
             'is_active'     => true,
             'is_tax_exempt' => false,
@@ -1996,6 +2094,7 @@ class PosController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
+            'cost_price' => 'nullable|numeric|min:0',
             'tax_rate' => 'nullable|numeric|min:0|max:100',
             'category' => 'nullable|string|max:100',
             'sku' => 'nullable|string|max:100',
@@ -2235,6 +2334,7 @@ class PosController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
+            'cost_price' => 'nullable|numeric|min:0',
             'tax_rate' => 'nullable|numeric|min:0|max:100',
             'category' => 'nullable|string|max:100',
             'sku' => 'nullable|string|max:100',

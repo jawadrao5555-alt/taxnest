@@ -70,6 +70,10 @@
                 <input type="number" name="price" required step="0.01" min="0" placeholder="0.00" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
             </div>
             <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Cost Price <span class="text-gray-400">(for profit)</span></label>
+                <input type="number" name="cost_price" step="0.01" min="0" placeholder="0.00" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div>
                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Tax Rate %</label>
                 <input type="number" name="tax_rate" step="0.01" min="0" max="100" placeholder="0" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
             </div>
@@ -181,6 +185,7 @@
                                 @csrf @method('PUT')
                                 <input type="text" name="name" value="{{ $product->name }}" required placeholder="Name" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full col-span-2 sm:col-span-1">
                                 <input type="number" name="price" value="{{ $product->price }}" step="0.01" required placeholder="Price" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
+                                <input type="number" name="cost_price" value="{{ $product->cost_price ?? 0 }}" step="0.01" min="0" placeholder="Cost" title="Cost Price" class="text-sm rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10 text-gray-900 dark:text-white px-2 py-1.5 w-full">
                                 <input type="number" name="tax_rate" value="{{ $product->tax_rate }}" step="0.01" placeholder="Tax %" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
                                 <input type="text" name="category" value="{{ $product->category }}" placeholder="Category" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
                                 <input type="text" name="sku" value="{{ $product->sku }}" placeholder="SKU" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">

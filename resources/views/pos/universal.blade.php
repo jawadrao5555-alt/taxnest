@@ -190,7 +190,7 @@ window.addEventListener('popstate', function() {
 
 <div x-data="restaurantPos()" x-init="init()" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
     <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-bold tracking-wider uppercase px-3 py-1 text-center shadow-sm">
-        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v15-INVENTORY-STRICT
+        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v16-SMART-UPSELL
     </div>
 
     {{-- PRA Reporting + Auto-Print toggles strip (visible to admin + cashier).
@@ -1115,6 +1115,47 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
+    {{-- Smart Upsell — non-blocking floating card, bottom-right.
+         Enter = accept · Esc = skip · auto-dismiss after 8s · session memory --}}
+    <div x-show="currentUpsell" x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 translate-y-4"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 translate-y-0"
+         x-transition:leave-end="opacity-0 translate-y-4"
+         class="fixed bottom-4 right-4 z-40 w-[300px]" style="display:none">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-purple-200 dark:border-purple-800 overflow-hidden ring-2 ring-purple-500/20">
+            <div class="px-3 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                <span class="text-[11px] font-bold uppercase tracking-wider">Suggested Add-on</span>
+                <button @click="dismissUpsell(true)" class="ml-auto text-white/80 hover:text-white" aria-label="Skip">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="p-3">
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                    Add <span class="font-semibold text-purple-600 dark:text-purple-400" x-text="currentUpsell?.suggest?.name"></span> with this?
+                </p>
+                <p class="text-[10px] text-gray-400 dark:text-gray-500 mb-3">
+                    Goes great with <span x-text="currentUpsell?.trigger?.name"></span>
+                </p>
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-sm font-bold tabular-nums text-gray-900 dark:text-white">
+                        Rs. <span x-text="Number(currentUpsell?.suggest?.price || 0).toLocaleString()"></span>
+                    </span>
+                    <div class="flex items-center gap-1.5">
+                        <button @click="dismissUpsell(true)" class="px-3 py-1.5 text-[11px] font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition">
+                            Skip <span class="text-[9px] opacity-60 ml-0.5">Esc</span>
+                        </button>
+                        <button @click="acceptUpsell()" class="px-3 py-1.5 text-[11px] font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-lg transition shadow-md shadow-purple-500/30">
+                            + Add <span class="text-[9px] opacity-80 ml-0.5">⏎</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- Low Stock Alert Popup — strictly gated by isInventoryEnabled().
          Even if some downstream code flips showLowStockPopup, this guard keeps it hidden. --}}
     <div x-show="isInventoryEnabled() && showLowStockPopup && lowStockAlerts.length > 0" x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1497,7 +1538,91 @@ function restaurantPos() {
             }
             this.cartAnimating = true; setTimeout(() => this.cartAnimating = false, 300);
             this.scrollToCartItem(this.activeCartIndex);
+            // Smart Upsell — fire-and-forget; never blocks add flow.
+            try { this.triggerUpsell(item); } catch (e) { /* upsell must never break add */ }
         },
+
+        // ──────────────────────────────────────────────────────────────
+        // SMART UPSELL SYSTEM — purely client-side, zero backend impact.
+        // - Keyword-based mapping (Burger → Fries/Drink, etc.)
+        // - One suggestion at a time (no spam)
+        // - Session memory: dismissed pairs don't re-show until page reload
+        // - Enter = accept, Esc = dismiss (handled in keyboard router)
+        // ──────────────────────────────────────────────────────────────
+        upsellRules: {
+            // keyword in product name → candidate keywords to suggest
+            'burger':   ['fries', 'cola', 'drink', 'pepsi', 'coke'],
+            'pizza':    ['garlic', 'cola', 'drink', 'pepsi'],
+            'biryani':  ['raita', 'salad', 'drink', 'cola'],
+            'karahi':   ['naan', 'roti', 'salad', 'drink'],
+            'shawarma': ['fries', 'drink', 'cola'],
+            'sandwich': ['fries', 'drink', 'chips'],
+            'roll':     ['fries', 'drink', 'chips'],
+            'broast':   ['fries', 'drink', 'cola'],
+            'chicken':  ['fries', 'drink', 'roti', 'naan'],
+            'steak':    ['fries', 'drink', 'sauce'],
+            'pasta':    ['drink', 'garlic', 'salad'],
+            'coffee':   ['cookie', 'cake', 'muffin'],
+            'tea':      ['biscuit', 'cookie', 'cake'],
+            'fries':    ['cola', 'drink', 'pepsi', 'coke'],
+            'cake':     ['coffee', 'tea', 'drink'],
+        },
+        currentUpsell: null,           // { trigger:{id,name}, suggest:{id,name,price,...} }
+        dismissedUpsells: [],          // ['triggerId:suggestId', ...] — session-only
+        triggerUpsell(triggerItem) {
+            if (!triggerItem || !triggerItem.name) return;
+            const tname = String(triggerItem.name).toLowerCase();
+            // Find first matching rule key
+            const ruleKey = Object.keys(this.upsellRules).find(k => tname.includes(k));
+            if (!ruleKey) return;
+            const candidates = this.upsellRules[ruleKey];
+            // Search allProducts pool for first candidate not already in cart and not dismissed
+            for (const kw of candidates) {
+                const match = (this.allProducts || []).find(p => {
+                    if (!p || !p.name) return false;
+                    if (!p.name.toLowerCase().includes(kw)) return false;
+                    // Skip if same product as trigger
+                    if (p.id === triggerItem.id && (p.type || 'product') === (triggerItem.type || 'product')) return false;
+                    // Skip if already in cart
+                    const inCart = this.cart.some(c => c.item_id === p.id && c.item_type === (p.type || 'product'));
+                    if (inCart) return false;
+                    // Skip if previously dismissed for this trigger this session
+                    const pairKey = triggerItem.id + ':' + p.id;
+                    if (this.dismissedUpsells.includes(pairKey)) return false;
+                    return true;
+                });
+                if (match) {
+                    this.currentUpsell = {
+                        trigger: { id: triggerItem.id, name: triggerItem.name },
+                        suggest: { id: match.id, type: match.type || 'product', name: match.name, price: match.price, is_tax_exempt: match.is_tax_exempt || false }
+                    };
+                    // Auto-dismiss after 8s if cashier ignores it (no spam build-up)
+                    if (this._upsellTimer) clearTimeout(this._upsellTimer);
+                    this._upsellTimer = setTimeout(() => { this.dismissUpsell(false); }, 8000);
+                    return;
+                }
+            }
+        },
+        acceptUpsell() {
+            if (!this.currentUpsell) return;
+            const s = this.currentUpsell.suggest;
+            // Mark as accepted (still record so it won't re-fire same pair)
+            this.dismissedUpsells.push(this.currentUpsell.trigger.id + ':' + s.id);
+            this.currentUpsell = null;
+            if (this._upsellTimer) { clearTimeout(this._upsellTimer); this._upsellTimer = null; }
+            // Add the suggested item — reuse existing addToCart (will skip its own upsell since item already in cart)
+            this.addToCart({ id: s.id, type: s.type, name: s.name, price: s.price, is_tax_exempt: s.is_tax_exempt });
+            this.showToast('Added: ' + s.name, 'success');
+        },
+        dismissUpsell(record = true) {
+            if (!this.currentUpsell) return;
+            if (record) {
+                this.dismissedUpsells.push(this.currentUpsell.trigger.id + ':' + this.currentUpsell.suggest.id);
+            }
+            this.currentUpsell = null;
+            if (this._upsellTimer) { clearTimeout(this._upsellTimer); this._upsellTimer = null; }
+        },
+        _upsellTimer: null,
         updateQty(index, delta) {
             if (this._qtyUpdating) return;
             if (!this.cart[index]) return;
@@ -1602,6 +1727,12 @@ function restaurantPos() {
             if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) this.showPayModal = true; return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode(); this.mobileView = 'cart'; } return; }
+
+            // Smart Upsell takes highest priority for Enter/Esc when visible
+            if (this.currentUpsell) {
+                if (e.key === 'Enter') { e.preventDefault(); this.acceptUpsell(); return; }
+                if (e.key === 'Escape') { e.preventDefault(); this.dismissUpsell(true); return; }
+            }
 
             if (e.key === 'Escape') {
                 if (this.showShortcuts) { this.showShortcuts = false; return; }

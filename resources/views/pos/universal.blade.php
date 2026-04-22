@@ -670,20 +670,26 @@ window.addEventListener('popstate', function() {
                                 <button @click.stop="updateQty(index, -1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M20 12H4"/></svg>
                                 </button>
-                                <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="5"
+                                <input type="text" inputmode="decimal" maxlength="10"
                                     data-qty-input
-                                    :value="item.quantity"
+                                    x-model="item.quantity"
                                     @click.stop
                                     @mousedown.stop
-                                    @focus="$event.target.select()"
+                                    @focus="$nextTick(() => $event.target.select())"
                                     @keydown.enter.prevent="$event.target.blur()"
                                     @input.stop="
-                                        const v = ($event.target.value || '').replace(/[^0-9]/g, '');
+                                        let v = String($event.target.value || '').replace(/[^0-9.]/g, '');
+                                        const parts = v.split('.');
+                                        if (parts.length > 2) v = parts[0] + '.' + parts.slice(1).join('');
                                         $event.target.value = v;
-                                        item.quantity = v === '' ? '' : parseInt(v, 10);
+                                        item.quantity = v;
                                     "
-                                    @blur="item.quantity = Math.max(1, parseInt(item.quantity, 10) || 1)"
-                                    class="w-14 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner">
+                                    @blur="
+                                        let n = parseFloat(item.quantity);
+                                        if (!Number.isFinite(n) || n <= 0) n = 1;
+                                        item.quantity = Number.isInteger(n) ? n : Math.round(n * 1000) / 1000;
+                                    "
+                                    class="w-16 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner px-1">
                                 <button @click.stop="updateQty(index, 1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M12 4v16m8-8H4"/></svg>
                                 </button>

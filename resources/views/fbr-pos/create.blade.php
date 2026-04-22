@@ -6,6 +6,14 @@
 .toast-in { animation: toastIn 0.25s ease-out; }
 .cart-flash { animation: cartFlash 0.4s ease; }
 @keyframes cartFlash { 0% { background-color: rgb(187 247 208); } 100% { background-color: transparent; } }
+@keyframes rowIn { from { transform: translateY(-6px); opacity:0; } to { transform: translateY(0); opacity:1; } }
+.row-in { animation: rowIn 0.25s ease-out; }
+.item-card { transition: all 0.2s ease; position: relative; overflow: hidden; }
+.item-card.is-active { box-shadow: 0 0 0 2px rgba(59,130,246,0.5), 0 8px 24px -8px rgba(59,130,246,0.4); transform: translateY(-1px); }
+.item-card.is-active::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg,#3b82f6,#6366f1); }
+.item-num-badge { background: linear-gradient(135deg,#3b82f6,#6366f1); color: white; box-shadow: 0 4px 12px -2px rgba(59,130,246,0.5); }
+kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-size:10px; font-family:monospace; box-shadow:0 1px 0 rgba(0,0,0,0.3); border:1px solid #334155; }
+.dark kbd { background:#475569; border-color:#64748b; }
 </style>
 <div class="max-w-5xl mx-auto pb-20" x-data="fbrPosInvoice()" @click="userActivity()">
     {{-- 🎯 Sticky Premium Total Banner --}}
@@ -149,11 +157,13 @@
                     <div class="flex items-center justify-between mb-3">
                         <h3 class="font-semibold text-gray-900 dark:text-white">Items</h3>
                         <div class="flex items-center gap-3">
-                            <div class="relative" x-data="{ searchOpen: false, searchQuery: '', searchResults: [] }">
-                                <button type="button" @click="searchOpen = !searchOpen; $nextTick(() => $refs.productSearch && $refs.productSearch.focus())"
-                                    class="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
+                            <div class="relative" x-data="{ searchOpen: false, searchQuery: '', searchResults: [] }"
+                                 @open-product-search.window="searchOpen = true; $nextTick(() => $refs.productSearch && $refs.productSearch.focus())">
+                                <button type="button" id="fbrpos-search-btn" @click="searchOpen = !searchOpen; $nextTick(() => $refs.productSearch && $refs.productSearch.focus())"
+                                    class="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-bold rounded-lg shadow-md hover:shadow-lg transition flex items-center gap-2">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                                     Search Product
+                                    <span class="hidden md:inline text-[10px] bg-white/20 px-1.5 py-0.5 rounded ml-1">Ctrl+K</span>
                                 </button>
                                 <div x-show="searchOpen" @click.away="searchOpen = false" x-cloak x-transition
                                     class="absolute right-0 top-8 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 z-50 p-3">
@@ -206,11 +216,17 @@
                     </div>
 
                     <template x-for="(item, index) in items" :key="index">
-                        <div class="border rounded-lg p-4 mb-3 transition"
-                            :class="item.is_tax_exempt ? 'border-green-300 dark:border-green-700 bg-green-50/30 dark:bg-green-900/10' : 'border-gray-200 dark:border-gray-700'">
+                        <div class="item-card row-in border rounded-xl p-4 mb-3"
+                             :data-item-index="index"
+                             :class="[
+                                activeItemIndex === index ? 'is-active' : '',
+                                item.is_tax_exempt ? 'border-green-300 dark:border-green-700 bg-green-50/30 dark:bg-green-900/10' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900'
+                             ]"
+                             @focusin="activeItemIndex = index">
                             <div class="flex items-center justify-between mb-3">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400" x-text="'Item #' + (index + 1)"></span>
+                                <div class="flex items-center gap-2.5">
+                                    <span class="item-num-badge inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-black tabular-nums" x-text="index + 1"></span>
+                                    <span class="text-sm font-semibold text-gray-700 dark:text-gray-200" x-text="item.item_name || 'New Item'"></span>
                                     <span x-show="item.is_tax_exempt"
                                         class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">EXEMPT</span>
                                     <span x-show="!item.is_tax_exempt && item.tax_rate != 18"
@@ -219,7 +235,10 @@
                                     <span x-show="!item.is_tax_exempt && item.tax_rate == 18"
                                         class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">18% GST</span>
                                 </div>
-                                <button type="button" @click="removeItem(index)" x-show="items.length > 1" class="text-red-500 hover:text-red-700 text-xs">Remove</button>
+                                <div class="flex items-center gap-2">
+                                    <button type="button" @click="duplicateItem(index)" title="Duplicate row" class="text-blue-600 hover:text-blue-800 text-xs font-semibold">⎘ Duplicate</button>
+                                    <button type="button" @click="removeItem(index)" x-show="items.length > 1" class="text-red-500 hover:text-red-700 text-xs font-semibold">✕ Remove</button>
+                                </div>
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
                                 <input type="hidden" :name="'items['+index+'][product_id]'" :value="item.product_id || ''">
@@ -271,6 +290,8 @@
                                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Tax %</label>
                                     <input type="number" :name="'items['+index+'][tax_rate]'" x-model.number="item.tax_rate" min="0" max="100" step="0.01"
                                         :disabled="item.is_tax_exempt"
+                                        @keydown.tab="if(!$event.shiftKey && index === items.length - 1 && item.item_name && parseFloat(item.unit_price) > 0){ $event.preventDefault(); addItem(); }"
+                                        @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); }"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 px-1"
                                         placeholder="18">
                                 </div>
@@ -293,6 +314,26 @@
                             </div>
                         </div>
                     </template>
+
+                    {{-- ============ Premium "Add Next Item" CTA ============ --}}
+                    <button type="button" @click="addItem()"
+                        class="group w-full mt-2 py-4 rounded-xl border-2 border-dashed border-blue-300 dark:border-blue-700 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all flex items-center justify-center gap-3">
+                        <span class="w-9 h-9 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center text-xl font-black shadow-lg group-hover:scale-110 transition">+</span>
+                        <span class="text-blue-700 dark:text-blue-300 font-bold text-base">Add Another Product</span>
+                        <span class="hidden sm:inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 ml-2">
+                            press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> or <kbd>F6</kbd>
+                        </span>
+                    </button>
+
+                    {{-- Keyboard hints strip --}}
+                    <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-gray-500 dark:text-gray-400 px-1">
+                        <span><kbd>Ctrl</kbd>+<kbd>K</kbd> Search Product</span>
+                        <span><kbd>Ctrl</kbd>+<kbd>Enter</kbd> New Row</span>
+                        <span><kbd>Ctrl</kbd>+<kbd>D</kbd> Duplicate</span>
+                        <span><kbd>Ctrl</kbd>+<kbd>Del</kbd> Remove Active</span>
+                        <span><kbd>Tab</kbd> Next Field · <kbd>Enter</kbd> on Tax = New Row</span>
+                        <span><kbd>F2</kbd> Cash · <kbd>F3</kbd> Numpad · <kbd>F4</kbd> Hold · <kbd>F5</kbd> Recall · <kbd>F9</kbd> Complete</span>
+                    </div>
                 </div>
             </div>
 
@@ -474,6 +515,10 @@ function fbrPosInvoice() {
     return {
         uomOptions: ['U','PCS','KG','GM','LTR','ML','MTR','SQM','FT','IN','YDS','PKT','DOZ','BOX','CTN','BAG','BTL','TIN','CAN','BUN','ROL','SET'],
         items: [{ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0 }],
+        activeItemIndex: 0,
+        productSearchOpen: false,
+        productSearchQuery: '',
+        productSearchResults: [],
         discountType: '',
         discountValue: 0,
         barcodeBuffer: '',
@@ -510,12 +555,25 @@ function fbrPosInvoice() {
             this.loadHeld();
             // Global keyboard shortcuts
             window.addEventListener('keydown', (e) => {
+                // Always-active combos (work even inside inputs)
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); this.addItem(); return; }
+                if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); this.openProductSearch(); return; }
+                if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
+                    if (this.activeItemIndex >= 0 && this.activeItemIndex < this.items.length) { e.preventDefault(); this.duplicateItem(this.activeItemIndex); }
+                    return;
+                }
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Delete') {
+                    if (this.items.length > 1 && this.activeItemIndex >= 0) { e.preventDefault(); this.removeItem(this.activeItemIndex); }
+                    return;
+                }
                 if (e.target.tagName === 'INPUT' && ['F2','F3','F4','F5','F8','F9','F11'].indexOf(e.key) === -1) return;
                 if (e.key === 'F9') { e.preventDefault(); this.$refs.completeBtn && this.$refs.completeBtn.click(); }
                 else if (e.key === 'F2') { e.preventDefault(); this.cashReceived = this.calcTotal(); this.$refs.cashInput && this.$refs.cashInput.focus(); }
                 else if (e.key === 'F3') { e.preventDefault(); this.numpadOpen = !this.numpadOpen; }
                 else if (e.key === 'F4') { e.preventDefault(); this.holdSale(); }
                 else if (e.key === 'F5') { e.preventDefault(); this.openRecall(); }
+                else if (e.key === 'F6') { e.preventDefault(); this.addItem(); }
+                else if (e.key === 'F7') { e.preventDefault(); this.openProductSearch(); }
                 else if (e.key === 'F8') { e.preventDefault(); this.reprintLast(); }
                 else if (e.key === 'F11') { e.preventDefault(); this.toggleFullscreen(); }
             });
@@ -681,6 +739,33 @@ function fbrPosInvoice() {
         },
         addItem() {
             this.items.push({ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0 });
+            const newIdx = this.items.length - 1;
+            this.activeItemIndex = newIdx;
+            this.beep(600, 0.05);
+            this.focusItemName(newIdx);
+        },
+        duplicateItem(index) {
+            const src = this.items[index];
+            if (!src) return;
+            this.items.splice(index + 1, 0, JSON.parse(JSON.stringify(src)));
+            const newIdx = index + 1;
+            this.activeItemIndex = newIdx;
+            this.toast('Row duplicated', 'success');
+            this.beep(880, 0.05);
+            this.focusItemName(newIdx);
+        },
+        focusItemName(index) {
+            this.$nextTick(() => {
+                const card = document.querySelector(`[data-item-index="${index}"]`);
+                if (card) {
+                    card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                    const inp = card.querySelector('input[type="text"]');
+                    if (inp) { inp.focus(); inp.select(); }
+                }
+            });
+        },
+        openProductSearch() {
+            window.dispatchEvent(new CustomEvent('open-product-search'));
         },
         addProductItem(p) {
             let isExempt = p.tax_type === 'exempt';

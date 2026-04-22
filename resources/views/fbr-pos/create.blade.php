@@ -223,42 +223,42 @@
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
                                 <input type="hidden" :name="'items['+index+'][product_id]'" :value="item.product_id || ''">
-                                <div class="sm:col-span-4">
+                                <div class="sm:col-span-3">
                                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Item Name *</label>
                                     <input type="text" :name="'items['+index+'][item_name]'" x-model="item.item_name" required
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="Product name">
                                 </div>
                                 <div class="sm:col-span-2">
-                                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">HS Code <span class="text-gray-400 font-normal">(Optional)</span></label>
+                                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">HS Code <span class="text-gray-400 font-normal">(Opt.)</span></label>
                                     <input type="text" :name="'items['+index+'][hs_code]'" x-model="item.hs_code"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="00000000">
                                 </div>
-                                <div class="sm:col-span-1">
+                                <div class="sm:col-span-2">
                                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">UoM</label>
                                     <select :name="'items['+index+'][uom]'" x-model="item.uom"
-                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 font-semibold">
                                         <template x-for="u in uomOptions" :key="u">
                                             <option :value="u" x-text="u"></option>
                                         </template>
                                     </select>
                                 </div>
-                                <div class="sm:col-span-1">
+                                <div class="sm:col-span-2">
                                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Qty *</label>
                                     <div class="flex items-stretch">
-                                        <button type="button" tabindex="-1" @click="decQty(item)" class="px-1.5 rounded-l-lg border border-r-0 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100">−</button>
+                                        <button type="button" tabindex="-1" @click="decQty(item)" class="px-2 rounded-l-lg border border-r-0 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100">−</button>
                                         <input type="text" inputmode="decimal" autocomplete="off" maxlength="10"
                                             :name="'items['+index+'][quantity]'"
-                                            :value="item.quantity"
+                                            x-model="item.quantity"
                                             @input="item.quantity = sanitizeQty($event.target.value)"
                                             @focus="$nextTick(() => $event.target.select())"
                                             @mousedown="if(document.activeElement !== $event.target){ $event.preventDefault(); $event.target.focus(); $event.target.select(); }"
                                             @blur="if(!item.quantity || parseFloat(item.quantity) <= 0){ item.quantity = 1; }"
                                             required
-                                            class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 text-center font-semibold"
+                                            class="w-full min-w-0 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 text-center font-semibold px-1"
                                             placeholder="1">
-                                        <button type="button" tabindex="-1" @click="incQty(item)" class="px-1.5 rounded-r-lg border border-l-0 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100">+</button>
+                                        <button type="button" tabindex="-1" @click="incQty(item)" class="px-2 rounded-r-lg border border-l-0 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100">+</button>
                                     </div>
                                 </div>
                                 <div class="sm:col-span-2">
@@ -267,11 +267,11 @@
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="0.00">
                                 </div>
-                                <div class="sm:col-span-2">
+                                <div class="sm:col-span-1">
                                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Tax %</label>
                                     <input type="number" :name="'items['+index+'][tax_rate]'" x-model.number="item.tax_rate" min="0" max="100" step="0.01"
                                         :disabled="item.is_tax_exempt"
-                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
+                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 px-1"
                                         placeholder="18">
                                 </div>
                             </div>

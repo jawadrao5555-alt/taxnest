@@ -2238,6 +2238,13 @@ function restaurantPos() {
         },
 
         async deleteHeldOrder(orderId) {
+            // Find order for friendlier confirm prompt
+            const ord = this.heldOrders.find(o => o.id === orderId);
+            const label = ord ? (ord.order_number || '#' + orderId) : '#' + orderId;
+            // SAFETY: prevent accidental clicks / stray "D" key from blowing away a held order.
+            // Without this, after delete the modal stayed open and the next Enter would recall
+            // the neighbouring order — looked exactly like "delete pe order aa gaya".
+            if (!confirm('Delete held order ' + label + '?\nThis cannot be undone.')) return;
             try {
                 const res = await fetch(`/pos/restaurant/orders/${orderId}/delete`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' } });
                 if (!res.ok) { this.showToast('Failed to delete order (Error ' + res.status + ')', 'error'); return; }
@@ -2245,6 +2252,9 @@ function restaurantPos() {
                 if (data.success) {
                     this.heldOrders = this.heldOrders.filter(o => o.id !== orderId);
                     if (this.activeHeldIndex >= this.heldOrders.length) this.activeHeldIndex = Math.max(0, this.heldOrders.length - 1);
+                    // Auto-close the modal once the list is empty, otherwise the next
+                    // Enter keystroke would land on a phantom selection.
+                    if (this.heldOrders.length === 0) { this.showHeldOrders = false; this.activeHeldIndex = 0; }
                     this.showToast('Order deleted', 'success');
                 } else { this.showToast(data.message || 'Failed', 'error'); }
             } catch (e) { console.error('Delete held order error:', e); this.showToast('Error deleting order', 'error'); }

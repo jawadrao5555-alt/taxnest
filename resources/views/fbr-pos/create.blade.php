@@ -157,8 +157,8 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
                     <div class="flex items-center justify-between mb-3">
                         <h3 class="font-semibold text-gray-900 dark:text-white">Items</h3>
                         <div class="flex items-center gap-3">
-                            <div class="relative" x-data="{ searchOpen: false, searchQuery: '', searchResults: [] }"
-                                 @open-product-search.window="searchOpen = true; $nextTick(() => $refs.productSearch && $refs.productSearch.focus())">
+                            <div class="relative" x-data="{ searchOpen: false, searchQuery: '', searchResults: [], hi: 0 }"
+                                 @open-product-search.window="searchOpen = true; hi = 0; $nextTick(() => $refs.productSearch && $refs.productSearch.focus())">
                                 <button type="button" id="fbrpos-search-btn" @click="searchOpen = !searchOpen; $nextTick(() => $refs.productSearch && $refs.productSearch.focus())"
                                     class="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-bold rounded-lg shadow-md hover:shadow-lg transition flex items-center gap-2">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
@@ -172,15 +172,20 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
                                             if(searchQuery.length >= 1) {
                                                 fetch('{{ route('fbrpos.api.products.search') }}?q=' + encodeURIComponent(searchQuery))
                                                     .then(r => r.json())
-                                                    .then(data => searchResults = data)
-                                            } else { searchResults = [] }
+                                                    .then(data => { searchResults = data; hi = 0; })
+                                            } else { searchResults = []; hi = 0; }
                                         "
+                                        @keydown.arrow-down.prevent="if(searchResults.length){ hi = (hi + 1) % searchResults.length; }"
+                                        @keydown.arrow-up.prevent="if(searchResults.length){ hi = (hi - 1 + searchResults.length) % searchResults.length; }"
+                                        @keydown.enter.prevent="if(searchResults.length){ addProductItem(searchResults[hi]); searchOpen = false; searchQuery = ''; searchResults = []; hi = 0; }"
+                                        @keydown.escape.prevent="searchOpen = false; searchQuery = ''; searchResults = []; hi = 0;"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 mb-2"
-                                        placeholder="Type product name / barcode / SKU...">
+                                        placeholder="Type, then ↓ ↑ Enter to add">
                                     <div class="max-h-60 overflow-y-auto space-y-1">
-                                        <template x-for="p in searchResults" :key="p.id">
-                                            <button type="button" @click="addProductItem(p); searchOpen = false; searchQuery = ''; searchResults = [];"
-                                                class="w-full text-left px-3 py-2.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition flex items-center justify-between group">
+                                        <template x-for="(p, pi) in searchResults" :key="p.id">
+                                            <button type="button" @click="addProductItem(p); searchOpen = false; searchQuery = ''; searchResults = []; hi = 0;"
+                                                :class="hi === pi ? 'bg-blue-100 dark:bg-blue-900/40 ring-2 ring-blue-400' : 'hover:bg-blue-50 dark:hover:bg-blue-900/20'"
+                                                class="w-full text-left px-3 py-2.5 rounded-lg transition flex items-center justify-between group">
                                                 <div>
                                                     <p class="text-sm font-medium text-gray-900 dark:text-gray-100" x-text="p.name"></p>
                                                     <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -327,12 +332,12 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
 
                     {{-- Keyboard hints strip --}}
                     <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-gray-500 dark:text-gray-400 px-1">
-                        <span><kbd>Ctrl</kbd>+<kbd>K</kbd> Search Product</span>
+                        <span><kbd>Ctrl</kbd>+<kbd>K</kbd> Search → <kbd>↓</kbd><kbd>↑</kbd><kbd>Enter</kbd> add</span>
                         <span><kbd>Ctrl</kbd>+<kbd>Enter</kbd> New Row</span>
-                        <span><kbd>Ctrl</kbd>+<kbd>D</kbd> Duplicate</span>
-                        <span><kbd>Ctrl</kbd>+<kbd>Del</kbd> Remove Active</span>
-                        <span><kbd>Tab</kbd> Next Field · <kbd>Enter</kbd> on Tax = New Row</span>
-                        <span><kbd>F2</kbd> Cash · <kbd>F3</kbd> Numpad · <kbd>F4</kbd> Hold · <kbd>F5</kbd> Recall · <kbd>F9</kbd> Complete</span>
+                        <span><kbd>Enter</kbd> on Tax = next product</span>
+                        <span><kbd>Ctrl</kbd>+<kbd>D</kbd> Duplicate · <kbd>Ctrl</kbd>+<kbd>Del</kbd> Remove</span>
+                        <span class="text-emerald-700 dark:text-emerald-400 font-bold"><kbd>F9</kbd> or <kbd>Ctrl</kbd>+<kbd>B</kbd> = COMPLETE SALE</span>
+                        <span><kbd>F2</kbd> Cash · <kbd>F3</kbd> Numpad · <kbd>F4</kbd> Hold · <kbd>F5</kbd> Recall</span>
                     </div>
                 </div>
             </div>
@@ -451,8 +456,8 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
                                 <button type="button" @click="cashReceived = calcTotal(); $nextTick(() => $refs.cashInput && $refs.cashInput.focus())" class="text-emerald-600 hover:text-emerald-800 text-xs font-bold underline">EXACT</button>
                             </label>
                             <input type="number" name="cash_received" x-model.number="cashReceived" x-ref="cashInput"
-                                @keydown.enter.prevent="$refs.completeBtn && $refs.completeBtn.click()"
-                                step="0.01" min="0" placeholder="Tendered (Enter = pay)"
+                                @keydown.enter.prevent=""
+                                step="0.01" min="0" placeholder="Tendered amount (F9 / Ctrl+B = pay)"
                                 class="w-full rounded-lg border-2 border-emerald-400 dark:border-emerald-600 dark:bg-gray-800 dark:text-white text-xl font-bold py-3 px-3 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
                         </div>
                         {{-- Quick tender buttons --}}
@@ -482,7 +487,7 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
 
                 <button type="submit" x-ref="completeBtn"
                     class="w-full py-5 bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white font-black rounded-xl transition text-lg shadow-xl tracking-wide">
-                    ✓ COMPLETE SALE <span class="opacity-70 text-xs font-normal">(F9 / Enter)</span>
+                    ✓ COMPLETE SALE <span class="opacity-70 text-xs font-normal">(F9 / Ctrl+B)</span>
                 </button>
             </div>
         </div>
@@ -557,6 +562,7 @@ function fbrPosInvoice() {
             window.addEventListener('keydown', (e) => {
                 // Always-active combos (work even inside inputs)
                 if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); this.addItem(); return; }
+                if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) { e.preventDefault(); this.$refs.completeBtn && this.$refs.completeBtn.click(); return; }
                 if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); this.openProductSearch(); return; }
                 if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
                     if (this.activeItemIndex >= 0 && this.activeItemIndex < this.items.length) { e.preventDefault(); this.duplicateItem(this.activeItemIndex); }

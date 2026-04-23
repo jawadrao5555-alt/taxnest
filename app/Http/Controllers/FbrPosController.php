@@ -961,9 +961,34 @@ class FbrPosController extends Controller
                 'phone' => 'nullable|string|max:20',
                 'email' => 'nullable|email|max:255',
                 'ntn' => 'nullable|string|max:20',
+                'print_paper_size' => 'nullable|in:thermal,a4',
+                'receipt_footer_note' => 'nullable|string|max:255',
+                'logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+                'remove_logo' => 'nullable|boolean',
             ]);
 
-            $company->update($validated);
+            // Handle logo upload / removal
+            if ($request->boolean('remove_logo') && $company->logo_path) {
+                \Storage::disk('public')->delete($company->logo_path);
+                $company->logo_path = null;
+            }
+            if ($request->hasFile('logo')) {
+                if ($company->logo_path) {
+                    \Storage::disk('public')->delete($company->logo_path);
+                }
+                $company->logo_path = $request->file('logo')->store('company-logos', 'public');
+            }
+
+            $company->fill([
+                'name' => $validated['name'],
+                'address' => $validated['address'] ?? null,
+                'phone' => $validated['phone'] ?? null,
+                'email' => $validated['email'] ?? null,
+                'ntn' => $validated['ntn'] ?? null,
+                'print_paper_size' => $validated['print_paper_size'] ?? 'thermal',
+                'receipt_footer_note' => $validated['receipt_footer_note'] ?? null,
+            ])->save();
+
             return redirect()->route('fbrpos.business-profile')->with('success', 'Business profile updated successfully.');
         }
 

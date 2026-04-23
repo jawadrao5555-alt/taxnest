@@ -4,8 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Receipt - {{ $transaction->invoice_number }}</title>
+    @php $paperSize = $company->print_paper_size ?? 'thermal'; @endphp
     <style>
-        @page { size: 80mm auto; margin: 0; }
+        @if($paperSize === 'a4')
+            /* 📄 A4 mode — thermal-width receipt centered on full A4. No cutting. */
+            @page { size: A4 portrait; margin: 10mm; }
+        @else
+            /* 🧾 Thermal mode — 80mm continuous roll, auto-cut */
+            @page { size: 80mm auto; margin: 0; }
+        @endif
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Courier New', 'Lucida Console', monospace;
@@ -66,8 +73,14 @@
         .footer { margin-top: 8px; font-size: 9px; line-height: 1.5; }
 
         @media print {
-            body { width: 80mm; max-width: 80mm; padding: 2mm; margin: 0; }
+            body { width: 80mm; max-width: 80mm; padding: 2mm; margin: 0 auto; }
             .no-print { display: none !important; }
+            @if($paperSize === 'a4')
+                /* A4: centered on page, no page break inside the receipt so it stays intact */
+                html, body { background: #fff; }
+                body { margin: 0 auto; page-break-inside: avoid; }
+                .receipt-wrap { page-break-inside: avoid; break-inside: avoid; }
+            @endif
         }
         @media screen {
             body { padding: 10px; }
@@ -96,6 +109,7 @@
         };
     </script>
 
+    <div class="receipt-wrap">
     <div class="header text-center">
         @if($company->logo_path)
         <div style="margin-bottom: 5px;">
@@ -264,11 +278,15 @@
 
     <div class="footer text-center">
         <p>Thank you for your purchase!</p>
+        @if(!empty($company->receipt_footer_note))
+        <p style="font-style: italic; margin-top:2px;">{{ $company->receipt_footer_note }}</p>
+        @endif
         @if($company->fbr_pos_id)
         <p style="font-weight:bold;">Integrated with FBR | Reg #: {{ $company->fbr_pos_id }}</p>
         @endif
         <p>Powered by TaxNest FBR POS</p>
         <p>{{ now()->format('d/m/Y h:i:s A') }}</p>
     </div>
+    </div>{{-- /.receipt-wrap --}}
 </body>
 </html>

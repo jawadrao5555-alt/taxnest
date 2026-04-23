@@ -75,6 +75,8 @@ class Company extends Model
         'confidential_pin',
         'next_local_invoice_number',
         'logo_path',
+        'print_paper_size',
+        'receipt_footer_note',
         'status',
         'product_type',
         'franchise_id',

@@ -15,7 +15,9 @@ return new class extends Migration {
             $table->unsignedBigInteger('user_id')->nullable()->index();
             $table->unsignedBigInteger('company_id')->nullable()->index();
             $table->string('scope', 32)->default('di')->index(); // di | pos | fbrpos
-            $table->text('endpoint');
+            // Push endpoints are URLs — typically <500 chars; spec allows longer
+            // but VARCHAR(500) keeps the column index-friendly on MySQL.
+            $table->string('endpoint', 500);
             $table->string('p256dh', 255)->nullable();
             $table->string('auth_key', 255)->nullable();
             $table->string('user_agent', 500)->nullable();

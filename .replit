@@ -53,6 +53,10 @@ args = "Laravel Server"
 task = "workflow.run"
 args = "Queue Worker"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "MySQL Staging"
+
 [[workflows.workflow]]
 name = "Laravel Server"
 author = "agent"
@@ -76,6 +80,18 @@ outputType = "console"
 task = "shell.exec"
 args = "php artisan queue:work"
 
+[[workflows.workflow]]
+name = "MySQL Staging"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "mysqld --defaults-file=/tmp/mysql_staging/my.cnf"
+waitForPort = 9000
+
 [[ports]]
 localPort = 5000
 externalPort = 80
@@ -83,6 +99,10 @@ externalPort = 80
 [[ports]]
 localPort = 5001
 externalPort = 3001
+
+[[ports]]
+localPort = 9000
+externalPort = 9000
 
 [nix]
 channel = "stable-25_05"

@@ -340,14 +340,14 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
                                 <div class="sm:col-span-3">
                                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Item Name *</label>
                                     <input type="text" :name="'items['+index+'][item_name]'" x-model="item.item_name" required
-                                        @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); $nextTick(() => $refs.barcodeInput && $refs.barcodeInput.focus()); }"
+                                        @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="Product name">
                                 </div>
                                 <div class="sm:col-span-2">
                                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">HS Code <span class="text-gray-400 font-normal">(Opt.)</span></label>
                                     <input type="text" :name="'items['+index+'][hs_code]'" x-model="item.hs_code"
-                                        @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); $nextTick(() => $refs.barcodeInput && $refs.barcodeInput.focus()); }"
+                                        @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="00000000">
                                 </div>
@@ -371,7 +371,7 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
                                             @focus="$nextTick(() => $event.target.select())"
                                             @mousedown="if(document.activeElement !== $event.target){ $event.preventDefault(); $event.target.focus(); $event.target.select(); }"
                                             @blur="if(!item.quantity || parseFloat(item.quantity) <= 0){ item.quantity = 1; }"
-                                            @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); $nextTick(() => $refs.barcodeInput && $refs.barcodeInput.focus()); }"
+                                            @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
                                             required
                                             class="w-full min-w-0 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 text-center font-semibold px-1"
                                             placeholder="1">
@@ -381,7 +381,7 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
                                 <div class="sm:col-span-2">
                                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Unit Price *</label>
                                     <input type="number" :name="'items['+index+'][unit_price]'" x-model.number="item.unit_price" min="0.01" step="0.01" required
-                                        @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); $nextTick(() => $refs.barcodeInput && $refs.barcodeInput.focus()); }"
+                                        @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="0.00">
                                 </div>
@@ -390,7 +390,7 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
                                     <input type="number" :name="'items['+index+'][tax_rate]'" x-model.number="item.tax_rate" min="0" max="100" step="0.01"
                                         :disabled="item.is_tax_exempt"
                                         @keydown.tab="if(!$event.shiftKey && index === items.length - 1 && item.item_name && parseFloat(item.unit_price) > 0){ $event.preventDefault(); addItem(); }"
-                                        @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); $nextTick(() => $refs.barcodeInput && $refs.barcodeInput.focus()); }"
+                                        @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 px-1"
                                         placeholder="18">
                                 </div>
@@ -674,12 +674,12 @@ function fbrPosInvoice() {
                 if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
                     const tag = (e.target && e.target.tagName) || '';
                     if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT' && tag !== 'BUTTON') {
-                        e.preventDefault(); this.addItem(); this.$nextTick(() => { this.$refs.barcodeInput && this.$refs.barcodeInput.focus(); });
+                        e.preventDefault(); this.addItem(); this.focusLastRowName();
                         return;
                     }
                 }
                 // Ctrl+Enter still works as alias (for power users) — but plain Enter on item fields is the primary path
-                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); this.addItem(); this.$nextTick(() => { this.$refs.barcodeInput && this.$refs.barcodeInput.focus(); }); return; }
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); this.addItem(); this.focusLastRowName(); return; }
                 if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) { e.preventDefault(); this.$refs.completeBtn && this.$refs.completeBtn.click(); return; }
                 if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); this.openProductSearch(); return; }
                 if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
@@ -696,7 +696,7 @@ function fbrPosInvoice() {
                 else if (e.key === 'F3') { e.preventDefault(); this.numpadOpen = !this.numpadOpen; }
                 else if (e.key === 'F4') { e.preventDefault(); this.holdSale(); }
                 else if (e.key === 'F5') { e.preventDefault(); this.openRecall(); }
-                else if (e.key === 'F6') { e.preventDefault(); this.addItem(); }
+                else if (e.key === 'F6') { e.preventDefault(); this.addItem(); this.focusLastRowName(); }
                 else if (e.key === 'F7') { e.preventDefault(); this.openProductSearch(); }
                 else if (e.key === 'F8') { e.preventDefault(); this.openPaymentPicker(); }
                 else if (e.key === 'F11') { e.preventDefault(); this.toggleFullscreen(); }
@@ -747,6 +747,16 @@ function fbrPosInvoice() {
         reprintLast() {
             if (!this.lastSaleId) { this.toast('No previous sale found', 'warn'); return; }
             window.open('/fbr-pos/' + this.lastSaleId + '/receipt', '_blank');
+        },
+        // 🎯 Focus the Item Name field of the newest (last) item row
+        focusLastRowName() {
+            this.$nextTick(() => {
+                const rows = document.querySelectorAll('.item-card');
+                if (!rows.length) return;
+                const lastRow = rows[rows.length - 1];
+                const nameInput = lastRow.querySelector('input[name$="[item_name]"]');
+                if (nameInput) { nameInput.focus(); nameInput.select && nameInput.select(); }
+            });
         },
         // 💳 F8 Payment Picker
         openPaymentPicker() {

@@ -127,15 +127,6 @@ class FbrPosController extends Controller
             $request->merge(['items' => $cleanItems]);
         }
 
-        // 📝 Diagnostic: log incoming request shape (helps debug bill-create failures)
-        Log::info('FBR POS Store: incoming', [
-            'company_id' => $companyId,
-            'item_count' => count($request->input('items', [])),
-            'payment_method' => $request->input('payment_method'),
-            'has_breakdown' => !empty($request->input('payment_breakdown')),
-            'cash_received' => $request->input('cash_received'),
-        ]);
-
         try {
             $request->validate([
             'items' => 'required|array|min:1',

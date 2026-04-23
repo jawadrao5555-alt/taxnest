@@ -1,24 +1,87 @@
 <x-fbr-pos-layout>
 <style>
+/* ═══ Animations ═══ */
 @keyframes scanPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.5); } 50% { box-shadow: 0 0 0 8px rgba(59,130,246,0); } }
 .scan-pulse { animation: scanPulse 1.5s ease-in-out infinite; }
 @keyframes toastIn { from { transform: translateX(20px) scale(0.95); opacity: 0; } to { transform: translateX(0) scale(1); opacity: 1; } }
 .toast-in { animation: toastIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1); }
-@keyframes rowIn { from { transform: translateY(-6px); opacity:0; } to { transform: translateY(0); opacity:1; } }
-.row-in { animation: rowIn 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
-.item-card { transition: box-shadow 0.18s ease, transform 0.18s ease; position: relative; overflow: hidden; contain: layout style; }
-.item-card.is-active { box-shadow: 0 0 0 2px rgba(59,130,246,0.5), 0 8px 24px -8px rgba(59,130,246,0.4); transform: translateY(-1px); }
-.item-card.is-active::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg,#3b82f6,#6366f1); }
-.item-num-badge { background: linear-gradient(135deg,#3b82f6,#6366f1); color: white; box-shadow: 0 4px 12px -2px rgba(59,130,246,0.5); }
+@keyframes rowIn { from { transform: translateY(-8px) scale(0.98); opacity:0; } to { transform: translateY(0) scale(1); opacity:1; } }
+.row-in { animation: rowIn 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes badgePop { 0% { transform: scale(0.5); opacity: 0; } 60% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }
+.item-num-badge { animation: badgePop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); background: linear-gradient(135deg,#3b82f6,#6366f1); color: white; box-shadow: 0 4px 12px -2px rgba(59,130,246,0.5), inset 0 1px 0 rgba(255,255,255,0.25); }
+@keyframes glowPulse { 0%,100% { box-shadow: 0 0 0 2px rgba(59,130,246,0.55), 0 12px 28px -10px rgba(59,130,246,0.5); } 50% { box-shadow: 0 0 0 2px rgba(99,102,241,0.65), 0 14px 32px -10px rgba(99,102,241,0.55); } }
+
+/* ═══ Item card polish ═══ */
+.item-card { transition: box-shadow 0.22s ease, transform 0.22s ease, border-color 0.22s ease; position: relative; overflow: hidden; contain: layout style; }
+.item-card:hover:not(.is-active) { border-color: rgb(147 197 253); box-shadow: 0 4px 14px -6px rgba(59,130,246,0.18); }
+.dark .item-card:hover:not(.is-active) { border-color: rgb(59 130 246 / 0.6); }
+.item-card.is-active { animation: glowPulse 2.4s ease-in-out infinite; transform: translateY(-1px); border-color: transparent !important; }
+.item-card.is-active::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg,#3b82f6,#6366f1,#8b5cf6); }
+.item-card.is-active::after { content: ''; position: absolute; right: -40px; top: -40px; width: 120px; height: 120px; background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%); pointer-events: none; }
+
+/* ═══ Premium inputs & focus ═══ */
 .sticky-banner { will-change: transform; backface-visibility: hidden; }
-input[type="text"], input[type="number"], select, textarea { transition: border-color 0.15s ease, box-shadow 0.15s ease; }
-input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; }
-button { transition: transform 0.12s ease, background-color 0.15s ease, box-shadow 0.15s ease; }
-button:active:not(:disabled) { transform: scale(0.97); }
-kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-size:10px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; box-shadow:0 1px 0 rgba(0,0,0,0.3); border:1px solid #334155; }
-.dark kbd { background:#475569; border-color:#64748b; }
+input[type="text"], input[type="number"], input[type="email"], input[type="tel"], select, textarea {
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.18), 0 1px 2px rgba(0,0,0,0.04) !important;
+    border-color: rgb(59 130 246) !important;
+}
+.dark input:focus-visible, .dark select:focus-visible, .dark textarea:focus-visible {
+    box-shadow: 0 0 0 3px rgba(96,165,250,0.25), 0 1px 2px rgba(0,0,0,0.3) !important;
+    border-color: rgb(96 165 250) !important;
+}
+input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; }
+
+/* ═══ Buttons ═══ */
+button { transition: transform 0.12s ease, background-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease; }
+button:active:not(:disabled) { transform: scale(0.96); }
+button:focus-visible { outline: 2px solid rgba(59,130,246,0.55); outline-offset: 2px; }
+
+/* Quantity stepper polish */
+.item-card .flex.items-stretch button {
+    transition: background-color 0.12s ease, color 0.12s ease, transform 0.12s ease;
+    user-select: none;
+    min-width: 32px;
+}
+.item-card .flex.items-stretch button:hover { background: linear-gradient(180deg,#dbeafe,#bfdbfe); color: #1d4ed8; }
+.dark .item-card .flex.items-stretch button:hover { background: linear-gradient(180deg,#1e40af,#1e3a8a); color: #dbeafe; }
+
+/* ═══ KBD chips ═══ */
+kbd {
+    background: linear-gradient(180deg,#334155,#1e293b);
+    color: #fff; padding: 2px 7px; border-radius: 5px;
+    font-size: 10px; font-family: ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-weight: 700; letter-spacing: 0.02em;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08);
+    border: 1px solid #475569;
+}
+.dark kbd { background: linear-gradient(180deg,#64748b,#475569); border-color: #64748b; }
+
+/* ═══ Add Product CTA polish ═══ */
+.add-cta-glow:hover { box-shadow: 0 8px 28px -10px rgba(59,130,246,0.45); }
+
+/* ═══ Sticky bottom bar — mobile ═══ */
+@supports (backdrop-filter: blur(12px)) {
+    .lg\:hidden.fixed.bottom-0 { backdrop-filter: blur(12px); background-color: rgba(255,255,255,0.92); }
+    .dark .lg\:hidden.fixed.bottom-0 { background-color: rgba(17,24,39,0.92); }
+}
+
+/* ═══ Scrollbar polish ═══ */
+.main-scroll::-webkit-scrollbar { width: 10px; }
+.main-scroll::-webkit-scrollbar-thumb { background: linear-gradient(180deg,#cbd5e1,#94a3b8); border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+.main-scroll::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg,#94a3b8,#64748b); background-clip: padding-box; border: 2px solid transparent; }
+.dark .main-scroll::-webkit-scrollbar-thumb { background: linear-gradient(180deg,#475569,#334155); background-clip: padding-box; border: 2px solid transparent; }
+
+/* ═══ Empty state for first row when blank ═══ */
+.item-card[data-item-index="0"] .row-in { }
+
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    .item-card.is-active { animation: none; }
 }
 </style>
 <div class="max-w-7xl mx-auto pb-32 px-3 sm:px-4" x-data="fbrPosInvoice()" @click="userActivity()"

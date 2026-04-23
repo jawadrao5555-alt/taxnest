@@ -231,6 +231,7 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
     @endif
 
     <form method="POST" action="{{ route('fbrpos.store') }}" x-ref="saleForm"
+          @submit.prevent="finalizeAndSubmit($event)"
           @keydown.enter="
               /* Block stray Enter from submitting the bill — Enter is for adding products only.
                  Use F9 (or the Complete button) to finalize. Per-input handlers (barcode,
@@ -581,7 +582,6 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
 
                 <button type="submit" x-ref="completeBtn"
                     :disabled="!isOnline"
-                    @click="if(!isOnline){ $event.preventDefault(); toast('Internet required for FBR submission. Please reconnect.', 'error'); return false; }"
                     :class="isOnline ? 'bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white' : 'bg-gray-400 text-gray-200 cursor-not-allowed'"
                     class="w-full py-5 font-black rounded-xl transition text-lg shadow-xl tracking-wide">
                     <span x-show="isOnline">✓ COMPLETE SALE <span class="opacity-70 text-xs font-normal">(F8 Pay · F9 / Ctrl+B Direct)</span></span>
@@ -747,6 +747,39 @@ function fbrPosInvoice() {
         reprintLast() {
             if (!this.lastSaleId) { this.toast('No previous sale found', 'warn'); return; }
             window.open('/fbr-pos/' + this.lastSaleId + '/receipt', '_blank');
+        },
+        // 🧹 Strip out any empty/half-filled rows (no name OR price <= 0 OR qty <= 0)
+        cleanEmptyItems() {
+            const before = this.items.length;
+            this.items = this.items.filter(i =>
+                (i.item_name && String(i.item_name).trim() !== '')
+                && parseFloat(i.unit_price) > 0
+                && parseFloat(i.quantity) > 0
+            );
+            return before - this.items.length; // # removed
+        },
+        // 📤 Final submit pipeline — used by F8/F9/Ctrl+B/button click
+        finalizeAndSubmit(ev) {
+            // Offline guard (mirrors button-level check)
+            if (!this.isOnline) {
+                this.toast('Internet required for FBR submission. Please reconnect.', 'error');
+                return;
+            }
+            const removed = this.cleanEmptyItems();
+            if (this.items.length === 0) {
+                this.toast('No valid products in cart. Please add at least one product with name, qty & price.', 'error');
+                this.beep && this.beep(220, 0.25);
+                this.$nextTick(() => { this.$refs.barcodeInput && this.$refs.barcodeInput.focus(); });
+                return;
+            }
+            if (removed > 0) {
+                this.toast('Removed ' + removed + ' empty row' + (removed > 1 ? 's' : '') + ' before submitting', 'info');
+            }
+            // Wait for Alpine to re-render the cleaned items[] before native submit
+            this.$nextTick(() => {
+                // Native submit bypasses Alpine @submit listener (no recursion)
+                this.$refs.saleForm.submit();
+            });
         },
         // 🎯 Focus the Item Name field of the newest (last) item row
         focusLastRowName() {

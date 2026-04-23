@@ -230,7 +230,7 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
     </div>
     @endif
 
-    <form method="POST" action="{{ route('fbrpos.store') }}" x-ref="saleForm"
+    <form method="POST" action="{{ route('fbrpos.store') }}" x-ref="saleForm" novalidate
           @submit.prevent="finalizeAndSubmit($event)"
           @keydown.enter="
               /* Block stray Enter from submitting the bill — Enter is for adding products only.

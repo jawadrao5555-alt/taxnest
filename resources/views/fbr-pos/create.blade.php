@@ -306,7 +306,7 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
                             @keydown.enter.prevent="scanBarcode()"
                             autocomplete="off"
                             class="flex-1 bg-transparent border-0 focus:ring-0 text-sm font-mono dark:text-white placeholder-gray-400 font-semibold"
-                            placeholder="📡 Scanner Active — Scan or type code + Enter">
+                            placeholder="📡 Scan anywhere — auto-detected. Or type code here + Enter">
                         <span class="text-[10px] font-bold px-2 py-0.5 bg-blue-600 text-white rounded">READY</span>
                         <span x-show="scanStatus" :class="scanStatus.ok ? 'text-green-600' : 'text-red-600'" class="text-xs font-semibold" x-text="scanStatus.msg"></span>
                     </div>
@@ -664,8 +664,15 @@ function fbrPosInvoice() {
         soundOn: localStorage.getItem('fbrpos_sound') !== '0',
         lastSaleId: localStorage.getItem('fbrpos_last_sale') || '',
         audioCtx: null,
+        // 📡 Background scanner buffer (typing-mode friendly)
+        _scanBuf: '',
+        _scanLastTs: 0,
+        _scanResetTimer: null,
         init() {
-            this.$nextTick(() => { this.$refs.barcodeInput && this.$refs.barcodeInput.focus(); });
+            // 🎯 Default focus: first product's Item Name (typing-friendly)
+            // Scanner still works in background — see initBackgroundScanner()
+            this.$nextTick(() => { this.focusLastRowName(); });
+            this.initBackgroundScanner();
             this.loadHeld();
             // Global keyboard shortcuts
             window.addEventListener('keydown', (e) => {
@@ -706,12 +713,9 @@ function fbrPosInvoice() {
         },
         // ====== Premium helpers ======
         _lastActivity: 0,
-        userActivity() { /* throttled refocus — prevents per-click overhead */
-            const now = performance.now();
-            if (now - this._lastActivity < 200) return;
-            this._lastActivity = now;
-            if (document.activeElement === document.body && this.$refs.barcodeInput) this.$refs.barcodeInput.focus();
-        },
+        userActivity() { /* No-op — typing-friendly mode. Background scanner handles auto-capture.
+                            We deliberately do NOT refocus the barcode input on user clicks anymore,
+                            because that was stealing focus while users typed product details. */ },
         totalQty() { return this.items.reduce((s,i) => s + (parseFloat(i.quantity)||0), 0); },
         toast(msg, type) {
             const id = ++this.toastSeq;
@@ -747,6 +751,61 @@ function fbrPosInvoice() {
         reprintLast() {
             if (!this.lastSaleId) { this.toast('No previous sale found', 'warn'); return; }
             window.open('/fbr-pos/' + this.lastSaleId + '/receipt', '_blank');
+        },
+        // 📡 Full-Auto Background Scanner
+        // Detects hardware barcode scanner input ANYWHERE on the page (no need to click barcode field).
+        // Scanners type characters very fast (<30ms apart) and end with Enter. We buffer keys, and
+        // when Enter arrives after a fast burst, we strip those chars from whatever input received
+        // them and route the buffer to scanBarcode().
+        initBackgroundScanner() {
+            const SCAN_KEY_GAP = 35;          // ms — max gap between scanner keys
+            const SCAN_MIN_LEN  = 4;          // min chars to qualify as a scan
+            const IDLE_RESET    = 250;        // ms — clear buffer if user stops typing
+
+            window.addEventListener('keydown', (e) => {
+                // Skip when modals/overlays own the keyboard
+                if (this.paymentModalOpen || this.numpadOpen || this.recallOpen) return;
+                // Ignore modifier-key combos (shortcuts handled elsewhere)
+                if (e.ctrlKey || e.metaKey || e.altKey) { this._scanBuf = ''; return; }
+
+                const now = performance.now();
+                const gap = now - this._scanLastTs;
+                this._scanLastTs = now;
+
+                if (e.key === 'Enter') {
+                    // Did this Enter close a fast burst → treat as barcode scan
+                    if (this._scanBuf.length >= SCAN_MIN_LEN && gap <= SCAN_KEY_GAP * 4) {
+                        const code = this._scanBuf;
+                        this._scanBuf = '';
+                        // Strip the typed code from whatever input received it
+                        const tgt = e.target;
+                        if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA')) {
+                            const v = String(tgt.value || '');
+                            if (v.endsWith(code)) {
+                                tgt.value = v.slice(0, -code.length);
+                                tgt.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                        }
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.barcodeBuffer = code;
+                        this.scanBarcode();
+                        return;
+                    }
+                    this._scanBuf = '';
+                    return;
+                }
+
+                // Buffer only single printable chars during a fast burst
+                if (e.key.length === 1) {
+                    if (gap > SCAN_KEY_GAP) this._scanBuf = '';   // human typing → reset
+                    this._scanBuf += e.key;
+                }
+
+                // Auto-reset buffer after idle
+                clearTimeout(this._scanResetTimer);
+                this._scanResetTimer = setTimeout(() => { this._scanBuf = ''; }, IDLE_RESET);
+            }, true); // capture phase — runs before per-input handlers
         },
         // 🧹 Strip out any empty/half-filled rows (no name OR price <= 0 OR qty <= 0)
         cleanEmptyItems() {

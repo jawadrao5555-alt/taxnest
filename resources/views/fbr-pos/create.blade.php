@@ -291,12 +291,14 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
                                 <div class="sm:col-span-3">
                                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Item Name *</label>
                                     <input type="text" :name="'items['+index+'][item_name]'" x-model="item.item_name" required
+                                        @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); $nextTick(() => $refs.barcodeInput && $refs.barcodeInput.focus()); }"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="Product name">
                                 </div>
                                 <div class="sm:col-span-2">
                                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">HS Code <span class="text-gray-400 font-normal">(Opt.)</span></label>
                                     <input type="text" :name="'items['+index+'][hs_code]'" x-model="item.hs_code"
+                                        @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); $nextTick(() => $refs.barcodeInput && $refs.barcodeInput.focus()); }"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="00000000">
                                 </div>
@@ -320,6 +322,7 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
                                             @focus="$nextTick(() => $event.target.select())"
                                             @mousedown="if(document.activeElement !== $event.target){ $event.preventDefault(); $event.target.focus(); $event.target.select(); }"
                                             @blur="if(!item.quantity || parseFloat(item.quantity) <= 0){ item.quantity = 1; }"
+                                            @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); $nextTick(() => $refs.barcodeInput && $refs.barcodeInput.focus()); }"
                                             required
                                             class="w-full min-w-0 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 text-center font-semibold px-1"
                                             placeholder="1">
@@ -329,6 +332,7 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
                                 <div class="sm:col-span-2">
                                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Unit Price *</label>
                                     <input type="number" :name="'items['+index+'][unit_price]'" x-model.number="item.unit_price" min="0.01" step="0.01" required
+                                        @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); $nextTick(() => $refs.barcodeInput && $refs.barcodeInput.focus()); }"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="0.00">
                                 </div>
@@ -606,7 +610,16 @@ function fbrPosInvoice() {
             // Global keyboard shortcuts
             window.addEventListener('keydown', (e) => {
                 // Always-active combos (work even inside inputs)
-                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); this.addItem(); return; }
+                // Plain Enter (no modifiers) anywhere outside form inputs → add new product row
+                if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                    const tag = (e.target && e.target.tagName) || '';
+                    if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT' && tag !== 'BUTTON') {
+                        e.preventDefault(); this.addItem(); this.$nextTick(() => { this.$refs.barcodeInput && this.$refs.barcodeInput.focus(); });
+                        return;
+                    }
+                }
+                // Ctrl+Enter still works as alias (for power users) — but plain Enter on item fields is the primary path
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); this.addItem(); this.$nextTick(() => { this.$refs.barcodeInput && this.$refs.barcodeInput.focus(); }); return; }
                 if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) { e.preventDefault(); this.$refs.completeBtn && this.$refs.completeBtn.click(); return; }
                 if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); this.openProductSearch(); return; }
                 if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {

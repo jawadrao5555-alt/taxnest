@@ -51,7 +51,7 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
         </div>
         <div class="flex items-center gap-1 sm:gap-1.5">
             <button type="button" @click="numpadOpen = true" title="On-screen numpad (F3)" class="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-95 rounded-lg text-white text-base transition">⌨</button>
-            <button type="button" @click="reprintLast()" title="Reprint last receipt (F8)" class="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-95 rounded-lg text-white text-base transition">🖨</button>
+            <button type="button" @click="reprintLast()" title="Reprint last receipt (F12)" class="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-95 rounded-lg text-white text-base transition">🖨</button>
             <button type="button" @click="toggleFullscreen()" title="Fullscreen (F11)" class="hidden sm:flex w-9 h-9 sm:w-10 sm:h-10 items-center justify-center bg-white/10 hover:bg-white/20 active:scale-95 rounded-lg text-white text-base transition">⛶</button>
             <button type="button" @click="soundOn = !soundOn; toast(soundOn ? 'Sound ON' : 'Sound OFF', 'info')" title="Toggle sound" class="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-95 rounded-lg text-white text-base transition" x-text="soundOn ? '🔊' : '🔇'"></button>
         </div>
@@ -94,6 +94,55 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
             <div class="grid grid-cols-2 gap-2 mt-2">
                 <button type="button" @click="cashReceived = 0" class="py-3 bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/40 dark:text-red-300 rounded-lg font-bold">Clear</button>
                 <button type="button" @click="numpadOpen = false; $refs.completeBtn && $refs.completeBtn.click()" class="py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold">✓ Pay</button>
+            </div>
+        </div>
+    </div>
+
+    {{-- 💳 Payment Method Picker Modal (F8) --}}
+    <div x-show="paymentModalOpen" x-cloak
+         @keydown.window.escape="paymentModalOpen = false"
+         @keydown.window.arrow-down.prevent="if(paymentModalOpen){ paymentChoiceIdx = (paymentChoiceIdx + 1) % paymentMethods.length; }"
+         @keydown.window.arrow-up.prevent="if(paymentModalOpen){ paymentChoiceIdx = (paymentChoiceIdx - 1 + paymentMethods.length) % paymentMethods.length; }"
+         @keydown.window.enter.prevent="if(paymentModalOpen){ confirmPaymentAndSubmit(); }"
+         @keydown.window="if(paymentModalOpen && ['1','2','3','4'].includes($event.key)){ $event.preventDefault(); paymentChoiceIdx = parseInt($event.key) - 1; confirmPaymentAndSubmit(); }"
+         class="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+         @click.self="paymentModalOpen = false">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border-2 border-emerald-500 w-full max-w-lg p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-black dark:text-white flex items-center gap-2">
+                    <span class="inline-flex w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-blue-600 text-white items-center justify-center font-black text-sm">F8</span>
+                    Choose Payment Method
+                </h3>
+                <button type="button" @click="paymentModalOpen = false" class="text-gray-400 hover:text-red-600 text-2xl leading-none">✕</button>
+            </div>
+            <div class="text-xs text-gray-500 mb-3">Use <kbd class="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">1-4</kbd> · <kbd class="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">↑↓</kbd> + <kbd class="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">Enter</kbd> · <kbd class="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">Esc</kbd> to cancel</div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <template x-for="(m, i) in paymentMethods" :key="m.value">
+                    <button type="button"
+                            @click="paymentChoiceIdx = i; confirmPaymentAndSubmit()"
+                            :class="paymentChoiceIdx === i
+                                ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30 ring-2 ring-emerald-400 scale-[1.02]'
+                                : 'border-gray-300 dark:border-gray-700 hover:border-emerald-400 bg-white dark:bg-gray-800'"
+                            class="p-4 rounded-xl border-2 text-left transition-all">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-3xl" x-text="m.icon"></span>
+                            <span class="inline-flex w-7 h-7 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 items-center justify-center font-black text-sm" x-text="i + 1"></span>
+                        </div>
+                        <div class="font-bold text-base dark:text-white" x-text="m.label"></div>
+                        <div class="text-[10px] text-gray-500 mt-0.5" x-text="m.hint"></div>
+                    </button>
+                </template>
+            </div>
+
+            <div class="mt-4 flex items-center justify-between text-sm">
+                <div class="text-gray-600 dark:text-gray-300">
+                    Total: <span class="font-black text-emerald-700 dark:text-emerald-400" x-text="'Rs ' + formatNum(calcTotal())"></span>
+                </div>
+                <button type="button" @click="confirmPaymentAndSubmit()"
+                        class="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white font-bold rounded-lg shadow-lg">
+                    ✓ Confirm &amp; Complete Sale
+                </button>
             </div>
         </div>
     </div>
@@ -435,12 +484,13 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
                     <div class="space-y-3">
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Method *</label>
-                            <select name="payment_method" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <select name="payment_method" x-ref="paymentSelect" x-model="paymentMethod" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
                                 <option value="cash">Cash</option>
                                 <option value="card">Card</option>
                                 <option value="bank_transfer">Bank Transfer</option>
                                 <option value="online">Online</option>
                             </select>
+                            <p class="text-[11px] text-gray-500 mt-1">Press <kbd class="px-1 bg-gray-200 dark:bg-gray-700 rounded text-[10px]">F8</kbd> to pick payment method &amp; complete sale</p>
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Discount Type</label>
@@ -534,7 +584,7 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
                     @click="if(!isOnline){ $event.preventDefault(); toast('Internet required for FBR submission. Please reconnect.', 'error'); return false; }"
                     :class="isOnline ? 'bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white' : 'bg-gray-400 text-gray-200 cursor-not-allowed'"
                     class="w-full py-5 font-black rounded-xl transition text-lg shadow-xl tracking-wide">
-                    <span x-show="isOnline">✓ COMPLETE SALE <span class="opacity-70 text-xs font-normal">(F9 / Ctrl+B)</span></span>
+                    <span x-show="isOnline">✓ COMPLETE SALE <span class="opacity-70 text-xs font-normal">(F8 Pay · F9 / Ctrl+B Direct)</span></span>
                     <span x-show="!isOnline" x-cloak>⚠ OFFLINE — RECONNECT TO SUBMIT</span>
                 </button>
             </div>
@@ -556,7 +606,7 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
             @endif
         </div>
         <div class="flex items-center gap-3">
-            <span class="text-slate-400">F2 Cash · F3 Pad · F4 Hold · F5 Recall · F8 Reprint · F9 Pay</span>
+            <span class="text-slate-400">F2 Cash · F3 Pad · F4 Hold · F5 Recall · <span class="text-amber-300 font-bold">F8 Pay (Pick Method)</span> · F9 Direct Pay · F12 Reprint</span>
             <span class="text-slate-400">|</span>
             <span x-text="new Date().toLocaleTimeString()" x-init="setInterval(() => $el.textContent = new Date().toLocaleTimeString(), 1000)" class="font-mono font-bold text-emerald-300"></span>
         </div>
@@ -594,6 +644,16 @@ function fbrPosInvoice() {
         cashReceived: 0,
         cardAmount: 0,
         splitPayment: false,
+        // Payment method picker (F8)
+        paymentMethod: 'cash',
+        paymentModalOpen: false,
+        paymentChoiceIdx: 0,
+        paymentMethods: [
+            { value: 'cash',          label: 'Cash',          icon: '💵', hint: 'Press 1' },
+            { value: 'card',          label: 'Card',          icon: '💳', hint: 'Press 2' },
+            { value: 'bank_transfer', label: 'Bank Transfer', icon: '🏦', hint: 'Press 3' },
+            { value: 'online',        label: 'Online',        icon: '🌐', hint: 'Press 4' },
+        ],
         recallOpen: false,
         heldList: [],
         // Premium UI state
@@ -638,8 +698,9 @@ function fbrPosInvoice() {
                 else if (e.key === 'F5') { e.preventDefault(); this.openRecall(); }
                 else if (e.key === 'F6') { e.preventDefault(); this.addItem(); }
                 else if (e.key === 'F7') { e.preventDefault(); this.openProductSearch(); }
-                else if (e.key === 'F8') { e.preventDefault(); this.reprintLast(); }
+                else if (e.key === 'F8') { e.preventDefault(); this.openPaymentPicker(); }
                 else if (e.key === 'F11') { e.preventDefault(); this.toggleFullscreen(); }
+                else if (e.key === 'F12') { e.preventDefault(); this.reprintLast(); }
             });
             this.toast('POS Ready · Scanner active', 'success');
         },
@@ -686,6 +747,32 @@ function fbrPosInvoice() {
         reprintLast() {
             if (!this.lastSaleId) { this.toast('No previous sale found', 'warn'); return; }
             window.open('/fbr-pos/' + this.lastSaleId + '/receipt', '_blank');
+        },
+        // 💳 F8 Payment Picker
+        openPaymentPicker() {
+            // Guard: must have at least one valid item
+            const hasValidItem = this.items.some(i => i.item_name && parseFloat(i.unit_price) > 0 && parseFloat(i.quantity) > 0);
+            if (!hasValidItem) {
+                this.toast('Add at least one product before payment', 'error');
+                this.beep && this.beep(220, 0.2);
+                return;
+            }
+            // Sync current selection
+            const currentIdx = this.paymentMethods.findIndex(m => m.value === this.paymentMethod);
+            this.paymentChoiceIdx = currentIdx >= 0 ? currentIdx : 0;
+            this.paymentModalOpen = true;
+            this.beep && this.beep(880, 0.06);
+        },
+        confirmPaymentAndSubmit() {
+            if (!this.paymentModalOpen) return;
+            const chosen = this.paymentMethods[this.paymentChoiceIdx];
+            if (!chosen) return;
+            this.paymentMethod = chosen.value; // x-model syncs the select
+            this.paymentModalOpen = false;
+            this.toast('Payment: ' + chosen.label + ' · Submitting...', 'success');
+            this.$nextTick(() => {
+                this.$refs.completeBtn && this.$refs.completeBtn.click();
+            });
         },
         async loadHeld() {
             try { const r = await fetch("{{ route('fbrpos.phase2.held.list') }}"); this.heldList = await r.json(); } catch(e) {}

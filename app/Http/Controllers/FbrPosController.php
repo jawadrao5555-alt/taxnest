@@ -114,7 +114,30 @@ class FbrPosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
-        $request->validate([
+        // 🧹 Server-side empty-row scrub — defense-in-depth in case JS cleanEmptyItems missed any
+        $rawItems = $request->input('items', []);
+        if (is_array($rawItems)) {
+            $cleanItems = array_values(array_filter($rawItems, function ($it) {
+                if (!is_array($it)) return false;
+                $name = trim((string)($it['item_name'] ?? ''));
+                $qty = (float)($it['quantity'] ?? 0);
+                $price = (float)($it['unit_price'] ?? 0);
+                return $name !== '' && $qty > 0 && $price > 0;
+            }));
+            $request->merge(['items' => $cleanItems]);
+        }
+
+        // 📝 Diagnostic: log incoming request shape (helps debug bill-create failures)
+        Log::info('FBR POS Store: incoming', [
+            'company_id' => $companyId,
+            'item_count' => count($request->input('items', [])),
+            'payment_method' => $request->input('payment_method'),
+            'has_breakdown' => !empty($request->input('payment_breakdown')),
+            'cash_received' => $request->input('cash_received'),
+        ]);
+
+        try {
+            $request->validate([
             'items' => 'required|array|min:1',
             'items.*.item_name' => 'required|string|max:255',
             'items.*.quantity' => 'required|numeric|min:0.001',
@@ -139,7 +162,15 @@ class FbrPosController extends Controller
             'payment_breakdown' => 'nullable|array',
             'payment_breakdown.*.method' => 'required_with:payment_breakdown|string',
             'payment_breakdown.*.amount' => 'required_with:payment_breakdown|numeric|min:0',
-        ]);
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $ve) {
+            Log::warning('FBR POS Store: validation failed', [
+                'errors' => $ve->errors(),
+                'item_count' => count($request->input('items', [])),
+                'payment_method' => $request->input('payment_method'),
+            ]);
+            throw $ve;
+        }
 
         $fbrEnabled = (bool) $company->fbr_reporting_enabled;
         $invoiceMode = $fbrEnabled ? 'fbr' : 'local';

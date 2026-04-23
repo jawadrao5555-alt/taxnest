@@ -386,9 +386,15 @@ class FbrPosController extends Controller
                     ->with('warning', "FBR submission temporarily failed: {$fbrErrors}. Auto-retry scheduled (3 attempts, 10s apart).");
             }
 
+            // ✅ Sale was saved locally. FBR is a separate retry-able step — don't scare the cashier with red error.
+            $isTokenIssue = str_contains(strtolower($fbrErrors), 'token');
+            $warningMsg = $isTokenIssue
+                ? "✓ Bill saved successfully. FBR submission pending — your FBR token is not configured yet. Go to Settings → FBR Settings to set it up, then retry from Fail Queue."
+                : "✓ Bill saved successfully. FBR submission pending: {$fbrErrors}. Retry from this page or the Fail Queue.";
+
             return redirect()->route('fbrpos.show', $transaction->id)
-                ->with('success', "Sale #{$transaction->invoice_number} created (PKR " . number_format($transaction->total_amount, 2) . ").")
-                ->with('error', "FBR submission failed: {$fbrErrors}. Fix the issue and retry from Fail Queue or this page.");
+                ->with('success', "✓ Bill #{$transaction->invoice_number} created — PKR " . number_format($transaction->total_amount, 2))
+                ->with('warning', $warningMsg);
 
         } catch (\Exception $e) {
             Log::error('FBR POS Store Error', ['error' => $e->getMessage()]);

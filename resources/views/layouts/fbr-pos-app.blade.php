@@ -247,8 +247,20 @@
             <main class="flex-1 overflow-y-auto overflow-x-hidden main-scroll bg-slate-50 dark:bg-gray-950 page-fade" style="min-width: 0;">
                 @if(session('success'))
                     <div class="max-w-7xl mx-auto mb-4 px-4 sm:px-6 pt-4">
-                        <div class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 px-4 py-3 rounded-lg">
+                        <div class="bg-emerald-50 dark:bg-emerald-900/30 border-2 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 px-4 py-3 rounded-lg font-semibold shadow-sm">
                             {{ session('success') }}
+                        </div>
+                    </div>
+                @endif
+                @if(session('warning'))
+                    <div class="max-w-7xl mx-auto mb-4 px-4 sm:px-6 pt-2">
+                        <div class="bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 px-4 py-3 rounded-lg flex items-start gap-3">
+                            <span class="text-xl leading-none">⚠️</span>
+                            <div class="flex-1">{{ session('warning') }}
+                                @if(str_contains(strtolower(session('warning')), 'token'))
+                                    <a href="{{ route('fbrpos.settings') }}" class="ml-2 inline-flex items-center px-2.5 py-1 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold">⚙ Configure FBR Token →</a>
+                                @endif
+                            </div>
                         </div>
                     </div>
                 @endif
@@ -272,12 +284,15 @@
         @php
             $toastMessages = [];
             if(session('success')) $toastMessages[] = ['msg' => session('success'), 'type' => 'success'];
+            if(session('warning')) $toastMessages[] = ['msg' => session('warning'), 'type' => 'warning'];
             if(session('error')) $toastMessages[] = ['msg' => session('error'), 'type' => 'error'];
         @endphp
-        <div x-data="{ toasts: [], init() { const msgs = JSON.parse(this.$el.dataset.messages || '[]'); msgs.forEach(m => this.addToast(m.msg, m.type)); }, addToast(msg, type) { let id = Date.now() + Math.random(); this.toasts.push({id, msg, type}); setTimeout(() => this.toasts = this.toasts.filter(t => t.id !== id), 5000); } }" data-messages="{{ json_encode($toastMessages) }}" class="fixed top-4 right-4 z-50 space-y-2" style="pointer-events: none;">
+        <div x-data="{ toasts: [], init() { const msgs = JSON.parse(this.$el.dataset.messages || '[]'); msgs.forEach(m => this.addToast(m.msg, m.type)); }, addToast(msg, type) { let id = Date.now() + Math.random(); this.toasts.push({id, msg, type}); setTimeout(() => this.toasts = this.toasts.filter(t => t.id !== id), 6000); } }" data-messages="{{ json_encode($toastMessages) }}" class="fixed top-4 right-4 z-50 space-y-2" style="pointer-events: none;">
             <template x-for="toast in toasts" :key="toast.id">
-                <div x-transition class="px-4 py-3 rounded-xl shadow-lg border text-sm font-medium max-w-sm" style="pointer-events: auto;"
-                    :class="toast.type === 'success' ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-red-50 border-red-200 text-red-800'">
+                <div x-transition class="px-4 py-3 rounded-xl shadow-lg border-2 text-sm font-semibold max-w-sm" style="pointer-events: auto;"
+                    :class="toast.type === 'success' ? 'bg-emerald-50 border-emerald-300 text-emerald-800' :
+                            toast.type === 'warning' ? 'bg-amber-50 border-amber-300 text-amber-800' :
+                            'bg-red-50 border-red-200 text-red-800'">
                     <span x-text="toast.msg"></span>
                 </div>
             </template>

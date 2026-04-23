@@ -1093,7 +1093,7 @@ class RestaurantPosController extends Controller
         $peakData = RestaurantOrder::where('company_id', $companyId)
             ->where('status', 'completed')
             ->where('created_at', '>=', $today)
-            ->select(DB::raw('EXTRACT(HOUR FROM created_at) as hr'), DB::raw('SUM(total_amount) as total'))
+            ->select(DB::raw(\App\Helpers\DbCompat::extractHour('created_at') . ' as hr'), DB::raw('SUM(total_amount) as total'))
             ->groupBy('hr')
             ->orderByDesc('total')
             ->first();

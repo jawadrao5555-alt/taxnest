@@ -133,14 +133,14 @@ class SmartTaxEngine
 
     private static function getHistoricalUsage(string $hsCode, int $companyId): ?array
     {
+        $avgRateExpr = \App\Helpers\DbCompat::castFloat('tax_rate');
         $items = InvoiceItem::whereHas('invoice', function ($q) use ($companyId) {
             $q->where('company_id', $companyId);
         })
             ->where('hs_code', $hsCode)
             ->select(
                 DB::raw('COUNT(*) as count'),
-                DB::raw('AVG(CAST(tax_rate AS FLOAT)) as avg_rate'),
-                DB::raw('MODE() WITHIN GROUP (ORDER BY schedule_type) as most_used_schedule')
+                DB::raw("AVG({$avgRateExpr}) as avg_rate")
             )
             ->first();
 
@@ -148,23 +148,34 @@ class SmartTaxEngine
             return null;
         }
 
+        // Most-frequent schedule_type — separate query (cross-DB compatible).
+        $mostUsed = InvoiceItem::whereHas('invoice', function ($q) use ($companyId) {
+            $q->where('company_id', $companyId);
+        })
+            ->where('hs_code', $hsCode)
+            ->select('schedule_type', DB::raw('COUNT(*) as cnt'))
+            ->groupBy('schedule_type')
+            ->orderByDesc('cnt')
+            ->limit(1)
+            ->value('schedule_type');
+
         return [
             'count' => (int) $items->count,
             'avg_rate' => round((float) $items->avg_rate, 2),
-            'most_used_schedule' => $items->most_used_schedule ?? 'standard',
+            'most_used_schedule' => $mostUsed ?? 'standard',
         ];
     }
 
     private static function getHistoricalUsageByPrefix(string $hsPrefix, int $companyId): ?array
     {
+        $avgRateExpr = \App\Helpers\DbCompat::castFloat('tax_rate');
         $items = InvoiceItem::whereHas('invoice', function ($q) use ($companyId) {
             $q->where('company_id', $companyId);
         })
             ->where('hs_code', 'LIKE', $hsPrefix . '%')
             ->select(
                 DB::raw('COUNT(*) as count'),
-                DB::raw('AVG(CAST(tax_rate AS FLOAT)) as avg_rate'),
-                DB::raw('MODE() WITHIN GROUP (ORDER BY schedule_type) as most_used_schedule')
+                DB::raw("AVG({$avgRateExpr}) as avg_rate")
             )
             ->first();
 
@@ -172,10 +183,20 @@ class SmartTaxEngine
             return null;
         }
 
+        $mostUsed = InvoiceItem::whereHas('invoice', function ($q) use ($companyId) {
+            $q->where('company_id', $companyId);
+        })
+            ->where('hs_code', 'LIKE', $hsPrefix . '%')
+            ->select('schedule_type', DB::raw('COUNT(*) as cnt'))
+            ->groupBy('schedule_type')
+            ->orderByDesc('cnt')
+            ->limit(1)
+            ->value('schedule_type');
+
         return [
             'count' => (int) $items->count,
             'avg_rate' => round((float) $items->avg_rate, 2),
-            'most_used_schedule' => $items->most_used_schedule ?? 'standard',
+            'most_used_schedule' => $mostUsed ?? 'standard',
         ];
     }
 }

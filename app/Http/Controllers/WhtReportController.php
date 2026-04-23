@@ -11,36 +11,31 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class WhtReportController extends Controller
 {
+    // Local DB compat shims — delegate to central App\Helpers\DbCompat
+    // so MySQL/PostgreSQL portability stays in ONE place.
     private function isMySQL(): bool
     {
-        return config('database.default') === 'mysql';
+        return \App\Helpers\DbCompat::isMySQL();
     }
 
     private function dbDateFormat(string $column, string $format): string
     {
-        if ($this->isMySQL()) {
-            $mysqlFormats = [
-                'YYYY-MM' => '%Y-%m',
-                'YYYY' => '%Y',
-            ];
-            return "DATE_FORMAT({$column}, '{$mysqlFormats[$format]}')";
-        }
-        return "TO_CHAR({$column}::date, '{$format}')";
+        return \App\Helpers\DbCompat::dateFormat($column, $format);
     }
 
     private function dbExtractYear(string $column): string
     {
-        return $this->isMySQL() ? "YEAR({$column})" : "EXTRACT(YEAR FROM {$column}::date)";
+        return \App\Helpers\DbCompat::extractYear($column);
     }
 
     private function dbExtractMonth(string $column): string
     {
-        return $this->isMySQL() ? "MONTH({$column})" : "EXTRACT(MONTH FROM {$column}::date)";
+        return \App\Helpers\DbCompat::extractMonth($column);
     }
 
     private function dbLike(): string
     {
-        return $this->isMySQL() ? 'like' : 'ilike';
+        return \App\Helpers\DbCompat::like();
     }
 
     private function resolveDbStatus($status)

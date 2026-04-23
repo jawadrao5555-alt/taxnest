@@ -1,6 +1,96 @@
 <x-fbr-pos-layout>
 <style>
-/* ═══ Animations ═══ */
+/* ═══════════════════════════════════════════════
+   🌌 PREMIUM AMBIENT BACKGROUND
+   ═══════════════════════════════════════════════ */
+.fbr-pos-stage {
+    position: relative;
+    isolation: isolate;
+}
+.fbr-pos-stage::before {
+    content: '';
+    position: fixed;
+    inset: -10%;
+    z-index: -2;
+    background:
+        radial-gradient(ellipse 60% 40% at 12% 8%, rgba(59,130,246,0.10), transparent 60%),
+        radial-gradient(ellipse 50% 35% at 88% 12%, rgba(139,92,246,0.09), transparent 60%),
+        radial-gradient(ellipse 70% 45% at 50% 100%, rgba(16,185,129,0.07), transparent 60%);
+    pointer-events: none;
+    animation: ambientShift 18s ease-in-out infinite alternate;
+}
+.dark .fbr-pos-stage::before {
+    background:
+        radial-gradient(ellipse 60% 40% at 12% 8%, rgba(59,130,246,0.18), transparent 60%),
+        radial-gradient(ellipse 50% 35% at 88% 12%, rgba(139,92,246,0.16), transparent 60%),
+        radial-gradient(ellipse 70% 45% at 50% 100%, rgba(16,185,129,0.12), transparent 60%);
+}
+.fbr-pos-stage::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background-image:
+        linear-gradient(rgba(148,163,184,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148,163,184,0.06) 1px, transparent 1px);
+    background-size: 32px 32px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black, transparent 90%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black, transparent 90%);
+    pointer-events: none;
+}
+@keyframes ambientShift {
+    0%   { transform: translate(0,0) rotate(0deg); }
+    50%  { transform: translate(-2%, 1%) rotate(0.5deg); }
+    100% { transform: translate(2%, -1%) rotate(-0.5deg); }
+}
+
+/* ═══════════════════════════════════════════════
+   🎨 ANIMATED STICKY BANNER
+   ═══════════════════════════════════════════════ */
+.sticky-banner {
+    will-change: transform;
+    backface-visibility: hidden;
+    background-size: 200% 200% !important;
+    animation: bannerHueShift 14s ease-in-out infinite;
+    position: relative;
+    overflow: hidden;
+}
+.sticky-banner::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.08) 50%, transparent 70%);
+    background-size: 200% 100%;
+    animation: bannerSheen 6s ease-in-out infinite;
+    pointer-events: none;
+}
+@keyframes bannerHueShift {
+    0%,100% { background-position: 0% 50%; }
+    50%     { background-position: 100% 50%; }
+}
+@keyframes bannerSheen {
+    0%,100% { background-position: -100% 0; opacity: 0; }
+    40%     { opacity: 1; }
+    60%     { opacity: 1; }
+    100%    { background-position: 200% 0; opacity: 0; }
+}
+
+/* Grand total — shimmer text */
+.sticky-banner .text-emerald-300 {
+    background: linear-gradient(90deg, #6ee7b7, #34d399, #a7f3d0, #34d399, #6ee7b7);
+    background-size: 200% 100%;
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: totalShimmer 4s linear infinite;
+    text-shadow: 0 0 24px rgba(52,211,153,0.35);
+}
+@keyframes totalShimmer {
+    0%   { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+}
+
+/* ═══════════════════════════════════════════════
+   ✨ ANIMATIONS
+   ═══════════════════════════════════════════════ */
 @keyframes scanPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.5); } 50% { box-shadow: 0 0 0 8px rgba(59,130,246,0); } }
 .scan-pulse { animation: scanPulse 1.5s ease-in-out infinite; }
 @keyframes toastIn { from { transform: translateX(20px) scale(0.95); opacity: 0; } to { transform: translateX(0) scale(1); opacity: 1; } }
@@ -61,8 +151,91 @@ kbd {
 }
 .dark kbd { background: linear-gradient(180deg,#64748b,#475569); border-color: #64748b; }
 
-/* ═══ Add Product CTA polish ═══ */
-.add-cta-glow:hover { box-shadow: 0 8px 28px -10px rgba(59,130,246,0.45); }
+/* ═══════════════════════════════════════════════
+   🚀 ADD PRODUCT CTA — PREMIUM
+   ═══════════════════════════════════════════════ */
+.add-cta { background: rgba(255,255,255,0.4); backdrop-filter: blur(6px); }
+.dark .add-cta { background: rgba(15,23,42,0.4); }
+.add-cta:hover { box-shadow: 0 14px 40px -12px rgba(99,102,241,0.55); transform: translateY(-1px); }
+.add-cta-bg {
+    background: linear-gradient(120deg, #2563eb 0%, #6366f1 50%, #8b5cf6 100%);
+    background-size: 200% 200%;
+    animation: ctaGradient 4s ease-in-out infinite;
+}
+@keyframes ctaGradient {
+    0%,100% { background-position: 0% 50%; }
+    50%     { background-position: 100% 50%; }
+}
+.add-cta-shine::before {
+    content: ''; position: absolute; top: 0; left: -75%;
+    width: 50%; height: 100%;
+    background: linear-gradient(115deg, transparent, rgba(255,255,255,0.45), transparent);
+    transform: skewX(-20deg);
+    transition: left 0.6s cubic-bezier(0.16,1,0.3,1);
+}
+.add-cta:hover .add-cta-shine::before { left: 130%; }
+
+/* ═══════════════════════════════════════════════
+   🥃 GLASSMORPHISM PANELS
+   ═══════════════════════════════════════════════ */
+.fbr-pos-stage .bg-white,
+.fbr-pos-stage .dark\:bg-gray-900 {
+    /* leave inputs alone — only target large panels via item-card / specific containers */
+}
+.item-card:not(.is-active) {
+    background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0.65)) !important;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(226,232,240,0.9);
+}
+.dark .item-card:not(.is-active) {
+    background: linear-gradient(180deg, rgba(17,24,39,0.85), rgba(17,24,39,0.6)) !important;
+    border: 1px solid rgba(51,65,85,0.6);
+}
+.item-card.is-active {
+    background: linear-gradient(180deg, rgba(239,246,255,0.95), rgba(238,242,255,0.85)) !important;
+    backdrop-filter: blur(12px);
+}
+.dark .item-card.is-active {
+    background: linear-gradient(180deg, rgba(30,41,59,0.92), rgba(30,27,75,0.85)) !important;
+}
+
+/* ═══════════════════════════════════════════════
+   🎯 ITEM NUMBER BADGE — UPGRADED
+   ═══════════════════════════════════════════════ */
+.item-num-badge { position: relative; }
+.item-num-badge::after {
+    content: ''; position: absolute; inset: -3px;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #3b82f6, #6366f1, #8b5cf6);
+    z-index: -1; opacity: 0; filter: blur(8px);
+    transition: opacity 0.3s ease;
+}
+.item-card.is-active .item-num-badge::after { opacity: 0.7; animation: badgeRingPulse 2s ease-in-out infinite; }
+@keyframes badgeRingPulse {
+    0%,100% { opacity: 0.5; filter: blur(8px); }
+    50%     { opacity: 0.85; filter: blur(12px); }
+}
+
+/* ═══════════════════════════════════════════════
+   💎 LINE TOTAL — PREMIUM CHIP
+   ═══════════════════════════════════════════════ */
+.item-card .text-sm.font-semibold[x-text*="lineTotal"] {
+    /* Tailwind classes can't be matched in CSS — handled via .line-total-chip if added */
+}
+.line-total-chip {
+    display: inline-flex; align-items: center;
+    padding: 4px 12px; border-radius: 8px;
+    background: linear-gradient(135deg, rgba(16,185,129,0.12), rgba(59,130,246,0.12));
+    border: 1px solid rgba(16,185,129,0.25);
+    font-weight: 800; color: #047857;
+    font-variant-numeric: tabular-nums;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+.dark .line-total-chip {
+    background: linear-gradient(135deg, rgba(16,185,129,0.18), rgba(59,130,246,0.18));
+    border-color: rgba(52,211,153,0.4); color: #6ee7b7;
+}
+.item-card.is-active .line-total-chip { transform: scale(1.06); background: linear-gradient(135deg, rgba(16,185,129,0.22), rgba(99,102,241,0.22)); }
 
 /* ═══ Sticky bottom bar — mobile ═══ */
 @supports (backdrop-filter: blur(12px)) {
@@ -84,7 +257,7 @@ kbd {
     .item-card.is-active { animation: none; }
 }
 </style>
-<div class="max-w-7xl mx-auto pb-32 px-3 sm:px-4" x-data="fbrPosInvoice()" @click="userActivity()"
+<div class="fbr-pos-stage max-w-7xl mx-auto pb-32 px-3 sm:px-4" x-data="fbrPosInvoice()" @click="userActivity()"
      x-init="window.addEventListener('online', () => isOnline = true); window.addEventListener('offline', () => isOnline = false);">
     {{-- 🌐 Offline Banner — visible only when no internet --}}
     <div x-show="!isOnline" x-cloak
@@ -473,17 +646,19 @@ kbd {
                                             placeholder="0.00">
                                     </label>
                                 </div>
-                                <span class="text-sm font-semibold text-gray-900 dark:text-white" x-text="'PKR ' + formatNum(lineTotal(item))"></span>
+                                <span class="line-total-chip text-sm" x-text="'PKR ' + formatNum(lineTotal(item))"></span>
                             </div>
                         </div>
                     </template>
 
                     {{-- ============ Premium "Add Next Item" CTA ============ --}}
                     <button type="button" @click="addItem()"
-                        class="group w-full mt-2 py-4 rounded-xl border-2 border-dashed border-blue-300 dark:border-blue-700 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all flex items-center justify-center gap-3">
-                        <span class="w-9 h-9 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center text-xl font-black shadow-lg group-hover:scale-110 transition">+</span>
-                        <span class="text-blue-700 dark:text-blue-300 font-bold text-base">Add Another Product</span>
-                        <span class="hidden sm:inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 ml-2">
+                        class="add-cta group relative w-full mt-2 py-4 rounded-2xl border-2 border-dashed border-blue-300 dark:border-blue-700 hover:border-transparent transition-all flex items-center justify-center gap-3 overflow-hidden">
+                        <span class="add-cta-bg absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                        <span class="add-cta-shine absolute inset-0 pointer-events-none"></span>
+                        <span class="relative z-10 w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 text-white flex items-center justify-center text-xl font-black shadow-lg group-hover:scale-110 group-hover:rotate-90 transition-all duration-300" style="box-shadow: 0 8px 20px -6px rgba(99,102,241,0.55);">+</span>
+                        <span class="relative z-10 text-blue-700 dark:text-blue-300 group-hover:text-white font-bold text-base tracking-wide transition-colors">Add Another Product</span>
+                        <span class="relative z-10 hidden sm:inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 group-hover:text-white/80 ml-2 transition-colors">
                             press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> or <kbd>F6</kbd>
                         </span>
                     </button>

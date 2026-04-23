@@ -408,13 +408,13 @@
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Qty</label>
-                                <input type="text" inputmode="decimal" pattern="[0-9]*\.?[0-9]*" autocomplete="off" maxlength="10"
+                                <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6"
                                     :data-qty-row="index"
-                                    x-init="$el.value = item.quantity; $watch('item.quantity', v => { if(document.activeElement !== $el) $el.value = (v === '' || v === null) ? '' : v; })"
-                                    @input.stop="$event.target.value = $event.target.value.replace(/[^0-9.]/g,'')"
+                                    x-init="$el.value = item.quantity; $watch('item.quantity', v => { if(document.activeElement !== $el) $el.value = (v === '' || v === null) ? '' : parseInt(v) || ''; })"
+                                    @input.stop="$event.target.value = $event.target.value.replace(/[^0-9]/g,'')"
                                     @focus.stop="$event.target.dataset.prev = item.quantity; $event.target.value = ''"
                                     @click.stop="$event.target.dataset.prev = item.quantity; $event.target.value = ''"
-                                    @blur="(() => { const raw = $event.target.value.replace(/[^0-9.]/g,''); const prev = parseFloat($event.target.dataset.prev) || 1; let n = raw === '' || raw === '.' ? prev : (parseFloat(raw) || prev); if(!isFinite(n) || n < 0.001) n = prev || 1; item.quantity = n; $event.target.value = n; recalculate(); })()"
+                                    @blur="(() => { const raw = $event.target.value.replace(/[^0-9]/g,''); const prev = parseInt($event.target.dataset.prev) || 1; let n = raw === '' ? prev : (parseInt(raw,10) || prev); if(!isFinite(n) || n < 1) n = prev || 1; item.quantity = n; $event.target.value = n; recalculate(); })()"
                                     @keydown.stop
                                     @keypress.stop
                                     @keyup.stop
@@ -946,7 +946,7 @@
                                 type: it.type || 'product',
                                 item_id: it.item_id || '',
                                 name: it.name || '',
-                                quantity: parseFloat(it.quantity) || 1,
+                                quantity: Math.max(1, parseInt(it.quantity, 10) || 1),
                                 unit_price: parseFloat(it.unit_price) || 0,
                                 is_tax_exempt: !!it.is_tax_exempt,
                                 _isNew: false,
@@ -1015,7 +1015,7 @@
                                 type: item.item_type || 'product',
                                 item_id: item.item_id || '',
                                 name: item.item_name || '',
-                                quantity: parseFloat(item.quantity) || 1,
+                                quantity: Math.max(1, parseInt(item.quantity, 10) || 1),
                                 unit_price: parseFloat(item.unit_price) || 0,
                                 is_tax_exempt: isExempt,
                                 _isNew: false
@@ -1215,7 +1215,7 @@
                     let taxableSub = 0;
                     let exemptSub = 0;
                     this.items.forEach(item => {
-                        let lineTotal = (parseFloat(item.quantity) || 0) * (parseFloat(item.unit_price) || 0);
+                        let lineTotal = (parseInt(item.quantity, 10) || 0) * (parseFloat(item.unit_price) || 0);
                         this.subtotal += lineTotal;
                         if (item.is_tax_exempt) {
                             exemptSub += lineTotal;

@@ -415,7 +415,7 @@ class PosController extends Controller
         $request->validate([
             'items' => 'required|array|min:1',
             'items.*.name' => 'required|string',
-            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.quantity' => 'required|integer|min:1',
             'items.*.unit_price' => 'required|numeric|min:0',
             'payment_method' => 'required|in:cash,debit_card,credit_card,qr_payment',
             'discount_type' => 'required|in:percentage,amount',
@@ -642,7 +642,7 @@ class PosController extends Controller
         $request->validate([
             'items' => 'required|array|min:1',
             'items.*.name' => 'required|string',
-            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.quantity' => 'required|integer|min:1',
             'items.*.unit_price' => 'required|numeric|min:0',
             'payment_method' => 'required|in:cash,debit_card,credit_card,qr_payment',
             'discount_type' => 'required|in:percentage,amount',

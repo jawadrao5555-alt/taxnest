@@ -22,7 +22,7 @@ class CompanyIsolation
                 if ($user->company_id) {
                     app()->instance('currentCompanyId', $user->company_id);
                     $branchId = app(\App\Services\BranchContextService::class)->getActiveBranchId();
-                    app()->instance('currentBranchId', $branchId);
+                    app()->bind('currentBranchId', fn() => $branchId);
                     view()->share('currentBranchId', $branchId);
                     view()->share('currentBranch', $branchId ? \App\Models\Branch::find($branchId) : null);
                 }

@@ -22,7 +22,8 @@ class SetBranchContext
     {
         $svc = app(BranchContextService::class);
         $branchId = $svc->getActiveBranchId();
-        app()->instance('currentBranchId', $branchId);
+        // bind() not instance() — instance(name, null) is treated as "not bound".
+        app()->bind('currentBranchId', fn() => $branchId);
         // Also expose to all views
         view()->share('currentBranchId', $branchId);
         view()->share('currentBranch', $branchId ? \App\Models\Branch::find($branchId) : null);

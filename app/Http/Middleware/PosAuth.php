@@ -42,9 +42,10 @@ class PosAuth
 
         app()->instance('currentCompanyId', $user->company_id);
 
-        // Resolve & bind active branch (returns null if no branches exist yet)
+        // Resolve & bind active branch (returns null if no branches exist yet).
+        // NOTE: use bind() not instance() — instance(name, null) is treated as "not bound" by Laravel.
         $branchId = app(\App\Services\BranchContextService::class)->getActiveBranchId();
-        app()->instance('currentBranchId', $branchId);
+        app()->bind('currentBranchId', fn() => $branchId);
         view()->share('currentBranchId', $branchId);
         view()->share('currentBranch', $branchId ? \App\Models\Branch::find($branchId) : null);
 

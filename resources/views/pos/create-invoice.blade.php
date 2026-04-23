@@ -2,6 +2,70 @@
     <style>
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
         @keyframes priceGlow{0%{box-shadow:0 0 0 2px rgba(168,85,247,0.3)}50%{box-shadow:0 0 0 4px rgba(168,85,247,0.15)}100%{box-shadow:0 0 0 2px rgba(168,85,247,0.3)}}
+
+        /* ═══ Cart row — active indicator (emerald theme) ═══ */
+        .pos-cart-row { position: relative; transition: box-shadow 0.22s ease, transform 0.22s ease, border-color 0.22s ease, background 0.22s ease; border: 1px solid transparent; }
+        .pos-cart-row:hover:not(.is-active) { border-color: rgb(167 243 208); background: rgba(236,253,245,0.5); }
+        .dark .pos-cart-row:hover:not(.is-active) { border-color: rgb(6 95 70 / 0.5); background: rgba(6,78,59,0.18); }
+        .pos-cart-row.is-active {
+            background: linear-gradient(180deg, rgba(236,253,245,0.95), rgba(209,250,229,0.6)) !important;
+            border-color: transparent !important;
+            box-shadow: 0 0 0 2px rgba(16,185,129,0.55), 0 12px 28px -10px rgba(16,185,129,0.45);
+            transform: translateY(-1px);
+            animation: posActiveGlow 2.4s ease-in-out infinite;
+        }
+        .dark .pos-cart-row.is-active {
+            background: linear-gradient(180deg, rgba(6,78,59,0.55), rgba(20,83,45,0.45)) !important;
+        }
+        .pos-cart-row.is-active::before {
+            content: ''; position: absolute; left: -1px; top: 6px; bottom: 6px;
+            width: 4px; border-radius: 4px;
+            background: linear-gradient(180deg, #10b981, #059669, #047857);
+            box-shadow: 0 0 12px rgba(16,185,129,0.6);
+        }
+        @keyframes posActiveGlow {
+            0%,100% { box-shadow: 0 0 0 2px rgba(16,185,129,0.55), 0 12px 28px -10px rgba(16,185,129,0.45); }
+            50%     { box-shadow: 0 0 0 2px rgba(5,150,105,0.7), 0 14px 32px -10px rgba(5,150,105,0.55); }
+        }
+
+        /* ═══ Row number badge ═══ */
+        .pos-row-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 28px; height: 28px; border-radius: 9999px;
+            font-size: 11px; font-weight: 900;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            box-shadow: 0 4px 12px -2px rgba(16,185,129,0.5), inset 0 1px 0 rgba(255,255,255,0.25);
+            font-variant-numeric: tabular-nums;
+            position: relative;
+            transition: transform 0.2s ease;
+        }
+        .pos-cart-row.is-active .pos-row-badge { transform: scale(1.1); background: linear-gradient(135deg, #10b981, #059669, #047857); }
+        .pos-cart-row.is-active .pos-row-badge::after {
+            content: ''; position: absolute; inset: -3px; border-radius: 9999px;
+            background: linear-gradient(135deg,#10b981,#059669);
+            z-index: -1; filter: blur(8px); opacity: 0.7;
+            animation: posBadgeRing 2s ease-in-out infinite;
+        }
+        @keyframes posBadgeRing {
+            0%,100% { opacity: 0.5; filter: blur(8px); }
+            50%     { opacity: 0.9; filter: blur(12px); }
+        }
+
+        /* ═══ Premium focus ring (emerald) ═══ */
+        .pos-cart-row input:focus-visible, .pos-cart-row select:focus-visible {
+            outline: none !important;
+            box-shadow: 0 0 0 3px rgba(16,185,129,0.22), 0 1px 2px rgba(0,0,0,0.04) !important;
+            border-color: rgb(16 185 129) !important;
+        }
+
+        /* ═══ kbd chips ═══ */
+        .pos-kbd { background: linear-gradient(180deg,#334155,#1e293b); color:#fff; padding:2px 7px; border-radius:5px; font-size:10px; font-family:ui-monospace,Menlo,monospace; font-weight:700; box-shadow: 0 1px 0 rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08); border: 1px solid #475569; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .pos-cart-row.is-active { animation: none; }
+            .pos-cart-row.is-active .pos-row-badge::after { animation: none; }
+        }
     </style>
     <div class="pb-36" x-data="posInvoice()"
          @keydown.window="handleGlobalKey($event)">
@@ -294,8 +358,21 @@
                     </div>
 
                     <template x-for="(item, index) in items" :key="index">
-                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 mb-3 p-3 sm:py-2 sm:px-2 rounded-lg border transition-all"
-                            :style="item._isNew && (ddSearch[index] || '').length > 0 ? 'border-left: 3px solid #a855f7; background: rgba(168,85,247,0.04);' : 'border-color: transparent;'">
+                        <div class="pos-cart-row relative grid grid-cols-1 sm:grid-cols-12 gap-2 mb-3 p-3 sm:py-3 sm:pl-12 sm:pr-3 rounded-xl"
+                            :class="activeItemIndex === index ? 'is-active' : ''"
+                            :data-row-index="index"
+                            @focusin="activeItemIndex = index"
+                            @click="activeItemIndex = index">
+                            {{-- Desktop row number badge (absolute, doesn't break grid) --}}
+                            <span class="pos-row-badge hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2" x-text="index + 1"></span>
+                            {{-- Mobile header — badge + name + remove --}}
+                            <div class="sm:hidden flex items-center justify-between -mt-1 mb-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="pos-row-badge" x-text="index + 1"></span>
+                                    <span class="text-xs font-semibold text-gray-700 dark:text-gray-300" x-text="item.name || 'New Item'"></span>
+                                </div>
+                                <button type="button" @click.stop="removeItem(index)" x-show="items.length > 1" class="text-red-500 hover:text-red-700 text-xs font-bold">✕</button>
+                            </div>
                             <div class="sm:col-span-2">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Type</label>
                                 <select x-model="item.type" @change="onTypeChange(index)" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition">
@@ -643,6 +720,8 @@
                     { type: 'product', item_id: '', name: '', quantity: 1, unit_price: 0, _isNew: false, is_tax_exempt: false }
                 ],
 
+                activeItemIndex: 0,
+
                 ddOpen: {},
                 ddSearch: {},
                 ddHlIdx: {},
@@ -688,13 +767,31 @@
                 },
 
                 ddKeyEnter(idx) {
-                    if (this.ddOpen[idx] && (this.ddHlIdx[idx] || 0) >= 0) {
+                    // 🚀 Smart Enter: pick highlighted dropdown item, OR accept typed text as new, OR just close + jump to qty
+                    const hl = this.ddHlIdx[idx];
+                    if (this.ddOpen[idx] && hl !== undefined && hl >= 0) {
                         let f = this.ddGetFiltered(idx);
-                        if (f[this.ddHlIdx[idx]]) { this.ddSelect(idx, f[this.ddHlIdx[idx]]); return; }
+                        if (f[hl]) { this.ddSelect(idx, f[hl]); this.focusQtyRow(idx); return; }
                     }
-                    if (this.items[idx]._isNew && (this.ddSearch[idx] || '').length > 0) {
-                        this.ddConfirmNew(idx);
+                    const typed = (this.ddSearch[idx] || '').trim();
+                    if (typed.length > 0) {
+                        this.items[idx]._isNew = true;
+                        this.items[idx].name = typed;
+                        this.items[idx].item_id = '';
+                        this.ddOpen[idx] = false;
+                        this.ddHlIdx[idx] = -1;
+                        this.focusQtyRow(idx);
+                        return;
                     }
+                    this.ddOpen[idx] = false;
+                    this.focusQtyRow(idx);
+                },
+
+                focusQtyRow(idx) {
+                    this.$nextTick(() => {
+                        const el = document.querySelector('[data-qty-row="' + idx + '"]');
+                        if (el) { el.focus(); }
+                    });
                 },
 
                 ddIsNewProduct(idx) {

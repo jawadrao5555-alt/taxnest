@@ -181,7 +181,15 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
     </div>
     @endif
 
-    <form method="POST" action="{{ route('fbrpos.store') }}">
+    <form method="POST" action="{{ route('fbrpos.store') }}" x-ref="saleForm"
+          @keydown.enter="
+              /* Block stray Enter from submitting the bill — Enter is for adding products only.
+                 Use F9 (or the Complete button) to finalize. Per-input handlers (barcode,
+                 search, item rows) still run because they fire first during bubble. */
+              if ($event.target.tagName !== 'TEXTAREA' && $event.target.type !== 'submit' && $event.target.type !== 'button') {
+                  $event.preventDefault();
+              }
+          ">
         @csrf
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 items-start">
@@ -210,7 +218,7 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
                                         "
                                         @keydown.arrow-down.prevent="if(searchResults.length){ hi = (hi + 1) % searchResults.length; }"
                                         @keydown.arrow-up.prevent="if(searchResults.length){ hi = (hi - 1 + searchResults.length) % searchResults.length; }"
-                                        @keydown.enter.prevent="if(searchResults.length){ addProductItem(searchResults[hi]); searchOpen = false; searchQuery = ''; searchResults = []; hi = 0; }"
+                                        @keydown.enter.prevent="if(searchResults.length){ addProductItem(searchResults[hi]); searchOpen = false; searchQuery = ''; searchResults = []; hi = 0; $nextTick(() => $refs.barcodeInput && $refs.barcodeInput.focus()); }"
                                         @keydown.escape.prevent="searchOpen = false; searchQuery = ''; searchResults = []; hi = 0;"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 mb-2"
                                         placeholder="Type, then ↓ ↑ Enter to add">
@@ -329,7 +337,7 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
                                     <input type="number" :name="'items['+index+'][tax_rate]'" x-model.number="item.tax_rate" min="0" max="100" step="0.01"
                                         :disabled="item.is_tax_exempt"
                                         @keydown.tab="if(!$event.shiftKey && index === items.length - 1 && item.item_name && parseFloat(item.unit_price) > 0){ $event.preventDefault(); addItem(); }"
-                                        @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); }"
+                                        @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); $nextTick(() => $refs.barcodeInput && $refs.barcodeInput.focus()); }"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 px-1"
                                         placeholder="18">
                                 </div>
@@ -366,10 +374,9 @@ kbd { background:#1e293b; color:#fff; padding:1px 6px; border-radius:4px; font-s
                     {{-- Keyboard hints strip --}}
                     <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-gray-500 dark:text-gray-400 px-1">
                         <span><kbd>Ctrl</kbd>+<kbd>K</kbd> Search → <kbd>↓</kbd><kbd>↑</kbd><kbd>Enter</kbd> add</span>
-                        <span><kbd>Ctrl</kbd>+<kbd>Enter</kbd> New Row</span>
-                        <span><kbd>Enter</kbd> on Tax = next product</span>
+                        <span class="px-2 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-bold"><kbd>Enter</kbd> = Add Product / Next Row</span>
                         <span><kbd>Ctrl</kbd>+<kbd>D</kbd> Duplicate · <kbd>Ctrl</kbd>+<kbd>Del</kbd> Remove</span>
-                        <span class="text-emerald-700 dark:text-emerald-400 font-bold"><kbd>F9</kbd> or <kbd>Ctrl</kbd>+<kbd>B</kbd> = COMPLETE SALE</span>
+                        <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 font-bold"><kbd>F9</kbd> or <kbd>Ctrl</kbd>+<kbd>B</kbd> = COMPLETE SALE</span>
                         <span><kbd>F2</kbd> Cash · <kbd>F3</kbd> Numpad · <kbd>F4</kbd> Hold · <kbd>F5</kbd> Recall</span>
                     </div>
                 </div>

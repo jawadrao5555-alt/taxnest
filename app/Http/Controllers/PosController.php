@@ -501,7 +501,7 @@ class PosController extends Controller
 
                 $transaction = PosTransaction::create([
                     'company_id' => $companyId,
-                    'branch_id' => app('currentBranchId'),
+                    'branch_id' => app()->bound('currentBranchId') ? app('currentBranchId') : null,
                     'terminal_id' => $request->terminal_id,
                     'invoice_number' => $invoiceNumber,
                     'invoice_mode' => $invoiceMode,

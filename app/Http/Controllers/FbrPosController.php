@@ -259,7 +259,7 @@ class FbrPosController extends Controller
 
                 $transaction = FbrPosTransaction::create([
                     'company_id' => $companyId,
-                    'branch_id' => app('currentBranchId'),
+                    'branch_id' => app()->bound('currentBranchId') ? app('currentBranchId') : null,
                     'terminal_id' => $request->terminal_id,
                     'shift_id' => $shift?->id,
                     'invoice_number' => $invoiceNumber,

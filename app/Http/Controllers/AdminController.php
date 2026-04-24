@@ -875,4 +875,76 @@ class AdminController extends Controller
         if ($score >= 40) return rand(45, 65);
         return rand(70, 90);
     }
+
+    public function failedFbrInvoices(\Illuminate\Http\Request $request)
+    {
+        $flagEnabled = (bool) config('features.enable_fbr_retry_system', false);
+
+        $invoices = Invoice::with('company')
+            ->where('fbr_status', 'failed')
+            ->whereNull('fbr_invoice_number')
+            ->where('status', '!=', 'locked')
+            ->orderByDesc('updated_at')
+            ->paginate(25);
+
+        $invoiceIds = $invoices->pluck('id')->toArray();
+        $errorByInvoice = [];
+        if (!empty($invoiceIds)) {
+            $latestLogs = FbrLog::whereIn('invoice_id', $invoiceIds)
+                ->where('status', 'failed')
+                ->orderByDesc('created_at')
+                ->get()
+                ->groupBy('invoice_id');
+            foreach ($latestLogs as $invId => $logs) {
+                $first = $logs->first();
+                $resp = json_decode($first->response_payload ?? '{}', true);
+                if (is_array($resp)) {
+                    if (!empty($resp['errors']) && is_array($resp['errors'])) {
+                        $errorByInvoice[$invId] = is_array($resp['errors'][0])
+                            ? ($resp['errors'][0]['message'] ?? json_encode($resp['errors'][0]))
+                            : (string) $resp['errors'][0];
+                    } elseif (!empty($resp['schema_errors'])) {
+                        $errorByInvoice[$invId] = is_array($resp['schema_errors']) ? implode('; ', $resp['schema_errors']) : (string) $resp['schema_errors'];
+                    } elseif (!empty($resp['validationResponse']['error'])) {
+                        $errorByInvoice[$invId] = (string) $resp['validationResponse']['error'];
+                    } else {
+                        $errorByInvoice[$invId] = $first->failure_type ?? '—';
+                    }
+                } else {
+                    $errorByInvoice[$invId] = $first->failure_type ?? '—';
+                }
+            }
+        }
+
+        $stats = [
+            'total' => Invoice::where('fbr_status', 'failed')->whereNull('fbr_invoice_number')->where('status', '!=', 'locked')->count(),
+            'retryable' => Invoice::where('fbr_status', 'failed')->whereNull('fbr_invoice_number')->where('status', '!=', 'locked')
+                ->where(function ($q) { $q->whereNull('retry_count')->orWhere('retry_count', '<', 3); })->count(),
+            'exhausted' => Invoice::where('fbr_status', 'failed')->whereNull('fbr_invoice_number')->where('status', '!=', 'locked')
+                ->where('retry_count', '>=', 3)->count(),
+            'never_retried' => Invoice::where('fbr_status', 'failed')->whereNull('fbr_invoice_number')->where('status', '!=', 'locked')
+                ->where(function ($q) { $q->whereNull('retry_count')->orWhere('retry_count', 0); })->count(),
+        ];
+
+        return view('admin.failed-fbr-invoices', compact('invoices', 'errorByInvoice', 'stats', 'flagEnabled'));
+    }
+
+    public function retryFbrInvoice(Invoice $invoice)
+    {
+        if (!config('features.enable_fbr_retry_system', false)) {
+            return redirect()->back()->with('error', 'FBR retry system is disabled. Enable FEATURE_FBR_RETRY_SYSTEM env flag first.');
+        }
+
+        if ($invoice->fbr_invoice_number || $invoice->status === 'locked') {
+            return redirect()->back()->with('error', "Invoice #{$invoice->id} is already locked with FBR Invoice Number {$invoice->fbr_invoice_number}.");
+        }
+
+        if (($invoice->retry_count ?? 0) >= \App\Jobs\RetryFailedFbrInvoicesJob::MAX_RETRIES) {
+            return redirect()->back()->with('error', "Invoice #{$invoice->id} has exhausted retries ({$invoice->retry_count}/3). Manual fix required.");
+        }
+
+        \App\Jobs\RetryFailedFbrInvoicesJob::dispatch($invoice->id);
+
+        return redirect()->back()->with('success', "Invoice #{$invoice->id} retry queued (attempt " . (($invoice->retry_count ?? 0) + 1) . "/3).");
+    }
 }

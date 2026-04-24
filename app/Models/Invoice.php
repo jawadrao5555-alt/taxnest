@@ -42,6 +42,8 @@ class Invoice extends Model
         'fbr_submission_hash',
         'is_fbr_processing',
         'wht_locked',
+        'retry_count',
+        'last_retry_at',
     ];
 
     protected $casts = [

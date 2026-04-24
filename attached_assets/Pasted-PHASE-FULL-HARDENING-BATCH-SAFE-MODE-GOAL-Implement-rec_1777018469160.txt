@@ -1,0 +1,131 @@
+PHASE — FULL HARDENING BATCH (SAFE MODE)
+
+GOAL:
+Implement recovery + mapping + reduced-rate support in ONE pass
+WITHOUT breaking existing production flows
+
+CRITICAL RULES:
+- NO destructive migrations
+- NO change to existing working FBR/PRA/POS logic
+- All new features behind feature flags (default OFF)
+
+=====================================
+STEP 0 — FEATURE FLAGS (MANDATORY)
+=====================================
+
+Add to company settings / config:
+
+- enable_fbr_retry_system (default: false)
+- enable_hs_mapping_manager (default: false)
+- enable_reduced_rate_mapping (default: false)
+
+All new logic must check flags BEFORE execution.
+
+=====================================
+STEP 1 — FAILED INVOICE RECOVERY
+=====================================
+
+Backend:
+
+- Add nullable columns (SAFE):
+  - retry_count (int, default 0)
+  - last_retry_at (timestamp nullable)
+
+- Create Job:
+  RetryFailedFbrInvoicesJob
+    - fetch invoices where fbr_status = 'failed'
+    - retry max 3 times
+    - delay = 5 minutes
+    - skip if retry_count >= 3
+
+- Add endpoint:
+  POST /admin/fbr/retry/{invoice}
+
+Frontend (simple table, no heavy UI yet):
+
+- List failed invoices
+- Show:
+  - invoice_id
+  - error message
+  - retry_count
+- Button: Retry
+
+=====================================
+STEP 2 — HS CODE MAPPING MANAGER
+=====================================
+
+Backend:
+
+- Use existing hs_code_mappings (GLOBAL)
+
+- Add endpoints:
+  GET /admin/hs-mappings
+  POST /admin/hs-mappings
+  PUT /admin/hs-mappings/{id}
+
+Frontend:
+
+- Simple CRUD table:
+  - HS code
+  - sale_type
+  - SRO
+  - serial
+
+Validation:
+
+- If invoice item HS not found in mapping:
+  → log warning (DO NOT BLOCK)
+
+=====================================
+STEP 3 — REDUCED RATE SUPPORT
+=====================================
+
+Backend:
+
+- Extend hs_code_mappings:
+  - support sale_type = 'reduced'
+
+- In FbrService:
+  - IF reduced AND mapping exists → use DB mapping
+  - ELSE fallback = "8th Schedule"
+
+NO removal of fallback yet (safety)
+
+=====================================
+STEP 4 — SAFETY LOCKS
+=====================================
+
+Ensure:
+
+- Existing submitInvoice() untouched
+- Existing payload builder untouched (only additive logic)
+- No change to:
+  - pos_transactions
+  - invoices
+  - PRA services
+  - agent endpoints
+
+=====================================
+STEP 5 — TEST MODE
+=====================================
+
+Before enabling flags:
+
+- Run:
+  - 1 failed invoice retry
+  - 1 exempt invoice
+  - 1 reduced rate invoice
+
+=====================================
+STEP 6 — OUTPUT REQUIRED
+=====================================
+
+Return:
+
+1. Files changed
+2. Migrations added (if any)
+3. New endpoints
+4. Confirmation:
+   - existing flow untouched
+   - no data mutation outside intended scope
+   - feature flags working

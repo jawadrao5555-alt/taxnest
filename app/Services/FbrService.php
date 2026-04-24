@@ -203,6 +203,16 @@ class FbrService
                     $dbSroMapping = $preloadedMappings[$lookupKey] ?? null;
                 }
 
+                if (!$dbSroMapping && $saleTypeForLookup && $hsCode && config('features.enable_hs_mapping_manager', false)) {
+                    \Illuminate\Support\Facades\Log::warning("HS mapping missing", [
+                        'invoice_id' => $invoice->id,
+                        'hs_code' => $hsCode,
+                        'sale_type' => $saleTypeForLookup,
+                        'company_id' => $invoice->company_id ?? null,
+                        'fallback' => 'static_chapter_map',
+                    ]);
+                }
+
                 if ($dbSroMapping && $dbSroMapping->sro_number) {
                     $sroValue = $dbSroMapping->sro_number;
                     $serialNo = $dbSroMapping->serial_number_value ?? $serialNo;

@@ -1,0 +1,18 @@
+-- ==========================================================================
+-- TaxNest Production Sync — 2026-04-24
+-- Order of execution (run in this exact order):
+-- 0)  00-PREFLIGHT.sql         — verify state (READ-ONLY, just SELECTs)
+-- 1)  99-SCHEMA-FIXES.sql      — ONLY if preflight shows missing columns
+-- 2)  01a-punjab-plus-company.sql
+-- 3)  01b-punjab-plus-user.sql
+-- 4)  01c-punjab-plus-branch.sql
+-- 5)  01d-punjab-plus-subscription.sql
+-- 6)  03-zia-invoices.sql      — 79 rows
+-- 7)  04-zia-invoice-items.sql — 81 rows
+--
+-- After all complete, run 999-VERIFY.sql to confirm.
+-- ==========================================================================
+
+-- This is just a NOTES file. Run each individual .sql file separately
+-- via phpMyAdmin "SQL" tab or shell:
+--   mysql -u USER -p DBNAME < 01a-punjab-plus-company.sql

@@ -1,7 +1,7 @@
 # TaxNest - Heavy Enterprise Product
 
 ## Overview
-TaxNest is a multi-company SaaS platform for comprehensive tax and invoice management in Pakistan, ensuring strict compliance with FBR regulations. It provides smart invoicing, configurable governance, an enterprise API, PDF generation, and a demo mode. The "Heavy Enterprise" version extends capabilities with a Company Approval System, Customer Ledger, Multi-Branch support, FBR Token Health Monitor, Advanced Admin View, Immutable Audit Logs, Enterprise Analytics, and enhanced security. The project aims to capture a high-volume market with competitive pricing, focusing on robust compliance, scalability, and an intuitive user experience for businesses in Pakistan.
+TaxNest is a multi-company SaaS platform designed for comprehensive tax and invoice management in Pakistan, ensuring strict compliance with FBR regulations. It provides smart invoicing, configurable governance, an enterprise API, PDF generation, and a demo mode. The "Heavy Enterprise" version expands capabilities to include a Company Approval System, Customer Ledger, Multi-Branch support, FBR Token Health Monitor, Advanced Admin View, Immutable Audit Logs, Enterprise Analytics, and enhanced security. The project aims to capture a high-volume market with competitive pricing, focusing on robust compliance, scalability, and an intuitive user experience for Pakistani businesses.
 
 ## User Preferences
 - ZIA CORPORATION is a REAL production account (not demo/internal) - NTN: 3620291786117, Owner: ZIA UR REHMAN (Digital Invoice ONLY, NO POS data)
@@ -20,16 +20,16 @@ TaxNest is a multi-company SaaS platform for comprehensive tax and invoice manag
 - CNIC/NTN login maps to company_admin user of matching company
 
 ## System Architecture
-TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication. The frontend employs Tailwind CSS, Alpine.js, and Chart.js, with PostgreSQL as the chosen database.
+TaxNest is built on Laravel 12 with PHP 8.4, using Breeze for authentication. The frontend uses Tailwind CSS, Alpine.js, and Chart.js.
 
 **Core Architectural Patterns and Decisions:**
-- **Multi-tenancy:** Implemented using `company_id` and a `CompanyIsolation` middleware.
+- **Multi-tenancy:** Implemented with `company_id` and `CompanyIsolation` middleware.
 - **Role-Based Access Control (RBAC):** Permissions are managed via `RoleMiddleware`.
 - **Dual Invoice Numbering:** Supports separate internal and FBR/PRA invoice numbers.
-- **Dynamic Validation Engine:** `ScheduleEngine` handles FBR compliance rules.
+- **Dynamic Validation Engine:** `ScheduleEngine` for FBR compliance rules.
 - **Immutable Audit Logging:** Critical events are logged with SHA256 hashes.
-- **Queue-based Processing:** Background tasks are managed using a database queue.
-- **Company Approval Workflow:** Governs company lifecycle and status.
+- **Queue-based Processing:** Background tasks use a database queue.
+- **Company Approval Workflow:** Manages company lifecycle and status.
 - **Customer Ledger System:** Automates debit entries and allows manual adjustments.
 - **Multi-Branch System:** Supports multiple operational branches per company.
 - **FBR Token Health Monitoring:** Tracks FBR token status and connectivity.
@@ -58,8 +58,8 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **Dashboard Home Screen:** Redesigned dashboards with quick-access tiles and performance metrics.
 - **POS Theme System:** 6 pre-built themes selectable by users, affecting UI colors and gradients.
 - **Dashboard Style System:** 6 selectable dashboard layouts inspired by major POS platforms, configurable per company.
-- **HS Code Mapping Engine (DB-First):** `hs_code_mappings` table provides admin-managed FBR-confirmed HS→SRO/Serial mappings. Both `SroSuggestionService` and `FbrService` do DB-first lookup with hardcoded fallback. Admin CRUD at `/admin/hs-mapping-engine`.
-- **Enterprise Completed Invoices:** Summary stats bar (total amount/tax/production/pending/this month/buyers), keyboard navigation (J/K/Enter/D/arrows/Esc), advanced filters (FBR status, doc type, tax period, date range), column sorting, per-page selector (15/25/50/100), jump-to-page pagination.
+- **HS Code Mapping Engine (DB-First):** `hs_code_mappings` table provides admin-managed FBR-confirmed HS→SRO/Serial mappings.
+- **Enterprise Completed Invoices:** Summary stats bar, keyboard navigation, advanced filters, column sorting, per-page selector, jump-to-page pagination.
 
 **FBR POS Module:**
 - **Isolated FBR-integrated POS:** Accessible at `/fbr-pos` with direct FBR API submission.
@@ -74,7 +74,6 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **Server endpoints** (Bearer auth via `agent_api_key`): `POST /api/agent/heartbeat`, `GET /api/agent/pending-invoices`, `POST /api/agent/submit-result`
 - **Per-company credentials:** `companies.agent_api_key`, `agent_last_seen`, `agent_version`, `agent_enabled` columns. UI at `/company/agent` for key generation/regeneration/toggle/download.
 - **Agent flow:** Polls server every 30s for pending invoices, submits to PRA from local IP, reports results back. Heartbeat every 60s. Runs in system tray with auto-start.
-- **Source:** `pra-agent/` folder — Electron + Node.js + axios + electron-store. Build via `npm run build:win`.
 
 **UI/UX Design:**
 - **Layout:** Responsive sidebar with a single scrollable content area.
@@ -85,15 +84,20 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **Enterprise UX Engine:** Toast notifications, loading spinners, page transitions, auto-scrolling to errors.
 - **DI Dashboard Premium Upgrade:** Features gradient banners, quick-action tiles, stat cards, compliance gauge, and KPI cards.
 
-## Hostcry Pre-Deploy Hardening (2026-04-24)
-- **Database driver lock:** `config/database.php` patched so `DATABASE_URL`/`/tmp/replitdb`/`/tmp/prod_database_url` lookups are gated behind explicit `HONOR_DATABASE_URL=1` env flag AND `DB_CONNECTION!=mysql`. Default fallback driver hardcoded to `mysql` (was `pgsql`). On Hostcry (no env injection), pure `.env` loading.
-- **Runtime visibility:** `AppServiceProvider::boot()` logs `DB_DRIVER` (default driver, host, port, database, sapi) on every request — visible in `storage/logs/laravel.log`.
-- **Replit dev workflows:** Use `env -u DATABASE_URL -u DB_CONNECTION -u PGHOST -u PGPORT -u PGUSER -u PGPASSWORD -u PGDATABASE php artisan ...` to neutralize Replit's shell injection (mimics Hostcry clean env). On Hostcry, plain `php artisan ...` is sufficient — no `env -u` prefix needed.
-- **Verified state:** MySQL `taxnest_staging` (port 9000) holds invoices=341, pos_transactions=59, fbr_pos_transactions=21, companies=12. Postgres baseline FROZEN at invoices=337, pos=41 (no leak). Backup: `.local/backups/mysql_hardening_20260424_060606.sql.gz`.
+**PWA / Mall-Grade "exe-look" Suite (Phase C):**
+- **Three Independent PWAs:** Each product is installable as its own desktop app: Tax DI, Nest Pra Pos, Nest FBR Pos.
+- **Branded Icons:** Premium family-style icons for each PWA.
+- **Service Worker (`public/sw.js`, v12):** Stale-while-revalidate for static assets, network-first for HTML, in-memory offline splash, push notification handler ready.
+- **Blade Components:** `<x-pwa-install>`, `<x-pwa-banner>`, `<x-pwa-update>`, `<x-pwa-push>`.
+- **Push Subscriptions:** `push_subscriptions` table, with endpoints `POST /api/push/subscribe` and `POST /api/push/unsubscribe`. Server-side push works via `App\Services\PushNotificationService`.
+- **iOS Install Modal:** Custom modal for iOS Safari users.
+- **POS Offline Pre-Cache:** `<link rel="prefetch">` for `/pos/create-invoice` and `/fbr-pos/create` for pre-caching sale screens.
+- **PWA Diagnostics Page (`/pwa-status`):** Public diagnostic page showing service worker state, install state, notification permission, push subscription, cache contents, environment info with actions.
+- **Login Page Branding:** Branded PNG icons + install button in the header of login pages.
 
 ## External Dependencies
-- **MySQL (Hostcry production):** Primary database for production deployment.
-- **PostgreSQL (Replit dev only):** Legacy/baseline copy frozen for reference.
+- **MySQL:** Primary database for production deployment (Hostcry).
+- **PostgreSQL:** Used for Replit development and baseline reference.
 - **FBR (Federal Board of Revenue) Pakistan:** Core integration for tax compliance.
 - **Laravel Breeze:** Authentication scaffolding.
 - **Tailwind CSS:** Frontend styling.
@@ -101,22 +105,3 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **Chart.js:** Data visualization.
 - **PRA (Punjab Revenue Authority):** POS fiscal device integration via PRAL IMS API v1.2.
 - **Unsplash / Picsum:** (Fallback) for `ProductImageService`.
-
-## PWA / Mall-Grade "exe-look" Suite (Phase C)
-- **Three Independent PWAs:** Each product is installable as its own desktop app:
-  - **Tax DI** — `manifest.json` (emerald, scope `/`)
-  - **Nest Pra Pos** — `manifest-pos.json` (purple, scope `/pos`)
-  - **Nest FBR Pos** — `manifest-fbrpos.json` (blue, scope `/fbr-pos`)
-- **Branded Icons:** `public/icons/{tax-di,nest-pra,nest-fbr}/icon-{192,512}.png` — premium family-style icons (dark header bar + bold letters + product artwork).
-- **Service Worker (`public/sw.js`, v12):** Stale-while-revalidate for static assets, network-first for HTML, in-memory offline splash, auto-skips auth/API/admin paths, push notification handler ready.
-- **Blade Components:**
-  - `<x-pwa-install color label />` — install button (login pages, hidden until `beforeinstallprompt` fires)
-  - `<x-pwa-banner color appName />` — dismissable install banner (dashboards)
-  - `<x-pwa-update color />` — auto-update toast (in all 3 layouts, checks every 30 min)
-  - `<x-pwa-push scope />` — soft notification permission prompt + subscribe (dashboards)
-- **Push Subscriptions:** `push_subscriptions` table (user_id, company_id, scope, endpoint, p256dh, auth_key). Endpoints `POST /api/push/subscribe` and `POST /api/push/unsubscribe` (works for any guard: web/pos/fbrpos). VAPID keys configured (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`) — server-side push works even when app is closed via `App\Services\PushNotificationService` (`sendToUser`, `sendToCompany`, `sendToScope`). Local notifications also available via `window.tnNotify(title, body, opts)`.
-- **Real Notifications Wired:** FBR submit success/fail/pending fires `window.tnNotify()` toast in `invoice/show.blade.php` (`handleFbrResponse`).
-- **iOS Install Modal:** `<x-pwa-install>` detects iOS Safari (no `beforeinstallprompt` support) and shows custom step-by-step "Share → Add to Home Screen" instruction modal with branded gradients per product.
-- **POS Offline Pre-Cache:** `<link rel="prefetch">` for `/pos/create-invoice` (in `pos-app.blade.php`) and `/fbr-pos/create` (in `fbr-pos-app.blade.php`) — sale screens are pre-cached on every authenticated page load so net flicker doesn't break billing.
-- **PWA Diagnostics Page (`/pwa-status`):** Public diagnostic page showing service worker state, install state, notification permission, push subscription, cache contents, environment info. "Send Test Notification", "Check for Updates", "Clear All Caches" actions. Cashiers/support can use this to troubleshoot installs without dev access.
-- **Login Page Branding:** Tax DI modal in `di-landing.blade.php`, plus `pos/auth/login.blade.php` and `fbr-pos/auth/login.blade.php` all show branded PNG icons + install button in the header.

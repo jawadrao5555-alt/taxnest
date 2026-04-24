@@ -126,9 +126,6 @@ class FbrService
             $isExempt = (stripos($rawSaleType, 'Exempt') !== false || stripos($rawSaleType, 'exempt') !== false);
             $isReduced = (stripos($rawSaleType, 'Reduced') !== false || stripos($rawSaleType, 'reduced') !== false);
 
-            if ($isExempt || $scheduleType === 'exempt') {
-                continue;
-            }
             $saleTypeNormalized = $this->normalizeSaleType($rawSaleType, $env);
 
             if ($is3rdSchedule) {

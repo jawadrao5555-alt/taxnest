@@ -95,6 +95,21 @@ TaxNest is built on Laravel 12 with PHP 8.4, using Breeze for authentication. Th
 - **PWA Diagnostics Page (`/pwa-status`):** Public diagnostic page showing service worker state, install state, notification permission, push subscription, cache contents, environment info with actions.
 - **Login Page Branding:** Branded PNG icons + install button in the header of login pages.
 
+## ZIA March 2026 FBR Submission (2026-04-24) — FULLY SUBMITTED
+- **Scope**: 75 invoices, IDs 597-671, Invoice Nos INV-2026-000598 to 000672, March 2026 dates only.
+- **Final state**: **75/75 LOCKED with real FBR Invoice Numbers from PRAL production** (`3620291786117DIAEYM…` series). Zero invoices in `exempt_internal` mode. Zero failures.
+  - HS 1005.1000 Maize (Exempt goods, 6th Schd Table I, serial 163): 38 invoices, value 7,000,000
+  - HS 3808.9210 Insecticides (Exempt goods, 6th Schd Table I, serial 133): 11 invoices, value 2,000,000
+  - HS 2930.2020 Thiocarbamates (Exempt goods, 6th Schd Table I, serial 100): 6 invoices, value 1,000,000
+  - HS 3105.3000 Fertilizer (3rd Schedule Goods @ 5%, KG): 20 invoices, value 3,500,000, tax 175,000. Originally drafted as service HS 9988.7766 @ 18% but FBR rejected ([0052]/[0007] errors); converted under user authorization to 3105.3000 with realistic price 280-320 PKR/KG and integer quantities preserving line value (max ±0.01 PKR drift).
+- **Grand totals**: Sales (excl tax) 13,500,000 + Tax 175,000 = Grand total 13,675,000 PKR.
+- **Reports saved**: `storage/app/zia_march_2026_FINAL_submitted.csv`, `storage/app/zia_march_fbr_submission_report.json`, `storage/app/zia_march_3105_resubmit_report.json`, `storage/app/zia_march_exempt_resubmit_report.json`.
+
+### Critical FbrService fix (2026-04-24)
+- **Removed exempt-skip in `FbrService::buildPayload`** (was line 129-131): previously `if ($isExempt || $scheduleType === 'exempt') { continue; }` skipped exempt items, causing `submitInvoice` to lock invoices internally as `fbr_status='exempt_internal'` without ever calling FBR. This was incorrect behavior — FBR Digital Invoicing accepts exempt items with `rate="Exempt"`, `saleType="Exempt goods"`, `sroScheduleNo="6th Schd Table I"`, `sroItemSerialNo` per HS code, `salesTaxApplicable=0`. The downstream code (lines 134-227) already had full exempt handling; only the early `continue` was the bug.
+- **Effect**: All future exempt invoices will be sent to FBR and receive real `fbr_invoice_number`. The legacy `exempt_internal` lock path at submitInvoice line 849-862 remains as a defensive fallback (only triggers if items array becomes empty for some other reason).
+- **Submission flow**: `App\Services\FbrService::submitInvoice($invoice, 0)` called directly. Sends payload to `https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata` with company production token, then writes `status=locked`, `fbr_status=production`, `fbr_invoice_number`, `fbr_submission_date`, `submission_mode=production`, and computes `integrity_hash` on success. Workflows (Laravel Server + Queue Worker) restarted post-fix.
+
 ## External Dependencies
 - **MySQL:** Primary database for production deployment (Hostcry).
 - **PostgreSQL:** Used for Replit development and baseline reference.

@@ -2,25 +2,31 @@
 use Illuminate\Support\Str;
 
 $dbUrl = null;
-foreach (['DATABASE_URL'] as $envKey) {
-    $val = getenv($envKey) ?: ($_ENV[$envKey] ?? ($_SERVER[$envKey] ?? null));
-    if ($val && preg_match('/^postgres(ql)?:\/\//', $val)) {
-        $dbUrl = $val;
-        break;
-    }
-}
 
-if (empty($dbUrl) && file_exists('/tmp/prod_database_url')) {
-    $raw = trim(file_get_contents('/tmp/prod_database_url'));
-    if (!empty($raw) && preg_match('/^postgres(ql)?:\/\//', $raw)) {
-        $dbUrl = $raw;
-    }
-}
+$honorUrl = (getenv('HONOR_DATABASE_URL') ?: ($_ENV['HONOR_DATABASE_URL'] ?? null)) === '1';
+$dbConnEnv = strtolower((string)(getenv('DB_CONNECTION') ?: ($_ENV['DB_CONNECTION'] ?? '')));
 
-if (empty($dbUrl) && file_exists('/tmp/replitdb')) {
-    $raw = trim(file_get_contents('/tmp/replitdb'));
-    if (!empty($raw) && preg_match('/^postgres(ql)?:\/\//', $raw)) {
-        $dbUrl = $raw;
+if ($honorUrl && $dbConnEnv !== 'mysql') {
+    foreach (['DATABASE_URL'] as $envKey) {
+        $val = getenv($envKey) ?: ($_ENV[$envKey] ?? ($_SERVER[$envKey] ?? null));
+        if ($val && preg_match('/^postgres(ql)?:\/\//', $val)) {
+            $dbUrl = $val;
+            break;
+        }
+    }
+
+    if (empty($dbUrl) && file_exists('/tmp/prod_database_url')) {
+        $raw = trim(file_get_contents('/tmp/prod_database_url'));
+        if (!empty($raw) && preg_match('/^postgres(ql)?:\/\//', $raw)) {
+            $dbUrl = $raw;
+        }
+    }
+
+    if (empty($dbUrl) && file_exists('/tmp/replitdb')) {
+        $raw = trim(file_get_contents('/tmp/replitdb'));
+        if (!empty($raw) && preg_match('/^postgres(ql)?:\/\//', $raw)) {
+            $dbUrl = $raw;
+        }
     }
 }
 
@@ -47,18 +53,18 @@ if (!empty($dbUrl)) {
 }
 
 return [
-    'default' => env('DB_CONNECTION', 'pgsql'),
+    'default' => env('DB_CONNECTION', 'mysql'),
     'connections' => [
         'sqlite' => [
             'driver' => 'sqlite',
-            'url' => env('DB_URL'),
+            'url' => null,
             'database' => env('DB_DATABASE', database_path('database.sqlite')),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
         ],
         'mysql' => [
             'driver' => 'mysql',
-            'url' => env('DB_URL'),
+            'url' => null,
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '3306'),
             'database' => env('DB_DATABASE', 'laravel'),

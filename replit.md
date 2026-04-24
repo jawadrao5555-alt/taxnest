@@ -85,8 +85,15 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **Enterprise UX Engine:** Toast notifications, loading spinners, page transitions, auto-scrolling to errors.
 - **DI Dashboard Premium Upgrade:** Features gradient banners, quick-action tiles, stat cards, compliance gauge, and KPI cards.
 
+## Hostcry Pre-Deploy Hardening (2026-04-24)
+- **Database driver lock:** `config/database.php` patched so `DATABASE_URL`/`/tmp/replitdb`/`/tmp/prod_database_url` lookups are gated behind explicit `HONOR_DATABASE_URL=1` env flag AND `DB_CONNECTION!=mysql`. Default fallback driver hardcoded to `mysql` (was `pgsql`). On Hostcry (no env injection), pure `.env` loading.
+- **Runtime visibility:** `AppServiceProvider::boot()` logs `DB_DRIVER` (default driver, host, port, database, sapi) on every request — visible in `storage/logs/laravel.log`.
+- **Replit dev workflows:** Use `env -u DATABASE_URL -u DB_CONNECTION -u PGHOST -u PGPORT -u PGUSER -u PGPASSWORD -u PGDATABASE php artisan ...` to neutralize Replit's shell injection (mimics Hostcry clean env). On Hostcry, plain `php artisan ...` is sufficient — no `env -u` prefix needed.
+- **Verified state:** MySQL `taxnest_staging` (port 9000) holds invoices=341, pos_transactions=59, fbr_pos_transactions=21, companies=12. Postgres baseline FROZEN at invoices=337, pos=41 (no leak). Backup: `.local/backups/mysql_hardening_20260424_060606.sql.gz`.
+
 ## External Dependencies
-- **PostgreSQL:** Primary database.
+- **MySQL (Hostcry production):** Primary database for production deployment.
+- **PostgreSQL (Replit dev only):** Legacy/baseline copy frozen for reference.
 - **FBR (Federal Board of Revenue) Pakistan:** Core integration for tax compliance.
 - **Laravel Breeze:** Authentication scaffolding.
 - **Tailwind CSS:** Frontend styling.

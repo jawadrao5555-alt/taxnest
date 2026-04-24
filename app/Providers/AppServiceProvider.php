@@ -18,6 +18,25 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $dbDefault = config('database.default');
+        Log::info('DB_DRIVER', [
+            'default' => $dbDefault,
+            'host' => config('database.connections.' . $dbDefault . '.host'),
+            'port' => config('database.connections.' . $dbDefault . '.port'),
+            'database' => config('database.connections.' . $dbDefault . '.database'),
+            'sapi' => php_sapi_name(),
+        ]);
+
+        if (app()->environment('production') && $dbDefault !== 'mysql') {
+            $msg = 'PRODUCTION DB GUARD: expected mysql, got ' . $dbDefault . '. Aborting.';
+            Log::critical($msg);
+            if (php_sapi_name() === 'cli') {
+                fwrite(STDERR, $msg . PHP_EOL);
+                exit(1);
+            }
+            abort(503, 'Database configuration error.');
+        }
+
         if (app()->environment('production') && php_sapi_name() === 'cli') {
             $command = $_SERVER['argv'][1] ?? '';
             if (in_array($command, ['tinker'])) {

@@ -100,6 +100,27 @@ TaxNest is built on Laravel 12 with PHP 8.4, using Breeze for authentication. Th
 - **HS Code Mapping Manager (`FEATURE_HS_MAPPING_MANAGER`):** Manages HS code mappings with logging for missing mappings, ensuring submission continues with fallbacks.
 - **Reduced Rate Support (`FEATURE_REDUCED_RATE_MAPPING`):** Integrates support for reduced sales tax rates within HS code mappings.
 
+## Production Deployment Procedure (Hostcry)
+
+**LIVE site path**: `~/public_html/taxnest/` (NOT `~/public_html/` — that's an old separate install, ignore it). Bridge file `~/public_html/index.php` requires `taxnest/vendor/autoload.php` and `taxnest/bootstrap/app.php`.
+
+**Standard deploy command** (always run from `~/public_html/taxnest/`):
+```
+cd ~/public_html/taxnest
+git pull origin main
+composer install --no-dev --optimize-autoloader
+php artisan migrate --force
+php artisan optimize:clear && php artisan config:cache
+```
+
+**For data sync SQL files** (`database/deploy/<date>/MASTER-ALL.sql`): Always backup first (`mysqldump --no-tablespaces --single-transaction taxnestc_db <tables> > /tmp/pre-sync-*.sql`), safety-scan for `DROP/TRUNCATE/DELETE FROM` (must be 0), then `mysql taxnestc_db < <file>.sql`. Files use `INSERT IGNORE` + `ALTER TABLE ... IF NOT EXISTS` so they're idempotent and safe to re-run.
+
+**Production DB**: `taxnestc_db` (MariaDB on Hostcry, single DB — no other DBs on server). Credentials in `taxnest/.env` (DB_PASSWORD must match cPanel MySQL user). Both `~/public_html/.env` and `~/public_html/taxnest/.env` should have identical DB credentials.
+
+**PWA cache caveat**: After deploy, users may see stale data due to service worker (`public/sw.js v12`). Tell user to clear site data or use Incognito/Private mode to verify fresh changes.
+
+**Agent rule**: Always remind user of this exact deploy formula before each production deploy. User does NOT need to memorize it.
+
 ## External Dependencies
 - **MySQL:** Primary database for production deployment (Hostcry).
 - **PostgreSQL:** Used for Replit development and baseline reference.

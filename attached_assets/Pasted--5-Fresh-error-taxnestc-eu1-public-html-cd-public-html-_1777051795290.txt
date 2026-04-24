@@ -1,0 +1,250 @@
+==== 5. Fresh error ====
+[taxnestc@eu1 public_html]$ cd ~/public_html/taxnest
+git pull origin main
+composer install --no-dev --optimize-autoloader
+php artisan migrate --force
+php artisan config:cache
+remote: Enumerating objects: 779, done.
+remote: Counting objects: 100% (779/779), done.
+remote: Compressing objects: 100% (151/151), done.
+remote: Total 719 (delta 599), reused 686 (delta 566), pack-reused 0 (from 0)
+Receiving objects: 100% (719/719), 15.30 MiB | 15.98 MiB/s, done.
+Resolving deltas: 100% (599/599), completed with 52 local objects.
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+   9b546d9..d49231d  main       -> origin/main
+Updating 9b546d9..d49231d
+Updating files: 100% (117/117), done.
+Fast-forward
+ .agents/agent_assets_metadata.toml                 |   18 +
+ .env.mysql.staging                                 |   48 +
+ .env.pgsql.backup                                  |   45 +
+ .env.pgsql.backup.20260424_051433                  |   45 +
+ .gitignore                                         |    3 +
+ .replit                                            |   23 +-
+ MYSQL_MIGRATION.md                                 |  133 ++
+ app/Helpers/DbCompat.php                           |   97 +-
+ app/Http/Controllers/AdminController.php           |  115 +
+ app/Http/Controllers/BranchSwitchController.php    |   21 +
+ app/Http/Controllers/FbrPosController.php          |  185 +-
+ app/Http/Controllers/PosController.php             |  389 +++-
+ app/Http/Controllers/RestaurantPosController.php   |   45 +-
+ app/Http/Controllers/WhtReportController.php       |   19 +-
+ app/Http/Middleware/CompanyIsolation.php           |    4 +
+ app/Http/Middleware/FbrPosAuth.php                 |    7 +
+ app/Http/Middleware/PosAuth.php                    |    7 +
+ app/Http/Middleware/SetBranchContext.php           |   33 +
+ app/Jobs/RetryFailedFbrInvoicesJob.php             |  114 +
+ app/Jobs/RetryFbrPosSubmissionJob.php              |  104 +
+ app/Models/Branch.php                              |   11 +
+ app/Models/Company.php                             |    9 +
+ app/Models/FbrPosTransaction.php                   |    2 +-
+ app/Models/Invoice.php                             |    2 +
+ app/Models/PosProduct.php                          |    3 +-
+ app/Models/PosTransaction.php                      |    2 +-
+ app/Models/RestaurantOrder.php                     |    3 +
+ app/Providers/AppServiceProvider.php               |   19 +
+ app/Services/BranchContextService.php              |  197 ++
+ app/Services/FbrService.php                        |   13 +-
+ app/Services/PosFeatureService.php                 |  103 +
+ app/Services/SmartTaxEngine.php                    |   33 +-
+ .../Annexure_A_Report_(21)_1777013070792.pdf       |  Bin 0 -> 137357 bytes
+ .../Annexure_A_Report_(21)_1777014744724.pdf       |  Bin 0 -> 137357 bytes
+ attached_assets/Capture_1776770151862.JPG          |  Bin 0 -> 58009 bytes
+ attached_assets/Capture_1776839658247.JPG          |  Bin 0 -> 227877 bytes
+ attached_assets/Capture_1777020308610.JPG          |  Bin 0 -> 221167 bytes
+ attached_assets/Capture_1777020439070.JPG          |  Bin 0 -> 221167 bytes
+ attached_assets/IMG_1890_1777045158247.png         |  Bin 0 -> 550108 bytes
+ attached_assets/IMG_1891_1777045332056.png         |  Bin 0 -> 93746 bytes
+ attached_assets/IMG_1892_1777045821111.png         |  Bin 0 -> 179149 bytes
+ attached_assets/IMG_1894_1777046094310.png         |  Bin 0 -> 165767 bytes
+ attached_assets/IMG_1895_1777046275772.png         |  Bin 0 -> 209067 bytes
+ attached_assets/IMG_1896_1777046428296.png         |  Bin 0 -> 183560 bytes
+ attached_assets/IMG_1897_1777046765485.png         |  Bin 0 -> 174631 bytes
+ attached_assets/IMG_1898_1777046879452.png         |  Bin 0 -> 177816 bytes
+ ...mode-to-companies-php-24-3-29_1776837907524.txt | 1024 +++++++++
+ ...mode-to-companies-php-24-3-29_1776837999829.txt | 1024 +++++++++
+ ...mode-to-companies-php-24-3-29_1776839342707.txt | 1024 +++++++++
+ ...-class-head-meta-charset-utf-_1776681872232.txt | 2357 +++++++++++++++++++
+ ...DRAFT-ONLY-DO-NOT-SUBMIT-Comp_1777012076046.txt |  143 ++
+ ...LIDATION-UNIVERSAL-PRA-POS-IM_1776682345088.txt |   97 +
+ ...LIDATION-UNIVERSAL-PRA-POS-UP_1776682817127.txt |  141 ++
+ ...OS-FULL-IMPLEMENTATION-CONTRO_1776686813359.txt |  153 ++
+ ...N-YOU-BUILD-THIS-SYSTEM-IMPOR_1776686543894.txt |  118 +
+ ...ng-mukammal-Architect-review-_1777011759280.txt |   39 +
+ ...xception-vendor-laravel-frame_1777020151458.txt |  115 +
+ ...UILD-CRITICAL-PRODUCTION-BLOC_1777018728703.txt |  167 ++
+ ...UILD-CRITICAL-PRODUCTION-BLOC_1777018911456.txt |  167 ++
+ ...-SAFE-MODE-GOAL-Implement-rec_1777018469160.txt |  131 ++
+ ...-VALIDATION-GOAL-Test-ALL-pro_1777008363538.txt |  160 ++
+ ...ILD-WITH-DATA-SAFETY-LOCK-CRI_1776689746920.txt |  152 ++
+ ...-INSERT-IGNORE-INTO-companies_1777043281217.txt |   21 +
+ .../Profile_Report_(19)_1777020448663.pdf          |  Bin 0 -> 193054 bytes
+ attached_assets/image_1777042326387.jpg            |  Bin 0 -> 3647438 bytes
+ attached_assets/image_1777042339514.jpg            |  Bin 0 -> 5428982 bytes
+ attached_assets/image_1777042359998.jpg            |  Bin 0 -> 4582777 bytes
+ check-db.sh                                        |   17 +
+ config/database.php                                |   42 +-
+ config/features.php                                |   11 +
+ .../2026-04-24-production-sync/00-PREFLIGHT.sql    |   67 +
+ .../01a-punjab-plus-company.sql                    |   38 +
+ .../01b-punjab-plus-user.sql                       |   38 +
+ .../01c-punjab-plus-branch.sql                     |   38 +
+ .../01d-punjab-plus-subscription.sql               |   38 +
+ .../2026-04-24-production-sync/02-SCHEMA-ALIGN.sql |  205 ++
+ .../2026-04-24-production-sync/03-zia-invoices.sql |  116 +
+ .../04-zia-invoice-items.sql                       |  118 +
+ .../2026-04-24-production-sync/99-SCHEMA-FIXES.sql |   38 +
+ .../2026-04-24-production-sync/999-VERIFY.sql      |   32 +
+ .../2026-04-24-production-sync/MASTER-ALL.sql      |  645 ++++++
+ .../deploy/2026-04-24-production-sync/README.md    |   83 +
+ .../deploy/2026-04-24-production-sync/RUN-ALL.sql  |   18 +
+ .../2026-04-24-production-sync/run-migration.sh    |   52 +
+ ...4_19_160000_create_push_subscriptions_table.php |    4 +-
+ ...re_flags_and_business_category_to_companies.php |   45 +
+ ...63959_add_kot_tracking_to_restaurant_orders.php |   42 +
+ ...4_21_164943_add_auto_print_kot_to_companies.php |   30 +
+ ...04_22_120000_add_cost_price_to_pos_products.php |   30 +
+ ...04_22_180000_add_branch_id_to_pos_and_users.php |  112 +
+ ...23_062000_add_print_paper_size_to_companies.php |   31 +
+ ..._120000_add_missing_columns_from_production.php |   46 +
+ ..._130000_fix_pos_transactions_invoice_unique.php |   95 +
+ ..._04_24_080000_add_retry_columns_to_invoices.php |   32 +
+ public/manifest-pos.json                           |    2 +-
+ public/sw.js                                       |    4 +-
+ push.sh                                            |   15 +
+ replit.md                                          |   57 +-
+ .../views/admin/failed-fbr-invoices.blade.php      |  103 +
+ resources/views/admin/fbr-pos-logs.blade.php       |  134 ++
+ .../views/components/branch-switcher.blade.php     |   75 +
+ resources/views/fbr-pos/business-profile.blade.php |  100 +-
+ resources/views/fbr-pos/create.blade.php           |  702 +++++-
+ resources/views/fbr-pos/fail-queue.blade.php       |  159 ++
+ resources/views/fbr-pos/receipt.blade.php          |   22 +-
+ resources/views/layouts/fbr-pos-app.blade.php      |   55 +-
+ resources/views/layouts/pos-app.blade.php          |   15 +-
+ resources/views/pos/create-invoice.blade.php       |  123 +-
+ resources/views/pos/dashboard.blade.php            |  117 +
+ resources/views/pos/feature-settings.blade.php     |   86 +
+ resources/views/pos/products.blade.php             |    5 +
+ .../views/pos/restaurant/kitchen-ticket.blade.php  |    7 +-
+ resources/views/pos/universal.blade.php            | 2420 ++++++++++++++++++++
+ routes/web.php                                     |   21 +
+ screenshots/pos-login.jpg                          |  Bin 0 -> 29175 bytes
+ scripts/pg_to_mysql_sync.php                       |  212 ++
+ scripts/schema_drift_scan.php                      |  107 +
+ 117 files changed, 15300 insertions(+), 189 deletions(-)
+ create mode 100644 .env.mysql.staging
+ create mode 100644 .env.pgsql.backup
+ create mode 100644 .env.pgsql.backup.20260424_051433
+ create mode 100644 MYSQL_MIGRATION.md
+ create mode 100644 app/Http/Controllers/BranchSwitchController.php
+ create mode 100644 app/Http/Middleware/SetBranchContext.php
+ create mode 100644 app/Jobs/RetryFailedFbrInvoicesJob.php
+ create mode 100644 app/Jobs/RetryFbrPosSubmissionJob.php
+ create mode 100644 app/Services/BranchContextService.php
+ create mode 100644 app/Services/PosFeatureService.php
+ create mode 100644 attached_assets/Annexure_A_Report_(21)_1777013070792.pdf
+ create mode 100644 attached_assets/Annexure_A_Report_(21)_1777014744724.pdf
+ create mode 100644 attached_assets/Capture_1776770151862.JPG
+ create mode 100644 attached_assets/Capture_1776839658247.JPG
+ create mode 100644 attached_assets/Capture_1777020308610.JPG
+ create mode 100644 attached_assets/Capture_1777020439070.JPG
+ create mode 100644 attached_assets/IMG_1890_1777045158247.png
+ create mode 100644 attached_assets/IMG_1891_1777045332056.png
+ create mode 100644 attached_assets/IMG_1892_1777045821111.png
+ create mode 100644 attached_assets/IMG_1894_1777046094310.png
+ create mode 100644 attached_assets/IMG_1895_1777046275772.png
+ create mode 100644 attached_assets/IMG_1896_1777046428296.png
+ create mode 100644 attached_assets/IMG_1897_1777046765485.png
+ create mode 100644 attached_assets/IMG_1898_1777046879452.png
+ create mode 100644 attached_assets/Pasted--28-200002-add-restaurant-mode-to-companies-php-24-3-29_1776837907524.txt
+ create mode 100644 attached_assets/Pasted--28-200002-add-restaurant-mode-to-companies-php-24-3-29_1776837999829.txt
+ create mode 100644 attached_assets/Pasted--28-200002-add-restaurant-mode-to-companies-php-24-3-29_1776839342707.txt
+ create mode 100644 attached_assets/Pasted--DOCTYPE-html-html-lang-en-class-head-meta-charset-utf-_1776681872232.txt
+ create mode 100644 attached_assets/Pasted-CREATE-MARCH-SALES-STEP-1-DRAFT-ONLY-DO-NOT-SUBMIT-Comp_1777012076046.txt
+ create mode 100644 attached_assets/Pasted-ENTERPRISE-ARCHITECTURE-VALIDATION-UNIVERSAL-PRA-POS-IM_1776682345088.txt
+ create mode 100644 attached_assets/Pasted-ENTERPRISE-ARCHITECTURE-VALIDATION-UNIVERSAL-PRA-POS-UP_1776682817127.txt
+ create mode 100644 attached_assets/Pasted-ENTERPRISE-UNIVERSAL-PRA-POS-FULL-IMPLEMENTATION-CONTRO_1776686813359.txt
+ create mode 100644 attached_assets/Pasted-FINAL-FEASIBILITY-CHECK-CAN-YOU-BUILD-THIS-SYSTEM-IMPOR_1776686543894.txt
+ create mode 100644 attached_assets/Pasted-Hostcry-pre-deploy-hardening-mukammal-Architect-review-_1777011759280.txt
+ create mode 100644 attached_assets/Pasted-Illuminate-Database-QueryException-vendor-laravel-frame_1777020151458.txt
+ create mode 100644 attached_assets/Pasted-PHASE-CART-SYSTEM-HARD-REBUILD-CRITICAL-PRODUCTION-BLOC_1777018728703.txt
+ create mode 100644 attached_assets/Pasted-PHASE-CART-SYSTEM-HARD-REBUILD-CRITICAL-PRODUCTION-BLOC_1777018911456.txt
+ create mode 100644 attached_assets/Pasted-PHASE-FULL-HARDENING-BATCH-SAFE-MODE-GOAL-Implement-rec_1777018469160.txt
+ create mode 100644 attached_assets/Pasted-PHASE-PRE-LIVE-FULL-SYSTEM-VALIDATION-GOAL-Test-ALL-pro_1777008363538.txt
+ create mode 100644 attached_assets/Pasted-UNIVERSAL-PRA-POS-FINAL-BUILD-WITH-DATA-SAFETY-LOCK-CRI_1776689746920.txt
+ create mode 100644 attached_assets/Pasted-oduction-sync-04-sql-mysql-INSERT-IGNORE-INTO-companies_1777043281217.txt
+ create mode 100644 attached_assets/Profile_Report_(19)_1777020448663.pdf
+ create mode 100644 attached_assets/image_1777042326387.jpg
+ create mode 100644 attached_assets/image_1777042339514.jpg
+ create mode 100644 attached_assets/image_1777042359998.jpg
+ create mode 100644 check-db.sh
+ create mode 100644 config/features.php
+ create mode 100644 database/deploy/2026-04-24-production-sync/00-PREFLIGHT.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/01a-punjab-plus-company.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/01b-punjab-plus-user.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/01c-punjab-plus-branch.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/01d-punjab-plus-subscription.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/02-SCHEMA-ALIGN.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/03-zia-invoices.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/04-zia-invoice-items.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/99-SCHEMA-FIXES.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/999-VERIFY.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/MASTER-ALL.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/README.md
+ create mode 100644 database/deploy/2026-04-24-production-sync/RUN-ALL.sql
+ create mode 100755 database/deploy/2026-04-24-production-sync/run-migration.sh
+ create mode 100644 database/migrations/2026_04_20_120825_add_feature_flags_and_business_category_to_companies.php
+ create mode 100644 database/migrations/2026_04_21_163959_add_kot_tracking_to_restaurant_orders.php
+ create mode 100644 database/migrations/2026_04_21_164943_add_auto_print_kot_to_companies.php
+ create mode 100644 database/migrations/2026_04_22_120000_add_cost_price_to_pos_products.php
+ create mode 100644 database/migrations/2026_04_22_180000_add_branch_id_to_pos_and_users.php
+ create mode 100644 database/migrations/2026_04_23_062000_add_print_paper_size_to_companies.php
+ create mode 100644 database/migrations/2026_04_23_120000_add_missing_columns_from_production.php
+ create mode 100644 database/migrations/2026_04_23_130000_fix_pos_transactions_invoice_unique.php
+ create mode 100644 database/migrations/2026_04_24_080000_add_retry_columns_to_invoices.php
+ create mode 100644 push.sh
+ create mode 100644 resources/views/admin/failed-fbr-invoices.blade.php
+ create mode 100644 resources/views/admin/fbr-pos-logs.blade.php
+ create mode 100644 resources/views/components/branch-switcher.blade.php
+ create mode 100644 resources/views/fbr-pos/fail-queue.blade.php
+ create mode 100644 resources/views/pos/feature-settings.blade.php
+ create mode 100644 resources/views/pos/universal.blade.php
+ create mode 100644 screenshots/pos-login.jpg
+ create mode 100644 scripts/pg_to_mysql_sync.php
+ create mode 100644 scripts/schema_drift_scan.php
+Installing dependencies from lock file
+Verifying lock file contents can be installed on current platform.
+Nothing to install, update or remove
+Generating optimized autoload files
+> Illuminate\Foundation\ComposerScripts::postAutoloadDump
+> @php artisan package:discover --ansi
+
+   INFO  Discovering packages.
+
+  barryvdh/laravel-dompdf ............................................... DONE
+  laravel/tinker ........................................................ DONE
+  nesbot/carbon ......................................................... DONE
+  nunomaduro/termwind ................................................... DONE
+  simplesoftwareio/simple-qrcode ........................................ DONE
+
+62 packages you are using are looking for funding.
+Use the `composer fund` command to find out more!
+
+   INFO  Running migrations.
+
+  2026_04_20_120825_add_feature_flags_and_business_category_to_companies  14.49ms DONE
+  2026_04_21_163959_add_kot_tracking_to_restaurant_orders ........ 6.48ms DONE
+  2026_04_21_164943_add_auto_print_kot_to_companies .............. 2.20ms DONE
+  2026_04_22_120000_add_cost_price_to_pos_products ............... 2.82ms DONE
+  2026_04_22_180000_add_branch_id_to_pos_and_users .............. 76.45ms DONE
+  2026_04_23_062000_add_print_paper_size_to_companies ............ 5.32ms DONE
+  2026_04_23_120000_add_missing_columns_from_production .......... 0.64ms DONE
+  2026_04_23_130000_fix_pos_transactions_invoice_unique .......... 0.40ms DONE
+  2026_04_24_080000_add_retry_columns_to_invoices ................ 6.32ms DONE
+
+
+   INFO  Configuration cached successfully.
+
+[taxnestc@eu1 taxnest]$

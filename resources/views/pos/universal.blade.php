@@ -670,26 +670,23 @@ window.addEventListener('popstate', function() {
                                 <button @click.stop="updateQty(index, -1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M20 12H4"/></svg>
                                 </button>
-                                <input type="text" inputmode="decimal" maxlength="10"
+                                <input type="number" min="1" step="1" inputmode="numeric"
                                     data-qty-input
-                                    x-model="item.quantity"
-                                    @click.stop
+                                    :data-qty-row="index"
+                                    :value="item.quantity"
+                                    @click.stop="activeCartIndex = index; cartMode = true"
                                     @mousedown.stop
-                                    @focus="$nextTick(() => $event.target.select())"
+                                    @focus.stop="activeCartIndex = index; cartMode = true; $nextTick(() => $event.target.select())"
                                     @keydown.enter.prevent="$event.target.blur()"
-                                    @input.stop="
-                                        let v = String($event.target.value || '').replace(/[^0-9.]/g, '');
-                                        const parts = v.split('.');
-                                        if (parts.length > 2) v = parts[0] + '.' + parts.slice(1).join('');
-                                        $event.target.value = v;
-                                        item.quantity = v;
-                                    "
+                                    @keydown.arrow-down.prevent.stop="moveCartSelection(1)"
+                                    @keydown.arrow-up.prevent.stop="moveCartSelection(-1)"
+                                    @input.stop="item.quantity = $event.target.value"
                                     @blur="
                                         let n = parseFloat(item.quantity);
-                                        if (!Number.isFinite(n) || n <= 0) n = 1;
+                                        if (!Number.isFinite(n) || n < 1) n = 1;
                                         item.quantity = Number.isInteger(n) ? n : Math.round(n * 1000) / 1000;
                                     "
-                                    class="w-16 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner px-1">
+                                    class="w-16 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner px-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
                                 <button @click.stop="updateQty(index, 1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M12 4v16m8-8H4"/></svg>
                                 </button>
@@ -1773,18 +1770,14 @@ function restaurantPos() {
             } catch (e) { /* non-fatal — UI already updated */ }
         },
         updateQty(index, delta) {
-            if (this._qtyUpdating) return;
             if (!this.cart[index]) return;
-            this._qtyUpdating = true;
             let current = Number(this.cart[index].quantity);
             if (!Number.isFinite(current) || current < 1) current = 1;
-            if (Number.isInteger(current)) {
-                this.cart[index].quantity = Math.max(1, current + delta);
-            } else {
-                this.cart[index].quantity = Math.max(1, Math.round((current + delta) * 100) / 100);
-            }
-            if (!Number.isFinite(this.cart[index].quantity) || this.cart[index].quantity < 1) this.cart[index].quantity = 1;
-            setTimeout(() => { this._qtyUpdating = false; }, 50);
+            let next = Number.isInteger(current)
+                ? Math.max(1, current + delta)
+                : Math.max(1, Math.round((current + delta) * 100) / 100);
+            if (!Number.isFinite(next) || next < 1) next = 1;
+            this.cart[index].quantity = next;
         },
         setQty(index, val) {
             if (!this.cart[index]) return;
@@ -1817,11 +1810,22 @@ function restaurantPos() {
 
         moveCartSelection(dir) {
             if (this.cart.length === 0) { this.activeCartIndex = -1; this.cartMode = false; return; }
-            const next = this.activeCartIndex + dir;
-            if (next < 0) { this.exitCartMode(); return; }
-            if (next >= this.cart.length) { this.activeCartIndex = this.cart.length - 1; return; }
+            let next = (this.activeCartIndex < 0 ? 0 : this.activeCartIndex) + dir;
+            next = Math.max(0, Math.min(next, this.cart.length - 1));
+            if (next === this.activeCartIndex) {
+                this.focusActiveQty();
+                return;
+            }
             this.activeCartIndex = next;
             this.scrollToCartItem(next);
+            this.focusActiveQty();
+        },
+
+        focusActiveQty() {
+            this.$nextTick(() => {
+                const el = this.$refs.cartList?.querySelector(`[data-cart-index="${this.activeCartIndex}"] [data-qty-input]`);
+                if (el) { el.focus(); el.select(); }
+            });
         },
 
         fixCartIndex() {
@@ -1831,18 +1835,9 @@ function restaurantPos() {
         },
 
         handleKey(e) {
-            // 🔒 HARD SAFETY: any keystroke originating from a form field exits immediately
+            // HARD SAFETY: any keystroke originating from a form field exits immediately.
+            // This single guard replaces the old duplicate isInput check — single source of truth.
             if (e.target.closest('input, textarea, select')) {
-                return;
-            }
-
-            const active = document.activeElement;
-            const isInput = active && (
-                active.tagName === 'INPUT' ||
-                active.tagName === 'TEXTAREA' ||
-                active.tagName === 'SELECT'
-            );
-            if (isInput) {
                 return;
             }
 
@@ -1932,8 +1927,9 @@ function restaurantPos() {
         },
 
         handleSearchKeys(e) {
+            // Both arrows enter cart at first row → user then steps line-by-line. No more jump-to-last surprises.
             if (e.key === 'ArrowDown' && this.cart.length > 0 && !this.gridFocusMode) { this.enterCartMode(0); return; }
-            if (e.key === 'ArrowUp' && this.cart.length > 0 && !this.gridFocusMode) { this.enterCartMode('last'); return; }
+            if (e.key === 'ArrowUp' && this.cart.length > 0 && !this.gridFocusMode) { this.enterCartMode(0); return; }
             if ((e.key === '+' || e.key === '=') && this.cart.length > 0) { this.updateQty(this.cart.length - 1, 1); this.animateQty(this.cart.length - 1); return; }
             if (e.key === '-' && this.cart.length > 0) { this.updateQty(this.cart.length - 1, -1); this.animateQty(this.cart.length - 1); return; }
             if (e.key === 'Delete' && this.cart.length > 0) { this.removeFromCart(this.cart.length - 1); this.fixCartIndex(); return; }

@@ -1,0 +1,167 @@
+PHASE — CART SYSTEM HARD REBUILD (CRITICAL — PRODUCTION BLOCKER)
+
+GOAL:
+Completely rebuild ONLY the cart quantity + navigation system to be 100% reliable and native-feeling.
+
+IMPORTANT:
+- This is NOT a patch
+- This is a FULL REBUILD of cart interaction layer
+- NO changes to backend, invoices, PRA, FBR, totals logic
+
+=====================================
+PROBLEM SUMMARY (CURRENT ISSUES)
+=====================================
+
+1. Quantity typing broken:
+   - Cannot type clean numbers (10, 12, 25)
+   - Input resets / appends incorrectly
+
+2. Arrow navigation broken:
+   - Up/Down jumps randomly
+   - Does not move line-by-line reliably
+
+3. Keyboard conflicts:
+   - Global handler interfering with inputs
+   - Focus not stable
+
+=====================================
+STEP 1 — REMOVE OLD SYSTEM
+=====================================
+
+DELETE / REMOVE completely:
+
+- Any global qty buffer logic
+- Any setQty() binding on typing
+- Any forced clamp on @input
+- Any conflicting key handlers related to cart
+
+Keep ONLY:
+- updateQty(index, ±1)
+
+=====================================
+STEP 2 — NEW QTY INPUT (NATIVE-FIRST)
+=====================================
+
+Replace qty input with:
+
+<input type="number"
+    min="1"
+    step="1"
+    :value="item.quantity"
+    @focus="$event.target.select()"
+    @input="item.quantity = $event.target.value"
+    @blur="item.quantity = Math.max(1, parseInt(item.quantity) || 1)"
+    class="qty-input">
+
+REQUIREMENTS:
+
+✔ Typing must feel EXACTLY like Excel / spreadsheet
+✔ Empty state allowed while typing
+✔ Clamp ONLY on blur
+✔ No overwrite while typing
+
+=====================================
+STEP 3 — KEYBOARD ISOLATION (STRICT)
+=====================================
+
+In handleKey(e):
+
+ADD at TOP:
+
+if (e.target.closest('input, textarea, select')) return;
+
+RULE:
+
+✔ When typing → ZERO interference
+✔ No preventDefault inside inputs
+
+=====================================
+STEP 4 — CART NAVIGATION (REWRITE)
+=====================================
+
+Implement clean navigation:
+
+Arrow Down:
+→ activeCartIndex = min(index + 1, cart.length - 1)
+
+Arrow Up:
+→ activeCartIndex = max(index - 1, 0)
+
+AFTER CHANGE:
+
+- Focus the qty input of that row
+- Scroll into view (smooth)
+
+NO skipping
+NO jumping
+
+=====================================
+STEP 5 — ACTIVE ROW SYSTEM
+=====================================
+
+- Only ONE active row at a time
+- Visual highlight (existing style)
+
+On click OR focus:
+
+activeCartIndex = index
+
+=====================================
+STEP 6 — +/- BUTTONS (KEEP)
+=====================================
+
+Keep existing:
+
+updateQty(index, +1)
+updateQty(index, -1)
+
+Ensure:
+
+- Works instantly
+- No delay
+- No side effects
+
+=====================================
+STEP 7 — REMOVE ALL CONFLICTS
+=====================================
+
+VERIFY:
+
+- No duplicate key listeners
+- No Alpine watchers overwriting quantity
+- No :value re-renders during typing loop
+
+=====================================
+STEP 8 — TEST CASES (MANDATORY)
+=====================================
+
+You MUST test and confirm:
+
+1. Click qty → type 10 → shows 10 ✅
+2. Backspace → empty → type 5 → shows 5 ✅
+3. Type fast 123 → shows 123 (no lag) ✅
+4. Press ↑ / ↓ → moves EXACTLY one row ✅
+5. Press + / - → works instantly ✅
+6. 10+ cart items → navigation still perfect ✅
+
+=====================================
+STEP 9 — OUTPUT REQUIRED
+=====================================
+
+Provide:
+
+- Exact lines changed
+- Confirmation:
+  ✔ typing fixed
+  ✔ navigation fixed
+  ✔ no regressions
+
+=====================================
+FINAL RULE
+=====================================
+
+If ANY instability remains:
+
+→ BREAK and REBUILD again
+
+We are going LIVE — no compromise allowed

@@ -1,96 +1,83 @@
-# Production Sync Package — 2026-04-24
+# TaxNest Production Sync — 2026-04-24
 
-This package syncs new data from staging to Hostcry production MySQL.
+Sync staging data → Hostcry production MariaDB **in ONE shot**.
 
-## What's Included
+## What it adds to production
+- **PUNJAB PLUS RESTAURANT** (company id=17) + admin user, head office branch, POS Plus subscription
+- **ZIA's 79 invoices** (id 593–671) + **81 invoice_items** for today
 
-| File | Purpose | Rows |
-|---|---|---|
-| `00-PREFLIGHT.sql` | Pre-checks (READ-ONLY) | — |
-| `99-SCHEMA-FIXES.sql` | ALTER TABLE if columns missing | — |
-| `01a-punjab-plus-company.sql` | New company (PUNJAB PLUS) | 1 |
-| `01b-punjab-plus-user.sql` | Owner user (KHALID) | 1 |
-| `01c-punjab-plus-branch.sql` | Head office branch | 1 |
-| `01d-punjab-plus-subscription.sql` | 14-day trial | 1 |
-| `03-zia-invoices.sql` | ZIA's today invoices | 79 |
-| `04-zia-invoice-items.sql` | Invoice line items | 81 |
-| `999-VERIFY.sql` | Post-migration verification | — |
+ZIA company (id=7) and NestPOS (id=11) already exist on prod — untouched.
+**Today's NestPOS POS transactions and FBR POS test data are intentionally NOT in this batch** (test/internal — keep staging-only).
 
-All INSERTs use `INSERT IGNORE` — running twice will NOT create duplicates.
+## Safety
+- All ALTER TABLE use `ADD COLUMN IF NOT EXISTS` → existing columns silently skipped, never altered
+- All INSERT use `INSERT IGNORE` → if a row exists, it's skipped, never overwritten
+- **Primary keys / ID column types are NEVER touched** (no DDL on existing PKs)
+- Pre-migration backup auto-taken if not present (`~/backup-before-sync*.sql`)
+- Fully **idempotent** — safe to re-run if anything fails mid-way
 
-## Step-by-Step Procedure
+## How to run (ONE command on Hostcry)
 
-### 1. BACKUP FIRST (mandatory)
+After `git pull` on Hostcry to get the latest files:
 
-On Hostcry cPanel:
-- Go to **Backup Wizard** → **Partial Backup** → **MySQL Databases**
-- Download the .sql.gz file BEFORE running anything below
-- Or via SSH:
-  ```bash
-  mysqldump -u USER -p --single-transaction --routines DBNAME > backup-$(date +%Y%m%d-%H%M).sql
-  ```
-
-### 2. Upload SQL files to server
-
-Via cPanel **File Manager** → upload all files in this directory to a temp folder like `/home/USER/sync-2026-04-24/`.
-
-Or via SCP/FTP.
-
-### 3. Run preflight checks
-
-Open cPanel **phpMyAdmin** → select your DB → **SQL** tab → paste contents of `00-PREFLIGHT.sql` → Execute.
-
-**Stop and report** if any check returns unexpected result.
-
-### 4. Apply schema fixes (only if needed)
-
-If preflight step 7 shows missing columns:
-- Run `99-SCHEMA-FIXES.sql` via phpMyAdmin SQL tab
-- Note: requires MySQL 8.0.29+ for `IF NOT EXISTS`. Older MySQL — comment out columns that already exist manually.
-
-### 5. Run inserts in order
-
-Via phpMyAdmin SQL tab (one file at a time):
-1. `01a-punjab-plus-company.sql`
-2. `01b-punjab-plus-user.sql`
-3. `01c-punjab-plus-branch.sql`
-4. `01d-punjab-plus-subscription.sql`
-5. `03-zia-invoices.sql`
-6. `04-zia-invoice-items.sql`
-
-Or via SSH (faster):
 ```bash
-cd /home/USER/sync-2026-04-24/
-for f in 01a-punjab-plus-company.sql 01b-punjab-plus-user.sql 01c-punjab-plus-branch.sql 01d-punjab-plus-subscription.sql 03-zia-invoices.sql 04-zia-invoice-items.sql; do
-  echo "Running: $f"
-  mysql -u USER -p DBNAME < "$f"
-done
+cd ~/public_html
+bash database/deploy/2026-04-24-production-sync/run-migration.sh
 ```
 
-### 6. Verify
+That's it. The script:
+1. Takes a fresh backup if needed
+2. Runs schema-align (adds any missing columns to 6 tables)
+3. Inserts PUNJAB PLUS company + user + branch + subscription
+4. Inserts ZIA's 79 invoices + 81 items
+5. Prints VERIFY results so you can confirm
 
-Run `999-VERIFY.sql`. All counts must match expected values.
+## Expected VERIFY output (last lines)
 
-### 7. Login Test on Live
+| check_name | result |
+|---|---|
+| PUNJAB PLUS company present | 1 |
+| PUNJAB PLUS PRA configured | 1 |
+| PUNJAB PLUS user present | 1 |
+| PUNJAB PLUS branch present | 1 |
+| PUNJAB PLUS subscription present | 1 |
+| ZIA invoices today (79 expected) | 79 |
+| ZIA invoice_items today (81 expected) | 81 |
+| Orphan invoice_items (must be 0) | 0 |
 
-Open https://taxnest.com.pk/pos/login → login with:
-- Email: `hassankhan21500@gmail.com`
-- Password: `Admin@12345`
+If any number is off, **STOP** and ping me — DO NOT run anything else.
 
-Should redirect to restaurant POS screen.
+## Rollback (only if something is wrong)
 
-Open https://taxnest.com.pk/login → login with ZIA admin → check today's invoices visible (IDs 593–671).
-
-## Rollback
-
-If anything goes wrong:
 ```bash
-mysql -u USER -p DBNAME < backup-YYYYMMDD-HHMM.sql
+mysql taxnestc_db < ~/backup-before-sync.sql
 ```
 
-## Notes
+That restores the entire DB to pre-migration state.
 
-- `INSERT IGNORE` skips rows whose primary key OR unique key already exists. Safe to re-run.
-- This package does NOT include MALIK CHICKEN BROAST POS transactions or FBR POS test transactions — those companies are staging-only and not yet on production.
-- This package does NOT modify any existing production rows. Only ADDs new ones.
-- PRA production token is included in plain text inside the company INSERT — handle the SQL files securely.
+## Files in this folder
+
+| File | Purpose |
+|---|---|
+| **`run-migration.sh`** | **The one command** — runs everything end-to-end |
+| `MASTER-ALL.sql` | Single concatenated SQL (used by the runner) |
+| `02-SCHEMA-ALIGN.sql` | Standalone schema-align (uses ADD COLUMN IF NOT EXISTS) |
+| `01a..01d` | PUNJAB PLUS company/user/branch/subscription |
+| `03-zia-invoices.sql` | 79 ZIA invoices |
+| `04-zia-invoice-items.sql` | 81 ZIA invoice items |
+| `999-VERIFY.sql` | Verification SELECT queries |
+| `00-PREFLIGHT.sql` | Pre-flight checks (optional, MASTER already runs them implicitly) |
+| `99-SCHEMA-FIXES.sql` | Old/superseded — use `02-SCHEMA-ALIGN.sql` instead |
+| `RUN-ALL.sql` | Old order doc — superseded by run-migration.sh |
+
+## phpMyAdmin alternative (if shell access is limited)
+
+In cPanel → phpMyAdmin → select `taxnestc_db` → SQL tab →
+**Import** tab → upload `MASTER-ALL.sql` (169 KB) → Go.
+
+Then run `999-VERIFY.sql` separately to see verification.
+
+## Post-migration follow-ups
+
+1. Rotate the DB password (it was shared in chat earlier — change in cPanel → MySQL Databases → User → Change Password, then update `.env` `DB_PASSWORD` and run `php artisan config:clear`)
+2. Optional: `php artisan queue:restart` to pick up any queue config changes

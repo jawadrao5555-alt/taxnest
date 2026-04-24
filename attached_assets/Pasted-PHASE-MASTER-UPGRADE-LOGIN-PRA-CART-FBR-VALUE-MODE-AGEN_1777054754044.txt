@@ -1,0 +1,194 @@
+PHASE — MASTER UPGRADE (LOGIN + PRA CART + FBR VALUE MODE + AGENT + UI POLISH)
+
+GOAL:
+One-pass, production-safe upgrade across all 3 products (DI, PRA POS, FBR POS) with ZERO regression in tax logic, PRA/FBR services, or data integrity.
+
+════════════════════════════════════
+A) LOGIN ISOLATION (CRITICAL)
+════════════════════════════════════
+
+1. Remove ANY cross-guard detection/redirect logic.
+   - No auto-redirect based on credentials.
+
+2. Enforce strict guards:
+   /login        → guard:web
+   /pos/login    → guard:pos
+   /fbr-pos/login→ guard:fbrpos
+
+3. Controllers:
+   - Use ONLY Auth::guard('<current>')->attempt()
+   - If fail → return "Invalid credentials"
+   - NO redirect to other panels.
+
+4. Tests:
+   - DI + POS creds → error (no redirect)
+   - POS + DI creds → error
+   - FBR + POS creds → error
+   - Correct creds → success
+
+════════════════════════════════════
+B) PRA POS — CART REBUILD (KEYBOARD-FIRST)
+════════════════════════════════════
+
+REBUILD ONLY CART/ROW INTERACTION (no totals/tax changes).
+
+1) Quantity Input (INTEGER ONLY)
+- Allow transient empty during typing
+- @focus → select()
+- @input → raw value (string)
+- @blur  → clamp: Math.max(1, parseInt(val) || 1)
+- BLOCK decimals at input (pattern / inputmode)
+
+2) Unified Keyboard Engine (no conflicts)
+- Remove any preventDefault while target is input/textarea/select
+- Top guard:
+  if (e.target.closest('input,textarea,select')) return;
+
+3) Navigation (stable)
+- ↑ / ↓ → move active row (exactly one step)
+- After move → auto focus qty input + select()
+
+4) Direct Numeric Typing (no click needed)
+- If active row and user presses [0–9]:
+  → start typing in qty input immediately
+  → replace selected value on first key
+- ESC → blur qty (commit)
+
+5) +/- Buttons
+- + increments, − decrements (min 1)
+- No debounce/lag
+
+6) Visual polish
+- Clear active-row highlight
+- Large, centered qty input (tabular nums)
+- Smooth focus ring (no flicker)
+
+════════════════════════════════════
+C) FBR POS — VALUE MODE (FBR-COMPLIANT)
+════════════════════════════════════
+
+Add VALUE MODE per row (toggle [QTY | VALUE], default QTY).
+
+1) Internal base unit:
+- KG → grams (1000)
+- LTR → ml (1000)
+
+2) VALUE MODE behavior:
+- User edits VALUE (Rs)
+- Compute:
+  grams = round((value / unit_price) * 1000)
+  quantity = grams / 1000
+
+3) Reverse sync:
+- If quantity changes:
+  value = quantity * unit_price
+
+4) FBR payload (unchanged contract):
+- Send quantity in KG/LTR (decimal)
+- Ensure:
+  valueSalesExcludingST == quantity * unit_price
+
+5) Precision:
+- quantity rounded to max 3 decimals
+- Final authority:
+  value = quantity * price (recomputed before submit)
+
+6) Guardrails:
+- Disable VALUE MODE if unit_price <= 0
+- Disable for non-measurable items (PCS/services)
+
+════════════════════════════════════
+D) PRA AGENT — INSTALLER & UX (NO REINSTALL EVER)
+════════════════════════════════════
+
+Switch to proper Windows installer (electron-builder + NSIS).
+
+Installer MUST:
+- Install to Program Files
+- Create Desktop shortcut
+- Create Start Menu entry
+- Add Uninstall entry
+
+App behavior:
+- app.setLoginItemSettings({ openAtLogin: true })
+- Close → minimize to system tray (not exit)
+- Tray menu: Open / Restart / Exit
+- Auto-reconnect on launch
+- Persist agent_api_key
+
+════════════════════════════════════
+E) UI/UX POLISH (ALL PRODUCTS)
+════════════════════════════════════
+
+1) Inputs:
+- Consistent focus ring, no flicker
+- inputmode where applicable (numeric, tel)
+
+2) Lists/Grids:
+- Virtualize large product lists (>300)
+- Debounce searches (60–120ms)
+
+3) Performance:
+- Debounce localStorage writes (300–400ms)
+- Avoid JSON.stringify on every keystroke
+
+4) Feedback:
+- Inline spinners for async (customer search, save)
+- Disable buttons while saving
+
+5) Consistency:
+- Same keyboard hints across DI/POS/FBR
+- Same button sizes and spacing
+
+════════════════════════════════════
+F) SAFETY (DO NOT TOUCH)
+════════════════════════════════════
+
+- PRA services / agent endpoints
+- FBR submission logic (except value-mode pre-calc)
+- Invoice numbering, tax math, schedules
+- Existing database columns (only additive if needed)
+
+════════════════════════════════════
+G) CLEANUP
+════════════════════════════════════
+
+- Remove any legacy "auto-redirect login" code
+- Remove duplicate/old key handlers
+- Remove stale feature flags not used
+- Ensure no dead code paths for cart/qty
+
+════════════════════════════════════
+H) TEST MATRIX (MANDATORY)
+════════════════════════════════════
+
+LOGIN:
+- Cross-guard attempts → error only
+- Correct → success
+
+PRA CART:
+- ↑/↓ stable
+- Type 25 directly → qty=25
+- Backspace → empty → blur → 1
+- +/- instant
+
+FBR VALUE MODE:
+- 200/kg, value=100 → qty=0.5
+- Change qty → value sync
+- Submit → no FBR validation error
+
+AGENT:
+- Install once → shortcut present
+- Restart PC → auto-start
+- Tray works
+
+PERFORMANCE:
+- 20–50 items cart → no lag
+- Search responsive
+
+════════════════════════════════════
+OUTPUT REQUIRED:
+- Files changed (with paths)
+- Before/After notes (qty, login, value mode)
+- Test results (all PASS)
+- No regression confirmation

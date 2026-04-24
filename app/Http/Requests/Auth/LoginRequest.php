@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use App\Models\User;
 use App\Models\AdminUser;
+use App\Models\Company;
 
 class LoginRequest extends FormRequest
 {
@@ -26,6 +27,12 @@ class LoginRequest extends FormRequest
         ];
     }
 
+    /**
+     * PHASE 3 — Login Isolation
+     * 1) Admin first (any panel) → /admin/dashboard
+     * 2) Web (DI) guard ONLY for users whose company is DI (or no company)
+     * 3) Generic "Invalid credentials" — no cross-product redirect, no info leak
+     */
     public function authenticate(): void
     {
         $this->ensureIsNotRateLimited();
@@ -34,8 +41,48 @@ class LoginRequest extends FormRequest
         $password = $this->input('password');
         $remember = $this->boolean('remember');
 
-        $normalizedPhone = preg_replace('/[^0-9]/', '', $login);
+        // ═══ STEP 1 — Admin attempt (universal across all panels) ═══
+        if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
+            $admin = AdminUser::where('email', $login)->first();
+            if ($admin && Auth::guard('admin')->attempt(['email' => $login, 'password' => $password], $remember)) {
+                RateLimiter::clear($this->throttleKey());
+                session(['admin_login_redirect' => true]);
+                return;
+            }
+        }
 
+        // ═══ STEP 2 — Resolve identifier → User (DI only) ═══
+        $user = $this->resolveUserByIdentifier($login);
+
+        if ($user) {
+            $company = $user->company_id ? Company::find($user->company_id) : null;
+            $productType = $company ? $company->product_type : null;
+
+            // STRICT isolation: only DI users (or orphan users with no company) may login here.
+            // POS / FBR-POS users → fall through to generic failure (no info leak).
+            if (($productType === null || $productType === 'di')
+                && Auth::attempt(['email' => $user->email, 'password' => $password], $remember)
+            ) {
+                RateLimiter::clear($this->throttleKey());
+                return;
+            }
+        }
+
+        // ═══ STEP 3 — Generic failure ═══
+        RateLimiter::hit($this->throttleKey());
+
+        throw ValidationException::withMessages([
+            'login' => trans('auth.failed'),
+        ]);
+    }
+
+    /**
+     * Resolve a login identifier (email / phone / username / CNIC / NTN / FBR reg)
+     * into a User. Does NOT verify password — that's done by Auth::attempt afterwards.
+     */
+    private function resolveUserByIdentifier(string $login): ?User
+    {
+        $normalizedPhone = preg_replace('/[^0-9]/', '', $login);
         $user = null;
 
         if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
@@ -56,7 +103,7 @@ class LoginRequest extends FormRequest
         if (!$user) {
             $normalizedId = preg_replace('/[^0-9\-]/', '', $login);
             if (strlen($normalizedId) >= 7) {
-                $company = \App\Models\Company::where(function ($q) use ($login, $normalizedId) {
+                $company = Company::where(function ($q) use ($login, $normalizedId) {
                     $q->where('ntn', $login)
                       ->orWhere('ntn', $normalizedId)
                       ->orWhere('cnic', $login)
@@ -73,25 +120,7 @@ class LoginRequest extends FormRequest
             }
         }
 
-        if ($user && Auth::attempt(['email' => $user->email, 'password' => $password], $remember)) {
-            RateLimiter::clear($this->throttleKey());
-            return;
-        }
-
-        if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
-            $admin = AdminUser::where('email', $login)->first();
-            if ($admin && Auth::guard('admin')->attempt(['email' => $login, 'password' => $password], $remember)) {
-                RateLimiter::clear($this->throttleKey());
-                session(['admin_login_redirect' => true]);
-                return;
-            }
-        }
-
-        RateLimiter::hit($this->throttleKey());
-
-        throw ValidationException::withMessages([
-            'login' => trans('auth.failed'),
-        ]);
+        return $user;
     }
 
     public function ensureIsNotRateLimited(): void

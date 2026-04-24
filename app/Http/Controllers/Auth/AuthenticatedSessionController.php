@@ -27,28 +27,14 @@ class AuthenticatedSessionController extends Controller
     {
         $request->authenticate();
 
+        // PHASE 3 — Admin universal redirect (admin succeeded inside LoginRequest::authenticate)
         if (session()->pull('admin_login_redirect')) {
             $request->session()->regenerate();
             return redirect('/admin/dashboard');
         }
 
-        $user = Auth::user();
-        if ($user && $user->company_id) {
-            $company = \App\Models\Company::find($user->company_id);
-            if ($company && $company->product_type === 'pos') {
-                Auth::guard('web')->logout();
-                $request->session()->invalidate();
-                $request->session()->regenerateToken();
-                return redirect('/pos/login')->with('error', 'This is a POS account. Please login from NestPOS portal.');
-            }
-            if ($company && $company->product_type === 'fbrpos') {
-                Auth::guard('web')->logout();
-                $request->session()->invalidate();
-                $request->session()->regenerateToken();
-                return redirect('/fbr-pos/login')->with('error', 'This is an FBR POS account. Please login from the FBR POS portal.');
-            }
-        }
-
+        // STRICT ISOLATION: LoginRequest now refuses non-DI users with generic
+        // "Invalid credentials". No cross-product redirects here — clean DI flow only.
         $request->session()->regenerate();
 
         return redirect()->intended(route('dashboard', absolute: false));

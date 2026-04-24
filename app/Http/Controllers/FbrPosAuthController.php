@@ -22,6 +22,12 @@ class FbrPosAuthController extends Controller
         return view('fbr-pos.auth.login');
     }
 
+    /**
+     * PHASE 3 — Login Isolation (FBR POS panel)
+     * 1) Admin first (universal) → /admin/dashboard
+     * 2) FBR POS guard ONLY for users whose company.product_type === 'fbrpos'
+     * 3) Generic "Invalid credentials" otherwise — no info leak, no cross-redirect
+     */
     public function login(Request $request)
     {
         $request->validate([
@@ -38,8 +44,22 @@ class FbrPosAuthController extends Controller
         }
 
         $login = trim($request->login);
-        $user = null;
+        $password = $request->password;
+        $remember = $request->boolean('remember');
 
+        // ═══ STEP 1 — Admin attempt (universal) ═══
+        if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
+            $admin = AdminUser::where('email', $login)->first();
+            if ($admin && Hash::check($password, $admin->password)) {
+                RateLimiter::clear($throttleKey);
+                Auth::guard('admin')->login($admin, $remember);
+                $request->session()->regenerate();
+                return redirect('/admin/dashboard');
+            }
+        }
+
+        // ═══ STEP 2 — FBR POS user lookup (strict isolation) ═══
+        $user = null;
         if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
             $user = User::where('email', $login)->first();
         } elseif (preg_match('/^\d{10,13}$/', preg_replace('/\D/', '', $login))) {
@@ -55,51 +75,24 @@ class FbrPosAuthController extends Controller
             $user = User::where('username', $login)->first();
         }
 
-        if ($user && Hash::check($request->password, $user->password)) {
-            $company = Company::find($user->company_id);
+        if ($user && Hash::check($password, $user->password)) {
+            $company = $user->company_id ? Company::find($user->company_id) : null;
 
-            if ($company && $company->product_type === 'di') {
-                RateLimiter::hit($throttleKey);
-                return back()->withErrors([
-                    'login' => 'This is a Digital Invoice account. Please login from the Digital Invoice portal.',
-                ])->withInput($request->only('login'));
-            }
-
-            if ($company && $company->product_type === 'pos') {
-                RateLimiter::hit($throttleKey);
-                return back()->withErrors([
-                    'login' => 'This is a PRA POS account. Please login from the NestPOS portal.',
-                ])->withInput($request->only('login'));
-            }
-
-            if (!$company || !$company->fbr_pos_enabled || $company->product_type !== 'fbrpos') {
-                RateLimiter::hit($throttleKey);
-                return back()->withErrors([
-                    'login' => 'FBR POS is not enabled for your company. Please contact admin.',
-                ])->withInput($request->only('login'));
-            }
-
-            RateLimiter::clear($throttleKey);
-            Auth::guard('fbrpos')->login($user, $request->boolean('remember'));
-            $request->session()->regenerate();
-            $request->session()->forget('url.intended');
-            return redirect('/fbr-pos/create');
-        }
-
-        if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
-            $admin = AdminUser::where('email', $login)->first();
-            if ($admin && Hash::check($request->password, $admin->password)) {
+            if ($company && $company->product_type === 'fbrpos' && $company->fbr_pos_enabled) {
                 RateLimiter::clear($throttleKey);
-                Auth::guard('admin')->login($admin, $request->boolean('remember'));
+                Auth::guard('fbrpos')->login($user, $remember);
                 $request->session()->regenerate();
-                return redirect('/admin/dashboard');
+                $request->session()->forget('url.intended');
+                return redirect('/fbr-pos/create');
             }
+            // Wrong panel / FBR not enabled → fall through to generic failure (no info leak)
         }
 
+        // ═══ STEP 3 — Generic failure ═══
         RateLimiter::hit($throttleKey);
 
         return back()->withErrors([
-            'login' => 'These credentials do not match our records.',
+            'login' => 'Invalid credentials.',
         ])->withInput($request->only('login'));
     }
 

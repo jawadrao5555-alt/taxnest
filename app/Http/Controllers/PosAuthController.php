@@ -27,6 +27,12 @@ class PosAuthController extends Controller
         return view('pos.auth.login');
     }
 
+    /**
+     * PHASE 3 — Login Isolation (POS panel)
+     * 1) Admin first (universal) → /admin/dashboard
+     * 2) POS guard ONLY for users whose company.product_type === 'pos'
+     * 3) Generic "Invalid credentials" otherwise — no info leak, no cross-redirect
+     */
     public function login(Request $request)
     {
         $request->validate([
@@ -34,7 +40,7 @@ class PosAuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        $throttleKey = Str::transliterate(Str::lower($request->input('login')) . '|' . $request->ip());
+        $throttleKey = Str::transliterate(Str::lower($request->input('login')) . '|pos|' . $request->ip());
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
             $seconds = RateLimiter::availableIn($throttleKey);
             return back()->withErrors([
@@ -43,8 +49,22 @@ class PosAuthController extends Controller
         }
 
         $login = trim($request->login);
-        $user = null;
+        $password = $request->password;
+        $remember = $request->boolean('remember');
 
+        // ═══ STEP 1 — Admin attempt (universal) ═══
+        if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
+            $admin = AdminUser::where('email', $login)->first();
+            if ($admin && Hash::check($password, $admin->password)) {
+                RateLimiter::clear($throttleKey);
+                Auth::guard('admin')->login($admin, $remember);
+                $request->session()->regenerate();
+                return redirect('/admin/dashboard');
+            }
+        }
+
+        // ═══ STEP 2 — POS user lookup (strict isolation) ═══
+        $user = null;
         if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
             $user = User::where('email', $login)->first();
         } elseif (preg_match('/^\d{10,13}$/', preg_replace('/\D/', '', $login))) {
@@ -60,54 +80,28 @@ class PosAuthController extends Controller
             $user = User::where('username', $login)->first();
         }
 
-        if ($user && Hash::check($request->password, $user->password)) {
+        if ($user && Hash::check($password, $user->password)) {
             $company = $user->company_id ? Company::find($user->company_id) : null;
 
-            if (!$company || $company->product_type !== 'pos') {
-                if ($company && $company->product_type === 'di') {
-                    RateLimiter::hit($throttleKey);
-                    return back()->withErrors([
-                        'login' => 'This is a Digital Invoice account. Please login from the Digital Invoice portal.',
-                    ])->withInput($request->only('login'));
-                }
-                if ($company && $company->product_type === 'fbrpos') {
-                    RateLimiter::hit($throttleKey);
-                    return back()->withErrors([
-                        'login' => 'This is an FBR POS account. Please login from the FBR POS portal.',
-                    ])->withInput($request->only('login'));
-                }
-                RateLimiter::hit($throttleKey);
-                return back()->withErrors([
-                    'login' => 'This account is not registered for NestPOS.',
-                ])->withInput($request->only('login'));
-            }
-
-            RateLimiter::clear($throttleKey);
-            Auth::guard('pos')->login($user, $request->boolean('remember'));
-            $request->session()->regenerate();
-            $request->session()->forget('url.intended');
-
-            $loginCompany = Company::find($user->company_id);
-            if ($loginCompany && $loginCompany->restaurant_mode) {
-                return redirect('/pos/restaurant/pos');
-            }
-            return redirect('/pos/invoice/create');
-        }
-
-        if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
-            $admin = AdminUser::where('email', $login)->first();
-            if ($admin && Hash::check($request->password, $admin->password)) {
+            if ($company && $company->product_type === 'pos') {
                 RateLimiter::clear($throttleKey);
-                Auth::guard('admin')->login($admin, $request->boolean('remember'));
+                Auth::guard('pos')->login($user, $remember);
                 $request->session()->regenerate();
-                return redirect('/admin/dashboard');
+                $request->session()->forget('url.intended');
+
+                if ($company->restaurant_mode) {
+                    return redirect('/pos/restaurant/pos');
+                }
+                return redirect('/pos/invoice/create');
             }
+            // Wrong panel → fall through to generic failure (no info leak)
         }
 
+        // ═══ STEP 3 — Generic failure ═══
         RateLimiter::hit($throttleKey);
 
         return back()->withErrors([
-            'login' => 'These credentials do not match our records.',
+            'login' => 'Invalid credentials.',
         ])->withInput($request->only('login'));
     }
 

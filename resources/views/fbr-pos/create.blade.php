@@ -855,11 +855,13 @@ kbd {
                 </div>
 
                 <button type="submit" x-ref="completeBtn"
-                    :disabled="!isOnline"
-                    :class="isOnline ? 'bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white' : 'bg-gray-400 text-gray-200 cursor-not-allowed'"
-                    class="w-full py-5 font-black rounded-xl transition text-lg shadow-xl tracking-wide">
-                    <span x-show="isOnline">✓ COMPLETE SALE <span class="opacity-70 text-xs font-normal">(F8 Pay · F9 / Ctrl+B Direct)</span></span>
-                    <span x-show="!isOnline" x-cloak>⚠ OFFLINE — RECONNECT TO SUBMIT</span>
+                    :disabled="!isOnline || submitting"
+                    :class="(isOnline && !submitting) ? 'bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white' : 'bg-gray-400 text-gray-200 cursor-not-allowed'"
+                    class="w-full py-5 font-black rounded-xl transition text-lg shadow-xl tracking-wide flex items-center justify-center gap-2">
+                    <svg x-show="submitting" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    <span x-show="isOnline && !submitting">✓ COMPLETE SALE <span class="opacity-70 text-xs font-normal">(F8 Pay · F9 / Ctrl+B Direct)</span></span>
+                    <span x-show="submitting" x-cloak>SUBMITTING TO FBR...</span>
+                    <span x-show="!isOnline && !submitting" x-cloak>⚠ OFFLINE — RECONNECT TO SUBMIT</span>
                 </button>
             </div>
         </div>
@@ -896,6 +898,7 @@ function fbrPosInvoice() {
         productSearchOpen: false,
         productSearchQuery: '',
         productSearchResults: [],
+        submitting: false, // PHASE 4 — double-submit guard + spinner state
         discountType: '',
         discountValue: 0,
         barcodeBuffer: '',
@@ -1105,6 +1108,8 @@ function fbrPosInvoice() {
         },
         // 📤 Final submit pipeline — used by F8/F9/Ctrl+B/button click
         finalizeAndSubmit(ev) {
+            // PHASE 4 — block double-submit
+            if (this.submitting) return;
             // Offline guard (mirrors button-level check)
             if (!this.isOnline) {
                 this.toast('Internet required for FBR submission. Please reconnect.', 'error');
@@ -1120,6 +1125,8 @@ function fbrPosInvoice() {
             if (removed > 0) {
                 this.toast('Removed ' + removed + ' empty row' + (removed > 1 ? 's' : '') + ' before submitting', 'info');
             }
+            // PHASE 4 — set submitting BEFORE native submit so spinner+disabled paint immediately
+            this.submitting = true;
             // Wait for Alpine to re-render the cleaned items[] before native submit
             this.$nextTick(() => {
                 // Native submit bypasses Alpine @submit listener (no recursion)

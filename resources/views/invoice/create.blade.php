@@ -17,7 +17,7 @@
             </div>
         </div>
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <form method="POST" action="/invoice/store" x-data="invoiceForm()" @keydown.enter.prevent="focusNext($event)" @keydown.ctrl.s.prevent="saveDraft()" @keydown.meta.s.prevent="saveDraft()" @keydown.ctrl.enter.prevent="submitInvoice()" @keydown.meta.enter.prevent="submitInvoice()" @keydown.escape="closeModals()" class="space-y-6">
+            <form method="POST" action="/invoice/store" x-data="invoiceForm()" @submit="if (submitting) { $event.preventDefault(); return; } submitting = true;" @keydown.enter.prevent="focusNext($event)" @keydown.ctrl.s.prevent="saveDraft()" @keydown.meta.s.prevent="saveDraft()" @keydown.ctrl.enter.prevent="submitInvoice()" @keydown.meta.enter.prevent="submitInvoice()" @keydown.escape="closeModals()" class="space-y-6">
                 @csrf
 
                 @if(session('error'))
@@ -511,8 +511,9 @@
 
                 <div class="flex justify-end space-x-3">
                     <a href="/invoices" class="px-6 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700 transition">Cancel</a>
-                    <button type="submit" class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition">
-                        Create Invoice
+                    <button type="submit" :disabled="submitting" class="inline-flex items-center px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed transition">
+                        <svg x-show="submitting" class="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        <span x-text="submitting ? 'Submitting...' : 'Create Invoice'"></span>
                     </button>
                 </div>
 
@@ -537,9 +538,10 @@
                                     <p class="text-lg font-extrabold text-gray-900 dark:text-white" x-text="'PKR ' + Number(grandTotal || 0).toLocaleString()"></p>
                                 </div>
                             </div>
-                            <button type="submit" class="inline-flex items-center px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 shadow-sm transition">
-                                <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Save Invoice
+                            <button type="submit" :disabled="submitting" class="inline-flex items-center px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed shadow-sm transition">
+                                <svg x-show="!submitting" class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                <svg x-show="submitting" class="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                <span x-text="submitting ? 'Saving...' : 'Save Invoice'"></span>
                             </button>
                         </div>
                     </div>
@@ -658,7 +660,9 @@
             }
 
             return {
-                init() { window.invoiceFormInstance = this; this.showQuickProduct = false; this.quickProductName = ''; this.quickProductHs = ''; this.quickProductPrice = ''; this.quickProductUom = 'Numbers, pieces, units'; this.quickProductSchedule = 'standard'; this.quickProductTaxRate = companyStandardRate; this.quickProductSaving = false; this.quickProductItemIndex = null; },
+                // PHASE 4 — note: the merged init() lives lower in this object (after `get buyerRegType()`).
+                // Property defaults below are authoritative; init() only handles side-effects (window ref + focus).
+                submitting: false, // PHASE 4 — double-submit guard + spinner state
                 showQuickProduct: false,
                 quickProductName: '', quickProductHs: '', quickProductPrice: '', quickProductUom: 'Numbers, pieces, units',
                 quickProductSchedule: 'standard', quickProductTaxRate: companyStandardRate, quickProductSaving: false, quickProductItemIndex: null,
@@ -688,6 +692,9 @@
                 },
 
                 init() {
+                    // PHASE 4 — merged init: bridge to global (used by quickProduct modal lines 1421+) + post-render focus.
+                    window.invoiceFormInstance = this;
+                    this.submitting = false; // safety reset on (re)mount
                     this.$nextTick(() => {
                         const errorEl = document.querySelector('.bg-red-50');
                         if (errorEl) {
@@ -952,6 +959,7 @@
                 },
 
                 saveDraft() {
+                    if (this.submitting) return; // PHASE 4 — block double-submit
                     let form = this.$el.closest('form');
                     if (form) {
                         let hiddenInput = form.querySelector('input[name="save_as_draft"]');
@@ -962,15 +970,18 @@
                             hiddenInput.value = '1';
                             form.appendChild(hiddenInput);
                         }
+                        this.submitting = true;
                         form.submit();
                     }
                 },
 
                 submitInvoice() {
+                    if (this.submitting) return; // PHASE 4 — block double-submit
                     let form = this.$el.closest('form');
                     if (form) {
                         let hiddenInput = form.querySelector('input[name="save_as_draft"]');
                         if (hiddenInput) hiddenInput.remove();
+                        this.submitting = true;
                         form.submit();
                     }
                 },

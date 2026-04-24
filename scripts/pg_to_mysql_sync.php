@@ -25,6 +25,16 @@ $pgConn = new PDO($pgDsn, $pg['user'], urldecode($pg['pass'] ?? ''), [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_TIMEOUT => 30,
 ]);
+$pgConn->exec("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY");
+$pgConn->exec("SET default_transaction_read_only = on");
+fwrite(STDERR, "[SAFETY] Postgres session forced READ ONLY.\n");
+try {
+    $pgConn->exec("CREATE TEMP TABLE __ro_check (x int)");
+    fwrite(STDERR, "[SAFETY] !!! READ-ONLY ENFORCEMENT FAILED — aborting !!!\n");
+    exit(1);
+} catch (PDOException $e) {
+    fwrite(STDERR, "[SAFETY] Verified: PG writes blocked (" . substr($e->getMessage(), 0, 60) . "...)\n");
+}
 
 // ---- MySQL target ----
 $myDsn = 'mysql:host=127.0.0.1;port=9000;dbname=taxnest_staging;charset=utf8mb4';
@@ -86,6 +96,16 @@ foreach ($tables as $table) {
     }
     $colNames = array_column($cols, 'column_name');
     $colTypes = array_combine($colNames, array_column($cols, 'data_type'));
+
+    if (getenv('DRY_RUN') === '1') {
+        $myCount = (int) $myConn->query("SELECT COUNT(*) FROM `{$table}`")->fetchColumn();
+        $status = ($pgCount === $myCount) ? 'OK_DRY' : 'DRY_DIFF';
+        printf("%-40s %12d %12d %10s\n", $table, $pgCount, $myCount, $status);
+        if ($pgCount !== $myCount) {
+            $mismatches[] = "$table: PG=$pgCount MY=$myCount";
+        }
+        continue;
+    }
 
     // Truncate target table for clean copy
     try {

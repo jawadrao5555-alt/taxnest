@@ -144,3 +144,9 @@ id = "WQGaz6UoDrnFhrXTEUU2u"
 uri = "file://storage/app/zia_march_2026_full_report.txt"
 type = "text"
 title = "ZIA March 2026 Full Report (Text)"
+
+[[outputs]]
+id = "gYF0dThNiyb7WQnHt2Ri3"
+uri = "file://storage/app/zia_march_2026_FINAL_submitted.csv"
+type = "table"
+title = "ZIA CORPORATION — March 2026 — All 75 Invoices (FINAL Submitted to FBR)"

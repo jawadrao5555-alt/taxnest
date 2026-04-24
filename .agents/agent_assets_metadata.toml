@@ -132,3 +132,15 @@ id = "btZ0vncMuPtTVTGl-YrVS"
 uri = "file://.local/preview/nest-fbr.png"
 type = "image"
 title = "Nest FBR Pos (for comparison)"
+
+[[outputs]]
+id = "aXzJ10U-_pYYi_T8Ysn4x"
+uri = "file://storage/app/zia_march_2026_full_report.csv"
+type = "table"
+title = "ZIA March 2026 Full Report (Excel/CSV)"
+
+[[outputs]]
+id = "WQGaz6UoDrnFhrXTEUU2u"
+uri = "file://storage/app/zia_march_2026_full_report.txt"
+type = "text"
+title = "ZIA March 2026 Full Report (Text)"

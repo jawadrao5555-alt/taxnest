@@ -485,21 +485,31 @@
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Qty</label>
-                                <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6"
-                                    :data-qty-row="index"
-                                    x-init="$el.value = item.quantity; $watch('item.quantity', v => { if(document.activeElement !== $el) $el.value = (v === '' || v === null) ? '' : parseInt(v) || ''; })"
-                                    @input.stop="$event.target.value = $event.target.value.replace(/[^0-9]/g,'')"
-                                    @focus.stop="$event.target.dataset.prev = item.quantity; $event.target.value = ''"
-                                    @click.stop="$event.target.dataset.prev = item.quantity; $event.target.value = ''"
-                                    @blur="(() => { const raw = $event.target.value.replace(/[^0-9]/g,''); const prev = parseInt($event.target.dataset.prev) || 1; let n = raw === '' ? prev : (parseInt(raw,10) || prev); if(!isFinite(n) || n < 1) n = prev || 1; item.quantity = n; $event.target.value = n; recalculate(); })()"
-                                    @keydown.stop
-                                    @keypress.stop
-                                    @keyup.stop
-                                    @keydown.arrow-up.stop.prevent="(() => { $event.target.blur(); const next = document.querySelector('[data-qty-row=\'' + (index - 1) + '\']'); if(next){ setTimeout(() => { next.focus(); }, 0); } })()"
-                                    @keydown.arrow-down.stop.prevent="(() => { $event.target.blur(); const next = document.querySelector('[data-qty-row=\'' + (index + 1) + '\']'); if(next){ setTimeout(() => { next.focus(); }, 0); } })()"
-                                    @keydown.enter.stop.prevent="(() => { $event.target.blur(); const next = document.querySelector('[data-qty-row=\'' + (index + 1) + '\']'); if(next){ setTimeout(() => { next.focus(); }, 0); } })()"
-                                    @keydown.escape.stop.prevent="$event.target.value = $event.target.dataset.prev || item.quantity; $event.target.blur()"
-                                    class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition text-center font-semibold">
+                                {{-- ═══ PHASE 1 — Cart qty: keyboard-first, +/- buttons, select-on-focus ═══ --}}
+                                <div class="flex items-stretch rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 transition">
+                                    <button type="button"
+                                        @click.stop="qtyDec(index)"
+                                        tabindex="-1"
+                                        class="px-2.5 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 active:bg-emerald-100 dark:active:bg-emerald-900/50 font-bold text-lg leading-none transition select-none"
+                                        aria-label="Decrease quantity">−</button>
+                                    <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6"
+                                        :data-qty-row="index"
+                                        x-init="$el.value = item.quantity; $watch('item.quantity', v => { if(document.activeElement !== $el) $el.value = (v === '' || v === null) ? '' : (parseInt(v) || ''); })"
+                                        @input="$event.target.value = $event.target.value.replace(/[^0-9]/g,'')"
+                                        @focus="$nextTick(() => { try { $event.target.select(); } catch(e){} })"
+                                        @click.stop="$nextTick(() => { try { $event.target.select(); } catch(e){} })"
+                                        @blur="(() => { const raw = ($event.target.value || '').replace(/[^0-9]/g,''); let n = raw === '' ? 1 : (parseInt(raw, 10) || 1); if (!isFinite(n) || n < 1) n = 1; item.quantity = n; $event.target.value = n; recalculate(); })()"
+                                        @keydown.arrow-up.prevent="cartNav(-1, index)"
+                                        @keydown.arrow-down.prevent="cartNav(1, index)"
+                                        @keydown.enter.prevent="cartNav(1, index)"
+                                        @keydown.escape.prevent="$event.target.blur()"
+                                        class="flex-1 min-w-0 bg-transparent text-center text-base font-bold tabular-nums text-gray-900 dark:text-gray-100 px-1 py-2 border-0 focus:outline-none focus:ring-0">
+                                    <button type="button"
+                                        @click.stop="qtyInc(index)"
+                                        tabindex="-1"
+                                        class="px-2.5 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 active:bg-emerald-100 dark:active:bg-emerald-900/50 font-bold text-lg leading-none transition select-none"
+                                        aria-label="Increase quantity">+</button>
+                                </div>
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Unit Price</label>
@@ -721,6 +731,61 @@
                 ],
 
                 activeItemIndex: 0,
+
+                // ═══ PHASE 1 — Cart keyboard engine ═══
+                qtyInc(idx) {
+                    if (idx < 0 || idx >= this.items.length) return;
+                    this.activeItemIndex = idx;
+                    const cur = parseInt(this.items[idx].quantity, 10) || 0;
+                    this.items[idx].quantity = cur + 1;
+                    this.recalculate();
+                },
+                qtyDec(idx) {
+                    if (idx < 0 || idx >= this.items.length) return;
+                    this.activeItemIndex = idx;
+                    const cur = parseInt(this.items[idx].quantity, 10) || 1;
+                    this.items[idx].quantity = Math.max(1, cur - 1);
+                    this.recalculate();
+                },
+                cartNav(direction, fromIdx) {
+                    const len = this.items.length;
+                    if (len === 0) return;
+                    const baseIdx = (fromIdx === undefined || fromIdx === null) ? this.activeItemIndex : fromIdx;
+                    const nextIdx = Math.min(len - 1, Math.max(0, baseIdx + direction));
+                    if (nextIdx === baseIdx) return;
+                    this.activeItemIndex = nextIdx;
+                    this.cartFocusActiveQty();
+                },
+                cartFocusActiveQty() {
+                    this.$nextTick(() => {
+                        const el = document.querySelector('[data-qty-row="' + this.activeItemIndex + '"]');
+                        if (el) {
+                            el.focus();
+                            try { el.select(); } catch (e) {}
+                        }
+                    });
+                },
+                cartTypeDigit(digit) {
+                    if (this.items.length === 0) return;
+                    const idx = this.activeItemIndex;
+                    if (idx < 0 || idx >= this.items.length) return;
+                    const n = parseInt(digit, 10);
+                    if (isNaN(n) || n < 0 || n > 9) return;
+                    this.items[idx].quantity = n === 0 ? 1 : n;
+                    this.recalculate();
+                    this.$nextTick(() => {
+                        const el = document.querySelector('[data-qty-row="' + idx + '"]');
+                        if (el) {
+                            el.value = String(this.items[idx].quantity);
+                            el.focus();
+                            try {
+                                const len = el.value.length;
+                                el.setSelectionRange(len, len);
+                            } catch (e) {}
+                        }
+                    });
+                },
+                // ═══ END PHASE 1 cart keyboard engine ═══
 
                 ddOpen: {},
                 ddSearch: {},
@@ -956,7 +1021,6 @@
                 },
 
                 handleGlobalKey(e) {
-                    console.log('MAIN KEY HANDLER', e.key);
                     const tag = document.activeElement?.tagName;
                     const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 
@@ -969,6 +1033,19 @@
 
                     // 🔒 ISOLATION: User typing in input/textarea/select → ignore everything else
                     if (isInput) return;
+
+                    // ═══ PHASE 1 — Cart-level keyboard (only when no modal open + items present) ═══
+                    const noModalOpen = !this.showCustomerModal && !this.showExitModal && !this.showHelpModal;
+                    if (noModalOpen && this.items && this.items.length > 0) {
+                        // ↑/↓ navigate active cart row
+                        if (e.key === 'ArrowUp')   { e.preventDefault(); this.cartNav(-1); return; }
+                        if (e.key === 'ArrowDown') { e.preventDefault(); this.cartNav(1);  return; }
+                        // Direct digit typing → focus active row qty, set value
+                        if (/^[0-9]$/.test(e.key)) { e.preventDefault(); this.cartTypeDigit(e.key); return; }
+                        // +/- to inc/dec active row qty (numpad and main row)
+                        if (e.key === '+' || e.key === '=') { e.preventDefault(); this.qtyInc(this.activeItemIndex); return; }
+                        if (e.key === '-' || e.key === '_') { e.preventDefault(); this.qtyDec(this.activeItemIndex); return; }
+                    }
 
                     // '?' help shortcut
                     if (e.key === '?') { e.preventDefault(); this.showHelpModal = true; return; }
@@ -1266,6 +1343,17 @@
                     this.ddSearch = newSearch;
                     this.ddOpen = newOpen;
                     this.ddHlIdx = newHl;
+                    // PHASE 1 — clamp activeItemIndex after deletion + refocus active qty for keyboard continuity
+                    if (this.items.length === 0) {
+                        this.activeItemIndex = 0;
+                    } else {
+                        if (this.activeItemIndex >= this.items.length) {
+                            this.activeItemIndex = this.items.length - 1;
+                        } else if (this.activeItemIndex > index) {
+                            this.activeItemIndex -= 1;
+                        }
+                        this.cartFocusActiveQty();
+                    }
                     this.recalculate();
                 },
 

@@ -11,7 +11,7 @@ TaxNest is a multi-company SaaS platform for comprehensive tax and invoice manag
 - POS billing is ANNUAL-ONLY (6% discount baked in) — no billing cycle toggle
 - DI billing has full cycle toggle: Monthly / Quarterly(-1%) / Semi-Annual(-3%) / Annual(-6%)
 - POS admin CANNOT login through Digital Invoice /login — auto-redirected to /pos/login
-- **Unified Login**: All login forms (POS, DI, POS modal) auto-detect admin vs company user — single form, no separate admin login button. Admin credentials on any login form → admin guard + redirect to /admin/dashboard. Rate-limited (5 attempts/key).
+- **Unified Login (ADMIN-ONLY auto-detect)**: All login forms (POS, DI, FBR POS) auto-detect ONLY admin credentials → admin guard + redirect to /admin/dashboard. Company users CANNOT cross-login between panels — DI creds on /pos/login = "Invalid credentials" (no redirect). Each company guard (`web`/`pos`/`fbrpos`) is isolated. Rate-limited (5 attempts/key).
 - Login pages use premium dark glassmorphism design: POS = deep purple gradient, DI modal = deep emerald gradient, Admin = indigo-navy gradient, FBR POS = deep blue gradient
 - FBR POS uses isolated `fbrpos` guard — completely separate auth from DI (`web`) and PRA POS (`pos`). Login at `/fbr-pos/login`, register at `/fbr-pos/register`, logout at `/fbr-pos/logout`
 - Test Trading Company (company_id 12, test@testtrading.pk / Admin@12345) — for testing admin approval workflow
@@ -69,7 +69,8 @@ TaxNest is built on Laravel 12 with PHP 8.4, using Breeze for authentication. Th
 - **FBR Reporting Toggle:** Admin-only toggle for FBR reporting with corresponding invoice prefixes.
 - **Local Tabs & Confidential PIN System:** Provides PIN-protected access to local invoice data.
 
-**TaxNest PRA Sync Agent (Desktop Companion App):**
+**TaxNest PRA Sync Agent (Desktop Companion App — SEPARATE REPOSITORY):**
+- **Important:** The Electron desktop agent lives in a SEPARATE GitHub repository (NOT in this Laravel codebase). This codebase only exposes the server-side API endpoints + `/company/agent` UI for key management. All Electron/installer/NSIS work happens in the separate repo.
 - **Architecture:** Electron-based `.exe` desktop app installed on company's local Pakistani PC. Eliminates need for server-side Pakistani IP, relays, or proxies.
 - **Server endpoints** (Bearer auth via `agent_api_key`): `POST /api/agent/heartbeat`, `GET /api/agent/pending-invoices`, `POST /api/agent/submit-result`
 - **Per-company credentials:** `companies.agent_api_key`, `agent_last_seen`, `agent_version`, `agent_enabled` columns. UI at `/company/agent` for key generation/regeneration/toggle/download.

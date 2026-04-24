@@ -1,0 +1,68 @@
+cd ~/public_html/taxnest && curl -sI https://taxnest.com.pk/ | head -3 && php artisan migrate:status 2>&1 | tail -5 && cd ..
+HTTP/2 200 u1 taxnest]$ cd ~/public_html/taxnest && curl -sI https://taxnest.com.pk/ | head -3 && php artisan migrate:status 2>&1 | tail -5 && cd ..
+x-powered-by: PHP/8.4.15
+content-type: text/html; charset=utf-8
+  2026_04_23_062000_add_print_paper_size_to_companies ............... [16] Ran
+  2026_04_23_120000_add_missing_columns_from_production ............. [16] Ran
+  2026_04_23_130000_fix_pos_echo "==== A. Companies (ZIA/PUNJAB/POS) ====" Ran
+mysql -e "SELECT id, name, ntn FROM companies WHERE id IN (7,11,17);" taxnestc_db
+
+echo ""tc@eu1 public_html]$ echo "==== A. Companies (ZIA/PUNJAB/POS) ===="
+echo "==== B. ZIA invoices count ===="mpanies WHERE id IN (7,11,17);" taxnestc_db
+mysql -e "SELECT COUNT(*) as invoices, COUNT(DISTINCT id) as unique_ids FROM invoices WHERE company_id = 7;" taxnestc_db
+echo ""
+echo ""=== B. ZIA invoices count ===="
+echo "==== C. Latest deployed commit ===="NT(DISTINCT id) as unique_ids FROM invoices WHERE company_id = 7;" taxnestc_db
+cd taxnest && git log --oneline -3 && cd ..
+echo ""
+echo ""=== C. Latest deployed commit ===="
+echo "==== D. Force cache rebuild ===="d ..
+cd taxnest && php artisan optimize:clear && php artisan view:clear && php artisan route:clear && php artisan config:cache && cd ..
+echo ""
+echo ""=== D. Force cache rebuild ===="
+echo "==== E. Site fresh test ===="clear && php artisan view:clear && php artisan route:clear && php artisan config:cache && cd ..
+curl -s -o /dev/null -w "HTTP: %{http_code}\n" https://taxnest.com.pk/
+==== A. Companies (ZIA/PUNJAB/POS) ====
++----+--------------------------+---------------+
+| id | name                     | ntn           |tps://taxnest.com.pk/
++----+--------------------------+---------------+
+|  7 | ZIA CORPORATION          | 3638114-4     |
+| 11 | NestPOS Enterprise Store | 0000000000000 |
++----+--------------------------+---------------+
+
+==== B. ZIA invoices count ====
++----------+------------+
+| invoices | unique_ids |
++----------+------------+
+|      176 |        176 |
++----------+------------+
+
+==== C. Latest deployed commit ====
+d49231d (HEAD -> main, origin/main, origin/HEAD) Update database migration to use compatible data type
+c11c12a Add image asset to the project
+1cec0b1 Add an image file to project assets
+
+==== D. Force cache rebuild ====
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.94ms DONE
+  cache .......................................................... 2.00ms DONE
+  compiled ....................................................... 0.49ms DONE
+  events ......................................................... 0.30ms DONE
+  routes ......................................................... 0.84ms DONE
+  views .......................................................... 4.68ms DONE
+
+
+   INFO  Compiled views cleared successfully.
+
+
+   INFO  Route cache cleared successfully.
+
+
+   INFO  Configuration cached successfully.
+
+
+==== E. Site fresh test ====
+HTTP: 200
+[taxnestc@eu1 public_html]$

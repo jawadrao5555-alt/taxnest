@@ -1,0 +1,143 @@
+CREATE MARCH SALES — STEP 1 (DRAFT ONLY — DO NOT SUBMIT)
+
+Company: ZIA CORPORATION
+
+===================================
+TOTAL TARGET
+============
+
+Total Sales = PKR 13,500,000
+
+---
+
+## BREAKUP (STRICT)
+
+EXEMPT SALES = PKR 10,000,000
+TAXABLE SALES = PKR 3,500,000
+
+===================================
+EXEMPT SALES DETAILS
+====================
+
+HS CODE: 1005.1000
+Description: Maize (corn) seeds
+Rate: Exempt
+Sale Type: Exempt goods
+SRO: 6th Schedule Table I
+Serial No: 163
+Price: PKR 500 per KG
+Target: PKR 7,000,000
+
+---
+
+HS CODE: 3808.9210
+Description: Insecticides / pesticides
+Rate: Exempt
+Sale Type: Exempt goods
+SRO: 6th Schedule Table I
+Serial No: 133
+Price: PKR 2,500 per KG
+Target: PKR 2,000,000
+
+---
+
+HS CODE: 2930.2020
+Description: Thiocarbamates
+Rate: Exempt
+Sale Type: Exempt goods
+SRO: 6th Schedule Table I
+Serial No: 100
+Price: PKR 1,000 per KG
+Target: PKR 1,000,000
+
+===================================
+TAXABLE SALES DETAILS
+=====================
+
+Total: PKR 3,500,000
+
+* Use ONLY taxable HS codes from Annex-A
+* Apply correct GST rate (e.g. 18%)
+* Sale Type: Taxable supply
+
+===================================
+DATE RULE
+=========
+
+* Use ONLY March 2026 (01–31)
+* Spread across full month
+* Max 3 invoices per day
+
+===================================
+CUSTOMER NAME RULE (VERY IMPORTANT)
+===================================
+
+* EVERY invoice must have a UNIQUE customer name
+* NO repetition allowed
+
+IMPORTANT:
+
+* Names must be REALISTIC business names
+* DO NOT use random words or numbers
+* DO NOT use:
+  Walk-in Customer
+  Ahmad Traders
+  Ali Enterprises
+  Rehman & Co
+
+Examples of acceptable names:
+
+* Al-Madina Seeds Store
+* Hassan Agri Traders
+* Bilal Crop Solutions
+* Usman Fertilizers
+* Zain Agro Services
+
+===================================
+VALUE DISTRIBUTION
+==================
+
+* 50% → PKR 20,000 – 100,000
+
+* 35% → PKR 100,000 – 300,000
+
+* 15% → PKR 300,000 – 700,000
+
+* ALL values must be UNIQUE
+
+===================================
+QUANTITY RULE
+=============
+
+Quantity = Value ÷ Price
+
+* Must be exact integer
+* No decimals allowed
+* Verify: Quantity × Price = Value
+
+===================================
+GENERAL RULES
+=============
+
+Province: Punjab → Punjab
+Buyer: Unregistered
+Document Type: Sale Invoice
+
+===================================
+STATUS
+======
+
+ALL invoices must be DRAFT ONLY
+DO NOT submit to FBR
+
+===================================
+OUTPUT REQUIRED
+===============
+
+ID | Date | Customer Name | HS Code | Type | Quantity | Value | Tax | Status
+
+===================================
+STOP
+====
+
+After draft creation — WAIT for approval before production

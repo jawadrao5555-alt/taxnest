@@ -14,7 +14,7 @@ return new class extends Migration
                 $table->string('business_category', 60)->nullable()->after('business_activity');
             }
             if (!Schema::hasColumn('companies', 'feature_flags')) {
-                $table->jsonb('feature_flags')->nullable()->after('business_category');
+                $table->json('feature_flags')->nullable()->after('business_category');
             }
             if (!Schema::hasColumn('companies', 'use_universal_pos')) {
                 $table->boolean('use_universal_pos')->default(false)->after('feature_flags');

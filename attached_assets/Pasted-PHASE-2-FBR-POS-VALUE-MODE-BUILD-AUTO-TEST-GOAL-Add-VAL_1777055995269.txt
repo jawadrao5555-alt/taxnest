@@ -1,0 +1,141 @@
+PHASE 2 — FBR POS VALUE MODE (BUILD + AUTO-TEST)
+
+GOAL:
+Add VALUE MODE to FBR POS that lets cashier enter Rs (value) and auto-computes quantity, fully FBR-compliant (no payload mismatch).
+
+════════════════════════════════════
+A) BUILD — VALUE MODE (PER ROW)
+════════════════════════════════════
+
+1) Row State (Alpine / JS)
+Add per-item fields:
+- mode: 'qty' | 'value' (default 'qty')
+- baseUnitFactor: 1000 for KG/LTR (else 1 for PCS)
+- _valueInput: string (transient, for typing)
+
+2) UI
+- Add small toggle on each row: [QTY] [VALUE]
+- When VALUE active:
+  - Show "Value (Rs)" input (autofocus on toggle)
+  - Qty input still visible but read-only (or secondary)
+
+3) Input Rules (VALUE MODE)
+- Accept digits only (strip non-digits except optional decimal point)
+- On @input:
+  - let v = sanitize(valueInput)
+  - if empty → do not mutate state yet
+  - else:
+      const price = item.unit_price
+      if (price <= 0) return
+      const factor = item.baseUnitFactor || 1
+      // compute base units (grams/ml or pcs)
+      const base = Math.round((parseFloat(v) / price) * factor)
+      // clamp
+      const safeBase = Math.max(0, base)
+      // derive qty (decimal for KG/LTR)
+      const qty = factor === 1 ? safeBase : (safeBase / factor)
+      // round qty to max 3 decimals
+      item.quantity = factor === 1 ? safeBase : Math.round(qty * 1000) / 1000
+      // recompute authoritative value
+      item.line_value = item.quantity * price
+      recalculate()
+
+- On @blur:
+  - if empty → revert to last valid (or set 0 → then clamp to min rules if needed)
+
+4) Reverse Sync (QTY → VALUE)
+- When quantity changes (via +/- or typing in QTY mode):
+  - item.line_value = item.quantity * item.unit_price
+
+5) FBR Payload Integrity (DO NOT CHANGE SERVICE)
+Before submit (controller/service untouched):
+- Ensure:
+  valueSalesExcludingST == quantity * unit_price
+- quantity sent in KG/LTR (decimal), not grams
+- rate / SRO / serial logic unchanged
+
+6) Guards
+- Disable VALUE MODE if:
+  - unit_price <= 0
+  - item is non-measurable (optional flag: is_measurable === false)
+- For PCS (factor=1): VALUE MODE allowed, qty becomes integer
+
+════════════════════════════════════
+B) KEYBOARD UX
+════════════════════════════════════
+
+- V → switch active row to VALUE mode
+- Q → switch back to QTY mode
+- In VALUE mode:
+  - numeric keys type into value input (no click needed)
+  - Enter → commit & move to next row
+  - Esc → blur
+
+- Existing cart navigation (↑/↓, +/-) remains unchanged
+
+════════════════════════════════════
+C) AUTOMATED TEST SUITE
+════════════════════════════════════
+
+Run programmatic tests against cart engine (same approach as Phase 1).
+
+SCENARIOS:
+
+1) Basic Conversion (KG)
+- price=200, input value=100
+→ expect quantity=0.5, value=100
+
+2) Decimal Case
+- price=200, value=150
+→ qty=0.75 (≤3 decimals), value=150
+
+3) Rounding Control
+- price=200, value=333
+→ qty rounded to 3 decimals
+→ recomputed value == qtyprice (authoritative)
+
+4) Reverse Sync
+- set qty=2 → value=400
+- set qty=0.5 → value=100
+
+5) PCS Mode
+- factor=1, price=50, value=120
+→ qty=2 (rounded), value=100 OR enforce rounding rule:
+   qty = Math.round(value/price)
+   value = qtyprice
+
+6) Guard: price=0
+→ VALUE MODE disabled, no crash
+
+7) Mixed Interaction
+- toggle VALUE → type 100 → press +
+→ qty increments from computed base correctly
+
+8) Navigation
+- ↓, V, type 50, Enter → next row active, state intact
+
+9) Empty Input
+- clear value → blur → revert to last valid (no NaN)
+
+10) Stress
+- rapid: ↓ V 1 0 0 + - Q 5
+→ stable, no console errors
+
+ASSERTIONS:
+- No console errors
+- quantity always numeric
+- value always equals qty*price (post-recalc)
+- max 3 decimal places for KG/LTR
+- payload consistency invariant holds
+
+════════════════════════════════════
+D) OUTPUT REQUIRED
+════════════════════════════════════
+
+- Files changed (paths + key snippets)
+- PASS/FAIL per scenario
+- Any fixes applied during run
+- FINAL VERDICT: SAFE / NOT SAFE
+
+IMPORTANT:
+If ANY test fails → fix and re-run until ALL PASS, then report SAFE.

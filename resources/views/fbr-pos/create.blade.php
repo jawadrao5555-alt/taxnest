@@ -598,26 +598,62 @@ kbd {
                                     </select>
                                 </div>
                                 <div class="sm:col-span-2">
-                                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Qty *</label>
-                                    <div class="flex items-stretch">
+                                    <div class="flex items-center justify-between mb-1 gap-1">
+                                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400" x-text="(item.mode || 'qty') === 'value' ? 'Value (Rs) *' : 'Qty *'"></label>
+                                        <div class="inline-flex rounded-md overflow-hidden border border-gray-300 dark:border-gray-600 text-[9px] font-bold leading-none">
+                                            <button type="button" tabindex="-1"
+                                                @click="setMode(item, 'qty')"
+                                                :class="(item.mode || 'qty') === 'qty' ? 'bg-blue-600 text-white' : 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'"
+                                                class="px-1.5 py-0.5 transition" title="Quantity mode (Q)">QTY</button>
+                                            <button type="button" tabindex="-1"
+                                                @click="setMode(item, 'value')"
+                                                :disabled="!canUseValueMode(item)"
+                                                :class="(item.mode || 'qty') === 'value' ? 'bg-emerald-600 text-white' : 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'"
+                                                :title="canUseValueMode(item) ? 'Value (Rs) mode (V)' : 'Set unit price first'"
+                                                class="px-1.5 py-0.5 transition disabled:opacity-40 disabled:cursor-not-allowed">VAL</button>
+                                        </div>
+                                    </div>
+                                    {{-- QTY MODE --}}
+                                    <div x-show="(item.mode || 'qty') === 'qty'" class="flex items-stretch">
                                         <button type="button" tabindex="-1" @click="decQty(item)" class="px-2 rounded-l-lg border border-r-0 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100">−</button>
                                         <input type="text" inputmode="decimal" autocomplete="off" maxlength="10"
+                                            :data-qty-row="index"
                                             :name="'items['+index+'][quantity]'"
                                             x-model="item.quantity"
-                                            @input="item.quantity = sanitizeQty($event.target.value)"
+                                            @input="item.quantity = sanitizeQty($event.target.value); syncValueFromQty(item)"
                                             @focus="$nextTick(() => $event.target.select())"
                                             @mousedown="if(document.activeElement !== $event.target){ $event.preventDefault(); $event.target.focus(); $event.target.select(); }"
-                                            @blur="if(!item.quantity || parseFloat(item.quantity) <= 0){ item.quantity = 1; }"
+                                            @blur="if(!item.quantity || parseFloat(item.quantity) <= 0){ item.quantity = 1; } syncValueFromQty(item);"
                                             @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
                                             required
                                             class="w-full min-w-0 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 text-center font-semibold px-1"
                                             placeholder="1">
                                         <button type="button" tabindex="-1" @click="incQty(item)" class="px-2 rounded-r-lg border border-l-0 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100">+</button>
                                     </div>
+                                    {{-- VALUE MODE --}}
+                                    <div x-show="(item.mode || 'qty') === 'value'" class="flex items-stretch">
+                                        <span class="px-2 inline-flex items-center rounded-l-lg border border-r-0 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 text-[11px] font-bold text-emerald-700 dark:text-emerald-300">Rs</span>
+                                        <input type="text" inputmode="decimal" autocomplete="off" maxlength="12"
+                                            :data-value-row="index"
+                                            x-model="item._valueInput"
+                                            @input="item._valueInput = sanitizeQty($event.target.value); applyValueInput(item)"
+                                            @focus="$nextTick(() => $event.target.select())"
+                                            @mousedown="if(document.activeElement !== $event.target){ $event.preventDefault(); $event.target.focus(); $event.target.select(); }"
+                                            @blur="commitValueInput(item)"
+                                            @keydown.enter.prevent="commitValueInput(item); if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
+                                            @keydown.escape.prevent="$event.target.blur()"
+                                            class="w-full min-w-0 rounded-r-lg border border-emerald-300 dark:border-emerald-700 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-emerald-500 focus:border-emerald-500 text-center font-semibold px-1"
+                                            placeholder="0.00">
+                                    </div>
+                                    {{-- Derived qty subscript (visible in value mode) --}}
+                                    <div x-show="(item.mode || 'qty') === 'value' && parseFloat(item.quantity) > 0" class="text-[10px] text-emerald-700 dark:text-emerald-400 mt-0.5 text-center font-semibold">
+                                        ≈ <span x-text="item.quantity"></span> <span x-text="item.uom"></span>
+                                    </div>
                                 </div>
                                 <div class="sm:col-span-2">
                                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Unit Price *</label>
                                     <input type="number" :name="'items['+index+'][unit_price]'" x-model.number="item.unit_price" min="0.01" step="0.01" required
+                                        @input="syncValueFromQty(item)"
                                         @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="0.00">
@@ -855,7 +891,7 @@ kbd {
 function fbrPosInvoice() {
     return {
         uomOptions: ['U','PCS','KG','GM','LTR','ML','MTR','SQM','FT','IN','YDS','PKT','DOZ','BOX','CTN','BAG','BTL','TIN','CAN','BUN','ROL','SET'],
-        items: [{ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0 }],
+        items: [{ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, mode: 'qty', _valueInput: '', line_value: 0 }],
         activeItemIndex: 0,
         productSearchOpen: false,
         productSearchQuery: '',
@@ -934,6 +970,18 @@ function fbrPosInvoice() {
                 if ((e.ctrlKey || e.metaKey) && e.key === 'Delete') {
                     if (this.items.length > 1 && this.activeItemIndex >= 0) { e.preventDefault(); this.removeItem(this.activeItemIndex); }
                     return;
+                }
+                // ═══ PHASE 2 — V/Q mode toggle (only when no input focused) ═══
+                if ((e.key === 'v' || e.key === 'V' || e.key === 'q' || e.key === 'Q') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                    const tag = (e.target && e.target.tagName) || '';
+                    if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+                        if (this.activeItemIndex >= 0 && this.activeItemIndex < this.items.length) {
+                            e.preventDefault();
+                            const targetMode = (e.key === 'v' || e.key === 'V') ? 'value' : 'qty';
+                            this.setMode(this.items[this.activeItemIndex], targetMode);
+                            return;
+                        }
+                    }
                 }
                 if (e.target.tagName === 'INPUT' && ['F2','F3','F4','F5','F8','F9','F11'].indexOf(e.key) === -1) return;
                 if (e.key === 'F9') { e.preventDefault(); this.$refs.completeBtn && this.$refs.completeBtn.click(); }
@@ -1161,7 +1209,7 @@ function fbrPosInvoice() {
             this.loadHeld();
         },
         resetCart() {
-            this.items = [{ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0 }];
+            this.items = [{ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, mode: 'qty', _valueInput: '', line_value: 0 }];
             this.discountType = ''; this.discountValue = 0;
             this.customerName = ''; this.customerPhone = ''; this.customerId = ''; this.customerPoints = null;
             this.promoCode = ''; this.promotionId = ''; this.promoDiscount = 0; this.promoMessage = '';
@@ -1225,15 +1273,81 @@ function fbrPosInvoice() {
         incQty(item) {
             let cur = parseFloat(item.quantity) || 0;
             item.quantity = (cur + 1).toString();
+            this.syncValueFromQty(item);
         },
         decQty(item) {
             let cur = parseFloat(item.quantity) || 0;
             let next = cur - 1;
             if (next < 1) next = 1;
             item.quantity = next.toString();
+            this.syncValueFromQty(item);
+        },
+        // ═══ PHASE 2 — VALUE MODE engine (FBR POS) ═══
+        getBaseFactor(uom) {
+            const u = (uom || '').toString().toUpperCase();
+            if (u === 'KG' || u === 'LTR') return 1000;
+            return 1;
+        },
+        canUseValueMode(item) {
+            return parseFloat(item.unit_price) > 0;
+        },
+        setMode(item, mode) {
+            if (mode !== 'qty' && mode !== 'value') return;
+            if (mode === 'value' && !this.canUseValueMode(item)) return;
+            item.mode = mode;
+            const price = parseFloat(item.unit_price) || 0;
+            const qty = parseFloat(item.quantity) || 0;
+            item.line_value = Math.round(qty * price * 100) / 100;
+            if (mode === 'value') {
+                item._valueInput = item.line_value > 0 ? String(item.line_value) : '';
+            }
+            const self = this;
+            this.$nextTick(() => {
+                const idx = self.items.indexOf(item);
+                if (idx < 0) return;
+                const sel = mode === 'value' ? '[data-value-row="' + idx + '"]' : '[data-qty-row="' + idx + '"]';
+                const el = document.querySelector(sel);
+                if (el) { el.focus(); try { el.select(); } catch(e){} }
+            });
+        },
+        applyValueInput(item) {
+            const raw = (item._valueInput || '').toString().trim();
+            if (raw === '') return;
+            const parsed = parseFloat(raw);
+            if (!isFinite(parsed) || parsed < 0) return;
+            const price = parseFloat(item.unit_price) || 0;
+            if (price <= 0) return;
+            const factor = this.getBaseFactor(item.uom);
+            const base = Math.round((parsed / price) * factor);
+            const safeBase = Math.max(0, base);
+            let qty;
+            if (factor === 1) {
+                qty = safeBase;
+            } else {
+                qty = Math.round((safeBase / factor) * 1000) / 1000;
+            }
+            item.quantity = qty;
+            item.line_value = Math.round(qty * price * 100) / 100;
+        },
+        commitValueInput(item) {
+            const raw = (item._valueInput || '').toString().trim();
+            if (raw === '') {
+                item._valueInput = item.line_value > 0 ? String(item.line_value) : '';
+                return;
+            }
+            this.applyValueInput(item);
+            item._valueInput = item.line_value > 0 ? String(item.line_value) : '';
+        },
+        syncValueFromQty(item) {
+            const qty = parseFloat(item.quantity) || 0;
+            const price = parseFloat(item.unit_price) || 0;
+            item.line_value = Math.round(qty * price * 100) / 100;
+            if (item.mode === 'value') {
+                item._valueInput = item.line_value > 0 ? String(item.line_value) : '';
+            }
         },
         addItem() {
-            this.items.push({ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0 });
+            this.items.push({ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, mode: 'qty', _valueInput: '', line_value: 0 });
             const newIdx = this.items.length - 1;
             this.activeItemIndex = newIdx;
             this.beep(600, 0.05);
@@ -1278,14 +1392,16 @@ function fbrPosInvoice() {
                 this.items[0] = {
                     item_name: p.name, hs_code: p.hs_code || '', uom: p.uom || 'U',
                     quantity: 1, unit_price: parseFloat(p.default_price) || 0,
-                    tax_rate: taxRate, is_tax_exempt: isExempt, item_discount: 0, product_id: p.id
+                    tax_rate: taxRate, is_tax_exempt: isExempt, item_discount: 0, product_id: p.id,
+                    mode: 'qty', _valueInput: '', line_value: parseFloat(p.default_price) || 0
                 };
                 return;
             }
             this.items.push({
                 item_name: p.name, hs_code: p.hs_code || '', uom: p.uom || 'U',
                 quantity: 1, unit_price: parseFloat(p.default_price) || 0,
-                tax_rate: taxRate, is_tax_exempt: isExempt, item_discount: 0, product_id: p.id
+                tax_rate: taxRate, is_tax_exempt: isExempt, item_discount: 0, product_id: p.id,
+                mode: 'qty', _valueInput: '', line_value: parseFloat(p.default_price) || 0
             });
         },
         async scanBarcode() {

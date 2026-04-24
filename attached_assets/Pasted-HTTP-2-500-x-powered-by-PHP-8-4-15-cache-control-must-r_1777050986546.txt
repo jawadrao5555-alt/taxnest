@@ -1,0 +1,59 @@
+HTTP/2 500
+x-powered-by: PHP/8.4.15
+cache-control: must-revalidate, no-cache, no-store, private
+
+==== FRESH error_log (root) ====
+
+==== FRESH public/error_log ====
+
+==== FRESH laravel.log ====
+[2026-04-24 22:03:05] production.CRITICAL: PRODUCTION DB GUARD: expected mysql, got sqlite. Aborting.
+[2026-04-24 22:03:13] production.CRITICAL: PRODUCTION DB GUARD: expected mysql, got sqlite. Aborting.
+[2026-04-24 22:03:13] production.CRITICAL: PRODUCTION DB GUARD: expected mysql, got sqlite. Aborting.
+[2026-04-24 22:03:20] production.CRITICAL: PRODUCTION DB GUARD: expected mysql, got sqlite. Aborting.
+[taxnestc@eu1 public_html]$ echo "==== A. Files in public_html root ===="
+ls -la index.php .htaccess 2>&1
+echo ""
+echo "==== B. Web PHP via ROOT URL ===="
+echo '<?php echo "ROOT_PHP_v" . PHP_VERSION;' > __r.php
+curl -s "https://taxnest.com.pk/__r.php"
+echo ""
+rm -f __r.php
+echo ""
+echo "==== C. Web PHP via public/ subdir ===="
+echo '<?php echo "PUB_PHP_v" . PHP_VERSION;' > public/__p.php
+curl -s "https://taxnest.com.pk/__p.php"
+echo ""
+rm -f public/__p.php
+echo ""
+echo "==== D. .htaccess content ===="
+cat .htaccess 2>/dev/null | head -30
+==== A. Files in public_html root ====
+-rw-r--r-- 1 taxnestc taxnestc  178 Mar 28 10:34 .htaccess
+-rw-r--r-- 1 taxnestc taxnestc 1576 Mar 25 13:30 index.php
+
+==== B. Web PHP via ROOT URL ====
+ROOT_PHP_v8.4.15
+
+==== C. Web PHP via public/ subdir ====
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <meta http-equiv="refresh" content="0;url='https://taxnest.com.pk'" />
+
+        <title>Redirecting to https://taxnest.com.pk</title>
+    </head>
+    <body>
+        Redirecting to <a href="https://taxnest.com.pk">https://taxnest.com.pk</a>.
+    </body>
+</html>
+
+==== D. .htaccess content ====
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php/$1 [L]
+</IfModule>
+[taxnestc@eu1 public_html]$

@@ -495,7 +495,7 @@
                                     <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6"
                                         :data-qty-row="index"
                                         x-init="$el.value = item.quantity; $watch('item.quantity', v => { if(document.activeElement !== $el) $el.value = (v === '' || v === null) ? '' : (parseInt(v) || ''); })"
-                                        @input="$event.target.value = $event.target.value.replace(/[^0-9]/g,'')"
+                                        @input="(() => { let v = $event.target.value.replace(/[^0-9]/g,''); $event.target.value = v; if (v !== '') { item.quantity = parseInt(v, 10) || 1; recalculate(); } })()"
                                         @focus="$nextTick(() => { try { $event.target.select(); } catch(e){} })"
                                         @click.stop="$nextTick(() => { try { $event.target.select(); } catch(e){} })"
                                         @blur="(() => { const raw = ($event.target.value || '').replace(/[^0-9]/g,''); let n = raw === '' ? 1 : (parseInt(raw, 10) || 1); if (!isFinite(n) || n < 1) n = 1; item.quantity = n; $event.target.value = n; recalculate(); })()"

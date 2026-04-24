@@ -786,3 +786,4 @@ Route::post('/api/push/unsubscribe', [\App\Http\Controllers\PushSubscriptionCont
     ->name('push.unsubscribe');
 
 require __DIR__.'/auth.php';
+

@@ -21,3 +21,6 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+.local/mysql_data/
+.local/mysql_run/
+.local/mysql_log/

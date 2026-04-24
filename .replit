@@ -90,7 +90,6 @@ outputType = "console"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "mysqld --defaults-file=/home/runner/workspace/.local/mysql_run/my.cnf"
-waitForPort = 9000
 
 [[ports]]
 localPort = 5000

@@ -357,7 +357,7 @@
                 // updateViaCache: 'none' ensures the SW file itself is never browser-cached → instant updates
                 navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' }).catch(() => {});
             }
-            // Install UI driven by centralized <x-pwa-init /> (single beforeinstallprompt handler).
+            // Install UI driven by the centralized PWA initializer (single beforeinstallprompt handler).
             function tnRevealLegacyInstallUi() {
                 const btn = document.getElementById('pwa-install-btn');
                 if (btn) btn.classList.remove('hidden');

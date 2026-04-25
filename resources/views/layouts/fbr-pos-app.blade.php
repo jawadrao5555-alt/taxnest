@@ -66,14 +66,81 @@
             .main-scroll::-webkit-scrollbar { width: 6px; }
             .main-scroll::-webkit-scrollbar-thumb { background: rgba(156,163,175,0.3); border-radius: 4px; }
             .main-scroll::-webkit-scrollbar-track { background: transparent; }
-            .topnav-bar { background: linear-gradient(135deg, #0c1929 0%, #1e3a5f 40%, #1d4ed8 100%); }
-            .nav-pill { transition: all 0.15s ease; }
-            .nav-pill:hover { background: rgba(255,255,255,0.12); }
-            .nav-pill.active { background: rgba(255,255,255,0.18); box-shadow: 0 0 0 1px rgba(255,255,255,0.1); }
-            .profile-dropdown { animation: slideDown 0.15s ease-out; }
-            .menu-link { transition: all 0.1s ease; }
-            .menu-link:hover { background: rgba(37,99,235,0.08); }
-            .dark .menu-link:hover { background: rgba(59,130,246,0.15); }
+            /* === FBR POS Premium Header === */
+            .topnav-bar {
+                background:
+                    radial-gradient(1100px 220px at 12% -50%, rgba(96,165,250,0.28), transparent 60%),
+                    radial-gradient(900px 180px at 88% -40%, rgba(251,191,36,0.16), transparent 65%),
+                    linear-gradient(135deg, #050b18 0%, #0b1d3d 28%, #1e3a8a 62%, #1d4ed8 100%);
+                box-shadow:
+                    0 1px 0 rgba(255,255,255,0.08) inset,
+                    0 8px 24px -10px rgba(0,0,0,0.55),
+                    0 0 0 1px rgba(255,255,255,0.04);
+                position: relative;
+            }
+            .topnav-bar::after {
+                content: '';
+                position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+                background: linear-gradient(90deg, transparent 0%, rgba(96,165,250,0.55) 25%, rgba(251,191,36,0.45) 55%, rgba(96,165,250,0.55) 80%, transparent 100%);
+                opacity: 0.55;
+            }
+            .nav-pill { transition: all 0.18s cubic-bezier(.4,0,.2,1); position: relative; }
+            .nav-pill:hover { background: rgba(255,255,255,0.14); transform: translateY(-1px); }
+            .nav-pill.active {
+                background: linear-gradient(135deg, rgba(96,165,250,0.28), rgba(59,130,246,0.18));
+                box-shadow: 0 0 0 1px rgba(147,197,253,0.35) inset, 0 4px 14px -4px rgba(59,130,246,0.45);
+            }
+            .nav-pill.active::after {
+                content: ''; position: absolute; left: 14%; right: 14%; bottom: -2px; height: 2px;
+                background: linear-gradient(90deg, transparent, #fbbf24, transparent);
+                border-radius: 2px;
+            }
+            /* Premium gold-accented FBR badge */
+            .fbr-badge-premium {
+                background: linear-gradient(135deg, rgba(251,191,36,0.18) 0%, rgba(245,158,11,0.10) 100%);
+                color: #fcd34d;
+                border: 1px solid rgba(251,191,36,0.35);
+                box-shadow: 0 0 0 1px rgba(0,0,0,0.18) inset, 0 4px 10px -4px rgba(251,191,36,0.5);
+                text-shadow: 0 1px 0 rgba(0,0,0,0.25);
+                letter-spacing: 0.06em;
+            }
+            /* Brand mark with subtle inner glow */
+            .brand-tile-fbr {
+                background: linear-gradient(135deg, rgba(255,255,255,0.20) 0%, rgba(96,165,250,0.18) 50%, rgba(251,191,36,0.10) 100%);
+                box-shadow: 0 0 0 1px rgba(255,255,255,0.18) inset, 0 4px 12px -4px rgba(59,130,246,0.45);
+            }
+            /* Profile avatar ring */
+            .avatar-ring-fbr {
+                background: linear-gradient(135deg, #fbbf24 0%, #60a5fa 50%, #1d4ed8 100%);
+                box-shadow: 0 4px 14px -4px rgba(251,191,36,0.55), 0 0 0 1px rgba(255,255,255,0.18) inset;
+            }
+            .profile-dropdown {
+                animation: slideDown 0.18s cubic-bezier(.4,0,.2,1);
+                box-shadow: 0 25px 60px -15px rgba(15,23,42,0.55), 0 0 0 1px rgba(15,23,42,0.06);
+            }
+            .menu-link { transition: all 0.12s ease; border-left: 2px solid transparent; }
+            .menu-link:hover { background: linear-gradient(90deg, rgba(37,99,235,0.10), transparent 70%); border-left-color: #2563eb; padding-left: calc(1rem + 2px); }
+            .dark .menu-link:hover { background: linear-gradient(90deg, rgba(59,130,246,0.18), transparent 70%); border-left-color: #60a5fa; }
+            /* Premium page background — subtle navy/blue wash with corner gradients */
+            .fbr-page-bg {
+                background:
+                    radial-gradient(circle 800px at 100% 0%, rgba(96,165,250,0.10), transparent 60%),
+                    radial-gradient(circle 600px at 0% 100%, rgba(251,191,36,0.06), transparent 55%),
+                    linear-gradient(180deg, #f5f8ff 0%, #f1f5fb 100%);
+            }
+            .dark .fbr-page-bg {
+                background:
+                    radial-gradient(circle 800px at 100% 0%, rgba(59,130,246,0.10), transparent 60%),
+                    radial-gradient(circle 600px at 0% 100%, rgba(251,191,36,0.04), transparent 55%),
+                    linear-gradient(180deg, #030712 0%, #0a1124 100%);
+            }
+            /* Premium session toast banners */
+            .fbr-banner-success {
+                background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+                border: 1px solid #6ee7b7;
+                box-shadow: 0 6px 18px -8px rgba(16,185,129,0.35), 0 0 0 1px rgba(16,185,129,0.10) inset;
+            }
+            .dark .fbr-banner-success { background: linear-gradient(135deg, rgba(6,78,59,0.40), rgba(6,95,70,0.30)); border-color: rgba(16,185,129,0.45); }
             [x-cloak] { display: none !important; }
         </style>
         {{-- PWA service worker (FBR POS scope) --}}
@@ -93,13 +160,14 @@
                 <div class="flex items-center justify-between px-3 sm:px-5 h-12">
 
                     <div class="flex items-center gap-3">
-                        <a href="{{ route('fbrpos.dashboard') }}" class="flex items-center gap-2 group">
-                            <div class="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center group-hover:bg-white/25 transition">
-                                <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                        <a href="{{ route('fbrpos.dashboard') }}" class="flex items-center gap-2.5 group">
+                            <div class="brand-tile-fbr w-8 h-8 rounded-xl flex items-center justify-center transition group-hover:scale-105">
+                                <svg class="w-4 h-4 text-white drop-shadow" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                             </div>
-                            <div class="hidden sm:block">
+                            <div class="hidden sm:flex items-center gap-1.5">
                                 <span class="text-sm font-extrabold text-white tracking-tight">FBR POS</span>
-                                <span class="text-[9px] text-white/70 ml-1 hidden lg:inline">by TaxNest</span>
+                                <span class="hidden lg:inline-flex items-center px-1.5 py-0.5 rounded-md text-[8.5px] font-black tracking-widest fbr-badge-premium">PREMIUM</span>
+                                <span class="text-[9px] text-white/60 ml-0.5 hidden xl:inline">by TaxNest</span>
                             </div>
                         </a>
 
@@ -120,14 +188,15 @@
                     <div class="flex items-center gap-2">
                         <x-pwa-install color="blue" label="Install" />
                         <x-pwa-refresh-btn color="blue" />
-                        <span class="hidden lg:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-blue-200 border border-white/10">
-                            FBR POS
+                        <span class="hidden lg:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider fbr-badge-premium">
+                            <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z"/></svg>
+                            FBR CERTIFIED
                         </span>
 
                         <div class="relative">
-                            <button @click="profileOpen = !profileOpen" class="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-white/10 transition">
-                                <div class="w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-xs font-bold shadow-md">
-                                    {{ $userInitial }}
+                            <button @click="profileOpen = !profileOpen" class="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-white/10 transition group">
+                                <div class="avatar-ring-fbr w-8 h-8 rounded-full p-[1.5px] flex items-center justify-center transition group-hover:scale-105">
+                                    <div class="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-indigo-700 flex items-center justify-center text-white text-xs font-black">{{ $userInitial }}</div>
                                 </div>
                                 <div class="hidden sm:block text-left">
                                     <p class="text-xs font-semibold text-white leading-tight truncate max-w-[100px]">{{ $userName }}</p>
@@ -246,7 +315,7 @@
                 </div>
             </header>
 
-            <main class="flex-1 overflow-y-auto overflow-x-hidden main-scroll bg-slate-50 dark:bg-gray-950 page-fade" style="min-width: 0;">
+            <main class="flex-1 overflow-y-auto overflow-x-hidden main-scroll page-fade fbr-page-bg" style="min-width: 0;">
                 @if(session('success'))
                     <div class="max-w-7xl mx-auto mb-4 px-4 sm:px-6 pt-4">
                         <div class="bg-emerald-50 dark:bg-emerald-900/30 border-2 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 px-4 py-3 rounded-lg font-semibold shadow-sm">

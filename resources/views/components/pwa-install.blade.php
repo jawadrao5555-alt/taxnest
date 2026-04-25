@@ -93,7 +93,7 @@ Colors: emerald | purple | blue
         return;
     }
 
-    // Listen to centralized install-ready event (fired by <x-pwa-init />)
+    // Listen to centralized install-ready event (fired by the central PWA initializer)
     if (window.tnPwaCanInstall) showBtn();
     document.addEventListener('tn-pwa-can-install', showBtn);
     document.addEventListener('tn-pwa-installed', () => { btn.style.display = 'none'; });

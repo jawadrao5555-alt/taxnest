@@ -296,7 +296,7 @@ kbd {
     {{-- 📱 Sticky Bottom Mobile Pay Bar (visible only on mobile/tablet) --}}
     <div class="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-t-2 border-blue-200 dark:border-blue-800 px-3 py-2.5 shadow-2xl flex items-center gap-2">
         <div class="flex-1 min-w-0">
-            <div class="text-[9px] uppercase tracking-wider text-gray-500 dark:text-gray-400 leading-tight">Total</div>
+            <div class="text-[9px] uppercase tracking-wider font-bold text-slate-600 dark:text-slate-300 leading-tight">Total</div>
             <div class="text-lg font-black tabular-nums text-emerald-600 dark:text-emerald-400 leading-tight truncate" x-text="'Rs ' + formatNum(calcTotal())"></div>
         </div>
         <button type="button" @click="$refs.completeBtn && $refs.completeBtn.click()"
@@ -319,7 +319,7 @@ kbd {
         <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-5 w-80">
             <div class="flex items-center justify-between mb-3">
                 <h3 class="font-bold dark:text-white text-lg">Numpad → Cash</h3>
-                <button @click="numpadOpen = false" class="text-gray-500 hover:text-red-600 text-xl">✕</button>
+                <button @click="numpadOpen = false" class="text-slate-500 dark:text-slate-300 hover:text-red-600 text-xl font-bold">✕</button>
             </div>
             <input type="text" readonly :value="'Rs ' + formatNum(cashReceived || 0)" class="w-full mb-3 text-right text-3xl font-black bg-gray-100 dark:bg-gray-900 dark:text-white rounded-lg px-3 py-3 tabular-nums">
             <div class="grid grid-cols-3 gap-2">
@@ -349,9 +349,9 @@ kbd {
                     <span class="inline-flex w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-blue-600 text-white items-center justify-center font-black text-sm">F8</span>
                     Choose Payment Method
                 </h3>
-                <button type="button" @click="paymentModalOpen = false" class="text-gray-400 hover:text-red-600 text-2xl leading-none">✕</button>
+                <button type="button" @click="paymentModalOpen = false" class="text-slate-500 dark:text-slate-300 hover:text-red-600 text-2xl leading-none font-bold">✕</button>
             </div>
-            <div class="text-xs text-gray-500 mb-3">Use <kbd class="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">1-4</kbd> · <kbd class="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">↑↓</kbd> + <kbd class="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">Enter</kbd> · <kbd class="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">Esc</kbd> to cancel</div>
+            <div class="text-xs font-semibold text-slate-600 dark:text-slate-300 mb-3">Use <kbd class="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">1-4</kbd> · <kbd class="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">↑↓</kbd> + <kbd class="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">Enter</kbd> · <kbd class="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">Esc</kbd> to cancel</div>
 
             <div class="grid grid-cols-2 gap-3">
                 <template x-for="(m, i) in paymentMethods" :key="m.value">
@@ -366,7 +366,7 @@ kbd {
                             <span class="inline-flex w-7 h-7 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 items-center justify-center font-black text-sm" x-text="i + 1"></span>
                         </div>
                         <div class="font-bold text-base dark:text-white" x-text="m.label"></div>
-                        <div class="text-[10px] text-gray-500 mt-0.5" x-text="m.hint"></div>
+                        <div class="text-[10px] font-bold text-slate-600 dark:text-slate-300 mt-0.5" x-text="m.hint"></div>
                     </button>
                 </template>
             </div>
@@ -443,13 +443,13 @@ kbd {
     {{-- Recall Modal --}}
     <div x-show="recallOpen" x-cloak @click.self="recallOpen = false" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full p-5 max-h-[80vh] overflow-y-auto">
-            <div class="flex items-center justify-between mb-3"><h3 class="font-bold dark:text-white">Held Sales</h3><button type="button" @click="recallOpen = false" class="text-gray-500 hover:text-gray-800">✕</button></div>
-            <template x-if="heldList.length === 0"><p class="text-sm text-gray-500 py-6 text-center">No held sales</p></template>
+            <div class="flex items-center justify-between mb-3"><h3 class="font-bold dark:text-white">Held Sales</h3><button type="button" @click="recallOpen = false" class="text-slate-500 dark:text-slate-300 hover:text-red-600 text-xl font-bold">✕</button></div>
+            <template x-if="heldList.length === 0"><p class="text-sm font-semibold text-slate-600 dark:text-slate-300 py-6 text-center">No held sales</p></template>
             <template x-for="h in heldList" :key="h.id">
                 <div class="border dark:border-gray-700 rounded-lg p-3 mb-2 flex items-center justify-between">
                     <div>
                         <div class="font-semibold dark:text-white" x-text="h.hold_name"></div>
-                        <div class="text-xs text-gray-500" x-text="(h.customer_name || 'Walk-in') + ' · ' + new Date(h.created_at).toLocaleString()"></div>
+                        <div class="text-xs font-semibold text-slate-600 dark:text-slate-300" x-text="(h.customer_name || 'Walk-in') + ' · ' + new Date(h.created_at).toLocaleString()"></div>
                     </div>
                     <div class="flex gap-2">
                         <button type="button" @click="recallSale(h.id)" class="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-bold">Recall</button>
@@ -509,9 +509,10 @@ kbd {
                                             .then(data => { searchResults = data; searchHi = 0; searchOpen = data.length > 0; })
                                     } else { searchResults = []; searchOpen = false; }
                                 "
+                                @keydown="handleScanInputShortcut($event)"
                                 @keydown.arrow-down.prevent="if (searchOpen && searchResults.length) { searchHi = (searchHi + 1) % searchResults.length; }"
                                 @keydown.arrow-up.prevent="if (searchOpen && searchResults.length) { searchHi = (searchHi - 1 + searchResults.length) % searchResults.length; }"
-                                @keydown.escape.prevent="searchOpen = false; searchResults = []; searchHi = 0;"
+                                @keydown.escape.prevent="if (qtyMultiplier > 1) { qtyMultiplier = 1; toast('Multiplier cleared', 'info'); } searchOpen = false; searchResults = []; searchHi = 0;"
                                 @keydown.enter.prevent="
                                     if (searchOpen && searchResults.length > 0) {
                                         addProductItem(searchResults[searchHi]);
@@ -524,6 +525,10 @@ kbd {
                                 autocomplete="off"
                                 class="flex-1 bg-transparent border-0 focus:ring-0 text-base font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:font-medium placeholder:text-sm placeholder:font-sans"
                                 placeholder="🔎 Type name · SKU · barcode · HS code  ·  or scan with hardware scanner">
+                            <span x-show="qtyMultiplier > 1"
+                                  class="text-[10px] font-black px-2 py-0.5 bg-amber-500 text-white rounded-md shadow-sm tracking-wider animate-pulse"
+                                  x-text="'× ' + qtyMultiplier + ' NEXT'"
+                                  title="Quantity multiplier active — Esc to cancel"></span>
                             <span class="text-[10px] font-bold px-2 py-0.5 bg-emerald-600 text-white rounded-md shadow-sm tracking-wider">● LIVE</span>
                             <span x-show="scanStatus" :class="scanStatus.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'" class="text-xs font-bold" x-text="scanStatus.msg"></span>
                         </div>
@@ -587,7 +592,7 @@ kbd {
                             <div class="flex items-center justify-between mb-3">
                                 <div class="flex items-center gap-2.5">
                                     <span class="item-num-badge inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-black tabular-nums" x-text="index + 1"></span>
-                                    <span class="text-sm font-semibold text-gray-700 dark:text-gray-200" x-text="item.item_name || (item.product_id ? ('Product #' + item.product_id) : 'New Item')"></span>
+                                    <span class="text-sm font-bold text-slate-900 dark:text-white" x-text="item.item_name || (item.product_id ? ('Product #' + item.product_id) : 'New Item')"></span>
                                     <span x-show="item.is_tax_exempt"
                                         class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">EXEMPT</span>
                                     <span x-show="!item.is_tax_exempt && item.tax_rate != 18"
@@ -611,7 +616,7 @@ kbd {
                                         placeholder="Product name">
                                 </div>
                                 <div class="sm:col-span-2">
-                                    <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">HS Code <span class="text-gray-400 font-normal">(Opt.)</span></label>
+                                    <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">HS Code <span class="text-slate-500 dark:text-slate-400 font-bold normal-case">(Opt.)</span></label>
                                     <input type="text" :name="'items['+index+'][hs_code]'" x-model="item.hs_code"
                                         @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
@@ -653,10 +658,24 @@ kbd {
                                             @input="item.quantity = sanitizeQty($event.target.value); syncValueFromQty(item)"
                                             @focus="$event.target.select()"
                                             @blur="if(!item.quantity || parseFloat(item.quantity) <= 0){ item.quantity = 1; } syncValueFromQty(item);"
-                                            @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
+                                            @keydown.arrow-up.prevent="incQty(item); $event.target.select();"
+                                            @keydown.arrow-down.prevent="decQty(item); $event.target.select();"
+                                            @keydown.escape.prevent="$refs.barcodeInput && $refs.barcodeInput.focus()"
+                                            @keydown.enter.prevent="
+                                                if (item.product_id) {
+                                                    /* Scanned item — go back to scan input for next item */
+                                                    $refs.barcodeInput && $refs.barcodeInput.focus();
+                                                } else if (item.item_name && parseFloat(item.unit_price) > 0) {
+                                                    /* Manual row — add another manual row */
+                                                    addItem(); focusLastRowName();
+                                                } else {
+                                                    $refs.barcodeInput && $refs.barcodeInput.focus();
+                                                }
+                                            "
                                             required
                                             class="w-full min-w-0 border-0 dark:bg-gray-800 dark:text-white text-base font-bold tabular-nums shadow-inner focus:ring-2 focus:ring-blue-500 focus:outline-none text-center px-1"
-                                            placeholder="1">
+                                            placeholder="1"
+                                            title="↑/↓ +1/-1 · Esc back to scan · Enter back to scan">
                                         <button type="button" tabindex="-1" @click="incQty(item)"
                                             class="px-3 sm:px-3.5 border-l border-blue-200 dark:border-blue-800 bg-gradient-to-b from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-900/50 text-blue-700 dark:text-blue-300 text-base font-black hover:from-blue-100 hover:to-blue-200 dark:hover:from-blue-900/50 dark:hover:to-blue-900/70 active:scale-95 transition-all select-none">+</button>
                                     </div>
@@ -687,10 +706,36 @@ kbd {
                                             @focus="$nextTick(() => $event.target.select())"
                                             @mousedown="if(document.activeElement !== $event.target){ $event.preventDefault(); $event.target.focus(); $event.target.select(); }"
                                             @blur="commitValueInput(item)"
-                                            @keydown.enter.prevent="commitValueInput(item); if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
-                                            @keydown.escape.prevent="$event.target.blur()"
+                                            @keydown.arrow-up.prevent="
+                                                /* +1 unit-price worth */
+                                                const cur = parseFloat(item._valueInput) || 0;
+                                                const step = parseFloat(item.unit_price) || 1;
+                                                item._valueInput = (cur + step).toFixed(2);
+                                                applyValueInput(item);
+                                                $event.target.select();
+                                            "
+                                            @keydown.arrow-down.prevent="
+                                                const cur = parseFloat(item._valueInput) || 0;
+                                                const step = parseFloat(item.unit_price) || 1;
+                                                const next = Math.max(0, cur - step);
+                                                item._valueInput = next.toFixed(2);
+                                                applyValueInput(item);
+                                                $event.target.select();
+                                            "
+                                            @keydown.enter.prevent="
+                                                commitValueInput(item);
+                                                if (item.product_id) {
+                                                    $refs.barcodeInput && $refs.barcodeInput.focus();
+                                                } else if (item.item_name && parseFloat(item.unit_price) > 0) {
+                                                    addItem(); focusLastRowName();
+                                                } else {
+                                                    $refs.barcodeInput && $refs.barcodeInput.focus();
+                                                }
+                                            "
+                                            @keydown.escape.prevent="commitValueInput(item); $refs.barcodeInput && $refs.barcodeInput.focus();"
                                             class="w-full min-w-0 rounded-r-lg border border-emerald-300 dark:border-emerald-700 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-emerald-500 focus:border-emerald-500 text-center font-semibold px-1"
-                                            placeholder="0.00">
+                                            placeholder="0.00"
+                                            title="↑/↓ ±1 unit-price worth · Esc back to scan · Enter back to scan">
                                     </div>
                                     {{-- Derived qty subscript (visible in value mode) --}}
                                     <div x-show="(item.mode || 'qty') === 'value' && parseFloat(item.quantity) > 0" class="text-[10px] text-emerald-700 dark:text-emerald-400 mt-0.5 text-center font-semibold">
@@ -717,12 +762,12 @@ kbd {
                             </div>
                             <div class="flex flex-wrap items-center justify-between mt-2 gap-3">
                                 <div class="flex items-center gap-3">
-                                    <label class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 cursor-pointer">
+                                    <label class="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer">
                                         <input type="checkbox" :name="'items['+index+'][is_tax_exempt]'" x-model="item.is_tax_exempt" value="1"
                                             class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
                                         Tax Exempt
                                     </label>
-                                    <label class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                    <label class="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">
                                         <span>Item Discount (PKR):</span>
                                         <input type="number" :name="'items['+index+'][item_discount]'" x-model.number="item.item_discount" min="0" step="0.01"
                                             class="w-24 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs shadow-sm focus:ring-blue-500 focus:border-blue-500"
@@ -741,17 +786,26 @@ kbd {
                         <span class="add-cta-shine absolute inset-0 pointer-events-none"></span>
                         <span class="relative z-10 w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xl font-black shadow-md group-hover:scale-110 group-hover:rotate-90 transition-all duration-300">+</span>
                         <span class="relative z-10 text-blue-700 dark:text-blue-300 group-hover:text-white font-bold text-base tracking-wide transition-colors">Add Another Product</span>
-                        <span class="relative z-10 hidden sm:inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 group-hover:text-white/80 ml-2 transition-colors">
+                        <span class="relative z-10 hidden sm:inline-flex items-center gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300 group-hover:text-white/80 ml-2 transition-colors">
                             press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> or <kbd>F6</kbd>
                         </span>
                     </button>
 
                     {{-- Keyboard hints strip --}}
-                    <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-gray-500 dark:text-gray-400 px-1">
+                    <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300 px-1">
                         <span><kbd>Ctrl</kbd>+<kbd>K</kbd> Search → <kbd>↓</kbd><kbd>↑</kbd><kbd>Enter</kbd> add</span>
                         <span class="px-2 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-bold"><kbd>Enter</kbd> = Add Product / Next Row</span>
                         <span><kbd>Ctrl</kbd>+<kbd>D</kbd> Duplicate · <kbd>Ctrl</kbd>+<kbd>Del</kbd> Remove</span>
                         <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 font-bold"><kbd>F8</kbd> / <kbd>F9</kbd> / <kbd>Ctrl</kbd>+<kbd>B</kbd> = OPEN PAYMENT CONFIRM</span>
+                        <span class="w-full"></span>
+                        <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 font-bold">Quantity tricks (no mouse needed):</span>
+                        <span><kbd>3</kbd>+<kbd>*</kbd> in scan box → next item adds with qty 3</span>
+                        <span><kbd>*</kbd> alone → jump to last row's qty</span>
+                        <span><kbd>+</kbd> / <kbd>-</kbd> in scan box → bump last row qty ±1</span>
+                        <span><kbd>↑</kbd>/<kbd>↓</kbd> inside qty/value field → ±1</span>
+                        <span><kbd>Ctrl</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> anywhere → bump last row qty</span>
+                        <span><kbd>Alt</kbd>+<kbd>Q</kbd> anywhere → focus last row qty</span>
+                        <span><kbd>Esc</kbd> in qty/value → back to scan input</span>
                         <span><kbd>F2</kbd> Cash · <kbd>F3</kbd> Numpad · <kbd>F4</kbd> Hold · <kbd>F5</kbd> Recall · <kbd>F12</kbd> Reprint</span>
                     </div>
                 </div>
@@ -821,7 +875,7 @@ kbd {
                                 <option value="bank_transfer">Bank Transfer</option>
                                 <option value="online">Online</option>
                             </select>
-                            <p class="text-[11px] text-gray-500 mt-1">Press <kbd class="px-1 bg-gray-200 dark:bg-gray-700 rounded text-[10px]">F8</kbd> to pick payment method &amp; complete sale</p>
+                            <p class="text-[11px] font-semibold text-slate-600 dark:text-slate-300 mt-1">Press <kbd class="px-1 bg-gray-200 dark:bg-gray-700 rounded text-[10px]">F8</kbd> to pick payment method &amp; complete sale</p>
                         </div>
                         <div>
                             <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Discount Type</label>
@@ -841,29 +895,29 @@ kbd {
 
                 <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 p-5">
                     <div class="space-y-2 text-sm">
-                        <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                        <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold">
                             <span>Subtotal</span>
                             <span x-text="'PKR ' + formatNum(calcSubtotal())"></span>
                         </div>
-                        <div class="flex justify-between text-gray-600 dark:text-gray-400" x-show="calcDiscount() > 0">
+                        <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold" x-show="calcDiscount() > 0">
                             <span>Discount</span>
                             <span class="text-red-600" x-text="'-PKR ' + formatNum(calcDiscount())"></span>
                         </div>
-                        <div class="flex justify-between text-gray-600 dark:text-gray-400" x-show="promoDiscount > 0">
+                        <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold" x-show="promoDiscount > 0">
                             <span>Promo <span class="text-xs" x-text="'(' + promoCode + ')'"></span></span>
                             <span class="text-emerald-600" x-text="'-PKR ' + formatNum(promoDiscount)"></span>
                         </div>
-                        <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                        <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold">
                             <span>Tax</span>
                             <span x-text="'PKR ' + formatNum(calcTax())"></span>
                         </div>
                         @if($fbrReportingEnabled)
-                        <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                        <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold">
                             <span>FBR POS Fee <span class="text-xs">(SRO 1279/2021)</span></span>
                             <span>PKR 1.00</span>
                         </div>
                         @endif
-                        <div class="flex justify-between text-gray-600 dark:text-gray-400" x-show="loyaltyRedeem > 0">
+                        <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold" x-show="loyaltyRedeem > 0">
                             <span>Loyalty Redeemed <span class="text-xs" x-text="'(' + loyaltyRedeem + ' pts)'"></span></span>
                             <span class="text-emerald-600" x-text="'-PKR ' + formatNum(loyaltyRedeem * loyaltyPointValue)"></span>
                         </div>
@@ -925,7 +979,7 @@ kbd {
                     <span x-show="!isOnline && !submitting" x-cloak>⚠ OFFLINE — RECONNECT TO SUBMIT</span>
                 </button>
                 {{-- Tiny clarifier under the button --}}
-                <p class="mt-2 text-[11px] text-center text-gray-500 dark:text-gray-400 leading-snug">
+                <p class="mt-2 text-[11px] text-center font-semibold text-slate-600 dark:text-slate-300 leading-snug">
                     📝 Bill stays <span class="font-bold text-amber-600 dark:text-amber-400">PROVISIONAL</span> — edit/delete items above until you confirm payment.
                     <br>FBR submission happens <span class="font-bold">only</span> after you press "Confirm &amp; Complete" in the modal.
                 </p>
@@ -979,6 +1033,10 @@ function fbrPosInvoice() {
         discountValue: 0,
         barcodeBuffer: '',
         scanStatus: null,
+        // 🔢 Quantity multiplier — type "3*" then scan/select → next add gets qty 3 (auto-resets)
+        qtyMultiplier: 1,
+        // 🎯 Track last added row so * / Ctrl+Up / Ctrl+Down know which row to edit
+        lastAddedIndex: -1,
         // Phase 2 state
         terminalId: @json($terminals->first()?->id ?? ''),
         customerId: '',
@@ -1058,6 +1116,17 @@ function fbrPosInvoice() {
                 if ((e.ctrlKey || e.metaKey) && e.key === 'Delete') {
                     if (this.items.length > 1 && this.activeItemIndex >= 0) { e.preventDefault(); this.removeItem(this.activeItemIndex); }
                     return;
+                }
+                // ⌨️ NEW: Ctrl+Up / Ctrl+Down — bump last-added row qty ±1 (works ANYWHERE, even inside other inputs)
+                if ((e.ctrlKey || e.metaKey) && e.key === 'ArrowUp') {
+                    e.preventDefault(); this.bumpLastQty(1); return;
+                }
+                if ((e.ctrlKey || e.metaKey) && e.key === 'ArrowDown') {
+                    e.preventDefault(); this.bumpLastQty(-1); return;
+                }
+                // ⌨️ NEW: Alt+Q (anywhere) — jump to last-added row's qty input
+                if (e.altKey && (e.key === 'q' || e.key === 'Q')) {
+                    e.preventDefault(); this.focusLastRowQty(); return;
                 }
                 // ═══ PHASE 2 — V/Q mode toggle (only when no input focused) ═══
                 if ((e.key === 'v' || e.key === 'V' || e.key === 'q' || e.key === 'Q') && !e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -1312,6 +1381,8 @@ function fbrPosInvoice() {
                     this.customerName = data.cart.customer_name || '';
                     this.customerPhone = data.cart.customer_phone || '';
                     this.recallOpen = false;
+                    this.lastAddedIndex = this.items.length - 1;
+                    this.qtyMultiplier = 1;
                     this.loadHeld();
                     if (this.customerPhone) this.lookupCustomer();
                 }
@@ -1328,6 +1399,9 @@ function fbrPosInvoice() {
             this.customerName = ''; this.customerPhone = ''; this.customerId = ''; this.customerPoints = null;
             this.promoCode = ''; this.promotionId = ''; this.promoDiscount = 0; this.promoMessage = '';
             this.loyaltyRedeem = 0; this.cashReceived = 0;
+            this.lastAddedIndex = 0;
+            this.qtyMultiplier = 1;
+            this.activeItemIndex = 0;
         },
         async lookupCustomer() {
             if (!this.customerPhone || this.customerPhone.length < 4) { this.customerPoints = null; this.customerId = ''; return; }
@@ -1486,6 +1560,7 @@ function fbrPosInvoice() {
             this.items.push({ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, mode: 'qty', _valueInput: '', _amountInput: '', line_value: 0 });
             const newIdx = this.items.length - 1;
             this.activeItemIndex = newIdx;
+            this.lastAddedIndex = newIdx;
             this.beep(600, 0.05);
             this.focusItemName(newIdx);
         },
@@ -1495,6 +1570,9 @@ function fbrPosInvoice() {
             this.items.splice(index + 1, 0, JSON.parse(JSON.stringify(src)));
             const newIdx = index + 1;
             this.activeItemIndex = newIdx;
+            this.lastAddedIndex = newIdx;
+            // If lastAddedIndex pointed to a row at/after the splice point, the splice
+            // pushed it down by 1 already (we just overwrote with newIdx anyway).
             this.toast('Row duplicated', 'success');
             this.beep(880, 0.05);
             this.focusItemName(newIdx);
@@ -1518,24 +1596,28 @@ function fbrPosInvoice() {
             let isExempt = p.tax_type === 'exempt';
             let taxRate = isExempt ? 0 : (parseFloat(p.default_tax_rate) || 18);
             const price = parseFloat(p.default_price) || 0;
+            // 🔢 Apply pending qty multiplier (e.g. cashier typed "3*" before scan)
+            const mult = Math.max(1, parseInt(this.qtyMultiplier, 10) || 1);
             // Resilient name fallback (in case backend returned a product with empty/null name)
             const displayName = (p.name && String(p.name).trim() !== '')
                 ? String(p.name).trim()
                 : (p.barcode || p.sku || ('Product #' + p.id));
             this.beep(880, 0.06);
-            this.toast('+ ' + displayName, 'success');
-            // If same product already in cart, just increment qty
+            this.toast('+ ' + displayName + (mult > 1 ? ' × ' + mult : ''), 'success');
+            // If same product already in cart, just bump qty by multiplier
             const existing = this.items.find(it => it.product_id && p.id && it.product_id === p.id);
             if (existing) {
-                existing.quantity = (parseFloat(existing.quantity) || 0) + 1;
+                existing.quantity = (parseFloat(existing.quantity) || 0) + mult;
                 this.syncValueFromQty(existing);
+                this.lastAddedIndex = this.items.indexOf(existing);
+                this.qtyMultiplier = 1;
                 return;
             }
             const payload = {
                 item_name: displayName,
                 hs_code: p.hs_code || '',
                 uom: p.uom || 'U',
-                quantity: 1,
+                quantity: mult,
                 unit_price: price,
                 tax_rate: taxRate,
                 is_tax_exempt: isExempt,
@@ -1544,16 +1626,98 @@ function fbrPosInvoice() {
                 mode: 'qty',
                 _valueInput: '',
                 _amountInput: '',
-                line_value: price
+                line_value: price * mult
             };
             // If first row is empty, mutate it in place (Alpine-reactivity safe)
             if (this.items.length === 1 && !this.items[0].item_name && !this.items[0].product_id) {
                 Object.assign(this.items[0], payload);
                 this.activeItemIndex = 0;
+                this.lastAddedIndex = 0;
+                this.qtyMultiplier = 1;
                 return;
             }
             this.items.push(payload);
             this.activeItemIndex = this.items.length - 1;
+            this.lastAddedIndex = this.items.length - 1;
+            this.qtyMultiplier = 1;
+        },
+        // ⌨️ Scan input keyboard shortcuts — quantity multiplier + jump-to-qty
+        // Hardware-scanner safe: standalone +/-/* are deferred 100ms — if MORE chars
+        // arrive in that window (scanner fast-burst), we treat the symbol as part of
+        // the barcode and inject it back. Human typing pauses are >100ms so shortcut fires.
+        _symbolDeferTimer: null,
+        _lastKeyTs: 0,
+        handleScanInputShortcut(e) {
+            const k = e.key;
+            const cur = (this.barcodeBuffer || '').trim();
+            const now = Date.now();
+            const sinceLast = now - (this._lastKeyTs || 0);
+            this._lastKeyTs = now;
+
+            // 1) "<digits>*" pattern — only fire if input has been idle >150ms (rules out scanner mid-burst)
+            if (k === '*' && /^\d+$/.test(cur) && sinceLast > 150) {
+                e.preventDefault();
+                const n = Math.min(999, Math.max(1, parseInt(cur, 10)));
+                this.qtyMultiplier = n;
+                this.barcodeBuffer = '';
+                this.toast('× ' + n + ' multiplier active — next item will be qty ' + n, 'info');
+                this.beep(660, 0.05);
+                return;
+            }
+
+            // 2/3/4) Standalone "*" / "+" / "-" → DEFER 100ms. If more chars come, treat as scanner.
+            if (cur === '' && (k === '*' || k === '+' || k === '-')) {
+                e.preventDefault();
+                const sym = k;
+                if (this._symbolDeferTimer) clearTimeout(this._symbolDeferTimer);
+                const self = this;
+                this._symbolDeferTimer = setTimeout(() => {
+                    self._symbolDeferTimer = null;
+                    // If scan input still empty after 100ms → it was a deliberate shortcut
+                    if ((self.barcodeBuffer || '').trim() === '') {
+                        if (sym === '*') self.focusLastRowQty();
+                        else if (sym === '+') self.bumpLastQty(1);
+                        else if (sym === '-') self.bumpLastQty(-1);
+                    } else {
+                        // Scanner burst ate the symbol slot — inject it back as first char
+                        self.barcodeBuffer = sym + self.barcodeBuffer;
+                    }
+                }, 100);
+                return;
+            }
+        },
+        // 🎯 Focus + select qty input of the last-added row (or last row in cart)
+        focusLastRowQty() {
+            let idx = this.lastAddedIndex;
+            if (idx < 0 || idx >= this.items.length) idx = this.items.length - 1;
+            if (idx < 0) { this.toast('No items in cart', 'error'); return; }
+            const item = this.items[idx];
+            // Switch to QTY mode if currently in VALUE mode (so we land on the right input)
+            if (item.mode === 'value') item.mode = 'qty';
+            this.activeItemIndex = idx;
+            this.$nextTick(() => {
+                const el = document.querySelector('[data-qty-row="' + idx + '"]');
+                if (el) {
+                    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                    el.focus();
+                    try { el.select(); } catch(e) {}
+                }
+            });
+        },
+        // ➕➖ Bump qty of last-added row by delta (clamped to >= 1), refocus scan input
+        bumpLastQty(delta) {
+            let idx = this.lastAddedIndex;
+            if (idx < 0 || idx >= this.items.length) idx = this.items.length - 1;
+            if (idx < 0) { this.toast('No items in cart', 'error'); return; }
+            const item = this.items[idx];
+            const cur = parseFloat(item.quantity) || 0;
+            const next = Math.max(1, cur + delta);
+            item.quantity = String(next);
+            this.syncValueFromQty(item);
+            this.activeItemIndex = idx;
+            this.beep(delta > 0 ? 880 : 440, 0.04);
+            this.toast('Row ' + (idx + 1) + ' qty: ' + next, 'info');
+            this.$nextTick(() => { this.$refs.barcodeInput && this.$refs.barcodeInput.focus(); });
         },
         async scanBarcode() {
             const code = (this.barcodeBuffer || '').trim();
@@ -1577,6 +1741,12 @@ function fbrPosInvoice() {
         },
         removeItem(index) {
             this.items.splice(index, 1);
+            // Keep lastAddedIndex pointing at a valid row (or recompute on next access)
+            if (this.lastAddedIndex === index) {
+                this.lastAddedIndex = Math.min(index, this.items.length - 1);
+            } else if (this.lastAddedIndex > index) {
+                this.lastAddedIndex--;
+            }
             if (this.items.length === 0) this.addItem();
         },
         lineGross(item) {

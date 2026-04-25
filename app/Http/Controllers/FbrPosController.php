@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class FbrPosController extends Controller
 {
@@ -559,6 +560,226 @@ class FbrPosController extends Controller
         $fbrErrors = implode(', ', $fbrResult['errors'] ?? ['Unknown error']);
         return redirect()->route('fbrpos.show', $id)
             ->with('error', "FBR retry failed: {$fbrErrors}");
+    }
+
+    /**
+     * ✏️ Edit & Retry — show editable form for a FAILED FBR submission.
+     * Cashier can fix the issue (e.g. wrong HS code, wrong tax rate) without regenerating the bill.
+     * Only allowed for fbr_status in ['failed', 'pending_verification'] — never for submitted invoices.
+     */
+    public function editFailed($id)
+    {
+        $companyId = app('currentCompanyId');
+        $transaction = FbrPosTransaction::where('company_id', $companyId)
+            ->with(['items', 'fbrLogs' => function ($q) { $q->latest()->limit(1); }])
+            ->findOrFail($id);
+
+        if ($transaction->fbr_status === 'submitted') {
+            return redirect()->route('fbrpos.show', $id)
+                ->with('error', 'Already submitted to FBR — cannot edit a successful submission.');
+        }
+
+        if ($transaction->invoice_mode === 'local') {
+            return redirect()->route('fbrpos.show', $id)
+                ->with('error', 'Local invoices have no FBR submission to retry.');
+        }
+
+        // 🔒 Concurrency guard — only allow edits on `failed` (terminal-failed). `pending`/`pending_verification`
+        // may have a queued retry job in-flight (RetryFbrPosSubmissionJob), so editing them risks duplicate FBR sends.
+        if ($transaction->fbr_status !== 'failed') {
+            return redirect()->route('fbrpos.show', $id)
+                ->with('error', 'Edit & Retry is only available for FAILED bills. Pending bills must finish their automatic retry first.');
+        }
+
+        $lastError = optional($transaction->fbrLogs->first())->error_message;
+
+        return view('fbr-pos.edit-failed', compact('transaction', 'lastError'));
+    }
+
+    /**
+     * 💾 Save edits + immediately re-submit to FBR. Snapshots the original line-items to
+     * fbr_pos_logs (status='edit_snapshot') for audit before mutating.
+     * Recomputes subtotal/tax/total since user may have fixed qty/price/tax_rate.
+     */
+    public function updateAndRetry(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $transaction = FbrPosTransaction::where('company_id', $companyId)
+            ->with('items')
+            ->findOrFail($id);
+
+        if ($transaction->fbr_status === 'submitted') {
+            return redirect()->route('fbrpos.show', $id)
+                ->with('error', 'Already submitted to FBR — cannot edit a successful submission.');
+        }
+        if ($transaction->invoice_mode === 'local') {
+            return redirect()->route('fbrpos.show', $id)
+                ->with('error', 'Local invoices cannot be submitted to FBR.');
+        }
+        // 🔒 Concurrency guard — only `failed` is editable. `pending`/`pending_verification` may collide
+        // with the queued RetryFbrPosSubmissionJob and trigger duplicate FBR submissions.
+        if ($transaction->fbr_status !== 'failed') {
+            return redirect()->route('fbrpos.show', $id)
+                ->with('error', 'Edit & Retry is only available for FAILED bills.');
+        }
+
+        $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.id' => 'required|integer',
+            'items.*.item_name' => 'required|string|max:255',
+            'items.*.hs_code' => 'nullable|string|max:20',
+            'items.*.uom' => 'nullable|string|in:U,KG,GM,LTR,ML,MTR,SQM,PCS,PKT,DOZ,BOX,SET,BAG,BTL,CTN,ROL,FT,IN,YDS,TIN,CAN,BUN',
+            'items.*.quantity' => 'required|numeric|min:0.001',
+            'items.*.unit_price' => 'required|numeric|min:0.01',
+            'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
+            'items.*.is_tax_exempt' => 'nullable|boolean',
+            'items.*.item_discount' => 'nullable|numeric|min:0',
+            'edit_reason' => 'nullable|string|max:500',
+        ]);
+
+        // 🔐 STRICT item integrity check — prevent tampered payloads dropping/adding rows.
+        // Every existing item MUST appear in the submitted payload exactly once, and every
+        // submitted ID MUST belong to this transaction. No silent skip.
+        $existingIds = $transaction->items->pluck('id')->map(fn($v) => (int) $v)->sort()->values()->all();
+        $submittedIds = collect($request->items)->pluck('id')->map(fn($v) => (int) $v)->sort()->values()->all();
+        if (count($submittedIds) !== count(array_unique($submittedIds))) {
+            return redirect()->route('fbrpos.editFailed', $id)
+                ->with('error', 'Duplicate item IDs in submission. Reload the page and try again.');
+        }
+        if ($existingIds !== $submittedIds) {
+            $missing = array_diff($existingIds, $submittedIds);
+            $extra = array_diff($submittedIds, $existingIds);
+            $msg = 'Item set mismatch — original cart has been preserved.';
+            if (!empty($missing)) $msg .= ' Missing IDs: ' . implode(',', $missing) . '.';
+            if (!empty($extra))   $msg .= ' Unknown IDs: ' . implode(',', $extra) . '.';
+            return redirect()->route('fbrpos.editFailed', $id)->with('error', $msg);
+        }
+
+        // 📜 FULL audit snapshot — items + transaction header pre-state for deterministic rollback
+        $editAttemptId = (string) Str::uuid();
+        $originalItems = $transaction->items->map(function ($it) {
+            return [
+                'id' => $it->id,
+                'item_name' => $it->item_name,
+                'hs_code' => $it->hs_code,
+                'uom' => $it->uom,
+                'quantity' => (float) $it->quantity,
+                'unit_price' => (float) $it->unit_price,
+                'tax_rate' => (float) $it->tax_rate,
+                'is_tax_exempt' => (bool) $it->is_tax_exempt,
+                'item_discount' => (float) $it->item_discount,
+                'subtotal' => (float) $it->subtotal,
+                'tax_amount' => (float) $it->tax_amount,
+                'total' => (float) $it->total,
+            ];
+        })->all();
+        $originalHeader = [
+            'subtotal' => (float) $transaction->subtotal,
+            'discount_type' => $transaction->discount_type,
+            'discount_value' => (float) $transaction->discount_value,
+            'discount_amount' => (float) $transaction->discount_amount,
+            'tax_amount' => (float) $transaction->tax_amount,
+            'fbr_service_charge' => (float) ($transaction->fbr_service_charge ?? 0),
+            'loyalty_redemption_amount' => (float) ($transaction->loyalty_redemption_amount ?? 0),
+            'total_amount' => (float) $transaction->total_amount,
+            'fbr_status' => $transaction->fbr_status,
+            'fbr_submission_hash' => $transaction->fbr_submission_hash,
+            'fbr_invoice_number' => $transaction->fbr_invoice_number,
+        ];
+
+        \App\Models\FbrPosLog::create([
+            'company_id' => $companyId,
+            'transaction_id' => $transaction->id,
+            'request_payload' => [
+                'edit_attempt_id' => $editAttemptId,
+                'original_items' => $originalItems,
+                'original_header' => $originalHeader,
+                'submitted_items' => $request->items,
+            ],
+            'response_payload' => [
+                'edit_attempt_id' => $editAttemptId,
+                'edited_by_user_id' => Auth::guard('fbrpos')->id(),
+                'edit_reason' => $request->edit_reason,
+                'edited_at' => now()->toIso8601String(),
+            ],
+            'response_code' => 0,
+            'status' => 'edit_snapshot',
+            'error_message' => 'Cashier edited line items before FBR retry (attempt ' . $editAttemptId . ')',
+        ]);
+
+        // 🔁 Apply edits — update items, then RECOMPUTE totals from PERSISTED rows (not request)
+        $submittedById = collect($request->items)->keyBy(fn($r) => (int) $r['id']);
+
+        DB::transaction(function () use ($transaction, $submittedById) {
+            foreach ($transaction->items as $item) {
+                $row = $submittedById[$item->id]; // guaranteed present by integrity check above
+                $qty = round((float) $row['quantity'], 3);
+                if ($qty <= 0) $qty = 1;
+                $price = (float) $row['unit_price'];
+                $isExempt = !empty($row['is_tax_exempt']);
+                $taxRate = $isExempt ? 0 : (float) ($row['tax_rate'] ?? 18);
+                $itemDiscount = round((float) ($row['item_discount'] ?? 0), 2);
+                $grossLine = round($price * $qty, 2);
+                if ($itemDiscount > $grossLine) $itemDiscount = $grossLine;
+                $lineSubtotal = round($grossLine - $itemDiscount, 2);
+                $lineTax = round($lineSubtotal * $taxRate / 100, 2);
+                $lineTotal = round($lineSubtotal + $lineTax, 2);
+
+                $item->update([
+                    'item_name' => $row['item_name'],
+                    'hs_code' => $row['hs_code'] ?? null,
+                    'uom' => $row['uom'] ?? 'U',
+                    'quantity' => $qty,
+                    'unit_price' => $price,
+                    'tax_rate' => $taxRate,
+                    'is_tax_exempt' => $isExempt,
+                    'item_discount' => $itemDiscount,
+                    'subtotal' => $lineSubtotal,
+                    'tax_amount' => $lineTax,
+                    'total' => $lineTotal,
+                ]);
+            }
+
+            // 🧮 Recompute totals from FRESH DB read so we never trust request math
+            $persisted = FbrPosTransactionItem::where('transaction_id', $transaction->id)->get();
+            $newSubtotal = round($persisted->sum('subtotal'), 2);
+            $newTotalTax = round($persisted->sum('tax_amount'), 2);
+
+            // Re-apply existing transaction-level discount (percentage/fixed) on new subtotal
+            $discountAmount = 0;
+            if ($transaction->discount_type === 'percentage' && $transaction->discount_value > 0) {
+                $discountAmount = round($newSubtotal * (float) $transaction->discount_value / 100, 2);
+            } elseif ($transaction->discount_type === 'fixed' && $transaction->discount_value > 0) {
+                $discountAmount = min((float) $transaction->discount_value, $newSubtotal);
+            }
+
+            $fbrServiceCharge = (float) ($transaction->fbr_service_charge ?? 0);
+            $loyaltyRedemption = (float) ($transaction->loyalty_redemption_amount ?? 0);
+            $newTotal = round($newSubtotal - $discountAmount + $newTotalTax + $fbrServiceCharge - $loyaltyRedemption, 2);
+            if ($newTotal < 0) $newTotal = 0;
+
+            $transaction->update([
+                'subtotal' => $newSubtotal,
+                'discount_amount' => $discountAmount,
+                'tax_amount' => $newTotalTax,
+                'total_amount' => $newTotal,
+                'fbr_submission_hash' => null, // 🔓 reset so FBR accepts the new payload
+            ]);
+        });
+
+        // 🚀 Re-submit to FBR with corrected data
+        $transaction->refresh()->load(['items', 'company']);
+        $fbrService = new FbrService();
+        $fbrResult = $fbrService->submitFbrPosTransaction($transaction);
+
+        if ($fbrResult['status'] === 'success') {
+            return redirect()->route('fbrpos.show', $id)
+                ->with('success', "✅ Edited & submitted to FBR successfully! FBR Invoice: {$fbrResult['fbr_invoice_number']}");
+        }
+
+        $fbrErrors = implode(', ', $fbrResult['errors'] ?? ['Unknown error']);
+        return redirect()->route('fbrpos.editFailed', $id)
+            ->with('error', "Edits saved but FBR still rejected: {$fbrErrors}. Fix and try again — cart is preserved.");
     }
 
     /**

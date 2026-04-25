@@ -680,6 +680,8 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth'])->group(function () {
     Route::get('/transactions', [FbrPosController::class, 'transactions'])->name('fbrpos.transactions');
     Route::get('/transactions/{id}', [FbrPosController::class, 'show'])->name('fbrpos.show');
     Route::post('/transactions/{id}/retry-fbr', [FbrPosController::class, 'retryFbr'])->name('fbrpos.retryFbr');
+    Route::get('/transactions/{id}/edit-failed', [FbrPosController::class, 'editFailed'])->name('fbrpos.editFailed');
+    Route::post('/transactions/{id}/update-and-retry', [FbrPosController::class, 'updateAndRetry'])->name('fbrpos.updateAndRetry');
     Route::get('/fail-queue', [FbrPosController::class, 'failQueue'])->name('fbrpos.failQueue');
     Route::post('/fail-queue/retry-all', [FbrPosController::class, 'failQueueRetryAll'])->name('fbrpos.failQueue.retryAll');
     Route::post('/fail-queue/{id}/retry', [FbrPosController::class, 'failQueueRetryOne'])->name('fbrpos.failQueue.retryOne');

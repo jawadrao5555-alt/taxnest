@@ -5,7 +5,9 @@
     <title>Invoice {{ $invoice->invoice_number ?? $invoice->id }}</title>
     <style>
         @page {
-            margin: 14mm 16mm 12mm 16mm;
+            /* 🖨️ Safer margins — most consumer printers can't print to within 12mm of paper edge.
+               15mm sides + 18mm bottom (for printer feed roller) prevents corner-cut on inkjet/laser. */
+            margin: 15mm 15mm 18mm 15mm;
             size: A4 portrait;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }

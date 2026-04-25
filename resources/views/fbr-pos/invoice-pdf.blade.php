@@ -4,7 +4,12 @@
     <meta charset="UTF-8">
     <title>Invoice {{ $transaction->invoice_number }}</title>
     <style>
-        @page { margin: 8mm 12mm; }
+        @page {
+            /* 🖨️ Safer A4 margins — prevents corner-cut on consumer printers
+               (most can't reach within 12mm of paper edge). */
+            margin: 15mm 15mm 18mm 15mm;
+            size: A4 portrait;
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'DejaVu Sans', Arial, Helvetica, sans-serif;

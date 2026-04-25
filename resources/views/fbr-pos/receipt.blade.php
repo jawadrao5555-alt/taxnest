@@ -7,8 +7,9 @@
     @php $paperSize = $company->print_paper_size ?? 'thermal'; @endphp
     <style>
         @if($paperSize === 'a4')
-            /* 📄 A4 mode — thermal-width receipt centered on full A4. No cutting. */
-            @page { size: A4 portrait; margin: 10mm; }
+            /* 📄 A4 mode — thermal-width receipt centered on full A4.
+               15mm side + 18mm bottom margins prevent corner-cut on consumer printers. */
+            @page { size: A4 portrait; margin: 15mm 15mm 18mm 15mm; }
         @else
             /* 🧾 Thermal mode — 80mm continuous roll, auto-cut */
             @page { size: 80mm auto; margin: 0; }

@@ -16,7 +16,7 @@
             margin: 0 auto;
             padding: 6mm 4mm;
             background: #fff;
-            color: #1a1a1a;
+            color: #000;
             line-height: 1.45;
             -webkit-font-smoothing: antialiased;
         }
@@ -25,66 +25,66 @@
         .logo-area img { max-height: 44px; max-width: 55mm; width: auto; }
 
         .receipt-header { text-align: center; padding-bottom: 8px; }
-        .company-name { font-size: 17px; font-weight: 800; letter-spacing: -0.4px; color: #000; margin-bottom: 1px; }
-        .company-meta { font-size: 10px; color: #555; line-height: 1.5; }
-        .company-ntn { font-size: 10px; font-weight: 700; color: #222; margin-top: 3px; letter-spacing: 0.3px; }
+        .company-name { font-size: 17px; font-weight: 800; letter-spacing: -0.4px; color: #000; margin-bottom: 2px; }
+        .company-meta { font-size: 10px; color: #000; line-height: 1.5; font-weight: 500; }
+        .company-ntn { font-size: 10px; font-weight: 700; color: #000; margin-top: 3px; letter-spacing: 0.3px; }
 
-        .sep { border: none; border-top: 1px solid #ddd; margin: 7px 0; }
-        .sep-bold { border: none; border-top: 1.5px solid #111; margin: 8px 0; }
-        .sep-dashed { border: none; border-top: 1px dashed #bbb; margin: 7px 0; }
-        .sep-double { border: none; border-top: 3px double #111; margin: 8px 0; }
+        .sep { border: none; border-top: 1px solid #000; margin: 7px 0; }
+        .sep-bold { border: none; border-top: 2px solid #000; margin: 8px 0; }
+        .sep-dashed { border: none; border-top: 1px dashed #000; margin: 7px 0; }
+        .sep-double { border: none; border-top: 3px double #000; margin: 8px 0; }
 
         .invoice-bar { text-align: center; margin: 6px 0; }
         .invoice-number { font-size: 13px; font-weight: 800; letter-spacing: 0.3px; color: #000; }
         .badge-row { margin-top: 5px; }
-        .badge { display: inline-block; padding: 2px 8px; border: 1px solid #444; font-weight: 700; font-size: 8px; text-transform: uppercase; letter-spacing: 1.2px; border-radius: 3px; margin: 0 2px; color: #333; }
+        .badge { display: inline-block; padding: 2px 8px; border: 1.5px solid #000; font-weight: 800; font-size: 9px; text-transform: uppercase; letter-spacing: 1.2px; border-radius: 0; margin: 0 2px; color: #000; background: #fff; }
 
         .info-section { margin: 5px 0; }
-        .info-row { display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #444; padding: 1.5px 0; }
-        .info-row .lbl { font-weight: 600; color: #222; }
+        .info-row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #000; padding: 2px 0; font-weight: 600; }
+        .info-row .lbl { font-weight: 700; color: #000; }
 
-        .customer-box { background: #f7f7f7; border-left: 3px solid #333; padding: 5px 8px; margin: 5px 0; font-size: 10px; }
-        .customer-box .c-name { font-weight: 700; color: #000; font-size: 11px; }
-        .customer-box .c-phone { color: #555; margin-top: 1px; }
+        .customer-box { background: #fff; border: 1.5px solid #000; padding: 5px 8px; margin: 5px 0; font-size: 11px; color: #000; }
+        .customer-box .c-name { font-weight: 800; color: #000; font-size: 12px; }
+        .customer-box .c-phone { color: #000; margin-top: 1px; font-weight: 600; }
 
-        .cashier-line { font-size: 9px; color: #888; margin: 3px 0; }
+        .cashier-line { font-size: 10px; color: #000; margin: 3px 0; font-weight: 600; }
 
         .items-table { width: 100%; border-collapse: collapse; margin: 3px 0; }
-        .items-header { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #666; border-bottom: 1.5px solid #222; }
-        .items-header th { padding: 4px 2px 3px; }
-        .col-qty { text-align: center; width: 10%; }
-        .col-item { text-align: left; width: 50%; }
-        .col-rate { text-align: right; width: 18%; }
+        .items-header { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #000; border-bottom: 2px solid #000; border-top: 2px solid #000; }
+        .items-header th { padding: 5px 2px 4px; }
+        .col-qty { text-align: center; width: 12%; }
+        .col-item { text-align: left; width: 46%; }
+        .col-rate { text-align: right; width: 20%; }
         .col-amt { text-align: right; width: 22%; }
-        .items-table td { padding: 5px 2px; font-size: 11px; vertical-align: middle; }
-        .items-table td.col-qty { font-weight: 700; color: #222; text-align: center; }
-        .items-table td.col-item { font-weight: 500; color: #111; }
-        .items-table td.col-rate { color: #555; font-size: 10px; text-align: right; font-variant-numeric: tabular-nums; }
-        .items-table td.col-amt { font-weight: 700; color: #000; text-align: right; font-variant-numeric: tabular-nums; }
-        .item-row { border-bottom: 1px dotted #ddd; }
+        .items-table td { padding: 5px 2px; font-size: 11px; vertical-align: middle; color: #000; }
+        .items-table td.col-qty { font-weight: 800; color: #000; text-align: center; }
+        .items-table td.col-item { font-weight: 600; color: #000; word-wrap: break-word; }
+        .items-table td.col-rate { color: #000; font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+        .items-table td.col-amt { font-weight: 800; color: #000; text-align: right; font-variant-numeric: tabular-nums; }
+        .item-row { border-bottom: 1px dashed #000; }
         .item-row:last-child { border-bottom: none; }
-        .tax-exempt-tag { font-size: 7px; color: #059669; font-weight: 700; background: #ecfdf5; padding: 1px 3px; border-radius: 2px; margin-left: 3px; vertical-align: middle; }
-        .items-count { font-size: 9px; color: #888; text-align: right; margin-top: 2px; padding-right: 2px; }
+        .tax-exempt-tag { font-size: 8px; color: #000; font-weight: 800; background: #fff; border: 1px solid #000; padding: 1px 4px; border-radius: 2px; margin-left: 3px; vertical-align: middle; }
+        .items-count { font-size: 10px; color: #000; text-align: right; margin-top: 4px; padding-right: 2px; font-weight: 700; }
 
         .totals { margin: 4px 0; }
-        .total-line { display: flex; justify-content: space-between; padding: 2.5px 0; font-size: 11px; }
-        .total-line .t-label { color: #444; font-weight: 500; }
-        .total-line .t-value { font-weight: 600; color: #222; font-variant-numeric: tabular-nums; }
-        .total-line.discount .t-label, .total-line.discount .t-value { color: #c2410c; }
-        .total-line.exempt .t-label, .total-line.exempt .t-value { color: #059669; font-size: 10px; }
+        .total-line { display: flex; justify-content: space-between; padding: 3px 0; font-size: 11px; color: #000; }
+        .total-line .t-label { color: #000; font-weight: 600; }
+        .total-line .t-value { font-weight: 700; color: #000; font-variant-numeric: tabular-nums; }
+        .total-line.discount .t-label, .total-line.discount .t-value { color: #000; font-weight: 700; }
+        .total-line.exempt .t-label, .total-line.exempt .t-value { color: #000; font-size: 10px; font-weight: 700; }
 
-        .grand-total-box { background: #f5f5f5; border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 7px 6px; margin: 5px 0; display: flex; justify-content: space-between; align-items: center; }
-        .grand-total-box .gt-label { font-size: 14px; font-weight: 800; color: #000; letter-spacing: 0.5px; }
-        .grand-total-box .gt-value { font-size: 14px; font-weight: 800; color: #000; font-variant-numeric: tabular-nums; }
+        .grand-total-box { background: #000; border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 8px 8px; margin: 6px 0; display: flex; justify-content: space-between; align-items: center; }
+        .grand-total-box .gt-label { font-size: 14px; font-weight: 900; color: #fff; letter-spacing: 0.8px; }
+        .grand-total-box .gt-value { font-size: 14px; font-weight: 900; color: #fff; font-variant-numeric: tabular-nums; }
 
-        .pra-box { text-align: center; font-size: 10px; font-weight: 700; color: #222; background: #f0f0f0; padding: 5px 8px; border-radius: 4px; margin: 5px 0; border: 1px solid #ddd; }
+        .pra-box { text-align: center; font-size: 11px; font-weight: 800; color: #000; background: #fff; padding: 6px 8px; border-radius: 0; margin: 6px 0; border: 2px solid #000; letter-spacing: 0.3px; }
 
         .qr-section { text-align: center; margin: 10px 0 6px; }
-        .qr-section img { width: 80px; height: 80px; border-radius: 4px; border: 1px solid #e5e5e5; padding: 3px; background: #fff; }
+        .qr-section img { width: 80px; height: 80px; border-radius: 0; border: 1px solid #000; padding: 3px; background: #fff; }
 
         .footer { text-align: center; padding: 6px 0 2px; }
-        .footer .thanks { font-size: 11px; font-weight: 700; color: #111; letter-spacing: -0.2px; }
-        .footer .powered { font-size: 7px; color: #bbb; margin-top: 4px; letter-spacing: 1.2px; text-transform: uppercase; }
+        .footer .thanks { font-size: 11px; font-weight: 700; color: #000; letter-spacing: -0.2px; }
+        .footer .powered { font-size: 8px; color: #000; margin-top: 4px; letter-spacing: 1.2px; text-transform: uppercase; font-weight: 600; }
 
         .print-btn-row { display: flex; gap: 6px; margin-top: 12px; }
         .print-btn-row button, .print-btn-row a { flex: 1; padding: 12px; text-align: center; border: none; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; display: block; transition: all 0.15s; }

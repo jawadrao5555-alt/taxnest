@@ -24,7 +24,7 @@
             line-height: 1.5;
         }
         .separator { border-top: 2px dashed #000; margin: 6px 0; }
-        .separator-light { border-top: 1px dotted #999; margin: 4px 0; }
+        .separator-light { border-top: 1px dashed #000; margin: 4px 0; }
         .separator-station { border-top: 3px solid #000; margin: 8px 0 4px; }
         .bold { font-weight: bold; }
         .text-center { text-align: center; }
@@ -37,15 +37,16 @@
         .mb-1 { margin-bottom: 4px; }
         .flex { display: flex; justify-content: space-between; align-items: center; }
         .items-table { width: 100%; border-collapse: collapse; margin: 4px 0; }
-        .items-table td { padding: 4px 2px; vertical-align: top; font-size: 14px; }
-        .items-table .qty { width: 15%; font-weight: bold; font-size: 16px; text-align: center; }
-        .items-table .name { width: 85%; }
-        .items-table .note { font-size: 10px; font-style: italic; color: #555; padding-left: 10px; }
-        .items-table tr { border-bottom: 1px dotted #999; }
+        .items-table td { padding: 5px 2px; vertical-align: top; font-size: 14px; color: #000; }
+        .items-table .qty { width: 15%; font-weight: bold; font-size: 17px; text-align: center; color: #000; }
+        .items-table .name { width: 85%; color: #000; font-weight: 600; }
+        .items-table .note { font-size: 11px; font-style: italic; color: #000; padding-left: 10px; font-weight: bold; }
+        .items-table tr { border-bottom: 1px dashed #000; }
         .items-table tr:last-child { border-bottom: none; }
         .order-type-badge {
-            display: inline-block; padding: 2px 10px; border: 2px solid #000;
+            display: inline-block; padding: 3px 10px; border: 2px solid #000;
             font-weight: bold; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;
+            color: #000; background: #fff;
         }
         .priority-badge {
             display: inline-block; padding: 3px 12px; border: 3px solid #000;
@@ -54,14 +55,14 @@
         }
         .station-header {
             font-size: 15px; font-weight: bold; text-transform: uppercase;
-            padding: 4px 8px; margin: 0 0 4px 0; border: 2px solid #000;
-            text-align: center; letter-spacing: 2px; background: #eee;
+            padding: 5px 8px; margin: 0 0 4px 0; border: 2px solid #000;
+            text-align: center; letter-spacing: 2px; background: #000; color: #fff;
         }
         .station-section { margin-bottom: 8px; }
-        .station-item-count { font-size: 10px; text-align: center; color: #555; margin-bottom: 4px; }
+        .station-item-count { font-size: 11px; text-align: center; color: #000; margin-bottom: 4px; font-weight: bold; }
         .kitchen-notes {
             border: 2px solid #000; padding: 6px 8px; margin-top: 6px;
-            font-size: 12px; font-weight: bold; background: #f5f5f5;
+            font-size: 13px; font-weight: bold; background: #fff; color: #000;
         }
         .print-btn {
             display: block; width: 100%; padding: 12px; margin-top: 10px;
@@ -80,8 +81,8 @@
     <div class="text-center">
         @if(($order->kot_print_count ?? 0) > 1)
             {{-- Phase 5 — re-send marker so kitchen knows items changed --}}
-            <p class="priority-badge" style="background:#b91c1c; border-color:#b91c1c; color:#fff;">*** UPDATED ***</p>
-            <p class="text-xs bold mt-1" style="color:#b91c1c;">REPRINT #{{ $order->kot_print_count }} — IGNORE PRIOR TICKET</p>
+            <p class="priority-badge" style="background:#000; border-color:#000; color:#fff;">*** UPDATED ***</p>
+            <p class="text-sm bold mt-1" style="color:#000; font-weight:900;">REPRINT #{{ $order->kot_print_count }} &mdash; IGNORE PRIOR TICKET</p>
         @endif
         @if($order->priority ?? false)
             <p class="priority-badge mt-1">!!! RUSH !!!</p>
@@ -170,7 +171,7 @@
 
     @if($grouped->count() > 1)
     <div class="no-print" style="margin-top: 8px;">
-        <p style="font-size: 11px; font-weight: bold; color: #666; text-align: center; margin-bottom: 6px;">Print by Station:</p>
+        <p style="font-size: 11px; font-weight: bold; color: #1f2937; text-align: center; margin-bottom: 6px;">Print by Station:</p>
         <div class="print-btn-row">
             @foreach($stationNames as $sName)
             <button class="btn-station" onclick="printStation('{{ $sName }}')">{{ $sName }}</button>

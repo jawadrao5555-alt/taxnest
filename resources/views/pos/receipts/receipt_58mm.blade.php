@@ -22,6 +22,7 @@
             line-height: 1.35;
             word-wrap: break-word;
             overflow-wrap: break-word;
+            font-weight: 500;
         }
         .text-center { text-align: center; }
         .text-right { text-align: right; }
@@ -30,46 +31,46 @@
         .double-separator { border-top: 2px solid #000; margin: 5px 0; }
 
         .header { margin-bottom: 5px; }
-        .header h1 { font-size: 12px; font-weight: bold; margin-bottom: 2px; word-wrap: break-word; }
-        .header p { font-size: 9px; line-height: 1.3; word-wrap: break-word; }
+        .header h1 { font-size: 12px; font-weight: bold; margin-bottom: 2px; word-wrap: break-word; color: #000; }
+        .header p { font-size: 9px; line-height: 1.3; word-wrap: break-word; color: #000; font-weight: 600; }
 
         .info-table { width: 100%; border-collapse: collapse; margin: 2px 0; }
-        .info-table td { font-size: 9px; padding: 1px 0; vertical-align: top; }
-        .info-table .info-label { width: 30%; font-weight: bold; white-space: nowrap; }
-        .info-table .info-value { width: 70%; text-align: right; word-wrap: break-word; }
+        .info-table td { font-size: 9px; padding: 2px 0; vertical-align: top; color: #000; font-weight: 600; }
+        .info-table .info-label { width: 30%; font-weight: bold; white-space: nowrap; color: #000; }
+        .info-table .info-value { width: 70%; text-align: right; word-wrap: break-word; color: #000; }
 
-        .invoice-numbers { border: 1px solid #000; padding: 3px; margin: 5px 0; }
+        .invoice-numbers { border: 1.5px solid #000; padding: 4px; margin: 5px 0; }
         .inv-table { width: 100%; border-collapse: collapse; }
-        .inv-table td { font-size: 9px; padding: 1px 0; vertical-align: top; }
-        .inv-table .inv-label { font-weight: bold; white-space: nowrap; width: 30%; }
-        .inv-table .inv-value { text-align: right; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; font-family: 'Courier New', monospace; font-size: 7px; }
+        .inv-table td { font-size: 9px; padding: 2px 0; vertical-align: top; color: #000; }
+        .inv-table .inv-label { font-weight: bold; white-space: nowrap; width: 30%; color: #000; }
+        .inv-table .inv-value { text-align: right; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; font-family: 'Courier New', monospace; font-size: 8px; font-weight: bold; color: #000; }
 
         .items-table { width: 100%; margin: 3px 0; border-collapse: collapse; table-layout: fixed; }
-        .items-table th { font-size: 8px; text-transform: uppercase; border-bottom: 1px solid #000; padding: 2px 1px; text-align: left; }
-        .items-table td { font-size: 9px; padding: 2px 1px; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }
+        .items-table th { font-size: 8px; text-transform: uppercase; border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 3px 1px; text-align: left; font-weight: bold; color: #000; }
+        .items-table td { font-size: 9px; padding: 3px 1px; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; color: #000; font-weight: 600; }
         .items-table .col-qty { width: 12%; text-align: center; }
         .items-table .col-item { width: 46%; text-align: left; }
         .items-table .col-rate { width: 20%; text-align: right; }
-        .items-table .col-total { width: 22%; text-align: right; }
-        .items-table tbody tr { border-bottom: 1px dotted #ccc; }
+        .items-table .col-total { width: 22%; text-align: right; font-weight: bold; }
+        .items-table tbody tr { border-bottom: 1px dashed #000; }
         .items-table tbody tr:last-child { border-bottom: none; }
-        .exempt-tag { font-size: 7px; font-weight: bold; }
+        .exempt-tag { font-size: 7px; font-weight: bold; color: #000; }
 
         .totals-table { width: 100%; border-collapse: collapse; margin: 3px 0; }
-        .totals-table td { font-size: 9px; padding: 1px 0; vertical-align: top; }
-        .totals-table .tot-label { text-align: left; }
-        .totals-table .tot-value { text-align: right; white-space: nowrap; }
-        .totals-table .grand-total td { font-size: 13px; font-weight: bold; padding-top: 3px; }
+        .totals-table td { font-size: 9px; padding: 2px 0; vertical-align: top; color: #000; font-weight: 600; }
+        .totals-table .tot-label { text-align: left; color: #000; }
+        .totals-table .tot-value { text-align: right; white-space: nowrap; color: #000; font-weight: bold; }
+        .totals-table .grand-total td { font-size: 13px; font-weight: bold; padding: 5px 3px; background: #000; color: #fff; }
 
-        .pra-badge { border: 1px solid #000; padding: 4px; margin: 5px 0; text-align: center; font-size: 9px; overflow: hidden; }
-        .pra-badge .pra-title { font-size: 10px; font-weight: bold; margin-bottom: 2px; }
-        .pra-badge .pra-number { font-size: 7px; font-weight: bold; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; max-width: 100%; display: block; }
-        .local-badge { border: 1px dashed #666; padding: 4px; margin: 5px 0; text-align: center; font-size: 8px; color: #666; }
+        .pra-badge { border: 1.5px solid #000; padding: 4px; margin: 5px 0; text-align: center; font-size: 9px; overflow: hidden; color: #000; font-weight: 600; }
+        .pra-badge .pra-title { font-size: 10px; font-weight: bold; margin-bottom: 2px; color: #000; }
+        .pra-badge .pra-number { font-size: 8px; font-weight: bold; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; max-width: 100%; display: block; color: #000; }
+        .local-badge { border: 1.5px dashed #000; padding: 4px; margin: 5px 0; text-align: center; font-size: 9px; color: #000; font-weight: 700; }
         .qr-code { text-align: center; margin: 5px 0; }
         .qr-code img { width: 75px; height: 75px; }
-        .qr-code p { font-size: 7px; margin-top: 1px; }
+        .qr-code p { font-size: 8px; margin-top: 1px; color: #000; font-weight: 600; }
 
-        .footer { margin-top: 6px; font-size: 8px; line-height: 1.4; }
+        .footer { margin-top: 6px; font-size: 9px; line-height: 1.4; color: #000; font-weight: 600; }
 
         @media print {
             body { width: 58mm; max-width: 58mm; padding: 1mm; margin: 0; }
@@ -225,13 +226,13 @@
         ]);
         $qrUrl = 'https://chart.googleapis.com/chart?cht=qr&chs=120x120&chl=' . urlencode($qrData);
     @endphp
-    <div class="local-badge" style="border: 1.5px dashed #7c3aed; color: #5b21b6; padding: 6px;">
-        <strong style="font-size: 10px;">PROVISIONAL BILL</strong><br>
-        <span style="font-size: 8px;">{{ $transaction->invoice_number }}</span>
+    <div class="local-badge" style="border: 1.5px dashed #000; color: #000; padding: 6px; font-weight: 700;">
+        <strong style="font-size: 10px; color: #000;">PROVISIONAL BILL</strong><br>
+        <span style="font-size: 9px; font-weight: bold;">{{ $transaction->invoice_number }}</span>
     </div>
     <div class="qr-code">
         <img src="{{ $qrUrl }}" alt="Invoice QR" style="width: 80px; height: 80px; margin: 3px auto;">
-        <p style="font-size: 7px;">Scan for details</p>
+        <p style="font-size: 8px; color: #000; font-weight: 600;">Scan for details</p>
     </div>
     @endif
 

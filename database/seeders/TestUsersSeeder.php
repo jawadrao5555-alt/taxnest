@@ -11,19 +11,24 @@ class TestUsersSeeder extends Seeder
 {
     public function run(): void
     {
-        // Create Company
-        $company = Company::firstOrCreate([
-            'name' => 'Test Company',
-        ], [
-            'ntn' => '1234567-8',
-            'email' => 'test@company.com',
-            'phone' => '03000000000',
-            'address' => 'Test Address',
-            'fbr_token' => 'dummy-token'
-        ]);
+        // ─────────────────────────────────────────────────────────────────
+        // LEGACY Test Company / users — kept for dev fixtures only.
+        // Lookup by NTN (the actual unique constraint) so re-seeds on prod
+        // do NOT collide with existing rows that may have a different name.
+        // firstOrCreate (not updateOrCreate) so we never overwrite real prod data.
+        // ─────────────────────────────────────────────────────────────────
+        $company = Company::firstOrCreate(
+            ['ntn' => '1234567-8'],
+            [
+                'name' => 'Test Company',
+                'email' => 'test@company.com',
+                'phone' => '03000000000',
+                'address' => 'Test Address',
+                'fbr_token' => 'dummy-token',
+            ]
+        );
 
-        // Admin User
-        User::updateOrCreate(
+        User::firstOrCreate(
             ['email' => 'admin@test.com'],
             [
                 'name' => 'Admin',
@@ -33,8 +38,7 @@ class TestUsersSeeder extends Seeder
             ]
         );
 
-        // Normal User
-        User::updateOrCreate(
+        User::firstOrCreate(
             ['email' => 'jawad@test.com'],
             [
                 'name' => 'Jawad',
@@ -44,10 +48,14 @@ class TestUsersSeeder extends Seeder
             ]
         );
 
-        // ═══ FBR POS Test Company + User ═══
-        // Mandatory because /fbr-pos/login enforces company.product_type='fbrpos' AND fbr_pos_enabled=true
-        // Without this, NO test user can login on FBR POS panel.
-        $fbrCompany = Company::firstOrCreate(
+        // ─────────────────────────────────────────────────────────────────
+        // FBR POS Test Company + User
+        // Mandatory because /fbr-pos/login enforces:
+        //   user.company.product_type === 'fbrpos' AND fbr_pos_enabled === true
+        // updateOrCreate so the critical flags are GUARANTEED even if a row
+        // with NTN 7777777-7 pre-existed without them.
+        // ─────────────────────────────────────────────────────────────────
+        $fbrCompany = Company::updateOrCreate(
             ['ntn' => '7777777-7'],
             [
                 'name' => 'FBR POS Test Company',
@@ -63,14 +71,6 @@ class TestUsersSeeder extends Seeder
                 'fbr_reporting_enabled' => true,
             ]
         );
-        // Force-update key flags in case row pre-existed without them
-        $fbrCompany->update([
-            'company_status' => 'active',
-            'product_type' => 'fbrpos',
-            'fbr_pos_enabled' => true,
-            'fbr_pos_environment' => $fbrCompany->fbr_pos_environment ?: 'sandbox',
-            'fbr_reporting_enabled' => true,
-        ]);
 
         User::updateOrCreate(
             ['email' => 'fbrtest@taxnest.com'],

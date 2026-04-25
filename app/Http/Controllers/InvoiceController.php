@@ -1448,6 +1448,21 @@ class InvoiceController extends Controller
         return $pdf->stream($filename)->header('X-Frame-Options', 'SAMEORIGIN');
     }
 
+    public function pdfBwPreview(Invoice $invoice)
+    {
+        $companyId = app('currentCompanyId');
+        if ($invoice->company_id !== $companyId && auth()->user()->role !== 'super_admin') {
+            abort(403);
+        }
+
+        $data = $this->buildPdfData($invoice);
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-bw', $data);
+        $pdf->setPaper('A4', 'portrait');
+        $filename = 'invoice-bw-preview-' . ($invoice->fbr_invoice_number ?? $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id) . '.pdf';
+
+        return $pdf->stream($filename)->header('X-Frame-Options', 'SAMEORIGIN');
+    }
+
     public function download(Invoice $invoice)
     {
         $companyId = app('currentCompanyId');

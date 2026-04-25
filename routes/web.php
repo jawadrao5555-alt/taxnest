@@ -321,6 +321,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
     Route::get('/invoice/{invoice}/status-json', [InvoiceController::class, 'statusJson']);
     Route::get('/invoice/{invoice}/preview', [InvoiceController::class, 'preview']);
     Route::get('/invoice/{invoice}/pdf', [InvoiceController::class, 'pdf']);
+    Route::get('/invoice/{invoice}/pdf-bw-preview', [InvoiceController::class, 'pdfBwPreview'])->name('invoice.pdfBwPreview');
     Route::get('/invoice/{invoice}/download', [InvoiceController::class, 'download']);
     Route::post('/invoice/{invoice}/update-wht', [InvoiceController::class, 'updateWht'])->name('invoice.updateWht');
     Route::post('/invoice/{invoice}/update-wht-ajax', [InvoiceController::class, 'updateWhtAjax'])->name('invoice.updateWhtAjax');

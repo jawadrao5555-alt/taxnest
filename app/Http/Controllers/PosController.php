@@ -2134,6 +2134,7 @@ class PosController extends Controller
             'name' => $request->name,
             'description' => $request->description,
             'price' => $request->price,
+            'cost_price' => $request->filled('cost_price') ? $request->cost_price : 0,
             'tax_rate' => $request->tax_rate ?? 0,
             'category' => $request->category,
             'sku' => $request->sku,
@@ -2366,6 +2367,7 @@ class PosController extends Controller
         $data = array_merge(
             $request->only(['name', 'description', 'price', 'tax_rate', 'category', 'sku', 'barcode', 'uom']),
             [
+                'cost_price' => $request->filled('cost_price') ? $request->cost_price : 0,
                 'is_tax_exempt' => $request->has('is_tax_exempt'),
                 'prescription_required' => $request->has('prescription_required'),
                 'weight_based' => $request->has('weight_based'),

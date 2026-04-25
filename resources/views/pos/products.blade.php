@@ -140,11 +140,11 @@
                         <th class="px-4 py-3 text-center">Actions</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800" x-data="{ editingId: null }">
                     @forelse($products as $product)
-                    <tr class="{{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }} {{ !$product->is_active ? 'opacity-50' : '' }}" x-data="{ editing: false }">
+                    <tr class="{{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }} {{ !$product->is_active ? 'opacity-50' : '' }}" x-show="editingId !== {{ $product->id }}">
                         <td class="px-4 py-3">
-                            <div x-show="!editing" class="flex items-center gap-3">
+                            <div class="flex items-center gap-3">
                                 <img src="{{ $product->image ? asset('storage/products/' . $product->image) : asset('img/food-placeholder.svg') }}" alt="{{ $product->name }}" class="w-10 h-10 rounded-lg object-cover bg-gray-100 dark:bg-gray-700 flex-shrink-0 border border-gray-200 dark:border-gray-700" onerror="this.src='{{ asset('img/food-placeholder.svg') }}'">
                                 <div>
                                     <span class="font-medium text-gray-900 dark:text-white">{{ $product->name }}</span>
@@ -171,7 +171,7 @@
                         </td>
                         <td class="px-4 py-3 text-center">
                             <div class="flex items-center justify-center gap-1">
-                                <button @click="editing = !editing" class="text-xs text-purple-600 hover:text-purple-700 px-2 py-1">Edit</button>
+                                <button @click="editingId = (editingId === {{ $product->id }} ? null : {{ $product->id }})" class="text-xs text-purple-600 hover:text-purple-700 px-2 py-1">Edit</button>
                                 <form method="POST" action="{{ route('pos.products.delete', $product->id) }}" onsubmit="return confirm('Delete this product?')" class="inline">
                                     @csrf @method('DELETE')
                                     <button type="submit" class="text-xs text-red-500 hover:text-red-600 px-2 py-1">Delete</button>
@@ -179,7 +179,7 @@
                             </div>
                         </td>
                     </tr>
-                    <tr x-show="editing" class="bg-purple-50/50 dark:bg-purple-900/10">
+                    <tr x-show="editingId === {{ $product->id }}" x-cloak class="bg-purple-50/50 dark:bg-purple-900/10">
                         <td colspan="7" class="px-4 py-3">
                             <form method="POST" action="{{ route('pos.products.update', $product->id) }}" enctype="multipart/form-data" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 items-end">
                                 @csrf @method('PUT')
@@ -224,7 +224,7 @@
                                 @endif
                                 <div class="flex gap-2 col-span-2 sm:col-span-1">
                                     <button type="submit" class="text-xs font-semibold text-white px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 transition">Save</button>
-                                    <button type="button" @click="editing = false" class="text-xs text-gray-500 px-3 py-1.5">Cancel</button>
+                                    <button type="button" @click="editingId = null" class="text-xs text-gray-500 px-3 py-1.5">Cancel</button>
                                 </div>
                             </form>
                         </td>

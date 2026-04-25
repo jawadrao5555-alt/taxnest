@@ -722,8 +722,8 @@ kbd {
                         <span><kbd>Ctrl</kbd>+<kbd>K</kbd> Search → <kbd>↓</kbd><kbd>↑</kbd><kbd>Enter</kbd> add</span>
                         <span class="px-2 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-bold"><kbd>Enter</kbd> = Add Product / Next Row</span>
                         <span><kbd>Ctrl</kbd>+<kbd>D</kbd> Duplicate · <kbd>Ctrl</kbd>+<kbd>Del</kbd> Remove</span>
-                        <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 font-bold"><kbd>F9</kbd> or <kbd>Ctrl</kbd>+<kbd>B</kbd> = COMPLETE SALE</span>
-                        <span><kbd>F2</kbd> Cash · <kbd>F3</kbd> Numpad · <kbd>F4</kbd> Hold · <kbd>F5</kbd> Recall</span>
+                        <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 font-bold"><kbd>F8</kbd> / <kbd>F9</kbd> / <kbd>Ctrl</kbd>+<kbd>B</kbd> = OPEN PAYMENT CONFIRM</span>
+                        <span><kbd>F2</kbd> Cash · <kbd>F3</kbd> Numpad · <kbd>F4</kbd> Hold · <kbd>F5</kbd> Recall · <kbd>F12</kbd> Reprint</span>
                     </div>
                 </div>
             </div>
@@ -872,15 +872,25 @@ kbd {
                     </div>
                 </div>
 
-                <button type="submit" x-ref="completeBtn"
+                {{-- ✅ NEW (Apr-26): Button is now type="button" — opens Payment Confirm picker.
+                     The actual form submission (DB row + FBR submission) ONLY happens after the
+                     cashier presses "Confirm & Complete Sale" inside the picker modal.
+                     This means the bill stays PROVISIONAL (just JS state) until payment is confirmed. --}}
+                <button type="button" x-ref="completeBtn"
+                    @click="openPaymentPicker()"
                     :disabled="!isOnline || submitting"
                     :class="(isOnline && !submitting) ? 'bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white' : 'bg-gray-400 text-gray-200 cursor-not-allowed'"
                     class="w-full py-5 font-black rounded-xl transition text-lg shadow-xl tracking-wide flex items-center justify-center gap-2">
                     <svg x-show="submitting" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                    <span x-show="isOnline && !submitting">✓ COMPLETE SALE <span class="opacity-70 text-xs font-normal">(F8 Pay · F9 / Ctrl+B Direct)</span></span>
+                    <span x-show="isOnline && !submitting">✓ CONFIRM PAYMENT &amp; SUBMIT <span class="opacity-70 text-xs font-normal">(F8 / F9)</span></span>
                     <span x-show="submitting" x-cloak>SUBMITTING TO FBR...</span>
                     <span x-show="!isOnline && !submitting" x-cloak>⚠ OFFLINE — RECONNECT TO SUBMIT</span>
                 </button>
+                {{-- Tiny clarifier under the button --}}
+                <p class="mt-2 text-[11px] text-center text-gray-500 dark:text-gray-400 leading-snug">
+                    📝 Bill stays <span class="font-bold text-amber-600 dark:text-amber-400">PROVISIONAL</span> — edit/delete items above until you confirm payment.
+                    <br>FBR submission happens <span class="font-bold">only</span> after you press "Confirm &amp; Complete" in the modal.
+                </p>
             </div>
         </div>
     </form>
@@ -900,7 +910,7 @@ kbd {
             @endif
         </div>
         <div class="flex items-center gap-3">
-            <span class="text-slate-400">F2 Cash · F3 Pad · F4 Hold · F5 Recall · <span class="text-amber-300 font-bold">F8 Pay (Pick Method)</span> · F9 Direct Pay · F12 Reprint</span>
+            <span class="text-slate-400">F2 Cash · F3 Pad · F4 Hold · F5 Recall · F6 +Row · F7 Search · <span class="text-amber-300 font-bold">F8/F9 Confirm Payment</span> · F12 Reprint</span>
             <span class="text-slate-400">|</span>
             <span x-text="new Date().toLocaleTimeString()" x-init="setInterval(() => $el.textContent = new Date().toLocaleTimeString(), 1000)" class="font-mono font-bold text-emerald-300"></span>
         </div>
@@ -971,6 +981,14 @@ function fbrPosInvoice() {
             this.loadHeld();
             // Global keyboard shortcuts
             window.addEventListener('keydown', (e) => {
+                // ✅ NEW (Apr-26): When ANY modal is open, defer ALL global shortcuts to the
+                // modal's own @keydown handlers (Alpine bindings). Prevents accidental row-add /
+                // F8 picker re-open / search-modal toggle while user is confirming payment, etc.
+                if (this.paymentModalOpen || this.recallOpen || this.productSearchOpen) {
+                    // Allow Escape to bubble through Alpine modal handlers; allow F11 fullscreen always.
+                    if (e.key === 'F11') { e.preventDefault(); this.toggleFullscreen(); }
+                    return;
+                }
                 // Always-active combos (work even inside inputs)
                 // Plain Enter (no modifiers) anywhere outside form inputs → add new product row
                 if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
@@ -982,7 +1000,8 @@ function fbrPosInvoice() {
                 }
                 // Ctrl+Enter still works as alias (for power users) — but plain Enter on item fields is the primary path
                 if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); this.addItem(); this.focusLastRowName(); return; }
-                if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) { e.preventDefault(); this.$refs.completeBtn && this.$refs.completeBtn.click(); return; }
+                // ✅ NEW (Apr-26): Ctrl+B opens payment picker (not direct submit).
+                if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) { e.preventDefault(); this.openPaymentPicker(); return; }
                 if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); this.openProductSearch(); return; }
                 if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
                     if (this.activeItemIndex >= 0 && this.activeItemIndex < this.items.length) { e.preventDefault(); this.duplicateItem(this.activeItemIndex); }
@@ -1004,8 +1023,14 @@ function fbrPosInvoice() {
                         }
                     }
                 }
-                if (e.target.tagName === 'INPUT' && ['F2','F3','F4','F5','F8','F9','F11'].indexOf(e.key) === -1) return;
-                if (e.key === 'F9') { e.preventDefault(); this.$refs.completeBtn && this.$refs.completeBtn.click(); }
+                // ✅ FIX (Apr-26): All F-keys must work even when an input has focus.
+                // Previous whitelist only included F2/F3/F4/F5/F8/F9/F11 → F6/F7/F10/F12 silently failed
+                // because the cashier almost always has the barcode/qty/amount field focused.
+                const FBR_F_KEYS = ['F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12'];
+                if (e.target.tagName === 'INPUT' && FBR_F_KEYS.indexOf(e.key) === -1) return;
+                // ✅ NEW (Apr-26): F9 / Enter / Ctrl+B all open the Payment Confirm picker.
+                // No more "direct submit" — bill stays PROVISIONAL until cashier confirms payment in the modal.
+                if (e.key === 'F9') { e.preventDefault(); this.openPaymentPicker(); }
                 else if (e.key === 'F2') { e.preventDefault(); this.cashReceived = this.calcTotal(); this.$refs.cashInput && this.$refs.cashInput.focus(); }
                 else if (e.key === 'F3') { e.preventDefault(); this.numpadOpen = !this.numpadOpen; }
                 else if (e.key === 'F4') { e.preventDefault(); this.holdSale(); }
@@ -1013,6 +1038,7 @@ function fbrPosInvoice() {
                 else if (e.key === 'F6') { e.preventDefault(); this.addItem(); this.focusLastRowName(); }
                 else if (e.key === 'F7') { e.preventDefault(); this.openProductSearch(); }
                 else if (e.key === 'F8') { e.preventDefault(); this.openPaymentPicker(); }
+                else if (e.key === 'F10') { e.preventDefault(); this.openPaymentPicker(); } // alt confirm
                 else if (e.key === 'F11') { e.preventDefault(); this.toggleFullscreen(); }
                 else if (e.key === 'F12') { e.preventDefault(); this.reprintLast(); }
             });
@@ -1182,9 +1208,12 @@ function fbrPosInvoice() {
             if (!chosen) return;
             this.paymentMethod = chosen.value; // x-model syncs the select
             this.paymentModalOpen = false;
-            this.toast('Payment: ' + chosen.label + ' · Submitting...', 'success');
+            this.toast('Payment: ' + chosen.label + ' · Submitting to FBR...', 'success');
+            // ✅ NEW (Apr-26): Call finalizeAndSubmit() directly — DO NOT click completeBtn
+            // because completeBtn now opens the picker (would create infinite loop).
+            // finalizeAndSubmit() does the cleanup + native form submit (DB + FBR production).
             this.$nextTick(() => {
-                this.$refs.completeBtn && this.$refs.completeBtn.click();
+                this.finalizeAndSubmit();
             });
         },
         async loadHeld() {

@@ -547,15 +547,31 @@ window.addEventListener('popstate', function() {
     </div>
 
     <div x-show="showHeldOrders" x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showHeldOrders = false">
-        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden" x-transition.scale.90>
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-hidden" x-transition.scale.90>
             <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                 <div>
-                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">Held Orders</h3>
-                    <p class="text-[10px] text-gray-400 mt-0.5">Arrow keys to navigate • Enter=Recall • P=Pay • D=Delete • ESC=Close</p>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <span>📝 Provisional Bills</span>
+                        <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">EDITABLE</span>
+                    </h3>
+                    <p class="text-[10px] text-gray-400 mt-0.5">Arrow keys to navigate • Enter=Recall to Edit • P=Confirm Payment • D=Delete • ESC=Close</p>
                 </div>
                 <button @click="showHeldOrders = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
             </div>
-            <div class="max-h-[60vh] overflow-y-auto">
+            {{-- ✅ NEW (Apr-26): Crystal-clear lifecycle banner so cashiers/managers know
+                 what "provisional" means: editable / deletable freely, until they press
+                 "Pay" → which submits to PRA AND locks the bill forever. --}}
+            <div class="px-4 py-2.5 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 dark:from-amber-900/20 dark:via-orange-900/20 dark:to-amber-900/20 border-b border-amber-200 dark:border-amber-800/50 text-[11px] leading-snug">
+                <div class="flex items-start gap-2">
+                    <span class="text-amber-600 dark:text-amber-400 text-base leading-none mt-0.5">ⓘ</span>
+                    <div class="text-amber-900 dark:text-amber-200">
+                        <span class="font-bold">These bills are PROVISIONAL.</span>
+                        Edit items, change qty, or delete — no PRA submission yet.
+                        <span class="font-bold text-emerald-700 dark:text-emerald-300">"Pay" = Confirm Payment</span> → triggers PRA submission and <span class="font-bold">locks the bill permanently</span>.
+                    </div>
+                </div>
+            </div>
+            <div class="max-h-[55vh] overflow-y-auto">
                 <template x-if="heldOrders.length === 0">
                     <div class="p-8 text-center text-gray-400"><p class="text-sm">No held orders</p></div>
                 </template>
@@ -569,16 +585,16 @@ window.addEventListener('popstate', function() {
                             <div class="flex items-center gap-1.5">
                                 <template x-if="order.customer_name"><span class="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full font-medium" x-text="order.customer_name"></span></template>
                                 <template x-if="order.priority"><span class="text-[9px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold">RUSH</span></template>
-                                <span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="{'bg-amber-100 text-amber-700': order.status==='held', 'bg-blue-100 text-blue-700': order.status==='preparing', 'bg-green-100 text-green-700': order.status==='ready'}" x-text="order.status"></span>
+                                <span class="text-xs px-2 py-0.5 rounded-full font-bold uppercase tracking-wide" :class="{'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300': order.status==='held', 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300': order.status==='preparing', 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300': order.status==='ready'}" x-text="order.status==='held' ? '📝 PROVISIONAL' : order.status.toUpperCase()"></span>
                             </div>
                         </div>
                         <p class="text-xs text-gray-500 mb-1 ml-7" x-text="'Rs. ' + Number(order.total_amount).toLocaleString() + ' • ' + order.items.length + ' item(s)'"></p>
                         <template x-if="order.table"><p class="text-[10px] text-purple-600 ml-7" x-text="'Table: T-' + order.table.table_number"></p></template>
                         <div class="flex gap-2 mt-2 ml-7">
-                            <button @click="recallOrder(order)" class="flex-1 py-2 text-xs font-bold text-purple-600 border border-purple-300 rounded-xl hover:bg-purple-50 transition">Recall</button>
-                            <a :href="'/pos/restaurant/orders/' + order.id + '/kitchen-ticket'" target="_blank" class="py-2 px-3 text-xs font-bold text-center text-orange-600 border border-orange-300 rounded-xl hover:bg-orange-50 transition">KOT</a>
-                            <button @click="payHeldOrder(order.id)" class="flex-1 py-2 text-xs font-bold text-white bg-green-600 rounded-xl hover:bg-green-700 transition">Pay</button>
-                            <button @click="deleteHeldOrder(order.id)" class="py-2 px-3 text-xs font-bold text-red-500 border border-red-300 rounded-xl hover:bg-red-50 transition">Delete</button>
+                            <button @click="recallOrder(order)" title="Recall + Edit (Provisional)" class="flex-1 py-2 text-xs font-bold text-purple-600 border border-purple-300 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-900/20 transition">✏️ Edit</button>
+                            <a :href="'/pos/restaurant/orders/' + order.id + '/kitchen-ticket'" target="_blank" title="Reprint KOT (no submission)" class="py-2 px-3 text-xs font-bold text-center text-orange-600 border border-orange-300 rounded-xl hover:bg-orange-50 dark:hover:bg-orange-900/20 transition">KOT</a>
+                            <button @click="payHeldOrder(order.id)" title="Confirm Payment → submit to PRA + LOCK" class="flex-1 py-2 text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-green-600 rounded-xl hover:from-emerald-700 hover:to-green-700 transition shadow">💳 Pay &amp; Lock</button>
+                            <button @click="deleteHeldOrder(order.id)" title="Delete (allowed while provisional)" class="py-2 px-3 text-xs font-bold text-red-500 border border-red-300 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition">🗑</button>
                         </div>
                     </div>
                 </template>

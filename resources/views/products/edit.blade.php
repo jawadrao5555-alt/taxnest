@@ -49,18 +49,32 @@
                         </div>
                     </div>
 
+                    {{-- Quick Tax-Status helper: makes "exempt / zero-rated" obvious --}}
+                    <div class="mb-3 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+                        <div class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <div class="text-xs text-emerald-800 dark:text-emerald-200">
+                                <strong class="block mb-0.5">Tax-Free product chahiye?</strong>
+                                Schedule Type dropdown say <strong>"Exempt (Tax-Free / 0%)"</strong> select karein &mdash; tax rate khud-ba-khud 0 ho jayega.
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Schedule Type <span class="text-red-500">*</span></label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Schedule Type / Tax Status <span class="text-red-500">*</span></label>
                             <select name="schedule_type" required x-model="scheduleType" @change="updateRules()"
                                 class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 <option value="">Select Schedule Type</option>
-                                <option value="standard">Standard</option>
-                                <option value="reduced">Reduced</option>
-                                <option value="3rd_schedule">3rd Schedule</option>
-                                <option value="exempt">Exempt</option>
-                                <option value="zero_rated">Zero Rated</option>
+                                <option value="standard">Standard (18% normal sale tax)</option>
+                                <option value="reduced">Reduced Rate (lower than 18%)</option>
+                                <option value="3rd_schedule">3rd Schedule (MRP-based)</option>
+                                <option value="exempt">Exempt (Tax-Free / 0%)</option>
+                                <option value="zero_rated">Zero Rated (0% &mdash; Reportable)</option>
                             </select>
+                            <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                                <strong>Exempt</strong> = no tax, no FBR submission needed &middot; <strong>Zero Rated</strong> = 0% but reported to FBR
+                            </p>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Tax Rate (%) <span class="text-red-500">*</span></label>
@@ -247,8 +261,10 @@
                 } else if (st === 'reduced') {
                     this.requiresSro = true;
                     this.requiresSerial = true;
-                } else if (st === 'exempt') {
-                    this.requiresSro = true;
+                } else if (st === 'exempt' || st === 'zero_rated') {
+                    // Tax-free / zero-rated MUST have rate = 0 (matches helper-text promise)
+                    this.taxRate = 0;
+                    if (st === 'exempt') this.requiresSro = true;
                 }
                 this.calcTax();
             },

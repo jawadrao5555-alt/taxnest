@@ -1,0 +1,118 @@
+Internal Server Error
+
+Copy as Markdown
+Illuminate\Database\QueryException
+vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+SQLSTATE[HY000] [2002] Connection refused (Connection: mysql, Host: 127.0.0.1, Port: 9000, Database: taxnest_staging, SQL: select count(*) as aggregate from `invoices` where `status` = locked)
+
+LARAVEL
+12.51.0
+PHP
+8.4.16
+UNHANDLED
+CODE 2002
+500
+GET
+https://deeb2ffc-615d-44ed-a0cd-b1cde9f84756-00-24lu1hpq4f5ka.worf.replit.dev
+
+Exception trace
+12 vendor frames
+
+routes/web.php
+routes/web.php:113
+
+108    return response()->json($info);
+109});
+110
+111Route::get('/', function () {
+112    $stats = [
+113        'total_invoices' => \App\Models\Invoice::where('status', 'locked')->count()
+114            + \App\Models\PosTransaction::where('pra_status', 'success')->count()
+115            + \App\Models\FbrPosTransaction::where('fbr_status', 'success')->count(),
+116        'total_companies' => \App\Models\Company::where('status', 'approved')->count(),
+117    ];
+118
+119    return view('landing', [
+120        'showLogin' => false,
+121        'stats' => $stats,
+122    ]);
+123});
+124
+125
+25 vendor frames
+
+App\Http\Middleware\SecurityHeaders->handle(object(Illuminate\Http\Request), object(Closure))
+app/Http/Middleware/SecurityHeaders.php:13
+
+23 vendor frames
+
+public/index.php
+public/index.php:30
+
+1 vendor frame
+
+Queries
+// No queries executed
+Headers
+host
+deeb2ffc-615d-44ed-a0cd-b1cde9f84756-00-24lu1hpq4f5ka.worf.replit.dev
+user-agent
+Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36
+accept
+text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+accept-encoding
+gzip, deflate, br, zstd
+accept-language
+en-US,en;q=0.9
+cookie
+XSRF-TOKEN=eyJpdiI6IjFuSkRqcUt0VVBVb2RVWnJaSk0zalE9PSIsInZhbHVlIjoiZFY2ZFFNclJXaVpXV2xkdGhqMXhReXc2S0JhWk5ZLzdrQ0pZR2NUdFFrRmNsZy82Y3p6bEdtYi9wR0ZYR1JXRGY4NUgvbWZKcVNqNTBtZ2thWG8zVWg3NGRyREdvQldoOGFwd25WVlYrUGErSlplS0c0eTRVSUxwZ1FGektlazUiLCJtYWMiOiI5Y2I3MzEyMDk1MTlkNWNiM2NlMzhhOGIyNmRmZTM0ZDczYmFkMzhhZDNlOTE0MDUxZTZmYWU1NzUxOGY1MTQ1IiwidGFnIjoiIn0%3D; taxnest-session=eyJpdiI6IllDaGg4U2FOalRPWWVLVUUyNlpGV2c9PSIsInZhbHVlIjoiOExKNkI0dnJuaDQ3UU5TS0V6TlhUYXhGUDI4UHIxWldlYXgzMk84VjVxWmYxVmVPVXRvczBYazd5ams2cE5hdVM5RVYycDgrR2N6blZ6ak0vVUc3YjNXQ3YrWmdXSUp4VHJJdVBVYlhlWlFSR0Mybk9RSE5wYUU1SVA5ZHFNdFUiLCJtYWMiOiIwMTdjZTY4MTZhMDZkMTI4ZGI2NzUwMGQ3ZmNjNDRhMmQ0MGY4ZjNmM2RmMDY5NDE1YmE5ZDM5NmMxNjA0ZGE5IiwidGFnIjoiIn0%3D
+referer
+https://deeb2ffc-615d-44ed-a0cd-b1cde9f84756-00-24lu1hpq4f5ka.worf.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=default-laravel-server
+sec-ch-ua
+"Google Chrome";v="147", "Not.A/Brand";v="8", "Chromium";v="147"
+sec-ch-ua-mobile
+?0
+sec-ch-ua-platform
+"Windows"
+sec-fetch-dest
+empty
+sec-fetch-mode
+navigate
+sec-fetch-site
+same-origin
+sec-fetch-storage-access
+active
+traceparent
+00-69ec7dfe00000000486bcf2d1507b857-72038dca523c6043-00
+tracestate
+dd=s:0;p:72038dca523c6043;t.tid:69ec7dfe00000000
+upgrade-insecure-requests
+1
+x-datadog-parent-id
+8215566045356515395
+x-datadog-sampling-priority
+0
+x-datadog-tags
+_dd.p.tid=69ec7dfe00000000
+x-datadog-trace-id
+5218492385772157015
+x-forwarded-for
+182.181.115.255, 10.83.7.198, 127.0.0.1
+x-forwarded-proto
+https
+x-replit-user-bio
+x-replit-user-id
+x-replit-user-name
+x-replit-user-profile-image
+x-replit-user-roles
+x-replit-user-teams
+x-replit-user-url
+Body
+// No request body
+Routing
+controller
+Closure
+middleware
+web
+Routing parameters
+// No routing parameters

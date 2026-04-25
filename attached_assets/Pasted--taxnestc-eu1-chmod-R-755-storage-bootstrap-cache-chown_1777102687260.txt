@@ -1,0 +1,303 @@
+[taxnestc@eu1 ~]$ chmod -R 755 storage bootstrap/cache
+chown -R youruser:youruser storage bootstrap/cache
+chmod: cannot access 'storage': No such file or directory
+chmod: cannot access 'bootstrap/cache': No such file or directory
+chown: invalid usecd ~/repositories/taxnest    # apna project path adjust karein
+git pull origin main ~/repositories/taxnest    # apna project path adjust karein
+php artisan view:clear
+php artisan cache:clear
+php artisan config:cache
+php artisan route:cachee
+remote: Enumerating objects: 884, done.
+remote: Counting objects: 100% (884/884), done.
+remote: Compressing objects: 100% (245/245), done.
+remote: Total 801 (delta 639), reused 711 (delta 552), pack-reused 0 (from 0)
+Receiving objects: 100% (801/801), 22.10 MiB | 17.09 MiB/s, done.
+Resolving deltas: 100% (639/639), completed with 65 local objects.
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+   51f0d50..a0eee64  main       -> origin/main
+Updating 51f0d50..a0eee64
+Updating files: 100% (167/167), done.
+Fast-forward
+ .agents/agent_assets_metadata.toml                 |   18 +
+ .env.mysql.staging                                 |   48 +
+ .env.pgsql.backup                                  |   45 +
+ .env.pgsql.backup.20260424_051433                  |   45 +
+ .gitignore                                         |    3 +
+ .replit                                            |   23 +-
+ MYSQL_MIGRATION.md                                 |  133 +++
+ app/Helpers/DbCompat.php                           |   97 +-
+ app/Http/Controllers/AdminController.php           |  115 +++
+ .../Auth/AuthenticatedSessionController.php        |   20 +-
+ app/Http/Controllers/BranchSwitchController.php    |   21 +
+ app/Http/Controllers/FbrPosAuthController.php      |   67 +-
+ app/Http/Controllers/FbrPosController.php          |  185 +++-
+ app/Http/Controllers/InvoiceController.php         |   19 +-
+ app/Http/Controllers/PosAuthController.php         |   74 +-
+ app/Http/Controllers/PosController.php             |   22 +-
+ app/Http/Controllers/RestaurantPosController.php   |   23 +-
+ .../SaasAdmin/AdminCompanyController.php           |  143 +++
+ app/Http/Controllers/ShareController.php           |   16 +-
+ app/Http/Controllers/WhtReportController.php       |   19 +-
+ app/Http/Middleware/CheckPlanLimit.php             |   21 +
+ app/Http/Middleware/CompanyIsolation.php           |    4 +
+ app/Http/Middleware/FbrPosAuth.php                 |    7 +
+ app/Http/Middleware/PosAuth.php                    |    7 +
+ app/Http/Middleware/SetBranchContext.php           |   33 +
+ app/Http/Requests/Auth/LoginRequest.php            |   71 +-
+ app/Jobs/RetryFailedFbrInvoicesJob.php             |  114 +++
+ app/Jobs/RetryFbrPosSubmissionJob.php              |  104 ++
+ app/Models/Branch.php                              |   16 +
+ app/Models/Company.php                             |    2 +
+ app/Models/CustomerProfile.php                     |    5 +
+ app/Models/FbrPosTransaction.php                   |    2 +-
+ app/Models/Invoice.php                             |    3 +
+ app/Models/PosTransaction.php                      |    2 +-
+ app/Models/Product.php                             |    5 +
+ app/Models/Scopes/CompanyScope.php                 |   46 +
+ app/Models/Subscription.php                        |   30 +
+ app/Providers/AppServiceProvider.php               |   19 +
+ app/Services/BranchContextService.php              |  197 ++++
+ app/Services/FbrService.php                        |   13 +-
+ app/Services/ProductImageService.php               |  112 ++-
+ app/Services/SmartTaxEngine.php                    |   33 +-
+ app/Services/SubscriptionAccessService.php         |   94 ++
+ .../Annexure_A_Report_(21)_1777013070792.pdf       |  Bin 0 -> 137357 bytes
+ .../Annexure_A_Report_(21)_1777014744724.pdf       |  Bin 0 -> 137357 bytes
+ attached_assets/Capture_1776839658247.JPG          |  Bin 0 -> 227877 bytes
+ attached_assets/Capture_1777020308610.JPG          |  Bin 0 -> 221167 bytes
+ attached_assets/Capture_1777020439070.JPG          |  Bin 0 -> 221167 bytes
+ attached_assets/Capture_1777100231278.JPG          |  Bin 0 -> 36312 bytes
+ attached_assets/IMG_1890_1777045158247.png         |  Bin 0 -> 550108 bytes
+ attached_assets/IMG_1891_1777045332056.png         |  Bin 0 -> 93746 bytes
+ attached_assets/IMG_1892_1777045821111.png         |  Bin 0 -> 179149 bytes
+ attached_assets/IMG_1894_1777046094310.png         |  Bin 0 -> 165767 bytes
+ attached_assets/IMG_1895_1777046275772.png         |  Bin 0 -> 209067 bytes
+ attached_assets/IMG_1896_1777046428296.png         |  Bin 0 -> 183560 bytes
+ attached_assets/IMG_1897_1777046765485.png         |  Bin 0 -> 174631 bytes
+ attached_assets/IMG_1898_1777046879452.png         |  Bin 0 -> 177816 bytes
+ attached_assets/IMG_1899_1777047330522.png         |  Bin 0 -> 382678 bytes
+ attached_assets/IMG_1900_1777047602837.png         |  Bin 0 -> 208393 bytes
+ attached_assets/IMG_1901_1777047809663.png         |  Bin 0 -> 280886 bytes
+ ...mode-to-companies-php-24-3-29_1776837907524.txt | 1024 ++++++++++++++++++++
+ ...mode-to-companies-php-24-3-29_1776837999829.txt | 1024 ++++++++++++++++++++
+ ...mode-to-companies-php-24-3-29_1776839342707.txt | 1024 ++++++++++++++++++++
+ ...1-public-html-cd-public-html-_1777051795290.txt |  250 +++++
+ ...EBUG-OFF-safe-again--17770512_1777051250796.txt |  222 +++++
+ ...igration-taxnestc-eu1-public-_1777052276926.txt |   75 ++
+ ...in-https-github-com-jawadrao5_1777051342179.txt |   77 ++
+ ...wered-by-PHP-8-4-15-cache-con_1777051710729.txt |   56 ++
+ ...l-e-SELECT-id-name-ntn-cre-17_1777052165573.txt |   76 ++
+ ...-error-log-home-taxnestc-publ_1777050813437.txt |   95 ++
+ ...License-github-com-necolas-no_1777051189237.txt |  145 +++
+ ...ear-opt-alt-php84-usr-share-p_1777050884018.txt |   74 ++
+ ...ml-taxnest-git-pull-origin-ma_1777092145889.txt |  137 +++
+ ...ml-taxnest-git-pull-origin-ma_1777097891843.txt |  320 ++++++
+ ...PASS-grep-DB-PASSWORD-env-cut_1777051535297.txt |   73 ++
+ ...ET-ACCESS-KEY-AWS-DEFAULT-REG_1777050524669.txt |   47 +
+ ...DRAFT-ONLY-DO-NOT-SUBMIT-Comp_1777012076046.txt |  143 +++
+ ...P-8-4-15-cache-control-must-r_1777050986546.txt |   59 ++
+ ...P-8-4-15-cache-control-must-r_1777051098251.txt |  172 ++++
+ ...ng-mukammal-Architect-review-_1777011759280.txt |   39 +
+ ...RRIDE-USAGE-LIMIT-SYSTEM-FINA_1777091048825.txt |  124 +++
+ ...xception-vendor-laravel-frame_1777020151458.txt |  115 +++
+ ...BSERVABILITY-PERFORMANCE-SAFE_1777072007032.txt |  152 +++
+ ...UCTS-DI-PRA-POS-FBR-POS-GOAL-_1777087210958.txt |  179 ++++
+ ...-BUILD-AUTO-TEST-GOAL-Add-VAL_1777055995269.txt |  141 +++
+ ...MIN-UNIFIED-COMPANY-STRICT-GO_1777056807082.txt |  130 +++
+ ...MIN-UNIFIED-COMPANY-STRICT-GO_1777056933137.txt |  130 +++
+ ...LOW-ALL-PRODUCTS-GOAL-Make-en_1777057638790.txt |  124 +++
+ ...UILD-CRITICAL-PRODUCTION-BLOC_1777018728703.txt |  167 ++++
+ ...UILD-CRITICAL-PRODUCTION-BLOC_1777018911456.txt |  167 ++++
+ ...-SAFE-MODE-GOAL-Implement-rec_1777018469160.txt |  131 +++
+ ...-PRA-CART-FBR-VALUE-MODE-AGEN_1777054754044.txt |  194 ++++
+ ...-VALIDATION-GOAL-Test-ALL-pro_1777008363538.txt |  160 +++
+ ...stall-no-dev-no-scripts-optim_1777050152745.txt |  105 ++
+ ...l-sI-https-taxnest-com-pk-hea_1777052094172.txt |   68 ++
+ ...-INSERT-IGNORE-INTO-companies_1777043281217.txt |   21 +
+ ...xnest-envw-lines-w-as-f-quote_1777051625898.txt |   84 ++
+ ...blic-html-taxnest-git-pull-or_1777098135021.txt |   65 ++
+ .../Profile_Report_(19)_1777020448663.pdf          |  Bin 0 -> 193054 bytes
+ attached_assets/image_1777042326387.jpg            |  Bin 0 -> 3647438 bytes
+ attached_assets/image_1777042339514.jpg            |  Bin 0 -> 5428982 bytes
+ attached_assets/image_1777042359998.jpg            |  Bin 0 -> 4582777 bytes
+ attached_assets/image_1777099774395.jpg            |  Bin 0 -> 6311015 bytes
+ check-db.sh                                        |   17 +
+ config/database.php                                |   42 +-
+ config/features.php                                |   11 +
+ .../2026-04-24-production-sync/00-PREFLIGHT.sql    |   67 ++
+ .../01a-punjab-plus-company.sql                    |   38 +
+ .../01b-punjab-plus-user.sql                       |   38 +
+ .../01c-punjab-plus-branch.sql                     |   38 +
+ .../01d-punjab-plus-subscription.sql               |   38 +
+ .../2026-04-24-production-sync/02-SCHEMA-ALIGN.sql |  205 ++++
+ .../2026-04-24-production-sync/03-zia-invoices.sql |  116 +++
+ .../04-zia-invoice-items.sql                       |  118 +++
+ .../2026-04-24-production-sync/99-SCHEMA-FIXES.sql |   38 +
+ .../2026-04-24-production-sync/999-VERIFY.sql      |   32 +
+ .../2026-04-24-production-sync/MASTER-ALL.sql      |  645 ++++++++++++
+ .../deploy/2026-04-24-production-sync/README.md    |   83 ++
+ .../deploy/2026-04-24-production-sync/RUN-ALL.sql  |   18 +
+ .../2026-04-24-production-sync/run-migration.sh    |   52 +
+ ...4_19_160000_create_push_subscriptions_table.php |    4 +-
+ ...re_flags_and_business_category_to_companies.php |    2 +-
+ ...04_22_180000_add_branch_id_to_pos_and_users.php |  112 +++
+ ...23_062000_add_print_paper_size_to_companies.php |   31 +
+ ..._120000_add_missing_columns_from_production.php |   46 +
+ ..._130000_fix_pos_transactions_invoice_unique.php |   95 ++
+ ..._04_24_080000_add_retry_columns_to_invoices.php |   32 +
+ ...20000_add_override_columns_to_subscriptions.php |   40 +
+ ...plan_and_end_date_nullable_on_subscriptions.php |   76 ++
+ database/seeders/TestUsersSeeder.php               |   94 +-
+ public/sw.js                                       |    5 +-
+ push.sh                                            |   15 +
+ replit.md                                          |  108 +--
+ .../views/admin/failed-fbr-invoices.blade.php      |  103 ++
+ resources/views/admin/fbr-pos-logs.blade.php       |  134 +++
+ resources/views/company/agent.blade.php            |   99 +-
+ .../views/components/branch-switcher.blade.php     |   75 ++
+ resources/views/components/pwa-banner.blade.php    |   99 +-
+ resources/views/components/pwa-init.blade.php      |   74 ++
+ resources/views/components/pwa-install.blade.php   |   80 +-
+ .../views/components/pwa-refresh-btn.blade.php     |  133 +++
+ resources/views/components/pwa-update.blade.php    |  148 ++-
+ resources/views/fbr-pos/business-profile.blade.php |  100 +-
+ resources/views/fbr-pos/create.blade.php           |  848 ++++++++++++++--
+ resources/views/fbr-pos/fail-queue.blade.php       |  159 +++
+ resources/views/fbr-pos/receipt.blade.php          |   75 +-
+ resources/views/invoice/create.blade.php           |   25 +-
+ resources/views/invoice/pdf-bw.blade.php           |  379 ++++++++
+ resources/views/layouts/app.blade.php              |   34 +-
+ resources/views/layouts/fbr-pos-app.blade.php      |   59 +-
+ resources/views/layouts/pos-app.blade.php          |   32 +-
+ resources/views/pos/create-invoice.blade.php       |  245 ++++-
+ resources/views/pos/products.blade.php             |   85 +-
+ .../views/pos/receipts/receipt_58mm.blade.php      |   69 +-
+ .../views/pos/receipts/receipt_80mm.blade.php      |   71 +-
+ .../views/pos/restaurant/kitchen-ticket.blade.php  |   37 +-
+ resources/views/pos/restaurant/receipt.blade.php   |   87 +-
+ resources/views/pos/universal.blade.php            |  170 ++--
+ resources/views/products/create.blade.php          |   32 +-
+ resources/views/products/edit.blade.php            |   32 +-
+ .../views/saas-admin/companies/show.blade.php      |   96 ++
+ routes/web.php                                     |   33 +-
+ scripts/pg_to_mysql_sync.php                       |  212 ++++
+ scripts/phase_final_check.php                      |  210 ++++
+ scripts/schema_drift_scan.php                      |  107 ++
+ tests/Feature/Phase3LoginIsolationTest.php         |  388 ++++++++
+ tests/Feature/Phase4UiPolishTest.php               |  138 +++
+ 167 files changed, 15574 insertions(+), 815 deletions(-)
+ create mode 100644 .env.mysql.staging
+ create mode 100644 .env.pgsql.backup
+ create mode 100644 .env.pgsql.backup.20260424_051433
+ create mode 100644 MYSQL_MIGRATION.md
+ create mode 100644 app/Http/Controllers/BranchSwitchController.php
+ create mode 100644 app/Http/Middleware/SetBranchContext.php
+ create mode 100644 app/Jobs/RetryFailedFbrInvoicesJob.php
+ create mode 100644 app/Jobs/RetryFbrPosSubmissionJob.php
+ create mode 100644 app/Models/Scopes/CompanyScope.php
+ create mode 100644 app/Services/BranchContextService.php
+ create mode 100644 app/Services/SubscriptionAccessService.php
+ create mode 100644 attached_assets/Annexure_A_Report_(21)_1777013070792.pdf
+ create mode 100644 attached_assets/Annexure_A_Report_(21)_1777014744724.pdf
+ create mode 100644 attached_assets/Capture_1776839658247.JPG
+ create mode 100644 attached_assets/Capture_1777020308610.JPG
+ create mode 100644 attached_assets/Capture_1777020439070.JPG
+ create mode 100644 attached_assets/Capture_1777100231278.JPG
+ create mode 100644 attached_assets/IMG_1890_1777045158247.png
+ create mode 100644 attached_assets/IMG_1891_1777045332056.png
+ create mode 100644 attached_assets/IMG_1892_1777045821111.png
+ create mode 100644 attached_assets/IMG_1894_1777046094310.png
+ create mode 100644 attached_assets/IMG_1895_1777046275772.png
+ create mode 100644 attached_assets/IMG_1896_1777046428296.png
+ create mode 100644 attached_assets/IMG_1897_1777046765485.png
+ create mode 100644 attached_assets/IMG_1898_1777046879452.png
+ create mode 100644 attached_assets/IMG_1899_1777047330522.png
+ create mode 100644 attached_assets/IMG_1900_1777047602837.png
+ create mode 100644 attached_assets/IMG_1901_1777047809663.png
+ create mode 100644 attached_assets/Pasted--28-200002-add-restaurant-mode-to-companies-php-24-3-29_1776837907524.txt
+ create mode 100644 attached_assets/Pasted--28-200002-add-restaurant-mode-to-companies-php-24-3-29_1776837999829.txt
+ create mode 100644 attached_assets/Pasted--28-200002-add-restaurant-mode-to-companies-php-24-3-29_1776839342707.txt
+ create mode 100644 attached_assets/Pasted--5-Fresh-error-taxnestc-eu1-public-html-cd-public-html-_1777051795290.txt
+ create mode 100644 attached_assets/Pasted--D-Revert-debug-to-false-DEBUG-OFF-safe-again--17770512_1777051250796.txt
+ create mode 100644 attached_assets/Pasted--E-Today-s-invoices-post-migration-taxnestc-eu1-public-_1777052276926.txt
+ create mode 100644 attached_assets/Pasted--E-taxnest-git-status-origin-https-github-com-jawadrao5_1777051342179.txt
+ create mode 100644 attached_assets/Pasted--TEST-SITE-HTTP-2-500-x-powered-by-PHP-8-4-15-cache-con_1777051710729.txt
+ create mode 100644 attached_assets/Pasted--echo-A-ALL-companies-mysql-e-SELECT-id-name-ntn-cre-17_1777052165573.txt
+ create mode 100644 attached_assets/Pasted--home-taxnestc-public-html-error-log-home-taxnestc-publ_1777050813437.txt
+ create mode 100644 attached_assets/Pasted--normalize-css-v8-0-1-MIT-License-github-com-necolas-no_1777051189237.txt
+ create mode 100644 attached_assets/Pasted--opt-alt-php84-usr-share-pear-opt-alt-php84-usr-share-p_1777050884018.txt
+ create mode 100644 attached_assets/Pasted--taxnestc-eu1-cd-public-html-taxnest-git-pull-origin-ma_1777092145889.txt
+ create mode 100644 attached_assets/Pasted--taxnestc-eu1-cd-public-html-taxnest-git-pull-origin-ma_1777097891843.txt
+ create mode 100644 attached_assets/Pasted--taxnestc-eu1-public-html-PASS-grep-DB-PASSWORD-env-cut_1777051535297.txt
+ create mode 100644 attached_assets/Pasted-AWS-ACCESS-KEY-ID-AWS-SECRET-ACCESS-KEY-AWS-DEFAULT-REG_1777050524669.txt
+ create mode 100644 attached_assets/Pasted-CREATE-MARCH-SALES-STEP-1-DRAFT-ONLY-DO-NOT-SUBMIT-Comp_1777012076046.txt
+ create mode 100644 attached_assets/Pasted-HTTP-2-500-x-powered-by-PHP-8-4-15-cache-control-must-r_1777050986546.txt
+ create mode 100644 attached_assets/Pasted-HTTP-2-500-x-powered-by-PHP-8-4-15-cache-control-must-r_1777051098251.txt
+ create mode 100644 attached_assets/Pasted-Hostcry-pre-deploy-hardening-mukammal-Architect-review-_1777011759280.txt
+ create mode 100644 attached_assets/Pasted-IMPLEMENT-SUBSCRIPTION-OVERRIDE-USAGE-LIMIT-SYSTEM-FINA_1777091048825.txt
+ create mode 100644 attached_assets/Pasted-Illuminate-Database-QueryException-vendor-laravel-frame_1777020151458.txt
+ create mode 100644 attached_assets/Pasted-MASTER-COMMAND-PHASE-5-8-OBSERVABILITY-PERFORMANCE-SAFE_1777072007032.txt
+ create mode 100644 attached_assets/Pasted-MASTER-SaaS-AUDIT-ALL-PRODUCTS-DI-PRA-POS-FBR-POS-GOAL-_1777087210958.txt
+ create mode 100644 attached_assets/Pasted-PHASE-2-FBR-POS-VALUE-MODE-BUILD-AUTO-TEST-GOAL-Add-VAL_1777055995269.txt
+ create mode 100644 attached_assets/Pasted-PHASE-3-LOGIN-ISOLATION-ADMIN-UNIFIED-COMPANY-STRICT-GO_1777056807082.txt
+ create mode 100644 attached_assets/Pasted-PHASE-3-LOGIN-ISOLATION-ADMIN-UNIFIED-COMPANY-STRICT-GO_1777056933137.txt
+ create mode 100644 attached_assets/Pasted-PHASE-4-UI-POLISH-SMOOTH-FLOW-ALL-PRODUCTS-GOAL-Make-en_1777057638790.txt
+ create mode 100644 attached_assets/Pasted-PHASE-CART-SYSTEM-HARD-REBUILD-CRITICAL-PRODUCTION-BLOC_1777018728703.txt
+ create mode 100644 attached_assets/Pasted-PHASE-CART-SYSTEM-HARD-REBUILD-CRITICAL-PRODUCTION-BLOC_1777018911456.txt
+ create mode 100644 attached_assets/Pasted-PHASE-FULL-HARDENING-BATCH-SAFE-MODE-GOAL-Implement-rec_1777018469160.txt
+ create mode 100644 attached_assets/Pasted-PHASE-MASTER-UPGRADE-LOGIN-PRA-CART-FBR-VALUE-MODE-AGEN_1777054754044.txt
+ create mode 100644 attached_assets/Pasted-PHASE-PRE-LIVE-FULL-SYSTEM-VALIDATION-GOAL-Test-ALL-pro_1777008363538.txt
+ create mode 100644 attached_assets/Pasted-cd-public-html-composer-install-no-dev-no-scripts-optim_1777050152745.txt
+ create mode 100644 attached_assets/Pasted-cd-public-html-taxnest-curl-sI-https-taxnest-com-pk-hea_1777052094172.txt
+ create mode 100644 attached_assets/Pasted-oduction-sync-04-sql-mysql-INSERT-IGNORE-INTO-companies_1777043281217.txt
+ create mode 100644 attached_assets/Pasted-src-parse-env-env-print-taxnest-envw-lines-w-as-f-quote_1777051625898.txt
+ create mode 100644 attached_assets/Pasted-taxnestc-eu1-taxnest-cd-public-html-taxnest-git-pull-or_1777098135021.txt
+ create mode 100644 attached_assets/Profile_Report_(19)_1777020448663.pdf
+ create mode 100644 attached_assets/image_1777042326387.jpg
+ create mode 100644 attached_assets/image_1777042339514.jpg
+ create mode 100644 attached_assets/image_1777042359998.jpg
+ create mode 100644 attached_assets/image_1777099774395.jpg
+ create mode 100644 check-db.sh
+ create mode 100644 config/features.php
+ create mode 100644 database/deploy/2026-04-24-production-sync/00-PREFLIGHT.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/01a-punjab-plus-company.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/01b-punjab-plus-user.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/01c-punjab-plus-branch.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/01d-punjab-plus-subscription.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/02-SCHEMA-ALIGN.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/03-zia-invoices.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/04-zia-invoice-items.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/99-SCHEMA-FIXES.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/999-VERIFY.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/MASTER-ALL.sql
+ create mode 100644 database/deploy/2026-04-24-production-sync/README.md
+ create mode 100644 database/deploy/2026-04-24-production-sync/RUN-ALL.sql
+ create mode 100755 database/deploy/2026-04-24-production-sync/run-migration.sh
+ create mode 100644 database/migrations/2026_04_22_180000_add_branch_id_to_pos_and_users.php
+ create mode 100644 database/migrations/2026_04_23_062000_add_print_paper_size_to_companies.php
+ create mode 100644 database/migrations/2026_04_23_120000_add_missing_columns_from_production.php
+ create mode 100644 database/migrations/2026_04_23_130000_fix_pos_transactions_invoice_unique.php
+ create mode 100644 database/migrations/2026_04_24_080000_add_retry_columns_to_invoices.php
+ create mode 100644 database/migrations/2026_04_25_120000_add_override_columns_to_subscriptions.php
+ create mode 100644 database/migrations/2026_04_25_180000_make_pricing_plan_and_end_date_nullable_on_subscriptions.php
+ create mode 100644 push.sh
+ create mode 100644 resources/views/admin/failed-fbr-invoices.blade.php
+ create mode 100644 resources/views/admin/fbr-pos-logs.blade.php
+ create mode 100644 resources/views/components/branch-switcher.blade.php
+ create mode 100644 resources/views/components/pwa-init.blade.php
+ create mode 100644 resources/views/components/pwa-refresh-btn.blade.php
+ create mode 100644 resources/views/fbr-pos/fail-queue.blade.php
+ create mode 100644 resources/views/invoice/pdf-bw.blade.php
+ create mode 100644 scripts/pg_to_mysql_sync.php
+ create mode 100644 scripts/phase_final_check.php
+ create mode 100644 scripts/schema_drift_scan.php
+ create mode 100644 tests/Feature/Phase3LoginIsolationTest.php
+ create mode 100644 tests/Feature/Phase4UiPolishTest.php
+PRODUCTION DB GUARD: expected mysql, got pgsql. Aborting.
+PRODUCTION DB GUARD: expected mysql, got pgsql. Aborting.
+PRODUCTION DB GUARD: expected mysql, got pgsql. Aborting.
+PRODUCTION DB GUARD: expcurl -s https://taxnest.com.pk/sw.js | grep CACHE_VERSION
+# Expected: const CACHE_VERSION = 'taxnest-v24';com.pk/sw.js | grep CACHE_VERSION
+[taxnestc@eu1 taxnest]$ VERSION = 'taxnest-v24';

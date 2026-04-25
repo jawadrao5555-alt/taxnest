@@ -384,8 +384,11 @@ kbd {
     </div>
     <div class="flex items-center justify-between mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">New FBR POS Sale</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Create a new point of sale transaction</p>
+            <h1 class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                <span class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-blue-700 via-indigo-700 to-purple-700 text-white text-base shadow-lg ring-2 ring-blue-400/40">⚡</span>
+                New FBR POS Sale
+            </h1>
+            <p class="text-sm font-semibold text-slate-700 dark:text-slate-300 mt-1.5">Premium point-of-sale · FBR-compliant · Real-time submission</p>
         </div>
         <div class="flex items-center gap-2">
             @if(!$fbrReportingEnabled)
@@ -408,31 +411,32 @@ kbd {
     </div>
     @endif
 
-    {{-- ============ Phase 2 Top Action Bar ============ --}}
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3">
+    {{-- ============ Phase 2 Top Action Bar — PREMIUM ============ --}}
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-blue-100 via-indigo-100 to-purple-100 dark:from-blue-950/60 dark:via-indigo-950/60 dark:to-purple-950/60 border-2 border-blue-300 dark:border-blue-700 rounded-2xl p-3 shadow-md ring-1 ring-blue-500/10">
         <div class="flex items-center gap-3 flex-wrap">
-            <div class="flex items-center gap-2">
-                <label class="text-xs font-semibold text-gray-700 dark:text-gray-300">Counter:</label>
-                <select x-model="terminalId" name="terminal_id" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1 shadow-sm">
+            <div class="flex items-center gap-2 bg-white/70 dark:bg-slate-900/70 px-3 py-1.5 rounded-xl border border-blue-300 dark:border-blue-700 shadow-sm backdrop-blur">
+                <label class="text-xs font-black text-slate-800 dark:text-slate-100 tracking-wide uppercase">Counter</label>
+                <select x-model="terminalId" name="terminal_id" class="rounded-lg border-2 border-blue-300 dark:border-blue-700 dark:bg-slate-800 dark:text-white text-xs font-bold px-2 py-1 shadow-inner focus:ring-2 focus:ring-blue-500">
                     <option value="">-- Select --</option>
                     @foreach($terminals as $t)
                         <option value="{{ $t->id }}">{{ $t->terminal_name }}</option>
                     @endforeach
                 </select>
-                <a href="{{ route('fbrpos.phase2.terminals') }}" class="text-xs text-blue-600 hover:underline">+ Add</a>
+                <a href="{{ route('fbrpos.phase2.terminals') }}" class="text-xs font-black text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 hover:underline">+ Add</a>
             </div>
             @if($currentShift)
-                <span class="px-2 py-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 rounded text-xs font-bold">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl text-xs font-black shadow-md ring-2 ring-emerald-400/40">
+                    <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
                     SHIFT #{{ $currentShift->id }} OPEN · Rs {{ number_format($currentShift->opening_cash, 0) }}
                 </span>
             @else
-                <a href="{{ route('fbrpos.phase2.shifts') }}" class="px-2 py-1 bg-red-100 text-red-700 hover:bg-red-200 rounded text-xs font-bold">⚠ NO SHIFT — Open Now</a>
+                <a href="{{ route('fbrpos.phase2.shifts') }}" class="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-xl text-xs font-black shadow-md ring-2 ring-red-400/40">⚠ NO SHIFT — Open Now</a>
             @endif
         </div>
         <div class="flex items-center gap-2">
-            <button type="button" @click="holdSale()" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold shadow">⏸ Hold</button>
-            <button type="button" @click="openRecall()" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold shadow">⏵ Recall <span x-show="heldList.length > 0" class="ml-1 bg-white text-purple-700 rounded-full px-1.5 text-[10px]" x-text="heldList.length"></span></button>
-            <a href="{{ route('fbrpos.phase2.shifts') }}" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-800 text-white rounded-lg text-xs font-bold shadow">$ Drawer</a>
+            <button type="button" @click="holdSale()" class="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl text-xs font-black shadow-md ring-1 ring-amber-300/50 transition">⏸ Hold</button>
+            <button type="button" @click="openRecall()" class="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 text-white rounded-xl text-xs font-black shadow-md ring-1 ring-purple-300/50 transition">⏵ Recall <span x-show="heldList.length > 0" class="ml-1 bg-white text-purple-700 rounded-full px-1.5 text-[10px] font-black" x-text="heldList.length"></span></button>
+            <a href="{{ route('fbrpos.phase2.shifts') }}" class="px-3 py-1.5 bg-gradient-to-r from-slate-700 to-slate-900 hover:from-slate-800 hover:to-black text-white rounded-xl text-xs font-black shadow-md ring-1 ring-slate-500/40 transition">$ Drawer</a>
         </div>
     </div>
 
@@ -480,71 +484,138 @@ kbd {
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 items-start">
             <div class="lg:col-span-2 space-y-4">
-                <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-lg p-4 sm:p-5">
+                <div class="bg-white dark:bg-gray-900 rounded-2xl border-2 border-blue-200 dark:border-blue-800 shadow-xl ring-1 ring-blue-500/5 p-4 sm:p-5">
                     <div class="flex items-center justify-between mb-3">
-                        <h3 class="font-semibold text-gray-900 dark:text-white">Items</h3>
+                        <h3 class="text-base font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                            <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-sm shadow-md">🛒</span>
+                            Cart Items
+                            <span x-show="items.length > 0" class="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-600 text-white tracking-wider" x-text="items.length + (items.length === 1 ? ' ITEM' : ' ITEMS')"></span>
+                        </h3>
                         <div class="flex items-center gap-3">
-                            <div class="relative" x-data="{ searchOpen: false, searchQuery: '', searchResults: [], hi: 0 }"
+                            {{-- ✨ PREMIUM SMART SEARCH — searches NAME · SKU · BARCODE · HS CODE simultaneously --}}
+                            <div class="relative" x-data="{
+                                    searchOpen: false,
+                                    searchQuery: '',
+                                    searchResults: [],
+                                    hi: 0,
+                                    matchType(p, q) {
+                                        if (!q) return null;
+                                        const ql = String(q).toLowerCase();
+                                        if ((p.name||'').toLowerCase().includes(ql)) return 'name';
+                                        if ((p.sku||'').toLowerCase().includes(ql)) return 'sku';
+                                        if ((p.barcode||'').toLowerCase().includes(ql)) return 'barcode';
+                                        if ((p.hs_code||'').toLowerCase().includes(ql)) return 'hs';
+                                        return null;
+                                    }
+                                 }"
                                  @open-product-search.window="searchOpen = true; hi = 0; $nextTick(() => $refs.productSearch && $refs.productSearch.focus())">
                                 <button type="button" id="fbrpos-search-btn" @click="searchOpen = !searchOpen; $nextTick(() => $refs.productSearch && $refs.productSearch.focus())"
-                                    class="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-bold rounded-lg shadow-md hover:shadow-lg transition flex items-center gap-2">
-                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                    Search Product
-                                    <span class="hidden md:inline text-[10px] bg-white/20 px-1.5 py-0.5 rounded ml-1">Ctrl+K</span>
+                                    class="px-4 py-2 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 hover:from-blue-800 hover:via-indigo-800 hover:to-purple-800 text-white text-sm font-extrabold rounded-xl shadow-lg hover:shadow-2xl transition-all flex items-center gap-2 ring-2 ring-blue-400/40 hover:ring-blue-300/60">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                    <span class="hidden sm:inline tracking-wide">Search Product</span>
+                                    <span class="text-[10px] font-black bg-white/25 backdrop-blur px-2 py-0.5 rounded-md tracking-wider">F7 · Ctrl+K</span>
                                 </button>
-                                <div x-show="searchOpen" @click.away="searchOpen = false" x-cloak x-transition
-                                    class="absolute right-0 top-8 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 z-50 p-3">
-                                    <input type="text" x-ref="productSearch" x-model="searchQuery"
-                                        @input.debounce.300ms="
-                                            if(searchQuery.length >= 1) {
-                                                fetch('{{ route('fbrpos.api.products.search') }}?q=' + encodeURIComponent(searchQuery))
-                                                    .then(r => r.json())
-                                                    .then(data => { searchResults = data; hi = 0; })
-                                            } else { searchResults = []; hi = 0; }
-                                        "
-                                        @keydown.arrow-down.prevent="if(searchResults.length){ hi = (hi + 1) % searchResults.length; }"
-                                        @keydown.arrow-up.prevent="if(searchResults.length){ hi = (hi - 1 + searchResults.length) % searchResults.length; }"
-                                        @keydown.enter.prevent="if(searchResults.length){ addProductItem(searchResults[hi]); searchOpen = false; searchQuery = ''; searchResults = []; hi = 0; $nextTick(() => $refs.barcodeInput && $refs.barcodeInput.focus()); }"
-                                        @keydown.escape.prevent="searchOpen = false; searchQuery = ''; searchResults = []; hi = 0;"
-                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 mb-2"
-                                        placeholder="Type, then ↓ ↑ Enter to add">
-                                    <div class="max-h-60 overflow-y-auto space-y-1">
+                                <div x-show="searchOpen" @click.away="searchOpen = false" x-cloak
+                                    x-transition:enter="transition ease-out duration-200"
+                                    x-transition:enter-start="opacity-0 scale-95 -translate-y-2"
+                                    x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                                    class="absolute right-0 top-12 w-[28rem] max-w-[92vw] bg-gradient-to-br from-white via-blue-50/40 to-indigo-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-blue-950 rounded-2xl shadow-2xl border-2 border-blue-300 dark:border-blue-700 z-50 overflow-hidden ring-4 ring-blue-500/10">
+                                    {{-- Premium gradient header --}}
+                                    <div class="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 px-4 py-3 text-white">
+                                        <div class="flex items-center justify-between">
+                                            <div class="text-xs font-black tracking-widest uppercase flex items-center gap-1.5">
+                                                <span class="text-base">🔎</span> Smart Product Search
+                                            </div>
+                                            <div class="text-[10px] bg-white/25 backdrop-blur px-2 py-0.5 rounded-full font-extrabold tracking-wider">↑↓ · Enter · Esc</div>
+                                        </div>
+                                        <div class="flex items-center gap-1.5 mt-2.5 flex-wrap">
+                                            <span class="text-[10px] font-black px-2 py-0.5 rounded-md bg-emerald-400/30 text-emerald-50 border border-emerald-300/50 tracking-wider">NAME</span>
+                                            <span class="text-[10px] font-black px-2 py-0.5 rounded-md bg-amber-400/30 text-amber-50 border border-amber-300/50 tracking-wider">SKU</span>
+                                            <span class="text-[10px] font-black px-2 py-0.5 rounded-md bg-cyan-400/30 text-cyan-50 border border-cyan-300/50 tracking-wider">BARCODE</span>
+                                            <span class="text-[10px] font-black px-2 py-0.5 rounded-md bg-pink-400/30 text-pink-50 border border-pink-300/50 tracking-wider">HS CODE</span>
+                                            <span class="text-[10px] font-bold text-blue-100/90 ml-auto">all 4 fields</span>
+                                        </div>
+                                    </div>
+                                    {{-- Search input --}}
+                                    <div class="p-3">
+                                        <div class="relative">
+                                            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                            <input type="text" x-ref="productSearch" x-model="searchQuery"
+                                                @input.debounce.250ms="
+                                                    if(searchQuery.length >= 1) {
+                                                        fetch('{{ route('fbrpos.api.products.search') }}?q=' + encodeURIComponent(searchQuery))
+                                                            .then(r => r.json())
+                                                            .then(data => { searchResults = data; hi = 0; })
+                                                    } else { searchResults = []; hi = 0; }
+                                                "
+                                                @keydown.arrow-down.prevent="if(searchResults.length){ hi = (hi + 1) % searchResults.length; }"
+                                                @keydown.arrow-up.prevent="if(searchResults.length){ hi = (hi - 1 + searchResults.length) % searchResults.length; }"
+                                                @keydown.enter.prevent="if(searchResults.length){ addProductItem(searchResults[hi]); searchOpen = false; searchQuery = ''; searchResults = []; hi = 0; $nextTick(() => $refs.barcodeInput && $refs.barcodeInput.focus()); }"
+                                                @keydown.escape.prevent="searchOpen = false; searchQuery = ''; searchResults = []; hi = 0;"
+                                                class="w-full pl-11 pr-3 py-2.5 rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-base font-bold shadow-inner focus:ring-4 focus:ring-blue-400/40 focus:border-blue-600 placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:font-medium"
+                                                placeholder="Type name, SKU, barcode or HS…">
+                                        </div>
+                                    </div>
+                                    {{-- Results --}}
+                                    <div class="px-3 pb-3 max-h-72 overflow-y-auto space-y-1.5">
                                         <template x-for="(p, pi) in searchResults" :key="p.id">
                                             <button type="button" @click="addProductItem(p); searchOpen = false; searchQuery = ''; searchResults = []; hi = 0;"
-                                                :class="hi === pi ? 'bg-blue-100 dark:bg-blue-900/40 ring-2 ring-blue-400' : 'hover:bg-blue-50 dark:hover:bg-blue-900/20'"
-                                                class="w-full text-left px-3 py-2.5 rounded-lg transition flex items-center justify-between group">
-                                                <div>
-                                                    <p class="text-sm font-medium text-gray-900 dark:text-gray-100" x-text="(p.name && p.name.trim()) ? p.name : (p.barcode || p.sku || ('Product #' + p.id))"></p>
-                                                    <p class="text-xs text-gray-500 dark:text-gray-400">
-                                                        <span x-text="'PKR ' + Number(p.default_price).toFixed(2)"></span>
-                                                        <span class="mx-1">|</span>
-                                                        <span x-text="p.hs_code || 'No HS'"></span>
-                                                        <template x-if="p.barcode"><span class="ml-1 font-mono text-[10px]" x-text="'· ' + p.barcode"></span></template>
-                                                    </p>
+                                                :class="hi === pi ? 'bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/60 dark:to-indigo-900/60 ring-2 ring-blue-500 shadow-lg scale-[1.01]' : 'bg-white dark:bg-slate-800/60 hover:bg-blue-50 dark:hover:bg-blue-900/30 border border-slate-200 dark:border-slate-700'"
+                                                class="w-full text-left px-3 py-2.5 rounded-xl transition-all flex items-center justify-between group">
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="flex items-center gap-2 flex-wrap">
+                                                        <p class="text-sm font-extrabold text-slate-900 dark:text-white truncate" x-text="(p.name && p.name.trim()) ? p.name : (p.barcode || p.sku || ('Product #' + p.id))"></p>
+                                                        <template x-if="matchType(p, searchQuery)">
+                                                            <span class="text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider"
+                                                                  :class="{
+                                                                      'bg-emerald-200 text-emerald-900 dark:bg-emerald-700 dark:text-emerald-50': matchType(p, searchQuery) === 'name',
+                                                                      'bg-amber-200 text-amber-900 dark:bg-amber-700 dark:text-amber-50': matchType(p, searchQuery) === 'sku',
+                                                                      'bg-cyan-200 text-cyan-900 dark:bg-cyan-700 dark:text-cyan-50': matchType(p, searchQuery) === 'barcode',
+                                                                      'bg-pink-200 text-pink-900 dark:bg-pink-700 dark:text-pink-50': matchType(p, searchQuery) === 'hs'
+                                                                  }"
+                                                                  x-text="matchType(p, searchQuery)"></span>
+                                                        </template>
+                                                    </div>
+                                                    <div class="text-xs font-bold text-slate-700 dark:text-slate-200 mt-1 flex items-center gap-2 flex-wrap">
+                                                        <span class="text-emerald-700 dark:text-emerald-400 font-black" x-text="'Rs ' + Number(p.default_price).toFixed(2)"></span>
+                                                        <span class="text-slate-400">·</span>
+                                                        <span class="text-slate-600 dark:text-slate-300" x-text="'HS ' + (p.hs_code || '—')"></span>
+                                                        <template x-if="p.sku"><span class="font-mono text-[10px] bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-200 px-1.5 py-0.5 rounded font-black" x-text="'SKU ' + p.sku"></span></template>
+                                                        <template x-if="p.barcode"><span class="font-mono text-[10px] bg-cyan-100 text-cyan-900 dark:bg-cyan-900/50 dark:text-cyan-200 px-1.5 py-0.5 rounded font-black" x-text="'⠿ ' + p.barcode"></span></template>
+                                                    </div>
                                                 </div>
-                                                <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
-                                                    :class="p.tax_type === 'exempt' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'"
-                                                    x-text="p.tax_type === 'exempt' ? 'Exempt' : (p.default_tax_rate + '%')"></span>
+                                                <span class="text-xs font-black px-2.5 py-1 rounded-lg shrink-0 ml-2"
+                                                    :class="p.tax_type === 'exempt' ? 'bg-green-200 text-green-900 dark:bg-green-700 dark:text-green-50' : 'bg-amber-200 text-amber-900 dark:bg-amber-700 dark:text-amber-50'"
+                                                    x-text="p.tax_type === 'exempt' ? 'EXEMPT' : (p.default_tax_rate + '%')"></span>
                                             </button>
                                         </template>
-                                        <p x-show="searchQuery.length >= 1 && searchResults.length === 0" class="text-xs text-gray-500 dark:text-gray-400 text-center py-3">No products found</p>
-                                        <p x-show="searchQuery.length < 1" class="text-xs text-gray-500 dark:text-gray-400 text-center py-3">Type to search saved products</p>
+                                        <p x-show="searchQuery.length >= 1 && searchResults.length === 0" class="text-sm font-bold text-slate-600 dark:text-slate-300 text-center py-6">
+                                            <span class="text-3xl block mb-1">🔍</span>
+                                            No products found for "<span class="text-blue-600 dark:text-blue-400" x-text="searchQuery"></span>"
+                                        </p>
+                                        <p x-show="searchQuery.length < 1" class="text-xs font-bold text-slate-600 dark:text-slate-300 text-center py-6 leading-relaxed">
+                                            <span class="text-2xl block mb-1">⌨️</span>
+                                            Start typing — searches NAME · SKU · BARCODE · HS code<br>
+                                            <span class="text-[10px] font-semibold opacity-80">↑ ↓ navigate · Enter to add · Esc to close</span>
+                                        </p>
                                     </div>
                                 </div>
                             </div>
-                            <button type="button" @click="addItem()" class="text-sm text-blue-600 hover:text-blue-700 font-medium">+ Add Manual</button>
+                            <button type="button" @click="addItem()" class="text-sm text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 font-extrabold border-2 border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-lg px-3 py-1.5 shadow-sm transition">+ Manual Row</button>
                         </div>
                     </div>
 
-                    <div class="mb-4 flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-lg p-2 scan-pulse">
-                        <svg class="w-5 h-5 text-blue-600 flex-shrink-0 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10m4-10v10m4-10v10m4-10v10m-12 0h16"/></svg>
+                    <div class="mb-4 flex items-center gap-2 bg-gradient-to-r from-cyan-50 via-blue-50 to-indigo-50 dark:from-cyan-950/40 dark:via-blue-950/40 dark:to-indigo-950/40 border-2 border-cyan-400 dark:border-cyan-700 rounded-xl p-2.5 scan-pulse shadow-inner ring-1 ring-cyan-500/20">
+                        <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-md ring-2 ring-cyan-300/50 flex-shrink-0">
+                            <svg class="w-5 h-5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10m4-10v10m4-10v10m4-10v10m-12 0h16"/></svg>
+                        </span>
                         <input type="text" x-ref="barcodeInput" x-model="barcodeBuffer"
                             @keydown.enter.prevent="scanBarcode()"
                             autocomplete="off"
-                            class="flex-1 bg-transparent border-0 focus:ring-0 text-sm font-mono dark:text-white placeholder-gray-400 font-semibold"
-                            placeholder="📡 Scan anywhere — auto-detected. Or type code here + Enter">
-                        <span class="text-[10px] font-bold px-2 py-0.5 bg-blue-600 text-white rounded">READY</span>
-                        <span x-show="scanStatus" :class="scanStatus.ok ? 'text-green-600' : 'text-red-600'" class="text-xs font-semibold" x-text="scanStatus.msg"></span>
+                            class="flex-1 bg-transparent border-0 focus:ring-0 text-base font-mono font-black text-slate-900 dark:text-white placeholder:text-slate-500 dark:placeholder:text-slate-400 placeholder:font-semibold placeholder:text-sm"
+                            placeholder="📡 Scan barcode anywhere · or type code · F7 for name search">
+                        <span class="text-[10px] font-black px-2.5 py-1 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-lg shadow ring-1 ring-emerald-300/50 tracking-widest">● LIVE</span>
+                        <span x-show="scanStatus" :class="scanStatus.ok ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'" class="text-xs font-black" x-text="scanStatus.msg"></span>
                     </div>
 
                     <template x-for="(item, index) in items" :key="index">
@@ -575,21 +646,21 @@ kbd {
                             <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
                                 <input type="hidden" :name="'items['+index+'][product_id]'" :value="item.product_id || ''">
                                 <div class="sm:col-span-3">
-                                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Item Name *</label>
+                                    <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Item Name *</label>
                                     <input type="text" :name="'items['+index+'][item_name]'" x-model="item.item_name" required
                                         @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="Product name">
                                 </div>
                                 <div class="sm:col-span-2">
-                                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">HS Code <span class="text-gray-400 font-normal">(Opt.)</span></label>
+                                    <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">HS Code <span class="text-gray-400 font-normal">(Opt.)</span></label>
                                     <input type="text" :name="'items['+index+'][hs_code]'" x-model="item.hs_code"
                                         @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="00000000">
                                 </div>
                                 <div class="sm:col-span-2">
-                                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">UoM</label>
+                                    <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">UoM</label>
                                     <select :name="'items['+index+'][uom]'" x-model="item.uom"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 font-semibold">
                                         <template x-for="u in uomOptions" :key="u">
@@ -599,7 +670,7 @@ kbd {
                                 </div>
                                 <div class="sm:col-span-2">
                                     <div class="flex items-center justify-between mb-1 gap-1">
-                                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400" x-text="(item.mode || 'qty') === 'value' ? 'Value (Rs) *' : 'Qty *'"></label>
+                                        <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 tracking-wide uppercase" x-text="(item.mode || 'qty') === 'value' ? 'Value (Rs) *' : 'Qty *'"></label>
                                         <div class="inline-flex rounded-md overflow-hidden border border-gray-300 dark:border-gray-600 text-[9px] font-bold leading-none">
                                             <button type="button" tabindex="-1"
                                                 @click="setMode(item, 'qty')"
@@ -669,7 +740,7 @@ kbd {
                                     </div>
                                 </div>
                                 <div class="sm:col-span-2">
-                                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Unit Price *</label>
+                                    <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Unit Price *</label>
                                     <input type="number" :name="'items['+index+'][unit_price]'" x-model.number="item.unit_price" min="0.01" step="0.01" required
                                         @input="syncValueFromQty(item)"
                                         @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
@@ -677,7 +748,7 @@ kbd {
                                         placeholder="0.00">
                                 </div>
                                 <div class="sm:col-span-1">
-                                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Tax %</label>
+                                    <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Tax %</label>
                                     <input type="number" :name="'items['+index+'][tax_rate]'" x-model.number="item.tax_rate" min="0" max="100" step="0.01"
                                         :disabled="item.is_tax_exempt"
                                         @keydown.tab="if(!$event.shiftKey && index === items.length - 1 && item.item_name && parseFloat(item.unit_price) > 0){ $event.preventDefault(); addItem(); }"
@@ -730,14 +801,17 @@ kbd {
 
             <div class="space-y-4 lg:sticky lg:top-16 lg:self-start">
                 <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-                    <h3 class="font-semibold text-gray-900 dark:text-white mb-4">Customer (Optional)</h3>
+                    <h3 class="text-base font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2 tracking-tight">
+                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-sm shadow-md">👤</span>
+                        Customer <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400">(Optional)</span>
+                    </h3>
                     <div class="space-y-3">
                         <div>
-                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Name</label>
+                            <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Name</label>
                             <input type="text" name="customer_name" x-model="customerName" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Walk-in Customer">
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Phone <span class="text-emerald-600 text-[10px]" x-show="loyaltyEnabled">(loyalty lookup)</span></label>
+                            <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Phone <span class="text-emerald-600 text-[10px]" x-show="loyaltyEnabled">(loyalty lookup)</span></label>
                             <div class="flex gap-1">
                                 <input type="text" name="customer_phone" x-model="customerPhone" @blur="lookupCustomer()" class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="0300-1234567">
                                 <button type="button" @click="lookupCustomer()" class="px-3 bg-blue-600 text-white rounded-lg text-sm">Find</button>
@@ -754,7 +828,7 @@ kbd {
                             </div>
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">NTN</label>
+                            <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">NTN</label>
                             <input type="text" name="customer_ntn" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Optional">
                         </div>
                     </div>
@@ -762,7 +836,10 @@ kbd {
 
                 {{-- Promo Code --}}
                 <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-                    <h3 class="font-semibold text-gray-900 dark:text-white mb-3">Promo Code</h3>
+                    <h3 class="text-base font-black text-slate-900 dark:text-white mb-3 flex items-center gap-2 tracking-tight">
+                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-pink-500 to-rose-600 text-white text-sm shadow-md">🎁</span>
+                        Promo Code
+                    </h3>
                     <div class="flex gap-2">
                         <input type="text" x-model="promoCode" placeholder="Enter code" class="flex-1 uppercase rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm">
                         <button type="button" @click="applyPromo()" class="px-3 bg-emerald-600 text-white rounded-lg text-sm font-bold">Apply</button>
@@ -773,10 +850,13 @@ kbd {
                 </div>
 
                 <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-                    <h3 class="font-semibold text-gray-900 dark:text-white mb-4">Payment</h3>
+                    <h3 class="text-base font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2 tracking-tight">
+                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-sm shadow-md">💳</span>
+                        Payment &amp; Discount
+                    </h3>
                     <div class="space-y-3">
                         <div>
-                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Method *</label>
+                            <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Method *</label>
                             <select name="payment_method" x-ref="paymentSelect" x-model="paymentMethod" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
                                 <option value="cash">Cash</option>
                                 <option value="card">Card</option>
@@ -786,7 +866,7 @@ kbd {
                             <p class="text-[11px] text-gray-500 mt-1">Press <kbd class="px-1 bg-gray-200 dark:bg-gray-700 rounded text-[10px]">F8</kbd> to pick payment method &amp; complete sale</p>
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Discount Type</label>
+                            <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Discount Type</label>
                             <select name="discount_type" x-model="discountType" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
                                 <option value="">None</option>
                                 <option value="percentage">Percentage (%)</option>
@@ -794,7 +874,7 @@ kbd {
                             </select>
                         </div>
                         <div x-show="discountType">
-                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Discount Value</label>
+                            <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Discount Value</label>
                             <input type="number" name="discount_value" x-model.number="discountValue" min="0" step="0.01"
                                 class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
                         </div>

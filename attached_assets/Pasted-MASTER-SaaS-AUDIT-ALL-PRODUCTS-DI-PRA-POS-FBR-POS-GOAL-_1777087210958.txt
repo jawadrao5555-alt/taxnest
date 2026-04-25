@@ -1,0 +1,179 @@
+MASTER SaaS AUDIT — ALL PRODUCTS (DI + PRA POS + FBR POS)
+
+GOAL:
+Perform full system audit:
+
+* Functional testing
+* Data integrity
+* Business logic validation
+* FBR/PRA readiness
+* UX & flow validation
+
+OUTPUT:
+Enterprise audit report with PASS/FAIL + risk level
+
+════════════════════════════════════
+PHASE A — CORE SYSTEM TEST
+════════════════════════════════════
+
+TEST:
+
+1. Authentication (all guards)
+
+* DI login
+* POS login
+* FBR POS login
+* Cross-login rejection
+
+2. Company isolation
+
+* Ensure company_id enforced
+* No cross-company data leak
+
+3. Invoice lifecycle (DI)
+
+* draft → submit → locked
+* failed → retry
+* idempotency (no duplicate)
+
+ASSERT:
+
+* No duplicate invoices
+* No cross-guard session
+* Status transitions valid
+
+════════════════════════════════════
+PHASE B — PRA POS TEST
+════════════════════════════════════
+
+TEST:
+
+1. Cart engine
+
+* Add/remove items
+* Qty typing
+* +/- buttons
+* Keyboard navigation
+
+2. Customer flow
+
+* Search
+* Inline create
+* Attach to sale
+
+3. Payment flow
+
+* Cash submit
+* Receipt
+* Auto-print toggle
+
+ASSERT:
+
+* No lag
+* Totals correct
+* Focus always valid
+
+════════════════════════════════════
+PHASE C — FBR POS TEST
+════════════════════════════════════
+
+TEST:
+
+1. Item entry
+
+* Name
+* HS code
+* Tax type
+
+2. VALUE MODE
+
+* Rs input → qty auto calc
+* Reverse sync
+
+3. FBR payload
+
+* quantity decimal
+* value == qty × price
+* exempt/reduced handling
+
+ASSERT:
+
+* No payload mismatch
+* No rejection risk
+
+════════════════════════════════════
+PHASE D — DATA INTEGRITY
+════════════════════════════════════
+
+CHECK:
+
+* invoices count match
+* pos_transactions match
+* no null totals
+* no orphan items
+* tax calculations match
+
+════════════════════════════════════
+PHASE E — PERFORMANCE
+════════════════════════════════════
+
+TEST:
+
+* POS load < 100ms
+* Invoice save < 1s
+* No blocking UI
+* No excessive DB queries
+
+════════════════════════════════════
+PHASE F — SECURITY
+════════════════════════════════════
+
+CHECK:
+
+* CSRF enabled
+* Guards isolated
+* No info leak
+* No open endpoints
+
+════════════════════════════════════
+PHASE G — UX & FLOW
+════════════════════════════════════
+
+CHECK:
+
+* No dead focus
+* Keyboard flow smooth
+* No double submit
+* All inputs responsive
+
+════════════════════════════════════
+FINAL REPORT FORMAT
+════════════════════════════════════
+
+Output:
+
+SYSTEM AUDIT REPORT
+
+CORE SYSTEM        → PASS
+PRA POS            → PASS
+FBR POS            → PASS
+DATA INTEGRITY     → PASS
+PERFORMANCE        → PASS
+SECURITY           → PASS
+UX FLOW            → PASS
+
+OVERALL STATUS: PRODUCTION READY ✅
+
+If any FAIL:
+→ mark severity:
+LOW / MEDIUM / CRITICAL
+
+════════════════════════════════════
+IMPORTANT
+════════════════════════════════════
+
+If ANY CRITICAL FAIL:
+→ STOP DEPLOY
+
+If ALL PASS:
+→ SAFE TO PUSH + DEPLOY

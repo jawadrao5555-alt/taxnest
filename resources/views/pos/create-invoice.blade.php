@@ -1045,6 +1045,16 @@
                         // +/- to inc/dec active row qty (numpad and main row)
                         if (e.key === '+' || e.key === '=') { e.preventDefault(); this.qtyInc(this.activeItemIndex); return; }
                         if (e.key === '-' || e.key === '_') { e.preventDefault(); this.qtyDec(this.activeItemIndex); return; }
+                        // Delete → remove active row (with confirm if row has meaningful data; never delete last row)
+                        if (e.key === 'Delete') {
+                            e.preventDefault();
+                            if (this.items.length <= 1) return;
+                            const it = this.items[this.activeItemIndex];
+                            const hasData = it && ((it.name && String(it.name).trim().length > 0) || it.item_id || (parseFloat(it.unit_price) > 0) || (parseInt(it.quantity, 10) > 1));
+                            if (hasData && !confirm('Remove this item from cart?')) return;
+                            this.removeItem(this.activeItemIndex);
+                            return;
+                        }
                     }
 
                     // '?' help shortcut

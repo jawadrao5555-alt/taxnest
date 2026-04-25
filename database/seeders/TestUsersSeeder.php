@@ -81,5 +81,31 @@ class TestUsersSeeder extends Seeder
                 'company_id' => $fbrCompany->id,
             ]
         );
+
+        // ─────────────────────────────────────────────────────────────────
+        // Grant LIFETIME override to FBR POS test company so QA can use
+        // every billable feature without going through plan checkout.
+        // SubscriptionAccessService treats override_type='lifetime' as
+        // unconditionally allowed (regardless of pricing_plan_id / end_date).
+        // Requires migration 2026_04_25_180000 (nullable columns).
+        // ─────────────────────────────────────────────────────────────────
+        if (\Illuminate\Support\Facades\Schema::hasTable('subscriptions')) {
+            \App\Models\Subscription::updateOrCreate(
+                ['company_id' => $fbrCompany->id, 'active' => true],
+                [
+                    'pricing_plan_id' => null,
+                    'billing_cycle' => 'monthly',
+                    'discount_percent' => 0,
+                    'final_price' => 0,
+                    'start_date' => now()->toDateString(),
+                    'end_date' => null,
+                    'override_type' => 'lifetime',
+                    'override_until' => null,
+                    'free_invoice_limit' => null,
+                    'override_reason' => 'FBR POS Test User — lifetime free for QA',
+                    'override_by' => null,
+                ]
+            );
+        }
     }
 }

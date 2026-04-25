@@ -613,22 +613,23 @@ kbd {
                                                 class="px-1.5 py-0.5 transition disabled:opacity-40 disabled:cursor-not-allowed">VAL</button>
                                         </div>
                                     </div>
-                                    {{-- QTY MODE --}}
-                                    <div x-show="(item.mode || 'qty') === 'qty'" class="flex items-stretch">
-                                        <button type="button" tabindex="-1" @click="decQty(item)" class="px-2 rounded-l-lg border border-r-0 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100">−</button>
+                                    {{-- QTY MODE — bigger tactile +/- stepper, no mousedown intercept, direct typing always works --}}
+                                    <div x-show="(item.mode || 'qty') === 'qty'" class="flex items-stretch shadow-sm rounded-lg overflow-hidden ring-1 ring-blue-200 dark:ring-blue-800">
+                                        <button type="button" tabindex="-1" @click="decQty(item)"
+                                            class="px-3 sm:px-3.5 border-r border-blue-200 dark:border-blue-800 bg-gradient-to-b from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-900/50 text-blue-700 dark:text-blue-300 text-base font-black hover:from-blue-100 hover:to-blue-200 dark:hover:from-blue-900/50 dark:hover:to-blue-900/70 active:scale-95 transition-all select-none">−</button>
                                         <input type="text" inputmode="decimal" autocomplete="off" maxlength="10"
                                             :data-qty-row="index"
                                             :name="'items['+index+'][quantity]'"
                                             x-model="item.quantity"
                                             @input="item.quantity = sanitizeQty($event.target.value); syncValueFromQty(item)"
-                                            @focus="$nextTick(() => $event.target.select())"
-                                            @mousedown="if(document.activeElement !== $event.target){ $event.preventDefault(); $event.target.focus(); $event.target.select(); }"
+                                            @focus="$event.target.select()"
                                             @blur="if(!item.quantity || parseFloat(item.quantity) <= 0){ item.quantity = 1; } syncValueFromQty(item);"
                                             @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
                                             required
-                                            class="w-full min-w-0 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 text-center font-semibold px-1"
+                                            class="w-full min-w-0 border-0 dark:bg-gray-800 dark:text-white text-base font-bold tabular-nums shadow-inner focus:ring-2 focus:ring-blue-500 focus:outline-none text-center px-1"
                                             placeholder="1">
-                                        <button type="button" tabindex="-1" @click="incQty(item)" class="px-2 rounded-r-lg border border-l-0 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100">+</button>
+                                        <button type="button" tabindex="-1" @click="incQty(item)"
+                                            class="px-3 sm:px-3.5 border-l border-blue-200 dark:border-blue-800 bg-gradient-to-b from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-900/50 text-blue-700 dark:text-blue-300 text-base font-black hover:from-blue-100 hover:to-blue-200 dark:hover:from-blue-900/50 dark:hover:to-blue-900/70 active:scale-95 transition-all select-none">+</button>
                                     </div>
                                     {{-- VALUE MODE --}}
                                     <div x-show="(item.mode || 'qty') === 'value'" class="flex items-stretch">

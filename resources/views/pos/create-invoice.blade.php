@@ -494,7 +494,7 @@
                                         aria-label="Decrease quantity">−</button>
                                     <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6"
                                         :data-qty-row="index"
-                                        x-init="$el.value = item.quantity; $watch('item.quantity', v => { if(document.activeElement !== $el) $el.value = (v === '' || v === null) ? '' : (parseInt(v) || ''); })"
+                                        x-effect="if (document.activeElement !== $el) { $el.value = (item.quantity === '' || item.quantity === null || item.quantity === undefined) ? '' : (parseInt(item.quantity, 10) || ''); }"
                                         @input="(() => { let v = $event.target.value.replace(/[^0-9]/g,''); $event.target.value = v; if (v !== '') { item.quantity = parseInt(v, 10) || 1; recalculate(); } })()"
                                         @focus="$nextTick(() => { try { $event.target.select(); } catch(e){} })"
                                         @click.stop="$nextTick(() => { try { $event.target.select(); } catch(e){} })"

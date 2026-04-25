@@ -1,84 +1,91 @@
 {{--
-PWA Install button (login pages only).
+PWA Install button — premium "exe-look" install pill.
+Requires <x-pwa-init /> to be included once on the page first (it owns beforeinstallprompt).
 Usage: <x-pwa-install color="emerald" label="Install Tax DI" />
 Colors: emerald | purple | blue
-- Standard browsers: native install prompt via beforeinstallprompt
-- iOS Safari: shows custom "Add to Home Screen" instruction modal
 --}}
 @props(['color' => 'emerald', 'label' => 'Install App'])
 @php
-    $colorMap = [
-        'emerald' => 'from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 ring-emerald-300 shadow-emerald-500/30',
-        'purple'  => 'from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 ring-purple-300 shadow-purple-500/30',
-        'blue'    => 'from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 ring-blue-300 shadow-blue-500/30',
+    $palette = [
+        'emerald' => ['from' => '#10b981', 'to' => '#047857', 'glow' => 'rgba(16,185,129,0.55)', 'accent' => '#059669'],
+        'purple'  => ['from' => '#8b5cf6', 'to' => '#4f46e5', 'glow' => 'rgba(139,92,246,0.55)', 'accent' => '#7c3aed'],
+        'blue'    => ['from' => '#2563eb', 'to' => '#1e40af', 'glow' => 'rgba(37,99,235,0.55)', 'accent' => '#1e3a5f'],
     ];
-    $cls = $colorMap[$color] ?? $colorMap['emerald'];
-    $accent = ['emerald' => '#059669', 'purple' => '#7c3aed', 'blue' => '#1e3a5f'][$color] ?? '#059669';
+    $c = $palette[$color] ?? $palette['emerald'];
 @endphp
 <button id="tnPwaInstallBtn"
     type="button"
-    style="display:none"
-    class="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white rounded-lg shadow-lg bg-gradient-to-r {{ $cls }} focus:outline-none focus:ring-2 focus:ring-offset-1 transition-all hover:scale-105"
+    style="display:none; align-items:center; gap:7px; padding:7px 13px; border-radius:10px; background:linear-gradient(135deg, {{ $c['from'] }}, {{ $c['to'] }}); color:#fff; border:none; font-size:11.5px; font-weight:800; letter-spacing:0.2px; cursor:pointer; box-shadow: 0 4px 14px {{ $c['glow'] }}, inset 0 0 0 1px rgba(255,255,255,0.15); transition: all .15s ease;"
     title="Install this app to your device for an exe-like experience">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4m-9 8h10"/>
-    </svg>
+    <span style="display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:6px; background:rgba(255,255,255,0.22); flex-shrink:0;">
+        <svg style="width:11px; height:11px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4m-9 8h10"/>
+        </svg>
+    </span>
     <span>{{ $label }}</span>
 </button>
+<style>
+#tnPwaInstallBtn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px {{ $c['glow'] }}, inset 0 0 0 1px rgba(255,255,255,0.25); }
+#tnPwaInstallBtn:active { transform: translateY(0); }
+#tnPwaInstallBtn.tn-pulse { animation: tnInstallPulse 1.6s ease-in-out 3; }
+@keyframes tnInstallPulse { 0%, 100% { box-shadow: 0 4px 14px {{ $c['glow'] }}, inset 0 0 0 1px rgba(255,255,255,0.15); } 50% { box-shadow: 0 8px 28px {{ $c['glow'] }}, 0 0 0 4px rgba(255,255,255,0.18), inset 0 0 0 1px rgba(255,255,255,0.3); } }
+</style>
 
 {{-- iOS Install Instructions Modal --}}
-<div id="tnIosInstallModal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.65); backdrop-filter:blur(6px); align-items:center; justify-content:center; padding:16px;">
-    <div style="background:#fff; border-radius:18px; max-width:380px; width:100%; padding:24px; box-shadow:0 25px 60px rgba(0,0,0,0.4); position:relative; animation:tnIosFadeIn .3s ease;">
+<div id="tnIosInstallModal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.7); backdrop-filter:blur(8px); align-items:center; justify-content:center; padding:16px;">
+    <div style="background:#fff; border-radius:20px; max-width:380px; width:100%; padding:26px; box-shadow:0 30px 70px rgba(0,0,0,0.45); position:relative; animation:tnIosFadeIn .3s ease;">
         <button onclick="document.getElementById('tnIosInstallModal').style.display='none'" style="position:absolute; top:12px; right:12px; width:32px; height:32px; border-radius:50%; background:#f3f4f6; border:none; font-size:18px; cursor:pointer; color:#6b7280;">&times;</button>
         <div style="text-align:center; margin-bottom:18px;">
-            <div style="width:64px; height:64px; margin:0 auto 12px; border-radius:14px; background:linear-gradient(135deg, {{ $accent }}, {{ $accent }}aa); display:flex; align-items:center; justify-content:center; box-shadow:0 8px 20px {{ $accent }}55;">
-                <svg width="32" height="32" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4m-9 8h10"/></svg>
+            <div style="width:68px; height:68px; margin:0 auto 14px; border-radius:16px; background:linear-gradient(135deg, {{ $c['from'] }}, {{ $c['to'] }}); display:flex; align-items:center; justify-content:center; box-shadow:0 12px 28px {{ $c['glow'] }};">
+                <svg width="34" height="34" fill="none" stroke="white" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4m-9 8h10"/></svg>
             </div>
-            <h3 style="font-size:18px; font-weight:700; color:#111827; margin:0;">Install on your iPhone/iPad</h3>
-            <p style="font-size:13px; color:#6b7280; margin:6px 0 0;">Get the full app experience — works offline, no browser bar.</p>
+            <h3 style="font-size:18px; font-weight:800; color:#111827; margin:0;">Install on your iPhone/iPad</h3>
+            <p style="font-size:13px; color:#6b7280; margin:6px 0 0;">Get the full app experience &mdash; works offline, no browser bar.</p>
         </div>
         <ol style="font-size:14px; color:#374151; padding-left:0; list-style:none; margin:0;">
             <li style="display:flex; gap:12px; margin-bottom:14px; align-items:flex-start;">
-                <span style="flex-shrink:0; width:28px; height:28px; border-radius:50%; background:{{ $accent }}; color:white; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700;">1</span>
+                <span style="flex-shrink:0; width:28px; height:28px; border-radius:50%; background:{{ $c['accent'] }}; color:white; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700;">1</span>
                 <span>Tap the <strong>Share</strong> button
-                    <svg style="display:inline-block; vertical-align:-3px; margin:0 2px;" width="16" height="16" fill="none" stroke="{{ $accent }}" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M16 6l-4-4m0 0L8 6m4-4v14"/></svg>
+                    <svg style="display:inline-block; vertical-align:-3px; margin:0 2px;" width="16" height="16" fill="none" stroke="{{ $c['accent'] }}" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M16 6l-4-4m0 0L8 6m4-4v14"/></svg>
                     at the bottom of Safari.
                 </span>
             </li>
             <li style="display:flex; gap:12px; margin-bottom:14px; align-items:flex-start;">
-                <span style="flex-shrink:0; width:28px; height:28px; border-radius:50%; background:{{ $accent }}; color:white; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700;">2</span>
+                <span style="flex-shrink:0; width:28px; height:28px; border-radius:50%; background:{{ $c['accent'] }}; color:white; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700;">2</span>
                 <span>Scroll down and tap <strong>Add to Home Screen</strong>.</span>
             </li>
             <li style="display:flex; gap:12px; align-items:flex-start;">
-                <span style="flex-shrink:0; width:28px; height:28px; border-radius:50%; background:{{ $accent }}; color:white; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700;">3</span>
+                <span style="flex-shrink:0; width:28px; height:28px; border-radius:50%; background:{{ $c['accent'] }}; color:white; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700;">3</span>
                 <span>Tap <strong>Add</strong> in the top-right corner.</span>
             </li>
         </ol>
-        <button onclick="try{localStorage.setItem('tnIosInstallDismissed','1')}catch(e){}; document.getElementById('tnIosInstallModal').style.display='none'" style="margin-top:20px; width:100%; padding:10px; border-radius:10px; border:none; background:#f3f4f6; color:#6b7280; font-size:13px; cursor:pointer;">Don't show again</button>
+        <button onclick="try{localStorage.setItem('tnIosInstallDismissed','1')}catch(e){}; document.getElementById('tnIosInstallModal').style.display='none'" style="margin-top:20px; width:100%; padding:11px; border-radius:11px; border:none; background:#f3f4f6; color:#6b7280; font-size:13px; font-weight:600; cursor:pointer;">Don't show again</button>
     </div>
 </div>
 <style>@keyframes tnIosFadeIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}</style>
 
 <script>
 (function(){
-    let deferred = null;
     const btn = document.getElementById('tnPwaInstallBtn');
     if (!btn) return;
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
     if (isStandalone) return;
 
-    // iOS detection (no beforeinstallprompt support)
     const ua = navigator.userAgent || '';
     const isIos = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
     const isIosSafari = isIos && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
 
+    const showBtn = () => {
+        btn.style.display = 'inline-flex';
+        btn.classList.add('tn-pulse');
+        setTimeout(() => btn.classList.remove('tn-pulse'), 5000);
+    };
+
     if (isIosSafari) {
-        // iOS: honor "Don't show again" preference
         let dismissed = false;
         try { dismissed = localStorage.getItem('tnIosInstallDismissed') === '1'; } catch(_){}
         if (dismissed) return;
-        // Show the button — click opens custom modal
-        btn.style.display = 'inline-flex';
+        showBtn();
         btn.addEventListener('click', () => {
             const m = document.getElementById('tnIosInstallModal');
             if (m) m.style.display = 'flex';
@@ -86,14 +93,15 @@ Colors: emerald | purple | blue
         return;
     }
 
-    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferred = e; btn.style.display = 'inline-flex'; });
+    // Listen to centralized install-ready event (fired by <x-pwa-init />)
+    if (window.tnPwaCanInstall) showBtn();
+    document.addEventListener('tn-pwa-can-install', showBtn);
+    document.addEventListener('tn-pwa-installed', () => { btn.style.display = 'none'; });
+
     btn.addEventListener('click', async () => {
-        if (!deferred) return;
-        deferred.prompt();
-        const { outcome } = await deferred.userChoice;
-        deferred = null;
+        if (typeof window.tnPwaPromptInstall !== 'function') return;
+        const outcome = await window.tnPwaPromptInstall();
         if (outcome === 'accepted') btn.style.display = 'none';
     });
-    window.addEventListener('appinstalled', () => { btn.style.display = 'none'; });
 })();
 </script>

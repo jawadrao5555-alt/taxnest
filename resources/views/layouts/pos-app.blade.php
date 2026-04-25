@@ -146,12 +146,13 @@
         <script>
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', () => {
-                    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(()=>{});
+                    navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' }).catch(()=>{});
                 });
             }
         </script>
     </head>
     <body class="h-screen overflow-hidden antialiased" data-theme="{{ $posTheme }}">
+        <x-pwa-init />
         <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false, themeOpen: false, currentTheme: '{{ $posTheme }}' }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false">
 
             <header class="topnav-bar flex-shrink-0 relative z-50">
@@ -218,6 +219,10 @@
                             <span class="text-[10px] font-medium opacity-80">Search</span>
                             <kbd class="text-[9px] font-mono bg-white/10 px-1.5 py-0.5 rounded opacity-90 group-hover:opacity-100">⌘K</kbd>
                         </button>
+
+                        {{-- Premium PWA install + always-on update refresh --}}
+                        <x-pwa-install color="purple" label="Install" />
+                        <x-pwa-refresh-btn color="purple" />
 
                         <button @click="if(!document.fullscreenElement){document.documentElement.requestFullscreen().catch(()=>{}); document.body.classList.add('is-fullscreen');} else {document.exitFullscreen(); document.body.classList.remove('is-fullscreen');}"
                                 class="p-2 rounded-lg text-white hover:bg-white/15 transition" :title="isFs ? 'Exit Fullscreen (F11)' : 'Fullscreen (F11)'">

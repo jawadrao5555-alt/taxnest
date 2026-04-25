@@ -1,6 +1,6 @@
 // TaxNest Suite Service Worker — Tax DI / Nest Pra Pos / Nest FBR Pos
 // Strategy: Stale-while-revalidate for static assets, network-first for HTML, offline fallback.
-const CACHE_VERSION = 'taxnest-v22';
+const CACHE_VERSION = 'taxnest-v23';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const OFFLINE_PAGE = '/offline-splash';
@@ -28,7 +28,8 @@ self.addEventListener('install', e => {
             ])
         )
     );
-    self.skipWaiting();
+    // NOTE: Don't auto-skipWaiting — let the client (pwa-update toast / pwa-refresh-btn) opt-in via SKIP_WAITING.
+    // This prevents jarring mid-task reloads. First-time installs activate immediately anyway (no controller to wait for).
 });
 
 self.addEventListener('activate', e => {

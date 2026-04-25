@@ -80,12 +80,13 @@
         <script>
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', () => {
-                    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(()=>{});
+                    navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' }).catch(()=>{});
                 });
             }
         </script>
     </head>
     <body class="h-screen overflow-hidden antialiased">
+        <x-pwa-init />
         <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false">
 
             <header class="topnav-bar flex-shrink-0 relative z-50">
@@ -118,6 +119,7 @@
 
                     <div class="flex items-center gap-2">
                         <x-pwa-install color="blue" label="Install" />
+                        <x-pwa-refresh-btn color="blue" />
                         <span class="hidden lg:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-blue-200 border border-white/10">
                             FBR POS
                         </span>

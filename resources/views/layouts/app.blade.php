@@ -197,6 +197,7 @@
         </style>
     </head>
     <body class="h-screen overflow-hidden font-sans antialiased">
+        <x-pwa-init />
         @auth
         <div id="sidebarOverlay" class="fixed inset-0 bg-black/40 z-40 lg:hidden hidden" onclick="closeSidebar()"></div>
 
@@ -240,6 +241,8 @@
                                 <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                 Install
                             </button>
+                            {{-- App update / refresh control — always visible, badges when update available --}}
+                            <x-pwa-refresh-btn color="emerald" variant="light" />
                             <x-dropdown align="right" width="48">
                                 <x-slot name="trigger">
                                     <button class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
@@ -351,28 +354,31 @@
             });
 
             if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/sw.js').catch(() => {});
+                // updateViaCache: 'none' ensures the SW file itself is never browser-cached → instant updates
+                navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' }).catch(() => {});
             }
-            let deferredPrompt;
-            window.addEventListener('beforeinstallprompt', (e) => {
-                e.preventDefault();
-                deferredPrompt = e;
+            // Install UI driven by centralized <x-pwa-init /> (single beforeinstallprompt handler).
+            function tnRevealLegacyInstallUi() {
                 const btn = document.getElementById('pwa-install-btn');
                 if (btn) btn.classList.remove('hidden');
                 const popup = document.getElementById('pwa-install-popup');
                 if (popup && !localStorage.getItem('pwa-install-dismissed')) {
                     setTimeout(() => popup.classList.remove('hidden'), 2000);
                 }
+            }
+            if (window.tnPwaCanInstall) tnRevealLegacyInstallUi();
+            document.addEventListener('tn-pwa-can-install', tnRevealLegacyInstallUi);
+            document.addEventListener('tn-pwa-installed', () => {
+                const btn = document.getElementById('pwa-install-btn');
+                if (btn) btn.classList.add('hidden');
+                const popup = document.getElementById('pwa-install-popup');
+                if (popup) popup.classList.add('hidden');
             });
-            function installPwa() {
-                if (deferredPrompt) {
-                    deferredPrompt.prompt();
-                    deferredPrompt.userChoice.then(() => {
-                        deferredPrompt = null;
-                        const popup = document.getElementById('pwa-install-popup');
-                        if (popup) popup.classList.add('hidden');
-                    });
-                }
+            async function installPwa() {
+                if (typeof window.tnPwaPromptInstall !== 'function') return;
+                await window.tnPwaPromptInstall();
+                const popup = document.getElementById('pwa-install-popup');
+                if (popup) popup.classList.add('hidden');
             }
             function dismissInstallPopup() {
                 const popup = document.getElementById('pwa-install-popup');

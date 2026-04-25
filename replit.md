@@ -36,7 +36,7 @@ TaxNest is built on Laravel 12 with PHP 8.4, using Breeze for authentication. Th
 - **Enterprise Analytics:** Provides KPIs and compliance metrics through dashboards.
 - **Security Hardening:** Includes `ForceHttps` and subscription-based access controls.
 - **Dynamic FBR Compliance:** Features FBR Excel template alignment, PRAL API integration, per-item FBR fields, and pre-submission payload validation with a sandbox mode.
-- **Enterprise Scoped Idempotency Shield:** A 6-phase system for preventing duplicate submissions, scoped per invoice.
+- **FBR Submission Idempotency:** Multi-layer protection in `App\Jobs\SendInvoiceToFbrJob` — (a) `safeDispatch()` 120s `Cache::add` lock keyed `fbr_dispatch_lock:{invoiceId}` prevents duplicate dispatch; (b) `lockForUpdate()` DB row lock during the submission transaction; (c) status guards skip already-locked invoices; (d) FBR response duplicate-failure type detection; (e) `retry_count` ceiling prevents runaway retries; (f) `Cache::forget` cleanup on completion.
 - **Enterprise UX Simplification:** Invoice lifecycle has 4 states (`draft`, `failed`, `locked`, `pending_verification`) with specific FBR submission flow.
 - **Global HS Intelligence Control System:** Centralized `global_hs_master` table, HS resolution, and dynamic validation for tax schedules, including weighted suggestions and rejection learning.
 - **HS Code Mapping Engine:** Admin-managed mappings with real-time suggestions during invoice creation.

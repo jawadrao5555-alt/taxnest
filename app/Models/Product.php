@@ -24,6 +24,11 @@ class Product extends Model
         'is_active',
     ];
 
+    protected static function booted()
+    {
+        static::addGlobalScope(new \App\Models\Scopes\CompanyScope);
+    }
+
     public function company()
     {
         return $this->belongsTo(Company::class);

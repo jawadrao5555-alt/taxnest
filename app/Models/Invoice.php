@@ -68,6 +68,7 @@ class Invoice extends Model
     protected static function boot()
     {
         parent::boot();
+        static::addGlobalScope(new \App\Models\Scopes\CompanyScope);
         static::creating(function ($invoice) {
             if (!$invoice->share_uuid) {
                 $invoice->share_uuid = (string) \Illuminate\Support\Str::uuid();

@@ -22,6 +22,11 @@ class Branch extends Model
         'is_active' => 'boolean',
     ];
 
+    protected static function booted()
+    {
+        static::addGlobalScope(new \App\Models\Scopes\CompanyScope);
+    }
+
     public function users()
     {
         return $this->belongsToMany(\App\Models\User::class, 'branch_user')

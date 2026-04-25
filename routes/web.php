@@ -193,7 +193,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
 
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/products/create', [ProductController::class, 'create'])->name('products.create');
-        Route::post('/products', [ProductController::class, 'store'])->name('products.store');
+        Route::post('/products', [ProductController::class, 'store'])->name('products.store')->middleware('plan.limit:products');
         Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
         Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
         Route::post('/products/{product}/toggle', [ProductController::class, 'deactivate'])->name('products.toggle');
@@ -211,7 +211,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
 
     Route::middleware(['role:company_admin'])->group(function () {
         Route::get('/company/users', [CompanyUserController::class, 'index']);
-        Route::post('/company/users', [CompanyUserController::class, 'store']);
+        Route::post('/company/users', [CompanyUserController::class, 'store'])->middleware('plan.limit:users');
         Route::patch('/company/users/{user}/role', [CompanyUserController::class, 'updateRole']);
         Route::patch('/company/users/{user}/reset-password', [CompanyUserController::class, 'resetPassword']);
         Route::patch('/company/users/{user}/toggle', [CompanyUserController::class, 'toggleActive']);
@@ -452,13 +452,13 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
         Route::put('/services/{id}', [PosController::class, 'updateService'])->name('pos.services.update');
         Route::delete('/services/{id}', [PosController::class, 'deleteService'])->name('pos.services.delete');
         Route::get('/terminals', [PosController::class, 'terminals'])->name('pos.terminals');
-        Route::post('/terminals', [PosController::class, 'storeTerminal'])->name('pos.terminals.store');
+        Route::post('/terminals', [PosController::class, 'storeTerminal'])->name('pos.terminals.store')->middleware('plan.limit:terminals');
         Route::put('/terminals/{id}', [PosController::class, 'updateTerminal'])->name('pos.terminals.update');
         Route::delete('/terminals/{id}', [PosController::class, 'deleteTerminal'])->name('pos.terminals.delete');
         Route::match(['get', 'post'], '/pra-settings', [PosController::class, 'praSettings'])->name('pos.pra-settings');
         Route::get('/billing', [PosController::class, 'billing'])->name('pos.billing');
         Route::match(['get', 'post'], '/business-profile', [PosController::class, 'businessProfile'])->name('pos.business-profile');
-        Route::post('/products', [PosController::class, 'storeProduct'])->name('pos.products.store');
+        Route::post('/products', [PosController::class, 'storeProduct'])->name('pos.products.store')->middleware('plan.limit:products');
         Route::get('/products/template', [PosController::class, 'downloadProductTemplate'])->name('pos.products.template');
         Route::post('/products/import', [PosController::class, 'importProducts'])->name('pos.products.import');
         Route::put('/products/{id}', [PosController::class, 'updateProduct'])->name('pos.products.update');
@@ -697,7 +697,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth'])->group(function () {
 
     Route::get('/products', [FbrPosController::class, 'products'])->name('fbrpos.products');
     Route::get('/products/create', [FbrPosController::class, 'createProduct'])->name('fbrpos.products.create');
-    Route::post('/products', [FbrPosController::class, 'storeProduct'])->name('fbrpos.products.store');
+    Route::post('/products', [FbrPosController::class, 'storeProduct'])->name('fbrpos.products.store')->middleware('plan.limit:products');
     Route::get('/products/{id}/edit', [FbrPosController::class, 'editProduct'])->name('fbrpos.products.edit');
     Route::put('/products/{id}', [FbrPosController::class, 'updateProduct'])->name('fbrpos.products.update');
     Route::post('/products/{id}/toggle', [FbrPosController::class, 'toggleProduct'])->name('fbrpos.products.toggle');

@@ -11,6 +11,7 @@ use App\Models\PosTransaction;
 use App\Models\User;
 use App\Models\Subscription;
 use App\Models\Franchise;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\Request;
 
@@ -317,5 +318,147 @@ class AdminCompanyController extends Controller
             'name' => $company->name, 'from' => $old, 'to' => $request->product_type
         ]);
         return back()->with('success', "Company type changed to " . strtoupper($request->product_type) . ".");
+    }
+
+    // ========================================================================
+    // SUBSCRIPTION OVERRIDE + USAGE LIMIT — admin-only actions
+    // Rule: only ONE override active at a time; override always supersedes
+    // subscription expiry; never modifies expires_at / never deletes the subscription.
+    // ========================================================================
+
+    /**
+     * Find the company's active subscription (or most-recent inactive one) and
+     * force it back to active=true so an override always lands on the same row
+     * that SubscriptionAccessService::hasAccess() reads. Wrapped in a transaction
+     * + lockForUpdate to prevent concurrent admin requests from creating duplicates.
+     */
+    private function getOrCreateActiveSubscription(int $companyId): Subscription
+    {
+        return DB::transaction(function () use ($companyId) {
+            $sub = Subscription::where('company_id', $companyId)
+                ->orderByDesc('active')   // prefer active rows
+                ->orderByDesc('id')        // then most recent
+                ->lockForUpdate()
+                ->first();
+            if (!$sub) {
+                $sub = Subscription::create([
+                    'company_id' => $companyId,
+                    'pricing_plan_id' => null,
+                    'billing_cycle' => 'monthly',
+                    'discount_percent' => 0,
+                    'final_price' => 0,
+                    'start_date' => now()->toDateString(),
+                    'end_date' => null,
+                    'active' => true,
+                ]);
+            } elseif (!$sub->active) {
+                // Re-activate so hasAccess() (which filters active=true) reads it.
+                $sub->update(['active' => true]);
+            }
+            return $sub;
+        });
+    }
+
+    public function grantLifetime(Request $request, $id)
+    {
+        $request->validate(['reason' => 'nullable|string|max:255']);
+        $company = Company::findOrFail($id);
+        $sub = $this->getOrCreateActiveSubscription($company->id);
+        $sub->update([
+            'override_type' => 'lifetime',
+            'override_until' => null,
+            'free_invoice_limit' => null,
+            'override_reason' => $request->input('reason', 'Lifetime free access granted by admin'),
+            'override_by' => auth('admin')->id(),
+        ]);
+        AdminAuditLog::log(auth('admin')->id(), 'Override granted: LIFETIME', 'Subscription', $sub->id, [
+            'company' => $company->name, 'reason' => $sub->override_reason,
+        ]);
+        return back()->with('success', "Lifetime free access granted to '{$company->name}'.");
+    }
+
+    public function grantTemporary(Request $request, $id)
+    {
+        $request->validate([
+            'until' => 'required|date|after:today',
+            'reason' => 'nullable|string|max:255',
+        ]);
+        $company = Company::findOrFail($id);
+        $sub = $this->getOrCreateActiveSubscription($company->id);
+        $sub->update([
+            'override_type' => 'temporary',
+            'override_until' => $request->input('until'),
+            'free_invoice_limit' => null,
+            'override_reason' => $request->input('reason', 'Temporary access granted by admin'),
+            'override_by' => auth('admin')->id(),
+        ]);
+        AdminAuditLog::log(auth('admin')->id(), 'Override granted: TEMPORARY', 'Subscription', $sub->id, [
+            'company' => $company->name, 'until' => $sub->override_until?->toDateString(), 'reason' => $sub->override_reason,
+        ]);
+        return back()->with('success', "Temporary access granted to '{$company->name}' until " . $sub->override_until->format('Y-m-d') . '.');
+    }
+
+    public function grantGrace(Request $request, $id)
+    {
+        $request->validate([
+            'days' => 'required|integer|min:1|max:90',
+            'reason' => 'nullable|string|max:255',
+        ]);
+        $company = Company::findOrFail($id);
+        $sub = $this->getOrCreateActiveSubscription($company->id);
+        $until = now()->addDays((int) $request->input('days'));
+        $sub->update([
+            'override_type' => 'grace',
+            'override_until' => $until,
+            'free_invoice_limit' => null,
+            'override_reason' => $request->input('reason', $request->input('days') . '-day grace period'),
+            'override_by' => auth('admin')->id(),
+        ]);
+        AdminAuditLog::log(auth('admin')->id(), 'Override granted: GRACE', 'Subscription', $sub->id, [
+            'company' => $company->name, 'days' => $request->input('days'), 'until' => $until->toDateString(),
+        ]);
+        return back()->with('success', "Grace period of {$request->input('days')} days granted to '{$company->name}'.");
+    }
+
+    public function grantUsageFree(Request $request, $id)
+    {
+        $request->validate([
+            'free_invoice_limit' => 'required|integer|min:1|max:1000000',
+            'reason' => 'nullable|string|max:255',
+        ]);
+        $company = Company::findOrFail($id);
+        $sub = $this->getOrCreateActiveSubscription($company->id);
+        $sub->update([
+            'override_type' => 'usage_free',
+            'override_until' => null,
+            'free_invoice_limit' => (int) $request->input('free_invoice_limit'),
+            'override_reason' => $request->input('reason', "Free invoice limit: " . $request->input('free_invoice_limit')),
+            'override_by' => auth('admin')->id(),
+        ]);
+        AdminAuditLog::log(auth('admin')->id(), 'Override granted: USAGE_FREE', 'Subscription', $sub->id, [
+            'company' => $company->name, 'limit' => $sub->free_invoice_limit,
+        ]);
+        return back()->with('success', "Free invoice limit of {$sub->free_invoice_limit} granted to '{$company->name}'.");
+    }
+
+    public function removeOverride($id)
+    {
+        $company = Company::findOrFail($id);
+        $sub = Subscription::where('company_id', $company->id)->orderByDesc('id')->first();
+        if (!$sub) {
+            return back()->with('error', 'No subscription found for this company.');
+        }
+        $oldType = $sub->override_type;
+        $sub->update([
+            'override_type' => 'none',
+            'override_until' => null,
+            'free_invoice_limit' => null,
+            'override_reason' => null,
+            'override_by' => null,
+        ]);
+        AdminAuditLog::log(auth('admin')->id(), 'Override REMOVED', 'Subscription', $sub->id, [
+            'company' => $company->name, 'previous_type' => $oldType,
+        ]);
+        return back()->with('success', "Override removed for '{$company->name}'. Normal subscription rules now apply.");
     }
 }

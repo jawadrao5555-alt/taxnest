@@ -177,6 +177,102 @@
         </div>
     </div>
 
+    {{-- ============================================================
+         SUBSCRIPTION OVERRIDE + USAGE LIMIT — admin-only controls
+         ============================================================ --}}
+    @php
+        $activeSub = \App\Models\Subscription::where('company_id', $company->id)->orderByDesc('id')->first();
+        $overrideActive = $activeSub && method_exists($activeSub, 'hasActiveOverride') && $activeSub->hasActiveOverride();
+    @endphp
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 mt-6" x-data="{ open: null }">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h3 class="text-lg font-bold text-white">Subscription Override &amp; Usage Limit</h3>
+                <p class="text-xs text-gray-500 mt-1">Lifetime / Temporary / Grace / Free-invoice access. Always overrides expiry.</p>
+            </div>
+            @if($overrideActive)
+                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-600/20 text-emerald-400 border border-emerald-700">
+                    Active: {{ $activeSub->overrideLabel() }}
+                </span>
+            @else
+                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-800 text-gray-400 border border-gray-700">No Override</span>
+            @endif
+        </div>
+
+        @if($activeSub && $activeSub->override_reason)
+            <div class="mb-4 px-3 py-2 bg-gray-800/60 rounded-lg text-xs text-gray-300">
+                <span class="text-gray-500">Reason:</span> {{ $activeSub->override_reason }}
+                @if($activeSub->override_by)
+                    <span class="text-gray-500"> · by admin #{{ $activeSub->override_by }}</span>
+                @endif
+            </div>
+        @endif
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+            <button type="button" @click="open = open === 'lifetime' ? null : 'lifetime'" class="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 text-xs font-semibold rounded-lg border border-emerald-800 transition">Grant Lifetime</button>
+            <button type="button" @click="open = open === 'temporary' ? null : 'temporary'" class="px-3 py-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 text-xs font-semibold rounded-lg border border-blue-800 transition">Grant Temporary</button>
+            <button type="button" @click="open = open === 'grace' ? null : 'grace'" class="px-3 py-2 bg-yellow-600/20 hover:bg-yellow-600/40 text-yellow-400 text-xs font-semibold rounded-lg border border-yellow-800 transition">Grant Grace Period</button>
+            <button type="button" @click="open = open === 'usage' ? null : 'usage'" class="px-3 py-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-400 text-xs font-semibold rounded-lg border border-purple-800 transition">Free Invoice Limit</button>
+            @if($overrideActive)
+            <form method="POST" action="{{ route('saas.admin.companies.override.remove', $company->id) }}" onsubmit="return confirm('Remove the active override?');">
+                @csrf @method('DELETE')
+                <button type="submit" class="w-full px-3 py-2 bg-red-600/20 hover:bg-red-600/40 text-red-400 text-xs font-semibold rounded-lg border border-red-800 transition">Remove Override</button>
+            </form>
+            @endif
+        </div>
+
+        {{-- Lifetime form --}}
+        <div x-show="open === 'lifetime'" x-cloak class="mt-4 p-4 bg-gray-800/40 rounded-lg border border-gray-700">
+            <form method="POST" action="{{ route('saas.admin.companies.override.lifetime', $company->id) }}" class="space-y-3">
+                @csrf
+                <label class="text-xs text-gray-400 block">Reason (optional)</label>
+                <input type="text" name="reason" maxlength="255" placeholder="e.g. Internal account, partner deal, etc." class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
+                <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg font-medium transition">Confirm Lifetime Free</button>
+            </form>
+        </div>
+
+        {{-- Temporary form --}}
+        <div x-show="open === 'temporary'" x-cloak class="mt-4 p-4 bg-gray-800/40 rounded-lg border border-gray-700">
+            <form method="POST" action="{{ route('saas.admin.companies.override.temporary', $company->id) }}" class="space-y-3">
+                @csrf
+                <label class="text-xs text-gray-400 block">Access until (date)</label>
+                <input type="date" name="until" required min="{{ now()->addDay()->toDateString() }}" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
+                <label class="text-xs text-gray-400 block">Reason (optional)</label>
+                <input type="text" name="reason" maxlength="255" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
+                <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition">Grant Temporary</button>
+            </form>
+        </div>
+
+        {{-- Grace form --}}
+        <div x-show="open === 'grace'" x-cloak class="mt-4 p-4 bg-gray-800/40 rounded-lg border border-gray-700">
+            <form method="POST" action="{{ route('saas.admin.companies.override.grace', $company->id) }}" class="space-y-3">
+                @csrf
+                <div class="flex gap-2">
+                    <button type="button" onclick="this.form.days.value=7" class="px-3 py-1 bg-yellow-600/20 text-yellow-300 text-xs rounded border border-yellow-800">7 days</button>
+                    <button type="button" onclick="this.form.days.value=15" class="px-3 py-1 bg-yellow-600/20 text-yellow-300 text-xs rounded border border-yellow-800">15 days</button>
+                    <button type="button" onclick="this.form.days.value=30" class="px-3 py-1 bg-yellow-600/20 text-yellow-300 text-xs rounded border border-yellow-800">30 days</button>
+                </div>
+                <label class="text-xs text-gray-400 block">Days (1–90)</label>
+                <input type="number" name="days" required min="1" max="90" value="7" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
+                <label class="text-xs text-gray-400 block">Reason (optional)</label>
+                <input type="text" name="reason" maxlength="255" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
+                <button type="submit" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded-lg font-medium transition">Grant Grace</button>
+            </form>
+        </div>
+
+        {{-- Usage-free form --}}
+        <div x-show="open === 'usage'" x-cloak class="mt-4 p-4 bg-gray-800/40 rounded-lg border border-gray-700">
+            <form method="POST" action="{{ route('saas.admin.companies.override.usageFree', $company->id) }}" class="space-y-3">
+                @csrf
+                <label class="text-xs text-gray-400 block">Free Invoice Limit (e.g. 10000)</label>
+                <input type="number" name="free_invoice_limit" required min="1" max="1000000" placeholder="10000" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
+                <label class="text-xs text-gray-400 block">Reason (optional)</label>
+                <input type="text" name="reason" maxlength="255" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
+                <button type="submit" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg font-medium transition">Grant Free Limit</button>
+            </form>
+        </div>
+    </div>
+
     <div x-show="showDeleteModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @click.self="showDeleteModal = false">
         <div class="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md mx-4" @click.stop>
             <h3 class="text-lg font-bold text-white mb-2">Move to Bin</h3>

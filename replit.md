@@ -43,6 +43,7 @@ TaxNest is built on Laravel 12 with PHP 8.4, using Breeze for authentication. Th
 - **Admin Announcement System:** Allows administrators to create targeted, dismissable announcements.
 - **SaaS Management Layer:** Separated admin and franchise management with distinct authentication, layouts, subscription plan builders, company approval workflows, and usage monitoring.
 - **Product-Type Plan Separation:** `pricing_plans` table has a `product_type` column (`di` or `pos`) to display relevant plans on landing pages.
+- **Subscription Override + Usage Limit System:** Admin-only override layer on `subscriptions` table — `override_type` (`none`/`lifetime`/`temporary`/`grace`/`usage_free`), `override_until` (date), `free_invoice_limit` (int), `override_reason` (text), `override_by` (admin id). Decision in `App\Services\SubscriptionAccessService::hasAccess($company)` enforces order: lifetime → usage_free (allowed until invoice_count reaches limit) → temporary/grace (allowed while now < override_until) → fallback to normal subscription check (active + not expired). Wired into `App\Http\Middleware\CheckPlanLimit` BEFORE per-resource caps. Admin UI at `/admin/companies/{id}` provides 5 actions: Grant Lifetime / Temporary (date) / Grace (7-15-30 day quick) / Free Invoice Limit / Remove Override. Only one override active at a time; never modifies `end_date` or deletes subscription data. All changes audit-logged via `AdminAuditLog`.
 
 **NestPOS Module:**
 - **Isolated POS System:** Separate from Digital Invoice, with its own authentication, layouts, and data models.

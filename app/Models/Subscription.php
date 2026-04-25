@@ -16,6 +16,11 @@ class Subscription extends Model
         'end_date',
         'trial_ends_at',
         'active',
+        'override_type',
+        'override_until',
+        'free_invoice_limit',
+        'override_reason',
+        'override_by',
     ];
 
     protected $casts = [
@@ -24,7 +29,32 @@ class Subscription extends Model
         'end_date' => 'date',
         'discount_percent' => 'decimal:2',
         'final_price' => 'decimal:2',
+        'override_until' => 'datetime',
+        'free_invoice_limit' => 'integer',
     ];
+
+    public function hasActiveOverride(): bool
+    {
+        $type = $this->override_type ?? 'none';
+        if ($type === 'none' || !$type) return false;
+        if ($type === 'lifetime') return true;
+        if ($type === 'usage_free') return true;
+        if (in_array($type, ['temporary', 'grace'], true)) {
+            return $this->override_until && $this->override_until->isFuture();
+        }
+        return false;
+    }
+
+    public function overrideLabel(): string
+    {
+        return match ($this->override_type) {
+            'lifetime' => 'Lifetime Free',
+            'usage_free' => 'Free Invoice Limit (' . ($this->free_invoice_limit ?? 0) . ')',
+            'temporary' => 'Temporary Access until ' . optional($this->override_until)->format('Y-m-d'),
+            'grace' => 'Grace Period until ' . optional($this->override_until)->format('Y-m-d'),
+            default => 'No Override',
+        };
+    }
 
     public function isTrialActive(): bool
     {

@@ -166,7 +166,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
 
     Route::middleware(['role:company_admin,employee'])->group(function () {
         Route::get('/invoice/create', [InvoiceController::class, 'create'])->name('invoice.create');
-        Route::post('/invoice/store', [InvoiceController::class, 'store']);
+        Route::post('/invoice/store', [InvoiceController::class, 'store'])->middleware('plan.limit:invoices');
         Route::get('/invoice/{invoice}/edit', [InvoiceController::class, 'edit']);
         Route::put('/invoice/{invoice}', [InvoiceController::class, 'update']);
         Route::post('/invoice/{invoice}/submit', [InvoiceController::class, 'submit']);
@@ -407,7 +407,7 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::get('/features', [PosController::class, 'featureSettings'])->name('pos.features');
     Route::post('/features', [PosController::class, 'updateFeatureSettings'])->name('pos.features.update');
     Route::post('/features/reset', [PosController::class, 'resetFeaturesToCategory'])->name('pos.features.reset');
-    Route::post('/invoice/store', [PosController::class, 'storeInvoice'])->name('pos.invoice.store');
+    Route::post('/invoice/store', [PosController::class, 'storeInvoice'])->name('pos.invoice.store')->middleware('plan.limit:invoices');
     Route::get('/transactions', [PosController::class, 'transactions'])->name('pos.transactions');
     Route::get('/transaction/{id}', [PosController::class, 'transactionShow'])->name('pos.transaction.show');
     Route::get('/transaction/{id}/edit', [PosController::class, 'editTransaction'])->name('pos.transaction.edit');
@@ -626,6 +626,11 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/companies/{id}/limits', [AdminCompanyController::class, 'updateLimits'])->name('saas.admin.companies.limits');
     Route::post('/companies/{id}/delete', [AdminCompanyController::class, 'softDelete'])->name('saas.admin.companies.delete');
     Route::post('/companies/{id}/change-type', [AdminCompanyController::class, 'changeProductType'])->name('saas.admin.companies.changeType');
+    Route::post('/companies/{id}/override/lifetime', [AdminCompanyController::class, 'grantLifetime'])->name('saas.admin.companies.override.lifetime');
+    Route::post('/companies/{id}/override/temporary', [AdminCompanyController::class, 'grantTemporary'])->name('saas.admin.companies.override.temporary');
+    Route::post('/companies/{id}/override/grace', [AdminCompanyController::class, 'grantGrace'])->name('saas.admin.companies.override.grace');
+    Route::post('/companies/{id}/override/usage-free', [AdminCompanyController::class, 'grantUsageFree'])->name('saas.admin.companies.override.usageFree');
+    Route::delete('/companies/{id}/override', [AdminCompanyController::class, 'removeOverride'])->name('saas.admin.companies.override.remove');
     Route::get('/bin', [AdminCompanyController::class, 'bin'])->name('saas.admin.companies.bin');
     Route::post('/bin/{id}/restore', [AdminCompanyController::class, 'restore'])->name('saas.admin.companies.restore');
     Route::delete('/bin/{id}/destroy', [AdminCompanyController::class, 'forceDelete'])->name('saas.admin.companies.destroy');
@@ -670,7 +675,7 @@ Route::post('/fbr-pos/logout', [FbrPosAuthController::class, 'logout'])->name('f
 Route::prefix('fbr-pos')->middleware(['fbrpos.auth'])->group(function () {
     Route::get('/dashboard', [FbrPosController::class, 'dashboard'])->name('fbrpos.dashboard');
     Route::get('/create', [FbrPosController::class, 'create'])->name('fbrpos.create');
-    Route::post('/store', [FbrPosController::class, 'store'])->name('fbrpos.store');
+    Route::post('/store', [FbrPosController::class, 'store'])->name('fbrpos.store')->middleware('plan.limit:invoices');
     Route::get('/transactions', [FbrPosController::class, 'transactions'])->name('fbrpos.transactions');
     Route::get('/transactions/{id}', [FbrPosController::class, 'show'])->name('fbrpos.show');
     Route::post('/transactions/{id}/retry-fbr', [FbrPosController::class, 'retryFbr'])->name('fbrpos.retryFbr');

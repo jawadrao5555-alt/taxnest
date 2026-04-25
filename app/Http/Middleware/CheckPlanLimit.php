@@ -4,10 +4,12 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use App\Models\Company;
 use App\Models\Subscription;
 use App\Models\PosTerminal;
 use App\Models\User;
 use App\Models\Product;
+use App\Services\SubscriptionAccessService;
 
 class CheckPlanLimit
 {
@@ -20,6 +22,25 @@ class CheckPlanLimit
         $companyId = app('currentCompanyId');
         if (!$companyId) {
             return $next($request);
+        }
+
+        // Step 1: Override + access gate — runs BEFORE per-resource limit check.
+        $company = Company::find($companyId);
+        if ($company) {
+            $access = SubscriptionAccessService::hasAccess($company);
+            if (!$access['allowed']) {
+                if ($request->expectsJson()) {
+                    return response()->json(['error' => $access['reason']], 403);
+                }
+                return back()->with('error', $access['reason']);
+            }
+
+            // Lifetime + active temporary/grace bypass per-resource limits entirely.
+            if (in_array($access['override'], ['lifetime', 'temporary', 'grace'], true)) {
+                return $next($request);
+            }
+            // usage_free continues to the per-resource check below (no plan caps apply,
+            // but we still want products/users/terminals counts capped by plan if set).
         }
 
         $subscription = Subscription::where('company_id', $companyId)

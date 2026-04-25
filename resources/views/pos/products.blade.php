@@ -57,8 +57,21 @@
         </div>
     </div>
 
-    <div id="addProductForm" class="hidden mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-md p-5">
-        <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Add New Product</h3>
+    <div id="addProductForm" class="hidden mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-md p-5"
+         x-data="{ exempt: false }">
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">Add New Product</h3>
+
+        {{-- PRA POS tax model helper: keeps UX simple per Pakistan PRA flow --}}
+        <div class="mb-4 p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
+            <div class="flex items-start gap-2">
+                <svg class="w-4 h-4 text-purple-600 dark:text-purple-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <div class="text-xs text-purple-800 dark:text-purple-200 leading-relaxed">
+                    <strong class="block mb-0.5">PRA Tax — Simple Setup</strong>
+                    Default: <strong>16% cash / 5% card</strong> automatically apply hota hai. Agar product ka custom rate hai to <strong>Tax Rate %</strong> field mein dijiye. Tax-free product ke liye seedha <strong class="text-amber-700 dark:text-amber-300">"Tax Exempt"</strong> toggle on karein &mdash; rate khud-ba-khud 0 ho jayega.
+                </div>
+            </div>
+        </div>
+
         <form method="POST" action="{{ route('pos.products.store') }}" enctype="multipart/form-data" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             @csrf
             <div>
@@ -73,9 +86,24 @@
                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Cost Price <span class="text-gray-400">(for profit)</span></label>
                 <input type="number" name="cost_price" step="0.01" min="0" placeholder="0.00" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-emerald-500">
             </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Tax Rate %</label>
-                <input type="number" name="tax_rate" step="0.01" min="0" max="100" placeholder="0" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+            {{-- Unified Tax cell: rate + exempt toggle, both prominent --}}
+            <div class="rounded-lg border-2 p-2.5 transition-all"
+                 :class="exempt ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20' : 'border-purple-200 dark:border-purple-800 bg-purple-50/30 dark:bg-purple-900/10'">
+                <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">Tax Setup</label>
+                {{-- When exempt is on, the visible input is disabled (won't submit). This hidden input ensures tax_rate=0 still posts. --}}
+                <template x-if="exempt"><input type="hidden" name="tax_rate" value="0"></template>
+                <input type="number" name="tax_rate" step="0.01" min="0" max="100"
+                       :placeholder="exempt ? '0 (exempt)' : '16'"
+                       :disabled="exempt"
+                       class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5 focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-gray-700">
+                <label class="flex items-center gap-2 mt-2 cursor-pointer select-none">
+                    <input type="checkbox" name="is_tax_exempt" value="1" x-model="exempt"
+                           class="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                    <span class="text-xs font-bold uppercase tracking-wider"
+                          :class="exempt ? 'text-amber-700 dark:text-amber-300' : 'text-gray-600 dark:text-gray-400'">
+                        Tax Exempt (Tax-Free)
+                    </span>
+                </label>
             </div>
             <div>
                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Category</label>
@@ -105,12 +133,6 @@
                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Product Image</label>
                 <input type="file" name="image" accept="image/jpeg,image/jpg,image/png,image/webp"
                     class="w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 dark:file:bg-purple-900/30 dark:file:text-purple-300">
-            </div>
-            <div class="flex items-center gap-3 pt-5">
-                <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" name="is_tax_exempt" value="1" class="rounded border-gray-300 text-amber-600 focus:ring-amber-500">
-                    <span class="text-xs font-medium text-gray-600 dark:text-gray-400">Tax Exempt</span>
-                </label>
             </div>
             @if(count($categoryFields) > 0)
             <div class="col-span-full border-t border-gray-200 dark:border-gray-700 pt-3 mt-1">
@@ -181,12 +203,31 @@
                     </tr>
                     <tr x-show="editingId === {{ $product->id }}" x-cloak class="bg-purple-50/50 dark:bg-purple-900/10">
                         <td colspan="7" class="px-4 py-3">
-                            <form method="POST" action="{{ route('pos.products.update', $product->id) }}" enctype="multipart/form-data" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 items-end">
+                            <form method="POST" action="{{ route('pos.products.update', $product->id) }}" enctype="multipart/form-data"
+                                  x-data="{ exempt: {{ $product->is_tax_exempt ? 'true' : 'false' }} }"
+                                  class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 items-end">
                                 @csrf @method('PUT')
                                 <input type="text" name="name" value="{{ $product->name }}" required placeholder="Name" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full col-span-2 sm:col-span-1">
                                 <input type="number" name="price" value="{{ $product->price }}" step="0.01" required placeholder="Price" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
                                 <input type="number" name="cost_price" value="{{ $product->cost_price ?? 0 }}" step="0.01" min="0" placeholder="Cost" title="Cost Price" class="text-sm rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10 text-gray-900 dark:text-white px-2 py-1.5 w-full">
-                                <input type="number" name="tax_rate" value="{{ $product->tax_rate }}" step="0.01" placeholder="Tax %" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
+                                {{-- Unified Tax Setup cell: rate + exempt toggle (consolidated, no longer buried) --}}
+                                <div class="rounded-lg border-2 px-2 py-1.5 transition-all"
+                                     :class="exempt ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20' : 'border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800'">
+                                    {{-- Hidden submit-safe input ensures tax_rate=0 posts when visible input is disabled --}}
+                                    <template x-if="exempt"><input type="hidden" name="tax_rate" value="0"></template>
+                                    <input type="number" name="tax_rate" value="{{ $product->tax_rate }}" step="0.01" min="0" max="100"
+                                           :placeholder="exempt ? '0 (exempt)' : 'Tax %'"
+                                           :disabled="exempt"
+                                           class="text-sm rounded border-0 bg-transparent text-gray-900 dark:text-white px-1 py-0 w-full focus:ring-0 focus:outline-none disabled:opacity-50">
+                                    <label class="flex items-center gap-1.5 mt-0.5 cursor-pointer select-none">
+                                        <input type="checkbox" name="is_tax_exempt" value="1" x-model="exempt"
+                                               class="w-3.5 h-3.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                                        <span class="text-[10px] font-bold uppercase tracking-wider"
+                                              :class="exempt ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500 dark:text-gray-400'">
+                                            Tax Exempt
+                                        </span>
+                                    </label>
+                                </div>
                                 <input type="text" name="category" value="{{ $product->category }}" placeholder="Category" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
                                 <input type="text" name="sku" value="{{ $product->sku }}" placeholder="SKU" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
                                 <input type="text" name="barcode" value="{{ $product->barcode }}" placeholder="Barcode" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
@@ -207,12 +248,6 @@
                                     </div>
                                     <input type="file" name="image" accept="image/jpeg,image/jpg,image/png,image/webp"
                                         class="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-purple-50 file:text-purple-700">
-                                </div>
-                                <div class="flex items-center gap-3">
-                                    <label class="flex items-center gap-1.5 cursor-pointer">
-                                        <input type="checkbox" name="is_tax_exempt" value="1" {{ $product->is_tax_exempt ? 'checked' : '' }} class="rounded border-gray-300 text-amber-600 focus:ring-amber-500">
-                                        <span class="text-xs text-gray-600 dark:text-gray-400">Tax Exempt</span>
-                                    </label>
                                 </div>
                                 @if(count($categoryFields) > 0)
                                 <div class="col-span-full border-t border-gray-200 dark:border-gray-700 pt-2 mt-1">

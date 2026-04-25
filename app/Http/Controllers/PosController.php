@@ -2129,18 +2129,20 @@ class PosController extends Controller
             $request->file('image')->storeAs('products', $imageName, 'public');
         }
 
+        $isExempt = $request->has('is_tax_exempt');
         $data = [
             'company_id' => $companyId,
             'name' => $request->name,
             'description' => $request->description,
             'price' => $request->price,
             'cost_price' => $request->filled('cost_price') ? $request->cost_price : 0,
-            'tax_rate' => $request->tax_rate ?? 0,
+            // Backend hardening: exempt MUST persist tax_rate=0 regardless of what (if anything) UI submitted
+            'tax_rate' => $isExempt ? 0 : ($request->tax_rate ?? 0),
             'category' => $request->category,
             'sku' => $request->sku,
             'barcode' => $request->barcode,
             'uom' => $request->uom ?? 'NOS',
-            'is_tax_exempt' => $request->has('is_tax_exempt'),
+            'is_tax_exempt' => $isExempt,
             'image' => $imageName,
             'prescription_required' => $request->has('prescription_required'),
             'weight_based' => $request->has('weight_based'),
@@ -2364,11 +2366,14 @@ class PosController extends Controller
             'box_type' => 'nullable|string|max:50',
         ]);
 
+        $isExempt = $request->has('is_tax_exempt');
         $data = array_merge(
-            $request->only(['name', 'description', 'price', 'tax_rate', 'category', 'sku', 'barcode', 'uom']),
+            $request->only(['name', 'description', 'price', 'category', 'sku', 'barcode', 'uom']),
             [
                 'cost_price' => $request->filled('cost_price') ? $request->cost_price : 0,
-                'is_tax_exempt' => $request->has('is_tax_exempt'),
+                // Backend hardening: exempt MUST force tax_rate=0; otherwise honor submitted value (or keep current if absent)
+                'tax_rate' => $isExempt ? 0 : ($request->has('tax_rate') ? $request->tax_rate : $product->tax_rate),
+                'is_tax_exempt' => $isExempt,
                 'prescription_required' => $request->has('prescription_required'),
                 'weight_based' => $request->has('weight_based'),
                 'custom_order' => $request->has('custom_order'),

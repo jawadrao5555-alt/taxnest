@@ -249,6 +249,27 @@
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                         </button>
 
+                        @if($praEnabledLayout && $companyLayout)
+                            @php
+                                $agentOn = (bool) ($companyLayout->agent_enabled ?? false);
+                                $agentOnline = $agentOn && $companyLayout->agent_last_seen
+                                    && \Carbon\Carbon::parse($companyLayout->agent_last_seen)->gt(now()->subMinutes(2));
+                            @endphp
+                            <a href="{{ route('pos.agent') }}"
+                               title="{{ $agentOn ? ($agentOnline ? 'Agent Sync · Online' : 'Agent Sync · Offline! Check desktop agent.') : 'Direct Production — server submits to PRA' }}"
+                               class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition border
+                                      {{ $agentOn
+                                            ? ($agentOnline ? 'bg-purple-500/20 text-purple-100 border-purple-300/40 hover:bg-purple-500/30' : 'bg-amber-500/20 text-amber-100 border-amber-300/40 hover:bg-amber-500/30 animate-pulse')
+                                            : 'bg-blue-500/20 text-blue-100 border-blue-300/40 hover:bg-blue-500/30' }}">
+                                @if($agentOn)
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $agentOnline ? 'bg-emerald-400' : 'bg-red-400 animate-pulse' }}"></span>
+                                    🤖 Agent
+                                @else
+                                    ⚡ Direct
+                                @endif
+                            </a>
+                        @endif
+
                         <div class="relative">
                             <button @click="profileOpen = !profileOpen; themeOpen = false"
                                     class="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-white/10 transition cursor-pointer">

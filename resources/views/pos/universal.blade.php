@@ -1085,11 +1085,20 @@ window.addEventListener('popstate', function() {
                  'New Sale' and 'Close' buttons removed. Modal auto-dismisses (4s) so the cashier can chain
                  sales hands-free; Esc / outside-click also dismiss; clicking Print cancels the auto-close. --}}
             <div class="p-3 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
-                <button @click="cancelReceiptAutoClose(); printReceipt()" class="w-full py-3.5 text-center rounded-xl bg-gradient-to-br from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800 text-white text-base font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-2">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                    Print Receipt
-                    <kbd class="text-[10px] bg-purple-500/40 px-1.5 py-0.5 rounded font-mono ml-1">P</kbd>
-                </button>
+                <div class="flex gap-2">
+                    <button @click="cancelReceiptAutoClose(); printReceipt()" class="flex-1 py-3.5 text-center rounded-xl bg-gradient-to-br from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800 text-white text-base font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                        Print Receipt
+                        <kbd class="text-[10px] bg-purple-500/40 px-1.5 py-0.5 rounded font-mono ml-1">P</kbd>
+                    </button>
+                    <button x-show="lastOrderId"
+                            @click="cancelReceiptAutoClose(); printKitchenTicket()"
+                            class="flex-1 py-3.5 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white text-base font-bold transition shadow-md shadow-orange-500/20 flex items-center justify-center gap-2"
+                            :title="autoKotEnabled ? 'Reprint kitchen ticket (auto-KOT is ON)' : 'Print kitchen ticket manually'">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                        Print KOT
+                    </button>
+                </div>
                 <p class="text-[10px] text-center text-gray-400 dark:text-gray-500 mt-2 tracking-wide">Auto-dismissing in a few seconds · press <kbd class="font-mono bg-gray-100 dark:bg-gray-800 px-1 rounded">Esc</kbd> to close now</p>
             </div>
         </div>
@@ -1375,6 +1384,7 @@ function restaurantPos() {
         receiptAutoCloseTimer: null,
         lastInvoiceNumber: '',
         lastTransactionId: null,
+        lastOrderId: null,
         lastTotal: 0,
         lastPaymentMethod: '',
         submitting: false,
@@ -2248,6 +2258,29 @@ function restaurantPos() {
             printFrame.src = url;
         },
 
+        // Phase 5++ — Silent KOT print via hidden iframe (no popup window).
+        // Used by both auto-KOT (when enabled) and the manual "Print KOT" button
+        // on the receipt success modal. Mirrors printReceipt() pattern.
+        printKitchenTicket(orderId) {
+            const id = orderId || this.lastOrderId;
+            if (!id) return;
+            const url = '/pos/restaurant/orders/' + id + '/kitchen-ticket?auto_print=1';
+            let kotFrame = document.getElementById('print-kot-frame');
+            if (!kotFrame) {
+                kotFrame = document.createElement('iframe');
+                kotFrame.id = 'print-kot-frame';
+                kotFrame.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;top:-9999px;';
+                document.body.appendChild(kotFrame);
+            }
+            kotFrame.onload = () => {
+                setTimeout(() => {
+                    try { kotFrame.contentWindow.print(); } catch(e) { window.open(url, '_blank', 'width=380,height=620'); }
+                }, 500);
+            };
+            kotFrame.src = url;
+            this.showToast('Kitchen ticket sent to printer', 'success');
+        },
+
         async deleteHeldOrder(orderId) {
             // Find order for friendlier confirm prompt
             const ord = this.heldOrders.find(o => o.id === orderId);
@@ -2278,12 +2311,13 @@ function restaurantPos() {
                 if (data.success) {
                     this.heldOrders = this.heldOrders.filter(o => o.id !== orderId);
                     this.lastInvoiceNumber = data.invoice_number || ''; this.lastTransactionId = data.transaction_id || null;
+                    this.lastOrderId = orderId || null;
                     this.lastTotal = savedTotal || data.total_amount || 0; this.lastPaymentMethod = method;
-                    // Phase 5+ — Auto-KOT: print kitchen ticket alongside the receipt for restaurant orders.
-                    // Open inline (no setTimeout) — keeps the call as close to the originating user gesture
-                    // as possible so popup blockers are less likely to swallow it.
+                    // Phase 5++ — Auto-KOT: silently print kitchen ticket via hidden iframe (NO popup)
+                    // when company.auto_print_kot is enabled. When disabled, NO ticket is opened —
+                    // cashier can hit the "Print KOT" button on the success modal to print manually.
                     if (this.autoKotEnabled && orderId) {
-                        window.open('/pos/restaurant/orders/' + orderId + '/kitchen-ticket?auto_print=1', '_blank', 'width=380,height=620');
+                        this.printKitchenTicket(orderId);
                     }
                     this.showReceipt = true;
                     this.scheduleReceiptAutoClose();

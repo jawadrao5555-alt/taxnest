@@ -47,7 +47,7 @@
         .doc-title { font-size: 16px; font-weight: 900; color: #000000; margin-bottom: 10px; letter-spacing: 0.5px; }
 
         .info-section { width: 100%; margin-bottom: 12px; border-collapse: collapse; }
-        .info-section td { vertical-align: top; }
+        .info-section td { vertical-align: top; padding: 0; }
         .info-heading {
             font-size: 9px;
             text-transform: uppercase;
@@ -55,20 +55,22 @@
             background: #000000;
             font-weight: 800;
             letter-spacing: 1.5px;
-            padding: 4px 8px;
-            margin-bottom: 6px;
+            padding: 5px 8px;
             border: 1px solid #000000;
+            display: block;
         }
-        .info-row { font-size: 10.5px; color: #000000; padding: 2px 0; line-height: 1.5; }
+        .info-body { padding: 6px 8px 4px 8px; border-left: 1px solid #000000; border-right: 1px solid #000000; border-bottom: 1px solid #000000; }
+        .info-row { font-size: 10.5px; color: #000000; padding: 1px 0; line-height: 1.5; }
         .info-row strong { font-weight: 700; }
         .info-row-label { font-size: 10px; color: #000000; font-weight: 600; }
         .info-row-value { font-size: 10.5px; color: #000000; font-weight: 700; }
 
-        .detail-table { width: 100%; border-collapse: collapse; }
-        .detail-table td { padding: 3px 6px; font-size: 10px; }
-        .detail-table .dt-label { color: #000000; font-weight: 600; text-align: left; }
-        .detail-table .dt-value { color: #000000; font-weight: 700; text-align: right; }
+        .detail-table { width: 100%; border-collapse: collapse; border-left: 1px solid #000000; border-right: 1px solid #000000; border-bottom: 1px solid #000000; }
+        .detail-table td { padding: 5px 8px; font-size: 10px; }
+        .detail-table .dt-label { color: #000000; font-weight: 600; text-align: left; width: 40%; }
+        .detail-table .dt-value { color: #000000; font-weight: 700; text-align: right; width: 60%; }
         .detail-table tr { border-bottom: 1px solid #000000; }
+        .detail-table tr:last-child { border-bottom: none; }
 
         .items-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
         .items-table thead th {
@@ -206,9 +208,9 @@
     {{-- ===== BILL TO + INVOICE DETAILS ===== --}}
     <table class="info-section">
         <tr>
-            <td style="width: 52%; padding-right: 14px;">
+            <td style="width: 52%; padding: 0 7px 0 0;">
                 <div class="info-heading">Bill To</div>
-                <div style="padding: 4px 0;">
+                <div class="info-body">
                     <div class="info-row" style="font-weight:800; font-size: 11px; text-transform: uppercase; color: #000000; margin-bottom: 2px;">
                         {{ $invoice->buyer_registration_type ?? 'UNREGISTERED' }}
                     </div>
@@ -229,9 +231,9 @@
                     @endif
                 </div>
             </td>
-            <td style="width: 48%; padding-left: 14px;">
+            <td style="width: 48%; padding: 0 0 0 7px;">
                 <div class="info-heading">Invoice Details</div>
-                <table class="detail-table" style="margin-top: 4px;">
+                <table class="detail-table">
                     <tr>
                         <td class="dt-label">Invoice No.</td>
                         <td class="dt-value">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</td>
@@ -275,14 +277,14 @@
     <table class="items-table">
         <thead>
             <tr>
-                <th style="width: 28px;">SR</th>
+                <th class="ac" style="width: 30px;">SR</th>
                 <th style="width: 78px;">HS CODE</th>
                 <th>DESCRIPTION</th>
                 <th class="ac" style="width: 55px;">UNIT</th>
-                <th class="ar" style="width: 40px;">QTY</th>
+                <th class="ar" style="width: 48px;">QTY</th>
                 <th class="ar" style="width: 70px;">RATE</th>
                 <th class="ar" style="width: 80px;">AMOUNT</th>
-                <th class="ar" style="width: 38px;">TAX</th>
+                <th class="ar" style="width: 50px;">TAX</th>
             </tr>
         </thead>
         <tbody>

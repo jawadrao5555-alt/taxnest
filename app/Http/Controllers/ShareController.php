@@ -86,7 +86,7 @@ class ShareController extends Controller
             'fbrLogoBase64' => $fbrLogoBase64,
         ];
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-professional', $data);
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-bw', $data);
         $pdf->setPaper('A4', 'portrait');
         $filename = 'invoice-' . ($invoice->fbr_invoice_number ?? $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id) . '.pdf';
 

@@ -1,7 +1,7 @@
 # TaxNest - Heavy Enterprise Product
 
 ## Overview
-TaxNest is a multi-company SaaS platform for comprehensive tax and invoice management in Pakistan, ensuring strict compliance with FBR regulations. It offers smart invoicing, configurable governance, an enterprise API, PDF generation, and a demo mode. The "Heavy Enterprise" version extends capabilities to include a Company Approval System, Customer Ledger, Multi-Branch support, FBR Token Health Monitor, Advanced Admin View, Immutable Audit Logs, Enterprise Analytics, and enhanced security. The project aims to target the Pakistani market with competitive pricing, focusing on robust compliance, scalability, and an intuitive user experience.
+TaxNest is a multi-company SaaS platform designed for comprehensive tax and invoice management in Pakistan, ensuring strict compliance with FBR regulations. It provides smart invoicing, configurable governance, an enterprise API, PDF generation, and a demo mode. The "Heavy Enterprise" version expands these capabilities to include a Company Approval System, Customer Ledger, Multi-Branch support, FBR Token Health Monitor, Advanced Admin View, Immutable Audit Logs, Enterprise Analytics, and enhanced security features. The project targets the Pakistani market with a focus on robust compliance, scalability, and an intuitive user experience, aiming for a significant market share.
 
 ## User Preferences
 - ZIA CORPORATION is a REAL production account (not demo/internal) - NTN: 3620291786117, Owner: ZIA UR REHMAN (Digital Invoice ONLY, NO POS data)
@@ -20,111 +20,39 @@ TaxNest is a multi-company SaaS platform for comprehensive tax and invoice manag
 - CNIC/NTN login maps to company_admin user of matching company
 
 ## System Architecture
-TaxNest is built on Laravel 12 with PHP 8.4, using Breeze for authentication. The frontend uses Tailwind CSS, Alpine.js, and Chart.js.
+TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication. The frontend employs Tailwind CSS, Alpine.js, and Chart.js.
 
 **Core Architectural Patterns and Decisions:**
-- **Multi-tenancy:** Implemented with `company_id` and `CompanyIsolation` middleware.
+- **Multi-tenancy:** Implemented with `company_id` and `CompanyIsolation` middleware for data segregation.
 - **Role-Based Access Control (RBAC):** Permissions are managed via `RoleMiddleware`.
-- **Dual Invoice Numbering:** Supports separate internal and FBR/PRA invoice numbers.
+- **Dual Invoice Numbering:** Supports separate internal and regulatory (FBR/PRA) invoice numbers.
 - **Dynamic Validation Engine:** `ScheduleEngine` for FBR compliance rules.
-- **Immutable Audit Logging:** Critical events are logged with SHA256 hashes.
-- **Queue-based Processing:** Background tasks use a database queue.
-- **Company Approval Workflow:** Manages company lifecycle and status.
-- **Customer Ledger System:** Automates debit entries and allows manual adjustments.
-- **Multi-Branch System:** Supports multiple operational branches per company.
-- **FBR Token Health Monitoring:** Tracks FBR token status and connectivity.
-- **Enterprise Analytics:** Provides KPIs and compliance metrics through dashboards.
+- **Immutable Audit Logging:** Critical events are logged with SHA256 hashes for data integrity.
+- **Queue-based Processing:** Background tasks utilize a database queue for asynchronous operations.
+- **Company Approval Workflow:** Manages the lifecycle and status of companies within the platform.
+- **Customer Ledger System:** Automates debit entries and allows for manual adjustments.
+- **Multi-Branch System:** Supports multiple operational branches for each company.
+- **FBR Token Health Monitoring:** Tracks FBR token status and connectivity to ensure uninterrupted service.
+- **Enterprise Analytics:** Provides key performance indicators and compliance metrics through dashboards.
 - **Security Hardening:** Includes `ForceHttps` and subscription-based access controls.
-- **Dynamic FBR Compliance:** Features FBR Excel template alignment, PRAL API integration, per-item FBR fields, and pre-submission payload validation with a sandbox mode.
-- **FBR Submission Idempotency:** Multi-layer protection in `App\Jobs\SendInvoiceToFbrJob` — (a) `safeDispatch()` 120s `Cache::add` lock keyed `fbr_dispatch_lock:{invoiceId}` prevents duplicate dispatch; (b) `lockForUpdate()` DB row lock during the submission transaction; (c) status guards skip already-locked invoices; (d) FBR response duplicate-failure type detection; (e) `retry_count` ceiling prevents runaway retries; (f) `Cache::forget` cleanup on completion.
-- **Enterprise UX Simplification:** Invoice lifecycle has 4 states (`draft`, `failed`, `locked`, `pending_verification`) with specific FBR submission flow.
+- **Dynamic FBR Compliance:** Features FBR Excel template alignment, PRAL API integration, per-item FBR fields, and pre-submission payload validation with a sandbox mode, ensuring FBR submission idempotency through a multi-layer locking mechanism.
+- **Enterprise UX Simplification:** Invoice lifecycle managed through 4 states (`draft`, `failed`, `locked`, `pending_verification`) with a streamlined FBR submission flow.
+- **DI Invoice PDF Default:** Pure 100% B&W PDF (`resources/views/invoice/pdf-bw.blade.php`) is the standard output for invoices, designed for clarity and compliance.
 - **Global HS Intelligence Control System:** Centralized `global_hs_master` table, HS resolution, and dynamic validation for tax schedules, including weighted suggestions and rejection learning.
 - **HS Code Mapping Engine:** Admin-managed mappings with real-time suggestions during invoice creation.
 - **Admin Announcement System:** Allows administrators to create targeted, dismissable announcements.
 - **SaaS Management Layer:** Separated admin and franchise management with distinct authentication, layouts, subscription plan builders, company approval workflows, and usage monitoring.
-- **Product-Type Plan Separation:** `pricing_plans` table has a `product_type` column (`di` or `pos`) to display relevant plans on landing pages.
-- **Subscription Override + Usage Limit System:** Admin-only override layer on `subscriptions` table — `override_type` (`none`/`lifetime`/`temporary`/`grace`/`usage_free`), `override_until` (date), `free_invoice_limit` (int), `override_reason` (text), `override_by` (admin id). Decision in `App\Services\SubscriptionAccessService::hasAccess($company)` enforces order: lifetime → usage_free (allowed until invoice_count reaches limit) → temporary/grace (allowed while now < override_until) → fallback to normal subscription check (active + not expired). Wired into `App\Http\Middleware\CheckPlanLimit` BEFORE per-resource caps. Admin UI at `/admin/companies/{id}` provides 5 actions: Grant Lifetime / Temporary (date) / Grace (7-15-30 day quick) / Free Invoice Limit / Remove Override. Only one override active at a time; never modifies `end_date` or deletes subscription data. All changes audit-logged via `AdminAuditLog`.
-
-**NestPOS Module:**
-- **Isolated POS System:** Separate from Digital Invoice, with its own authentication, layouts, and data models.
-- **PRA Integration:** Supports offline billing with auto-sync and dual invoice numbering (POS and PRA Fiscal).
-- **Restaurant POS Module:** Full restaurant management integrated into NestPOS at `/pos/restaurant/*`. Features include POS screen, table management, KDS, KOT, ingredient inventory, recipe/BOM engine, and customer CRM.
-- **Enterprise POS Upgrade:** Includes direct POS login, full keyboard system, premium UI, and a customer address system.
-- **Smart Customer System:** Prioritizes mobile number input with auto-search and customer management features.
-- **Enterprise Cart UI & Keyboard System:** Redesigned cart with large quantity controls and comprehensive keyboard navigation.
-- **Seamless Keyboard Flow:** Ensures a fully keyboard-driven POS workflow from customer selection to payment.
-- **Unified Top Nav Layout (No Sidebar):** All POS types use a consistent top navigation layout.
-- **Direct-to-Sale Login:** POS login redirects directly to the sale screen.
-- **Universal Business Categories:** Supports 10 business types with category-specific product fields.
-- **Dashboard Home Screen:** Redesigned dashboards with quick-access tiles and performance metrics.
-- **POS Theme System:** 6 pre-built themes selectable by users, affecting UI colors and gradients.
-- **Dashboard Style System:** 6 selectable dashboard layouts inspired by major POS platforms, configurable per company.
-- **HS Code Mapping Engine (DB-First):** `hs_code_mappings` table provides admin-managed FBR-confirmed HS→SRO/Serial mappings.
-- **Enterprise Completed Invoices:** Summary stats bar, keyboard navigation, advanced filters, column sorting, per-page selector, jump-to-page pagination.
-
-**FBR POS Module:**
-- **Isolated FBR-integrated POS:** Accessible at `/fbr-pos` with direct FBR API submission.
-- **Top Nav Layout:** Converted to top navigation bar layout.
-- **Universal Categories:** Uses the same 10 business types as NestPOS.
-- **Product Tax Configuration:** Products have `tax_type` field, with full product CRUD for admins.
-- **FBR Reporting Toggle:** Admin-only toggle for FBR reporting with corresponding invoice prefixes.
-- **Local Tabs & Confidential PIN System:** Provides PIN-protected access to local invoice data.
-
-**TaxNest PRA Sync Agent (Desktop Companion App — SEPARATE REPOSITORY):**
-- **Important:** The Electron desktop agent lives in a SEPARATE GitHub repository (NOT in this Laravel codebase). This codebase only exposes the server-side API endpoints + `/company/agent` UI for key management. All Electron/installer/NSIS work happens in the separate repo.
-- **Architecture:** Electron-based `.exe` desktop app installed on company's local Pakistani PC. Eliminates need for server-side Pakistani IP, relays, or proxies.
-- **Server endpoints** (Bearer auth via `agent_api_key`): `POST /api/agent/heartbeat`, `GET /api/agent/pending-invoices`, `POST /api/agent/submit-result`
-- **Per-company credentials:** `companies.agent_api_key`, `agent_last_seen`, `agent_version`, `agent_enabled` columns. UI at `/company/agent` for key generation/regeneration/toggle/download.
-- **Agent flow:** Polls server every 30s for pending invoices, submits to PRA from local IP, reports results back. Heartbeat every 60s. Runs in system tray with auto-start.
-
-**UI/UX Design:**
-- **Layout:** Responsive sidebar with a single scrollable content area.
-- **Styling:** Consistent dark/light modes, standardized components, emerald-600 primary color palette.
-- **Design System:** Unified SaaS-grade design with consistent card, button, and section styling.
-- **Product Visual Separation:** DI (emerald), NestPOS (purple), FBR POS (blue) themes.
-- **Mobile Responsiveness:** Fully responsive (320px+).
-- **Enterprise UX Engine:** Toast notifications, loading spinners, page transitions, auto-scrolling to errors.
-- **DI Dashboard Premium Upgrade:** Features gradient banners, quick-action tiles, stat cards, compliance gauge, and KPI cards.
-
-**PWA / Mall-Grade "exe-look" Suite:**
-- **Three Independent PWAs:** Each product is installable as its own desktop app: Tax DI, Nest Pra Pos, Nest FBR Pos.
-- **Branded Icons:** Premium family-style icons for each PWA.
-- **Service Worker (`public/sw.js`, v12):** Stale-while-revalidate for static assets, network-first for HTML, in-memory offline splash, push notification handler ready.
-- **Blade Components:** `<x-pwa-install>`, `<x-pwa-banner>`, `<x-pwa-update>`, `<x-pwa-push>`.
-- **Push Subscriptions:** `push_subscriptions` table, with endpoints `POST /api/push/subscribe` and `POST /api/push/unsubscribe`. Server-side push works via `App\Services\PushNotificationService`.
-- **iOS Install Modal:** Custom modal for iOS Safari users.
-- **POS Offline Pre-Cache:** `<link rel="prefetch">` for `/pos/create-invoice` and `/fbr-pos/create` for pre-caching sale screens.
-- **PWA Diagnostics Page (`/pwa-status`):** Public diagnostic page showing service worker state, install state, notification permission, push subscription, cache contents, environment info with actions.
-- **Login Page Branding:** Branded PNG icons + install button in the header of login pages.
-
-**Hardening Batch — Phase 1 — Feature-Flagged**
-- **Failed Invoice Recovery System (`FEATURE_FBR_RETRY_SYSTEM`):** Implements a retry mechanism for failed FBR invoice submissions with a dedicated job and admin interface.
-- **HS Code Mapping Manager (`FEATURE_HS_MAPPING_MANAGER`):** Manages HS code mappings with logging for missing mappings, ensuring submission continues with fallbacks.
-- **Reduced Rate Support (`FEATURE_REDUCED_RATE_MAPPING`):** Integrates support for reduced sales tax rates within HS code mappings.
-
-## Production Deployment Procedure (Hostcry)
-
-**LIVE site path**: `~/public_html/taxnest/` (NOT `~/public_html/` — that's an old separate install, ignore it). Bridge file `~/public_html/index.php` requires `taxnest/vendor/autoload.php` and `taxnest/bootstrap/app.php`.
-
-**Standard deploy command** (always run from `~/public_html/taxnest/`):
-```
-cd ~/public_html/taxnest
-git pull origin main
-composer install --no-dev --optimize-autoloader
-php artisan migrate --force
-php artisan optimize:clear && php artisan config:cache
-```
-
-**For data sync SQL files** (`database/deploy/<date>/MASTER-ALL.sql`): Always backup first (`mysqldump --no-tablespaces --single-transaction taxnestc_db <tables> > /tmp/pre-sync-*.sql`), safety-scan for `DROP/TRUNCATE/DELETE FROM` (must be 0), then `mysql taxnestc_db < <file>.sql`. Files use `INSERT IGNORE` + `ALTER TABLE ... IF NOT EXISTS` so they're idempotent and safe to re-run.
-
-**Production DB**: `taxnestc_db` (MariaDB on Hostcry, single DB — no other DBs on server). Credentials in `taxnest/.env` (DB_PASSWORD must match cPanel MySQL user). Both `~/public_html/.env` and `~/public_html/taxnest/.env` should have identical DB credentials.
-
-**PWA cache caveat**: After deploy, users may see stale data due to service worker (`public/sw.js v12`). Tell user to clear site data or use Incognito/Private mode to verify fresh changes.
-
-**Agent rule**: Always remind user of this exact deploy formula before each production deploy. User does NOT need to memorize it.
+- **Product-Type Plan Separation:** `pricing_plans` table distinguishes between `di` and `pos` product types for plan display.
+- **Subscription Override + Usage Limit System:** Admin-only override functionality on `subscriptions` table, allowing for `lifetime`, `temporary`, `grace`, or `usage_free` access, with an enforcement order: lifetime → usage_free → temporary/grace → normal subscription check.
+- **NestPOS Module:** A completely isolated POS system with its own authentication, layouts, and data models, supporting PRA integration with offline billing and auto-sync. Includes a full Restaurant POS Module with table management, KDS, KOT, inventory, and CRM. Features an Enterprise Cart UI, seamless keyboard flow, and a unified top navigation layout. Supports 10 universal business categories and offers 6 dashboard styles and themes.
+- **FBR POS Module:** An isolated FBR-integrated POS accessible at `/fbr-pos` with direct FBR API submission, product tax configuration, FBR reporting toggle, and a confidential PIN system for local data access.
+- **TaxNest PRA Sync Agent (Desktop Companion App):** An Electron-based desktop application (separate repository) that runs locally on the client's PC, polling the server for pending invoices, submitting to PRA from a local IP, and reporting results back. The server provides API endpoints (`/api/agent/heartbeat`, `/api/agent/pending-invoices`, `/api/agent/submit-result`) and a UI at `/company/agent` for key management.
+- **UI/UX Design:** Responsive sidebar layout with consistent dark/light modes, emerald-600 primary color. Features a unified SaaS-grade design system with consistent components and enhanced mobile responsiveness. Includes an Enterprise UX Engine for notifications, spinners, and transitions. DI Dashboard has premium upgrades with gradient banners and KPI cards.
+- **PWA / Mall-Grade "exe-look" Suite:** Three independent PWAs (Tax DI, Nest Pra Pos, Nest FBR Pos) with branded icons, a Service Worker for offline capabilities and push notifications, and Blade components for PWA features. Includes an iOS Install Modal, POS offline pre-caching, and a PWA diagnostics page. Login pages feature branding and install buttons.
+- **Hardening Batch — Phase 1:** Feature-flagged implementations for Failed Invoice Recovery System, HS Code Mapping Manager, and Reduced Rate Support.
 
 ## External Dependencies
-- **MySQL:** Primary database for production deployment (Hostcry).
+- **MySQL:** Primary database for production deployment.
 - **PostgreSQL:** Used for Replit development and baseline reference.
 - **FBR (Federal Board of Revenue) Pakistan:** Core integration for tax compliance.
 - **Laravel Breeze:** Authentication scaffolding.
@@ -132,4 +60,4 @@ php artisan optimize:clear && php artisan config:cache
 - **Alpine.js:** Interactive frontend components.
 - **Chart.js:** Data visualization.
 - **PRA (Punjab Revenue Authority):** POS fiscal device integration via PRAL IMS API v1.2.
-- **Unsplash / Picsum:** (Fallback) for `ProductImageService`.
+- **Unsplash / Picsum:** (Fallback) for `ProductImageService` to fetch product images.

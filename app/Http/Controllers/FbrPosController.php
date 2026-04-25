@@ -262,6 +262,13 @@ class FbrPosController extends Controller
 
                 // Cash received & change
                 $cashReceived = (float) ($request->cash_received ?? 0);
+                // 💵 SERVER-SIDE CASH GUARD — block sale if cash payment & received < total
+                if ($request->payment_method === 'cash' && $cashReceived < $totalAmount) {
+                    $shortBy = number_format($totalAmount - $cashReceived, 2);
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'cash_received' => "Cash received (Rs " . number_format($cashReceived, 2) . ") is less than total (Rs " . number_format($totalAmount, 2) . "). Short by Rs {$shortBy}. Sale blocked.",
+                    ]);
+                }
                 $changeDue = max(0, $cashReceived - $totalAmount);
 
                 // Payment breakdown
@@ -418,6 +425,11 @@ class FbrPosController extends Controller
                 ->with('success', "✓ Bill #{$transaction->invoice_number} created — PKR " . number_format($transaction->total_amount, 2))
                 ->with('warning', $warningMsg);
 
+        } catch (\Illuminate\Validation\ValidationException $ve) {
+            // 💵 Field-level validation errors (e.g. cash_received < total) MUST propagate
+            // through Laravel's normal error bag so the error appears next to the cash input.
+            // Re-throw before the generic Exception catch swallows it.
+            throw $ve;
         } catch (\Exception $e) {
             Log::error('FBR POS Store Error', ['error' => $e->getMessage()]);
             return back()->withInput()->with('error', 'Failed to create sale: ' . $e->getMessage());

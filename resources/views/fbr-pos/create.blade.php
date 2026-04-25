@@ -385,7 +385,7 @@ kbd {
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                <span class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-blue-700 via-indigo-700 to-purple-700 text-white text-base shadow-lg ring-2 ring-blue-400/40">⚡</span>
+                <span class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-indigo-600 text-white text-base shadow-md">⚡</span>
                 New FBR POS Sale
             </h1>
             <p class="text-sm font-semibold text-slate-700 dark:text-slate-300 mt-1.5">Premium point-of-sale · FBR-compliant · Real-time submission</p>
@@ -412,7 +412,7 @@ kbd {
     @endif
 
     {{-- ============ Phase 2 Top Action Bar — PREMIUM ============ --}}
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-blue-100 via-indigo-100 to-purple-100 dark:from-blue-950/60 dark:via-indigo-950/60 dark:to-purple-950/60 border-2 border-blue-300 dark:border-blue-700 rounded-2xl p-3 shadow-md ring-1 ring-blue-500/10">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-2xl p-3 shadow-sm">
         <div class="flex items-center gap-3 flex-wrap">
             <div class="flex items-center gap-2 bg-white/70 dark:bg-slate-900/70 px-3 py-1.5 rounded-xl border border-blue-300 dark:border-blue-700 shadow-sm backdrop-blur">
                 <label class="text-xs font-black text-slate-800 dark:text-slate-100 tracking-wide uppercase">Counter</label>
@@ -425,18 +425,18 @@ kbd {
                 <a href="{{ route('fbrpos.phase2.terminals') }}" class="text-xs font-black text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 hover:underline">+ Add</a>
             </div>
             @if($currentShift)
-                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl text-xs font-black shadow-md ring-2 ring-emerald-400/40">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-black shadow-sm">
                     <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
                     SHIFT #{{ $currentShift->id }} OPEN · Rs {{ number_format($currentShift->opening_cash, 0) }}
                 </span>
             @else
-                <a href="{{ route('fbrpos.phase2.shifts') }}" class="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-xl text-xs font-black shadow-md ring-2 ring-red-400/40">⚠ NO SHIFT — Open Now</a>
+                <a href="{{ route('fbrpos.phase2.shifts') }}" class="inline-flex items-center px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black shadow-sm">⚠ NO SHIFT — Open Now</a>
             @endif
         </div>
         <div class="flex items-center gap-2">
-            <button type="button" @click="holdSale()" class="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl text-xs font-black shadow-md ring-1 ring-amber-300/50 transition">⏸ Hold</button>
-            <button type="button" @click="openRecall()" class="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 text-white rounded-xl text-xs font-black shadow-md ring-1 ring-purple-300/50 transition">⏵ Recall <span x-show="heldList.length > 0" class="ml-1 bg-white text-purple-700 rounded-full px-1.5 text-[10px] font-black" x-text="heldList.length"></span></button>
-            <a href="{{ route('fbrpos.phase2.shifts') }}" class="px-3 py-1.5 bg-gradient-to-r from-slate-700 to-slate-900 hover:from-slate-800 hover:to-black text-white rounded-xl text-xs font-black shadow-md ring-1 ring-slate-500/40 transition">$ Drawer</a>
+            <button type="button" @click="holdSale()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black shadow-sm transition">⏸ Hold</button>
+            <button type="button" @click="openRecall()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-sm transition">⏵ Recall <span x-show="heldList.length > 0" class="ml-1 bg-white text-indigo-700 rounded-full px-1.5 text-[10px] font-black" x-text="heldList.length"></span></button>
+            <a href="{{ route('fbrpos.phase2.shifts') }}" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-black shadow-sm transition">$ Drawer</a>
         </div>
     </div>
 
@@ -484,138 +484,96 @@ kbd {
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 items-start">
             <div class="lg:col-span-2 space-y-4">
-                <div class="bg-white dark:bg-gray-900 rounded-2xl border-2 border-blue-200 dark:border-blue-800 shadow-xl ring-1 ring-blue-500/5 p-4 sm:p-5">
+                <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-md p-4 sm:p-5">
                     <div class="flex items-center justify-between mb-3">
                         <h3 class="text-base font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                            <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-sm shadow-md">🛒</span>
+                            <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-indigo-600 text-white text-sm shadow-sm">🛒</span>
                             Cart Items
-                            <span x-show="items.length > 0" class="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-600 text-white tracking-wider" x-text="items.length + (items.length === 1 ? ' ITEM' : ' ITEMS')"></span>
+                            <span x-show="items.length > 0" class="text-[10px] font-black px-2 py-0.5 rounded-full bg-indigo-600 text-white tracking-wider" x-text="items.length + (items.length === 1 ? ' ITEM' : ' ITEMS')"></span>
                         </h3>
-                        <div class="flex items-center gap-3">
-                            {{-- ✨ PREMIUM SMART SEARCH — searches NAME · SKU · BARCODE · HS CODE simultaneously --}}
-                            <div class="relative" x-data="{
-                                    searchOpen: false,
-                                    searchQuery: '',
-                                    searchResults: [],
-                                    hi: 0,
-                                    matchType(p, q) {
-                                        if (!q) return null;
-                                        const ql = String(q).toLowerCase();
-                                        if ((p.name||'').toLowerCase().includes(ql)) return 'name';
-                                        if ((p.sku||'').toLowerCase().includes(ql)) return 'sku';
-                                        if ((p.barcode||'').toLowerCase().includes(ql)) return 'barcode';
-                                        if ((p.hs_code||'').toLowerCase().includes(ql)) return 'hs';
-                                        return null;
-                                    }
-                                 }"
-                                 @open-product-search.window="searchOpen = true; hi = 0; $nextTick(() => $refs.productSearch && $refs.productSearch.focus())">
-                                <button type="button" id="fbrpos-search-btn" @click="searchOpen = !searchOpen; $nextTick(() => $refs.productSearch && $refs.productSearch.focus())"
-                                    class="px-4 py-2 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 hover:from-blue-800 hover:via-indigo-800 hover:to-purple-800 text-white text-sm font-extrabold rounded-xl shadow-lg hover:shadow-2xl transition-all flex items-center gap-2 ring-2 ring-blue-400/40 hover:ring-blue-300/60">
-                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                    <span class="hidden sm:inline tracking-wide">Search Product</span>
-                                    <span class="text-[10px] font-black bg-white/25 backdrop-blur px-2 py-0.5 rounded-md tracking-wider">F7 · Ctrl+K</span>
-                                </button>
-                                <div x-show="searchOpen" @click.away="searchOpen = false" x-cloak
-                                    x-transition:enter="transition ease-out duration-200"
-                                    x-transition:enter-start="opacity-0 scale-95 -translate-y-2"
-                                    x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-                                    class="absolute right-0 top-12 w-[28rem] max-w-[92vw] bg-gradient-to-br from-white via-blue-50/40 to-indigo-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-blue-950 rounded-2xl shadow-2xl border-2 border-blue-300 dark:border-blue-700 z-50 overflow-hidden ring-4 ring-blue-500/10">
-                                    {{-- Premium gradient header --}}
-                                    <div class="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 px-4 py-3 text-white">
-                                        <div class="flex items-center justify-between">
-                                            <div class="text-xs font-black tracking-widest uppercase flex items-center gap-1.5">
-                                                <span class="text-base">🔎</span> Smart Product Search
-                                            </div>
-                                            <div class="text-[10px] bg-white/25 backdrop-blur px-2 py-0.5 rounded-full font-extrabold tracking-wider">↑↓ · Enter · Esc</div>
-                                        </div>
-                                        <div class="flex items-center gap-1.5 mt-2.5 flex-wrap">
-                                            <span class="text-[10px] font-black px-2 py-0.5 rounded-md bg-emerald-400/30 text-emerald-50 border border-emerald-300/50 tracking-wider">NAME</span>
-                                            <span class="text-[10px] font-black px-2 py-0.5 rounded-md bg-amber-400/30 text-amber-50 border border-amber-300/50 tracking-wider">SKU</span>
-                                            <span class="text-[10px] font-black px-2 py-0.5 rounded-md bg-cyan-400/30 text-cyan-50 border border-cyan-300/50 tracking-wider">BARCODE</span>
-                                            <span class="text-[10px] font-black px-2 py-0.5 rounded-md bg-pink-400/30 text-pink-50 border border-pink-300/50 tracking-wider">HS CODE</span>
-                                            <span class="text-[10px] font-bold text-blue-100/90 ml-auto">all 4 fields</span>
-                                        </div>
-                                    </div>
-                                    {{-- Search input --}}
-                                    <div class="p-3">
-                                        <div class="relative">
-                                            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                            <input type="text" x-ref="productSearch" x-model="searchQuery"
-                                                @input.debounce.250ms="
-                                                    if(searchQuery.length >= 1) {
-                                                        fetch('{{ route('fbrpos.api.products.search') }}?q=' + encodeURIComponent(searchQuery))
-                                                            .then(r => r.json())
-                                                            .then(data => { searchResults = data; hi = 0; })
-                                                    } else { searchResults = []; hi = 0; }
-                                                "
-                                                @keydown.arrow-down.prevent="if(searchResults.length){ hi = (hi + 1) % searchResults.length; }"
-                                                @keydown.arrow-up.prevent="if(searchResults.length){ hi = (hi - 1 + searchResults.length) % searchResults.length; }"
-                                                @keydown.enter.prevent="if(searchResults.length){ addProductItem(searchResults[hi]); searchOpen = false; searchQuery = ''; searchResults = []; hi = 0; $nextTick(() => $refs.barcodeInput && $refs.barcodeInput.focus()); }"
-                                                @keydown.escape.prevent="searchOpen = false; searchQuery = ''; searchResults = []; hi = 0;"
-                                                class="w-full pl-11 pr-3 py-2.5 rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-base font-bold shadow-inner focus:ring-4 focus:ring-blue-400/40 focus:border-blue-600 placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:font-medium"
-                                                placeholder="Type name, SKU, barcode or HS…">
-                                        </div>
-                                    </div>
-                                    {{-- Results --}}
-                                    <div class="px-3 pb-3 max-h-72 overflow-y-auto space-y-1.5">
-                                        <template x-for="(p, pi) in searchResults" :key="p.id">
-                                            <button type="button" @click="addProductItem(p); searchOpen = false; searchQuery = ''; searchResults = []; hi = 0;"
-                                                :class="hi === pi ? 'bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/60 dark:to-indigo-900/60 ring-2 ring-blue-500 shadow-lg scale-[1.01]' : 'bg-white dark:bg-slate-800/60 hover:bg-blue-50 dark:hover:bg-blue-900/30 border border-slate-200 dark:border-slate-700'"
-                                                class="w-full text-left px-3 py-2.5 rounded-xl transition-all flex items-center justify-between group">
-                                                <div class="flex-1 min-w-0">
-                                                    <div class="flex items-center gap-2 flex-wrap">
-                                                        <p class="text-sm font-extrabold text-slate-900 dark:text-white truncate" x-text="(p.name && p.name.trim()) ? p.name : (p.barcode || p.sku || ('Product #' + p.id))"></p>
-                                                        <template x-if="matchType(p, searchQuery)">
-                                                            <span class="text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider"
-                                                                  :class="{
-                                                                      'bg-emerald-200 text-emerald-900 dark:bg-emerald-700 dark:text-emerald-50': matchType(p, searchQuery) === 'name',
-                                                                      'bg-amber-200 text-amber-900 dark:bg-amber-700 dark:text-amber-50': matchType(p, searchQuery) === 'sku',
-                                                                      'bg-cyan-200 text-cyan-900 dark:bg-cyan-700 dark:text-cyan-50': matchType(p, searchQuery) === 'barcode',
-                                                                      'bg-pink-200 text-pink-900 dark:bg-pink-700 dark:text-pink-50': matchType(p, searchQuery) === 'hs'
-                                                                  }"
-                                                                  x-text="matchType(p, searchQuery)"></span>
-                                                        </template>
-                                                    </div>
-                                                    <div class="text-xs font-bold text-slate-700 dark:text-slate-200 mt-1 flex items-center gap-2 flex-wrap">
-                                                        <span class="text-emerald-700 dark:text-emerald-400 font-black" x-text="'Rs ' + Number(p.default_price).toFixed(2)"></span>
-                                                        <span class="text-slate-400">·</span>
-                                                        <span class="text-slate-600 dark:text-slate-300" x-text="'HS ' + (p.hs_code || '—')"></span>
-                                                        <template x-if="p.sku"><span class="font-mono text-[10px] bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-200 px-1.5 py-0.5 rounded font-black" x-text="'SKU ' + p.sku"></span></template>
-                                                        <template x-if="p.barcode"><span class="font-mono text-[10px] bg-cyan-100 text-cyan-900 dark:bg-cyan-900/50 dark:text-cyan-200 px-1.5 py-0.5 rounded font-black" x-text="'⠿ ' + p.barcode"></span></template>
-                                                    </div>
-                                                </div>
-                                                <span class="text-xs font-black px-2.5 py-1 rounded-lg shrink-0 ml-2"
-                                                    :class="p.tax_type === 'exempt' ? 'bg-green-200 text-green-900 dark:bg-green-700 dark:text-green-50' : 'bg-amber-200 text-amber-900 dark:bg-amber-700 dark:text-amber-50'"
-                                                    x-text="p.tax_type === 'exempt' ? 'EXEMPT' : (p.default_tax_rate + '%')"></span>
-                                            </button>
-                                        </template>
-                                        <p x-show="searchQuery.length >= 1 && searchResults.length === 0" class="text-sm font-bold text-slate-600 dark:text-slate-300 text-center py-6">
-                                            <span class="text-3xl block mb-1">🔍</span>
-                                            No products found for "<span class="text-blue-600 dark:text-blue-400" x-text="searchQuery"></span>"
-                                        </p>
-                                        <p x-show="searchQuery.length < 1" class="text-xs font-bold text-slate-600 dark:text-slate-300 text-center py-6 leading-relaxed">
-                                            <span class="text-2xl block mb-1">⌨️</span>
-                                            Start typing — searches NAME · SKU · BARCODE · HS code<br>
-                                            <span class="text-[10px] font-semibold opacity-80">↑ ↓ navigate · Enter to add · Esc to close</span>
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                            <button type="button" @click="addItem()" class="text-sm text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 font-extrabold border-2 border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-lg px-3 py-1.5 shadow-sm transition">+ Manual Row</button>
-                        </div>
+                        <button type="button" @click="addItem()" class="text-sm text-indigo-700 dark:text-indigo-300 hover:text-indigo-900 dark:hover:text-indigo-100 font-bold border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg px-3 py-1.5 shadow-sm transition">+ Manual Row</button>
                     </div>
 
-                    <div class="mb-4 flex items-center gap-2 bg-gradient-to-r from-cyan-50 via-blue-50 to-indigo-50 dark:from-cyan-950/40 dark:via-blue-950/40 dark:to-indigo-950/40 border-2 border-cyan-400 dark:border-cyan-700 rounded-xl p-2.5 scan-pulse shadow-inner ring-1 ring-cyan-500/20">
-                        <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-md ring-2 ring-cyan-300/50 flex-shrink-0">
-                            <svg class="w-5 h-5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10m4-10v10m4-10v10m4-10v10m-12 0h16"/></svg>
-                        </span>
-                        <input type="text" x-ref="barcodeInput" x-model="barcodeBuffer"
-                            @keydown.enter.prevent="scanBarcode()"
-                            autocomplete="off"
-                            class="flex-1 bg-transparent border-0 focus:ring-0 text-base font-mono font-black text-slate-900 dark:text-white placeholder:text-slate-500 dark:placeholder:text-slate-400 placeholder:font-semibold placeholder:text-sm"
-                            placeholder="📡 Scan barcode anywhere · or type code · F7 for name search">
-                        <span class="text-[10px] font-black px-2.5 py-1 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-lg shadow ring-1 ring-emerald-300/50 tracking-widest">● LIVE</span>
-                        <span x-show="scanStatus" :class="scanStatus.ok ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'" class="text-xs font-black" x-text="scanStatus.msg"></span>
+                    {{-- 🎯 UNIFIED SMART INPUT — searches NAME · SKU · BARCODE · HS · scanner all in ONE field --}}
+                    <div class="mb-4 relative" @click.outside="searchOpen = false">
+                        <div class="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/60 border-2 border-indigo-300 dark:border-indigo-700 rounded-xl p-2.5 shadow-sm scan-pulse focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/20 transition">
+                            <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-600 text-white shadow-sm flex-shrink-0">
+                                <svg class="w-5 h-5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10m4-10v10m4-10v10m4-10v10m-12 0h16"/></svg>
+                            </span>
+                            <input type="text" x-ref="barcodeInput" x-model="barcodeBuffer"
+                                @input.debounce.250ms="
+                                    const q = (barcodeBuffer || '').trim();
+                                    if (q.length >= 2) {
+                                        fetch('{{ route('fbrpos.api.products.search') }}?q=' + encodeURIComponent(q))
+                                            .then(r => r.json())
+                                            .then(data => { searchResults = data; searchHi = 0; searchOpen = data.length > 0; })
+                                    } else { searchResults = []; searchOpen = false; }
+                                "
+                                @keydown.arrow-down.prevent="if (searchOpen && searchResults.length) { searchHi = (searchHi + 1) % searchResults.length; }"
+                                @keydown.arrow-up.prevent="if (searchOpen && searchResults.length) { searchHi = (searchHi - 1 + searchResults.length) % searchResults.length; }"
+                                @keydown.escape.prevent="searchOpen = false; searchResults = []; searchHi = 0;"
+                                @keydown.enter.prevent="
+                                    if (searchOpen && searchResults.length > 0) {
+                                        addProductItem(searchResults[searchHi]);
+                                        barcodeBuffer = ''; searchResults = []; searchOpen = false; searchHi = 0;
+                                        $nextTick(() => $refs.barcodeInput && $refs.barcodeInput.focus());
+                                    } else {
+                                        scanBarcode();
+                                    }
+                                "
+                                autocomplete="off"
+                                class="flex-1 bg-transparent border-0 focus:ring-0 text-base font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:font-medium placeholder:text-sm placeholder:font-sans"
+                                placeholder="🔎 Type name · SKU · barcode · HS code  ·  or scan with hardware scanner">
+                            <span class="text-[10px] font-bold px-2 py-0.5 bg-emerald-600 text-white rounded-md shadow-sm tracking-wider">● LIVE</span>
+                            <span x-show="scanStatus" :class="scanStatus.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'" class="text-xs font-bold" x-text="scanStatus.msg"></span>
+                        </div>
+
+                        {{-- Autocomplete dropdown — appears under input as cashier types --}}
+                        <div x-show="searchOpen && searchResults.length > 0" x-cloak
+                             x-transition:enter="transition ease-out duration-150"
+                             x-transition:enter-start="opacity-0 -translate-y-1"
+                             x-transition:enter-end="opacity-100 translate-y-0"
+                             class="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border-2 border-indigo-300 dark:border-indigo-700 z-40 max-h-80 overflow-y-auto">
+                            <div class="px-3 py-2 bg-indigo-50 dark:bg-indigo-950/40 border-b border-indigo-200 dark:border-indigo-800 flex items-center justify-between">
+                                <div class="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+                                    <span x-text="searchResults.length"></span> match<span x-show="searchResults.length !== 1">es</span>
+                                </div>
+                                <div class="text-[10px] font-semibold text-slate-500 dark:text-slate-400">↑↓ Enter Esc</div>
+                            </div>
+                            <div class="p-2 space-y-1">
+                                <template x-for="(p, pi) in searchResults" :key="p.id">
+                                    <button type="button" @click="addProductItem(p); barcodeBuffer = ''; searchResults = []; searchOpen = false; searchHi = 0; $nextTick(() => $refs.barcodeInput && $refs.barcodeInput.focus());"
+                                        :class="searchHi === pi ? 'bg-indigo-100 dark:bg-indigo-900/40 ring-2 ring-indigo-500' : 'hover:bg-slate-100 dark:hover:bg-slate-800/60'"
+                                        class="w-full text-left px-3 py-2 rounded-lg transition flex items-center justify-between">
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-center gap-2 flex-wrap">
+                                                <p class="text-sm font-bold text-slate-900 dark:text-white truncate" x-text="(p.name && p.name.trim()) ? p.name : (p.barcode || p.sku || ('Product #' + p.id))"></p>
+                                                <template x-if="matchType(p, barcodeBuffer)">
+                                                    <span class="text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wide"
+                                                          :class="{
+                                                              'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200': matchType(p, barcodeBuffer) === 'name',
+                                                              'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200': matchType(p, barcodeBuffer) === 'sku',
+                                                              'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/50 dark:text-cyan-200': matchType(p, barcodeBuffer) === 'barcode',
+                                                              'bg-pink-100 text-pink-800 dark:bg-pink-900/50 dark:text-pink-200': matchType(p, barcodeBuffer) === 'hs'
+                                                          }"
+                                                          x-text="matchType(p, barcodeBuffer)"></span>
+                                                </template>
+                                            </div>
+                                            <div class="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-0.5 flex items-center gap-2 flex-wrap">
+                                                <span class="text-emerald-700 dark:text-emerald-400 font-bold" x-text="'Rs ' + Number(p.default_price).toFixed(2)"></span>
+                                                <span class="text-slate-400">·</span>
+                                                <span x-text="'HS ' + (p.hs_code || '—')"></span>
+                                                <template x-if="p.sku"><span class="font-mono text-[10px] text-slate-600 dark:text-slate-400" x-text="'· SKU ' + p.sku"></span></template>
+                                                <template x-if="p.barcode"><span class="font-mono text-[10px] text-slate-600 dark:text-slate-400" x-text="'· ⠿ ' + p.barcode"></span></template>
+                                            </div>
+                                        </div>
+                                        <span class="text-xs font-bold px-2 py-0.5 rounded ml-2 shrink-0"
+                                            :class="p.tax_type === 'exempt' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'"
+                                            x-text="p.tax_type === 'exempt' ? 'EXEMPT' : (p.default_tax_rate + '%')"></span>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
                     </div>
 
                     <template x-for="(item, index) in items" :key="index">
@@ -781,7 +739,7 @@ kbd {
                         class="add-cta group relative w-full mt-2 py-4 rounded-2xl border-2 border-dashed border-blue-300 dark:border-blue-700 hover:border-transparent transition-all flex items-center justify-center gap-3 overflow-hidden">
                         <span class="add-cta-bg absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
                         <span class="add-cta-shine absolute inset-0 pointer-events-none"></span>
-                        <span class="relative z-10 w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 text-white flex items-center justify-center text-xl font-black shadow-lg group-hover:scale-110 group-hover:rotate-90 transition-all duration-300" style="box-shadow: 0 8px 20px -6px rgba(99,102,241,0.55);">+</span>
+                        <span class="relative z-10 w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xl font-black shadow-md group-hover:scale-110 group-hover:rotate-90 transition-all duration-300">+</span>
                         <span class="relative z-10 text-blue-700 dark:text-blue-300 group-hover:text-white font-bold text-base tracking-wide transition-colors">Add Another Product</span>
                         <span class="relative z-10 hidden sm:inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 group-hover:text-white/80 ml-2 transition-colors">
                             press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> or <kbd>F6</kbd>
@@ -802,7 +760,7 @@ kbd {
             <div class="space-y-4 lg:sticky lg:top-16 lg:self-start">
                 <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                     <h3 class="text-base font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2 tracking-tight">
-                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-sm shadow-md">👤</span>
+                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-600 text-white text-sm shadow-sm">👤</span>
                         Customer <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400">(Optional)</span>
                     </h3>
                     <div class="space-y-3">
@@ -837,7 +795,7 @@ kbd {
                 {{-- Promo Code --}}
                 <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                     <h3 class="text-base font-black text-slate-900 dark:text-white mb-3 flex items-center gap-2 tracking-tight">
-                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-pink-500 to-rose-600 text-white text-sm shadow-md">🎁</span>
+                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-pink-600 text-white text-sm shadow-sm">🎁</span>
                         Promo Code
                     </h3>
                     <div class="flex gap-2">
@@ -851,7 +809,7 @@ kbd {
 
                 <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                     <h3 class="text-base font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2 tracking-tight">
-                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-sm shadow-md">💳</span>
+                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-indigo-600 text-white text-sm shadow-sm">💳</span>
                         Payment &amp; Discount
                     </h3>
                     <div class="space-y-3">
@@ -959,7 +917,7 @@ kbd {
                 <button type="button" x-ref="completeBtn"
                     @click="openPaymentPicker()"
                     :disabled="!isOnline || submitting"
-                    :class="(isOnline && !submitting) ? 'bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white' : 'bg-gray-400 text-gray-200 cursor-not-allowed'"
+                    :class="(isOnline && !submitting) ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-gray-400 text-gray-200 cursor-not-allowed'"
                     class="w-full py-5 font-black rounded-xl transition text-lg shadow-xl tracking-wide flex items-center justify-center gap-2">
                     <svg x-show="submitting" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                     <span x-show="isOnline && !submitting">✓ CONFIRM PAYMENT &amp; SUBMIT <span class="opacity-70 text-xs font-normal">(F8 / F9)</span></span>
@@ -1003,9 +961,19 @@ function fbrPosInvoice() {
         uomOptions: ['U','PCS','KG','GM','LTR','ML','MTR','SQM','FT','IN','YDS','PKT','DOZ','BOX','CTN','BAG','BTL','TIN','CAN','BUN','ROL','SET'],
         items: [{ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, mode: 'qty', _valueInput: '', _amountInput: '', line_value: 0 }],
         activeItemIndex: 0,
-        productSearchOpen: false,
-        productSearchQuery: '',
-        productSearchResults: [],
+        // 🎯 Unified search dropdown state (merged with barcode/scan input)
+        searchOpen: false,
+        searchHi: 0,
+        searchResults: [],
+        matchType(p, q) {
+            if (!q) return null;
+            const ql = String(q).toLowerCase();
+            if ((p.name||'').toLowerCase().includes(ql)) return 'name';
+            if ((p.sku||'').toLowerCase().includes(ql)) return 'sku';
+            if ((p.barcode||'').toLowerCase().includes(ql)) return 'barcode';
+            if ((p.hs_code||'').toLowerCase().includes(ql)) return 'hs';
+            return null;
+        },
         submitting: false, // PHASE 4 — double-submit guard + spinner state
         discountType: '',
         discountValue: 0,
@@ -1064,7 +1032,7 @@ function fbrPosInvoice() {
                 // ✅ NEW (Apr-26): When ANY modal is open, defer ALL global shortcuts to the
                 // modal's own @keydown handlers (Alpine bindings). Prevents accidental row-add /
                 // F8 picker re-open / search-modal toggle while user is confirming payment, etc.
-                if (this.paymentModalOpen || this.recallOpen || this.productSearchOpen) {
+                if (this.paymentModalOpen || this.recallOpen || this.searchOpen) {
                     // Allow Escape to bubble through Alpine modal handlers; allow F11 fullscreen always.
                     if (e.key === 'F11') { e.preventDefault(); this.toggleFullscreen(); }
                     return;
@@ -1082,7 +1050,7 @@ function fbrPosInvoice() {
                 if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); this.addItem(); this.focusLastRowName(); return; }
                 // ✅ NEW (Apr-26): Ctrl+B opens payment picker (not direct submit).
                 if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) { e.preventDefault(); this.openPaymentPicker(); return; }
-                if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); this.openProductSearch(); return; }
+                if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); this.$refs.barcodeInput && this.$refs.barcodeInput.focus(); return; }
                 if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
                     if (this.activeItemIndex >= 0 && this.activeItemIndex < this.items.length) { e.preventDefault(); this.duplicateItem(this.activeItemIndex); }
                     return;
@@ -1116,7 +1084,7 @@ function fbrPosInvoice() {
                 else if (e.key === 'F4') { e.preventDefault(); this.holdSale(); }
                 else if (e.key === 'F5') { e.preventDefault(); this.openRecall(); }
                 else if (e.key === 'F6') { e.preventDefault(); this.addItem(); this.focusLastRowName(); }
-                else if (e.key === 'F7') { e.preventDefault(); this.openProductSearch(); }
+                else if (e.key === 'F7') { e.preventDefault(); this.$refs.barcodeInput && this.$refs.barcodeInput.focus(); }
                 else if (e.key === 'F8') { e.preventDefault(); this.openPaymentPicker(); }
                 else if (e.key === 'F10') { e.preventDefault(); this.openPaymentPicker(); } // alt confirm
                 else if (e.key === 'F11') { e.preventDefault(); this.toggleFullscreen(); }
@@ -1238,6 +1206,18 @@ function fbrPosInvoice() {
             if (!this.isOnline) {
                 this.toast('Internet required for FBR submission. Please reconnect.', 'error');
                 return;
+            }
+            // 💵 CASH GUARD — if cash payment, received must be >= total (no shortage allowed)
+            if (this.paymentMethod === 'cash') {
+                const total = this.calcTotal();
+                const received = parseFloat(this.cashReceived || 0);
+                if (received < total) {
+                    const shortBy = (total - received).toFixed(2);
+                    this.toast('❌ Cash received Rs ' + received.toFixed(2) + ' is LESS than total Rs ' + total.toFixed(2) + ' (short by Rs ' + shortBy + '). Sale BLOCKED.', 'error');
+                    this.beep && this.beep(220, 0.45);
+                    this.$nextTick(() => { this.$refs.cashInput && this.$refs.cashInput.focus(); this.$refs.cashInput && this.$refs.cashInput.select && this.$refs.cashInput.select(); });
+                    return;
+                }
             }
             const removed = this.cleanEmptyItems();
             if (this.items.length === 0) {
@@ -1530,7 +1510,9 @@ function fbrPosInvoice() {
             });
         },
         openProductSearch() {
-            window.dispatchEvent(new CustomEvent('open-product-search'));
+            // 🎯 Compat shim — search is now MERGED into the barcode input.
+            // Just focus the unified input; user types to see autocomplete dropdown.
+            this.$refs.barcodeInput && this.$refs.barcodeInput.focus();
         },
         addProductItem(p) {
             let isExempt = p.tax_type === 'exempt';

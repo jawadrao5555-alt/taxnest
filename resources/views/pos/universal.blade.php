@@ -700,6 +700,7 @@ window.addEventListener('popstate', function() {
                         </div>
                         <div class="flex items-center gap-1.5 mt-1.5">
                             <input type="text" x-model="item.special_notes" @click.stop placeholder="Notes..." class="flex-1 text-[11px] bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg px-2 py-1 text-gray-600 dark:text-gray-400 focus:ring-purple-500 placeholder-gray-300">
+                            <button @click.stop="item.is_tax_exempt = !item.is_tax_exempt" class="text-[9px] font-bold px-1.5 py-1 rounded-md transition whitespace-nowrap" :class="item.is_tax_exempt ? 'bg-green-100 text-green-700 dark:bg-green-900/30' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-green-600'" :title="item.is_tax_exempt ? 'Tax exempt — click to apply tax' : 'Apply tax exemption to this item'" x-text="item.is_tax_exempt ? 'NT' : 'Tax'"></button>
                             <button @click.stop="item.showItemDiscount = !item.showItemDiscount" class="text-[9px] font-bold px-1.5 py-1 rounded-md transition whitespace-nowrap" :class="(item.item_discount_value || 0) > 0 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-orange-500'" x-text="(item.item_discount_value || 0) > 0 ? ((item.item_discount_type || 'percentage') === 'percentage' ? '-' + item.item_discount_value + '%' : '-Rs.' + item.item_discount_value) : 'Disc'"></button>
                         </div>
                         <div x-show="item.showItemDiscount" x-transition class="mt-1 flex items-center gap-1">
@@ -733,12 +734,17 @@ window.addEventListener('popstate', function() {
                             <button @click="discountType = 'amount'" class="flex-1 text-[10px] font-bold py-1 rounded-lg transition" :class="discountType === 'amount' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-500'">Rs.</button>
                         </div>
                         <div class="flex items-center gap-1.5">
-                            <input type="number" x-model.number="discountValue" @input="if(!checkDiscountLimit(discountValue, discountType)) { discountValue = discountType === 'percentage' ? effectiveDiscountLimit : r2(effectiveSubtotal * effectiveDiscountLimit / 100); showToast('Discount capped at ' + effectiveDiscountLimit + '%', 'error'); } recalcDiscount()" min="0" :max="discountType === 'percentage' ? effectiveDiscountLimit : r2(effectiveSubtotal * effectiveDiscountLimit / 100)" step="any" :placeholder="discountType === 'percentage' ? 'Max ' + effectiveDiscountLimit + '%' : 'e.g. 500'" class="flex-1 text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-gray-900 dark:text-white focus:ring-purple-500">
+                            <input type="number" x-model.number="discountValue" @input="if(!checkDiscountLimit(discountValue, discountType)) { discountValue = discountType === 'percentage' ? effectiveDiscountLimit : effectiveSubtotal; showToast(discountType === 'percentage' ? 'Discount capped at ' + effectiveDiscountLimit + '%' : 'Discount cannot exceed subtotal', 'error'); } recalcDiscount()" min="0" :max="discountType === 'percentage' ? effectiveDiscountLimit : effectiveSubtotal" step="any" :placeholder="discountType === 'percentage' ? 'Max ' + effectiveDiscountLimit + '%' : 'Direct amount Rs.'" class="flex-1 text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-gray-900 dark:text-white focus:ring-purple-500">
                             <button @click="discountValue = 0; recalcDiscount(); showDiscount = false" class="text-[10px] text-red-500 hover:text-red-700 px-1.5">Clear</button>
                         </div>
-                        <div class="flex gap-1 flex-wrap">
-                            <template x-for="q in [5, 10, 15, 20].filter(v => v <= effectiveDiscountLimit)" :key="q">
-                                <button @click="discountType = 'percentage'; discountValue = q; recalcDiscount()" class="text-[9px] font-semibold px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-md hover:bg-purple-100 hover:text-purple-700 transition" x-text="q + '%'"></button>
+                        <div x-show="discountType === 'percentage'" class="flex gap-1 flex-wrap">
+                            <template x-for="q in [5, 10, 15, 20, 25, 30, 40, 50].filter(v => v <= effectiveDiscountLimit)" :key="'pct-' + q">
+                                <button @click="discountType = 'percentage'; discountValue = q; recalcDiscount()" class="text-[10px] font-bold px-2.5 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md hover:bg-purple-100 hover:text-purple-700 transition" x-text="q + '%'"></button>
+                            </template>
+                        </div>
+                        <div x-show="discountType === 'amount'" class="flex gap-1 flex-wrap">
+                            <template x-for="q in [50, 100, 200, 500, 1000].filter(v => v <= effectiveSubtotal)" :key="'amt-' + q">
+                                <button @click="discountType = 'amount'; discountValue = q; recalcDiscount()" class="text-[10px] font-bold px-2.5 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md hover:bg-purple-100 hover:text-purple-700 transition" x-text="'Rs.' + q"></button>
                             </template>
                         </div>
                     </div>
@@ -1079,7 +1085,7 @@ window.addEventListener('popstate', function() {
                 </div>
             </div>
             <div class="flex-1 overflow-hidden bg-gray-50 dark:bg-gray-800/50 min-h-0" style="max-height: 45vh;">
-                <iframe x-ref="receiptIframe" class="w-full h-full border-0" :src="lastTransactionId ? ('/pos/restaurant/receipt/' + lastTransactionId + (autoPrintEnabled ? '?auto_print=1' : '')) : ''" style="min-height:300px;"></iframe>
+                <iframe x-ref="receiptIframe" class="w-full h-full border-0" :src="lastTransactionId ? '/pos/restaurant/receipt/' + lastTransactionId : ''" style="min-height:300px;"></iframe>
             </div>
             {{-- Phase 5+ — simplified post-production view: only the receipt + a single Print action.
                  'New Sale' and 'Close' buttons removed. Modal auto-dismisses (4s) so the cashier can chain
@@ -2313,15 +2319,19 @@ function restaurantPos() {
                     this.lastInvoiceNumber = data.invoice_number || ''; this.lastTransactionId = data.transaction_id || null;
                     this.lastOrderId = orderId || null;
                     this.lastTotal = savedTotal || data.total_amount || 0; this.lastPaymentMethod = method;
-                    // Phase 5++ — Auto-KOT: silently print kitchen ticket via hidden iframe (NO popup)
-                    // when company.auto_print_kot is enabled. When disabled, NO ticket is opened —
-                    // cashier can hit the "Print KOT" button on the success modal to print manually.
-                    if (this.autoKotEnabled && orderId) {
-                        this.printKitchenTicket(orderId);
-                    }
                     this.showReceipt = true;
                     this.scheduleReceiptAutoClose();
                     this.$nextTick(() => { setTimeout(() => this.triggerConfetti(), 300); });
+                    // Print order: INVOICE FIRST → KOT AFTER. Cashier-requested sequence.
+                    // Step 1 (200ms): print invoice receipt if auto-print is enabled.
+                    // Step 2 (1800ms): print kitchen ticket if auto-KOT is enabled — gives the
+                    // invoice print dialog enough time to appear & be dismissed first.
+                    if (this.autoPrintEnabled && this.lastTransactionId) {
+                        setTimeout(() => this.printReceipt(), 200);
+                    }
+                    if (this.autoKotEnabled && orderId) {
+                        setTimeout(() => this.printKitchenTicket(orderId), 1800);
+                    }
                 } else { if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; } this.showToast(data.message || 'Payment failed', 'error'); }
             } catch (e) { this.showToast('Payment error', 'error'); }
         },
@@ -2379,8 +2389,13 @@ function restaurantPos() {
             return this.managerOverrideActive ? {{ $hasManagerPin ? ($company->manager_discount_limit ?? 50) : 100 }} : this.discountLimit;
         },
         checkDiscountLimit(val, type) {
-            if (type === 'percentage' && val > this.effectiveDiscountLimit) return false;
-            if (type === 'amount' && this.effectiveSubtotal > 0 && (val / this.effectiveSubtotal * 100) > this.effectiveDiscountLimit) return false;
+            // Percentage discounts respect the role-based cap (cashier vs manager-override).
+            // Amount discounts allow ANY value up to the subtotal — cashier can give a Rs-based
+            // discount of any size as long as it's not larger than the order itself.
+            // Use 2-dp integer comparison to dodge JS float precision (0.1 + 0.2 = 0.30000…04).
+            const valCents = Math.round((Number(val) || 0) * 100);
+            if (type === 'percentage' && valCents > Math.round(this.effectiveDiscountLimit * 100)) return false;
+            if (type === 'amount' && this.effectiveSubtotal > 0 && valCents > Math.round(this.effectiveSubtotal * 100)) return false;
             return true;
         },
         async requestManagerOverride() {

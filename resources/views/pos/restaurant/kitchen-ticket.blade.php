@@ -200,12 +200,16 @@
 
         window.onload = function() {
             const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('auto_print') === '1' && !hasPrinted) {
+            // Skip self-trigger if loaded inside an iframe — the parent fires print directly
+            // via iframe.contentWindow.print(); a second self-trigger would queue a duplicate dialog
+            // (the "Esc twice to skip KOT" bug).
+            const isInIframe = window.parent && window.parent !== window;
+            if (urlParams.get('auto_print') === '1' && !hasPrinted && !isInIframe) {
                 hasPrinted = true;
                 setTimeout(function() { window.print(); }, 500);
             }
             const station = urlParams.get('station');
-            if (station) {
+            if (station && !isInIframe) {
                 setTimeout(() => printStation(station), 600);
             }
         };

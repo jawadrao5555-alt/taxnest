@@ -52,12 +52,12 @@
         .items-table { width: 100%; border-collapse: collapse; margin: 3px 0; }
         .items-header { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #000; border-bottom: 2px solid #000; border-top: 2px solid #000; }
         .items-header th { padding: 5px 2px 4px; }
-        .col-qty { text-align: center; width: 12%; }
-        .col-item { text-align: left; width: 46%; }
-        .col-rate { text-align: right; width: 20%; }
+        .col-item { text-align: left; width: 44%; }
+        .col-qty { text-align: center; width: 16%; white-space: nowrap; }
+        .col-rate { text-align: right; width: 18%; }
         .col-amt { text-align: right; width: 22%; }
         .items-table td { padding: 5px 2px; font-size: 11px; vertical-align: middle; color: #000; }
-        .items-table td.col-qty { font-weight: 800; color: #000; text-align: center; }
+        .items-table td.col-qty { font-weight: 800; color: #000; text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
         .items-table td.col-item { font-weight: 600; color: #000; word-wrap: break-word; }
         .items-table td.col-rate { color: #000; font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
         .items-table td.col-amt { font-weight: 800; color: #000; text-align: right; font-variant-numeric: tabular-nums; }
@@ -152,8 +152,8 @@
     <table class="items-table">
         <thead>
             <tr class="items-header">
-                <th class="col-qty">Qty</th>
                 <th class="col-item">Item</th>
+                <th class="col-qty">Qty</th>
                 <th class="col-rate">Rate</th>
                 <th class="col-amt">Amt</th>
             </tr>
@@ -161,8 +161,8 @@
         <tbody>
         @foreach($transaction->items as $item)
         <tr class="item-row">
-            <td class="col-qty">{{ number_format($item->quantity, $item->quantity == intval($item->quantity) ? 0 : 2) }}</td>
             <td class="col-item">{{ $item->item_name }}@if($item->is_tax_exempt)<span class="tax-exempt-tag">NT</span>@endif</td>
+            <td class="col-qty">{{ number_format($item->quantity, $item->quantity == intval($item->quantity) ? 0 : 2) }}</td>
             <td class="col-rate">{{ number_format($item->unit_price) }}</td>
             <td class="col-amt">{{ number_format($item->subtotal) }}</td>
         </tr>
@@ -243,7 +243,10 @@
         }
         window.onload = function() {
             const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('auto_print') === '1' && !hasPrinted) {
+            // Skip self-trigger if loaded inside an iframe — the parent frame fires print directly
+            // via iframe.contentWindow.print(), so a second self-trigger would queue a duplicate dialog.
+            const isInIframe = window.parent && window.parent !== window;
+            if (urlParams.get('auto_print') === '1' && !hasPrinted && !isInIframe) {
                 hasPrinted = true;
                 markPrinted();
                 setTimeout(function() { window.print(); }, 500);

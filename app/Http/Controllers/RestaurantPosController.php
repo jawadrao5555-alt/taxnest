@@ -135,6 +135,7 @@ class RestaurantPosController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.item_discount_type' => 'nullable|in:percentage,amount',
             'items.*.item_discount_value' => 'nullable|numeric|min:0|max:999999',
+            'items.*.is_tax_exempt' => 'nullable|boolean',
             'order_type' => 'required|in:dine_in,takeaway,delivery',
             'discount_type' => 'nullable|in:percentage,amount',
             'discount_value' => 'nullable|numeric|min:0|max:999999',
@@ -178,6 +179,13 @@ class RestaurantPosController extends Controller
                 } elseif ($itemDiscountValue > 0 && $itemDiscountType === 'amount') {
                     $itemDiscountAmount = min($lineTotal, round($itemDiscountValue, 2));
                 }
+                // Tax-exempt: cashier's cart toggle wins over the product master setting.
+                // If `items.*.is_tax_exempt` is sent in the payload, honor it; otherwise fall back
+                // to the product's master flag. This lets the cashier mark any line ad-hoc exempt
+                // (or remove a default exemption) without editing the product record.
+                $itemExempt = array_key_exists('is_tax_exempt', $item)
+                    ? (bool)$item['is_tax_exempt']
+                    : (bool)($product->is_tax_exempt ?? false);
                 $resolvedItems[] = [
                     'item_type' => 'product',
                     'item_id' => $product->id,
@@ -186,7 +194,7 @@ class RestaurantPosController extends Controller
                     'unit_price' => (float)$product->price,
                     'subtotal' => round($lineTotal - $itemDiscountAmount, 2),
                     'special_notes' => $item['special_notes'] ?? null,
-                    'is_tax_exempt' => (bool)($product->is_tax_exempt ?? false),
+                    'is_tax_exempt' => $itemExempt,
                     'item_discount_type' => $itemDiscountValue > 0 ? $itemDiscountType : null,
                     'item_discount_value' => $itemDiscountValue,
                     'item_discount_amount' => $itemDiscountAmount,
@@ -205,6 +213,9 @@ class RestaurantPosController extends Controller
                 } elseif ($itemDiscountValue > 0 && $itemDiscountType === 'amount') {
                     $itemDiscountAmount = min($lineTotal, round($itemDiscountValue, 2));
                 }
+                $itemExempt = array_key_exists('is_tax_exempt', $item)
+                    ? (bool)$item['is_tax_exempt']
+                    : (bool)($service->is_tax_exempt ?? false);
                 $resolvedItems[] = [
                     'item_type' => 'service',
                     'item_id' => $service->id,
@@ -213,7 +224,7 @@ class RestaurantPosController extends Controller
                     'unit_price' => (float)$service->price,
                     'subtotal' => round($lineTotal - $itemDiscountAmount, 2),
                     'special_notes' => $item['special_notes'] ?? null,
-                    'is_tax_exempt' => (bool)($service->is_tax_exempt ?? false),
+                    'is_tax_exempt' => $itemExempt,
                     'item_discount_type' => $itemDiscountValue > 0 ? $itemDiscountType : null,
                     'item_discount_value' => $itemDiscountValue,
                     'item_discount_amount' => $itemDiscountAmount,
@@ -230,13 +241,15 @@ class RestaurantPosController extends Controller
 
         $maxDiscountPct = 100;
         if ($user->pos_role === 'pos_cashier') {
-            $maxDiscountPct = (float)($company->cashier_discount_limit ?? 10);
+            $maxDiscountPct = (float)($company->cashier_discount_limit ?? 50);
         }
         if ($discountType === 'percentage' && $discountValue > 0) {
             $discountValue = min($discountValue, $maxDiscountPct);
             $discountAmount = round($subtotal * min(100, $discountValue) / 100, 2);
         } elseif ($discountType === 'amount' && $discountValue > 0) {
-            $maxAmountFromPct = round($subtotal * $maxDiscountPct / 100, 2);
+            // Amount discounts are NOT capped by the percentage limit anymore — cashier may apply
+            // any Rs amount up to the order subtotal (matches the cart UI's checkDiscountLimit logic).
+            $maxAmountFromPct = $subtotal;
             $discountAmount = min($subtotal, min($maxAmountFromPct, round($discountValue, 2)));
         }
         $discountAmount = max(0, $discountAmount);

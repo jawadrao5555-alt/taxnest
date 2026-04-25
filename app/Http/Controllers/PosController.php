@@ -344,7 +344,7 @@ class PosController extends Controller
         $posRole = $user->pos_role ?? 'pos_cashier';
         $discountLimit = $posRole === 'pos_admin'
             ? (float)($company->manager_discount_limit ?? 50)
-            : (float)($company->cashier_discount_limit ?? 10);
+            : (float)($company->cashier_discount_limit ?? 50);
         $hasManagerPin = !empty($company->manager_override_pin);
 
         return response(view('pos.universal', compact(

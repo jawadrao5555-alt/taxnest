@@ -48,9 +48,9 @@
         .items-table { width: 100%; margin: 4px 0; border-collapse: collapse; table-layout: fixed; }
         .items-table th { font-size: 10px; text-transform: uppercase; border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 4px 1px; text-align: left; font-weight: bold; color: #000; }
         .items-table td { font-size: 11px; padding: 4px 1px; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; color: #000; font-weight: 600; }
-        .items-table .col-qty { width: 12%; text-align: center; }
-        .items-table .col-item { width: 46%; text-align: left; }
-        .items-table .col-rate { width: 20%; text-align: right; }
+        .items-table .col-item { width: 44%; text-align: left; }
+        .items-table .col-qty { width: 16%; text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .items-table .col-rate { width: 18%; text-align: right; }
         .items-table .col-total { width: 22%; text-align: right; font-weight: bold; }
         .items-table tbody tr { border-bottom: 1px dashed #000; }
         .items-table tbody tr:last-child { border-bottom: none; }
@@ -154,8 +154,8 @@
     <table class="items-table">
         <thead>
             <tr>
-                <th class="col-qty">Qty</th>
                 <th class="col-item">Item</th>
+                <th class="col-qty">Qty</th>
                 <th class="col-rate">Rate</th>
                 <th class="col-total">Amt</th>
             </tr>
@@ -163,8 +163,8 @@
         <tbody>
             @foreach($transaction->items as $item)
             <tr>
-                <td class="col-qty">{{ $item->quantity }}</td>
                 <td class="col-item">{{ $item->item_name }}</td>
+                <td class="col-qty">{{ rtrim(rtrim(number_format($item->quantity, 2, '.', ''), '0'), '.') ?: '0' }}</td>
                 <td class="col-rate">{{ number_format($item->unit_price, 0) }}</td>
                 <td class="col-total">{{ number_format($item->subtotal, 0) }}</td>
             </tr>

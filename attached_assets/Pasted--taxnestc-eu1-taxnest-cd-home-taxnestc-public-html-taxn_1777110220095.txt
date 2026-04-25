@@ -1,0 +1,75 @@
+                        [taxnestc@eu1 taxnest]$ cd /home/taxnestc/public_html/taxnest
+git pull origin maint]$ [taxnestc@eu1 taxnest]$ cd /home/taxnestc/public_html/taxnest
+php artisan view:clear
+php artisan route:clear
+php artisan config:cache
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEADest
+Already up to date.  main       -> FETCH_HEAD
+Already up to date.
+   INFO  Compiled views cleared successfully.
+   INFO  Compiled views cleared successfully.
+
+   INFO  Route cache cleared successfully.
+   INFO  Route cache cleared successfully.
+
+   INFO  Configuration cached successfully.
+   INFO  Configuration cached successfully.
+[taxnestc@eu1 taxnest]$
+bash: [taxnestc@eu1: command not found
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+
+   INFO  Compiled views cleared successfully.
+
+
+   INFO  Route cache cleared successfully.
+
+
+   INFO  Configuration cached successfully.
+
+bash: From: command not found
+bash: app: command not found
+bash: Already: command not found
+bash: INFO: command not found
+bash: INFO: command not found
+bash: INFO: command not found
+bash: [taxnestc@eu1: command not found
+[taxnestc@eu1 taxnest]$ cd /home/taxnestc/public_html/taxnest
+git pull origin main
+php artisan view:clear
+php artisan config:cache
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+
+   INFO  Compiled views cleared successfully.
+
+
+   INFO  Configuration cached successfully.
+
+[taxnestc@eu1 taxnest]$ cd /home/taxnestc/public_html/taxnest
+git pull origin main
+php artisan view:clear
+php artisan route:clear
+php artisan config:cache
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+
+   INFO  Compiled views cleared successfully.
+
+
+   INFO  Route cache cleared successfully.
+
+
+   INFO  Configuration cgrep -c "CONFIRM PAYMENT" /home/taxnestc/public_html/taxnest/resources/views/fbr-pos/create.blade.php
+grep -c "Provisional Bills" /home/taxnestc/public_html/taxnest/resources/views/pos/restaurant/pos.blade.php
+git -C /home/taxnestt]$ grep -c "CONFIRM PAYMENT" /home/taxnestc/public_html/taxnest/resources/views/fbr-pos/create.blade.php
+1rep -c "Provisional Bills" /home/taxnestc/public_html/taxnest/resources/views/pos/restaurant/pos.blade.php
+1it -C /home/taxnest
+fatal: cannot change to '/home/taxnest': No such file or directory
+[taxnestc@eu1 taxnest]$ grep -c "CONFIRM PAYMENT" /home/taxnestc/public_html/taxnest/resources/views/fbr-pos/create.blade.php
+grep -c "Provisional Bills" /home/taxnestc/public_html/taxnest/resources/views/pos/restaurant/pos.blade.php
+git -C /home/taxnest

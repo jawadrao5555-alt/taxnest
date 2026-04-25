@@ -514,7 +514,7 @@ kbd {
                                                 :class="hi === pi ? 'bg-blue-100 dark:bg-blue-900/40 ring-2 ring-blue-400' : 'hover:bg-blue-50 dark:hover:bg-blue-900/20'"
                                                 class="w-full text-left px-3 py-2.5 rounded-lg transition flex items-center justify-between group">
                                                 <div>
-                                                    <p class="text-sm font-medium text-gray-900 dark:text-gray-100" x-text="p.name"></p>
+                                                    <p class="text-sm font-medium text-gray-900 dark:text-gray-100" x-text="(p.name && p.name.trim()) ? p.name : (p.barcode || p.sku || ('Product #' + p.id))"></p>
                                                     <p class="text-xs text-gray-500 dark:text-gray-400">
                                                         <span x-text="'PKR ' + Number(p.default_price).toFixed(2)"></span>
                                                         <span class="mx-1">|</span>
@@ -558,7 +558,7 @@ kbd {
                             <div class="flex items-center justify-between mb-3">
                                 <div class="flex items-center gap-2.5">
                                     <span class="item-num-badge inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-black tabular-nums" x-text="index + 1"></span>
-                                    <span class="text-sm font-semibold text-gray-700 dark:text-gray-200" x-text="item.item_name || 'New Item'"></span>
+                                    <span class="text-sm font-semibold text-gray-700 dark:text-gray-200" x-text="item.item_name || (item.product_id ? ('Product #' + item.product_id) : 'New Item')"></span>
                                     <span x-show="item.is_tax_exempt"
                                         class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">EXEMPT</span>
                                     <span x-show="!item.is_tax_exempt && item.tax_rate != 18"
@@ -630,6 +630,23 @@ kbd {
                                             placeholder="1">
                                         <button type="button" tabindex="-1" @click="incQty(item)"
                                             class="px-3 sm:px-3.5 border-l border-blue-200 dark:border-blue-800 bg-gradient-to-b from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-900/50 text-blue-700 dark:text-blue-300 text-base font-black hover:from-blue-100 hover:to-blue-200 dark:hover:from-blue-900/50 dark:hover:to-blue-900/70 active:scale-95 transition-all select-none">+</button>
+                                    </div>
+                                    {{-- ⚡ INLINE REVERSE CALC — type Rs amount, qty auto-calculates (no mode toggle needed) --}}
+                                    <div x-show="(item.mode || 'qty') === 'qty' && parseFloat(item.unit_price) > 0"
+                                         class="mt-1.5 flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 rounded-md px-1.5 py-1 ring-1 ring-emerald-200 dark:ring-emerald-800">
+                                        <span class="text-[10px] font-black text-emerald-700 dark:text-emerald-300 leading-none whitespace-nowrap">Or Rs</span>
+                                        <input type="text" inputmode="decimal" autocomplete="off" maxlength="10"
+                                            x-model="item._amountInput"
+                                            @focus="$event.target.select(); item._amountInput = item.line_value > 0 ? String(item.line_value) : ''"
+                                            @input="item._amountInput = sanitizeQty($event.target.value); reverseCalcFromAmount(item, item._amountInput)"
+                                            @blur="item._amountInput = ''"
+                                            @keydown.enter.prevent="item._amountInput = ''; if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
+                                            class="flex-1 min-w-0 border-0 bg-white dark:bg-gray-800 dark:text-white text-xs font-bold tabular-nums shadow-inner rounded px-1 py-0.5 focus:ring-1 focus:ring-emerald-500 focus:outline-none text-right"
+                                            :placeholder="'e.g. ' + (parseFloat(item.unit_price) * 2).toFixed(0)"
+                                            title="Type Rs amount → quantity auto-calculates from unit price">
+                                        <span x-show="parseFloat(item.quantity) > 0 && item.line_value > 0"
+                                              class="text-[9px] font-bold text-emerald-700 dark:text-emerald-400 leading-none whitespace-nowrap"
+                                              x-text="'≈ ' + item.quantity + ' ' + item.uom"></span>
                                     </div>
                                     {{-- VALUE MODE --}}
                                     <div x-show="(item.mode || 'qty') === 'value'" class="flex items-stretch">
@@ -894,7 +911,7 @@ kbd {
 function fbrPosInvoice() {
     return {
         uomOptions: ['U','PCS','KG','GM','LTR','ML','MTR','SQM','FT','IN','YDS','PKT','DOZ','BOX','CTN','BAG','BTL','TIN','CAN','BUN','ROL','SET'],
-        items: [{ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, mode: 'qty', _valueInput: '', line_value: 0 }],
+        items: [{ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, mode: 'qty', _valueInput: '', _amountInput: '', line_value: 0 }],
         activeItemIndex: 0,
         productSearchOpen: false,
         productSearchQuery: '',
@@ -1217,7 +1234,7 @@ function fbrPosInvoice() {
             this.loadHeld();
         },
         resetCart() {
-            this.items = [{ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, mode: 'qty', _valueInput: '', line_value: 0 }];
+            this.items = [{ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, mode: 'qty', _valueInput: '', _amountInput: '', line_value: 0 }];
             this.discountType = ''; this.discountValue = 0;
             this.customerName = ''; this.customerPhone = ''; this.customerId = ''; this.customerPoints = null;
             this.promoCode = ''; this.promotionId = ''; this.promoDiscount = 0; this.promoMessage = '';
@@ -1354,8 +1371,30 @@ function fbrPosInvoice() {
                 item._valueInput = item.line_value > 0 ? String(item.line_value) : '';
             }
         },
+        // ⚡ Inline reverse-calc: type Rs amount → quantity auto-derives from unit price
+        // Works in QTY mode (no need to switch to VAL mode). For KG/LTR allows 3-decimal precision.
+        reverseCalcFromAmount(item, amountStr) {
+            const raw = (amountStr || '').toString().trim();
+            if (raw === '') return; // empty = user is backspacing; don't clobber qty
+            const parsed = parseFloat(raw);
+            if (!isFinite(parsed) || parsed <= 0) return;
+            const price = parseFloat(item.unit_price) || 0;
+            if (price <= 0) return;
+            const factor = this.getBaseFactor(item.uom); // KG/LTR=1000 (gm precision), else=1
+            let qty;
+            if (factor === 1) {
+                // Whole-unit items (PCS, BOX, etc.) — round to nearest whole, min 1
+                qty = Math.max(1, Math.round(parsed / price));
+            } else {
+                // Weight/volume — 3-decimal precision (≈1g for KG, ≈1ml for LTR)
+                qty = Math.round((parsed / price) * 1000) / 1000;
+                if (qty < 0.001) qty = 0.001;
+            }
+            item.quantity = String(qty);
+            item.line_value = Math.round(qty * price * 100) / 100;
+        },
         addItem() {
-            this.items.push({ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, mode: 'qty', _valueInput: '', line_value: 0 });
+            this.items.push({ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, mode: 'qty', _valueInput: '', _amountInput: '', line_value: 0 });
             const newIdx = this.items.length - 1;
             this.activeItemIndex = newIdx;
             this.beep(600, 0.05);
@@ -1387,30 +1426,43 @@ function fbrPosInvoice() {
         addProductItem(p) {
             let isExempt = p.tax_type === 'exempt';
             let taxRate = isExempt ? 0 : (parseFloat(p.default_tax_rate) || 18);
+            const price = parseFloat(p.default_price) || 0;
+            // Resilient name fallback (in case backend returned a product with empty/null name)
+            const displayName = (p.name && String(p.name).trim() !== '')
+                ? String(p.name).trim()
+                : (p.barcode || p.sku || ('Product #' + p.id));
             this.beep(880, 0.06);
-            this.toast('+ ' + p.name, 'success');
+            this.toast('+ ' + displayName, 'success');
             // If same product already in cart, just increment qty
             const existing = this.items.find(it => it.product_id && p.id && it.product_id === p.id);
             if (existing) {
                 existing.quantity = (parseFloat(existing.quantity) || 0) + 1;
+                this.syncValueFromQty(existing);
                 return;
             }
-            // If first row is empty, fill it instead of adding new
+            const payload = {
+                item_name: displayName,
+                hs_code: p.hs_code || '',
+                uom: p.uom || 'U',
+                quantity: 1,
+                unit_price: price,
+                tax_rate: taxRate,
+                is_tax_exempt: isExempt,
+                item_discount: 0,
+                product_id: p.id,
+                mode: 'qty',
+                _valueInput: '',
+                _amountInput: '',
+                line_value: price
+            };
+            // If first row is empty, mutate it in place (Alpine-reactivity safe)
             if (this.items.length === 1 && !this.items[0].item_name && !this.items[0].product_id) {
-                this.items[0] = {
-                    item_name: p.name, hs_code: p.hs_code || '', uom: p.uom || 'U',
-                    quantity: 1, unit_price: parseFloat(p.default_price) || 0,
-                    tax_rate: taxRate, is_tax_exempt: isExempt, item_discount: 0, product_id: p.id,
-                    mode: 'qty', _valueInput: '', line_value: parseFloat(p.default_price) || 0
-                };
+                Object.assign(this.items[0], payload);
+                this.activeItemIndex = 0;
                 return;
             }
-            this.items.push({
-                item_name: p.name, hs_code: p.hs_code || '', uom: p.uom || 'U',
-                quantity: 1, unit_price: parseFloat(p.default_price) || 0,
-                tax_rate: taxRate, is_tax_exempt: isExempt, item_discount: 0, product_id: p.id,
-                mode: 'qty', _valueInput: '', line_value: parseFloat(p.default_price) || 0
-            });
+            this.items.push(payload);
+            this.activeItemIndex = this.items.length - 1;
         },
         async scanBarcode() {
             const code = (this.barcodeBuffer || '').trim();

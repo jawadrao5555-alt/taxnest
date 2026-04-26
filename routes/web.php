@@ -551,6 +551,15 @@ Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admi
 Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('saas.admin.dashboard');
 
+    // 🎯 Analytics + Reporting + Smart Pricing (Phases 1-4)
+    Route::get('/analytics/dashboard', [\App\Http\Controllers\Admin\AnalyticsController::class, 'dashboard'])->name('admin.analytics.dashboard');
+    Route::get('/analytics/advanced', [\App\Http\Controllers\Admin\AnalyticsController::class, 'advanced'])->name('admin.analytics.advanced');
+    Route::get('/reports/daily', [\App\Http\Controllers\Admin\ReportsController::class, 'dailyReport'])->name('admin.reports.daily');
+    Route::get('/reports/products', [\App\Http\Controllers\Admin\ReportsController::class, 'productReport'])->name('admin.reports.products');
+    Route::get('/reports/fbr', [\App\Http\Controllers\Admin\ReportsController::class, 'fbrComplianceReport'])->name('admin.reports.fbr');
+    Route::get('/pricing/suggestions', [\App\Http\Controllers\Admin\PricingController::class, 'index'])->name('admin.pricing.suggestions');
+    Route::post('/pricing/apply/{product}', [\App\Http\Controllers\Admin\PricingController::class, 'applySuggestion'])->name('admin.pricing.apply');
+
     Route::get('/old-dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
     Route::get('/di-companies', [AdminController::class, 'companies']);
     Route::get('/di-companies/create', [AdminController::class, 'createCompany']);

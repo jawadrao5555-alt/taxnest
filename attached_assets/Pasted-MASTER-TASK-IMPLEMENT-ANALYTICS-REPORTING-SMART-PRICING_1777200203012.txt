@@ -1,0 +1,154 @@
+MASTER TASK: IMPLEMENT ANALYTICS + REPORTING + SMART PRICING (ALL PHASES)
+
+EXECUTION MODE:
+- Sequential (Phase 1 → 2 → 3 → 4)
+- Each phase MUST pass tests before next starts
+- If any phase fails → STOP and report
+
+═══════════════════════════════
+PHASE 1 — ANALYTICS CORE
+═══════════════════════════════
+
+BUILD:
+
+1. Dashboard KPIs (Controller: AdminDashboardController or new AnalyticsController)
+   - today_sales
+   - today_profit (subtotal - cost, if cost exists; else subtotal proxy)
+   - invoice_count
+   - avg_invoice_value
+   - top_product_today
+
+2. Queries (use fbr_pos_transactions + items)
+   - SUM(total_amount)
+   - COUNT(*)
+   - AVG(total_amount)
+   - GROUP BY product_id
+
+3. Routes:
+   /admin/analytics/dashboard
+
+4. View:
+   resources/views/admin/analytics/dashboard.blade.php
+
+TESTS:
+- Seed 10 transactions → verify KPI numbers match DB
+- No N+1 queries (use eager loading or aggregates)
+- Response time < 300ms (dev)
+
+═══════════════════════════════
+PHASE 2 — REPORTING SYSTEM
+═══════════════════════════════
+
+BUILD:
+
+1. ReportsController:
+   - dailyReport()
+   - productReport()
+   - fbrComplianceReport()
+
+2. Filters:
+   - date_from, date_to
+   - company_id (already scoped)
+   - optional branch_id
+
+3. Exports:
+   - PDF (barryvdh/laravel-dompdf)
+   - Excel (maatwebsite/excel)
+
+4. Routes:
+   /admin/reports/daily
+   /admin/reports/products
+   /admin/reports/fbr
+
+TESTS:
+- Generate daily report for sample date → totals match DB
+- Excel export opens correctly
+- PDF renders without missing data
+
+═══════════════════════════════
+PHASE 3 — SMART PRICING (BASIC + DYNAMIC)
+═══════════════════════════════
+
+DB ADDITIONS (migration):
+
+products table:
+- cost_price DECIMAL(10,2) NULL
+- suggested_price DECIMAL(10,2) NULL
+- pricing_strategy VARCHAR(20) DEFAULT 'manual'
+
+BUILD:
+
+1. PricingService:
+   - calculateMarginPrice(cost, margin%)
+   - suggestPrice(product_id):
+        if fast-selling → +5%
+        if slow-selling → -5%
+
+2. Logic:
+   - fast-selling = sold > avg(product sales last 7 days)
+   - slow-selling = sold < avg
+
+3. Admin UI:
+   /admin/products → show suggested price badge
+
+TESTS:
+- Seed products with sales data
+- Verify suggestion increases/decreases correctly
+
+═══════════════════════════════
+PHASE 4 — ADVANCED ANALYTICS
+═══════════════════════════════
+
+BUILD:
+
+1. Sales Heatmap:
+   - group by HOUR(created_at)
+   - output: [hour => total_sales]
+
+2. Top/Worst products:
+   - order by SUM(qty)
+
+3. Simple Insights:
+   - if today < yesterday → "Sales dropped"
+   - if product spikes → "Trending product"
+
+ROUTE:
+   /admin/analytics/advanced
+
+TESTS:
+- Heatmap returns 24 keys (0–23)
+- Insight strings generated correctly
+
+═══════════════════════════════
+GLOBAL RULES
+═══════════════════════════════
+
+- DO NOT touch:
+  ❌ FbrService
+  ❌ PRA POS
+  ❌ Digital Invoice
+
+- Respect:
+  ✔ CompanyScope (tenant isolation)
+  ✔ plan.limit middleware
+
+- Use:
+  ✔ optimized queries (no heavy loops)
+  ✔ caching where needed (optional)
+
+═══════════════════════════════
+FINAL OUTPUT REQUIRED
+═══════════════════════════════
+
+Return:
+
+1. Files created/modified
+2. DB migrations
+3. Routes added
+4. Sample API responses
+5. Test results (PASS/FAIL per phase)
+6. Final line:
+
+"ALL PHASES IMPLEMENTED & VERIFIED"
+
+STOP

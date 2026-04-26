@@ -608,6 +608,9 @@ kbd {
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
                                 <input type="hidden" :name="'items['+index+'][product_id]'" :value="item.product_id || ''">
+                                {{-- 🎯 VALUE MODE — hidden field carries Rs amount to backend (only when in VAL mode) --}}
+                                <input type="hidden" :name="'items['+index+'][value_input]'"
+                                       :value="(item.mode || 'qty') === 'value' && parseFloat(item._valueInput) > 0 ? item._valueInput : ''">
                                 <div class="sm:col-span-3">
                                     <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Item Name *</label>
                                     <input type="text" :name="'items['+index+'][item_name]'" x-model="item.item_name" required
@@ -625,6 +628,7 @@ kbd {
                                 <div class="sm:col-span-2">
                                     <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">UoM</label>
                                     <select :name="'items['+index+'][uom]'" x-model="item.uom"
+                                        @change="if ((item.mode || 'qty') === 'value' && !canUseValueMode(item)) { setMode(item, 'qty'); toast('Switched to QTY — UoM not value-compatible', 'info'); }"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 font-semibold">
                                         <template x-for="u in uomOptions" :key="u">
                                             <option :value="u" x-text="u"></option>
@@ -643,7 +647,7 @@ kbd {
                                                 @click="setMode(item, 'value')"
                                                 :disabled="!canUseValueMode(item)"
                                                 :class="(item.mode || 'qty') === 'value' ? 'bg-emerald-600 text-white' : 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'"
-                                                :title="canUseValueMode(item) ? 'Value (Rs) mode (V)' : 'Set unit price first'"
+                                                :title="canUseValueMode(item) ? 'Value (Rs) mode — qty auto-derives from value' : (parseFloat(item.unit_price) <= 0 ? 'Set unit price first' : 'Value mode only for KG/GM/LTR/ML/MTR/SQM')"
                                                 class="px-1.5 py-0.5 transition disabled:opacity-40 disabled:cursor-not-allowed">VAL</button>
                                         </div>
                                     </div>
@@ -1477,7 +1481,10 @@ function fbrPosInvoice() {
             return 1;
         },
         canUseValueMode(item) {
-            return parseFloat(item.unit_price) > 0;
+            // 🎯 VALUE MODE — only measure-based UoMs (matches FbrPosController::VALUE_MODE_UOMS)
+            const u = (item.uom || '').toString().toUpperCase();
+            const allowed = ['KG', 'GM', 'LTR', 'ML', 'MTR', 'SQM'];
+            return allowed.includes(u) && parseFloat(item.unit_price) > 0;
         },
         setMode(item, mode) {
             if (mode !== 'qty' && mode !== 'value') return;
@@ -1505,15 +1512,9 @@ function fbrPosInvoice() {
             if (!isFinite(parsed) || parsed < 0) return;
             const price = parseFloat(item.unit_price) || 0;
             if (price <= 0) return;
-            const factor = this.getBaseFactor(item.uom);
-            const base = Math.round((parsed / price) * factor);
-            const safeBase = Math.max(0, base);
-            let qty;
-            if (factor === 1) {
-                qty = safeBase;
-            } else {
-                qty = Math.round((safeBase / factor) * 1000) / 1000;
-            }
+            // 🎯 4-decimal precision (matches backend round(qty, 4) and FBR PRAL spec).
+            // VALUE MODE is gated to KG/GM/LTR/ML/MTR/SQM, so decimal qty is always valid here.
+            const qty = Math.round((parsed / price) * 10000) / 10000;
             item.quantity = qty;
             item.line_value = Math.round(qty * price * 100) / 100;
         },

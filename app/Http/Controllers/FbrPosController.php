@@ -18,6 +18,10 @@ use Illuminate\Support\Str;
 
 class FbrPosController extends Controller
 {
+    // 🎯 VALUE MODE — UoM gating: only measure-based UoMs allow value(Rs) → qty derivation
+    // Per FBR PRAL spec: weight/volume/length UoMs accept decimal qty; piece-based UoMs do not.
+    const VALUE_MODE_UOMS = ['KG', 'GM', 'LTR', 'ML', 'MTR', 'SQM'];
+
     public function updateDashboardStyle(Request $request)
     {
         if (Auth::guard('fbrpos')->user()->role !== 'company_admin') {
@@ -139,6 +143,7 @@ class FbrPosController extends Controller
             'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
             'items.*.is_tax_exempt' => 'nullable|boolean',
             'items.*.item_discount' => 'nullable|numeric|min:0',
+            'items.*.value_input' => 'nullable|numeric|min:0.01',
             'customer_name' => 'nullable|string|max:255',
             'customer_phone' => 'nullable|string|max:20',
             'customer_ntn' => 'nullable|string|max:30',
@@ -176,9 +181,42 @@ class FbrPosController extends Controller
                 $defaultTaxRate = 18;
 
                 foreach ($request->items as $item) {
-                    $qty = round((float) $item['quantity'], 3);
-                    if ($qty <= 0) { $qty = 1; }
                     $price = (float) $item['unit_price'];
+                    $uom = strtoupper($item['uom'] ?? 'U');
+                    $valueInput = isset($item['value_input']) && $item['value_input'] !== ''
+                        ? (float) $item['value_input'] : 0;
+
+                    // 🎯 VALUE MODE — derive qty from Rs amount (authoritative) for measure UoMs only
+                    if ($valueInput > 0) {
+                        if (!in_array($uom, self::VALUE_MODE_UOMS, true)) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'items' => "Value (Rs) entry only allowed for KG/GM/LTR/ML/MTR/SQM. Got '{$uom}' for item '{$item['item_name']}'.",
+                            ]);
+                        }
+                        if ($price <= 0) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'items' => "Cannot derive quantity from value: unit price must be > 0 for '{$item['item_name']}'.",
+                            ]);
+                        }
+                        $qty = round($valueInput / $price, 4);
+                    } else {
+                        $qty = round((float) $item['quantity'], 4);
+                    }
+
+                    // 🚫 Reject qty <= 0 outright (no silent fallback to 1)
+                    if ($qty <= 0) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'items' => "Item '{$item['item_name']}' has invalid quantity (must be > 0).",
+                        ]);
+                    }
+
+                    // 🚫 Decimal qty NOT allowed for unit-based UoMs (PCS/U/BOX/PKT/...)
+                    if (!in_array($uom, self::VALUE_MODE_UOMS, true) && abs($qty - round($qty)) > 0.0001) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'items' => "Decimal quantity not allowed for unit-based UoM '{$uom}' on item '{$item['item_name']}'. Use whole numbers only (or switch UoM to KG/LTR for value-mode).",
+                        ]);
+                    }
+
                     $isExempt = !empty($item['is_tax_exempt']);
                     $taxRate = $isExempt ? 0 : (float) ($item['tax_rate'] ?? $defaultTaxRate);
                     $itemDiscount = round((float) ($item['item_discount'] ?? 0), 2);
@@ -194,7 +232,7 @@ class FbrPosController extends Controller
                     $itemsData[] = [
                         'item_name' => $item['item_name'],
                         'hs_code' => $item['hs_code'] ?? null,
-                        'uom' => $item['uom'] ?? 'U',
+                        'uom' => $uom,
                         'product_id' => $item['product_id'] ?? null,
                         'quantity' => $qty,
                         'unit_price' => $price,
@@ -634,6 +672,7 @@ class FbrPosController extends Controller
             'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
             'items.*.is_tax_exempt' => 'nullable|boolean',
             'items.*.item_discount' => 'nullable|numeric|min:0',
+            'items.*.value_input' => 'nullable|numeric|min:0.01',
             'edit_reason' => 'nullable|string|max:500',
         ]);
 
@@ -713,9 +752,42 @@ class FbrPosController extends Controller
         DB::transaction(function () use ($transaction, $submittedById) {
             foreach ($transaction->items as $item) {
                 $row = $submittedById[$item->id]; // guaranteed present by integrity check above
-                $qty = round((float) $row['quantity'], 3);
-                if ($qty <= 0) $qty = 1;
                 $price = (float) $row['unit_price'];
+                $uom = strtoupper($row['uom'] ?? 'U');
+                $valueInput = isset($row['value_input']) && $row['value_input'] !== ''
+                    ? (float) $row['value_input'] : 0;
+
+                // 🎯 VALUE MODE — derive qty from Rs amount (authoritative) for measure UoMs only
+                if ($valueInput > 0) {
+                    if (!in_array($uom, self::VALUE_MODE_UOMS, true)) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'items' => "Value (Rs) entry only allowed for KG/GM/LTR/ML/MTR/SQM. Got '{$uom}' for item ID #{$item->id}.",
+                        ]);
+                    }
+                    if ($price <= 0) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'items' => "Cannot derive quantity from value: unit price must be > 0 for item ID #{$item->id}.",
+                        ]);
+                    }
+                    $qty = round($valueInput / $price, 4);
+                } else {
+                    $qty = round((float) $row['quantity'], 4);
+                }
+
+                // 🚫 Reject qty <= 0 (no silent fallback to 1)
+                if ($qty <= 0) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'items' => "Invalid quantity (must be > 0) for item ID #{$item->id}.",
+                    ]);
+                }
+
+                // 🚫 Decimal qty NOT allowed for unit-based UoMs
+                if (!in_array($uom, self::VALUE_MODE_UOMS, true) && abs($qty - round($qty)) > 0.0001) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'items' => "Decimal quantity not allowed for unit-based UoM '{$uom}' on item ID #{$item->id}. Use whole numbers only.",
+                    ]);
+                }
+
                 $isExempt = !empty($row['is_tax_exempt']);
                 $taxRate = $isExempt ? 0 : (float) ($row['tax_rate'] ?? 18);
                 $itemDiscount = round((float) ($row['item_discount'] ?? 0), 2);
@@ -728,7 +800,7 @@ class FbrPosController extends Controller
                 $item->update([
                     'item_name' => $row['item_name'],
                     'hs_code' => $row['hs_code'] ?? null,
-                    'uom' => $row['uom'] ?? 'U',
+                    'uom' => $uom,
                     'quantity' => $qty,
                     'unit_price' => $price,
                     'tax_rate' => $taxRate,

@@ -1,0 +1,392 @@
+[taxnestc@eu1 ~]$ git pull origin main
+fatal: not a git recho "--- HOME contents ---"; ls -la ~ | head; echo "--- public_html contents ---"; ls -la ~/public_html 2>/dev/null | head -30; echo "--- artisan location ---"; find ~ -maxdepth 4 -name "artisan" -type f 2>/dev/null; echo "--- .git location ---"; find ~ -maxdepth 4 -name ".git"-type d 2>/dev/nullation ---"; find ~ -maxdepth 4 -name "artisan" -type f 2>/dev/null; echo "--- .git location ---"; find ~ -maxdepth 4 -name ".git"--- HOME contents ---
+ls: cannot open directory '/home/taxnestc': Permission denied
+--- public_html contents ---
+total 12
+drwxr-xr-x  2 taxnestc nobody   4096 Apr 27 07:36 .
+drwx--x--x 17 root     root     4096 Apr 27 09:15 ..
+-rw-------  1 taxnestc taxnestc    4 Apr 27 09:15 .ftpquota
+--- artisan location ---
+--- .git location ---
+[taxnestc@eu1 ~]$ cd ~/public_html
+[taxnestc@eu1 public_html]$ mv .ftpquota /tmp/.ftpquota.bak 2>/dev/null                                     git clone https://TOKEN@github.com/jawadrao5555-alt/taxnest.git .l]$ git clone https://TOKEN@github.com/jawadrao5555-alt/taxnest.git .
+Cloning into '.'...
+remote: Enumerating objects: 10858, done.
+remote: Counting objects: 100% (1744/1744), done.
+remote: Compressing objects: 100% (519/519), done.
+remote: Total 10858 (delta 1442), reused 1476 (delta 1219), pack-reused 9114 (from 2)
+Receiving objects: 100% (10858/10858), 312.65 MiB | 10.31 MiB/s, done.
+Resolving deltas: 100% (8645/8645), done.Updating files: 100% (1452/1452), done.
+[taxnestc@eu1 public_html]$ ls -la | head -20.bak ./.ftpquota 2>/dev/null
+total 2304an ] && echo "✅ Laravel project mil gaya" || echo "❌ Clone fail hua"
+drwxr-xr-x 21 taxnestc nobody     4096 Apr 27 12:29 .| echo "❌ Clone fail hua"
+drwx--x--x 17 root     root       4096 Apr 27 09:15 ..
+drwxr-xr-x  2 taxnestc taxnestc   4096 Apr 27 12:28 .agents
+drwxr-xr-x 10 taxnestc taxnestc   4096 Apr 27 12:28 app
+-rwxr-xr-x  1 taxnestc taxnestc    425 Apr 27 12:28 artisan
+drwxr-xr-x  3 taxnestc taxnestc  49152 Apr 27 12:29 attached_assets
+-rw-r--r--  1 taxnestc taxnestc 714633 Apr 27 12:29 backup.sql
+drwxr-xr-x  3 taxnestc taxnestc   4096 Apr 27 12:29 bootstrap
+-rw-r--r--  1 taxnestc taxnestc   1343 Apr 27 12:29 check-db.sh
+-rw-r--r--  1 taxnestc taxnestc   3100 Apr 27 12:29 composer.json
+-rw-r--r--  1 taxnestc taxnestc 370473 Apr 27 12:29 composer.lock
+drwxr-xr-x  2 taxnestc taxnestc   4096 Apr 27 12:29 config
+-rw-r--r--  1 taxnestc taxnestc    922 Apr 27 12:29 cookies.txt
+-rw-r--r--  1 taxnestc taxnestc   3242 Apr 27 12:28 CPANEL_SETUP.md
+-rw-r--r--  1 taxnestc taxnestc    563 Apr 27 12:28 .cpanel.yml
+drwxr-xr-x  7 taxnestc taxnestc   4096 Apr 27 12:29 database
+drwxr-xr-x  2 taxnestc taxnestc   4096 Apr 27 12:29 deployment
+-rw-r--r--  1 taxnestc taxnestc    252 Apr 27 12:28 .editorconfig
+-rw-r--r--  1 taxnestc taxnestc    814 Apr 27 12:28 .env.cpanel
+✅ Laravel project mil gaya
+[taxnestc@eu1 public_html]$ # Composer
+composer install --no-dev --# Composerutoloader
+composer install --no-dev --optimize-autoloader
+# .env file banao (production ki credentials chahiyein hongi)
+# .env file banao (production ki credentials chahiyein hongi)
+cp .env.example .envrate
+php artisan key:generate
+# Phir .env edit karo (nano .env) — yeh values daalo:
+# Phir .env edit karo (nano .env) — yeh values daalo:
+#   APP_ENV=production
+#   APP_DEBUG=false/taxnest.com.pk
+#   APP_URL=https://taxnest.com.pk
+#   DB_HOST=localhostel-mysql-db-name>
+#   DB_DATABASE=<cpanel-mysql-db-name>
+#   DB_USERNAME=<cpanel-mysql-user>ord>
+#   DB_PASSWORD=<cpanel-mysql-password>
+# Storage symlink + permissions
+# Storage symlink + permissions
+php artisan storage:linktstrap/cache
+chmod -R 775 storage bootstrap/cache
+# Saari migrations chalao (fresh DB pe)
+# Saari migrations chalao (fresh DB pe)
+php artisan migrate --force
+# Caches
+# Cachessan config:cache && php artisan route:cache && php artisan view:cache
+php artisan config:cache && php artisan route:cache && php artisan view:cache
+bash: composer: command not found
+[taxnestc@eu1 public_html]$ composer install --no-dev --optimize-autoloader
+bash: composer: command not found
+[taxnestc@eu1 public_html]$ cd ~/public_html
+[taxnestc@eu1 public_html]$ composer install --no-dev --optimize-autoloader
+bash: composer: command not found
+[taxnestc@eu1 public_html]$ which php
+php -v
+/usr/local/bin/php
+PHP 8.2.29 (cli) (built: Nov 12 2025 00:00:00) (NTS)
+Copyright (c) The PHP Group
+Zend Engine v4.2.29, Copyright (c) Zend Technologies
+[taxnestc@eu1 public_html]$ cd ~/public_html
+curl -sS https://getcomposer.org/installer | php
+ls -la composer.phar
+All settings correct for using Composer
+Unable to create Composer home directory "/home/taxnestc/.composer": mkdir(): Permission denied
+ls: cannot access 'composer.phar': No such file or directory
+[taxnestc@eu1 public_html]$ mkdir -p ~/bin
+mv composer.phar ~/bin/composer
+chmod +x ~/bin/composer
+mkdir: cannot create directory ‘/home/taxnestc/bin’: Permission denied
+mv: cannot stat 'composer.phar': No such file or directory
+chmod: cannot access '/home/taxnestc/bin/composer': No such file or directory
+[taxnestc@eu1 public_html]$ echo 'export PATH=$HOME/bin:$PATH' >> ~/.bashrc
+source ~/.bashrc
+[taxnestc@eu1 public_html]$ composer --version
+bash: composer: command not found
+[taxnestc@eu1 public_html]$ cd ~/public_html
+
+# 1. COMPOSER_HOME ko public_html ke andar set karo (jahan write permission hai)
+export COMPOSER_HOME=$HOME/public_html/.composer-home
+mkdir -p $COMPOSER_HOME
+
+# 2. Composer installer dobara chalao
+curl -sS https://getcomposer.org/installer | php
+
+# 3. Verify composer.phar ban gaya
+ls -la composer.phar
+
+# 4. Composer ka version check (php se directly chalao)
+php composer.phar --version
+
+# 5. Permanent banao future sessions ke liye
+cat >> ~/.bashrc << 'EOF'
+export COMPOSER_HOME=$HOME/public_html/.composer-home
+alias composer='php $HOME/public_html/composer.phar'
+EOF
+source ~/.bashrc
+
+# 6. Verify alias kaam kar raha hai
+composer install --no-dev --optimize-autoloader --no-interaction
+All settings correct for using Composer
+Downloading...
+
+Composer (version 2.9.7) successfully installed to: /home/taxnestc/public_html/composer.phar
+Use it: php composer.phar
+
+-rwxr-xr-x 1 taxnestc taxnestc 3377213 Apr 27 12:35 composer.phar
+Composer version 2.9.7 2026-04-14 13:31:52
+PHP version 8.2.29 (/opt/alt/php82/usr/bin/php)
+Run the "diagnose" command to get more detailed diagnostics output.
+Composer version 2.9.7 2026-04-14 13:31:52
+PHP version 8.2.29 (/opt/alt/php82/usr/bin/php)
+Run the "diagnose" command to get more detailed diagnostics output.
+Installing dependencies from lock file
+Verifying lock file contents can be installed on current platform.
+Your lock file does not contain a compatible set of packages. Please run composer update.
+
+  Problem 1
+    - maennchen/zipstream-php is locked to version 3.2.1 and an update of this package was not requested.
+    - maennchen/zipstream-php 3.2.1 requires php-64bit ^8.3 -> your php-64bit version (8.2.29) does not satisfy that requirement.
+  Problem 2
+    - phpoffice/phpspreadsheet is locked to version 5.4.0 and an update of this package was not requested.
+    - phpoffice/phpspreadsheet 5.4.0 requires ext-gd * -> it is missing from your system. Install or enable PHP's gd extension.
+  Problem 3
+    - simplesoftwareio/simple-qrcode is locked to version 4.2.0 and an update of this package was not requested.
+    - simplesoftwareio/simple-qrcode 4.2.0 requires ext-gd * -> it is missing from your system. Install or enable PHP's gd extension.
+  Problem 4
+    - symfony/clock is locked to version v8.0.0 and an update of this package was not requested.
+    - symfony/clock v8.0.0 requires php >=8.4 -> your php version (8.2.29) does not satisfy that requirement.
+  Problem 5
+    - symfony/css-selector is locked to version v8.0.0 and an update of this package was not requested.
+    - symfony/css-selector v8.0.0 requires php >=8.4 -> your php version (8.2.29) does not satisfy that requirement.
+  Problem 6
+    - symfony/event-dispatcher is locked to version v8.0.4 and an update of this package was not requested.
+    - symfony/event-dispatcher v8.0.4 requires php >=8.4 -> your php version (8.2.29) does not satisfy that requirement.
+  Problem 7
+    - symfony/string is locked to version v8.0.4 and an update of this package was not requested.
+    - symfony/string v8.0.4 requires php >=8.4 -> your php version (8.2.29) does not satisfy that requirement.
+  Problem 8
+    - symfony/translation is locked to version v8.0.4 and an update of this package was not requested.
+    - symfony/translation v8.0.4 requires php >=8.4 -> your php version (8.2.29) does not satisfy that requirement.
+  Problem 9
+    - nesbot/carbon is locked to version 3.11.1 and an update of this package was not requested.
+    - nesbot/carbon 3.11.1 requires symfony/clock ^6.3.12 || ^7.0 || ^8.0 -> satisfiable by symfony/clock[v8.0.0].
+    - symfony/clock v8.0.0 requires php >=8.4 -> your php version (8.2.29) does not satisfy that requirement.
+
+To enable extensions, verify that they are enabled in your .ini files:
+    - /opt/alt/php82/etc/php.ini
+    - /opt/alt/php82/link/conf/alt_php.ini
+You can also run `php --ini` in a terminal to see which files are used by PHP in CLI mode.
+Alternatively, you can run Composer with `--ignore-platform-req=ext-gd` to temporarily ignore these required extensions.
+[taxnestc@eu1 public_html]$ curl -sS https://getcomposer.org/installer | php
+All settings correct for using Composer
+Downloading...
+
+Composer (version 2.9.7) successfully installed to: /home/taxnestc/public_html/composer.phar
+Use it: php composer.phar
+
+[taxnestc@eu1 public_html]$ ls -la composer.phar
+-rwxr-xr-x 1 taxnestc taxnestc 3377213 Apr 27 12:35 composer.phar
+[taxnestc@eu1 public_html]$ php composer.phar --version
+Composer version 2.9.7 2026-04-14 13:31:52
+PHP version 8.2.29 (/opt/alt/php82/usr/bin/php)
+Run the "diagnose" command to get more detailed diagnostics output.
+[taxnestc@eu1 public_html]$ cat >> ~/.bashrc << 'EOF'
+export COMPOSER_HOME=$HOME/public_html/.composer-home
+alias composer='php $HOME/public_html/composer.phar'
+EOF
+source ~/.bashrc
+[taxnestc@eu1 public_html]$ composer --version
+Composer version 2.9.7 2026-04-14 13:31:52
+PHP version 8.2.29 (/opt/alt/php82/usr/bin/php)
+Run the "diagnose" command to get more detailed diagnostics output.                                         composer install --no-dev --optimize-auto
+loader --no-interactionml]$ composer install --no-dev --optimize-autoloader --no-interaction
+Installing dependencies from lock file
+Verifying lock file contents can be installed on current platform.
+Your lock file does not contain a compatible set of packages. Please run composer update.
+
+  Problem 1
+    - maennchen/zipstream-php is locked to version 3.2.1 and an update of this package was not requested.
+    - maennchen/zipstream-php 3.2.1 requires php-64bit ^8.3 -> your php-64bit version (8.2.29) does not satisfy that requirement.
+  Problem 2
+    - phpoffice/phpspreadsheet is locked to version 5.4.0 and an update of this package was not requested.
+    - phpoffice/phpspreadsheet 5.4.0 requires ext-gd * -> it is missing from your system. Install or enable PHP's gd extension.
+  Problem 3
+    - simplesoftwareio/simple-qrcode is locked to version 4.2.0 and an update of this package was not requested.
+    - simplesoftwareio/simple-qrcode 4.2.0 requires ext-gd * -> it is missing from your system. Install or enable PHP's gd extension.
+  Problem 4
+    - symfony/clock is locked to version v8.0.0 and an update of this package was not requested.
+    - symfony/clock v8.0.0 requires php >=8.4 -> your php version (8.2.29) does not satisfy that requirement.
+  Problem 5
+    - symfony/css-selector is locked to version v8.0.0 and an update of this package was not requested.
+    - symfony/css-selector v8.0.0 requires php >=8.4 -> your php version (8.2.29) does not satisfy that requirement.
+  Problem 6
+    - symfony/event-dispatcher is locked to version v8.0.4 and an update of this package was not requested.
+    - symfony/event-dispatcher v8.0.4 requires php >=8.4 -> your php version (8.2.29) does not satisfy that requirement.
+  Problem 7
+    - symfony/string is locked to version v8.0.4 and an update of this package was not requested.
+    - symfony/string v8.0.4 requires php >=8.4 -> your php version (8.2.29) does not satisfy that requirement.
+  Problem 8
+    - symfony/translation is locked to version v8.0.4 and an update of this package was not requested.
+    - symfony/translation v8.0.4 requires php >=8.4 -> your php version (8.2.29) does not satisfy that requirement.
+  Problem 9
+    - nesbot/carbon is locked to version 3.11.1 and an update of this package was not requested.
+    - nesbot/carbon 3.11.1 requires symfony/clock ^6.3.12 || ^7.0 || ^8.0 -> satisfiable by symfony/clock[v8.0.0].
+    - symfony/clock v8.0.0 requires php >=8.4 -> your php version (8.2.29) does not satisfy that requirement.
+
+To enable extensions, verify that they are enabled in your .ini files:
+    - /opt/alt/php82/etc/php.ini
+    - /opt/alt/php82/link/conf/alt_php.ini
+You can also run `php --ini` in a terminal to see which files are used by PHP in CLI mode.
+Alternatively, you can run Composer with `--ignore-platform-req=ext-gd` to temporarily ignore these required extensions.
+[taxnestc@eu1 public_html]$ cat ~/public_html/CPANEL_SETUP.md
+ls -la ~/public_html/deployment/
+# TaxNest - cPanel Deployment Guide
+
+## Step 1: Upload Files
+- Download/clone the repo from GitHub
+- Upload ALL files to `public_html/taxnest/` (ya apni domain folder mein)
+- Ya phir direct `public_html/` mein upload karein agar dedicated domain hai
+
+## Step 2: Database Setup (PostgreSQL ya MySQL)
+1. cPanel > **PostgreSQL Databases** (ya MySQL Databases)
+2. Naya database banayein: `taxnest_db`
+3. Naya user banayein: `taxnest_user` with strong password
+4. User ko database mein add karein (ALL PRIVILEGES)
+5. `backup.sql` import karein:
+   - **PostgreSQL:** cPanel > Terminal > `psql -U taxnest_user -d taxnest_db < backup.sql`
+   - **MySQL:** cPanel > phpMyAdmin > Import > `backup.sql` select karein
+
+## Step 3: Environment File (.env)
+1. `.env.example` ko `.env` rename karein
+2. Ye values update karein:
+
+```
+APP_NAME=TaxNest
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://aapki-domain.com
+
+DB_CONNECTION=pgsql
+DB_HOST=localhost
+DB_PORT=5432
+DB_DATABASE=taxnest_db
+DB_USERNAME=taxnest_user
+DB_PASSWORD=aapka_password
+
+SESSION_DRIVER=file
+SESSION_LIFETIME=120
+
+QUEUE_CONNECTION=database
+```
+
+## Step 4: PHP Version
+- cPanel > **MultiPHP Manager** > PHP 8.2+ select karein
+- cPanel > **MultiPHP INI Editor** > Ye enable karein:
+  - `fileinfo`
+  - `pdo_pgsql` (PostgreSQL ke liye)
+  - `pdo_mysql` (MySQL ke liye)
+  - `mbstring`
+  - `openssl`
+  - `gd`
+  - `zip`
+
+## Step 5: Terminal Commands
+cPanel > **Terminal** mein ye commands chalayein:
+
+```bash
+cd ~/public_html/taxnest
+
+composer install --no-dev --optimize-autoloader
+
+php artisan key:generate
+
+php artisan config:cache
+
+php artisan route:cache
+
+php artisan view:cache
+
+php artisan storage:link
+
+chmod -R 775 storage bootstrap/cache
+```
+
+## Step 6: Domain/Subdomain Point karein
+- Agar subdomain use kar rahe hain: cPanel > **Subdomains** > Document Root set karein:
+  `/public_html/taxnest/public`
+- Agar main domain hai to root `.htaccess` already public folder redirect karega
+
+## Step 7: Queue Worker (Optional but Recommended)
+cPanel > **Cron Jobs** mein add karein:
+```
+* * * * * cd ~/public_html/taxnest && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Queue ke liye Supervisor ya cron:
+```
+* * * * * cd ~/public_html/taxnest && php artisan queue:work --stop-when-empty >> /dev/null 2>&1
+```
+
+## Step 8: SSL Certificate
+- cPanel > **SSL/TLS** ya **Let's Encrypt** se free SSL lagayein
+- `.env` mein `APP_URL=https://...` rakhein
+
+## Folder Structure (cPanel mein)
+```
+public_html/
+└── taxnest/
+    ├── .htaccess          (root - public folder redirect)
+    ├── .env               (environment config)
+    ├── app/
+    ├── bootstrap/
+    ├── config/
+    ├── database/
+    ├── public/
+    │   ├── .htaccess      (Laravel routes)
+    │   ├── index.php
+    │   └── build/
+    ├── resources/
+    ├── routes/
+    ├── storage/
+    └── vendor/
+```
+
+## Troubleshooting
+- **500 Error:** `chmod -R 775 storage bootstrap/cache`
+- **Blank Page:** `.env` mein `APP_DEBUG=true` karein temporarily
+- **CSS/JS not loading:** `php artisan storage:link` chalayein
+- **Database error:** `.env` mein DB credentials check karein
+- **Session issues:** `php artisan config:cache` dobara chalayein
+total 1900
+drwxr-xr-x  2 taxnestc taxnestc    4096 Apr 27 12:29 .
+drwxr-xr-x 22 taxnestc nobody      4096 Apr 27 12:35 ..
+-rw-r--r--  1 taxnestc taxnestc  867894 Apr 27 12:29 complete_data_export.sql
+-rw-r--r--  1 taxnestc taxnestc     189 Apr 27 12:29 htaccess
+-rw-r--r--  1 taxnestc taxnestc    1576 Apr 27 12:29 index.php
+-rw-r--r--  1 taxnestc taxnestc 1056564 Apr 27 12:29 production_data.sql
+-rw-r--r--  1 taxnestc taxnestc     742 Apr 27 12:29 reset_passwords.php
+[taxnestc@eu1 public_html]$ ls /opt/alt/ | grep -E '^php[0-9]+$'
+php56
+php70
+php71
+php72
+php73
+php74
+php80
+php81
+php82
+php83
+php84
+php85                                                                                                       # Test karo PHP 8.4 binary
+/opt/alt/php84/usr/bin/php -v Test karo PHP 8.4 binary
+/opt/alt/php84/usr/bin/php -v
+# GD extension enabled hai ya nahi check karo (yeh CRITICAL hai)
+/opt/alt/php84/usr/bin/php -m | grep -E 'gd|mbstring|bcmath|pdo_mysql|tokenizer|xml|zip'
+PHP 8.4.15 (cli) (built: Nov 20 2025 00:00:00) (NTS)|bcmath|pdo_mysql|tokenizer|xml|zip'
+Copyright (c) The PHP Group
+Zend Engine v4.4.15, Copyright (c) Zend Technologies
+libxml
+tokenizer
+xml
+[taxnestc@eu1 public_html]$ /opt/alt/php84/usr/bin/php -v
+PHP 8.4.15 (cli) (built: Nov 20 2025 00:00:00) (NTS)
+Copyright (c) The PHP Group
+Zend Engine v4.4.15, Copyright (c) Zend Technologies                                                        /opt/alt/php84/usr/bin/php -m | grep -E '
+gd|mbstring|bcmath|pdo_mysql|tokenizer|xml|zip'bin/php -m | grep -E 'gd|mbstring|bcmath|pdo_mysql|tokenizer|xml|zip'
+libxml
+tokenizer
+xml                                                                                                         gd, bcmath, intl, mbstring, mysqli, pdo_m
+ysql, tokenizer, xml, zip, gmp, fileinfo, openssl, curl → Save. pdo_mysql, tokenizer, xml, zip, gmp, fileinfo, openssl, curl → Save.
+bash: gd,: command not found
+[taxnestc@eu1 public_html]$

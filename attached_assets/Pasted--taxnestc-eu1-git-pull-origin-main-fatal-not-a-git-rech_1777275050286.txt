@@ -1,0 +1,75 @@
+[taxnestc@eu1 ~]$ git pull origin main
+fatal: not a git recho "--- HOME contents ---"; ls -la ~ | head; echo "--- public_html contents ---"; ls -la ~/public_html 2>/dev/null | head -30; echo "--- artisan location ---"; find ~ -maxdepth 4 -name "artisan" -type f 2>/dev/null; echo "--- .git location ---"; find ~ -maxdepth 4 -name ".git"-type d 2>/dev/nullation ---"; find ~ -maxdepth 4 -name "artisan" -type f 2>/dev/null; echo "--- .git location ---"; find ~ -maxdepth 4 -name ".git"--- HOME contents ---
+ls: cannot open directory '/home/taxnestc': Permission denied
+--- public_html contents ---
+total 12
+drwxr-xr-x  2 taxnestc nobody   4096 Apr 27 07:36 .
+drwx--x--x 17 root     root     4096 Apr 27 09:15 ..
+-rw-------  1 taxnestc taxnestc    4 Apr 27 09:15 .ftpquota
+--- artisan location ---
+--- .git location ---
+[taxnestc@eu1 ~]$ cd ~/public_html
+[taxnestc@eu1 public_html]$ mv .ftpquota /tmp/.ftpquota.bak 2>/dev/null                                     git clone https://TOKEN@github.com/jawadrao5555-alt/taxnest.git .l]$ git clone https://TOKEN@github.com/jawadrao5555-alt/taxnest.git .
+Cloning into '.'...
+remote: Enumerating objects: 10858, done.
+remote: Counting objects: 100% (1744/1744), done.
+remote: Compressing objects: 100% (519/519), done.
+remote: Total 10858 (delta 1442), reused 1476 (delta 1219), pack-reused 9114 (from 2)
+Receiving objects: 100% (10858/10858), 312.65 MiB | 10.31 MiB/s, done.
+Resolving deltas: 100% (8645/8645), done.
+Updating files: 100% (1452/1452), done.
+[taxnestc@eu1 public_html]$ ls -la | head -20.bak ./.ftpquota 2>/dev/null
+total 2304an ] && echo "✅ Laravel project mil gaya" || echo "❌ Clone fail hua"
+drwxr-xr-x 21 taxnestc nobody     4096 Apr 27 12:29 .| echo "❌ Clone fail hua"
+drwx--x--x 17 root     root       4096 Apr 27 09:15 ..
+drwxr-xr-x  2 taxnestc taxnestc   4096 Apr 27 12:28 .agents
+drwxr-xr-x 10 taxnestc taxnestc   4096 Apr 27 12:28 app
+-rwxr-xr-x  1 taxnestc taxnestc    425 Apr 27 12:28 artisan
+drwxr-xr-x  3 taxnestc taxnestc  49152 Apr 27 12:29 attached_assets
+-rw-r--r--  1 taxnestc taxnestc 714633 Apr 27 12:29 backup.sql
+drwxr-xr-x  3 taxnestc taxnestc   4096 Apr 27 12:29 bootstrap
+-rw-r--r--  1 taxnestc taxnestc   1343 Apr 27 12:29 check-db.sh
+-rw-r--r--  1 taxnestc taxnestc   3100 Apr 27 12:29 composer.json
+-rw-r--r--  1 taxnestc taxnestc 370473 Apr 27 12:29 composer.lock
+drwxr-xr-x  2 taxnestc taxnestc   4096 Apr 27 12:29 config
+-rw-r--r--  1 taxnestc taxnestc    922 Apr 27 12:29 cookies.txt
+-rw-r--r--  1 taxnestc taxnestc   3242 Apr 27 12:28 CPANEL_SETUP.md
+-rw-r--r--  1 taxnestc taxnestc    563 Apr 27 12:28 .cpanel.yml
+drwxr-xr-x  7 taxnestc taxnestc   4096 Apr 27 12:29 database
+drwxr-xr-x  2 taxnestc taxnestc   4096 Apr 27 12:29 deployment
+-rw-r--r--  1 taxnestc taxnestc    252 Apr 27 12:28 .editorconfig
+-rw-r--r--  1 taxnestc taxnestc    814 Apr 27 12:28 .env.cpanel
+✅ Laravel project mil gaya
+[taxnestc@eu1 public_html]$ # Composer
+composer install --no-dev --# Composerutoloader
+composer install --no-dev --optimize-autoloader
+# .env file banao (production ki credentials chahiyein hongi)
+# .env file banao (production ki credentials chahiyein hongi)
+cp .env.example .envrate
+php artisan key:generate
+# Phir .env edit karo (nano .env) — yeh values daalo:
+# Phir .env edit karo (nano .env) — yeh values daalo:
+#   APP_ENV=production
+#   APP_DEBUG=false/taxnest.com.pk
+#   APP_URL=https://taxnest.com.pk
+#   DB_HOST=localhostel-mysql-db-name>
+#   DB_DATABASE=<cpanel-mysql-db-name>
+#   DB_USERNAME=<cpanel-mysql-user>ord>
+#   DB_PASSWORD=<cpanel-mysql-password>
+# Storage symlink + permissions
+# Storage symlink + permissions
+php artisan storage:linktstrap/cache
+chmod -R 775 storage bootstrap/cache
+# Saari migrations chalao (fresh DB pe)
+# Saari migrations chalao (fresh DB pe)
+php artisan migrate --force
+# Caches
+# Cachessan config:cache && php artisan route:cache && php artisan view:cache
+php artisan config:cache && php artisan route:cache && php artisan view:cache
+bash: composer: command not found
+[taxnestc@eu1 public_html]$ composer install --no-dev --optimize-autoloader
+bash: composer: command not found
+[taxnestc@eu1 public_html]$ cd ~/public_html
+[taxnestc@eu1 public_html]$ composer install --no-dev --optimize-autoloader
+bash: composer: command not found
+[taxnestc@eu1 public_html]$

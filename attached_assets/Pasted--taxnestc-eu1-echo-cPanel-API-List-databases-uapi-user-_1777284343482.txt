@@ -1,0 +1,46 @@
+[taxnestc@eu1 ~]$ echo "--- cPanel API: List databases ---"
+uapi --user=$(whoami) Mysql list_databases 2>/dev/null | head -50
+
+echo ""
+echo "--- Alt method: list DB files ---"
+ls -la /var/lib/mysql/ 2>/dev/null | grep taxnestc
+
+echo ""
+echo "--- Current error_log last 30 lines (kya error aa rahi hai) ---"
+tail -30 ~/public_html/public/error_log 2>/dev/null
+--- cPanel API: List databases ---
+
+--- Alt method: list DB files ---
+
+--- Current error_log last 30 lines (kya error aa rahi hai) ---
+[27-Apr-2026 10:05:03 UTC] PHP Warning:  require(/home/taxnestc/public_html/public/../vendor/autoload.php): Failed to open stream: No such file or directory in /home/taxnestc/public_html/public/index.php on line 24
+[27-Apr-2026 10:05:03 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/taxnestc/public_html/public/../vendor/autoload.php' (include_path='.:/opt/alt/php84/usr/share/pear:/opt/alt/php84/usr/share/php:/usr/share/pear:/usr/share/php') in /home/taxnestc/public_html/public/index.php:24
+Stack trace:
+#0 {main}
+  thrown in /home/taxnestc/public_html/public/index.php on line 24
+[27-Apr-2026 10:05:09 UTC] PHP Warning:  require(/home/taxnestc/public_html/public/../vendor/autoload.php): Failed to open stream: No such file or directory in /home/taxnestc/public_html/public/index.php on line 24
+[27-Apr-2026 10:05:09 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/taxnestc/public_html/public/../vendor/autoload.php' (include_path='.:/opt/alt/php84/usr/share/pear:/opt/alt/php84/usr/share/php:/usr/share/pear:/usr/share/php') in /home/taxnestc/public_html/public/index.php:24
+Stack trace:
+#0 {main}
+  thrown in /home/taxnestc/public_html/public/index.php on line 24
+[27-Apr-2026 10:05:13 UTC] PHP Warning:  require(/home/taxnestc/public_html/public/../vendor/autoload.php): Failed to open stream: No such file or directory in /home/taxnestc/public_html/public/index.php on line 24
+[27-Apr-2026 10:05:13 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/taxnestc/public_html/public/../vendor/autoload.php' (include_path='.:/opt/alt/php84/usr/share/pear:/opt/alt/php84/usr/share/php:/usr/share/pear:/usr/share/php') in /home/taxnestc/public_html/public/index.php:24
+Stack trace:
+#0 {main}
+  thrown in /home/taxnestc/public_html/public/index.php on line 24
+[27-Apr-2026 10:05:19 UTC] PHP Warning:  require(/home/taxnestc/public_html/public/../vendor/autoload.php): Failed to open stream: No such file or directory in /home/taxnestc/public_html/public/index.php on line 24
+[27-Apr-2026 10:05:19 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/taxnestc/public_html/public/../vendor/autoload.php' (include_path='.:/opt/alt/php84/usr/share/pear:/opt/alt/php84/usr/share/php:/usr/share/pear:/usr/share/php') in /home/taxnestc/public_html/public/index.php:24
+Stack trace:
+#0 {main}
+  thrown in /home/taxnestc/public_html/public/index.php on line 24
+[27-Apr-2026 10:05:23 UTC] PHP Warning:  require(/home/taxnestc/public_html/public/../vendor/autoload.php): Failed to open stream: No such file or directory in /home/taxnestc/public_html/public/index.php on line 24
+[27-Apr-2026 10:05:23 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/taxnestc/public_html/public/../vendor/autoload.php' (include_path='.:/opt/alt/php84/usr/share/pear:/opt/alt/php84/usr/share/php:/usr/share/pear:/usr/share/php') in /home/taxnestc/public_html/public/index.php:24
+Stack trace:
+#0 {main}
+  thrown in /home/taxnestc/public_html/public/index.php on line 24
+[27-Apr-2026 10:05:29 UTC] PHP Warning:  require(/home/taxnestc/public_html/public/../vendor/autoload.php): Failed to open stream: No such file or directory in /home/taxnestc/public_html/public/index.php on line 24
+[27-Apr-2026 10:05:29 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/taxnestc/public_html/public/../vendor/autoload.php' (include_path='.:/opt/alt/php84/usr/share/pear:/opt/alt/php84/usr/share/php:/usr/share/pear:/usr/share/php') in /home/taxnestc/public_html/public/index.php:24
+Stack trace:
+#0 {main}
+  thrown in /home/taxnestc/public_html/public/index.php on line 24
+[taxnestc@eu1 ~]$

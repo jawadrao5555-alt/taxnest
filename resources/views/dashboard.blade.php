@@ -486,6 +486,7 @@
                     <h3 class="text-xs font-extrabold text-gray-900 dark:text-white uppercase tracking-widest">Top 5 Customers</h3>
                     <span class="premium-badge bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">{{ $topCustomers->count() }} customers</span>
                 </div>
+                <div class="overflow-x-auto">
                 <table class="min-w-full premium-table">
                     <thead class="bg-gradient-to-r from-gray-50 to-gray-100/80 dark:from-gray-800 dark:to-gray-800/80">
                         <tr>
@@ -504,6 +505,7 @@
                         @endforeach
                     </tbody>
                 </table>
+                </div>
             </div>
             @endif
 
@@ -512,6 +514,7 @@
                 <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800/60 dark:to-gray-900">
                     <h3 class="text-xs font-extrabold text-gray-900 dark:text-white uppercase tracking-widest">Branch Comparison</h3>
                 </div>
+                <div class="overflow-x-auto">
                 <table class="min-w-full premium-table">
                     <thead class="bg-gradient-to-r from-gray-50 to-gray-100/80 dark:from-gray-800 dark:to-gray-800/80">
                         <tr>
@@ -530,6 +533,7 @@
                         @endforeach
                     </tbody>
                 </table>
+                </div>
             </div>
             @endif
 

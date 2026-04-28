@@ -308,6 +308,7 @@ window.addEventListener('popstate', function() {
             </div>
 
             <button x-show="cart.length > 0 && !cartMode" @click="enterCartMode(); mobileView = 'cart';"
+                class="pos-edit-cart-floating-btn"
                 style="position:fixed; bottom:24px; right:400px; z-index:60; background:linear-gradient(135deg,#7c3aed,#6d28d9); color:white; border:none; border-radius:16px; padding:10px 20px; font-size:13px; font-weight:700; cursor:pointer; box-shadow:0 8px 24px rgba(124,58,237,0.4), 0 2px 8px rgba(0,0,0,0.15); display:flex; align-items:center; gap:8px; transition:all 0.2s;"
                 x-transition
                 title="Jump to Cart & Edit (F6)"
@@ -407,14 +408,14 @@ window.addEventListener('popstate', function() {
                             </button>
                         </div>
                         <div class="flex items-center gap-1.5 mt-1.5">
-                            <input type="text" x-model="item.special_notes" @click.stop placeholder="Notes..." class="flex-1 text-[11px] bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg px-2 py-1 text-gray-600 dark:text-gray-400 focus:ring-purple-500 placeholder-gray-300">
+                            <input type="text" x-model="item.special_notes" @click.stop placeholder="Notes..." class="dense-input flex-1 text-[11px] bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg px-2 py-1 text-gray-600 dark:text-gray-400 focus:ring-purple-500 placeholder-gray-300">
                             <button @click.stop="item.is_tax_exempt = !item.is_tax_exempt" class="text-[11px] font-extrabold px-2 py-1 rounded-md transition whitespace-nowrap ring-1" :class="item.is_tax_exempt ? 'bg-green-500 text-white ring-green-600 shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 ring-gray-300 dark:ring-gray-600 hover:ring-green-500 hover:text-green-600'" :title="item.is_tax_exempt ? 'Tax exempt — click to apply tax' : 'Apply tax exemption to this item'" x-text="item.is_tax_exempt ? 'NO TAX' : 'TAX'"></button>
                             <button @click.stop="item.showItemDiscount = !item.showItemDiscount" class="text-[9px] font-bold px-1.5 py-1 rounded-md transition whitespace-nowrap" :class="(item.item_discount_value || 0) > 0 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-orange-500'" x-text="(item.item_discount_value || 0) > 0 ? ((item.item_discount_type || 'percentage') === 'percentage' ? '-' + item.item_discount_value + '%' : '-Rs.' + item.item_discount_value) : 'Disc'"></button>
                         </div>
                         <div x-show="item.showItemDiscount" x-transition class="mt-1 flex items-center gap-1">
                             <button @click.stop="item.item_discount_type = 'percentage'" class="text-[9px] font-bold px-1.5 py-0.5 rounded transition" :class="(item.item_discount_type || 'percentage') === 'percentage' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400'">%</button>
                             <button @click.stop="item.item_discount_type = 'amount'" class="text-[9px] font-bold px-1.5 py-0.5 rounded transition" :class="item.item_discount_type === 'amount' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400'">Rs</button>
-                            <input type="number" x-model.number="item.item_discount_value" @click.stop min="0" step="any" placeholder="0" class="w-14 text-[10px] bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 text-gray-900 dark:text-white focus:ring-purple-500">
+                            <input type="number" x-model.number="item.item_discount_value" @click.stop min="0" step="any" placeholder="0" class="dense-input w-14 text-[10px] bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 text-gray-900 dark:text-white focus:ring-purple-500">
                             <button @click.stop="item.item_discount_value = 0; item.showItemDiscount = false" class="text-[9px] text-red-400 hover:text-red-600 px-1">X</button>
                         </div>
                     </div>

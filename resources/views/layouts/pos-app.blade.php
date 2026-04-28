@@ -23,7 +23,7 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
         <meta name="theme-color" content="#7c3aed">
-        <link rel="stylesheet" href="{{ asset('css/mobile.css') }}?v=1.1">
+        <link rel="stylesheet" href="{{ asset('css/mobile.css') }}?v=1.2">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
         <meta name="apple-mobile-web-app-title" content="Nest Pra Pos">

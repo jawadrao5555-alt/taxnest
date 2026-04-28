@@ -66,6 +66,18 @@ body {
     }
 }
 
+/* ----- 3b. Dense input opt-out (POS cart Notes / Discount fields) -----
+   Explicit class for dense table-cell inputs that intentionally stay tiny.
+   Pair with class="dense-input text-[10px]" or class="dense-input text-[11px]". */
+.dense-input { font-size: inherit !important; }
+
+/* ----- 3c. Hide desktop floating "Edit Cart" button on phones -----
+   Inline-styled fixed button with right:400px would push off-screen on
+   <400px wide phones. Mobile users use the dedicated bottom Cart bar instead. */
+@media (max-width: 767px) {
+    .pos-edit-cart-floating-btn { display: none !important; }
+}
+
 /* ----- 4. Touch targets — min 40x40 on all clickables ----- */
 @media (max-width: 768px) {
     button, a.btn, .btn, .nav-pill, [role="button"], .sidebar-link {

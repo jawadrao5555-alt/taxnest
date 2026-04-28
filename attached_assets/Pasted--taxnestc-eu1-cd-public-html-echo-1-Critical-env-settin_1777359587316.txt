@@ -1,0 +1,107 @@
+[taxnestc@eu1 ~]$ cd ~/public_html
+
+echo "=== 1. Critical .env settings ==="
+grep -E "^(APP_URL|APP_ENV|SESSION_|SANCTUM_|TRUST)" .env
+
+echo ""
+echo "=== 2. Latest laravel.log errors ==="
+tail -40 storage/logs/laravel.log 2>&1
+
+echo ""
+echo "=== 3. Live login test via curl ==="
+curl -sI https://taxnest.com.pk/login | head -8
+echo "---"
+curl -sc /tmp/cookie.txt https://taxnest.com.pk/login -o /tmp/login.html
+echo "Cookies set:"
+cat /tmp/cookie.txt | grep -v "^#" | head -5
+echo "CSRF token in form:"
+grep -oP 'name="_token" value="\K[^"]+' /tmp/login.html | head -1
+
+echo ""
+echo "=== 4. Storage permissions ==="
+ls -la storage/framework/sessions/ 2>&1 | head -5
+ls -la storage/logs/ 2>&1 | head -5
+
+ echo PHP_EOL; echo 'Users: '.\DB::table('users')->count();" 2>&1 | tail -5nt();
+=== 1. Critical .env settings ===
+APP_ENV=production
+APP_URL=https://taxnest.com.pk
+SESSION_DRIVER=file
+SESSION_LIFETIME=120
+SESSION_ENCRYPT=false
+SESSION_PATH=/
+SESSION_DOMAIN=null
+
+=== 2. Latest laravel.log errors ===
+[2026-04-28 11:54:27] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:54:29] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:54:29] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:54:34] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:54:35] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:54:39] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:54:49] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:54:59] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:55:01] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:55:09] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:55:19] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:55:29] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:55:39] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:55:49] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:55:59] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:56:01] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:56:09] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:56:19] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:56:29] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:56:39] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:56:49] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:56:59] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:57:01] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:57:09] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:57:19] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:57:29] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:57:39] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:57:49] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:57:59] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:58:01] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:58:09] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:58:19] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:58:29] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:58:39] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:58:49] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:58:59] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:59:01] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:59:09] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:59:19] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+[2026-04-28 11:59:29] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"litespeed"}
+
+=== 3. Live login test via curl ===
+HTTP/2 200
+x-powered-by: PHP/8.4.15
+content-type: text/html; charset=utf-8
+cache-control: must-revalidate, no-cache, no-store, private
+x-content-type-options: nosniff
+x-xss-protection: 1; mode=block
+referrer-policy: strict-origin-when-cross-origin
+pragma: no-cache
+---
+Cookies set:
+
+taxnest.com.pk  FALSE   /       TRUE    1777366773      XSRF-TOKEN      eyJpdiI6IkN3Vm9lZitDSFh1bTg2MlpZZ3o4N2c9PSIsInZhbHVlIjoiMEdJSWVlYW1UNG1HTTY5aU9pQ0ZHLzJQa0dBWGJOREEzcmlOWDRiSG9YSTVkaG5TVVZIN1VSZC8rdU5JNTRuOVk5MmNFUkxrSktyTXJnQUdSa0FVS284VGJxcUkwSzNnNUxYWHYzWG9SKzM5R2NYblF5ODk0b0J5MmYwWjltVG4iLCJtYWMiOiIwNDgyNjE2NjAwNjQ4MzI1YWNiZDVmZjQ2ZmVkOTY0YmU5Nzc4NGVjMzc1MTQxYjUzYjBhNmMzODY1OGJlYjJkIiwidGFnIjoiIn0%3D
+CSRF token in form:
+AQoj7YES9v2zfWwmxotz4n2wxGcok3KtkupaR5m3
+
+=== 4. Storage permissions ===
+total 2916
+drwxrwxr-x 2 taxnestc taxnestc 57344 Apr 28 06:59 .
+drwxrwxr-x 6 taxnestc taxnestc  4096 Apr 24 09:20 ..
+-rw-r--r-- 1 taxnestc taxnestc   221 Apr 28 06:14 01xJcVDZ0aB33ihlVQDrcskRXgoSPMvraZhGQz9e
+-rw-r--r-- 1 taxnestc taxnestc   118 Apr 28 05:33 02eTX5AVEIYXoRzVKr3OMqlbDNA8nYwcniRdBdBM
+total 256
+drwxrwxr-x 2 taxnestc taxnestc   4096 Apr 24 17:03 .
+drwxrwxr-x 5 taxnestc taxnestc   4096 Mar 27 15:15 ..
+-rwxrwxr-x 1 taxnestc taxnestc     14 Mar 28 05:06 .gitignore
+-rw-rw-r-- 1 taxnestc taxnestc 245177 Apr 28 06:59 laravel.log
+
+=== 5. Sessions table check ===
+CLI interactive shell disabled in production environment.
+[taxnestc@eu1 public_html]$

@@ -1,0 +1,241 @@
+[taxnestc@eu1 ~]$ echo "═══ PHP & Extensions Final Check ═══"
+php -v
+echo ""
+for ext in gd mbstring bcmath pdo_mysql mysqli zip intl gmp fileinfo openssl curl exif iconv tokenizer xml; do
+  if php -m 2>/dev/null | grep -qi "^$ext$"; then
+    echo "  ✅ $ext"
+  else
+    echo "  ❌ $ext MISSING"
+  fi
+done
+═══ PHP & Extensions Final Check ═══
+PHP 8.4.15 (cli) (built: Nov 20 2025 00:00:00) (NTS)
+Copyright (c) The PHP Group
+Zend Engine v4.4.15, Copyright (c) Zend Technologies
+    with the ionCube PHP Loader v15.0.0, Copyright (c) 2002-2025, by ionCube Ltd.
+
+  ✅ gd
+  ✅ mbstring
+  ✅ bcmath
+  ✅ pdo_mysql
+  ✅ mysqli
+  ✅ zip
+  ✅ intl
+  ✅ gmp
+  ✅ fileinfo
+  ✅ openssl
+  ✅ curl
+  ✅ exif
+  ✅ iconv
+  ✅ tokenizer
+  ✅ xml
+[taxnestc@eu1 ~]$ cd ~/public_html
+composer install --no-dev --optimize-autoloader --no-interaction
+Installing dependencies from lock file
+Verifying lock file contents can be installed on current platform.
+Nothing to install, update or remove
+Generating optimized autoload files
+> Illuminate\Foundation\ComposerScripts::postAutoloadDump
+> @php artisan package:discover --ansi
+
+   INFO  Discovering packages.
+
+  barryvdh/laravel-dompdf ............................................... DONE
+  laravel/tinker ........................................................ DONE
+  nesbot/carbon ......................................................... DONE
+  nunomaduro/termwind ................................................... DONE
+  simplesoftwareio/simple-qrcode ........................................ DONE
+
+62 packages you are using are looking for funding.
+Use the `composer fund` command to find out more!
+[taxnestc@eu1 public_html]$ cd ~/public_html
+
+# Backup current .env
+cp .env .env.backup-$(date +%F-%H%M)
+
+# Fresh .env from template
+cp .env.cpanel .env
+
+# Update DB settings (MySQL on Hostcry)
+sed -i 's|^DB_CONNECTION=.*|DB_CONNECTION=mysql|' .env
+sed -i 's|^DB_PORT=.*|DB_PORT=3306|' .env
+sed -i 's|^DB_DATABASE=.*|DB_DATABASE=taxnestc_db|' .env
+sed -i 's|^DB_USERNAME=.*|DB_USERNAME=taxnestc_admin|' .env
+
+# Password securely input (typing chhupi rahegi)
+echo ""
+echo "🔐 MySQL password type karo (jo cPanel me set kiya tha):"
+read -s DBPASS
+echo ""
+sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=${DBPASS}|" .env
+unset DBPASS
+
+# Generate APP_KEY
+B_USERNAME|APP_KEY)=" .envUG|APP_URL|DB_CONNECTION|DB_HOST|DB_PORT|DB_DATABASE|D
+
+🔐 MySQL password type karo (jo cPanel me set kiya tha):
+
+
+   INFO  Application key set successfully.
+
+
+═══ .env final state (password masked) ═══
+APP_ENV=production
+APP_KEY=base64:TiMAQXXwT5by9Da/vJM79GB1nbdAdZ7SVMr8mE6nI98=
+APP_DEBUG=false
+APP_URL=https://taxnest.com.pk
+DB_CONNECTION=mysql
+DB_HOST=localhost
+DB_PORT=3306
+DB_DATABASE=taxnestc_db
+DB_USERNAME=taxnestc_admin
+[taxnestc@eu1 public_html]$ cd ~/public_html
+
+echo "═══ 1. DB connection test ═══"
+php artisan db:show 2>&1 | head -20
+
+echo ""
+echo "═══ 2. Production data import (ZIA + sab) — 30 sec ═══"
+DB_PASS=$(grep "^DB_PASSWORD=" .env | cut -d'=' -f2-)
+mysql -u taxnestc_admin -p"$DB_PASS" taxnestc_db < deployment/production_data.sql 2>&1
+unset DB_PASS
+echo "✅ Import done"
+
+echo ""
+echo "═══ 3. Verify imported tables ═══"
+php artisan db:table --database=mysql 2>&1 | head -10
+echo "---"
+php artisan tinker --execute='echo "Companies: ".\App\Models\Company::count(); echo "\nUsers: ".\App\Models\User::count();' 2>&1
+
+echo ""
+_fbr_pos_quantity_to_4dp.php 2>&1alao ═══"
+echo "🎉 Deploy DONE! Browser me kholo: https://taxnest.com.pk"_26_140000_add_pricing_columns_to_products.php 2>&1
+═══ 1. DB connection test ═══me kholo: https://taxnest.com.pk"_26_140000_add_pricing_columns_to_products.php 2>&1
+
+In Connector.php line 67:
+
+  SQLSTATE[28000] [1045] Access denied for user 'taxnestc_admin'@'localhost'
+  (using password: YES)
+
+
+
+═══ 2. Production data import (ZIA + sab) — 30 sec ═══
+ERROR 1045 (28000): Access denied for user 'taxnestc_admin'@'localhost' (using password: YES)
+✅ Import done
+
+═══ 3. Verify imported tables ═══
+
+In Connection.php line 838:
+
+  SQLSTATE[28000] [1045] Access denied for user 'taxnestc_admin'@'localhost'
+  (using password: YES) (Connection: mysql, Host: localhost, Port: 3306, Data
+  base: taxnestc_db, SQL: select table_name as `name`, table_schema as `schem
+  a`, (data_length + index_length) as `size`, table_comment as `comment`, eng
+  ine as `engine`, table_collation as `collation` from information_schema.tab
+  les where table_type in ('BASE TABLE', 'SYSTEM VERSIONED') and table_schema
+   not in ('information_schema', 'mysql', 'ndbinfo', 'performance_schema', 's
+---
+CLI interactive shell disabled in production environment.
+
+═══ 4. Naye 2 migrations chalao ═══
+
+In Connection.php line 838:
+
+  SQLSTATE[28000] [1045] Access denied for user 'taxnestc_admin'@'localhost'
+  (using password: YES) (Connection: mysql, Host: localhost, Port: 3306, Data
+  base: taxnestc_db, SQL: select exists (select 1 from information_schema.tab
+  les where table_schema = schema() and table_name = 'migrations' and table_t
+  ype in ('BASE TABLE', 'SYSTEM VERSIONED')) as `exists`)
+
+
+In Connector.php line 67:
+
+  SQLSTATE[28000] [1045] Access denied for user 'taxnestc_admin'@'localhost'
+  (using password: YES)
+
+
+
+In Connection.php line 838:
+
+  SQLSTATE[28000] [1045] Access denied for user 'taxnestc_admin'@'localhost'
+  (using password: YES) (Connection: mysql, Host: localhost, Port: 3306, Data
+  base: taxnestc_db, SQL: select exists (select 1 from information_schema.tab
+  les where table_schema = schema() and table_name = 'migrations' and table_t
+  ype in ('BASE TABLE', 'SYSTEM VERSIONED')) as `exists`)
+
+
+In Connector.php line 67:
+
+  SQLSTATE[28000] [1045] Access denied for user 'taxnestc_admin'@'localhost'
+  (using password: YES)
+
+
+
+═══ 5. Storage symlink ═══
+
+   INFO  The [public/storage] link has been connected to [storage/app/public].
+
+
+═══ 6. Permissions ═══
+✅ chmod done
+
+═══ 7. Caches build ═══
+
+   INFO  Configuration cached successfully.
+
+
+   INFO  Routes cached successfully.
+
+
+
+   INFO  Blade templates cached successfully.
+
+
+═══ 8. Smoke test ═══
+HTTP/2 500
+x-powered-by: PHP/8.4.15
+cache-control: must-revalidate, no-cache, no-store, private
+content-type: text/html; charset=utf-8
+x-content-type-options: nosniff
+                                                                                                            cd ~/public_html
+🎉 Deploy DONE! Browser me kholo: https://taxnest.com.pk
+echo "═══ A. .env me password ka actual value (raw) ═══"
+grep "^DB_PASSWORD=" .env | sed 's/^DB_PASSWORD=/[VALUE→]/' | cat -A
+echo ""══ A. .env me password ka actual value (raw) ═══"
+echo "(Agar end me '$' hai matlab sahi line end. Agar koi weird char dikhe — wahi problem hai)"
+echo ""
+echo ""Agar end me '$' hai matlab sahi line end. Agar koi weird char dikhe — wahi problem hai)"
+echo "═══ B. Direct MySQL test (interactive password) ═══"
+echo "Password DOBARA type karo (jo cPanel me set kiya tha):"
+mysql -u taxnestc_admin -p taxnestc_db -e "SELECT 'CONNECTION OK' AS status, NOW() AS time;"
+═══ A. .env me password ka actual value (raw) ═══ kiya tha):"
+[VALUEM-bM-^FM-^R]O+ka9j9.Vad!M7b7$_db -e "SELECT 'CONNECTION OK' AS status, NOW() AS time;"
+
+(Agar end me '$' hai matlab sahi line end. Agar koi weird char dikhe — wahi problem hai)
+
+═══ B. Direct MySQL test (interactive password) ═══
+Password DOBARA type karo (jo cPanel me set kiya tha):
+Enter password:
+ERROR 1045 (28000): Access denied for user 'taxnestc_admin'@'localhost' (using password: YES)
+[taxnestc@eu1 public_html]$ ]huVzzDBK%B3;c8?
+bash: ]huVzzDBK%B3: command not found                                                                       cd ~/public_html
+bash: c8?: command not found
+echo "═══ A. .env me password ka actual value (raw) ═══"
+grep "^DB_PASSWORD=" .env | sed 's/^DB_PASSWORD=/[VALUE→]/' | cat -A
+echo ""══ A. .env me password ka actual value (raw) ═══"
+echo "(Agar end me '$' hai matlab sahi line end. Agar koi weird char dikhe — wahi problem hai)"
+echo ""
+echo ""Agar end me '$' hai matlab sahi line end. Agar koi weird char dikhe — wahi problem hai)"
+echo "═══ B. Direct MySQL test (interactive password) ═══"
+echo "Password DOBARA type karo (jo cPanel me set kiya tha):"
+mysql -u taxnestc_admin -p taxnestc_db -e "SELECT 'CONNECTION OK' AS status, NOW() AS time;"
+═══ A. .env me password ka actual value (raw) ═══ kiya tha):"
+[VALUEM-bM-^FM-^R]O+ka9j9.Vad!M7b7$_db -e "SELECT 'CONNECTION OK' AS status, NOW() AS time;"
+
+(Agar end me '$' hai matlab sahi line end. Agar koi weird char dikhe — wahi problem hai)
+
+═══ B. Direct MySQL test (interactive password) ═══
+Password DOBARA type karo (jo cPanel me set kiya tha):
+Enter password:
+ERROR 1045 (28000): Access denied for user 'taxnestc_admin'@'localhost' (using password: YES)
+[taxnestc@eu1 public_html]$

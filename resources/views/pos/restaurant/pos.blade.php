@@ -800,7 +800,7 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
-    <div x-show="showReceipt" x-transition.opacity @keydown.escape.window="if(showReceipt) { showReceipt = false; }" @click.self="showReceipt = false" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div x-show="showReceipt" x-transition.opacity x-effect="if (!showReceipt) cancelPendingPrints()" @keydown.escape.window="if(showReceipt) { showReceipt = false; }" @click.self="showReceipt = false" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="receipt-modal-enter bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" style="max-height:92vh;" x-transition.scale.90>
             <div class="relative p-5 text-center bg-gradient-to-b from-green-50 to-white dark:from-green-900/20 dark:to-gray-900 flex-shrink-0" id="confettiContainer">
                 <div class="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center mb-3 shadow-lg shadow-green-600/30 success-icon-animate" style="animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)">
@@ -822,10 +822,14 @@ window.addEventListener('popstate', function() {
                 <iframe x-ref="receiptIframe" class="w-full h-full border-0" :src="lastTransactionId ? '/pos/restaurant/receipt/' + lastTransactionId : ''" style="min-height:300px;"></iframe>
             </div>
             <div class="p-3 space-y-2 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
-                <div class="grid grid-cols-3 gap-2">
+                <div class="grid grid-cols-4 gap-2">
                     <button @click="printReceipt()" class="py-3 text-center rounded-xl bg-gradient-to-br from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800 text-white text-sm font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-1.5">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                         Print <kbd class="text-[8px] bg-purple-500/40 px-1 rounded font-mono">P</kbd>
+                    </button>
+                    <button @click="printKitchenTicket(lastOrderId)" :disabled="!lastOrderId" class="py-3 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-md shadow-orange-500/20 flex items-center justify-center gap-1.5" title="Print Kitchen Order Ticket">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                        KOT <kbd class="text-[8px] bg-orange-500/40 px-1 rounded font-mono">K</kbd>
                     </button>
                     <button @click="startNewAfterPayment()" class="py-3 text-center rounded-xl bg-gradient-to-br from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white text-sm font-bold transition shadow-md shadow-green-600/20 flex items-center justify-center gap-1.5">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
@@ -1061,6 +1065,10 @@ function restaurantPos() {
         showShortcuts: false,
         lastInvoiceNumber: '',
         lastTransactionId: null,
+        lastOrderId: null,
+        needsKotPrint: false,
+        pendingPrintTimers: [],
+        printSessionId: 0,
         lastTotal: 0,
         lastPaymentMethod: '',
         submitting: false,
@@ -1329,6 +1337,7 @@ function restaurantPos() {
                 if (e.key === 'Escape') { e.preventDefault(); this.showReceipt = false; }
                 else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); }
                 else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.printReceipt(); }
+                else if (e.key === 'k' || e.key === 'K') { e.preventDefault(); this.printKitchenTicket(this.lastOrderId); }
                 return;
             }
             if (this.showPayModal) {
@@ -1588,7 +1597,7 @@ function restaurantPos() {
                 if (data.success) {
                     this.showToast(data.message, 'success'); this.heldOrders.unshift(data.order); this.clearCart();
                     this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
-                    if (this.kitchenSettings.print_on_hold) { window.open('/pos/restaurant/orders/' + data.order.id + '/kitchen-ticket', '_blank', 'width=350,height=600'); }
+                    if (this.kitchenSettings.print_on_hold) { this.printKitchenTicket(data.order.id); }
                 } else { this.showToast(data.message || 'Failed', 'error'); }
             } catch (e) { this.showToast('Network error', 'error'); }
             this.submitting = false;
@@ -1599,6 +1608,8 @@ function restaurantPos() {
 
             if (this.payingHeldOrderId) {
                 this.submitting = true; this.stockError = '';
+                // Paying a previously-held order — KOT was already sent at hold time, do NOT reprint it
+                this.needsKotPrint = false;
                 await this.payHeldOrderDirect(this.payingHeldOrderId, method, null);
                 this.payingHeldOrderId = null;
                 this.showPayModal = false; this.submitting = false;
@@ -1618,6 +1629,8 @@ function restaurantPos() {
                 const holdData = await holdRes.json();
                 if (!holdData.success) { this.showToast(holdData.message || 'Failed', 'error'); this.submitting = false; return; }
                 const savedTotal = this.totalAmount;
+                // Fresh cart pay — silent hold did NOT print KOT, so queue it AFTER the receipt prints
+                this.needsKotPrint = this.kitchenSettings.print_on_hold;
                 await this.payHeldOrderDirect(holdData.order.id, method, savedTotal);
                 this.clearCart();
             } catch (e) { this.showToast('Network error', 'error'); }
@@ -1640,22 +1653,85 @@ function restaurantPos() {
             this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); });
         },
 
-        printReceipt() {
-            if (!this.lastTransactionId) return;
-            const url = '/pos/restaurant/receipt/' + this.lastTransactionId + '?auto_print=1';
-            let printFrame = document.getElementById('print-receipt-frame');
-            if (!printFrame) {
-                printFrame = document.createElement('iframe');
-                printFrame.id = 'print-receipt-frame';
-                printFrame.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;top:-9999px;';
-                document.body.appendChild(printFrame);
+        // Cancelable timer registry — prevents stray prints firing after the cashier closes
+        // the receipt modal mid-sequence (e.g., presses Esc before the chained KOT step runs).
+        queuePrintTimer(fn, delay) {
+            const id = setTimeout(() => {
+                this.pendingPrintTimers = this.pendingPrintTimers.filter(t => t !== id);
+                fn();
+            }, delay);
+            this.pendingPrintTimers.push(id);
+            return id;
+        },
+        cancelPendingPrints() {
+            // Bumping the session epoch invalidates any in-flight iframe.onload / afterprint
+            // callbacks that were captured under the prior epoch, so late-firing browser events
+            // (modal closed BEFORE iframe finished loading) cannot enqueue stray prints.
+            this.printSessionId++;
+            this.pendingPrintTimers.forEach(id => clearTimeout(id));
+            this.pendingPrintTimers = [];
+            ['print-receipt-frame', 'print-kot-frame'].forEach(id => {
+                const fr = document.getElementById(id);
+                if (fr) { fr.onload = null; }
+            });
+        },
+
+        // _printViaIframe — shared engine for receipt + KOT. Returns via onAfterPrint when the
+        // browser print dialog actually closes (afterprint event), so chained prints are
+        // event-driven, not time-guessed. Includes a 6s safety fallback if afterprint never
+        // fires (some thermal-driver setups suppress the event). All callbacks are gated by
+        // a captured printSessionId so cancelPendingPrints() also kills late iframe events.
+        _printViaIframe(frameId, url, popupSize, onAfterPrint) {
+            const sid = this.printSessionId;
+            const isStale = () => sid !== this.printSessionId;
+            let frame = document.getElementById(frameId);
+            if (!frame) {
+                frame = document.createElement('iframe');
+                frame.id = frameId;
+                frame.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;top:-9999px;';
+                document.body.appendChild(frame);
             }
-            printFrame.onload = () => {
-                setTimeout(() => {
-                    try { printFrame.contentWindow.print(); } catch(e) { window.open(url, '_blank', 'width=400,height=700'); }
+            const fireOnce = (() => {
+                let invoked = false;
+                return () => {
+                    if (invoked) return;
+                    invoked = true;
+                    if (isStale()) return; // session was canceled — drop callback silently
+                    if (typeof onAfterPrint === 'function') onAfterPrint();
+                };
+            })();
+            frame.onload = () => {
+                if (isStale()) return; // iframe finished loading after cancel — abort
+                this.queuePrintTimer(() => {
+                    if (isStale()) return;
+                    try {
+                        const win = frame.contentWindow;
+                        try { win.addEventListener('afterprint', fireOnce, { once: true }); } catch(e) {}
+                        try { win.print(); }
+                        catch(e) { window.open(url, '_blank', popupSize); fireOnce(); return; }
+                        // Safety fallback so the chain advances even if afterprint never fires
+                        this.queuePrintTimer(fireOnce, 6000);
+                    } catch (e) {
+                        window.open(url, '_blank', popupSize);
+                        this.queuePrintTimer(fireOnce, 1500);
+                    }
                 }, 500);
             };
-            printFrame.src = url;
+            frame.src = url;
+        },
+
+        printReceipt(onAfterPrint) {
+            if (!this.lastTransactionId) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
+            const url = '/pos/restaurant/receipt/' + this.lastTransactionId + '?auto_print=1';
+            this._printViaIframe('print-receipt-frame', url, 'width=400,height=700', onAfterPrint);
+        },
+
+        // Silent KOT print via hidden iframe — no popup window blocks the cashier screen.
+        // Falls back to popup only if iframe printing throws (rare cross-origin edge cases).
+        printKitchenTicket(orderId, onAfterPrint) {
+            if (!orderId) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
+            const url = '/pos/restaurant/orders/' + orderId + '/kitchen-ticket?auto_print=1';
+            this._printViaIframe('print-kot-frame', url, 'width=350,height=600', onAfterPrint);
         },
 
         async deleteHeldOrder(orderId) {
@@ -1678,8 +1754,37 @@ function restaurantPos() {
                 if (data.success) {
                     this.heldOrders = this.heldOrders.filter(o => o.id !== orderId);
                     this.lastInvoiceNumber = data.invoice_number || ''; this.lastTransactionId = data.transaction_id || null;
+                    this.lastOrderId = orderId;
                     this.lastTotal = savedTotal || data.total_amount || 0; this.lastPaymentMethod = method; this.showReceipt = true;
-                    this.$nextTick(() => { setTimeout(() => this.triggerConfetti(), 300); });
+
+                    // AUTO-PRINT SEQUENCE — invoice FIRST, then KOT — fixes the old "KOT pops up
+                    // before receipt and blocks the cashier" bug. The two gates are independent:
+                    //   - print_on_pay  → auto-print invoice (receipt)
+                    //   - needsKotPrint → auto-print KOT (set true ONLY for fresh-cart pays;
+                    //     held-order pays already printed KOT at hold time)
+                    // KOT is chained off the receipt's afterprint event so the order is
+                    // deterministic, not time-guessed.
+                    const wantsAutoReceipt = !!this.kitchenSettings.print_on_pay;
+                    const wantsAutoKot = !!(this.needsKotPrint && this.lastOrderId);
+                    if (wantsAutoKot) this.needsKotPrint = false; // consume the flag
+                    const kotOrderIdAtPay = this.lastOrderId;     // snapshot before any reset
+
+                    this.$nextTick(() => {
+                        this.queuePrintTimer(() => this.triggerConfetti(), 300);
+
+                        if (wantsAutoReceipt && wantsAutoKot) {
+                            this.queuePrintTimer(() => {
+                                this.printReceipt(() => {
+                                    this.queuePrintTimer(() => this.printKitchenTicket(kotOrderIdAtPay), 300);
+                                });
+                            }, 600);
+                        } else if (wantsAutoReceipt) {
+                            this.queuePrintTimer(() => this.printReceipt(), 600);
+                        } else if (wantsAutoKot) {
+                            // Receipt is manual; still auto-print KOT so kitchen gets the order
+                            this.queuePrintTimer(() => this.printKitchenTicket(kotOrderIdAtPay), 600);
+                        }
+                    });
                 } else { if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; } this.showToast(data.message || 'Payment failed', 'error'); }
             } catch (e) { this.showToast('Payment error', 'error'); }
         },

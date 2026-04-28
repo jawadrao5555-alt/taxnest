@@ -2,7 +2,8 @@
 <html lang="en" class="overflow-x-hidden">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <link rel="stylesheet" href="{{ asset('css/mobile.css') }}?v=1.1">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <title>Digital Invoice — FBR Compliant Invoicing by TaxNest</title>
     <link rel="preconnect" href="https://fonts.bunny.net">

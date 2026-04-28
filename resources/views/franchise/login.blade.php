@@ -2,7 +2,8 @@
 <html lang="en" class="h-full">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <link rel="stylesheet" href="{{ asset('css/mobile.css') }}?v=1.1">
     <title>Franchise Login - TaxNest</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>

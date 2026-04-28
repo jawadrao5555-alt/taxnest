@@ -1,0 +1,294 @@
+/* ===========================================================
+   TaxNest — Universal Mobile / PWA Polish (v1)
+   Loaded by every layout: app, guest, pos-app, fbr-pos-app,
+   admin-app, franchise-app. Designed to be additive only —
+   does not override desktop styles, only enhances <= 1024px
+   and PWA standalone mode (notch / home-bar safe-area).
+   =========================================================== */
+
+/* ----- 1. Root: smooth touch + iOS rubber-band control ----- */
+html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+}
+body {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: none;
+    touch-action: manipulation; /* removes 300ms double-tap delay on legacy iOS */
+}
+
+/* ----- 2. iOS Safe-Area (notch + home indicator) ----- */
+/* Apply to PWA standalone mode + always to app body so phones with notches
+   never hide content behind status bar / home bar. */
+@supports (padding-top: env(safe-area-inset-top)) {
+    /* Sticky/fixed top headers — pad inside, don't move whole layout */
+    .safe-top, header.sticky, .topnav-bar, .admin-header-border,
+    nav.fixed.top-0 {
+        padding-top: max(env(safe-area-inset-top), 0px);
+    }
+    /* Bottom drawers, fixed footers, action bars */
+    .safe-bottom, .pos-bottom-bar, .fixed.bottom-0,
+    .bottom-action-bar {
+        padding-bottom: max(env(safe-area-inset-bottom), 12px);
+    }
+    /* Side safe areas for landscape on notched devices */
+    .safe-x { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+}
+/* PWA standalone mode — fully cover the screen, no browser chrome */
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    html, body { height: 100vh; height: 100dvh; }
+    /* Disable text selection on chrome elements (iOS PWA polish) */
+    .topnav-bar, header.sticky, .admin-sidebar, nav#sidebarDrawer {
+        -webkit-user-select: none; user-select: none;
+    }
+}
+
+/* ----- 3. iOS prevent zoom on input focus -----
+   iOS Safari zooms when input font-size < 16px.
+   We force inputs to >= 16px on small screens only.
+   IMPORTANT: respect explicit Tailwind arbitrary text sizes (text-[10px] / text-[11px] /
+   text-[12px]) used in dense POS cart rows — those stay tiny by design. */
+@media (max-width: 768px) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([class*="text-["]):not(.dense-input),
+    select:not([class*="text-["]):not(.dense-input),
+    textarea:not([class*="text-["]):not(.dense-input),
+    .premium-input:not(.dense-input) {
+        font-size: 16px !important;
+        line-height: 1.4;
+    }
+    /* Tailwind `text-xs/text-sm` inputs would shrink — bump them on mobile too,
+       but again skip explicit arbitrary sizes + .dense-input opt-out. */
+    input.text-xs:not([class*="text-["]), input.text-sm:not([class*="text-["]),
+    select.text-xs:not([class*="text-["]), select.text-sm:not([class*="text-["]),
+    textarea.text-xs:not([class*="text-["]), textarea.text-sm:not([class*="text-["]) {
+        font-size: 16px !important;
+    }
+}
+
+/* ----- 4. Touch targets — min 40x40 on all clickables ----- */
+@media (max-width: 768px) {
+    button, a.btn, .btn, .nav-pill, [role="button"], .sidebar-link {
+        min-height: 40px;
+    }
+    /* Tiny icon buttons — keep them touch-safe */
+    button.p-1, button.p-1\.5, a.p-1, a.p-1\.5 {
+        min-width: 36px; min-height: 36px;
+    }
+    /* Form labels easier to tap */
+    label { padding: 4px 0; }
+    /* Bigger tap area for checkboxes & radios */
+    input[type="checkbox"], input[type="radio"] {
+        min-width: 18px; min-height: 18px;
+    }
+}
+
+/* ----- 5. Responsive tables — wrap long tables in horizontal scroller ----- */
+/* Add class .table-responsive on wrapper, OR just wrap any <table> */
+.table-responsive, .table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    border-radius: 12px;
+}
+.table-responsive table, .table-wrap table { min-width: 600px; }
+
+@media (max-width: 768px) {
+    /* Universal table mobile mode — anything in main content gets a soft horizontal scroll */
+    main table:not(.table-static), .premium-table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+    }
+    /* But preserve visual table semantics inside the scroll */
+    main table:not(.table-static) > tbody,
+    main table:not(.table-static) > thead,
+    main table:not(.table-static) > tfoot {
+        display: table;
+        width: 100%;
+        min-width: 600px;
+    }
+    main table:not(.table-static) > tbody > tr,
+    main table:not(.table-static) > thead > tr,
+    main table:not(.table-static) > tfoot > tr {
+        display: table-row;
+    }
+    main table:not(.table-static) > * > tr > th,
+    main table:not(.table-static) > * > tr > td {
+        display: table-cell;
+    }
+    /* Reduce padding inside dense tables on mobile */
+    .premium-table th, .premium-table td { padding: 0.5rem 0.6rem; font-size: 0.78rem; }
+}
+
+/* ----- 6. Mobile-friendly modals / dialogs ----- */
+@media (max-width: 768px) {
+    /* Common modal patterns — keep them inside viewport, scrollable */
+    .modal, [role="dialog"], .dialog-card,
+    .max-w-md.mx-auto, .max-w-lg.mx-auto, .max-w-xl.mx-auto, .max-w-2xl.mx-auto {
+        max-width: 95vw !important;
+    }
+    /* Bottom-sheet style for big forms — opt-in via .sheet-mobile */
+    .sheet-mobile {
+        position: fixed !important;
+        left: 0 !important; right: 0 !important; bottom: 0 !important;
+        top: auto !important;
+        max-height: 92vh !important;
+        border-radius: 18px 18px 0 0 !important;
+        animation: sheetUp 0.22s cubic-bezier(0.16,1,0.3,1);
+    }
+    @keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+}
+
+/* ----- 7. Mobile typography — prevent giant headlines, retain hierarchy ----- */
+@media (max-width: 640px) {
+    h1, .text-4xl, .text-5xl { font-size: 1.75rem !important; line-height: 2.05rem !important; }
+    h2, .text-3xl { font-size: 1.4rem !important; line-height: 1.7rem !important; }
+    h3, .text-2xl { font-size: 1.2rem !important; line-height: 1.5rem !important; }
+    .text-xl { font-size: 1.05rem !important; line-height: 1.4rem !important; }
+}
+
+/* ----- 8. Common layout fixes ----- */
+@media (max-width: 768px) {
+    /* Long horizontal pill bars / tab strips — give them horizontal scroll instead of wrap */
+    .tabs-scroll, .pill-strip {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+        scrollbar-width: none;
+    }
+    .tabs-scroll::-webkit-scrollbar, .pill-strip::-webkit-scrollbar { display: none; }
+
+    /* Reduce default page paddings on tiny screens */
+    main.flex-1.overflow-y-auto { padding: 1rem 0.875rem; }
+
+    /* Stack flex utility rows vertically on small phones if they were forced row */
+    .stack-mobile { flex-direction: column !important; align-items: stretch !important; }
+    .stack-mobile > * { width: 100% !important; }
+
+    /* Hide non-essential decorative elements on phones */
+    .hide-mobile, .desktop-only { display: none !important; }
+    /* Force-show on mobile only */
+    .mobile-only { display: block !important; }
+    .mobile-only.inline { display: inline !important; }
+    .mobile-only.flex   { display: flex !important; }
+    .mobile-only.grid   { display: grid !important; }
+}
+@media (min-width: 769px) {
+    .mobile-only { display: none !important; }
+}
+
+/* ----- 9. Sticky bottom action bar (used by POS carts, forms) ----- */
+.bottom-action-bar {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-top: 1px solid rgba(229,231,235,0.9);
+    padding: 0.75rem 1rem;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    z-index: 30;
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+}
+.dark .bottom-action-bar {
+    background: #0f172a;
+    border-top-color: rgba(55,65,81,0.7);
+}
+
+/* ----- 10. POS cart polish on mobile ----- */
+@media (max-width: 768px) {
+    /* Two-column POS pages (product grid + cart) → stack vertically */
+    .pos-grid-cart { display: block !important; }
+    .pos-grid-cart > * { width: 100% !important; max-width: 100% !important; }
+
+    /* Pin cart to bottom drawer with a toggle handle */
+    .cart-drawer-mobile {
+        position: fixed; left: 0; right: 0; bottom: 0;
+        max-height: 70vh; background: white;
+        border-radius: 18px 18px 0 0;
+        box-shadow: 0 -8px 24px rgba(0,0,0,0.18);
+        transform: translateY(calc(100% - 64px));
+        transition: transform 0.25s cubic-bezier(0.16,1,0.3,1);
+        z-index: 40;
+        overflow-y: auto;
+    }
+    .cart-drawer-mobile.is-open { transform: translateY(0); }
+    .dark .cart-drawer-mobile { background: #0f172a; }
+}
+
+/* ----- 11. Sidebar drawer width on small phones ----- */
+@media (max-width: 480px) {
+    nav#sidebarDrawer, aside.fixed.lg\:static {
+        width: 88vw !important;
+        max-width: 320px;
+    }
+}
+
+/* ----- 12. Better mobile scrollbars (slim, unobtrusive) ----- */
+@media (max-width: 768px) {
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.45); border-radius: 4px; }
+}
+
+/* ----- 13. Form field spacing on mobile ----- */
+@media (max-width: 640px) {
+    .grid.grid-cols-2:not(.grid-cols-2-keep), .grid.grid-cols-3:not(.grid-cols-3-keep),
+    .grid.grid-cols-4:not(.grid-cols-4-keep) {
+        grid-template-columns: 1fr !important;
+        gap: 0.75rem !important;
+    }
+    /* Restore 2-col when explicitly opted-in */
+    .grid.grid-cols-2.grid-cols-2-keep { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+
+/* ----- 14. KPI / stat card grids — 2-col on phones, 4-col on desktop ----- */
+@media (max-width: 480px) {
+    .kpi-grid, .stat-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 0.75rem !important;
+    }
+}
+
+/* ----- 15. Image sizing safety ----- */
+img, video, iframe { max-width: 100%; height: auto; }
+
+/* ----- 16. Better mobile button row spacing ----- */
+@media (max-width: 640px) {
+    .btn-row, .actions-row {
+        display: flex; flex-wrap: wrap; gap: 0.5rem;
+    }
+    .btn-row > *, .actions-row > * { flex: 1 1 auto; min-width: 0; }
+}
+
+/* ----- 17. Prevent horizontal page scroll (the #1 mobile-app sin) ----- */
+html, body { max-width: 100%; overflow-x: hidden; }
+
+/* ----- 18. Accessible focus rings on touch devices ----- */
+@media (hover: none) {
+    *:focus-visible {
+        outline: 2px solid #10b981;
+        outline-offset: 2px;
+    }
+}
+
+/* ----- 19. Loading / disabled state legibility on mobile ----- */
+@media (max-width: 768px) {
+    .btn-loading::after { width: 16px; height: 16px; margin-top: -8px; }
+}
+
+/* ----- 20. POS receipt preview / PDF iframes — full width on mobile ----- */
+@media (max-width: 768px) {
+    iframe.receipt-preview, iframe.pdf-preview {
+        width: 100% !important;
+        min-height: 60vh;
+    }
+}
+
+/* ----- 21. Print-mode: untouched, browser handles ----- */
+@media print {
+    .hide-print { display: none !important; }
+}

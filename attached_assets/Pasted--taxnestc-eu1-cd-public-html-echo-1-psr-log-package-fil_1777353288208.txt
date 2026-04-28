@@ -1,0 +1,209 @@
+[taxnestc@eu1 ~]$ cd ~/public_html
+
+echo "=== 1. psr/log package files ==="
+ls -la vendor/psr/log/src/ 2>&1
+echo "---"
+ls vendor/psr/ 2>&1
+
+echo ""
+echo "=== 2. WITH autoloader — both classes ==="
+php -d display_errors=stderr -r "
+require '/home/taxnestc/public_html/vendor/autoload.php';
+echo 'PSR LoggerInterface: '; var_dump(interface_exists('Psr\\Log\\LoggerInterface'));
+echo 'Monolog Logger: '; var_dump(class_exists('Monolog\\Logger'));
+echo 'Monolog StreamHandler: '; var_dump(class_exists('Monolog\\Handler\\StreamHandler'));
+" > /tmp/x.log 2>&1
+echo "EXIT: $?"
+cat /tmp/x.log
+
+echo ""
+echo "=== 3. Vendor dir size + missing dir check ==="
+du -sh vendor 2>&1
+find vendor -maxdepth 2 -type d -empty 2>&1 | head -20
+=== 1. psr/log package files ===
+total 40
+drwxr-xr-x 2 taxnestc taxnestc 4096 Sep 11  2024 .
+drwxr-xr-x 3 taxnestc taxnestc 4096 Sep 11  2024 ..
+-rw-r--r-- 1 taxnestc taxnestc  414 Sep 11  2024 AbstractLogger.php
+-rw-r--r-- 1 taxnestc taxnestc   96 Sep 11  2024 InvalidArgumentException.php
+-rw-r--r-- 1 taxnestc taxnestc  231 Sep 11  2024 LoggerAwareInterface.php
+-rw-r--r-- 1 taxnestc taxnestc  347 Sep 11  2024 LoggerAwareTrait.php
+-rw-r--r-- 1 taxnestc taxnestc 2770 Sep 11  2024 LoggerInterface.php
+-rw-r--r-- 1 taxnestc taxnestc 2755 Sep 11  2024 LoggerTrait.php
+-rw-r--r-- 1 taxnestc taxnestc  336 Sep 11  2024 LogLevel.php
+-rw-r--r-- 1 taxnestc taxnestc  643 Sep 11  2024 NullLogger.php
+---
+clock      event-dispatcher  http-factory  log
+container  http-client       http-message  simple-cache
+
+=== 2. WITH autoloader — both classes ===
+EXIT: 255
+Unsuccessful stat on filename containing newline at /var/cpanel/ea4/ea_php_cli.pm line 87.
+PSR LoggerInterface: Command line code:3:
+bool(true)
+Monolog Logger:
+Fatal error: Declaration of Monolog\Logger::emergency(Stringable|string $message, array $context = []): void must be compatible with PsrExt\Log\LoggerInterface::emergency($message, array $context = []) in /home/taxnestc/public_html/vendor/monolog/monolog/src/Monolog/Logger.php on line 683
+
+Call Stack:
+    0.0000    1802880   1. {main}() Command line code:0
+    0.0189    7219560   2. class_exists($class = 'Monolog\\Logger') Command line code:4
+    0.0189    7219632   3. Composer\Autoload\ClassLoader->loadClass($class = 'Monolog\\Logger') Command line code:4
+    0.0189    7219632   4. {closure:/home/taxnestc/public_html/vendor/composer/ClassLoader.php:575-577}($file = '/home/taxnestc/public_html/vendor/composer/../monolog/monolog/src/Monolog/Logger.php') /home/taxnestc/public_html/vendor/composer/ClassLoader.php:427
+    0.0191    7287608   5. include('/home/taxnestc/public_html/vendor/monolog/monolog/src/Monolog/Logger.php') /home/taxnestc/public_html/vendor/composer/ClassLoader.php:576
+
+
+=== 3. Vendor dir size + missing dir check ===
+73M     vendor
+[taxnestc@eu1 public_html]$ cd ~/public_html
+
+echo "=== 1. Search PsrExt in vendor ==="
+grep -rln "PsrExt" vendor/ 2>&1 | head -10
+
+echo ""
+echo "=== 2. psr/log LoggerInterface actual content ==="
+head -40 vendor/psr/log/src/LoggerInterface.php
+
+echo ""
+echo "=== 3. psr/log version ==="
+cat vendor/psr/log/composer.json 2>&1 | grep -E '"version|"name' | head -5
+
+echo ""
+echo "=== 4. Logger.php line 683 area ==="
+sed -n '680,690p' vendor/monolog/monolog/src/Monolog/Logger.php
+
+echo ""
+echo "=== 5. Check ionCube extension files (likely culprit) ==="
+php -m 2>&1 | head -30
+
+echo ""
+echo "=== 6. Loaded php.ini extensions ==="
+php --ini 2>&1 | head -10
+=== 1. Search PsrExt in vendor ===
+
+=== 2. psr/log LoggerInterface actual content ===
+<?php
+
+namespace Psr\Log;
+
+/**
+ * Describes a logger instance.
+ *
+ * The message MUST be a string or object implementing __toString().
+ *
+ * The message MAY contain placeholders in the form: {foo} where foo
+ * will be replaced by the context data in key "foo".
+ *
+ * The context array can contain arbitrary data. The only assumption that
+ * can be made by implementors is that if an Exception instance is given
+ * to produce a stack trace, it MUST be in a key named "exception".
+ *
+ * See https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-3-logger-interface.md
+ * for the full interface specification.
+ */
+interface LoggerInterface
+{
+    /**
+     * System is unusable.
+     *
+     * @param mixed[] $context
+     */
+    public function emergency(string|\Stringable $message, array $context = []): void;
+
+    /**
+     * Action must be taken immediately.
+     *
+     * Example: Entire website down, database unavailable, etc. This should
+     * trigger the SMS alerts and wake you up.
+     *
+     * @param mixed[] $context
+     */
+    public function alert(string|\Stringable $message, array $context = []): void;
+
+    /**
+     * Critical conditions.
+
+=== 3. psr/log version ===
+    "name": "psr/log",
+            "name": "PHP-FIG",
+
+=== 4. Logger.php line 683 area ===
+     * @param string|Stringable $message The log message
+     * @param mixed[]           $context The log context
+     */
+    public function emergency(string|\Stringable $message, array $context = []): void
+    {
+        $this->addRecord(Level::Emergency, (string) $message, $context);
+    }
+
+    /**
+     * Sets the timezone to be used for the timestamp of log records.
+     *
+
+=== 5. Check ionCube extension files (likely culprit) ===
+[PHP Modules]
+amqp
+apcu
+bcmath
+bitset
+brotli
+bz2
+calendar
+Core
+ctype
+curl
+date
+dom
+eio
+enchant
+exif
+FFI
+fileinfo
+filter
+ftp
+gd
+gearman
+gender
+geoip
+geos
+gettext
+gmagick
+gmp
+gnupg
+grpc
+
+=== 6. Loaded php.ini extensions ===
+Configuration File (php.ini) Path: /opt/alt/php84/etc
+Loaded Configuration File:         /opt/alt/php84/etc/php.ini
+Scan for additional .ini files in: /opt/alt/php84/link/conf
+Additional .ini files parsed:      /opt/alt/php84/link/conf/alt_php.ini
+                                                                                                            echo "=== psr extension loaded? ==="
+php -m | grep -i psr_html]$ echo "=== psr extension loaded? ==="
+echo "---"rep -i psr
+echo "=== psr.ini config ==="
+ls /opt/alt/php84/link/conf/ 2>&1 | grep -i psr
+cat /opt/alt/php84/link/conf/*psr* 2>&1 | head -10
+echo "---"lt/php84/link/conf/*psr* 2>&1 | head -10
+echo "=== Test WITHOUT psr extension ==="
+php -d extension=  -n -d extension_dir=/opt/alt/php84/usr/lib64/php/modules -r "echo PHP_VERSION;" 2>&1 | head -3
+=== psr extension loaded? ===nsion_dir=/opt/alt/php84/usr/lib64/php/modules -r "echo PHP_VERSION;" 2>&1 | head -3
+psr
+---
+=== psr.ini config ===
+cat: '/opt/alt/php84/link/conf/*psr*': No such file or directory
+---
+=== Test WITHOUT psr extension ===
+
+Warning: PHP Startup: Unable to load dynamic library '' (tried: /opt/alt/php84/usr/lib64/php/modules/ (/opt/alt/php84/usr/lib64/php/modules/: cannotread file data: Is a directory), /opt/alt/php84/usr/lib64/php/modules/.so (/opt/alt/php84/usr/lib64/php/modules/.so: cannot open shared object file:No such file or directory)) in Unknown on line 0
+8.4.15[taxnestc@eu1 public_hecho "=== Method 1: User-level php.ini ==="i ==="
+mkdir -p ~/public_html
+echo "extension=" > ~/public_html/.user.ini
+cat ~/public_html/.user.ini
+
+echo "=== Method 2: Selectively disable via .htaccess ==="
+# Ya .htaccess me yeh add kar sakte hain
+echo "Browser cPanel → Select PHP Version → Extensions → UNCHECK 'psr' → Save"
+=== Method 1: User-level php.ini ===
+extension=
+=== Method 2: Selectively disable via .htaccess ===
+Browser cPanel → Select PHP Version → Extensions → UNCHECK 'psr' → Save
+[taxnestc@eu1 public_html]$

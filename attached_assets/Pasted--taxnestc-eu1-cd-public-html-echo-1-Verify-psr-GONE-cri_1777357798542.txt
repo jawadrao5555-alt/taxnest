@@ -1,0 +1,141 @@
+[taxnestc@eu1 ~]$ cd ~/public_html
+
+echo "=== 1. Verify psr GONE + critical extensions ==="
+php -m | grep -iE "^(psr|pdo_mysql|mysqli|mbstring|gd)$" 2>&1
+echo ""
+echo "=== 2. Class load test (must work now!) ==="
+php -r "require '/home/taxnestc/public_html/vendor/autoload.php'; echo 'Logger: '; var_dump(class_exists('Monolog\\Logger')); echo 'Handler: '; var_dump(class_exists('Monolog\\Handler\\StreamHandler'));" 2>&1.php'; echo 'Logger: '; var_dump(class_exists('Monolog\\Logger')); echo 'Handler: '; var_dump(class_exists('Monolog\\Handler\\StreamHandler'));" 2>&1
+echo ""
+echo "=== 3. Artisan package:discover ==="
+php artisan package:discover 2>&1 | tail -10
+echo "EXIT: $?"kage:discover 2>&1 | tail -10
+echo "EXIT: $?"
+echo ""
+echo "=== 4. Clear all caches + rebuild ==="
+php artisan config:clear 2>&1 | tail -3 ==="
+php artisan cache:clear 2>&1 | tail -33
+php artisan view:clear 2>&1 | tail -33
+php artisan route:clear 2>&1 | tail -3
+php artisan route:clear 2>&1 | tail -3
+echo ""
+curl -s https://taxnest.com.pk | head -20
+=== 1. Verify psr GONE + critical extensions ===
+gd
+mbstring
+mysqli
+pdo_mysql
+
+bash: !: event not found
+Logger: bool(true)
+Handler: bool(true)
+
+=== 3. Artisan package:discover ===
+
+   INFO  Discovering packages.
+
+  barryvdh/laravel-dompdf ............................................... DONE
+  laravel/tinker ........................................................ DONE
+  nesbot/carbon ......................................................... DONE
+  nunomaduro/termwind ................................................... DONE
+  simplesoftwareio/simple-qrcode ........................................ DONE
+
+EXIT: 0
+
+=== 4. Clear all caches + rebuild ===
+
+   INFO  Configuration cache cleared successfully.
+
+
+   INFO  Application cache cleared successfully.
+
+
+   INFO  Compiled views cleared successfully.
+
+
+   INFO  Route cache cleared successfully.
+
+
+=== 5. HTTP test ===
+HTTP/2 200
+x-powered-by: PHP/8.4.15
+content-type: text/html; charset=utf-8
+cache-control: must-revalidate, no-cache, no-store, private
+x-content-type-options: nosniff
+---
+<!DOCTYPE html>
+<html lang="en" class="overflow-x-hidden">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>TaxNest — Pakistan's Most Advanced Tax Compliance Platform</title>
+    <link rel="preconnect" href="https://fonts.bunny.net">
+    <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800&display=swap" rel="stylesheet">
+    <link rel="preload" as="style" href="/build/assets/app-Be1o2smU.css" /><link rel="modulepreload" as="script" href="/build/assets/app-BAnLkSj-.js" /><link rel="stylesheet" href="/build/assets/app-Be1o2smU.css" /><script type="module" src="/build/assets/app-BAnLkSj-.js"></script>    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        [x-cloak] { display: none !important; }
+        .fade-up { opacity: 0; transform: translateY(24px); transition: opacity 0.7s ease, transform 0.7s ease; }
+        .fade-up.visible { opacity: 1; transform: translateY(0); }
+        .hero-glow {
+            background:
+                radial-gradient(ellipse 80% 60% at 50% -10%, rgba(16,185,129,0.22) 0%, transparent 70%),
+                radial-gradient(ellipse 60% 50% at 80% 50%, rgba(139,92,246,0.14) 0%, transparent 60%),
+                radial-gradient(ellipse 40% 40% at 20% 80%, rgba(6,182,212,0.10) 0%, transparent 50%);
+        }
+[taxnestc@eu1 public_html]$ cd ~/public_html
+
+echo "=== 1. APP_DEBUG=false (production mode) ==="
+sed -i 's/^APP_DEBUG=true/APP_DEBUG=false/' .env
+sed -i 's/^APP_ENV=local/APP_ENV=production/' .env
+grep -E "^APP_(ENV|DEBUG)=" .env
+
+echo ""
+echo "=== 2. Production caches (speed boost) ==="
+php artisan config:cache 2>&1 | tail -2
+php artisan route:cache 2>&1 | tail -2
+php artisan view:cache 2>&1 | tail -2
+php artisan event:cache 2>&1 | tail -2
+
+echo ""
+echo "=== 3. Storage symlink (uploaded images visible) ==="
+php artisan storage:link 2>&1 | tail -3
+
+echo ""
+echo "=== 4. Final HTTP test ==="
+curl -sI https://taxnest.com.pk | head -3
+echo "---"
+curl -sI https://taxnest.com.pk/login | head -3
+
+5s -la ~/public_html/index.php.OLD-* ~/public_html/.htaccess.OLD-* 2>&1 | head -
+=== 1. APP_DEBUG=false (production mode) ===
+APP_ENV=production
+APP_DEBUG=false
+
+=== 2. Production caches (speed boost) ===
+   INFO  Configuration cached successfully.
+
+   INFO  Routes cached successfully.
+
+   INFO  Blade templates cached successfully.
+
+   INFO  Events cached successfully.
+
+
+=== 3. Storage symlink (uploaded images visible) ===
+
+   ERROR  The [public/storage] link already exists.
+
+
+=== 4. Final HTTP test ===
+HTTP/2 200
+x-powered-by: PHP/8.4.15
+content-type: text/html; charset=utf-8
+---
+HTTP/2 200
+x-powered-by: PHP/8.4.15
+content-type: text/html; charset=utf-8
+
+=== 5. Cleanup OLD backup files ===
+ls: cannot access '/home/taxnestc/public_html/index.php.OLD-*': No such file or directory
+ls: cannot access '/home/taxnestc/public_html/.htaccess.OLD-*': No such file or directory
+[taxnestc@eu1 public_html]$

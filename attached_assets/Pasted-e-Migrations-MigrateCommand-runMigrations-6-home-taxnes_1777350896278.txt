@@ -1,0 +1,97 @@
+e\\Migrations\\MigrateCommand->runMigrations()
+#6 /home/taxnestc/public_html/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(36): Illuminate\\Database\\Console\\Migrations\\MigrateCommand->handle()
+#7 /home/taxnestc/public_html/vendor/laravel/framework/src/Illuminate/Container/Util.php(43): Illuminate\\Container\\BoundMethod::{closure:Illuminate\\Container\\BoundMethod::call():35}()
+#8 /home/taxnestc/public_html/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(96): Illuminate\\Container\\Util::unwrapIfClosure()
+#9 /home/taxnestc/public_html/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(35): Illuminate\\Container\\BoundMethod::callBoundMethod()
+#10 /home/taxnestc/public_html/vendor/laravel/framework/src/Illuminate/Container/Container.php(799): Illuminate\\Container\\BoundMethod::call()
+#11 /home/taxnestc/public_html/vendor/laravel/framework/src/Illuminate/Console/Command.php(211): Illuminate\\Container\\Container->call()
+#12 /home/taxnestc/public_html/vendor/symfony/console/Command/Command.php(341): Illuminate\\Console\\Command->execute()
+#13 /home/taxnestc/public_html/vendor/laravel/framework/src/Illuminate/Console/Command.php(180): Symfony\\Component\\Console\\Command\\Command->run()
+#14 /home/taxnestc/public_html/vendor/symfony/console/Application.php(1102): Illuminate\\Console\\Command->run()
+#15 /home/taxnestc/public_html/vendor/symfony/console/Application.php(356): Symfony\\Component\\Console\\Application->doRunCommand()
+#16 /home/taxnestc/public_html/vendor/symfony/console/Application.php(195): Symfony\\Component\\Console\\Application->doRun()
+#17 /home/taxnestc/public_html/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(198): Symfony\\Component\\Console\\Application->run()
+#18 /home/taxnestc/public_html/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1235): Illuminate\\Foundation\\Console\\Kernel->handle()
+#19 /home/taxnestc/public_html/artisan(16): Illuminate\\Foundation\\Application->handleCommand()
+#20 {main}
+"}
+
+═══ HTML body title (agar 500 hai) ═══
+Server Error
+[taxnestc@eu1 public_html]$ cd ~/public_html
+
+echo "═══ 1. Debug mode TEMPORARILY ON ═══"
+sed -i 's|^APP_DEBUG=.*|APP_DEBUG=true|' .env
+sed -i 's|^LOG_LEVEL=.*|LOG_LEVEL=debug|' .env
+php artisan config:clear
+php artisan config:cache
+echo "✅ Debug ON"
+
+echo ""
+echo "═══ 2. Log file permission + recent files ═══"
+ls -la storage/logs/ 2>&1
+echo "---"
+stat storage/logs/laravel.log 2>&1 | head -5
+
+echo ""
+echo "═══ 3. Make sure logs writable ═══"
+chmod -R 775 storage bootstrap/cache
+chmod -R g+w storage/logs
+touch storage/logs/laravel.log
+chmod 664 storage/logs/laravel.log
+echo "✅ perms set"
+
+echo ""
+tail -30 ~/public_html/public/error_log 2>&1 level) ═══"/tmp/response.html | hea
+═══ 1. Debug mode TEMPORARILY ON ═══
+
+   INFO  Configuration cache cleared successfully.
+
+
+   INFO  Configuration cached successfully.
+
+✅ Debug ON
+
+═══ 2. Log file permission + recent files ═══
+total 104
+drwxrwxr-x 2 taxnestc taxnestc  4096 Apr 24 17:03 .
+drwxrwxr-x 5 taxnestc taxnestc  4096 Mar 27 15:15 ..
+-rwxrwxr-x 1 taxnestc taxnestc    14 Mar 28 05:06 .gitignore
+-rwxrwxr-x 1 taxnestc taxnestc 89240 Apr 28 04:34 laravel.log
+---
+  File: storage/logs/laravel.log
+  Size: 89240           Blocks: 184        IO Block: 4096   regular file
+Device: 901h/2305d      Inode: 85480972    Links: 1
+Access: (0775/-rwxrwxr-x)  Uid: ( 1776/taxnestc)   Gid: ( 1780/taxnestc)
+Access: 2026-04-28 04:30:15.430744788 +0000
+
+═══ 3. Make sure logs writable ═══
+✅ perms set
+
+═══ 4. Truncate log so we see ONLY new errors ═══
+✅ log cleared
+
+═══ 5. Hit the site ═══
+HTTP: 500
+---
+
+═══ 6. Real error from response body ═══
+        <title>Server Error</title>
+---
+FULL ERROR (first 2000 chars):
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <title>Server Error</title>
+
+        <style>
+            /*! normalize.css v8.0.1 | MIT License | github.com/necolas/normalize.css */html{line-height:1.15;-webkit-text-size-adjust:100%}body{margin:0}a{background-color:transparent}code{font-family:monospace,monospace;font-size:1em}[hidden]{display:none}html{font-family:system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial,Noto Sans,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol,Noto Color Emoji;line-height:1.5}*,:after,:before{box-sizing:border-box;border:0 solid #e2e8f0}a{color:inherit;text-decoration:inherit}code{font-family:Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace}svg,video{display:block;vertical-align:middle}video{max-width:100%;height:auto}.bg-white{--bg-opacity:1;background-color:#fff;background-color:rgba(255,255,255,var(--bg-opacity))}.bg-gray-100{--bg-opacity:1;background-color:#f7fafc;background-color:rgba(247,250,252,var(--bg-opacity))}.border-gray-200{--border-opacity:1;border-color:#edf2f7;border-color:rgba(237,242,247,var(--border-opacity))}.border-gray-400{--border-opacity:1;border-color:#cbd5e0;border-color:rgba(203,213,224,var(--border-opacity))}.border-t{border-top-width:1px}.border-r{border-right-width:1px}.flex{display:flex}.grid{display:grid}.hidden{display:none}.items-center{align-items:center}.justify-center{justify-content:center}.font-semibold{font-weight:600}.h-5{height:1.25rem}.h-8{height:2rem}.h-16{height:4rem}.text-sm{font-size:.875rem}.text-lg{font-size:1.125rem}.leading-7{line-height:1.75rem}.mx-auto{margin-left:auto;margin-right:auto}.ml-1{margin-left:.25rem}.mt-2{margin-top:.5rem}.mr-2{margin-right:.5rem}.ml-2{margin-left:.5rem}.mt-4{margin-top:1rem}.ml-4{margin-left:1rem}.mt-8{margin-top:2rem}.ml-12{margin-left:3rem}.-mt-px{margin-top:-1px}.max-w-xl{max-width:36rem}.ma
+
+═══ 7. Fresh Laravel error log ═══
+
+═══ 8. PHP error log (LiteSpeed/Apache level) ═══
+---
+[taxnestc@eu1 public_html]$

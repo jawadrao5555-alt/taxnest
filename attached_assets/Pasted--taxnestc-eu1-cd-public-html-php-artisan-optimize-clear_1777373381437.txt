@@ -1,0 +1,61 @@
+[taxnestc@eu1 ~]$ cd ~/public_html
+php artisan optimize:clear
+php artisan config:clear
+php artisan cache:clear
+php artisan route:clear
+php artisan view:clear
+chmod -R 775 storage bootstrap/cache
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.90ms DONE
+  cache .......................................................... 5.07ms DONE
+  compiled ....................................................... 0.56ms DONE
+  events ......................................................... 0.34ms DONE
+  routes ......................................................... 0.48ms DONE
+  views .......................................................... 2.35ms DONE
+
+
+   INFO  Configuration cache cleared successfully.
+
+
+   INFO  Application cache cleared successfully.
+
+   INFO  Route cache cleared successfully.
+
+
+   INFO  Compiled views cleared successfully.
+
+[taxnestc@eu1 public_html]$ tail -80 storage/logs/laravel.log
+[taxnestc@eu1 public_html]$ ls -la storage/framework/sessions/ | head -10
+ls -la storage/framework/ | head -10
+total 872
+drwxrwxr-x 2 taxnestc taxnestc 57344 Apr 28 09:34 .
+drwxrwxr-x 6 taxnestc taxnestc  4096 Apr 28 09:34 ..
+-rwxrwxr-x 1 taxnestc taxnestc   210 Apr 28 07:22 06IZMGp8ymodwEye4YefZWs4A1x4N2GbBG76bkmj
+-rwxrwxr-x 1 taxnestc taxnestc   254 Apr 28 07:14 0M18rISVgvZdk6JTDfo98SI27d2XQ72atlXWUU8u
+-rwxrwxr-x 1 taxnestc taxnestc   254 Apr 28 07:34 1aqryF7qp357vgud6hJeQlvTj58h1yugTb0figeq
+-rwxrwxr-x 1 taxnestc taxnestc   226 Apr 28 07:19 1n0Eifk5nf1VMWnTE0YQZgF8YPzbAzkU2ACV5d9S
+-rwxrwxr-x 1 taxnestc taxnestc   254 Apr 28 07:33 1ru0CZHX52XmLTCT7m69pAubkGR1Xnza682Pxi7X
+-rwxrwxr-x 1 taxnestc taxnestc   254 Apr 28 07:22 2IpZ4YISQp7S6ROa3F7UbnYko79LwnksA6iBWRKB
+-rwxrwxr-x 1 taxnestc taxnestc   254 Apr 28 07:19 2uo8MF6YblTqpltkSvm5yj1tdrQykJZ9afrmIcbC
+total 108
+drwxrwxr-x 6 taxnestc taxnestc  4096 Apr 28 09:34 .
+drwxrwxr-x 5 taxnestc taxnestc  4096 Apr 28 09:37 ..
+drwxrwxr-x 3 taxnestc taxnestc  4096 Apr 28 09:34 cache
+-rwxrwxr-x 1 taxnestc taxnestc    11 Apr 28 09:34 .deploy_version
+-rwxrwxr-x 1 taxnestc taxnestc   119 Apr 28 09:34 .gitignore
+drwxrwxr-x 2 taxnestc taxnestc 57344 Apr 28 09:34 sessions
+drwxrwxr-x 2 taxnestc taxnestc  4096 Apr 28 09:34 testing
+drwxrwxr-x 2 taxnestc taxnestc 20480 Apr 28 10:49 views                                                     grep -E "^(SESSION_|APP_URL|APP_KEY=|APP_
+DEBUG)" .env1 public_html]$ grep -E "^(SESSION_|APP_URL|APP_KEY=|APP_DEBUG)" .env
+APP_KEY=base64:guOFv2bF9I1ah6howSdaRm/n/wVuw+wZC5t0u30CSZg=
+APP_DEBUG=true
+APP_URL=https://taxnest.com.pk
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+SESSION_ENCRYPT=false
+SESSION_PATH=/
+SESSION_DOMAIN=.taxnest.com.pk
+SESSION_SECURE_COOKIE=true
+[taxnestc@eu1 public_html]$

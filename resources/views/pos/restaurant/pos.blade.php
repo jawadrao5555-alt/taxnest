@@ -822,12 +822,14 @@ window.addEventListener('popstate', function() {
                 <iframe x-ref="receiptIframe" class="w-full h-full border-0" :src="lastTransactionId ? '/pos/restaurant/receipt/' + lastTransactionId : ''" style="min-height:300px;"></iframe>
             </div>
             <div class="p-3 space-y-2 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
-                <div class="grid grid-cols-4 gap-2">
+                {{-- KOT button shows ONLY when KOT auto-print is OFF (print_on_hold = false). --}}
+                {{-- When auto-print is ON, KOT prints automatically after invoice — button would be redundant. --}}
+                <div :class="kitchenSettings.print_on_hold ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-4 gap-2'">
                     <button @click="printReceipt()" class="py-3 text-center rounded-xl bg-gradient-to-br from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800 text-white text-sm font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-1.5">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                         Print <kbd class="text-[8px] bg-purple-500/40 px-1 rounded font-mono">P</kbd>
                     </button>
-                    <button @click="printKitchenTicket(lastOrderId)" :disabled="!lastOrderId" class="py-3 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-md shadow-orange-500/20 flex items-center justify-center gap-1.5" title="Print Kitchen Order Ticket">
+                    <button x-show="!kitchenSettings.print_on_hold" @click="printKitchenTicket(lastOrderId)" :disabled="!lastOrderId" class="py-3 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-md shadow-orange-500/20 flex items-center justify-center gap-1.5" title="Print Kitchen Order Ticket">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
                         KOT <kbd class="text-[8px] bg-orange-500/40 px-1 rounded font-mono">K</kbd>
                     </button>
@@ -1676,11 +1678,14 @@ function restaurantPos() {
             });
         },
 
-        // _printViaIframe — shared engine for receipt + KOT. Returns via onAfterPrint when the
-        // browser print dialog actually closes (afterprint event), so chained prints are
-        // event-driven, not time-guessed. Includes a 6s safety fallback if afterprint never
-        // fires (some thermal-driver setups suppress the event). All callbacks are gated by
-        // a captured printSessionId so cancelPendingPrints() also kills late iframe events.
+        // Hidden-iframe print engine. Relies on win.print()'s documented BLOCKING behavior in
+        // Chromium browsers (per MDN: "This method will block while the print dialog is open."),
+        // so the next chained print never fires until the user dismisses the current dialog.
+        // We deliberately do NOT use the `afterprint` event — it fires unpredictably across
+        // browser/printer-driver combos (sometimes when the dialog OPENS, sometimes when it
+        // closes, sometimes never with silent-print drivers), which caused the receipt and KOT
+        // dialogs to appear stacked or in reverse order. Cache-bust query forces iframe.onload
+        // to refire even when the same URL is reprinted (e.g. user presses K twice).
         _printViaIframe(frameId, url, popupSize, onAfterPrint) {
             const sid = this.printSessionId;
             const isStale = () => sid !== this.printSessionId;
@@ -1700,24 +1705,29 @@ function restaurantPos() {
                     if (typeof onAfterPrint === 'function') onAfterPrint();
                 };
             })();
+            const cacheBustedUrl = url + (url.includes('?') ? '&' : '?') + '_t=' + Date.now();
             frame.onload = () => {
                 if (isStale()) return; // iframe finished loading after cancel — abort
                 this.queuePrintTimer(() => {
                     if (isStale()) return;
                     try {
                         const win = frame.contentWindow;
-                        try { win.addEventListener('afterprint', fireOnce, { once: true }); } catch(e) {}
-                        try { win.print(); }
-                        catch(e) { window.open(url, '_blank', popupSize); fireOnce(); return; }
-                        // Safety fallback so the chain advances even if afterprint never fires
-                        this.queuePrintTimer(fireOnce, 6000);
+                        try {
+                            win.print(); // BLOCKS in Chrome until the print dialog is dismissed
+                        } catch(e) {
+                            window.open(cacheBustedUrl, '_blank', popupSize);
+                        }
+                        // win.print() returned ⇒ dialog is closed ⇒ safe to advance the chain.
+                        // Tiny buffer lets the OS-level dialog finish closing visually before
+                        // the next dialog opens (avoids any flicker / overlap on slow GPUs).
+                        if (!isStale()) this.queuePrintTimer(fireOnce, 250);
                     } catch (e) {
-                        window.open(url, '_blank', popupSize);
+                        window.open(cacheBustedUrl, '_blank', popupSize);
                         this.queuePrintTimer(fireOnce, 1500);
                     }
                 }, 500);
             };
-            frame.src = url;
+            frame.src = cacheBustedUrl;
         },
 
         printReceipt(onAfterPrint) {
@@ -1757,15 +1767,18 @@ function restaurantPos() {
                     this.lastOrderId = orderId;
                     this.lastTotal = savedTotal || data.total_amount || 0; this.lastPaymentMethod = method; this.showReceipt = true;
 
-                    // AUTO-PRINT SEQUENCE — invoice FIRST, then KOT — fixes the old "KOT pops up
-                    // before receipt and blocks the cashier" bug. The two gates are independent:
-                    //   - print_on_pay  → auto-print invoice (receipt)
-                    //   - needsKotPrint → auto-print KOT (set true ONLY for fresh-cart pays;
-                    //     held-order pays already printed KOT at hold time)
-                    // KOT is chained off the receipt's afterprint event so the order is
-                    // deterministic, not time-guessed.
-                    const wantsAutoReceipt = !!this.kitchenSettings.print_on_pay;
+                    // AUTO-PRINT SEQUENCE — invoice ALWAYS prints first, KOT ALWAYS prints after.
+                    // Cashier requirement: KOT must NEVER appear before the invoice dialog.
+                    // Therefore, whenever KOT auto-print is enabled (needsKotPrint = true), we
+                    // FORCE the invoice to auto-print first as well, even if print_on_pay is off
+                    // — otherwise the cashier would see the KOT dialog before the invoice.
+                    //   - print_on_pay  → user wants invoice to auto-print on pay
+                    //   - needsKotPrint → fresh-cart pay AND print_on_hold = true
+                    //                     (held-order pays don't reprint KOT — already printed at hold)
+                    // Chain order is enforced by win.print()'s blocking behavior in Chrome —
+                    // _printViaIframe never advances until the current print dialog is dismissed.
                     const wantsAutoKot = !!(this.needsKotPrint && this.lastOrderId);
+                    const wantsAutoReceipt = !!this.kitchenSettings.print_on_pay || wantsAutoKot;
                     if (wantsAutoKot) this.needsKotPrint = false; // consume the flag
                     const kotOrderIdAtPay = this.lastOrderId;     // snapshot before any reset
 
@@ -1773,6 +1786,7 @@ function restaurantPos() {
                         this.queuePrintTimer(() => this.triggerConfetti(), 300);
 
                         if (wantsAutoReceipt && wantsAutoKot) {
+                            // Strict sequence: receipt dialog MUST close before KOT dialog opens.
                             this.queuePrintTimer(() => {
                                 this.printReceipt(() => {
                                     this.queuePrintTimer(() => this.printKitchenTicket(kotOrderIdAtPay), 300);
@@ -1780,10 +1794,8 @@ function restaurantPos() {
                             }, 600);
                         } else if (wantsAutoReceipt) {
                             this.queuePrintTimer(() => this.printReceipt(), 600);
-                        } else if (wantsAutoKot) {
-                            // Receipt is manual; still auto-print KOT so kitchen gets the order
-                            this.queuePrintTimer(() => this.printKitchenTicket(kotOrderIdAtPay), 600);
                         }
+                        // No standalone "auto KOT only" branch — wantsAutoKot now implies wantsAutoReceipt.
                     });
                 } else { if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; } this.showToast(data.message || 'Payment failed', 'error'); }
             } catch (e) { this.showToast('Payment error', 'error'); }

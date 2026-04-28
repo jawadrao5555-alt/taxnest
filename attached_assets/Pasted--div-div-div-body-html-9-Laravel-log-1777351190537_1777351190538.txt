@@ -1,0 +1,125 @@
+              </div>
+            </div>
+        </div>
+    </body>
+</html>
+
+═══ 9. Laravel log (fresh writes) ═══
+-rw-rw-r-- 1 taxnestc taxnestc 282 Apr 28 04:35 storage/logs/laravel.log
+---
+[2026-04-28 09:35:56] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"cli"}
+[2026-04-28 09:35:57] production.INFO: DB_DRIVER {"default":"mysql","host":"localhost","port":"3306","database":"taxnestc_db","sapi":"cli"}
+
+═══ 10. PHP/LiteSpeed level errors ═══
+/home/taxnestc/public_html/taxnest/error_log
+/home/taxnestc/public_html/error_log
+/home/taxnestc/public_html/public/error_log
+---
+-rw-r--r-- 1 taxnestc taxnestc 0 Apr 24 17:14 /home/taxnestc/public_html/error_log
+-rw-r--r-- 1 taxnestc taxnestc 0 Apr 24 17:14 /home/taxnestc/public_html/public/error_log
+---
+[taxnestc@eu1 public_html]$ curl -sI https://taxnest.com.pk | head -3
+HTTP/2 500
+x-powered-by: PHP/8.4.15
+content-type: text/html; charset=UTF-8
+[taxnestc@eu1 public_html]$ cd ~/public_html
+
+echo "═══ 1. Mysterious 'taxnest/' subdirectory check ═══"
+ls -la taxnest/ 2>&1 | head -10
+
+echo ""
+echo "═══ 2. .htaccess check (public folder) ═══"
+ls -la public/.htaccess public/index.php
+echo "---"
+cat public/.htaccess
+
+echo ""
+echo "═══ 3. Document root verify (cPanel ne kya set kiya hai?) ═══"
+cat ~/public_html/.htaccess 2>&1 | head -20
+echo "---"
+ls -la ~/public_html/index.php ~/public_html/index.html 2>&1
+
+echo ""
+echo "═══ 4. PHP works at all? (simple test) ═══"
+cat > public/_test.php <<'EOF'
+<?php
+echo "PHP_VERSION: " . PHP_VERSION . "<br>";
+echo "SAPI: " . php_sapi_name() . "<br>";
+echo "Date: " . date('Y-m-d H:i:s') . "<br>";
+echo "✅ test files removed"_boot.phphttps://taxnest.com.pk/_boot.php>"; : 'false
+═══ 1. Mysterious 'taxnest/' subdirectory check ═══
+total 2348
+drwx------ 22 taxnestc taxnestc   4096 Apr 25 11:09 .
+drwxr-x--- 26 taxnestc nobody     4096 Apr 28 04:34 ..
+drwxr-xr-x  2 taxnestc taxnestc   4096 Apr 24 17:29 .agents
+drwxr-xr-x 10 taxnestc taxnestc   4096 Mar 25 07:33 app
+-rwxr-xr-x  1 taxnestc taxnestc    425 Mar 24 13:54 artisan
+drwxr-xr-x  3 taxnestc taxnestc  69632 Apr 25 09:56 attached_assets
+-rw-r--r--  1 taxnestc taxnestc 714633 Mar 24 13:54 backup.sql
+drwxr-xr-x  3 taxnestc taxnestc   4096 Apr 17 05:41 bootstrap
+-rw-r--r--  1 taxnestc taxnestc   1343 Apr 24 17:29 check-db.sh
+
+═══ 2. .htaccess check (public folder) ═══
+-rw-r--r-- 1 taxnestc taxnestc 985 Apr 24 09:20 public/.htaccess
+-rw-r--r-- 1 taxnestc taxnestc 917 Apr 24 09:20 public/index.php
+---
+<IfModule LiteSpeed>
+    CacheDisable public /
+    CacheLookup off
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    RewriteEngine On
+
+    # Handle Authorization Header
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Handle X-XSRF-Token Header
+    RewriteCond %{HTTP:x-xsrf-token} .
+    RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
+
+    # Redirect Trailing Slashes If Not A Folder...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ %1 [L,R=301]
+
+    # Send Requests To Front Controller...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+═══ 3. Document root verify (cPanel ne kya set kiya hai?) ═══
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php/$1 [L]
+</IfModule>
+---
+ls: cannot access '/home/taxnestc/public_html/index.html': No such file or directory
+-rw-r--r-- 1 taxnestc taxnestc 1576 Mar 25 08:30 /home/taxnestc/public_html/index.php
+
+═══ 4. PHP works at all? (simple test) ═══
+
+HTTP: 500
+
+═══ 5. Laravel boot test (raw, no routing) ═══
+---
+
+HTTP: 500
+
+═══ 6. Cleanup ═══
+✅ test files removed
+[taxnestc@eu1 public_html]$

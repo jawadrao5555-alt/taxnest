@@ -200,12 +200,23 @@
 
         window.onload = function() {
             const urlParams = new URLSearchParams(window.location.search);
-            // Skip self-trigger if loaded inside an iframe — the parent fires print directly
-            // via iframe.contentWindow.print(); a second self-trigger would queue a duplicate dialog
-            // (the "Esc twice to skip KOT" bug).
             const isInIframe = window.parent && window.parent !== window;
-            if (urlParams.get('auto_print') === '1' && !hasPrinted && !isInIframe) {
+            const frameSignal = urlParams.get('_signal'); // sent by parent for postMessage routing
+            if (urlParams.get('auto_print') === '1' && !hasPrinted) {
                 hasPrinted = true;
+                // When inside the parent's hidden print iframe, attach afterprint INSIDE the iframe
+                // (where it's spec-reliable) and signal the parent via postMessage when the print
+                // dialog actually closes. Parent uses this signal to enforce strict print ordering.
+                if (isInIframe && frameSignal) {
+                    let signaled = false;
+                    const signalParent = function() {
+                        if (signaled) return;
+                        signaled = true;
+                        try { window.parent.postMessage({ type: 'pos_print_done', signal: frameSignal }, '*'); } catch (e) {}
+                    };
+                    window.addEventListener('afterprint', signalParent, { once: true });
+                    setTimeout(signalParent, 20000);
+                }
                 setTimeout(function() { window.print(); }, 500);
             }
             const station = urlParams.get('station');

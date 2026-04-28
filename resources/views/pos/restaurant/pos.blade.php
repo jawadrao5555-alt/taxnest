@@ -1678,17 +1678,26 @@ function restaurantPos() {
             });
         },
 
-        // Hidden-iframe print engine. Relies on win.print()'s documented BLOCKING behavior in
-        // Chromium browsers (per MDN: "This method will block while the print dialog is open."),
-        // so the next chained print never fires until the user dismisses the current dialog.
-        // We deliberately do NOT use the `afterprint` event — it fires unpredictably across
-        // browser/printer-driver combos (sometimes when the dialog OPENS, sometimes when it
-        // closes, sometimes never with silent-print drivers), which caused the receipt and KOT
-        // dialogs to appear stacked or in reverse order. Cache-bust query forces iframe.onload
-        // to refire even when the same URL is reprinted (e.g. user presses K twice).
+        // Hidden-iframe print engine — postMessage-based chain.
+        //
+        // KEY INSIGHT: calling `iframe.contentWindow.print()` from the parent does NOT block the
+        // parent's JavaScript and does NOT reliably fire `afterprint` in the iframe across all
+        // browser / printer-driver combos. That made KOT chain-fire BEFORE the receipt dialog
+        // closed, so Chrome merged the two prints and a single Esc closed both.
+        //
+        // FIX: don't call print() from the parent at all. Pass `auto_print=1&_signal=<sid>` in
+        // the iframe URL — the iframe's own onload self-prints AND attaches `afterprint` INSIDE
+        // its own window (where it IS reliable per spec). When the iframe's print dialog truly
+        // closes, the iframe posts {type:'pos_print_done', signal:<sid>} back to us, and only
+        // THEN do we fire onAfterPrint and chain the next print. Strict ordering, no race.
+        //
+        // The `signal` value is unique per call so stale messages from a prior cancelled session
+        // can never trigger the wrong callback.
         _printViaIframe(frameId, url, popupSize, onAfterPrint) {
             const sid = this.printSessionId;
             const isStale = () => sid !== this.printSessionId;
+            // Unique signal per invocation — defeats stale postMessage from cancelled sessions
+            const signal = frameId + '_' + sid + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
             let frame = document.getElementById(frameId);
             if (!frame) {
                 frame = document.createElement('iframe');
@@ -1701,31 +1710,29 @@ function restaurantPos() {
                 return () => {
                     if (invoked) return;
                     invoked = true;
+                    window.removeEventListener('message', messageHandler);
                     if (isStale()) return; // session was canceled — drop callback silently
                     if (typeof onAfterPrint === 'function') onAfterPrint();
                 };
             })();
-            const cacheBustedUrl = url + (url.includes('?') ? '&' : '?') + '_t=' + Date.now();
+            const messageHandler = (e) => {
+                if (!e.data || e.data.type !== 'pos_print_done' || e.data.signal !== signal) return;
+                if (isStale()) { window.removeEventListener('message', messageHandler); return; }
+                // Tiny buffer lets the OS-level dialog finish closing visually before the next opens
+                this.queuePrintTimer(fireOnce, 200);
+            };
+            window.addEventListener('message', messageHandler);
+            // Hard ceiling — if iframe never signals (load failure, exotic printer driver),
+            // advance the chain after 30s so the cashier isn't stuck waiting forever.
+            this.queuePrintTimer(fireOnce, 30000);
+            const cacheBustedUrl = url
+                + (url.includes('?') ? '&' : '?')
+                + '_t=' + Date.now()
+                + '&_signal=' + encodeURIComponent(signal);
             frame.onload = () => {
                 if (isStale()) return; // iframe finished loading after cancel — abort
-                this.queuePrintTimer(() => {
-                    if (isStale()) return;
-                    try {
-                        const win = frame.contentWindow;
-                        try {
-                            win.print(); // BLOCKS in Chrome until the print dialog is dismissed
-                        } catch(e) {
-                            window.open(cacheBustedUrl, '_blank', popupSize);
-                        }
-                        // win.print() returned ⇒ dialog is closed ⇒ safe to advance the chain.
-                        // Tiny buffer lets the OS-level dialog finish closing visually before
-                        // the next dialog opens (avoids any flicker / overlap on slow GPUs).
-                        if (!isStale()) this.queuePrintTimer(fireOnce, 250);
-                    } catch (e) {
-                        window.open(cacheBustedUrl, '_blank', popupSize);
-                        this.queuePrintTimer(fireOnce, 1500);
-                    }
-                }, 500);
+                // Iframe's own window.onload fires print() + attaches afterprint listener.
+                // Parent does nothing here except wait for the postMessage signal.
             };
             frame.src = cacheBustedUrl;
         },

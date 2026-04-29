@@ -372,7 +372,7 @@ window.addEventListener('popstate', function() {
                         <span style="color:rgba(255,255,255,0.9); font-size:10px; font-weight:600;">↑↓ Navigate &nbsp; +/− Qty &nbsp; 0-9 Set Qty &nbsp; Del Remove &nbsp; Esc Exit</span>
                     </div>
                 </template>
-                <template x-for="(item, index) in cart" :key="index">
+                <template x-for="(item, index) in cart" :key="item.cart_uid">
                     <div class="cart-item cart-item-enter px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 cursor-pointer relative"
                         :style="activeCartIndex === index ? 'background:#f3e8ff; outline:2px solid #7c3aed; outline-offset:-2px; border-radius:8px; margin:2px;' : ''"
                         @click="activeCartIndex = index; cartMode = true;" :data-cart-index="index">
@@ -1181,7 +1181,7 @@ function restaurantPos() {
         restoreCart() {
             try {
                 const saved = localStorage.getItem(this.storageKey);
-                if (saved) { const parsed = JSON.parse(saved); if (Array.isArray(parsed) && parsed.length > 0) this.cart = parsed; }
+                if (saved) { const parsed = JSON.parse(saved); if (Array.isArray(parsed) && parsed.length > 0) this.cart = parsed.map(i => ({ ...i, cart_uid: i.cart_uid || ('c' + Date.now() + '_' + Math.random().toString(36).slice(2,9)) })); }
                 const notes = localStorage.getItem(this.notesKey);
                 if (notes) this.kitchenNotes = notes;
             } catch(e) {}
@@ -1292,7 +1292,7 @@ function restaurantPos() {
                 this.activeCartIndex = this.cart.indexOf(existing);
                 this.animateQty(this.activeCartIndex);
             } else {
-                this.cart.push({ item_id: item.id, item_type: item.type, item_name: item.name, quantity: 1, unit_price: parseFloat(item.price), special_notes: '', is_tax_exempt: item.is_tax_exempt || false, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false });
+                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.id, item_type: item.type, item_name: item.name, quantity: 1, unit_price: parseFloat(item.price), special_notes: '', is_tax_exempt: item.is_tax_exempt || false, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false });
                 this.activeCartIndex = this.cart.length - 1;
             }
             this.cartAnimating = true; setTimeout(() => this.cartAnimating = false, 300);
@@ -1319,12 +1319,24 @@ function restaurantPos() {
             this.cart[index].quantity = v;
         },
         removeFromCart(index) {
+            if (index < 0 || index >= this.cart.length) return;
+            // Capture stable cart_uid BEFORE setTimeout — index becomes stale
+            // if any other cart mutation happens during the 250ms animation.
+            const uid = this.cart[index].cart_uid;
             const el = this.$refs.cartList?.querySelector(`[data-cart-index="${index}"]`);
             if (el) {
                 el.classList.add('cart-item-exit');
-                setTimeout(() => { this.cart.splice(index, 1); this.fixCartIndex(); }, 250);
+                setTimeout(() => {
+                    // Re-find by uid (not stale index) at splice time
+                    const realIdx = this.cart.findIndex(c => c.cart_uid === uid);
+                    if (realIdx !== -1) {
+                        this.cart.splice(realIdx, 1);
+                        this.fixCartIndex();
+                    }
+                }, 250);
             } else {
-                this.cart.splice(index, 1); this.fixCartIndex();
+                this.cart.splice(index, 1);
+                this.fixCartIndex();
             }
         },
 
@@ -1841,7 +1853,7 @@ function restaurantPos() {
 
         recallOrder(order) {
             if (this.cart.length > 0 && !confirm('Current cart has items. Replace with recalled order?')) return;
-            this.cart = order.items.map(i => ({ item_id: i.item_id, item_type: i.item_type, item_name: i.item_name, quantity: parseFloat(i.quantity), unit_price: parseFloat(i.unit_price), special_notes: i.special_notes || '', is_tax_exempt: i.is_tax_exempt || false, item_discount_type: i.item_discount_type || 'percentage', item_discount_value: parseFloat(i.item_discount_value) || 0, showItemDiscount: parseFloat(i.item_discount_value) > 0 }));
+            this.cart = order.items.map(i => ({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: i.item_id, item_type: i.item_type, item_name: i.item_name, quantity: parseFloat(i.quantity), unit_price: parseFloat(i.unit_price), special_notes: i.special_notes || '', is_tax_exempt: i.is_tax_exempt || false, item_discount_type: i.item_discount_type || 'percentage', item_discount_value: parseFloat(i.item_discount_value) || 0, showItemDiscount: parseFloat(i.item_discount_value) > 0 }));
             this.kitchenNotes = order.kitchen_notes || '';
             this.recalledOrderId = order.id;
             this.priorityOrder = order.priority || false;
@@ -1911,7 +1923,7 @@ function restaurantPos() {
             for (const item of order.items) {
                 const existing = this.cart.find(c => c.item_id === item.item_id && c.item_type === item.item_type);
                 if (existing) { existing.quantity += item.qty; } else {
-                    this.cart.push({ item_id: item.item_id, item_type: item.item_type, item_name: item.name, quantity: item.qty, unit_price: item.price, special_notes: '', is_tax_exempt: false, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false });
+                    this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.item_id, item_type: item.item_type, item_name: item.name, quantity: item.qty, unit_price: item.price, special_notes: '', is_tax_exempt: false, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false });
                 }
             }
             this.showCustomerHistory = false; this.showToast('Items added to cart', 'success');

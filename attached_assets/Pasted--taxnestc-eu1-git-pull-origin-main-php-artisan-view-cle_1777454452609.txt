@@ -1,0 +1,126 @@
+[taxnestc@eu1 ~]$ git pull origin main
+php artisan view:clear
+php artisan cache:clear
+fatal: not a git repository (or any of the parent directories): .git
+Could not open input file: artisan
+Could not open input file: artisan
+[taxnestc@eu1 ~]$ cd ~/taxnest
+git pull origin main
+php artisan view:clear
+php artisan cache:clear
+bash: cd: /home/taxnestc/taxnest: No such file or directory
+fatal: not a git repository (or any of the parent directories): .git
+Could not open input file: artisan
+Could not open input file: artisan
+[taxnestc@eu1 ~]$ cd /home/taxnestc/public_html
+git pull origin main
+php artisan view:clear
+php artisan cache:clear
+remote: Enumerating objects: 72, done.
+remote: Counting objects: 100% (72/72), done.
+remote: Compressing objects: 100% (9/9), done.
+remote: Total 41 (delta 30), reused 41 (delta 30), pack-reused 0 (from 0)
+Unpacking objects: 100% (41/41), 50.51 KiB | 1.15 MiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+   9318d25..c3c070d  main       -> origin/main
+Updating 9318d25..c3c070d
+Fast-forward
+ public/css/mobile.css                              | 36 ++++++++++++++
+ replit.md                                          |  1 +
+ resources/views/admin/login.blade.php              |  2 +-
+ resources/views/di-landing.blade.php               |  2 +-
+ resources/views/errors/company-rejected.blade.php  |  2 +-
+ resources/views/errors/company-suspended.blade.php |  2 +-
+ resources/views/fbr-pos/auth/login.blade.php       |  2 +-
+ resources/views/fbr-pos/auth/register.blade.php    |  2 +-
+ resources/views/fbr-pos/landing.blade.php          |  2 +-
+ resources/views/franchise/login.blade.php          |  2 +-
+ resources/views/landing.blade.php                  |  2 +-
+ resources/views/layouts/admin-app.blade.php        |  2 +-
+ resources/views/layouts/app.blade.php              |  2 +-
+ resources/views/layouts/fbr-pos-app.blade.php      |  2 +-
+ resources/views/layouts/franchise-app.blade.php    |  2 +-
+ resources/views/layouts/guest.blade.php            |  2 +-
+ resources/views/layouts/pos-app.blade.php          |  2 +-
+ resources/views/pos/auth/login.blade.php           |  2 +-
+ resources/views/pos/auth/register.blade.php        |  2 +-
+ resources/views/pos/landing.blade.php              |  2 +-
+ resources/views/pos/restaurant/pos.blade.php       | 57 ++++++++++++++++------
+ resources/views/pos/universal.blade.php            | 50 ++++++++++++++-----
+ resources/views/pwa-status.blade.php               |  2 +-
+ resources/views/share/invoice.blade.php            |  2 +-
+ resources/views/welcome.blade.php                  |  2 +-
+ 25 files changed, 138 insertions(+), 48 deletions(-)
+
+   INFO  Compiled views cleared successfully.
+
+
+   INFO  Application cache cleared successfully.
+
+[taxnestc@eu1 public_html]$ ls -la ~
+find / -name "artisan" -type f 2>/dev/null | head -5
+total 2784
+drwx--x--x 27 taxnestc taxnestc    4096 Apr 29 05:11 .
+drwxr-xr-x  3 root     nobody      4096 Apr 27 23:31 ..
+lrwxrwxrwx  1 taxnestc taxnestc      34 Mar 10 08:20 access-logs -> /etc/apache2/logs/domlogs/taxnestc
+-rw-r--r--  1 taxnestc taxnestc 1750846 Apr 24 15:01 backup-before-sync.sql
+-rw-------  1 taxnestc taxnestc   53524 Apr 29 05:11 .bash_history
+-rw-r--r--  1 taxnestc taxnestc      18 Mar 10 08:11 .bash_logout
+-rw-r--r--  1 taxnestc taxnestc     141 Mar 10 08:11 .bash_profile
+-rw-r--r--  1 taxnestc taxnestc     492 Mar 10 08:11 .bashrc
+drwxr-xr-x  2 taxnestc taxnestc    4096 Mar 24 13:19 bin
+drwxrwx--x  5 taxnestc taxnestc    4096 Mar 10 10:28 .cagefs
+drwxr-xr-x  5 taxnestc taxnestc    4096 Mar 25 08:14 .caldav
+-rw-r--r--  1 taxnestc taxnestc       0 Mar 10 08:11 .cloud-locale-test.skip
+drwxr-xr-x  2 taxnestc taxnestc    4096 Apr 22 06:35 .cl.selector
+drwx------  2 taxnestc taxnestc    4096 Mar 25 12:09 .clwpos
+drwxr-xr-x  3 taxnestc taxnestc    4096 Mar 11 09:38 .composer
+-rw-r--r--  1 taxnestc taxnestc   59524 Mar 24 13:18 composer-setup.php
+drwx------  9 taxnestc taxnestc    4096 Apr 29 09:14 .cpanel
+-rw-------  1 taxnestc taxnestc       1 Mar 11 10:08 .env.save
+-rw-------  1 taxnestc taxnestc     130 Mar 24 13:52 .env.save.1
+drwxr-x---  4 taxnestc mail        4096 Apr 27 05:26 etc
+-rw-r--r--  1 taxnestc taxnestc     139 Mar 10 08:11 .gemrc
+drwxr-x---  2 taxnestc nobody      4096 Mar 10 08:11 .htpasswds
+-rw-r--r--  1 taxnestc taxnestc     106 Mar 10 12:09 .imunify_patch_id
+drwxr-xr-x  2 taxnestc taxnestc    4096 Apr 28 04:05 .koality
+-rw-------  1 taxnestc taxnestc     592 Apr 29 09:14 .lastlogin
+-rw-------  1 taxnestc taxnestc      20 Apr 24 17:34 .lesshst
+drwx------  2 taxnestc taxnestc    4096 Apr 28 15:53 logs
+drwxrws---  2 nobody   taxnestc    4096 Mar 10 08:11 lscache
+drwxr-x--x 11 taxnestc taxnestc    4096 Apr 28 07:41 mail
+-rw-------  1 taxnestc taxnestc      83 Apr 24 15:07 .my.cnf
+-rw-r--r--  1 taxnestc taxnestc     102 Mar 10 12:09 .myimunify_id
+-rw-------  1 taxnestc taxnestc     539 Apr 24 14:59 .mysql_history
+-rw-r--r--  1 taxnestc taxnestc  796159 Apr 28 04:49 PROD-BACKUP-2026-04-28-0449.sql
+-rw-r--r--  1 taxnestc taxnestc   13720 Apr 24 15:10 prod-schema-current.sql
+drwxr-x---  3 taxnestc taxnestc    4096 Mar 10 08:11 public_ftp
+drwxr-x--- 23 taxnestc nobody      4096 Apr 29 09:17 public_html
+drwx------  3 taxnestc taxnestc    4096 Mar 24 13:05 repositories
+drwxr-xr-x  3 taxnestc taxnestc    4096 Mar 13 10:33 repositoriesas
+drwx--x--x  2 taxnestc taxnestc    4096 Mar 10 08:49 .sitepad
+drwx--x--x  5 taxnestc taxnestc    4096 Mar 10 08:49 .softaculous
+drwx------  2 taxnestc taxnestc    4096 Mar 10 08:11 .spamassassin
+-rw-r--r--  1 taxnestc taxnestc       0 Mar 10 08:11 .spamassassinboxenable
+-rw-r--r--  1 taxnestc taxnestc       0 Mar 10 08:11 .spamassassinenable
+drwx------  2 taxnestc taxnestc    4096 Apr 25 09:32 .ssh
+drwxr-xr-x  5 taxnestc taxnestc    4096 Mar 11 09:52 ssl
+drwx------  2 taxnestc taxnestc    4096 Mar 13 10:40 .subaccounts
+drwxr-xr-x  7 taxnestc taxnestc    4096 Apr 20 04:55 tmp
+drwx------  3 taxnestc taxnestc    4096 Mar 24 13:53 .trash
+-rw-------  1 taxnestc taxnestc     684 Apr 28 19:15 .wp-toolkit-identifier
+lrwxrwxrwx  1 taxnestc taxnestc      11 Mar 10 08:11 www -> public_html
+/home/taxnestc/public_html/taxnest/artisan
+/home/taxnestc/public_html/artisan
+/home/taxnestc/repositories/taxnest/artisan
+find /home -name "artisan" -type f 2>/dev/null
+find /var/www -name "artisan" -type f 2>/dev/null
+find /opt -name "artisan" -type f 2>/dev/null
+[taxnestc@eu1 public_html]$ find /home -name "artisan" -type f 2>/dev/null
+/home/taxnestc/public_html/taxnest/artisan
+/home/taxnestc/public_html/artisan
+/home/taxnestc/repositories/taxnest/artisan
+[taxnestc@eu1 public_html]$ find /var/www -name "artisan" -type f 2>/dev/null
+[taxnestc@eu1 public_html]$ find /opt -name "artisan" -type f 2>/dev/null
+[taxnestc@eu1 public_html]$

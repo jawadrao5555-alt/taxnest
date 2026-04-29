@@ -357,7 +357,7 @@
                         <div class="col-span-1"></div>
                     </div>
 
-                    <template x-for="(item, index) in items" :key="index">
+                    <template x-for="(item, index) in items" :key="item._uid">
                         <div class="pos-cart-row relative grid grid-cols-1 sm:grid-cols-12 gap-2 mb-3 p-3 sm:py-3 sm:pl-12 sm:pr-3 rounded-xl"
                             :class="activeItemIndex === index ? 'is-active' : ''"
                             :data-row-index="index"
@@ -649,7 +649,7 @@
                     </div>
                 </div>
 
-                <template x-for="(item, index) in items" :key="'hidden-'+index">
+                <template x-for="(item, index) in items" :key="'hidden-'+item._uid">
                     <div>
                         <input type="hidden" :name="'items['+index+'][type]'" :value="item.type">
                         <input type="hidden" :name="'items['+index+'][item_id]'" :value="item.item_id">
@@ -727,7 +727,7 @@
                 toast: { visible: false, message: '', type: 'info', timer: null },
 
                 items: [
-                    { type: 'product', item_id: '', name: '', quantity: 1, unit_price: 0, _isNew: false, is_tax_exempt: false }
+                    { _uid: 'r' + Date.now() + '_' + Math.random().toString(36).slice(2,7), type: 'product', item_id: '', name: '', quantity: 1, unit_price: 0, _isNew: false, is_tax_exempt: false }
                 ],
 
                 activeItemIndex: 0,
@@ -912,6 +912,10 @@
                     @else
                         this.checkLocalDraft();
                     @endif
+
+                    // Phase 4: backfill stable _uid for every items[] row — required by
+                    // :key="item._uid" to prevent Alpine DOM-reuse delete-wrong-item bug.
+                    this.items = this.items.map(i => ({ ...i, _uid: i._uid || ('r' + Date.now() + '_' + Math.random().toString(36).slice(2,7)) }));
 
                     this.fetchTaxRate(this.paymentMethod);
                     this.recalculate();
@@ -1127,6 +1131,7 @@
                         if (data.payment_method) this.paymentMethod = data.payment_method;
                         if (data.items && data.items.length) {
                             this.items = data.items.map(it => ({
+                                _uid: it._uid || ('r' + Date.now() + '_' + Math.random().toString(36).slice(2,7)),
                                 type: it.type || 'product',
                                 item_id: it.item_id || '',
                                 name: it.name || '',
@@ -1196,6 +1201,7 @@
                                 if (s) isExempt = !!s.is_tax_exempt;
                             }
                             return {
+                                _uid: item._uid || ('r' + Date.now() + '_' + Math.random().toString(36).slice(2,7)),
                                 type: item.item_type || 'product',
                                 item_id: item.item_id || '',
                                 name: item.item_name || '',
@@ -1236,7 +1242,7 @@
                     this.draftId = d.draft_id || null;
 
                     if (d.items && d.items.length > 0) {
-                        this.items = d.items;
+                        this.items = d.items.map(i => ({ ...i, _uid: i._uid || ('r' + Date.now() + '_' + Math.random().toString(36).slice(2,7)) }));
                     }
 
                     this.showDraftRecovery = false;
@@ -1334,7 +1340,7 @@
 
                 addItem() {
                     let idx = this.items.length;
-                    this.items.push({ type: 'product', item_id: '', name: '', quantity: 1, unit_price: 0, _isNew: false, is_tax_exempt: false });
+                    this.items.push({ _uid: 'r' + Date.now() + '_' + Math.random().toString(36).slice(2,7), type: 'product', item_id: '', name: '', quantity: 1, unit_price: 0, _isNew: false, is_tax_exempt: false });
                     this.ddSearch[idx] = '';
                     this.ddOpen[idx] = false;
                     this.ddHlIdx[idx] = -1;

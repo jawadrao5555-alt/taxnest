@@ -86,7 +86,7 @@
                         <div class="col-span-1"></div>
                     </div>
 
-                    <template x-for="(item, index) in items" :key="index">
+                    <template x-for="(item, index) in items" :key="item._uid">
                         <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 mb-3 p-3 sm:p-1 bg-gray-50 dark:bg-gray-800/50 sm:bg-transparent sm:dark:bg-transparent rounded-lg sm:rounded-none border sm:border-0 border-gray-200 dark:border-gray-700">
                             <div class="sm:col-span-2">
                                 <label class="block sm:hidden text-xs text-gray-500 mb-1">Type</label>
@@ -224,7 +224,7 @@
                     </div>
                 </div>
 
-                <template x-for="(item, index) in items" :key="'hidden-'+index">
+                <template x-for="(item, index) in items" :key="'hidden-'+item._uid">
                     <div>
                         <input type="hidden" :name="'items['+index+'][type]'" :value="item.type">
                         <input type="hidden" :name="'items['+index+'][item_id]'" :value="item.item_id">
@@ -314,12 +314,16 @@
                 ],
 
                 init() {
+                    // Phase 4: backfill stable _uid for every items[] row (server-rendered items
+                    // from @json don't have _uid). Required by :key="item._uid" to prevent
+                    // Alpine DOM-reuse bug when splicing rows (delete-wrong-item visual bug).
+                    this.items = this.items.map(i => ({ ...i, _uid: i._uid || ('r' + Date.now() + '_' + Math.random().toString(36).slice(2,7)) }));
                     this.fetchTaxRate(this.paymentMethod);
                     this.recalculate();
                 },
 
                 addItem() {
-                    this.items.push({ type: 'product', item_id: '', name: '', quantity: 1, unit_price: 0 });
+                    this.items.push({ _uid: 'r' + Date.now() + '_' + Math.random().toString(36).slice(2,7), type: 'product', item_id: '', name: '', quantity: 1, unit_price: 0 });
                 },
 
                 removeItem(index) {

@@ -581,7 +581,7 @@ kbd {
                         </div>
                     </div>
 
-                    <template x-for="(item, index) in items" :key="index">
+                    <template x-for="(item, index) in items" :key="item._uid">
                         <div class="item-card row-in border rounded-xl p-4 mb-3"
                              :data-item-index="index"
                              :class="[
@@ -1017,7 +1017,7 @@ kbd {
 function fbrPosInvoice() {
     return {
         uomOptions: ['U','PCS','KG','GM','LTR','ML','MTR','SQM','FT','IN','YDS','PKT','DOZ','BOX','CTN','BAG','BTL','TIN','CAN','BUN','ROL','SET'],
-        items: [{ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, mode: 'qty', _valueInput: '', _amountInput: '', line_value: 0 }],
+        items: [{ _uid: 'r' + Date.now() + '_' + Math.random().toString(36).slice(2,7), item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, mode: 'qty', _valueInput: '', _amountInput: '', line_value: 0 }],
         activeItemIndex: 0,
         // 🎯 Unified search dropdown state (merged with barcode/scan input)
         searchOpen: false,
@@ -1084,6 +1084,9 @@ function fbrPosInvoice() {
         _scanLastTs: 0,
         _scanResetTimer: null,
         init() {
+            // Phase 4: backfill stable _uid for every items[] row — required by
+            // :key="item._uid" to prevent Alpine DOM-reuse delete-wrong-item bug.
+            this.items = this.items.map(i => ({ ...i, _uid: i._uid || ('r' + Date.now() + '_' + Math.random().toString(36).slice(2,7)) }));
             // 🎯 Default focus: first product's Item Name (typing-friendly)
             // Scanner still works in background — see initBackgroundScanner()
             this.$nextTick(() => { this.focusLastRowName(); });
@@ -1379,7 +1382,7 @@ function fbrPosInvoice() {
                 const r = await fetch("/fbr-pos/api/held/" + id + "/recall");
                 const data = await r.json();
                 if (data.success && data.cart) {
-                    this.items = data.cart.items || this.items;
+                    this.items = (data.cart.items || this.items).map(i => ({ ...i, _uid: i._uid || ('r' + Date.now() + '_' + Math.random().toString(36).slice(2,7)) }));
                     this.discountType = data.cart.discountType || '';
                     this.discountValue = data.cart.discountValue || 0;
                     this.customerName = data.cart.customer_name || '';
@@ -1398,7 +1401,7 @@ function fbrPosInvoice() {
             this.loadHeld();
         },
         resetCart() {
-            this.items = [{ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, mode: 'qty', _valueInput: '', _amountInput: '', line_value: 0 }];
+            this.items = [{ _uid: 'r' + Date.now() + '_' + Math.random().toString(36).slice(2,7), item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, mode: 'qty', _valueInput: '', _amountInput: '', line_value: 0 }];
             this.discountType = ''; this.discountValue = 0;
             this.customerName = ''; this.customerPhone = ''; this.customerId = ''; this.customerPoints = null;
             this.promoCode = ''; this.promotionId = ''; this.promoDiscount = 0; this.promoMessage = '';
@@ -1558,7 +1561,7 @@ function fbrPosInvoice() {
             item.line_value = Math.round(qty * price * 100) / 100;
         },
         addItem() {
-            this.items.push({ item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, mode: 'qty', _valueInput: '', _amountInput: '', line_value: 0 });
+            this.items.push({ _uid: 'r' + Date.now() + '_' + Math.random().toString(36).slice(2,7), item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, mode: 'qty', _valueInput: '', _amountInput: '', line_value: 0 });
             const newIdx = this.items.length - 1;
             this.activeItemIndex = newIdx;
             this.lastAddedIndex = newIdx;
@@ -1568,7 +1571,11 @@ function fbrPosInvoice() {
         duplicateItem(index) {
             const src = this.items[index];
             if (!src) return;
-            this.items.splice(index + 1, 0, JSON.parse(JSON.stringify(src)));
+            const copy = JSON.parse(JSON.stringify(src));
+            // Phase 5: regenerate _uid so duplicated row gets unique :key (avoid Alpine
+            // duplicate-key warnings + DOM-reuse bugs that brought us here in the first place).
+            copy._uid = 'r' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+            this.items.splice(index + 1, 0, copy);
             const newIdx = index + 1;
             this.activeItemIndex = newIdx;
             this.lastAddedIndex = newIdx;
@@ -1637,6 +1644,7 @@ function fbrPosInvoice() {
                 this.qtyMultiplier = 1;
                 return;
             }
+            payload._uid = 'r' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
             this.items.push(payload);
             this.activeItemIndex = this.items.length - 1;
             this.lastAddedIndex = this.items.length - 1;

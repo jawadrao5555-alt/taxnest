@@ -71,6 +71,42 @@ body {
    Pair with class="dense-input text-[10px]" or class="dense-input text-[11px]". */
 .dense-input { font-size: inherit !important; }
 
+/* === POS Cart Row Mobile Optimization (Phase 3) === */
+/* On phones, the cart-item row is too cramped (name + qty stepper + total + delete = ~250px on 360px screens).
+   Stack the bottom (notes/discount toggle) row already exists; we tighten the top row controls. */
+@media (max-width: 480px) {
+    .cart-item .flex.items-center.gap-2\.5 > .flex-1 {
+        min-width: 0;
+    }
+    .cart-item input[data-qty-input] {
+        width: 3rem !important;
+        height: 2.25rem !important;
+        font-size: 0.95rem !important;
+    }
+    .cart-item .flex.items-center.gap-0\.5.bg-gray-100 button,
+    .cart-item .flex.items-center.gap-0\.5.dark\:bg-gray-800 button {
+        width: 2rem !important;
+        height: 2.25rem !important;
+        min-width: 2rem !important;
+        min-height: 2.25rem !important;
+    }
+    .cart-item .text-right.min-w-\[60px\] {
+        min-width: 50px !important;
+    }
+    .cart-item .text-right.min-w-\[60px\] p {
+        font-size: 0.75rem !important;
+    }
+}
+@media (max-width: 360px) {
+    /* Ultra-narrow phones (iPhone SE 1st gen, old Androids): stack qty stepper to its own row */
+    .cart-item .flex.items-center.gap-2\.5 {
+        flex-wrap: wrap !important;
+    }
+    .cart-item .flex.items-center.gap-2\.5 > .flex-1 {
+        flex-basis: 100% !important;
+    }
+}
+
 /* ----- 3c. Hide desktop floating "Edit Cart" button on phones -----
    Inline-styled fixed button with right:400px would push off-screen on
    <400px wide phones. Mobile users use the dedicated bottom Cart bar instead. */

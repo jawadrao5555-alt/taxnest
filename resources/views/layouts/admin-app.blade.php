@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#6366f1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="stylesheet" href="{{ asset('css/mobile.css') }}?v=1.2">
+    <link rel="stylesheet" href="{{ asset('css/mobile.css') }}?v=1.3">
     <title>{{ $title ?? 'Admin Panel' }} - TaxNest Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>

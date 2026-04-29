@@ -303,7 +303,7 @@ window.addEventListener('popstate', function() {
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
                     Cart
                     <span x-show="cart.length > 0" class="bg-white/20 px-1.5 rounded-full text-xs" x-text="cart.length"></span>
-                    <span x-show="cart.length > 0" class="text-xs opacity-80" x-text="'Rs. ' + Number(totalAmount).toLocaleString()"></span>
+                    <span x-show="cart.length > 0" class="text-xs opacity-80" x-text="'Rs. ' + Number(roundedTotal).toLocaleString()"></span>
                 </button>
             </div>
 
@@ -317,7 +317,7 @@ window.addEventListener('popstate', function() {
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
                 <span>Edit Cart</span>
                 <span style="background:rgba(255,255,255,0.25); padding:2px 8px; border-radius:8px; font-size:11px; font-weight:800;" x-text="cart.length"></span>
-                <span style="font-size:10px; opacity:0.7; margin-left:2px;" x-text="'Rs.' + Number(totalAmount).toLocaleString()"></span>
+                <span style="font-size:10px; opacity:0.7; margin-left:2px;" x-text="'Rs.' + Number(roundedTotal).toLocaleString()"></span>
                 <span style="background:rgba(255,255,255,0.15); padding:2px 6px; border-radius:6px; font-size:9px; font-weight:700; letter-spacing:0.5px; border:1px solid rgba(255,255,255,0.25);">F6</span>
             </button>
         </div>
@@ -385,16 +385,28 @@ window.addEventListener('popstate', function() {
                                 <button @click.stop="updateQty(index, -1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M20 12H4"/></svg>
                                 </button>
-                                <input type="number" min="1" max="999999" step="1"
-                                    x-model.number="item.quantity"
-                                    @focus.stop="activeCartIndex = index; cartMode = true"
+                                <input type="text" inputmode="decimal" autocomplete="off"
+                                    data-qty-input
+                                    :data-qty-row="index"
+                                    :value="item.quantity"
                                     @click.stop="activeCartIndex = index; cartMode = true"
-                                    @blur="if(!Number.isFinite(Number(item.quantity)) || Number(item.quantity) < 1) item.quantity = 1"
-                                    @keydown.stop
-                                    @keypress.stop
-                                    @keyup.stop
                                     @mousedown.stop
-                                    class="w-14 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    @focus.stop="activeCartIndex = index; cartMode = true; $nextTick(() => $event.target.select())"
+                                    @input.stop="
+                                        // Edit-buffer strategy: keep item.quantity as raw string while typing
+                                        // so transient '1.' / '0.' don't collapse mid-decimal entry.
+                                        let v = ($event.target.value || '').replace(/[^0-9.]/g, '');
+                                        const dot = v.indexOf('.');
+                                        if (dot !== -1) v = v.slice(0, dot + 1) + v.slice(dot + 1).replace(/\./g, '');
+                                        $event.target.value = v;
+                                        item.quantity = v;
+                                    "
+                                    @blur="
+                                        let n = parseFloat(item.quantity);
+                                        if (!Number.isFinite(n) || n < 1) n = 1;
+                                        item.quantity = Number.isInteger(n) ? n : Math.round(n * 1000) / 1000;
+                                    "
+                                    class="w-14 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner"
                                     :class="activeCartIndex === index ? 'qty-pop' : ''">
                                 <button @click.stop="updateQty(index, 1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M12 4v16m8-8H4"/></svg>
@@ -463,9 +475,13 @@ window.addEventListener('popstate', function() {
                     </div>
                     <div x-show="exemptAmount > 0" class="flex justify-between text-xs text-green-600 dark:text-green-400"><span>Tax-Exempt</span><span x-text="'-Rs. ' + Number(exemptAmount).toLocaleString()"></span></div>
                     <div class="flex justify-between text-xs text-gray-500"><span x-text="'Tax (' + taxRate + '%)'"></span><span x-text="'Rs. ' + Number(taxAmount).toLocaleString()"></span></div>
+                    <div x-show="Math.abs(roundOff) > 0.001" class="flex justify-between text-xs text-blue-500 dark:text-blue-400">
+                        <span>Round Off</span>
+                        <span x-text="(roundOff >= 0 ? '+ Rs. ' : '− Rs. ') + Math.abs(roundOff).toFixed(2)"></span>
+                    </div>
                     <div class="flex justify-between text-lg font-extrabold text-gray-900 dark:text-white pt-1.5 border-t border-gray-200 dark:border-gray-700">
                         <span>Total</span>
-                        <span class="total-animate" x-text="'Rs. ' + Number(totalAmount).toLocaleString()" :class="cartAnimating ? 'cart-pop' : ''" :style="totalAmount > 0 ? 'color: #059669' : ''"></span>
+                        <span class="total-animate" x-text="'Rs. ' + Number(roundedTotal).toLocaleString()" :class="cartAnimating ? 'cart-pop' : ''" :style="roundedTotal > 0 ? 'color: #059669' : ''"></span>
                     </div>
                     <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] text-gray-400 pt-0.5">
                         <span>Est. Cost</span><span x-text="'Rs. ' + r2(getCartCost()).toLocaleString()"></span>
@@ -491,7 +507,7 @@ window.addEventListener('popstate', function() {
                         <span class="flex items-center justify-center gap-2">
                             <svg x-show="submitting" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                             <svg x-show="!submitting" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                            PAY Rs. <span x-text="Number(totalAmount).toLocaleString()"></span>
+                            PAY Rs. <span x-text="Number(roundedTotal).toLocaleString()"></span>
                             <kbd x-show="!submitting" class="text-[9px] bg-green-500/30 px-1.5 rounded font-mono">F8</kbd>
                         </span>
                     </button>
@@ -504,7 +520,8 @@ window.addEventListener('popstate', function() {
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
             <div class="p-5 text-center border-b border-gray-100 dark:border-gray-800">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">Payment</h3>
-                <p class="text-3xl font-extrabold text-purple-600 dark:text-purple-400 mt-2" x-text="'Rs. ' + Number(totalAmount).toLocaleString()"></p>
+                <p class="text-3xl font-extrabold text-purple-600 dark:text-purple-400 mt-2" x-text="'Rs. ' + Number(roundedTotal).toLocaleString()"></p>
+                <p x-show="Math.abs(roundOff) > 0.001" class="text-[10px] text-gray-400 mt-0.5" x-text="(roundOff >= 0 ? 'rounded up by ' : 'rounded down by ') + 'Rs. ' + Math.abs(roundOff).toFixed(2)"></p>
                 <p x-show="stockError" class="text-xs text-red-500 mt-2 bg-red-50 dark:bg-red-900/20 p-2 rounded-lg" x-text="stockError"></p>
                 <p x-show="submitting" class="text-xs text-purple-500 mt-2">Processing payment...</p>
             </div>
@@ -1115,6 +1132,8 @@ function restaurantPos() {
         },
         get taxAmount() { return this.r2(this.taxableSubtotal * this.taxRate / 100); },
         get totalAmount() { return Math.max(0, this.r2(this.effectiveSubtotal - this.discountAmount + this.taxAmount)); },
+        get roundedTotal() { return Math.round(this.totalAmount); },
+        get roundOff() { return this.r2(this.roundedTotal - this.totalAmount); },
         get exemptAmount() { return this.cart.filter(i => i.is_tax_exempt).reduce((s, i) => s + this.getItemTotal(i), 0); },
         recalcDiscount() {
             if (!this.discountValue || this.discountValue <= 0) { this.discountAmount = 0; return; }
@@ -1334,6 +1353,15 @@ function restaurantPos() {
         },
 
         handleKey(e) {
+            // CART QTY INPUT: special-case so arrow keys ALWAYS navigate cart rows
+            // (single source of truth — eliminates double-firing skip bug 1→3→5).
+            const isQtyInput = e.target.matches && e.target.matches('[data-qty-input]');
+            if (isQtyInput) {
+                if (e.key === 'ArrowDown') { e.preventDefault(); this.moveCartSelection(1); return; }
+                if (e.key === 'ArrowUp')   { e.preventDefault(); this.moveCartSelection(-1); return; }
+                if (e.key === 'Enter')     { e.preventDefault(); e.target.blur(); return; }
+                return;
+            }
             const tag = document.activeElement?.tagName;
             const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 
@@ -1440,7 +1468,8 @@ function restaurantPos() {
 
         animateQty(index) {
             this.$nextTick(() => {
-                const el = this.$refs.cartList?.querySelector(`[data-cart-index="${index}"] input[type="number"]`);
+                // Selector updated to [data-qty-input] since qty input is now type="text"
+                const el = this.$refs.cartList?.querySelector(`[data-cart-index="${index}"] [data-qty-input]`);
                 if (el) { el.classList.remove('qty-pop'); void el.offsetWidth; el.classList.add('qty-pop'); }
             });
         },

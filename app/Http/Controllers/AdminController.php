@@ -721,6 +721,63 @@ class AdminController extends Controller
         return redirect('/admin/company/' . $company->id)->with('success', 'Inventory module ' . ($company->inventory_enabled ? 'enabled' : 'disabled') . '.');
     }
 
+    /**
+     * GET /admin/company/{company}/pos-features
+     * Show admin override page for the company's PRA POS Universal feature flags.
+     */
+    public function posFeatures(Company $company)
+    {
+        $features = \App\Services\PosFeatureService::forCompany($company);
+        return view('admin.company-pos-features', compact('company', 'features'));
+    }
+
+    /**
+     * PUT /admin/company/{company}/pos-features
+     * Save admin override for POS feature flags.
+     */
+    public function updatePosFeatures(Request $request, Company $company)
+    {
+        $allowedCategories = \App\Services\PosFeatureService::categories();
+        $data = $request->validate([
+            'business_category' => 'nullable|string|in:' . implode(',', $allowedCategories),
+            'pos_ui_density'    => 'nullable|in:simple,standard,premium',
+            'feature_flags'     => 'nullable|array',
+        ]);
+
+        $flags = [];
+        foreach (\App\Services\PosFeatureService::ALL_FLAGS as $flag) {
+            $flags[$flag] = (bool) $request->input("feature_flags.$flag", false);
+        }
+
+        $oldFlags = is_array($company->feature_flags) ? $company->feature_flags : [];
+        $oldCategory = $company->business_category;
+
+        $company->update([
+            'business_category' => $data['business_category'] ?? $company->business_category,
+            'feature_flags'     => $flags,
+            'use_universal_pos' => true,
+            'pos_ui_density'    => $data['pos_ui_density'] ?? $company->pos_ui_density ?? 'standard',
+        ]);
+
+        $adminId = auth('admin')->id();
+        AuditLogService::log(
+            'admin_pos_features_override',
+            'Company',
+            $company->id,
+            ['business_category' => $oldCategory, 'feature_flags' => $oldFlags],
+            ['business_category' => $company->business_category, 'feature_flags' => $flags],
+            $company->id,
+            $adminId
+        );
+        SecurityLogService::log('admin_pos_features_override', $adminId, [
+            'company_id' => $company->id,
+            'business_category' => $company->business_category,
+        ]);
+
+        return redirect('/admin/company/' . $company->id . '/pos-features')
+            ->with('success', 'POS features saved for ' . $company->name . '.');
+    }
+
     public function toggleFbrPos(Request $request, Company $company)
     {
         $company->update(['fbr_pos_enabled' => !$company->fbr_pos_enabled]);

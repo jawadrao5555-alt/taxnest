@@ -13,11 +13,141 @@ class PosFeatureService
         'multi_branch', 'customer_loyalty',
     ];
 
+    public const FLAG_META = [
+        'kot' => [
+            'label' => 'KOT (Kitchen Order Tickets)',
+            'description' => 'Send orders to kitchen printer/screen instantly. Track order status from POS.',
+            'icon' => '🧾',
+            'category' => 'restaurant',
+        ],
+        'kitchen' => [
+            'label' => 'Kitchen Display Screen (KDS)',
+            'description' => 'Live kitchen screen showing pending orders, prep status, ready-for-pickup queue.',
+            'icon' => '📺',
+            'category' => 'restaurant',
+        ],
+        'kitchen_notes' => [
+            'label' => 'Kitchen Notes',
+            'description' => 'Cashier can add per-item notes (e.g. "no onions", "extra spicy") visible to kitchen.',
+            'icon' => '📝',
+            'category' => 'restaurant',
+        ],
+        'tables' => [
+            'label' => 'Table Management',
+            'description' => 'Floor map with tables, seat counts, table assignments, dine-in order tracking.',
+            'icon' => '🍽️',
+            'category' => 'restaurant',
+        ],
+        'recipes' => [
+            'label' => 'Recipes / BOM',
+            'description' => 'Define ingredients per dish. Auto-deduct stock on sale. Real-time cost-of-sale.',
+            'icon' => '👨‍🍳',
+            'category' => 'restaurant',
+        ],
+        'inventory' => [
+            'label' => 'Inventory Tracking',
+            'description' => 'Stock counts, low-stock alerts, OUT badges, block sale of out-of-stock items.',
+            'icon' => '📦',
+            'category' => 'inventory',
+        ],
+        'barcode' => [
+            'label' => 'Barcode Scanning',
+            'description' => 'Scan product barcodes from any USB/Bluetooth scanner — instant cart add.',
+            'icon' => '📊',
+            'category' => 'inventory',
+        ],
+        'bulk_pricing' => [
+            'label' => 'Bulk / Tier Pricing',
+            'description' => 'Quantity-based price tiers (e.g. 1-9 = Rs 100, 10+ = Rs 90). Wholesale-friendly.',
+            'icon' => '💼',
+            'category' => 'inventory',
+        ],
+        'multi_branch' => [
+            'label' => 'Multi-Branch / Outlets',
+            'description' => 'Manage multiple physical stores from one account. Per-branch reports.',
+            'icon' => '🏢',
+            'category' => 'inventory',
+        ],
+        'delivery' => [
+            'label' => 'Delivery / Takeaway',
+            'description' => 'Capture delivery address, rider assignment, delivery charges as line item.',
+            'icon' => '🛵',
+            'category' => 'sales',
+        ],
+        'customer_profile' => [
+            'label' => 'Customer Profiles',
+            'description' => 'Save customer name, phone, address. Search past orders. Required for loyalty/delivery.',
+            'icon' => '👤',
+            'category' => 'customer',
+        ],
+        'customer_loyalty' => [
+            'label' => 'Loyalty Points / Rewards',
+            'description' => 'Earn points per purchase. Redeem on future orders. Configurable rules.',
+            'icon' => '⭐',
+            'category' => 'customer',
+        ],
+        'prescription' => [
+            'label' => 'Prescription (Pharmacy)',
+            'description' => 'Capture doctor name, prescription image, drug schedule for pharmacy compliance.',
+            'icon' => '💊',
+            'category' => 'specialty',
+        ],
+        'service_jobs' => [
+            'label' => 'Service Jobs (Salon/Workshop)',
+            'description' => 'Book appointments, track service duration, assign staff per service.',
+            'icon' => '💇',
+            'category' => 'specialty',
+        ],
+    ];
+
+    public const CATEGORY_META = [
+        'restaurant' => [
+            'label' => 'Restaurant & Kitchen',
+            'description' => 'Table service, kitchen workflow, recipe-based stock',
+            'icon' => '🍽️',
+            'color' => 'orange',
+        ],
+        'inventory' => [
+            'label' => 'Inventory & Stock',
+            'description' => 'Track stock, scan barcodes, manage outlets',
+            'icon' => '📦',
+            'color' => 'blue',
+        ],
+        'sales' => [
+            'label' => 'Sales Tools',
+            'description' => 'Delivery, takeaway, channel-based features',
+            'icon' => '💰',
+            'color' => 'emerald',
+        ],
+        'customer' => [
+            'label' => 'Customers & CRM',
+            'description' => 'Customer profiles, loyalty, retention',
+            'icon' => '👥',
+            'color' => 'purple',
+        ],
+        'specialty' => [
+            'label' => 'Industry Specialty',
+            'description' => 'Pharmacy compliance, salon bookings, service jobs',
+            'icon' => '🎯',
+            'color' => 'pink',
+        ],
+    ];
+
     public const CATEGORY_DEFAULTS = [
         'restaurant' => [
             'kot' => true, 'tables' => true, 'kitchen' => true,
             'kitchen_notes' => true, 'recipes' => true, 'inventory' => true,
             'delivery' => true, 'customer_profile' => true,
+        ],
+        'cafe' => [
+            'kot' => true, 'kitchen' => true, 'kitchen_notes' => true,
+            'recipes' => true, 'inventory' => true,
+            'customer_profile' => true, 'customer_loyalty' => true,
+        ],
+        'quick_service' => [
+            'kot' => true, 'kitchen' => true, 'recipes' => true,
+            'inventory' => true, 'delivery' => true,
+            'customer_profile' => true,
         ],
         'retail' => [
             'barcode' => true, 'inventory' => true, 'customer_profile' => true,
@@ -36,6 +166,77 @@ class PosFeatureService
         'wholesale' => [
             'inventory' => true, 'bulk_pricing' => true,
             'customer_profile' => true, 'multi_branch' => true,
+        ],
+        'hybrid_cafe_retail' => [
+            'barcode' => true, 'inventory' => true,
+            'kot' => true, 'kitchen' => true,
+            'customer_profile' => true, 'customer_loyalty' => true,
+        ],
+    ];
+
+    public const PRESET_META = [
+        'restaurant' => [
+            'label' => 'Restaurant Dine-in',
+            'description' => 'Table service, KOT, KDS, recipes, dine-in & delivery',
+            'icon' => '🍽️',
+            'badge' => 'Most Popular',
+            'color' => 'orange',
+        ],
+        'cafe' => [
+            'label' => 'Cafe / Coffee Shop',
+            'description' => 'KOT, recipes, customer loyalty — no tables required',
+            'icon' => '☕',
+            'badge' => null,
+            'color' => 'amber',
+        ],
+        'quick_service' => [
+            'label' => 'Quick Service / Dhaba',
+            'description' => 'Fast counter service, KOT, delivery — minimal overhead',
+            'icon' => '🥡',
+            'badge' => null,
+            'color' => 'red',
+        ],
+        'retail' => [
+            'label' => 'Retail Store',
+            'description' => 'Barcode scanning, inventory, customer database',
+            'icon' => '🛒',
+            'badge' => 'Most Popular',
+            'color' => 'blue',
+        ],
+        'pharmacy' => [
+            'label' => 'Pharmacy / Medical',
+            'description' => 'Prescription tracking, batch/expiry, compliance-ready',
+            'icon' => '💊',
+            'badge' => null,
+            'color' => 'green',
+        ],
+        'salon' => [
+            'label' => 'Salon / Spa',
+            'description' => 'Service jobs, staff bookings, loyalty rewards',
+            'icon' => '💇',
+            'badge' => null,
+            'color' => 'pink',
+        ],
+        'grocery' => [
+            'label' => 'Grocery / Mart',
+            'description' => 'Barcode-heavy, inventory + delivery support',
+            'icon' => '🥬',
+            'badge' => null,
+            'color' => 'lime',
+        ],
+        'wholesale' => [
+            'label' => 'Wholesale / Distributor',
+            'description' => 'Bulk pricing tiers, multi-branch, B2B customers',
+            'icon' => '📦',
+            'badge' => null,
+            'color' => 'indigo',
+        ],
+        'hybrid_cafe_retail' => [
+            'label' => 'Hybrid (Cafe + Retail)',
+            'description' => 'Coffee shop with retail counter — best of both',
+            'icon' => '🌟',
+            'badge' => 'New',
+            'color' => 'purple',
         ],
     ];
 
@@ -70,6 +271,71 @@ class PosFeatureService
     public static function categories(): array
     {
         return array_keys(self::CATEGORY_DEFAULTS);
+    }
+
+    public static function flagMeta(string $flag): array
+    {
+        return self::FLAG_META[$flag] ?? [
+            'label' => str_replace('_', ' ', ucwords($flag, '_')),
+            'description' => '',
+            'icon' => '⚙️',
+            'category' => 'sales',
+        ];
+    }
+
+    public static function presetMeta(string $preset): array
+    {
+        return self::PRESET_META[$preset] ?? [
+            'label' => ucwords(str_replace('_', ' ', $preset)),
+            'description' => '',
+            'icon' => '🏪',
+            'badge' => null,
+            'color' => 'gray',
+        ];
+    }
+
+    public static function categoryMeta(string $category): array
+    {
+        return self::CATEGORY_META[$category] ?? [
+            'label' => ucfirst($category),
+            'description' => '',
+            'icon' => '📂',
+            'color' => 'gray',
+        ];
+    }
+
+    /**
+     * Returns flags grouped by their category.
+     * [
+     *   'restaurant' => ['kot', 'kitchen', ...],
+     *   'inventory'  => ['barcode', 'inventory', ...],
+     *   ...
+     * ]
+     */
+    public static function flagsByCategory(): array
+    {
+        $grouped = [];
+        foreach (self::ALL_FLAGS as $flag) {
+            $cat = self::flagMeta($flag)['category'];
+            $grouped[$cat] ??= [];
+            $grouped[$cat][] = $flag;
+        }
+        // Preserve category order from CATEGORY_META
+        $ordered = [];
+        foreach (array_keys(self::CATEGORY_META) as $cat) {
+            if (!empty($grouped[$cat])) {
+                $ordered[$cat] = $grouped[$cat];
+            }
+        }
+        return $ordered;
+    }
+
+    /**
+     * Dependency labels for UI tooltips: ['kot' => ['kitchen'], 'recipes' => ['inventory'], ...]
+     */
+    public static function dependencies(): array
+    {
+        return self::DEPENDENCIES;
     }
 
     protected static function baseDefaults(): array

@@ -55,6 +55,12 @@ TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication
 - **PDF A4 Margin Hardening:** All A4 PDF templates use safe `15mm 15mm 18mm 15mm` page margins.
 - **Universal Mobile / PWA Polish:** Global CSS applied across all layouts and standalone views to enhance mobile experience, including iOS tuning, safe-area insets, touch target sizing, responsive tables, mobile-first typography, and horizontal overflow prevention.
 - **POS Cart Keying Fixes:** Implemented stable `_uid` fields for cart items to resolve DOM-reuse bugs in Alpine.js across all cart-bearing POS views.
+- **PRA POS Universal v2 (Phase 1 — Foundation Polish):** Premium customization layer over the existing universal POS (`/pos/v2/invoice/create` + `pos.universal.blade.php`). Built on the existing `companies.feature_flags` JSON column and `PosFeatureService`. Phase 1 deliverables:
+  1. **`PosFeatureService` expanded:** 9 industry presets (Restaurant, Cafe, Quick Service, Retail, Pharmacy, Salon, Grocery, Wholesale, Hybrid Cafe+Retail), 14 module flags grouped into 5 categories (Restaurant & Kitchen, Inventory, Sales, Customer & CRM, Specialty), rich metadata (label/description/icon/color) per flag and preset, dependency resolver.
+  2. **Premium `/pos/features` page:** visual preset cards (one-click apply), categorized module groups with descriptions and dependency badges, UI density picker (Simple/Standard/Premium), sticky save bar, "Open Universal POS" CTA.
+  3. **Admin override `/admin/company/{id}/pos-features`:** admin can browse to any company → switch industry preset → toggle individual modules → save. All overrides audit-logged via `AuditLogService` + `SecurityLogService`. CTA card on the company show page (Settings tab) → "Open Override Panel".
+  4. **Dashboard CTA banner (dismissible):** Promotes Universal POS customization on the PRA POS dashboard for admins; localStorage-dismissible so cashiers/admins are not nagged.
+  - Phases 2-6 pending (module extraction into shared Blade components, full v2 cart rewrite, onboarding wizard, beta migration of legacy POS users).
 
 ## External Dependencies
 - **MySQL:** Primary production database.

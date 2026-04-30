@@ -5,6 +5,35 @@
         <x-pwa-banner color="purple" appName="Nest Pra Pos" />
         <x-pwa-push scope="pos" />
 
+        {{-- ━━━ PRA POS Universal v2 — Customize CTA (dismissible) ━━━ --}}
+        @if(!$isCashier)
+        <div x-data="{ show: localStorage.getItem('hide_universal_cta_v1') !== '1' }" x-show="show" x-cloak class="mb-4 rounded-2xl bg-gradient-to-br from-purple-600 via-fuchsia-600 to-pink-600 p-4 sm:p-5 text-white shadow-xl relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16"></div>
+            <button @click="show=false; localStorage.setItem('hide_universal_cta_v1','1')" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition" aria-label="Dismiss">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+            <div class="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pr-6">
+                <div class="flex items-start gap-3">
+                    <div class="text-3xl">🎯</div>
+                    <div>
+                        <div class="flex items-center gap-1.5 mb-0.5">
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded-full bg-white/20 backdrop-blur text-[9px] font-bold uppercase tracking-wider">New</span>
+                            <span class="text-sm font-extrabold">PRA POS Universal v2 — One Screen, All Features</span>
+                        </div>
+                        <p class="text-xs text-white/85">Customize from 9 industry presets (Restaurant, Cafe, Quick Service, Retail, Pharmacy, Salon, Grocery, Wholesale, Hybrid). Toggle KOT, KDS, recipes, inventory, loyalty &amp; more.</p>
+                    </div>
+                </div>
+                <div class="flex gap-2 flex-shrink-0 w-full sm:w-auto">
+                    <a href="{{ route('pos.features') }}" class="flex-1 sm:flex-initial inline-flex justify-center items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-purple-700 text-xs font-bold hover:bg-purple-50 transition shadow-lg whitespace-nowrap">
+                        Customize POS
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                    </a>
+                    <a href="{{ route('pos.v2.invoice.create') }}" class="flex-1 sm:flex-initial inline-flex justify-center items-center px-4 py-2 rounded-lg bg-white/10 backdrop-blur text-white text-xs font-bold hover:bg-white/20 transition border border-white/30 whitespace-nowrap">Open POS</a>
+                </div>
+            </div>
+        </div>
+        @endif
+
         {{-- ─── PROFIT + BI WIDGETS (v18) — admin only, sits above the chosen dashboard style ─── --}}
         @if(!$isCashier && isset($profitStats))
         @php

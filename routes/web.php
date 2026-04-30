@@ -586,6 +586,8 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/company/{company}/toggle-internal', [AdminController::class, 'toggleInternalAccount']);
     Route::post('/company/{company}/toggle-inventory', [AdminController::class, 'toggleInventory']);
     Route::post('/company/{company}/toggle-fbr-pos', [AdminController::class, 'toggleFbrPos']);
+    Route::get('/company/{company}/pos-features', [AdminController::class, 'posFeatures'])->name('admin.company.pos-features');
+    Route::put('/company/{company}/pos-features', [AdminController::class, 'updatePosFeatures'])->name('admin.company.pos-features.update');
     Route::post('/company/{company}/update-limits', [AdminController::class, 'updateCompanyLimits']);
     Route::post('/company/{company}/reset-limits', [AdminController::class, 'resetCompanyLimits']);
 

@@ -342,6 +342,28 @@
             </div>
 
             <div x-show="activeTab === 'settings'" class="space-y-6">
+
+                {{-- ━━━ PRA POS Universal v2 — Admin Override CTA ━━━ --}}
+                <div class="rounded-2xl bg-gradient-to-br from-purple-600 via-fuchsia-600 to-pink-600 p-5 sm:p-6 text-white shadow-xl relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16"></div>
+                    <div class="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div>
+                            <div class="flex items-center gap-2 mb-1.5">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-white/20 backdrop-blur text-[10px] font-bold uppercase tracking-wider">🚀 PRA POS Universal v2</span>
+                                @if($company->business_category)
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-400/30 backdrop-blur text-[10px] font-bold uppercase tracking-wider">{{ ucfirst(str_replace('_',' ',$company->business_category)) }}</span>
+                                @endif
+                            </div>
+                            <h4 class="text-lg font-extrabold mb-1">Manage POS Features for this Company</h4>
+                            <p class="text-xs text-white/85 max-w-xl">Override the company's POS configuration — switch industry preset, toggle modules (KOT, KDS, recipes, inventory, etc.), set UI density. All changes are audit-logged.</p>
+                        </div>
+                        <a href="/admin/company/{{ $company->id }}/pos-features" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-white text-purple-700 text-sm font-bold hover:bg-purple-50 transition shadow-lg whitespace-nowrap">
+                            Open Override Panel
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                        </a>
+                    </div>
+                </div>
+
                 <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
                     <h4 class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-4">Limit Overrides</h4>
                     <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Override the subscription plan limits for this company. Leave empty to use the plan default. Set to <strong>-1</strong> for unlimited.</p>

@@ -361,6 +361,10 @@ class PosController extends Controller
 
     public function featureSettings(Request $request)
     {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) {
+            abort(403, 'Only POS administrators can customize POS features.');
+        }
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $features = PosFeatureService::forCompany($company);
@@ -371,12 +375,17 @@ class PosController extends Controller
 
     public function updateFeatureSettings(Request $request)
     {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) {
+            abort(403, 'Only POS administrators can customize POS features.');
+        }
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         if (!$company) { abort(404); }
 
+        $allowedCategories = PosFeatureService::categories();
         $data = $request->validate([
-            'business_category' => 'nullable|string|max:60',
+            'business_category' => 'nullable|string|in:' . implode(',', $allowedCategories),
             'use_universal_pos' => 'nullable|boolean',
             'pos_ui_density'    => 'nullable|in:simple,standard,premium',
             'feature_flags'     => 'nullable|array',
@@ -399,12 +408,24 @@ class PosController extends Controller
 
     public function resetFeaturesToCategory(Request $request)
     {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) {
+            abort(403, 'Only POS administrators can reset POS features.');
+        }
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         if (!$company) { abort(404); }
-        $defaults = PosFeatureService::defaultsForCategory($company->business_category ?: 'retail');
-        $company->update(['feature_flags' => $defaults]);
-        return redirect()->route('pos.features')->with('success', 'Features reset to ' . $company->business_category . ' defaults.');
+        $allowedCategories = PosFeatureService::categories();
+        $data = $request->validate([
+            'business_category' => 'nullable|string|in:' . implode(',', $allowedCategories),
+        ]);
+        $category = $data['business_category'] ?? ($company->business_category ?: 'retail');
+        $defaults = PosFeatureService::defaultsForCategory($category);
+        $company->update([
+            'business_category' => $category,
+            'feature_flags' => $defaults,
+        ]);
+        return redirect()->route('pos.features')->with('success', 'Features reset to ' . $category . ' defaults.');
     }
 
     public function storeInvoice(Request $request)

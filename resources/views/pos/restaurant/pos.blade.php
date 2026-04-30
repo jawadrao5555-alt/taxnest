@@ -393,8 +393,6 @@ window.addEventListener('popstate', function() {
                                     @mousedown.stop
                                     @focus.stop="activeCartIndex = index; cartMode = true; $nextTick(() => $event.target.select())"
                                     @input.stop="
-                                        // Edit-buffer strategy: keep item.quantity as raw string while typing
-                                        // so transient '1.' / '0.' don't collapse mid-decimal entry.
                                         let v = ($event.target.value || '').replace(/[^0-9.]/g, '');
                                         const dot = v.indexOf('.');
                                         if (dot !== -1) v = v.slice(0, dot + 1) + v.slice(dot + 1).replace(/\./g, '');

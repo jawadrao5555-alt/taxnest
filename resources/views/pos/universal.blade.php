@@ -679,10 +679,6 @@ window.addEventListener('popstate', function() {
                                     @mousedown.stop
                                     @focus.stop="activeCartIndex = index; cartMode = true; $nextTick(() => $event.target.select())"
                                     @input.stop="
-                                        // Edit-buffer strategy: keep item.quantity as raw string while typing
-                                        // so transient values like '1.' or '0.' don't get collapsed to '1'/'0'
-                                        // on Alpine re-render (which would steal the cursor mid-decimal entry).
-                                        // _safeQty() does Number(q) so calculations still work on strings.
                                         let v = ($event.target.value || '').replace(/[^0-9.]/g, '');
                                         const dot = v.indexOf('.');
                                         if (dot !== -1) v = v.slice(0, dot + 1) + v.slice(dot + 1).replace(/\./g, '');
@@ -690,7 +686,6 @@ window.addEventListener('popstate', function() {
                                         item.quantity = v;
                                     "
                                     @blur="
-                                        // Normalize edit-buffer string → number on blur
                                         let n = parseFloat(item.quantity);
                                         if (!Number.isFinite(n) || n < 1) n = 1;
                                         item.quantity = Number.isInteger(n) ? n : Math.round(n * 1000) / 1000;

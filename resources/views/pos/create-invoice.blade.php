@@ -495,14 +495,15 @@
                                     <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6"
                                         :data-qty-row="index"
                                         x-model.number="item.quantity"
-                                        @input.debounce.20ms="recalculate()"
-                                        @focus="$nextTick(() => { try { $event.target.select(); } catch(e){} })"
-                                        @click.stop="$nextTick(() => { try { $event.target.select(); } catch(e){} })"
-                                        @blur="if (!Number.isFinite(item.quantity) || item.quantity < 1) { item.quantity = 1; } recalculate();"
+                                        @input.debounce.20ms="recalculate(); $event.target.dataset._fresh = '0'"
+                                        @focus="$event.target.dataset._fresh = '1'; try { $event.target.select(); } catch(e){}"
+                                        @click.stop="$event.target.dataset._fresh = '1'; try { $event.target.select(); } catch(e){}"
+                                        @blur="$event.target.dataset._fresh = '0'; if (!Number.isFinite(item.quantity) || item.quantity < 1) { item.quantity = 1; } recalculate();"
                                         @keydown.arrow-up.prevent="cartNav(-1, index)"
                                         @keydown.arrow-down.prevent="cartNav(1, index)"
                                         @keydown.enter.prevent="cartNav(1, index)"
                                         @keydown.escape.prevent="$event.target.blur()"
+                                        @keydown="if (/^[0-9]$/.test($event.key) && !$event.ctrlKey && !$event.metaKey && !$event.altKey && !$event.shiftKey) { const t = $event.target; if (t.dataset._fresh === '1') { $event.preventDefault(); t.value = $event.key; item.quantity = parseInt($event.key,10) || 0; t.dispatchEvent(new Event('input',{bubbles:true})); t.dataset._fresh = '0'; try { t.setSelectionRange(1,1); } catch(e){} } }"
                                         class="flex-1 min-w-0 bg-transparent text-center text-base font-bold tabular-nums text-gray-900 dark:text-gray-100 px-1 py-2 border-0 focus:outline-none focus:ring-0">
                                     <button type="button"
                                         @click.stop="qtyInc(index)"
@@ -1041,9 +1042,13 @@
                     // ═══ PHASE 1 — Cart-level keyboard (only when no modal open + items present) ═══
                     const noModalOpen = !this.showCustomerModal && !this.showExitModal && !this.showHelpModal;
                     if (noModalOpen && this.items && this.items.length > 0) {
-                        // ↑/↓ navigate active cart row
-                        if (e.key === 'ArrowUp')   { e.preventDefault(); this.cartNav(-1); return; }
-                        if (e.key === 'ArrowDown') { e.preventDefault(); this.cartNav(1);  return; }
+                        // ↑/↓ DIRECT cart entry (focus is outside all inputs at this point):
+                        // ArrowDown → jump to TOP (row 0). ArrowUp → jump to BOTTOM (last row).
+                        // Stale activeItemIndex (set by last interacted row) is overridden so user always
+                        // gets a predictable entry point. Subsequent arrows from inside qty input use
+                        // the qty input's own @keydown.arrow handlers (cartNav with explicit index).
+                        if (e.key === 'ArrowDown') { e.preventDefault(); this.activeItemIndex = 0; this.cartFocusActiveQty(); return; }
+                        if (e.key === 'ArrowUp')   { e.preventDefault(); this.activeItemIndex = Math.max(0, this.items.length - 1); this.cartFocusActiveQty(); return; }
                         // Direct digit typing → focus active row qty, set value
                         if (/^[0-9]$/.test(e.key)) { e.preventDefault(); this.cartTypeDigit(e.key); return; }
                         // +/- to inc/dec active row qty (numpad and main row)

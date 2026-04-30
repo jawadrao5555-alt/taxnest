@@ -675,10 +675,12 @@ window.addEventListener('popstate', function() {
                                     data-qty-input
                                     :data-qty-row="index"
                                     :value="item.quantity"
-                                    @click.stop="activeCartIndex = index; cartMode = true"
+                                    @click.stop="activeCartIndex = index; cartMode = true; $event.target.dataset._fresh = '1'; try { $event.target.select(); } catch(e){}"
                                     @mousedown.stop
-                                    @focus.stop="activeCartIndex = index; cartMode = true; $nextTick(() => $event.target.select())"
+                                    @focus.stop="activeCartIndex = index; cartMode = true; $event.target.dataset._fresh = '1'; try { $event.target.select(); } catch(e){}"
+                                    @keydown="if (/^[0-9]$/.test($event.key) && !$event.ctrlKey && !$event.metaKey && !$event.altKey && !$event.shiftKey) { const t = $event.target; if (t.dataset._fresh === '1') { $event.preventDefault(); t.value = $event.key; item.quantity = $event.key; t.dataset._fresh = '0'; try { t.setSelectionRange(1,1); } catch(e){} } }"
                                     @input.stop="
+                                        $event.target.dataset._fresh = '0';
                                         let v = ($event.target.value || '').replace(/[^0-9.]/g, '');
                                         const dot = v.indexOf('.');
                                         if (dot !== -1) v = v.slice(0, dot + 1) + v.slice(dot + 1).replace(/\./g, '');
@@ -686,6 +688,7 @@ window.addEventListener('popstate', function() {
                                         item.quantity = v;
                                     "
                                     @blur="
+                                        $event.target.dataset._fresh = '0';
                                         let n = parseFloat(item.quantity);
                                         if (!Number.isFinite(n) || n < 1) n = 1;
                                         item.quantity = Number.isInteger(n) ? n : Math.round(n * 1000) / 1000;
@@ -1826,8 +1829,8 @@ function restaurantPos() {
             if (startAt === 'last') this.activeCartIndex = this.cart.length - 1;
             else if (typeof startAt === 'number') this.activeCartIndex = Math.max(0, Math.min(startAt, this.cart.length - 1));
             else this.activeCartIndex = 0;
-            document.activeElement?.blur();
             this.scrollToCartItem(this.activeCartIndex);
+            this.focusActiveQty();
         },
 
         exitCartMode() {
@@ -1868,9 +1871,14 @@ function restaurantPos() {
             // All other keys (digits, dots, backspace) pass through to native input.
             const isQtyInput = e.target.matches && e.target.matches('[data-qty-input]');
             if (isQtyInput) {
+                const ci = this.activeCartIndex;
                 if (e.key === 'ArrowDown') { e.preventDefault(); this.moveCartSelection(1); return; }
                 if (e.key === 'ArrowUp')   { e.preventDefault(); this.moveCartSelection(-1); return; }
                 if (e.key === 'Enter')     { e.preventDefault(); e.target.blur(); return; }
+                // Cart shortcuts still work while a qty input has focus.
+                if ((e.key === '+' || e.key === '=') && ci >= 0) { e.preventDefault(); this.updateQty(ci, 1); this.animateQty(ci); return; }
+                if (e.key === '-' && ci >= 0)                    { e.preventDefault(); this.updateQty(ci, -1); this.animateQty(ci); return; }
+                if (e.key === 'Escape')                          { e.preventDefault(); this.exitCartMode(); return; }
                 return;
             }
             // HARD SAFETY: any other keystroke originating from a form field exits immediately.
@@ -1943,8 +1951,11 @@ function restaurantPos() {
                 e.preventDefault();
             }
 
-            // Mode-specific routing
-            if (this.cartMode && this.cart.length > 0) { this.handleCartKeys(e); return; }
+            // Mode-specific routing — only stay in cart if focus is actually in the cart.
+            // (Sticky cartMode + BODY focus would otherwise hijack ArrowUp/Down navigation
+            //  and prevent ArrowUp-from-outside from entering the cart at the BOTTOM row.)
+            const focusInCart = !!(document.activeElement?.closest?.('[data-cart-index]'));
+            if (this.cartMode && this.cart.length > 0 && focusInCart) { this.handleCartKeys(e); return; }
             this.handleSearchKeys(e);
         },
 
@@ -1964,9 +1975,9 @@ function restaurantPos() {
         },
 
         handleSearchKeys(e) {
-            // Both arrows enter cart at first row → user then steps line-by-line. No more jump-to-last surprises.
+            // Natural pattern: ArrowDown enters cart at TOP, ArrowUp enters at BOTTOM.
             if (e.key === 'ArrowDown' && this.cart.length > 0 && !this.gridFocusMode) { this.enterCartMode(0); return; }
-            if (e.key === 'ArrowUp' && this.cart.length > 0 && !this.gridFocusMode) { this.enterCartMode(0); return; }
+            if (e.key === 'ArrowUp' && this.cart.length > 0 && !this.gridFocusMode) { this.enterCartMode('last'); return; }
             if ((e.key === '+' || e.key === '=') && this.cart.length > 0) { this.updateQty(this.cart.length - 1, 1); this.animateQty(this.cart.length - 1); return; }
             if (e.key === '-' && this.cart.length > 0) { this.updateQty(this.cart.length - 1, -1); this.animateQty(this.cart.length - 1); return; }
             if (e.key === 'Delete' && this.cart.length > 0) { this.removeFromCart(this.cart.length - 1); this.fixCartIndex(); return; }

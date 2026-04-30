@@ -106,7 +106,7 @@ window.addEventListener('popstate', function() {
 });
 </script>
 
-<div x-data="restaurantPos()" x-init="init()" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
+<div x-data="restaurantPos()" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
 
     <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0 shadow-sm">
 
@@ -1144,6 +1144,8 @@ function restaurantPos() {
         },
 
         init() {
+            if (this._inited) return;
+            this._inited = true;
             this.filterProducts();
             setTimeout(() => { this.loading = false; }, 300);
             this.$watch('activeCategory', () => { this.filterProducts(); this.gridFocusIndex = 0; });

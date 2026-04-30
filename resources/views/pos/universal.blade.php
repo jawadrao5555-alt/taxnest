@@ -188,7 +188,7 @@ window.addEventListener('popstate', function() {
 });
 </script>
 
-<div x-data="restaurantPos()" x-init="init()" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
+<div x-data="restaurantPos()" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
     <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-bold tracking-wider uppercase px-3 py-1 text-center shadow-sm">
         ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v18-PROFIT-BI
     </div>
@@ -1456,17 +1456,18 @@ function restaurantPos() {
         },
 
         init() {
+            if (this._inited) return;
+            this._inited = true;
             this.filterProducts();
             setTimeout(() => { this.loading = false; }, 300);
             this.$watch('activeCategory', () => { this.filterProducts(); this.gridFocusIndex = 0; });
             this.calcGridCols();
             window.addEventListener('resize', () => this.calcGridCols());
-            // Cart auto-restore disabled — every page load starts with an EMPTY cart.
+            // Cart auto-restore is intentionally disabled — every page load starts with an EMPTY cart.
             // Saved cart is written to localStorage as a safety net only (debounced 400ms — see saveCart).
-            // recalcDiscount is O(1) when no discount → safe to leave inside the deep watcher.
+            // Do NOT call this.restoreCart() here without explicit product approval.
             this.$watch('cart', () => { this.saveCart(); this.recalcDiscount(); }, { deep: true });
             this.$watch('kitchenNotes', () => { this.saveCart(); });
-            // Defer non-critical localStorage product cache off the init hot path → faster first paint.
             setTimeout(() => this.cacheProductData(), 800);
             document.addEventListener('keydown', (e) => this.handleKey(e));
             this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });

@@ -130,23 +130,41 @@
                 </select>
             </div>
             <div x-data="{ mode: 'none' }">
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Product Image <span class="text-gray-400 text-[10px]">(Optional)</span></label>
+                <label class="flex items-center justify-between text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <span class="flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        Product Image
+                    </span>
+                    <span class="text-[9px] font-bold uppercase tracking-wider text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">Optional</span>
+                </label>
                 <div class="flex flex-wrap gap-1.5 mb-2">
-                    <label class="flex items-center gap-1 cursor-pointer text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition" :class="mode === 'none' ? 'bg-gray-200 dark:bg-gray-700 border-gray-400 text-gray-800 dark:text-gray-100' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500'">
-                        <input type="radio" name="image_mode" value="none" x-model="mode" class="hidden"> No Image
+                    <label class="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold px-3 py-1.5 rounded-xl border-2 transition-all peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-purple-500 dark:peer-focus-visible:ring-offset-gray-900" :class="mode === 'none' ? 'bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 border-gray-400 dark:border-gray-500 text-gray-800 dark:text-gray-100 shadow-sm scale-105' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:border-gray-300'">
+                        <input type="radio" name="image_mode" value="none" x-model="mode" class="sr-only peer">
+                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                        No Image
                     </label>
-                    <label class="flex items-center gap-1 cursor-pointer text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition" :class="mode === 'upload' ? 'bg-purple-100 dark:bg-purple-900/30 border-purple-400 text-purple-700 dark:text-purple-300' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500'">
-                        <input type="radio" name="image_mode" value="upload" x-model="mode" class="hidden"> Upload
+                    <label class="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold px-3 py-1.5 rounded-xl border-2 transition-all peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-purple-500 dark:peer-focus-visible:ring-offset-gray-900" :class="mode === 'upload' ? 'bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900/40 dark:to-purple-800/30 border-purple-400 text-purple-700 dark:text-purple-300 shadow-sm shadow-purple-200 scale-105' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:border-purple-300'">
+                        <input type="radio" name="image_mode" value="upload" x-model="mode" class="sr-only peer">
+                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                        Upload
                     </label>
-                    <label class="flex items-center gap-1 cursor-pointer text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition" :class="mode === 'auto' ? 'bg-amber-100 dark:bg-amber-900/30 border-amber-400 text-amber-700 dark:text-amber-300' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500'">
-                        <input type="radio" name="image_mode" value="auto" x-model="mode" class="hidden"> Auto-fetch
+                    <label class="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold px-3 py-1.5 rounded-xl border-2 transition-all peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-purple-500 dark:peer-focus-visible:ring-offset-gray-900" :class="mode === 'auto' ? 'bg-gradient-to-br from-amber-100 to-orange-200 dark:from-amber-900/40 dark:to-orange-800/30 border-amber-400 text-amber-700 dark:text-amber-300 shadow-sm shadow-amber-200 scale-105' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:border-amber-300'">
+                        <input type="radio" name="image_mode" value="auto" x-model="mode" class="sr-only peer">
+                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        Auto-fetch
                     </label>
                 </div>
                 <input type="file" name="image" accept="image/jpeg,image/jpg,image/png,image/webp"
-                    x-show="mode === 'upload'"
-                    class="w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 dark:file:bg-purple-900/30 dark:file:text-purple-300">
-                <p x-show="mode === 'none'" class="text-[10px] text-gray-500 dark:text-gray-400 italic">List mein sirf product name show ho ga &mdash; koi picture nahi.</p>
-                <p x-show="mode === 'auto'" class="text-[10px] text-amber-600 dark:text-amber-400 italic">System khud product ke naam ki picture internet se laye ga.</p>
+                    x-show="mode === 'upload'" x-transition.opacity
+                    class="w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 dark:file:bg-purple-900/30 dark:file:text-purple-300 mt-1">
+                <div x-show="mode === 'none'" x-transition.opacity class="text-[10px] text-gray-500 dark:text-gray-400 italic flex items-start gap-1.5 mt-1 px-1">
+                    <svg class="w-3 h-3 mt-0.5 flex-shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    List mein sirf product name + 2-letter chip show ho ga &mdash; koi picture nahi.
+                </div>
+                <div x-show="mode === 'auto'" x-transition.opacity class="text-[10px] text-amber-600 dark:text-amber-400 italic flex items-start gap-1.5 mt-1 px-1">
+                    <svg class="w-3 h-3 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                    System khud product ke naam ki picture internet se laye ga.
+                </div>
             </div>
             @if(count($categoryFields) > 0)
             <div class="col-span-full border-t border-gray-200 dark:border-gray-700 pt-3 mt-1">
@@ -182,10 +200,15 @@
                         <td class="px-4 py-3">
                             <div class="flex items-center gap-3">
                                 @if($product->image)
-                                    <img src="{{ asset('storage/products/' . $product->image) }}" alt="{{ $product->name }}" class="w-10 h-10 rounded-lg object-cover bg-gray-100 dark:bg-gray-700 flex-shrink-0 border border-gray-200 dark:border-gray-700" onerror="this.style.display='none'">
+                                    <img src="{{ asset('storage/products/' . $product->image) }}" alt="{{ $product->name }}" class="w-10 h-10 rounded-lg object-cover bg-gray-100 dark:bg-gray-700 flex-shrink-0 border border-gray-200 dark:border-gray-700 shadow-sm" onerror="this.style.display='none'">
                                 @else
-                                    {{-- name-only mode: tiny initials chip so the row doesn't look broken --}}
-                                    <div class="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center text-[11px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800">
+                                    {{-- name-only mode: deterministic-color initials chip (hash → unique HSL hue per product).
+                                         Text uses fixed L=20% with high saturation → guaranteed ≥4.5:1 contrast (WCAG AA) on bg L=92%. --}}
+                                    @php
+                                        $hue = crc32($product->name) % 360;
+                                        $bgStyle = "background: linear-gradient(135deg, hsl({$hue}, 70%, 92%) 0%, hsl(" . (($hue + 30) % 360) . ", 70%, 88%) 100%); color: hsl({$hue}, 80%, 20%); border-color: hsl({$hue}, 55%, 75%); box-shadow: 0 2px 6px -2px hsl({$hue}, 60%, 70%);";
+                                    @endphp
+                                    <div class="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center text-[12px] font-extrabold border tracking-tight" style="{{ $bgStyle }}">
                                         {{ strtoupper(mb_substr($product->name, 0, 2)) }}
                                     </div>
                                 @endif
@@ -257,31 +280,44 @@
                                     <option value="{{ $u }}" {{ $product->uom === $u ? 'selected' : '' }}>{{ $u }}</option>
                                     @endforeach
                                 </select>
+                                @php
+                                    $editHash = crc32($product->name);
+                                    $editHue = $editHash % 360;
+                                @endphp
                                 <div x-data="{ emode: 'keep' }">
-                                    <div class="flex items-center gap-2 mb-1">
+                                    <div class="flex items-center gap-2 mb-1.5">
                                         @if($product->image)
-                                        <img src="{{ asset('storage/products/' . $product->image) }}" class="w-8 h-8 rounded object-cover border" onerror="this.style.display='none'">
+                                        <img src="{{ asset('storage/products/' . $product->image) }}" class="w-9 h-9 rounded-lg object-cover border-2 border-purple-200 dark:border-purple-800 shadow-sm" onerror="this.style.display='none'">
                                         @else
-                                        <div class="w-8 h-8 rounded flex items-center justify-center text-[9px] font-bold text-purple-700 bg-purple-50 border border-purple-100">{{ strtoupper(mb_substr($product->name, 0, 2)) }}</div>
+                                        <div class="w-9 h-9 rounded-lg flex items-center justify-center text-[10px] font-extrabold border-2 shadow-sm" style="background: hsl({{ $editHue }}, 65%, 92%); color: hsl({{ $editHue }}, 80%, 20%); border-color: hsl({{ $editHue }}, 55%, 75%);">{{ strtoupper(mb_substr($product->name, 0, 2)) }}</div>
                                         @endif
+                                        <span class="text-[9px] uppercase tracking-wider font-bold text-gray-400">Image Mode</span>
                                     </div>
-                                    <div class="flex flex-wrap gap-1 mb-1">
-                                        <label class="cursor-pointer text-[10px] font-semibold px-1.5 py-0.5 rounded border" :class="emode === 'keep' ? 'bg-gray-200 border-gray-400 text-gray-800' : 'bg-white border-gray-300 text-gray-500'">
-                                            <input type="radio" name="image_mode" value="keep" x-model="emode" class="hidden" checked> Keep
+                                    <div class="flex flex-wrap gap-1 mb-1.5">
+                                        <label class="cursor-pointer text-[10px] font-bold px-2 py-1 rounded-lg border-2 transition-all flex items-center gap-1 peer-focus-visible:ring-2 peer-focus-visible:ring-offset-1 peer-focus-visible:ring-purple-500" :class="emode === 'keep' ? 'bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 border-gray-400 text-gray-800 dark:text-gray-100 shadow-sm scale-105' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:border-gray-400'">
+                                            <input type="radio" name="image_mode" value="keep" x-model="emode" class="sr-only peer" checked>
+                                            <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                            Keep
                                         </label>
-                                        <label class="cursor-pointer text-[10px] font-semibold px-1.5 py-0.5 rounded border" :class="emode === 'upload' ? 'bg-purple-100 border-purple-400 text-purple-700' : 'bg-white border-gray-300 text-gray-500'">
-                                            <input type="radio" name="image_mode" value="upload" x-model="emode" class="hidden"> Upload
+                                        <label class="cursor-pointer text-[10px] font-bold px-2 py-1 rounded-lg border-2 transition-all flex items-center gap-1 peer-focus-visible:ring-2 peer-focus-visible:ring-offset-1 peer-focus-visible:ring-purple-500" :class="emode === 'upload' ? 'bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900/40 dark:to-purple-800/30 border-purple-400 text-purple-700 dark:text-purple-300 shadow-sm scale-105' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:border-purple-300'">
+                                            <input type="radio" name="image_mode" value="upload" x-model="emode" class="sr-only peer">
+                                            <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                                            Upload
                                         </label>
-                                        <label class="cursor-pointer text-[10px] font-semibold px-1.5 py-0.5 rounded border" :class="emode === 'auto' ? 'bg-amber-100 border-amber-400 text-amber-700' : 'bg-white border-gray-300 text-gray-500'">
-                                            <input type="radio" name="image_mode" value="auto" x-model="emode" class="hidden"> Auto
+                                        <label class="cursor-pointer text-[10px] font-bold px-2 py-1 rounded-lg border-2 transition-all flex items-center gap-1 peer-focus-visible:ring-2 peer-focus-visible:ring-offset-1 peer-focus-visible:ring-purple-500" :class="emode === 'auto' ? 'bg-gradient-to-br from-amber-100 to-orange-200 dark:from-amber-900/40 dark:to-orange-800/30 border-amber-400 text-amber-700 dark:text-amber-300 shadow-sm scale-105' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:border-amber-300'">
+                                            <input type="radio" name="image_mode" value="auto" x-model="emode" class="sr-only peer">
+                                            <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                            Auto
                                         </label>
-                                        <label class="cursor-pointer text-[10px] font-semibold px-1.5 py-0.5 rounded border" :class="emode === 'remove' ? 'bg-red-100 border-red-400 text-red-700' : 'bg-white border-gray-300 text-gray-500'">
-                                            <input type="radio" name="image_mode" value="remove" x-model="emode" class="hidden"> No Image
+                                        <label class="cursor-pointer text-[10px] font-bold px-2 py-1 rounded-lg border-2 transition-all flex items-center gap-1 peer-focus-visible:ring-2 peer-focus-visible:ring-offset-1 peer-focus-visible:ring-purple-500" :class="emode === 'remove' ? 'bg-gradient-to-br from-red-100 to-rose-200 dark:from-red-900/40 dark:to-rose-800/30 border-red-400 text-red-700 dark:text-red-300 shadow-sm scale-105' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:border-red-300'">
+                                            <input type="radio" name="image_mode" value="remove" x-model="emode" class="sr-only peer">
+                                            <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22"/></svg>
+                                            No Image
                                         </label>
                                     </div>
                                     <input type="file" name="image" accept="image/jpeg,image/jpg,image/png,image/webp"
-                                        x-show="emode === 'upload'"
-                                        class="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-purple-50 file:text-purple-700">
+                                        x-show="emode === 'upload'" x-transition.opacity
+                                        class="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-purple-50 file:text-purple-700">
                                     {{-- Backwards-compat: controller still honours remove_image=1 --}}
                                     <input type="hidden" name="remove_image" :value="emode === 'remove' ? '1' : '0'">
                                 </div>

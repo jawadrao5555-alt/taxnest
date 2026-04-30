@@ -1091,51 +1091,123 @@ window.addEventListener('popstate', function() {
          lightning-fast demo / stress-testing.
          Open: F9 or toolbar "Quick" button. Close: Esc.
          ═══════════════════════════════════════════════════════════════ --}}
-    <div x-show="showQuickType" x-transition.opacity @click.self="showQuickType = false" @keydown.escape.window="if(showQuickType) showQuickType = false" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" style="display:none;">
-        <div x-show="showQuickType" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" @click.stop class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
-            <div style="background:linear-gradient(135deg,#0ea5e9,#0369a1);" class="px-5 py-4 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
-                        <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+    <div x-show="showQuickType" x-transition.opacity @click.self="showQuickType = false" @keydown.escape.window="if(showQuickType) showQuickType = false" class="fixed inset-0 bg-gradient-to-br from-sky-950/70 via-black/70 to-blue-950/70 backdrop-blur-md z-50 flex items-center justify-center p-4" style="display:none;">
+        <div x-show="showQuickType" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-90 translate-y-4" x-transition:enter-end="opacity-100 scale-100 translate-y-0" @click.stop class="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden ring-1 ring-sky-200/50 dark:ring-sky-800/50" style="box-shadow: 0 25px 80px -20px rgba(2, 132, 199, 0.55);">
+            {{-- Header — sky/blue gradient with subtle glow --}}
+            <div class="relative px-6 py-5 flex items-center justify-between" style="background:linear-gradient(135deg,#0284c7 0%,#0369a1 50%,#1e40af 100%);">
+                <div class="absolute inset-0 opacity-30 pointer-events-none" style="background:radial-gradient(circle at 20% 0%, rgba(255,255,255,0.4) 0%, transparent 40%);"></div>
+                <div class="relative flex items-center gap-3">
+                    <div class="w-11 h-11 bg-white/25 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg ring-1 ring-white/30">
+                        <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     </div>
                     <div>
-                        <h3 class="text-white text-base font-extrabold m-0">Quick Type</h3>
-                        <p class="text-white/70 text-[11px] m-0">Type items fast — like <code class="bg-white/15 px-1 rounded">chai 2, samosa 1</code> — and add to cart instantly.</p>
+                        <h3 class="text-white text-lg font-extrabold m-0 tracking-tight flex items-center gap-2">Quick Type <span class="text-[9px] font-bold bg-white/20 px-1.5 py-0.5 rounded-md ring-1 ring-white/30 uppercase tracking-wider">F9</span></h3>
+                        <p class="text-white/75 text-[11px] m-0 font-medium">Lightning-fast multi-add &mdash; type, parse, drop into cart.</p>
                     </div>
                 </div>
-                <button @click="showQuickType = false" class="w-7 h-7 bg-white/15 rounded-lg text-white flex items-center justify-center hover:bg-white/25 transition">
+                <button @click="showQuickType = false" class="relative w-8 h-8 bg-white/15 hover:bg-white/30 rounded-xl text-white flex items-center justify-center transition-all hover:rotate-90 ring-1 ring-white/20" title="Close (Esc)">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
-            <div class="p-5 space-y-4">
+            <div class="p-6 space-y-4 bg-gradient-to-b from-white to-sky-50/30 dark:from-gray-900 dark:to-sky-950/20">
+                {{-- Textarea --}}
                 <div>
-                    <label class="text-[11px] font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400 block mb-2">Items (one per line OR comma-separated)</label>
-                    <textarea x-model="quickTypeText" @input="parseQuickTypeText()" @keydown.ctrl.enter.prevent="applyQuickType()" @keydown.meta.enter.prevent="applyQuickType()" x-init="$nextTick(() => $el.focus())" rows="5" placeholder="chai 2&#10;samosa 1&#10;paratha 3&#10;&#10;or: chai 2, samosa 1, paratha 3" class="w-full text-sm rounded-xl border-2 border-sky-200 dark:border-sky-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2.5 focus:ring-2 focus:ring-sky-500 focus:border-sky-400 font-mono"></textarea>
-                    <p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1.5">Format: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">name qty</code> or <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">qty name</code> — qty optional (defaults to 1). Press <kbd class="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-[10px] font-bold">Ctrl+Enter</kbd> to add all.</p>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-[10px] font-extrabold uppercase tracking-[0.15em] text-sky-700 dark:text-sky-400 flex items-center gap-1.5">
+                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h7"/></svg>
+                            Items
+                        </label>
+                        <span class="text-[10px] text-gray-400 dark:text-gray-500 font-mono" x-show="quickTypeText.length > 0" x-text="(quickTypeText.split(/[,;\n]+/).filter(s=>s.trim()).length) + ' line(s)'"></span>
+                    </div>
+                    <div class="relative">
+                        <textarea x-model="quickTypeText" @input="parseQuickTypeText()" @keydown.ctrl.enter.prevent="applyQuickType()" @keydown.meta.enter.prevent="applyQuickType()" x-init="$nextTick(() => $el.focus())" rows="5" placeholder="chai 2&#10;samosa 1&#10;paratha 3&#10;&#10;(or comma-separated: chai 2, samosa 1)" class="w-full text-sm rounded-2xl border-2 border-sky-200 dark:border-sky-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-4 py-3 focus:ring-4 focus:ring-sky-500/20 focus:border-sky-500 font-mono leading-relaxed transition-all shadow-sm hover:shadow-md"></textarea>
+                    </div>
+                    <div class="flex items-center justify-between mt-2 px-1">
+                        <p class="text-[10px] text-gray-500 dark:text-gray-400">
+                            Format: <code class="bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 px-1.5 py-0.5 rounded font-semibold">name qty</code> &middot; <code class="bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 px-1.5 py-0.5 rounded font-semibold">qty name</code>
+                        </p>
+                        <p class="text-[10px] text-gray-500 dark:text-gray-400 hidden sm:block">
+                            <kbd class="bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 text-gray-700 dark:text-gray-200 px-1.5 py-0.5 rounded text-[10px] font-bold border border-gray-300 dark:border-gray-600 shadow-sm">Ctrl</kbd>
+                            +
+                            <kbd class="bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 text-gray-700 dark:text-gray-200 px-1.5 py-0.5 rounded text-[10px] font-bold border border-gray-300 dark:border-gray-600 shadow-sm">Enter</kbd>
+                            to add
+                        </p>
+                    </div>
                 </div>
 
-                <template x-if="quickTypeParsed.length > 0">
-                    <div class="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-xl p-3 space-y-1.5 max-h-48 overflow-y-auto">
-                        <p class="text-[10px] font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400 mb-1.5">Preview (<span x-text="quickTypeParsed.filter(p => p.match).length"></span> matched / <span x-text="quickTypeParsed.length"></span> total)</p>
-                        <template x-for="(p, idx) in quickTypeParsed" :key="idx">
-                            <div class="flex items-center gap-2 text-xs" :class="p.match ? '' : 'opacity-60'">
-                                <span class="font-bold w-8 text-right" :class="p.match ? 'text-sky-700 dark:text-sky-300' : 'text-red-500'" x-text="p.qty + '×'"></span>
-                                <span class="flex-1 text-gray-700 dark:text-gray-300" x-text="p.match ? p.match.name : ('Not found: ' + p.raw)"></span>
-                                <span x-show="p.match" class="text-[10px] text-sky-600 dark:text-sky-400 font-mono" x-text="p.match ? ('Rs. ' + Number(p.match.price).toLocaleString()) : ''"></span>
-                            </div>
-                        </template>
+                {{-- Empty-state hint when textarea is blank --}}
+                <template x-if="quickTypeParsed.length === 0">
+                    <div class="rounded-2xl border-2 border-dashed border-sky-200 dark:border-sky-800 bg-sky-50/50 dark:bg-sky-900/10 p-4 flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-sky-100 dark:bg-sky-900/40 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-5 h-5 text-sky-600 dark:text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <div class="text-[11px] text-sky-700 dark:text-sky-300 leading-snug">
+                            <span class="font-bold block">Tip</span>
+                            Start typing item names &mdash; the parser will fuzzy-match against your products in real time. No qty? Defaults to 1.
+                        </div>
                     </div>
                 </template>
 
-                <div class="flex flex-wrap gap-2">
-                    <button @click="addRandomProduct()" :disabled="(!allProducts || allProducts.length === 0) && (!allServices || allServices.length === 0)" class="flex-1 min-w-[140px] px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 disabled:opacity-40 text-white text-sm font-bold transition flex items-center justify-center gap-2 shadow-md">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                        Add Random Product
+                {{-- Preview list with check / x icons + subtotal --}}
+                <template x-if="quickTypeParsed.length > 0">
+                    <div class="rounded-2xl border border-sky-200 dark:border-sky-800 bg-gradient-to-br from-sky-50 to-blue-50/50 dark:from-sky-950/30 dark:to-blue-950/20 overflow-hidden shadow-sm">
+                        <div class="flex items-center justify-between px-4 py-2.5 bg-white/60 dark:bg-black/20 border-b border-sky-200/60 dark:border-sky-800/60">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] font-extrabold uppercase tracking-[0.15em] text-sky-700 dark:text-sky-400">Preview</span>
+                                <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+                                    <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                    <span x-text="quickTypeParsed.filter(p => p.match).length"></span> matched
+                                </span>
+                                <template x-if="quickTypeParsed.filter(p => !p.match).length > 0">
+                                    <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">
+                                        <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
+                                        <span x-text="quickTypeParsed.filter(p => !p.match).length"></span> not found
+                                    </span>
+                                </template>
+                            </div>
+                            <span class="text-[11px] font-bold text-sky-700 dark:text-sky-300" x-text="'Rs. ' + Number(quickTypeParsed.filter(p => p.match).reduce((s, p) => s + (parseFloat(p.match.price) * p.qty), 0)).toLocaleString()"></span>
+                        </div>
+                        <div class="divide-y divide-sky-100 dark:divide-sky-900/40 max-h-52 overflow-y-auto">
+                            <template x-for="(p, idx) in quickTypeParsed" :key="idx">
+                                <div class="flex items-center gap-3 px-4 py-2 hover:bg-white/60 dark:hover:bg-black/20 transition" :class="p.match ? '' : 'opacity-70'">
+                                    {{-- Status icon --}}
+                                    <template x-if="p.match">
+                                        <div class="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center flex-shrink-0 shadow-sm shadow-emerald-500/30">
+                                            <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                        </div>
+                                    </template>
+                                    <template x-if="!p.match">
+                                        <div class="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center flex-shrink-0">
+                                            <svg class="w-3.5 h-3.5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                        </div>
+                                    </template>
+                                    {{-- Qty pill --}}
+                                    <span class="font-mono text-[11px] font-extrabold w-9 text-center px-1.5 py-0.5 rounded-md flex-shrink-0" :class="p.match ? 'bg-sky-200/70 dark:bg-sky-800/60 text-sky-800 dark:text-sky-200' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 line-through'" x-text="p.qty + '×'"></span>
+                                    {{-- Name --}}
+                                    <span class="flex-1 text-xs font-semibold text-gray-800 dark:text-gray-200 truncate" x-text="p.match ? p.match.name : p.raw"></span>
+                                    {{-- Price / fallback note --}}
+                                    <template x-if="p.match">
+                                        <span class="text-[11px] font-bold font-mono text-sky-700 dark:text-sky-300 flex-shrink-0" x-text="'Rs. ' + Number(parseFloat(p.match.price) * p.qty).toLocaleString()"></span>
+                                    </template>
+                                    <template x-if="!p.match">
+                                        <span class="text-[10px] italic text-red-500 dark:text-red-400 flex-shrink-0">not found</span>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+
+                {{-- Action buttons --}}
+                <div class="flex flex-wrap gap-2 pt-1">
+                    <button @click="addRandomProduct()" :disabled="(!allProducts || allProducts.length === 0) && (!allServices || allServices.length === 0)" class="group flex-1 min-w-[160px] px-4 py-3 rounded-2xl bg-gradient-to-br from-amber-400 via-orange-500 to-orange-600 hover:from-amber-500 hover:via-orange-600 hover:to-orange-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 hover:shadow-xl hover:shadow-orange-500/40 hover:-translate-y-0.5 active:translate-y-0">
+                        <svg class="w-4 h-4 transition-transform group-hover:rotate-180 duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Random Product
                     </button>
-                    <button @click="applyQuickType()" :disabled="quickTypeParsed.filter(p => p.match).length === 0" class="flex-1 min-w-[140px] px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 disabled:opacity-40 text-white text-sm font-bold transition flex items-center justify-center gap-2 shadow-md">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    <button @click="applyQuickType()" :disabled="quickTypeParsed.filter(p => p.match).length === 0" class="flex-1 min-w-[160px] px-4 py-3 rounded-2xl bg-gradient-to-br from-sky-500 via-sky-600 to-blue-700 hover:from-sky-600 hover:via-sky-700 hover:to-blue-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-sky-500/30 hover:shadow-xl hover:shadow-sky-500/40 hover:-translate-y-0.5 active:translate-y-0">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                         Add to Cart
-                        <kbd class="text-[9px] bg-white/25 px-1 py-0.5 rounded font-mono ml-1">Ctrl+Enter</kbd>
+                        <kbd class="text-[9px] bg-white/25 backdrop-blur-sm px-1.5 py-0.5 rounded font-mono ring-1 ring-white/20">⌃↵</kbd>
                     </button>
                 </div>
             </div>

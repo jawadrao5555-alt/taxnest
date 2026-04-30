@@ -430,6 +430,16 @@ window.addEventListener('popstate', function() {
             <span class="text-[8px] font-mono bg-sky-200 dark:bg-sky-800/50 px-1 rounded hidden sm:inline">F9</span>
         </button>
 
+        {{-- Manual Item — only when inventory mode is OFF (Simple Mode).
+             Lets the cashier bill an ad-hoc item that isn't in the product list.
+             Optional checkbox in the modal also persists it to /pos/products. --}}
+        <template x-if="!isInventoryEnabled()">
+            <button @click="openManualItem()" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 hover:border-emerald-300 transition flex-shrink-0" title="Add a manual item to the bill (not in product list)">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                <span class="hidden lg:inline">Manual</span>
+            </button>
+        </template>
+
         <button @click="newSale()" class="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 hover:bg-green-100 transition">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
             <span class="hidden sm:inline">New</span>
@@ -443,14 +453,14 @@ window.addEventListener('popstate', function() {
         </button>
 
         <div class="hidden md:flex items-center gap-1.5">
-            <button @click="holdOrder()" :disabled="cart.length === 0 || submitting" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-40 shadow-sm transition">
+            <button @click="holdOrder()" :disabled="cart.length === 0 || submitting || hasManualItems()" :title="hasManualItems() ? 'Manual items billing-only — pay first or remove from cart to hold' : 'Hold this order'" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
                 <svg x-show="submitting" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                 <span x-show="!submitting" class="text-[10px] bg-amber-400/30 px-1 rounded">F5</span> <span x-text="submitting ? 'Holding...' : 'Hold'"></span>
             </button>
 
             {{-- Phase 5 — Send to Kitchen (visible only when restaurant_mode OR feature.kot is on) --}}
             @if(($company->restaurant_mode ?? false) || ($features->kot ?? false))
-            <button @click="sendToKitchen()" :disabled="cart.length === 0 || submitting" title="Saves the order and prints the kitchen ticket without taking payment." class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 shadow-sm transition">
+            <button @click="sendToKitchen()" :disabled="cart.length === 0 || submitting || hasManualItems()" :title="hasManualItems() ? 'Manual items billing-only — pay first or remove from cart' : 'Saves the order and prints the kitchen ticket without taking payment.'" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
                 <span class="text-base leading-none">🍳</span>
                 <span x-text="submitting ? 'Sending...' : 'Send to Kitchen'"></span>
             </button>
@@ -792,7 +802,7 @@ window.addEventListener('popstate', function() {
                 <div class="px-3 pb-3 space-y-2 mobile-sticky-pay">
                     <div class="grid grid-cols-3 gap-2">
                         <button @click="if(cart.length && confirm('Clear entire cart?')) { clearCart(); }" :disabled="cart.length === 0" class="py-2 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-30 transition flex items-center justify-center gap-0.5">Clear <kbd class="text-[8px] bg-red-200/50 dark:bg-red-800/30 px-1 rounded font-mono">F4</kbd></button>
-                        <button @click="holdOrder()" :disabled="cart.length === 0 || submitting" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 transition flex items-center justify-center gap-1">
+                        <button @click="holdOrder()" :disabled="cart.length === 0 || submitting || hasManualItems()" :title="hasManualItems() ? 'Manual items billing-only — pay first or remove' : ''" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-1">
                             <svg x-show="submitting" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                             <span x-text="submitting ? 'Holding...' : 'Hold'"></span>
                             <kbd x-show="!submitting" class="text-[8px] bg-amber-200/50 dark:bg-amber-800/30 px-1 rounded ml-0.5 font-mono">F5</kbd>
@@ -1214,6 +1224,91 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
+    {{-- ═══════════════════════════════════════════════════════════════
+         MANUAL ITEM MODAL — ad-hoc cart entry (inventory-OFF only).
+         Cashier types Name + Price → optional "save to products" toggle.
+         If save: persists via apiQuickCreate then adds to cart.
+         Else: pushes a synthetic cart line (item_id=null) — billable.
+         Open: toolbar "+ Manual" button. Close: Esc.
+         ═══════════════════════════════════════════════════════════════ --}}
+    <div x-show="showManualItem" x-transition.opacity @click.self="showManualItem = false" @keydown.escape.window="if(showManualItem) showManualItem = false" class="fixed inset-0 bg-gradient-to-br from-emerald-950/70 via-black/70 to-teal-950/70 backdrop-blur-md z-50 flex items-center justify-center p-4" style="display:none;">
+        <div x-show="showManualItem" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-90 translate-y-4" x-transition:enter-end="opacity-100 scale-100 translate-y-0" @click.stop class="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden ring-1 ring-emerald-200/50 dark:ring-emerald-800/50" style="box-shadow: 0 25px 80px -20px rgba(5, 150, 105, 0.55);">
+            {{-- Header --}}
+            <div class="relative px-6 py-5 flex items-center justify-between" style="background:linear-gradient(135deg,#059669 0%,#0d9488 50%,#0f766e 100%);">
+                <div class="absolute inset-0 opacity-30 pointer-events-none" style="background:radial-gradient(circle at 20% 0%, rgba(255,255,255,0.4) 0%, transparent 40%);"></div>
+                <div class="relative flex items-center gap-3">
+                    <div class="w-11 h-11 bg-white/25 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg ring-1 ring-white/30">
+                        <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                    </div>
+                    <div>
+                        <h3 class="text-white text-lg font-extrabold m-0 tracking-tight">Manual Item</h3>
+                        <p class="text-white/75 text-[11px] m-0 font-medium">Bill ke liye ad-hoc product add karein.</p>
+                    </div>
+                </div>
+                <button @click="showManualItem = false" class="relative w-8 h-8 bg-white/15 hover:bg-white/30 rounded-xl text-white flex items-center justify-center transition-all hover:rotate-90 ring-1 ring-white/20" title="Close (Esc)">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <form @submit.prevent="addManualItem()" class="p-6 space-y-4 bg-gradient-to-b from-white to-emerald-50/30 dark:from-gray-900 dark:to-emerald-950/20">
+                {{-- Name --}}
+                <div>
+                    <label for="manualItemNameInput" class="text-[10px] font-extrabold uppercase tracking-[0.15em] text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 mb-2">
+                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        Item Name
+                    </label>
+                    <input id="manualItemNameInput" x-model="manualItemName" type="text" required maxlength="255" placeholder="e.g. Special Order, Custom Service" autocomplete="off"
+                        class="w-full text-sm rounded-2xl border-2 border-emerald-200 dark:border-emerald-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-4 py-2.5 focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm hover:shadow-md">
+                </div>
+
+                {{-- Price --}}
+                <div>
+                    <label for="manualItemPriceInput" class="text-[10px] font-extrabold uppercase tracking-[0.15em] text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 mb-2">
+                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/></svg>
+                        Unit Price (Rs.)
+                    </label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400 font-bold text-xs pointer-events-none">Rs.</span>
+                        <input id="manualItemPriceInput" x-model="manualItemPrice" type="number" required min="0" step="0.01" placeholder="0.00"
+                            class="w-full text-sm rounded-2xl border-2 border-emerald-200 dark:border-emerald-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white pl-12 pr-4 py-2.5 focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono font-bold transition-all shadow-sm hover:shadow-md">
+                    </div>
+                    <p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1.5 px-1 italic">
+                        Quantity aur tax cart se adjust kar sakte ho. Tax payment-method per auto (5% Card / 16% Cash / Exempt).
+                    </p>
+                </div>
+
+                {{-- Save-permanent toggle --}}
+                <label class="flex items-start gap-3 p-3 rounded-2xl border-2 cursor-pointer transition-all" :class="manualItemSavePermanent ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 shadow-sm' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 hover:border-emerald-300'">
+                    <input type="checkbox" x-model="manualItemSavePermanent" class="sr-only peer">
+                    <div class="flex-shrink-0 mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-500 peer-focus-visible:ring-offset-1" :class="manualItemSavePermanent ? 'bg-emerald-600 border-emerald-600' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600'">
+                        <svg x-show="manualItemSavePermanent" class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    </div>
+                    <div class="flex-1">
+                        <div class="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                            Future ke liye Products mein bhi save karein
+                            <span class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">Optional</span>
+                        </div>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">
+                            Tick karne se yeh item permanently <span class="font-semibold text-emerald-700 dark:text-emerald-400">"Quick"</span> category mein /pos/products mein save ho jaaye ga &mdash; agli baar search mein bhi mile ga.
+                        </p>
+                    </div>
+                </label>
+
+                {{-- Actions --}}
+                <div class="flex flex-wrap gap-2 pt-1">
+                    <button type="button" @click="showManualItem = false" :disabled="manualItemSubmitting" class="px-4 py-3 rounded-2xl text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition disabled:opacity-50">
+                        Cancel
+                    </button>
+                    <button type="submit" :disabled="manualItemSubmitting || !manualItemName.trim() || manualItemPrice === '' || parseFloat(manualItemPrice) < 0" class="flex-1 px-4 py-3 rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 hover:from-emerald-600 hover:via-emerald-700 hover:to-teal-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 hover:-translate-y-0.5 active:translate-y-0">
+                        <svg x-show="manualItemSubmitting" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        <svg x-show="!manualItemSubmitting" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                        <span x-text="manualItemSubmitting ? 'Adding...' : 'Add to Cart'"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div x-show="showReceipt" x-transition.opacity @keydown.escape.window="if(showReceipt) { cancelReceiptAutoClose(); showReceipt = false; }" @click.self="cancelReceiptAutoClose(); showReceipt = false;" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="receipt-modal-enter bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" style="max-height:92vh;" x-transition.scale.90>
             <div class="relative p-5 text-center bg-gradient-to-b from-green-50 to-white dark:from-green-900/20 dark:to-gray-900 flex-shrink-0" id="confettiContainer">
@@ -1466,6 +1561,12 @@ function restaurantPos() {
         // Use isInventoryEnabled() helper everywhere — never reference this directly.
         inventoryEnabled: {{ ($inventoryEnabled ?? false) ? 'true' : 'false' }},
         isInventoryEnabled() { return this.inventoryEnabled === true; },
+        // True when the cart contains at least one synthetic Manual Item line
+        // (item_type='manual', item_id=null). Such lines bill cleanly through
+        // the standard Pay flow (storeInvoice has lax per-item validation),
+        // but the restaurant Hold/Send-to-Kitchen endpoints require a real
+        // item_id, so we gate those actions while a manual line is in cart.
+        hasManualItems() { return (this.cart || []).some(i => i && i.item_type === 'manual'); },
         blockOutOfStock: {{ $blockOutOfStock ? 'true' : 'false' }},
         taxRate: {{ $taxRate }},
         taxRules: @json($taxRules->mapWithKeys(fn($r) => [$r->payment_method => (float) $r->tax_rate])),
@@ -1534,6 +1635,13 @@ function restaurantPos() {
         showQuickType: false,
         quickTypeText: '',
         quickTypeParsed: [],
+        // Manual Item Modal — ad-hoc cart entry for inventory-OFF companies.
+        // Optional "save to products" checkbox persists via apiQuickCreate.
+        showManualItem: false,
+        manualItemName: '',
+        manualItemPrice: '',
+        manualItemSavePermanent: false,
+        manualItemSubmitting: false,
         // Phase 4 — Auto-Print receipt on successful sale (mirrors companies.print_on_pay)
         autoPrintEnabled: {{ ($company->print_on_pay ?? true) ? 'true' : 'false' }},
         // Phase 5+ — Auto-print kitchen ticket on successful sale (mirrors companies.auto_print_kot)
@@ -1788,6 +1896,101 @@ function restaurantPos() {
         openQuickType() {
             this.showQuickType = true;
             this.parseQuickTypeText();
+        },
+
+        // ──────────────────────────────────────────────────────────────
+        // MANUAL ITEM — Simple-Mode (inventory-OFF) ad-hoc cart entry.
+        // Backend storeInvoice() only validates name/qty/unit_price per
+        // item, so a synthetic line with item_id=null bills cleanly.
+        // If "save permanently" is ticked, we POST to apiQuickCreate
+        // first, then add the freshly-created product to allProducts +
+        // cart (so it appears in next searches too).
+        // Inventory-ON companies: button is hidden in toolbar AND server
+        // also blocks apiQuickCreate (returns 422). Defence in depth.
+        // ──────────────────────────────────────────────────────────────
+        openManualItem() {
+            if (this.isInventoryEnabled()) {
+                window.tnNotify && window.tnNotify('Manual Item', 'Inventory mode mein allowed nahi.');
+                return;
+            }
+            this.manualItemName = '';
+            this.manualItemPrice = '';
+            this.manualItemSavePermanent = false;
+            this.manualItemSubmitting = false;
+            this.showManualItem = true;
+            this.$nextTick(() => {
+                const el = document.getElementById('manualItemNameInput');
+                if (el) el.focus();
+            });
+        },
+        async addManualItem() {
+            const name = (this.manualItemName || '').trim();
+            const priceRaw = (this.manualItemPrice || '').toString().trim();
+            const price = parseFloat(priceRaw);
+            if (!name) {
+                window.tnNotify && window.tnNotify('Manual Item', 'Naam zaroori hai.');
+                return;
+            }
+            if (priceRaw === '' || isNaN(price) || price < 0) {
+                window.tnNotify && window.tnNotify('Manual Item', 'Sahi price likhein.');
+                return;
+            }
+            if (this.manualItemSubmitting) return;
+            this.manualItemSubmitting = true;
+            try {
+                if (this.manualItemSavePermanent) {
+                    const res = await fetch('{{ route("pos.api.products.quick-create") }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: JSON.stringify({ name, price }),
+                    });
+                    const json = await res.json().catch(() => ({}));
+                    if (!res.ok || !json.ok) {
+                        throw new Error(json.error || ('Save failed (' + res.status + ')'));
+                    }
+                    const p = json.product || {};
+                    // Mirror the existing allProducts shape so search/grid/Quick Type pick it up.
+                    this.allProducts.push({
+                        id: p.id, name: p.name, price: parseFloat(p.price) || 0,
+                        category: p.category || 'Quick', type: 'product', image: null,
+                        is_tax_exempt: false, hasRecipe: false, stockStatus: null,
+                    });
+                    this.addToCart({
+                        id: p.id, type: 'product', name: p.name,
+                        price: parseFloat(p.price) || 0, is_tax_exempt: false,
+                    });
+                    window.tnNotify && window.tnNotify('Saved & Added', p.name);
+                } else {
+                    // One-time line — no DB write. Backend accepts item_id=null.
+                    this.cart.push({
+                        cart_uid: 'm' + Date.now() + '_' + Math.random().toString(36).slice(2,9),
+                        item_id: null,
+                        item_type: 'manual',
+                        item_name: name,
+                        quantity: 1,
+                        unit_price: price,
+                        special_notes: '',
+                        is_tax_exempt: false,
+                        item_discount_type: 'percentage',
+                        item_discount_value: 0,
+                        showItemDiscount: false,
+                    });
+                    window.tnNotify && window.tnNotify('Manual Added', name + ' — Rs. ' + price.toLocaleString());
+                }
+                this.showManualItem = false;
+                this.manualItemName = '';
+                this.manualItemPrice = '';
+                this.manualItemSavePermanent = false;
+            } catch (e) {
+                window.tnNotify && window.tnNotify('Error', e.message || 'Save failed');
+            } finally {
+                this.manualItemSubmitting = false;
+            }
         },
         // Build a flat searchable pool: products + services, each tagged with its type.
         // Cached per-call (cheap) so we always reflect newly-added master items.
@@ -2397,6 +2600,14 @@ function restaurantPos() {
         async holdOrder(opts) {
             opts = opts || {};
             if (this.cart.length === 0 || this.submitting) return null;
+            // Defence-in-depth: backend hold endpoint validates item_id as required|integer
+            // and item_type in product,service. Synthetic manual lines (item_id=null,
+            // item_type='manual') would 422. Block the action client-side too so the
+            // cashier doesn't lose the cart on a server reject.
+            if (this.hasManualItems()) {
+                this.showToast('Manual items billing-only — pay first or remove them to hold.', 'error');
+                return null;
+            }
             const now = Date.now();
             if (now - this.lastHoldTime < 2000) return null;
             this.lastHoldTime = now;

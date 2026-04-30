@@ -93,7 +93,11 @@ class PraIntegrationService
                     'Quantity' => $qty,
                     'PCTCode' => '00000000',
                     'TaxRate' => $itemTaxRate,
-                    'SaleValue' => $saleValuePerUnit,
+                    // PRAL IMS v1.2 spec: SaleValue = LINE TOTAL (qty × unit price), excluding tax.
+                    // Sending per-unit caused PRA portal Gross Total summary to be wrong (sum of per-unit
+                    // prices instead of sum of line totals). Per-line "Total" column was unaffected
+                    // because it reads our TotalAmount field directly.
+                    'SaleValue' => $lineSaleValue,
                     'TotalAmount' => $totalAmount,
                     'TaxCharged' => $taxCharged,
                     'Discount' => 0.0,
@@ -105,7 +109,8 @@ class PraIntegrationService
 
         $paymentMode = self::PAYMENT_MODE_MAP[$transaction->payment_method] ?? 1;
 
-        $totalSaleValue = array_sum(array_map(fn($i) => round($i['SaleValue'] * $i['Quantity'], 2), $items));
+        // SaleValue is now per-line (already qty-multiplied), so just sum the column directly.
+        $totalSaleValue = array_sum(array_column($items, 'SaleValue'));
         $totalTaxCharged = array_sum(array_column($items, 'TaxCharged'));
         $totalBillAmount = array_sum(array_column($items, 'TotalAmount'));
 

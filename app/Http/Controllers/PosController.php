@@ -2184,7 +2184,10 @@ class PosController extends Controller
 
         $product = PosProduct::create($data);
 
-        if (!$imageName && $request->name) {
+        // Auto-fetch image ONLY if cashier explicitly chose image_mode=auto.
+        // Default (none) leaves the image field blank so the list shows
+        // a name-only row — exactly what the user asked for.
+        if (!$imageName && $request->name && $request->input('image_mode') === 'auto') {
             try {
                 $autoImage = \App\Services\ProductImageService::fetchForProduct($request->name, $companyId);
                 if ($autoImage) {
@@ -2428,6 +2431,18 @@ class PosController extends Controller
         }
 
         $product->update($data);
+
+        // Auto-fetch image ONLY if cashier explicitly chose image_mode=auto on edit.
+        // Other modes (keep / upload / remove) are already handled above.
+        if ($request->input('image_mode') === 'auto' && empty($data['image'] ?? null) && $product->name) {
+            try {
+                $autoImage = \App\Services\ProductImageService::fetchForProduct($product->name, $companyId);
+                if ($autoImage) {
+                    $product->update(['image' => $autoImage]);
+                }
+            } catch (\Exception $e) {}
+        }
+
         return back()->with('success', 'Product updated successfully.');
     }
 

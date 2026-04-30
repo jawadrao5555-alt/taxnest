@@ -424,6 +424,12 @@ window.addEventListener('popstate', function() {
             <span class="text-[8px] font-mono bg-gray-200 dark:bg-gray-700 px-1 rounded hidden sm:inline">F1</span>
         </button>
 
+        <button @click="openQuickType()" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 hover:border-sky-300 transition flex-shrink-0" title="Quick Type Mode (F9) — type 'chai 2, samosa 1' or pick random product">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            <span class="hidden lg:inline">Quick</span>
+            <span class="text-[8px] font-mono bg-sky-200 dark:bg-sky-800/50 px-1 rounded hidden sm:inline">F9</span>
+        </button>
+
         <button @click="newSale()" class="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 hover:bg-green-100 transition">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
             <span class="hidden sm:inline">New</span>
@@ -1078,6 +1084,64 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
+    {{-- ═══════════════════════════════════════════════════════════════
+         QUICK TYPE MODE — type free-form lines like "chai 2, samosa 1"
+         and the parser fuzzy-matches each entry against the product list,
+         then bulk-adds to cart. Plus an "Add Random Product" button for
+         lightning-fast demo / stress-testing.
+         Open: F9 or toolbar "Quick" button. Close: Esc.
+         ═══════════════════════════════════════════════════════════════ --}}
+    <div x-show="showQuickType" x-transition.opacity @click.self="showQuickType = false" @keydown.escape.window="if(showQuickType) showQuickType = false" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" style="display:none;">
+        <div x-show="showQuickType" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" @click.stop class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+            <div style="background:linear-gradient(135deg,#0ea5e9,#0369a1);" class="px-5 py-4 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    </div>
+                    <div>
+                        <h3 class="text-white text-base font-extrabold m-0">Quick Type</h3>
+                        <p class="text-white/70 text-[11px] m-0">Type items fast — like <code class="bg-white/15 px-1 rounded">chai 2, samosa 1</code> — and add to cart instantly.</p>
+                    </div>
+                </div>
+                <button @click="showQuickType = false" class="w-7 h-7 bg-white/15 rounded-lg text-white flex items-center justify-center hover:bg-white/25 transition">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="p-5 space-y-4">
+                <div>
+                    <label class="text-[11px] font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400 block mb-2">Items (one per line OR comma-separated)</label>
+                    <textarea x-model="quickTypeText" @input="parseQuickTypeText()" @keydown.ctrl.enter.prevent="applyQuickType()" @keydown.meta.enter.prevent="applyQuickType()" x-init="$nextTick(() => $el.focus())" rows="5" placeholder="chai 2&#10;samosa 1&#10;paratha 3&#10;&#10;or: chai 2, samosa 1, paratha 3" class="w-full text-sm rounded-xl border-2 border-sky-200 dark:border-sky-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2.5 focus:ring-2 focus:ring-sky-500 focus:border-sky-400 font-mono"></textarea>
+                    <p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1.5">Format: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">name qty</code> or <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">qty name</code> — qty optional (defaults to 1). Press <kbd class="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-[10px] font-bold">Ctrl+Enter</kbd> to add all.</p>
+                </div>
+
+                <template x-if="quickTypeParsed.length > 0">
+                    <div class="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-xl p-3 space-y-1.5 max-h-48 overflow-y-auto">
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400 mb-1.5">Preview (<span x-text="quickTypeParsed.filter(p => p.match).length"></span> matched / <span x-text="quickTypeParsed.length"></span> total)</p>
+                        <template x-for="(p, idx) in quickTypeParsed" :key="idx">
+                            <div class="flex items-center gap-2 text-xs" :class="p.match ? '' : 'opacity-60'">
+                                <span class="font-bold w-8 text-right" :class="p.match ? 'text-sky-700 dark:text-sky-300' : 'text-red-500'" x-text="p.qty + '×'"></span>
+                                <span class="flex-1 text-gray-700 dark:text-gray-300" x-text="p.match ? p.match.name : ('Not found: ' + p.raw)"></span>
+                                <span x-show="p.match" class="text-[10px] text-sky-600 dark:text-sky-400 font-mono" x-text="p.match ? ('Rs. ' + Number(p.match.price).toLocaleString()) : ''"></span>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <div class="flex flex-wrap gap-2">
+                    <button @click="addRandomProduct()" :disabled="(!allProducts || allProducts.length === 0) && (!allServices || allServices.length === 0)" class="flex-1 min-w-[140px] px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 disabled:opacity-40 text-white text-sm font-bold transition flex items-center justify-center gap-2 shadow-md">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Add Random Product
+                    </button>
+                    <button @click="applyQuickType()" :disabled="quickTypeParsed.filter(p => p.match).length === 0" class="flex-1 min-w-[140px] px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 disabled:opacity-40 text-white text-sm font-bold transition flex items-center justify-center gap-2 shadow-md">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        Add to Cart
+                        <kbd class="text-[9px] bg-white/25 px-1 py-0.5 rounded font-mono ml-1">Ctrl+Enter</kbd>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div x-show="showReceipt" x-transition.opacity @keydown.escape.window="if(showReceipt) { cancelReceiptAutoClose(); showReceipt = false; }" @click.self="cancelReceiptAutoClose(); showReceipt = false;" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="receipt-modal-enter bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" style="max-height:92vh;" x-transition.scale.90>
             <div class="relative p-5 text-center bg-gradient-to-b from-green-50 to-white dark:from-green-900/20 dark:to-gray-900 flex-shrink-0" id="confettiContainer">
@@ -1394,6 +1458,10 @@ function restaurantPos() {
         showHeldOrders: false,
         showReceipt: false,
         showShortcuts: false,
+        // Quick Type Mode — type free-form lines like "chai 2, samosa 1" → cart
+        showQuickType: false,
+        quickTypeText: '',
+        quickTypeParsed: [],
         // Phase 4 — Auto-Print receipt on successful sale (mirrors companies.print_on_pay)
         autoPrintEnabled: {{ ($company->print_on_pay ?? true) ? 'true' : 'false' }},
         // Phase 5+ — Auto-print kitchen ticket on successful sale (mirrors companies.auto_print_kot)
@@ -1640,6 +1708,78 @@ function restaurantPos() {
         },
 
         // ──────────────────────────────────────────────────────────────
+        // QUICK TYPE MODE — type freeform "chai 2, samosa 1" → cart.
+        // Parser supports: "name qty", "qty name", "name" (qty=1).
+        // Separators: comma, semicolon, OR newline. Fuzzy product match
+        // by case-insensitive substring on this.products[].name.
+        // ──────────────────────────────────────────────────────────────
+        openQuickType() {
+            this.showQuickType = true;
+            this.parseQuickTypeText();
+        },
+        // Build a flat searchable pool: products + services, each tagged with its type.
+        // Cached per-call (cheap) so we always reflect newly-added master items.
+        quickTypePool() {
+            const products = (this.allProducts || []).filter(p => p && p.name).map(p => ({ ...p, _type: 'product' }));
+            const services = (this.allServices || []).filter(s => s && s.name).map(s => ({ ...s, _type: 'service' }));
+            return [...products, ...services];
+        },
+        parseQuickTypeText() {
+            const lines = (this.quickTypeText || '').split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
+            const pool = this.quickTypePool();
+            this.quickTypeParsed = lines.map(raw => {
+                // Pull out the qty: number at start OR end. Default 1.
+                let qty = 1;
+                let name = raw;
+                const mEnd = raw.match(/^(.*?)\s+(\d{1,3})$/);
+                const mStart = raw.match(/^(\d{1,3})\s+(.+)$/);
+                if (mEnd) { name = mEnd[1].trim(); qty = parseInt(mEnd[2], 10); }
+                else if (mStart) { qty = parseInt(mStart[1], 10); name = mStart[2].trim(); }
+                if (!Number.isFinite(qty) || qty < 1) qty = 1;
+                if (qty > 999) qty = 999;
+                // Fuzzy match against pool: exact > startsWith > includes > word-prefix on any token
+                const needle = name.toLowerCase();
+                let match = pool.find(p => p.name.toLowerCase() === needle)
+                         || pool.find(p => p.name.toLowerCase().startsWith(needle))
+                         || pool.find(p => p.name.toLowerCase().includes(needle))
+                         || pool.find(p => p.name.toLowerCase().split(/\s+/).some(t => t.startsWith(needle)));
+                return { raw: name, qty, match: match || null };
+            });
+        },
+        applyQuickType() {
+            const matched = this.quickTypeParsed.filter(p => p.match);
+            if (matched.length === 0) { this.showToast('No items matched — check spelling', 'error'); return; }
+            const inv = this.isInventoryEnabled();
+            let added = 0, skipped = 0;
+            matched.forEach(p => {
+                // Honour the same stock-out gate as handleProductClick — Quick Type
+                // must NOT bypass blockOutOfStock on inventory-enabled companies.
+                if (inv && p.match.stockStatus === 'out' && this.blockOutOfStock) { skipped++; return; }
+                const item = { id: p.match.id, type: p.match._type || p.match.type || 'product', name: p.match.name, price: p.match.price, is_tax_exempt: p.match.is_tax_exempt };
+                for (let i = 0; i < p.qty; i++) { this.addToCart(item); added++; }
+            });
+            if (added > 0) this.showToast(`Added ${added} item(s)` + (skipped ? `, skipped ${skipped} out-of-stock` : ''), 'success');
+            else this.showToast('All matched items are out of stock', 'error');
+            this.showQuickType = false;
+            this.quickTypeText = '';
+            this.quickTypeParsed = [];
+        },
+        addRandomProduct() {
+            const inv = this.isInventoryEnabled();
+            // Filter out: inactive, zero-price, AND (when inventory blocking is on) out-of-stock items.
+            const pool = this.quickTypePool().filter(p => {
+                if (p.is_active === false) return false;
+                if (!(parseFloat(p.price) > 0)) return false;
+                if (inv && p.stockStatus === 'out' && this.blockOutOfStock) return false;
+                return true;
+            });
+            if (pool.length === 0) { this.showToast('No products available', 'error'); return; }
+            const pick = pool[Math.floor(Math.random() * pool.length)];
+            this.addToCart({ id: pick.id, type: pick._type || pick.type || 'product', name: pick.name, price: pick.price, is_tax_exempt: pick.is_tax_exempt });
+            this.showToast('Random: ' + pick.name, 'success');
+        },
+
+        // ──────────────────────────────────────────────────────────────
         // SMART UPSELL SYSTEM — purely client-side, zero backend impact.
         // - Keyword-based mapping (Burger → Fries/Drink, etc.)
         // - One suggestion at a time (no spam)
@@ -1866,6 +2006,25 @@ function restaurantPos() {
         },
 
         handleKey(e) {
+            // ═══════════════════════════════════════════════════════════════
+            // GLOBAL FUNCTION-KEY SHORTCUTS — fire FIRST, regardless of focus.
+            // Without this, search/qty inputs swallow F1-F8 (and F5 would even
+            // reload the browser). preventDefault on document-level handler
+            // also cancels the browser's native F-key behaviors.
+            // ═══════════════════════════════════════════════════════════════
+            if (e.key === 'F1') { e.preventDefault(); this.showShortcuts = !this.showShortcuts; return; }
+            if (e.key === 'F2') { e.preventDefault(); this.cartMode = false; this.activeCartIndex = -1; this.enterSearchMode(); return; }
+            if (e.key === 'F3') { e.preventDefault(); this.activeHeldIndex = 0; this.showHeldOrders = true; return; }
+            if (e.key === 'F4') { e.preventDefault(); if (this.cart.length && confirm('Clear entire cart?')) { this.clearCart(); } return; }
+            if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
+            if (e.key === 'F6') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode('last'); this.mobileView = 'cart'; } return; }
+            if (e.key === 'F7') { e.preventDefault(); this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); return; }
+            if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) this.showPayModal = true; return; }
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode(); this.mobileView = 'cart'; } return; }
+            // F9 — Quick Type Mode (parses "chai 2, samosa 1" style input → cart)
+            if (e.key === 'F9') { e.preventDefault(); this.openQuickType(); return; }
+
             // CART QTY INPUT: special-case so arrow keys ALWAYS navigate cart rows
             // (single source of truth — eliminates double-firing skip bug 1→3→5).
             // All other keys (digits, dots, backspace) pass through to native input.
@@ -1914,16 +2073,8 @@ function restaurantPos() {
                 return;
             }
 
-            if (e.key === 'F1') { e.preventDefault(); this.showShortcuts = !this.showShortcuts; return; }
-            if (e.key === 'F2') { e.preventDefault(); this.cartMode = false; this.activeCartIndex = -1; this.enterSearchMode(); return; }
-            if (e.key === 'F3') { e.preventDefault(); this.activeHeldIndex = 0; this.showHeldOrders = true; return; }
-            if (e.key === 'F4') { e.preventDefault(); if (this.cart.length && confirm('Clear entire cart?')) { this.clearCart(); } return; }
-            if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
-            if (e.key === 'F6') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode('last'); this.mobileView = 'cart'; } return; }
-            if (e.key === 'F7') { e.preventDefault(); this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); return; }
-            if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) this.showPayModal = true; return; }
-            if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
-            if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode(); this.mobileView = 'cart'; } return; }
+            // (F-keys hoisted to top of handleKey above — kept here as no-op
+            //  comment so future readers understand the routing.)
 
             // Smart Upsell takes highest priority for Enter/Esc when visible
             if (this.currentUpsell) {

@@ -129,10 +129,24 @@
                     <option value="BOX">BOX (Boxes)</option>
                 </select>
             </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Product Image</label>
+            <div x-data="{ mode: 'none' }">
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Product Image <span class="text-gray-400 text-[10px]">(Optional)</span></label>
+                <div class="flex flex-wrap gap-1.5 mb-2">
+                    <label class="flex items-center gap-1 cursor-pointer text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition" :class="mode === 'none' ? 'bg-gray-200 dark:bg-gray-700 border-gray-400 text-gray-800 dark:text-gray-100' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500'">
+                        <input type="radio" name="image_mode" value="none" x-model="mode" class="hidden"> No Image
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition" :class="mode === 'upload' ? 'bg-purple-100 dark:bg-purple-900/30 border-purple-400 text-purple-700 dark:text-purple-300' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500'">
+                        <input type="radio" name="image_mode" value="upload" x-model="mode" class="hidden"> Upload
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition" :class="mode === 'auto' ? 'bg-amber-100 dark:bg-amber-900/30 border-amber-400 text-amber-700 dark:text-amber-300' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500'">
+                        <input type="radio" name="image_mode" value="auto" x-model="mode" class="hidden"> Auto-fetch
+                    </label>
+                </div>
                 <input type="file" name="image" accept="image/jpeg,image/jpg,image/png,image/webp"
+                    x-show="mode === 'upload'"
                     class="w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 dark:file:bg-purple-900/30 dark:file:text-purple-300">
+                <p x-show="mode === 'none'" class="text-[10px] text-gray-500 dark:text-gray-400 italic">List mein sirf product name show ho ga &mdash; koi picture nahi.</p>
+                <p x-show="mode === 'auto'" class="text-[10px] text-amber-600 dark:text-amber-400 italic">System khud product ke naam ki picture internet se laye ga.</p>
             </div>
             @if(count($categoryFields) > 0)
             <div class="col-span-full border-t border-gray-200 dark:border-gray-700 pt-3 mt-1">
@@ -167,7 +181,14 @@
                     <tr class="{{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }} {{ !$product->is_active ? 'opacity-50' : '' }}" x-show="editingId !== {{ $product->id }}">
                         <td class="px-4 py-3">
                             <div class="flex items-center gap-3">
-                                <img src="{{ $product->image ? asset('storage/products/' . $product->image) : asset('img/food-placeholder.svg') }}" alt="{{ $product->name }}" class="w-10 h-10 rounded-lg object-cover bg-gray-100 dark:bg-gray-700 flex-shrink-0 border border-gray-200 dark:border-gray-700" onerror="this.src='{{ asset('img/food-placeholder.svg') }}'">
+                                @if($product->image)
+                                    <img src="{{ asset('storage/products/' . $product->image) }}" alt="{{ $product->name }}" class="w-10 h-10 rounded-lg object-cover bg-gray-100 dark:bg-gray-700 flex-shrink-0 border border-gray-200 dark:border-gray-700" onerror="this.style.display='none'">
+                                @else
+                                    {{-- name-only mode: tiny initials chip so the row doesn't look broken --}}
+                                    <div class="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center text-[11px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800">
+                                        {{ strtoupper(mb_substr($product->name, 0, 2)) }}
+                                    </div>
+                                @endif
                                 <div>
                                     <span class="font-medium text-gray-900 dark:text-white">{{ $product->name }}</span>
                                     @if($product->is_tax_exempt)
@@ -236,18 +257,33 @@
                                     <option value="{{ $u }}" {{ $product->uom === $u ? 'selected' : '' }}>{{ $u }}</option>
                                     @endforeach
                                 </select>
-                                <div>
+                                <div x-data="{ emode: 'keep' }">
                                     <div class="flex items-center gap-2 mb-1">
                                         @if($product->image)
                                         <img src="{{ asset('storage/products/' . $product->image) }}" class="w-8 h-8 rounded object-cover border" onerror="this.style.display='none'">
-                                        <label class="flex items-center gap-1 cursor-pointer">
-                                            <input type="checkbox" name="remove_image" value="1" class="rounded border-gray-300 text-red-500 focus:ring-red-500 w-3 h-3">
-                                            <span class="text-[10px] text-red-500">Remove</span>
-                                        </label>
+                                        @else
+                                        <div class="w-8 h-8 rounded flex items-center justify-center text-[9px] font-bold text-purple-700 bg-purple-50 border border-purple-100">{{ strtoupper(mb_substr($product->name, 0, 2)) }}</div>
                                         @endif
                                     </div>
+                                    <div class="flex flex-wrap gap-1 mb-1">
+                                        <label class="cursor-pointer text-[10px] font-semibold px-1.5 py-0.5 rounded border" :class="emode === 'keep' ? 'bg-gray-200 border-gray-400 text-gray-800' : 'bg-white border-gray-300 text-gray-500'">
+                                            <input type="radio" name="image_mode" value="keep" x-model="emode" class="hidden" checked> Keep
+                                        </label>
+                                        <label class="cursor-pointer text-[10px] font-semibold px-1.5 py-0.5 rounded border" :class="emode === 'upload' ? 'bg-purple-100 border-purple-400 text-purple-700' : 'bg-white border-gray-300 text-gray-500'">
+                                            <input type="radio" name="image_mode" value="upload" x-model="emode" class="hidden"> Upload
+                                        </label>
+                                        <label class="cursor-pointer text-[10px] font-semibold px-1.5 py-0.5 rounded border" :class="emode === 'auto' ? 'bg-amber-100 border-amber-400 text-amber-700' : 'bg-white border-gray-300 text-gray-500'">
+                                            <input type="radio" name="image_mode" value="auto" x-model="emode" class="hidden"> Auto
+                                        </label>
+                                        <label class="cursor-pointer text-[10px] font-semibold px-1.5 py-0.5 rounded border" :class="emode === 'remove' ? 'bg-red-100 border-red-400 text-red-700' : 'bg-white border-gray-300 text-gray-500'">
+                                            <input type="radio" name="image_mode" value="remove" x-model="emode" class="hidden"> No Image
+                                        </label>
+                                    </div>
                                     <input type="file" name="image" accept="image/jpeg,image/jpg,image/png,image/webp"
+                                        x-show="emode === 'upload'"
                                         class="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-purple-50 file:text-purple-700">
+                                    {{-- Backwards-compat: controller still honours remove_image=1 --}}
+                                    <input type="hidden" name="remove_image" :value="emode === 'remove' ? '1' : '0'">
                                 </div>
                                 @if(count($categoryFields) > 0)
                                 <div class="col-span-full border-t border-gray-200 dark:border-gray-700 pt-2 mt-1">

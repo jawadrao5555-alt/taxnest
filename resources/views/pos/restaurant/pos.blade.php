@@ -874,10 +874,13 @@ window.addEventListener('popstate', function() {
     {{-- ============================================================ --}}
     {{-- COMPACT PAYMENT-SUCCESS POPUP                                --}}
     {{-- - No inline receipt preview (was a "module"; now a popup).   --}}
-    {{-- - Top-right cross + Esc + click-outside all close it.        --}}
-    {{-- - Print/KOT buttons auto-close the popup AFTER the browser   --}}
-    {{-   print dialog dismisses (postMessage signal). The floating   --}}
-    {{--   "Last Sale" widget remains for any later reprint.          --}}
+    {{-- - Popup STAYS OPEN after auto-print finishes - cashier       --}}
+    {{--   dismisses manually via X (top-right cross), Esc, click-    --}}
+    {{--   outside backdrop, Cancel button, or "New Sale" button.     --}}
+    {{-- - Print / KOT buttons (and P / K shortcuts) fire prints but  --}}
+    {{--   do NOT close the popup - cashier verifies and closes when  --}}
+    {{--   ready. The floating "Last Sale" widget remains for         --}}
+    {{--   reprints after popup is dismissed.                         --}}
     {{-- ============================================================ --}}
     <div x-cloak x-show="showReceipt" x-transition.opacity x-effect="if (!showReceipt) cancelPendingPrints()" @keydown.escape.window="if(showReceipt) { showReceipt = false; }" @click.self="showReceipt = false" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="receipt-modal-enter relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
@@ -909,13 +912,13 @@ window.addEventListener('popstate', function() {
                 {{-- KOT button shows ONLY when KOT auto-print is OFF (print_on_hold = false). --}}
                 {{-- When auto-print is ON, KOT prints automatically after invoice — button would be redundant. --}}
                 <div :class="kitchenSettings.print_on_hold ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-4 gap-2'">
-                    {{-- Print → after print dialog dismisses, popup auto-closes. --}}
-                    <button @click="printReceipt(() => { showReceipt = false; }, true)" class="py-3 text-center rounded-xl bg-gradient-to-br from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800 text-white text-sm font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-1.5">
+                    {{-- Print → fires receipt print, popup STAYS OPEN (user closes manually). --}}
+                    <button @click="printReceipt(null, true)" class="py-3 text-center rounded-xl bg-gradient-to-br from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800 text-white text-sm font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-1.5">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                         Print <kbd class="text-[8px] bg-purple-500/40 px-1 rounded font-mono">P</kbd>
                     </button>
-                    {{-- KOT button only when auto-KOT is OFF; also auto-closes popup after print. --}}
-                    <button x-show="!kitchenSettings.print_on_hold" @click="printKitchenTicket(lastOrderId, () => { showReceipt = false; }, true)" :disabled="!lastOrderId" class="py-3 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-md shadow-orange-500/20 flex items-center justify-center gap-1.5" title="Print Kitchen Order Ticket">
+                    {{-- KOT button only when auto-KOT is OFF; popup STAYS OPEN after print (user closes manually). --}}
+                    <button x-show="!kitchenSettings.print_on_hold" @click="printKitchenTicket(lastOrderId, null, true)" :disabled="!lastOrderId" class="py-3 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-md shadow-orange-500/20 flex items-center justify-center gap-1.5" title="Print Kitchen Order Ticket">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
                         KOT <kbd class="text-[8px] bg-orange-500/40 px-1 rounded font-mono">K</kbd>
                     </button>
@@ -1468,8 +1471,8 @@ function restaurantPos() {
             if (this.showReceipt) {
                 if (e.key === 'Escape') { e.preventDefault(); this.showReceipt = false; }
                 else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); }
-                else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.printReceipt(() => { this.showReceipt = false; }, true); }
-                else if (e.key === 'k' || e.key === 'K') { e.preventDefault(); this.printKitchenTicket(this.lastOrderId, () => { this.showReceipt = false; }, true); }
+                else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.printReceipt(null, true); }
+                else if (e.key === 'k' || e.key === 'K') { e.preventDefault(); this.printKitchenTicket(this.lastOrderId, null, true); }
                 return;
             }
             if (this.showPayModal) {
@@ -1971,22 +1974,25 @@ function restaurantPos() {
                     this.$nextTick(() => {
                         this.queuePrintTimer(() => this.triggerConfetti(), 300);
 
-                        // After ALL auto-prints finish, close the success popup.
-                        // The floating "Last Sale" widget remains for any later reprint.
-                        const closePopup = () => { this.showReceipt = false; };
-
+                        // USER-REQUESTED BEHAVIOR (do NOT auto-close popup):
+                        // - Auto-print chain still fires (receipt → KOT) when enabled.
+                        // - But popup STAYS OPEN after prints finish — cashier closes it
+                        //   manually via X (top-right cross), Esc, click-outside, or Cancel button.
+                        // - This way the cashier can verify the sale, reprint, or take other
+                        //   actions before dismissing. The floating "Last Sale" widget is also
+                        //   available for later reprints once the popup is closed.
                         if (wantsAutoReceipt && wantsAutoKot) {
                             // Strict sequence: receipt dialog MUST close before KOT dialog opens.
                             this.queuePrintTimer(() => {
                                 this.printReceipt(() => {
-                                    this.queuePrintTimer(() => this.printKitchenTicket(kotOrderIdAtPay, closePopup), 300);
+                                    this.queuePrintTimer(() => this.printKitchenTicket(kotOrderIdAtPay, null), 300);
                                 });
                             }, 600);
                         } else if (wantsAutoReceipt) {
-                            this.queuePrintTimer(() => this.printReceipt(closePopup), 600);
+                            this.queuePrintTimer(() => this.printReceipt(null), 600);
                         }
                         // No standalone "auto KOT only" branch — wantsAutoKot now implies wantsAutoReceipt.
-                        // If neither auto-print is enabled, popup stays open until user clicks Close/Esc/cross.
+                        // Popup is ALWAYS user-dismissed regardless of auto-print settings.
                     });
                 } else { if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; } this.showToast(data.message || 'Payment failed', 'error'); }
             } catch (e) { this.showToast('Payment error', 'error'); }

@@ -874,18 +874,24 @@ window.addEventListener('popstate', function() {
     {{-- ============================================================ --}}
     {{-- COMPACT PAYMENT-SUCCESS POPUP                                --}}
     {{-- - No inline receipt preview (was a "module"; now a popup).   --}}
-    {{-- - Popup STAYS OPEN after auto-print finishes - cashier       --}}
-    {{--   dismisses manually via X (top-right cross), Esc, click-    --}}
-    {{--   outside backdrop, Cancel button, or "New Sale" button.     --}}
-    {{-- - Print / KOT buttons (and P / K shortcuts) fire prints but  --}}
-    {{--   do NOT close the popup - cashier verifies and closes when  --}}
-    {{--   ready. The floating "Last Sale" widget remains for         --}}
-    {{--   reprints after popup is dismissed.                         --}}
+    {{-- - Persistent: Esc and backdrop-click do NOT dismiss it.      --}}
+    {{--   Esc is reserved for the browser print dialog only.         --}}
+    {{-- - Closes ONLY via: X (top-right cross), Close button, or     --}}
+    {{--   "New Sale" button (Enter key).                             --}}
+    {{-- - Print and KOT buttons (P / K) fire prints but the popup    --}}
+    {{--   stays open so cashier sees live status pills:              --}}
+    {{--   "Printing receipt..." -> "Receipt printed" (and same KOT). --}}
+    {{-- - Floating "Last Sale" widget remains for reprints after     --}}
+    {{--   popup is dismissed.                                        --}}
     {{-- ============================================================ --}}
-    <div x-cloak x-show="showReceipt" x-transition.opacity x-effect="if (!showReceipt) cancelPendingPrints()" @keydown.escape.window="if(showReceipt) { showReceipt = false; }" @click.self="showReceipt = false" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    {{-- Popup is persistent: Esc + backdrop-click are intentionally NOT bound here so       --}}
+    {{-- the cashier doesn't dismiss the popup by accident while reading totals or printing.  --}}
+    {{-- Esc on this popup belongs to the browser print dialog (closes that, not our popup).  --}}
+    {{-- Popup closes ONLY via: X (top-right cross), Close button, or "New Sale" button.      --}}
+    <div x-cloak x-show="showReceipt" x-transition.opacity x-effect="if (!showReceipt) cancelPendingPrints()" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="receipt-modal-enter relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
-            {{-- Top-right cross --}}
-            <button @click="showReceipt = false" class="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/80 dark:bg-gray-800/80 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white flex items-center justify-center transition shadow-sm" title="Close (Esc)">
+            {{-- Top-right cross (primary close action) --}}
+            <button @click="showReceipt = false" class="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/80 dark:bg-gray-800/80 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white flex items-center justify-center transition shadow-sm" title="Close popup">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
 
@@ -907,27 +913,60 @@ window.addEventListener('popstate', function() {
                 </div>
             </div>
 
-            {{-- Action buttons --}}
+            {{-- Live print-status pills (only render once a print has actually fired). --}}
+            {{-- States per channel: 'idle' (hidden) → 'printing' (spinner) → 'done' (check). --}}
+            <div x-show="receiptPrintStatus !== 'idle' || kotPrintStatus !== 'idle'"
+                 x-transition.opacity
+                 class="px-5 py-2.5 bg-gray-50 dark:bg-gray-800/40 border-t border-gray-100 dark:border-gray-800 space-y-1.5">
+                {{-- Receipt status row --}}
+                <div x-show="receiptPrintStatus !== 'idle'" class="flex items-center gap-2 text-xs">
+                    <template x-if="receiptPrintStatus === 'printing'">
+                        <svg class="w-3.5 h-3.5 text-purple-600 animate-spin" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0110 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+                    </template>
+                    <template x-if="receiptPrintStatus === 'done'">
+                        <svg class="w-3.5 h-3.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                    </template>
+                    <span class="font-semibold" :class="receiptPrintStatus === 'done' ? 'text-green-700 dark:text-green-400' : 'text-purple-700 dark:text-purple-400'"
+                          x-text="receiptPrintStatus === 'printing' ? 'Printing receipt...' : 'Receipt printed'"></span>
+                </div>
+                {{-- KOT status row --}}
+                <div x-show="kotPrintStatus !== 'idle'" class="flex items-center gap-2 text-xs">
+                    <template x-if="kotPrintStatus === 'printing'">
+                        <svg class="w-3.5 h-3.5 text-orange-600 animate-spin" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0110 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+                    </template>
+                    <template x-if="kotPrintStatus === 'done'">
+                        <svg class="w-3.5 h-3.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                    </template>
+                    <span class="font-semibold" :class="kotPrintStatus === 'done' ? 'text-green-700 dark:text-green-400' : 'text-orange-700 dark:text-orange-400'"
+                          x-text="kotPrintStatus === 'printing' ? 'Printing KOT...' : 'KOT printed'"></span>
+                </div>
+            </div>
+
+            {{-- Action buttons.                                                                --}}
+            {{-- Layout: 4 fixed columns. KOT is ALWAYS visible (cashier can reprint anytime,   --}}
+            {{-- regardless of auto-KOT setting). Disabled state activates when no order ID.    --}}
+            {{-- Each click triggers print only - popup never auto-closes.                       --}}
             <div class="p-3 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800">
-                {{-- KOT button shows ONLY when KOT auto-print is OFF (print_on_hold = false). --}}
-                {{-- When auto-print is ON, KOT prints automatically after invoice — button would be redundant. --}}
-                <div :class="kitchenSettings.print_on_hold ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-4 gap-2'">
-                    {{-- Print → fires receipt print, popup STAYS OPEN (user closes manually). --}}
-                    <button @click="printReceipt(null, true)" class="py-3 text-center rounded-xl bg-gradient-to-br from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800 text-white text-sm font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-1.5">
+                <div class="grid grid-cols-4 gap-2">
+                    {{-- 1. Print Receipt (P) --}}
+                    <button @click="printReceipt(null, true)" :disabled="!lastTransactionId" class="py-3 text-center rounded-xl bg-gradient-to-br from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-1.5" title="Print customer receipt">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                         Print <kbd class="text-[8px] bg-purple-500/40 px-1 rounded font-mono">P</kbd>
                     </button>
-                    {{-- KOT button only when auto-KOT is OFF; popup STAYS OPEN after print (user closes manually). --}}
-                    <button x-show="!kitchenSettings.print_on_hold" @click="printKitchenTicket(lastOrderId, null, true)" :disabled="!lastOrderId" class="py-3 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-md shadow-orange-500/20 flex items-center justify-center gap-1.5" title="Print Kitchen Order Ticket">
+                    {{-- 2. KOT (K) - ALWAYS visible. Cashier can reprint Kitchen Order Ticket   --}}
+                    {{-- whenever needed, even if auto-KOT is ON (e.g. paper jam, kitchen lost it). --}}
+                    <button @click="printKitchenTicket(lastOrderId, null, true)" :disabled="!lastOrderId" class="py-3 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-md shadow-orange-500/20 flex items-center justify-center gap-1.5" title="Print Kitchen Order Ticket (always available)">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
                         KOT <kbd class="text-[8px] bg-orange-500/40 px-1 rounded font-mono">K</kbd>
                     </button>
-                    <button @click="startNewAfterPayment()" class="py-3 text-center rounded-xl bg-gradient-to-br from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white text-sm font-bold transition shadow-md shadow-green-600/20 flex items-center justify-center gap-1.5">
+                    {{-- 3. New Sale (Enter) --}}
+                    <button @click="startNewAfterPayment()" class="py-3 text-center rounded-xl bg-gradient-to-br from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white text-sm font-bold transition shadow-md shadow-green-600/20 flex items-center justify-center gap-1.5" title="Clear cart & start a new sale">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
                         New <kbd class="text-[8px] bg-green-500/40 px-1 rounded font-mono">Enter</kbd>
                     </button>
-                    <button @click="showReceipt = false" class="py-3 text-center rounded-xl bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 text-sm font-semibold transition flex items-center justify-center gap-1.5">
-                        Close <kbd class="text-[8px] bg-gray-300 dark:bg-gray-600 px-1 rounded font-mono">Esc</kbd>
+                    {{-- 4. Close popup (mouse only - Esc no longer bound to keep print dialog Esc clean) --}}
+                    <button @click="showReceipt = false" class="py-3 text-center rounded-xl bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 text-sm font-semibold transition flex items-center justify-center gap-1.5" title="Close this popup (does not start new sale)">
+                        Close
                     </button>
                 </div>
             </div>
@@ -1158,6 +1197,11 @@ function restaurantPos() {
         showPayModal: false,
         showHeldOrders: false,
         showReceipt: false,
+        // Live print-status state per channel ('idle' | 'printing' | 'done').
+        // Set inside printReceipt() / printKitchenTicket() so manual + auto paths share the same UI.
+        // Reset to 'idle' whenever the popup opens fresh OR cashier starts a new sale.
+        receiptPrintStatus: 'idle',
+        kotPrintStatus: 'idle',
         showShortcuts: false,
         lastInvoiceNumber: '',
         lastTransactionId: null,
@@ -1469,8 +1513,13 @@ function restaurantPos() {
             const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 
             if (this.showReceipt) {
-                if (e.key === 'Escape') { e.preventDefault(); this.showReceipt = false; }
-                else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); }
+                // Esc is INTENTIONALLY NOT bound on the success popup.
+                // Reason: when a browser print dialog is open over the popup, Esc must close
+                // ONLY that dialog (browser-native). If we also closed the popup on Esc, the
+                // cashier loses context the moment they cancel a print. So Esc is a no-op here
+                // and the popup is dismissed only via X / Close button / "New Sale" (Enter).
+                // Enter-only (NOT Space) starts a new sale — Space is too easy to hit by accident.
+                if (e.key === 'Enter') { e.preventDefault(); this.startNewAfterPayment(); }
                 else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.printReceipt(null, true); }
                 else if (e.key === 'k' || e.key === 'K') { e.preventDefault(); this.printKitchenTicket(this.lastOrderId, null, true); }
                 return;
@@ -1789,6 +1838,9 @@ function restaurantPos() {
 
         startNewAfterPayment() {
             this.showReceipt = false;
+            // Reset print pills so the next sale's popup opens clean (no stale ✓ marks).
+            this.receiptPrintStatus = 'idle';
+            this.kotPrintStatus = 'idle';
             // Hide reprint widget too — fresh sale begins
             this.showLastSaleWidget = false;
             this.clearCart();
@@ -1903,14 +1955,22 @@ function restaurantPos() {
             const now = Date.now();
             if (!force && this._lastReceiptPrintTxnId === this.lastTransactionId && (now - this._lastReceiptPrintAt) < this._printDedupMs) {
                 console.log('[POS] printReceipt deduped — same txn within ' + this._printDedupMs + 'ms');
+                // Dedup means previous print already finished — surface 'done' so the pill
+                // is consistent with reality (not stuck on 'printing').
+                this.receiptPrintStatus = 'done';
                 if (typeof onAfterPrint === 'function') this.queuePrintTimer(onAfterPrint, 50);
                 return;
             }
             this._lastReceiptPrintAt = now;
             this._lastReceiptPrintTxnId = this.lastTransactionId;
+            // Surface 'printing' BEFORE iframe load so the cashier sees instant feedback.
+            this.receiptPrintStatus = 'printing';
             const url = '/pos/restaurant/receipt/' + this.lastTransactionId + '?auto_print=1';
             console.log('[POS] printReceipt → txn=' + this.lastTransactionId + (force ? ' (forced)' : ''));
-            this._printViaIframe('print-receipt-frame', url, 'width=400,height=700', onAfterPrint);
+            this._printViaIframe('print-receipt-frame', url, 'width=400,height=700', () => {
+                this.receiptPrintStatus = 'done';
+                if (typeof onAfterPrint === 'function') onAfterPrint();
+            });
         },
 
         // Silent KOT print via hidden iframe — no popup window blocks the cashier screen.
@@ -1920,14 +1980,20 @@ function restaurantPos() {
             const now = Date.now();
             if (!force && this._lastKotPrintOrderId === orderId && (now - this._lastKotPrintAt) < this._printDedupMs) {
                 console.log('[POS] printKitchenTicket deduped — same orderId within ' + this._printDedupMs + 'ms');
+                this.kotPrintStatus = 'done';
                 if (typeof onAfterPrint === 'function') this.queuePrintTimer(onAfterPrint, 50);
                 return;
             }
             this._lastKotPrintAt = now;
             this._lastKotPrintOrderId = orderId;
+            // Surface 'printing' BEFORE iframe load so the cashier sees instant feedback.
+            this.kotPrintStatus = 'printing';
             const url = '/pos/restaurant/orders/' + orderId + '/kitchen-ticket?auto_print=1';
             console.log('[POS] printKitchenTicket → order=' + orderId + (force ? ' (forced)' : ''));
-            this._printViaIframe('print-kot-frame', url, 'width=350,height=600', onAfterPrint);
+            this._printViaIframe('print-kot-frame', url, 'width=350,height=600', () => {
+                this.kotPrintStatus = 'done';
+                if (typeof onAfterPrint === 'function') onAfterPrint();
+            });
         },
 
         async deleteHeldOrder(orderId) {
@@ -1951,9 +2017,15 @@ function restaurantPos() {
                     this.heldOrders = this.heldOrders.filter(o => o.id !== orderId);
                     this.lastInvoiceNumber = data.invoice_number || ''; this.lastTransactionId = data.transaction_id || null;
                     this.lastOrderId = orderId;
-                    this.lastTotal = savedTotal || data.total_amount || 0; this.lastPaymentMethod = method; this.showReceipt = true;
-                    // Persistent reprint widget — stays visible after Esc closes the success modal,
-                    // so cashier always has a way back to Print Receipt / Print KOT for the last sale.
+                    this.lastTotal = savedTotal || data.total_amount || 0; this.lastPaymentMethod = method;
+                    // Reset print pills to 'idle' BEFORE opening popup so any prior sale's
+                    // ✓ marks don't briefly flash through. Auto-print chain (if enabled) will
+                    // flip them to 'printing' → 'done' as it runs.
+                    this.receiptPrintStatus = 'idle';
+                    this.kotPrintStatus = 'idle';
+                    this.showReceipt = true;
+                    // Persistent reprint widget — stays visible after the success popup is closed
+                    // (via X / Close / New Sale), so cashier always has a way back to reprint.
                     this.showLastSaleWidget = true;
 
                     // AUTO-PRINT SEQUENCE — invoice ALWAYS prints first, KOT ALWAYS prints after.
@@ -1977,7 +2049,8 @@ function restaurantPos() {
                         // USER-REQUESTED BEHAVIOR (do NOT auto-close popup):
                         // - Auto-print chain still fires (receipt → KOT) when enabled.
                         // - But popup STAYS OPEN after prints finish — cashier closes it
-                        //   manually via X (top-right cross), Esc, click-outside, or Cancel button.
+                        //   manually via X (top-right cross), "Close" button, or "New Sale"
+                        //   (Enter key). Esc and backdrop-click do NOT dismiss the popup.
                         // - This way the cashier can verify the sale, reprint, or take other
                         //   actions before dismissing. The floating "Last Sale" widget is also
                         //   available for later reprints once the popup is closed.

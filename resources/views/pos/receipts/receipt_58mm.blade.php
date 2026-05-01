@@ -188,10 +188,6 @@
         </tbody>
     </table>
 
-    @if($transaction->items->where('is_tax_exempt', true)->count() > 0)
-    <div class="exempt-note">NT = NO TAX</div>
-    @endif
-
     <div class="separator"></div>
 
     <table class="totals-table">

@@ -1346,7 +1346,7 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
-    <div x-show="showReceipt" x-transition.opacity @keydown.escape.window="if(showReceipt) { cancelReceiptAutoClose(); showReceipt = false; }" @click.self="cancelReceiptAutoClose(); showReceipt = false;" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div x-show="showReceipt" x-transition.opacity x-effect="if (!showReceipt) cancelPendingPrints()" @keydown.escape.window="if(showReceipt) { cancelReceiptAutoClose(); showReceipt = false; }" @click.self="cancelReceiptAutoClose(); showReceipt = false;" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="receipt-modal-enter bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" style="max-height:92vh;" x-transition.scale.90>
             <div class="relative p-5 text-center bg-gradient-to-b from-green-50 to-white dark:from-green-900/20 dark:to-gray-900 flex-shrink-0" id="confettiContainer">
                 <div class="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center mb-3 shadow-lg shadow-green-600/30 success-icon-animate" style="animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)">
@@ -1685,6 +1685,14 @@ function restaurantPos() {
         autoKotEnabled: {{ ($company->auto_print_kot ?? false) ? 'true' : 'false' }},
         // Phase 5+ — auto-dismiss timer for the success modal so cashiers can chain sales hands-free
         receiptAutoCloseTimer: null,
+        // Print-chain session tracker — bumping the epoch invalidates in-flight iframe.onload /
+        // afterprint callbacks so late-firing browser events (modal closed mid-sequence) cannot
+        // enqueue stray prints. Mirrors restaurant POS engine.
+        printSessionId: 0,
+        pendingPrintTimers: [],
+        // Registry of attached postMessage listeners — lets us remove them on cancel
+        // so long cashier sessions (100s of bills) don't leak window-level listeners.
+        printMessageHandlers: [],
         lastInvoiceNumber: '',
         lastTransactionId: null,
         lastOrderId: null,
@@ -2856,6 +2864,9 @@ function restaurantPos() {
                 this.showReceipt = true;
                 this.scheduleReceiptAutoClose();
                 this.$nextTick(() => { setTimeout(() => this.triggerConfetti(), 300); });
+                // Auto-print receipt for manual-cart bills too (parity with held-order pay).
+                // Manual carts don't have a restaurant order so KOT is a no-op — receipt only.
+                this.runAutoPrintChain(null);
                 this.clearCart();
                 this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
             } catch (e) {
@@ -2882,46 +2893,124 @@ function restaurantPos() {
             this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); });
         },
 
-        printReceipt() {
-            if (!this.lastTransactionId) return;
-            // Manual button click → always force print, regardless of auto-print setting.
-            const url = '/pos/restaurant/receipt/' + this.lastTransactionId + '?auto_print=1';
-            let printFrame = document.getElementById('print-receipt-frame');
-            if (!printFrame) {
-                printFrame = document.createElement('iframe');
-                printFrame.id = 'print-receipt-frame';
-                printFrame.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;top:-9999px;';
-                document.body.appendChild(printFrame);
-            }
-            printFrame.onload = () => {
-                setTimeout(() => {
-                    try { printFrame.contentWindow.print(); } catch(e) { window.open(url, '_blank', 'width=400,height=700'); }
-                }, 500);
-            };
-            printFrame.src = url;
+        // Cancelable timer registry — prevents stray prints firing after the cashier closes
+        // the receipt modal mid-sequence. Mirrors restaurant POS engine.
+        queuePrintTimer(fn, delay) {
+            const id = setTimeout(() => {
+                this.pendingPrintTimers = this.pendingPrintTimers.filter(t => t !== id);
+                fn();
+            }, delay);
+            this.pendingPrintTimers.push(id);
+            return id;
+        },
+        cancelPendingPrints() {
+            // Bumping the session epoch invalidates any in-flight iframe.onload / afterprint
+            // callbacks captured under the prior epoch.
+            this.printSessionId++;
+            this.pendingPrintTimers.forEach(id => clearTimeout(id));
+            this.pendingPrintTimers = [];
+            // Remove any postMessage listeners attached by _printViaIframe — prevents
+            // long-session listener accumulation across many sales.
+            this.printMessageHandlers.forEach(h => {
+                try { window.removeEventListener('message', h); } catch (e) {}
+            });
+            this.printMessageHandlers = [];
+            ['print-receipt-frame', 'print-kot-frame'].forEach(id => {
+                const fr = document.getElementById(id);
+                if (fr) { fr.onload = null; }
+            });
         },
 
-        // Phase 5++ — Silent KOT print via hidden iframe (no popup window).
-        // Used by both auto-KOT (when enabled) and the manual "Print KOT" button
-        // on the receipt success modal. Mirrors printReceipt() pattern.
-        printKitchenTicket(orderId) {
-            const id = orderId || this.lastOrderId;
-            if (!id) return;
-            const url = '/pos/restaurant/orders/' + id + '/kitchen-ticket?auto_print=1';
-            let kotFrame = document.getElementById('print-kot-frame');
-            if (!kotFrame) {
-                kotFrame = document.createElement('iframe');
-                kotFrame.id = 'print-kot-frame';
-                kotFrame.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;top:-9999px;';
-                document.body.appendChild(kotFrame);
+        // Hidden-iframe print engine — postMessage-based chain.
+        // Receipt template (`/pos/restaurant/receipt/...?auto_print=1&_signal=...`) calls
+        // window.print() in its own onload then postMessage('pos_print_done') to parent.
+        // Parent waits for the signal before chaining the next print, so KOT NEVER fires
+        // before the receipt dialog is dismissed (Chrome blocks parent JS during print).
+        _printViaIframe(frameId, url, popupSpec, onAfterPrint) {
+            const sessionAtCall = this.printSessionId;
+            const isStale = () => sessionAtCall !== this.printSessionId;
+            const signal = frameId + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+            let frame = document.getElementById(frameId);
+            if (!frame) {
+                frame = document.createElement('iframe');
+                frame.id = frameId;
+                frame.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;top:-9999px;';
+                document.body.appendChild(frame);
             }
-            kotFrame.onload = () => {
-                setTimeout(() => {
-                    try { kotFrame.contentWindow.print(); } catch(e) { window.open(url, '_blank', 'width=380,height=620'); }
-                }, 500);
+            const removeHandler = () => {
+                window.removeEventListener('message', messageHandler);
+                this.printMessageHandlers = this.printMessageHandlers.filter(h => h !== messageHandler);
             };
-            kotFrame.src = url;
-            this.showToast('Kitchen ticket sent to printer', 'success');
+            const fireOnce = (() => {
+                let invoked = false;
+                return () => {
+                    if (invoked) return;
+                    invoked = true;
+                    removeHandler();
+                    if (isStale()) return;
+                    if (typeof onAfterPrint === 'function') onAfterPrint();
+                };
+            })();
+            const messageHandler = (e) => {
+                if (!e.data || e.data.type !== 'pos_print_done' || e.data.signal !== signal) return;
+                if (isStale()) { removeHandler(); return; }
+                this.queuePrintTimer(fireOnce, 200);
+            };
+            window.addEventListener('message', messageHandler);
+            this.printMessageHandlers.push(messageHandler);
+            // Hard ceiling — if iframe never signals (load failure / exotic printer driver),
+            // advance the chain after 30s so the cashier isn't stuck.
+            this.queuePrintTimer(fireOnce, 30000);
+            const cacheBustedUrl = url
+                + (url.includes('?') ? '&' : '?')
+                + '_t=' + Date.now()
+                + '&_signal=' + encodeURIComponent(signal);
+            frame.onload = () => {
+                if (isStale()) return;
+                // Iframe's own window.onload fires print() + posts the done signal.
+            };
+            frame.src = cacheBustedUrl;
+        },
+
+        printReceipt(onAfterPrint) {
+            if (!this.lastTransactionId) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
+            const url = '/pos/restaurant/receipt/' + this.lastTransactionId + '?auto_print=1';
+            this._printViaIframe('print-receipt-frame', url, 'width=400,height=700', onAfterPrint);
+        },
+
+        // Silent KOT print via hidden iframe — no popup window blocks the cashier screen.
+        printKitchenTicket(orderId, onAfterPrint) {
+            const id = orderId || this.lastOrderId;
+            if (!id) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
+            const url = '/pos/restaurant/orders/' + id + '/kitchen-ticket?auto_print=1';
+            this._printViaIframe('print-kot-frame', url, 'width=350,height=600', onAfterPrint);
+        },
+
+        // Print invoice → KOT in strict order. Used by auto-print on successful pay.
+        // Receipt ALWAYS prints first; KOT chains after receipt's print dialog closes.
+        // Mirrors restaurant POS payHeldOrderDirect policy: when auto-KOT is enabled but
+        // auto-print is OFF, we STILL force the receipt to print first — otherwise the
+        // cashier would see the KOT dialog before the invoice (cashier-requested ordering).
+        runAutoPrintChain(orderId) {
+            const hasReceipt = !!this.lastTransactionId;
+            const wantsKot = !!this.autoKotEnabled && !!orderId;
+            // Force receipt-first whenever KOT will print — even if autoPrintEnabled is false.
+            const wantsReceipt = hasReceipt && (!!this.autoPrintEnabled || wantsKot);
+            if (!wantsReceipt && !wantsKot) return;
+            this.$nextTick(() => {
+                if (wantsReceipt && wantsKot) {
+                    this.queuePrintTimer(() => {
+                        this.printReceipt(() => {
+                            this.queuePrintTimer(() => this.printKitchenTicket(orderId), 300);
+                        });
+                    }, 400);
+                } else if (wantsReceipt) {
+                    this.queuePrintTimer(() => this.printReceipt(), 400);
+                } else if (wantsKot) {
+                    // Pathological case: no transaction (so no receipt possible) but KOT requested.
+                    this.queuePrintTimer(() => this.printKitchenTicket(orderId), 400);
+                }
+            });
         },
 
         async deleteHeldOrder(orderId) {
@@ -2960,15 +3049,10 @@ function restaurantPos() {
                     this.scheduleReceiptAutoClose();
                     this.$nextTick(() => { setTimeout(() => this.triggerConfetti(), 300); });
                     // Print order: INVOICE FIRST → KOT AFTER. Cashier-requested sequence.
-                    // Step 1 (200ms): print invoice receipt if auto-print is enabled.
-                    // Step 2 (1800ms): print kitchen ticket if auto-KOT is enabled — gives the
-                    // invoice print dialog enough time to appear & be dismissed first.
-                    if (this.autoPrintEnabled && this.lastTransactionId) {
-                        setTimeout(() => this.printReceipt(), 200);
-                    }
-                    if (this.autoKotEnabled && orderId) {
-                        setTimeout(() => this.printKitchenTicket(orderId), 1800);
-                    }
+                    // Uses postMessage-chained engine — KOT never fires before the receipt
+                    // print dialog is dismissed (was a race in the old setTimeout(200/1800) impl
+                    // on slow networks where KOT iframe loaded before receipt iframe).
+                    this.runAutoPrintChain(orderId);
                 } else { if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; } this.showToast(data.message || 'Payment failed', 'error'); }
             } catch (e) { this.showToast('Payment error', 'error'); }
         },

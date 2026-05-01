@@ -102,6 +102,25 @@
                 window.location.href = '{{ route('pos.transactions') }}';
             }
         };
+
+        // AUTO-PRINT + POSTMESSAGE SIGNAL (Restaurant POS sale-time chain)
+        // See receipt_80mm for full rationale.
+        window.addEventListener('load', function() {
+            var urlParams = new URLSearchParams(window.location.search);
+            var frameSignal = urlParams.get('_signal');
+            if (urlParams.get('auto_print') !== '1') return;
+            if (isInIframe && frameSignal) {
+                var signaled = false;
+                var signalParent = function() {
+                    if (signaled) return;
+                    signaled = true;
+                    try { window.parent.postMessage({ type: 'pos_print_done', signal: frameSignal }, '*'); } catch (e) {}
+                };
+                window.addEventListener('afterprint', signalParent, { once: true });
+                setTimeout(signalParent, 20000);
+            }
+            setTimeout(function() { window.print(); }, 500);
+        });
     </script>
 
     <div class="header text-center">

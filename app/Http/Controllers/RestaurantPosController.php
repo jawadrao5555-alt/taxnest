@@ -1175,15 +1175,18 @@ class RestaurantPosController extends Controller
         $company = Company::find($companyId);
 
         $transaction = PosTransaction::where('company_id', $companyId)
-            ->with(['items', 'creator'])
+            ->with(['items', 'payments', 'creator', 'terminal'])
             ->findOrFail($transactionId);
 
-        $order = RestaurantOrder::where('company_id', $companyId)
-            ->where('pos_transaction_id', $transaction->id)
-            ->with('table')
-            ->first();
+        // Restaurant POS sale-time + reprint now use the SAME beautiful
+        // typewriter-style thermal receipt as the universal Reports flow
+        // (pos.receipts.receipt_80mm / receipt_58mm). Single source of truth
+        // — a single template change updates both flows. The order/KOT
+        // linkage stays separate (KOT prints via pos.restaurant.kitchen-ticket).
+        $printerSize = $company->receipt_printer_size ?? '80mm';
+        $receiptView = $printerSize === '58mm' ? 'pos.receipts.receipt_58mm' : 'pos.receipts.receipt_80mm';
 
-        return view('pos.restaurant.receipt', compact('transaction', 'company', 'order'));
+        return view($receiptView, compact('transaction', 'company'));
     }
 
     public function verifyManagerPin(Request $request)

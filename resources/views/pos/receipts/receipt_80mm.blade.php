@@ -102,6 +102,35 @@
                 window.location.href = '{{ route('pos.transactions') }}';
             }
         };
+
+        // AUTO-PRINT + POSTMESSAGE SIGNAL (Restaurant POS sale-time chain)
+        // ----------------------------------------------------------------
+        // When loaded with ?auto_print=1, automatically fire window.print().
+        // When loaded with ?_signal=<token> inside the parent's hidden print
+        // iframe, attach `afterprint` here (where it's reliable per spec) and
+        // signal the parent via postMessage when the print dialog actually
+        // closes. Parent then chains the next print (e.g. KOT) only AFTER
+        // receiving this signal — eliminates the "KOT pops up before receipt"
+        // race. Mirrors the wiring previously used in pos.restaurant.receipt.
+        window.addEventListener('load', function() {
+            var urlParams = new URLSearchParams(window.location.search);
+            var frameSignal = urlParams.get('_signal');
+            if (urlParams.get('auto_print') !== '1') return;
+            if (isInIframe && frameSignal) {
+                var signaled = false;
+                var signalParent = function() {
+                    if (signaled) return;
+                    signaled = true;
+                    try { window.parent.postMessage({ type: 'pos_print_done', signal: frameSignal }, '*'); } catch (e) {}
+                };
+                window.addEventListener('afterprint', signalParent, { once: true });
+                // Safety net inside the iframe — if afterprint never fires
+                // (silent printer drivers), signal the parent after a generous
+                // wait so the chain still advances.
+                setTimeout(signalParent, 20000);
+            }
+            setTimeout(function() { window.print(); }, 500);
+        });
     </script>
 
     <div class="header text-center">

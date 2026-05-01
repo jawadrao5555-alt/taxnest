@@ -242,15 +242,16 @@ window.addEventListener('popstate', function() {
                 <template x-if="!loading">
                     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                         <template x-for="(item, idx) in displayItems" :key="item.id + '-' + item.type">
-                            <div :id="'grid-item-' + idx" class="prod-card bg-white dark:bg-gray-900 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800 shadow-sm fade-in" :class="[gridFocusMode && gridFocusIndex === idx ? 'ring-2 ring-purple-500 shadow-purple-200 dark:shadow-purple-900' : '', item.stockStatus === 'out' && blockOutOfStock ? 'stock-out' : (item.stockStatus === 'out' && !blockOutOfStock ? 'stock-out allow-add' : '')]" @click="handleProductClick(item)">
+                            <div :id="'grid-item-' + idx" class="prod-card bg-white dark:bg-gray-900 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800 shadow-sm fade-in" :class="[gridFocusMode && gridFocusIndex === idx ? 'ring-2 ring-purple-500 shadow-purple-200 dark:shadow-purple-900' : '', isInventoryEnabled() && item.stockStatus === 'out' && blockOutOfStock ? 'stock-out' : (isInventoryEnabled() && item.stockStatus === 'out' && !blockOutOfStock ? 'stock-out allow-add' : '')]" @click="handleProductClick(item)">
                                 {{-- IMAGE CARD: only render the big image area when a real uploaded image exists. --}}
                                 <template x-if="item.image">
                                     <div class="relative aspect-[4/3] bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center overflow-hidden">
                                         <img :src="item.image" :alt="item.name" class="w-full h-full object-cover" loading="lazy" onerror="this.style.display='none';">
                                         <div class="absolute top-1.5 left-1.5 flex flex-col gap-1">
-                                            <template x-if="item.stockStatus === 'available'"><span class="stock-dot stock-available"></span></template>
-                                            <template x-if="item.stockStatus === 'low'"><span class="stock-dot stock-low" title="Low stock"></span></template>
-                                            <template x-if="item.stockStatus === 'out'"><span class="px-1.5 py-0.5 bg-red-500/90 text-white text-[8px] font-bold rounded-md">OUT</span></template>
+                                            {{-- Stock dots/OUT pill: gated by isInventoryEnabled() so they vanish entirely when inventory module is OFF. --}}
+                                            <template x-if="isInventoryEnabled() && item.stockStatus === 'available'"><span class="stock-dot stock-available"></span></template>
+                                            <template x-if="isInventoryEnabled() && item.stockStatus === 'low'"><span class="stock-dot stock-low" title="Low stock"></span></template>
+                                            <template x-if="isInventoryEnabled() && item.stockStatus === 'out'"><span class="px-1.5 py-0.5 bg-red-500/90 text-white text-[8px] font-bold rounded-md">OUT</span></template>
                                         </div>
                                         <div class="absolute top-1.5 right-1.5 flex flex-col gap-1">
                                             <template x-if="item.hasRecipe"><span class="px-1.5 py-0.5 bg-orange-500/90 text-white text-[8px] font-bold rounded-md flex items-center gap-0.5"><span class="text-[9px]">&#x1F373;</span> Recipe</span></template>
@@ -264,8 +265,9 @@ window.addEventListener('popstate', function() {
                                 {{-- TEXT-ONLY ROW: when no image, render a compact name+price list row — no placeholder, no letter badge. --}}
                                 <template x-if="!item.image">
                                     <div class="relative flex items-center justify-end gap-1 px-3 pt-2.5 min-h-[26px]">
-                                        <template x-if="item.stockStatus === 'low'"><span class="stock-dot stock-low" title="Low stock"></span></template>
-                                        <template x-if="item.stockStatus === 'out'"><span class="px-1.5 py-0.5 bg-red-500/90 text-white text-[8px] font-bold rounded-md">OUT</span></template>
+                                        {{-- Stock dots/OUT pill: gated by isInventoryEnabled() — invisible when inventory OFF. --}}
+                                        <template x-if="isInventoryEnabled() && item.stockStatus === 'low'"><span class="stock-dot stock-low" title="Low stock"></span></template>
+                                        <template x-if="isInventoryEnabled() && item.stockStatus === 'out'"><span class="px-1.5 py-0.5 bg-red-500/90 text-white text-[8px] font-bold rounded-md">OUT</span></template>
                                         <template x-if="item.hasRecipe"><span class="px-1.5 py-0.5 bg-orange-500/90 text-white text-[8px] font-bold rounded-md flex items-center gap-0.5"><span class="text-[9px]">&#x1F373;</span> Recipe</span></template>
                                         <template x-if="item.is_tax_exempt"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md">NO TAX</span></template>
                                     </div>
@@ -1014,8 +1016,9 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
-    {{-- Low Stock Alert Popup --}}
-    <div x-cloak x-show="showLowStockPopup && lowStockAlerts.length > 0" x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    {{-- Low Stock Alert Popup — strictly gated by isInventoryEnabled().
+         Even if some downstream code flips showLowStockPopup, this guard keeps it hidden. --}}
+    <div x-cloak x-show="isInventoryEnabled() && showLowStockPopup && lowStockAlerts.length > 0" x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" @click.outside="showLowStockPopup = false">
             <div class="p-4 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 flex items-center gap-3">
                 <div class="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
@@ -1100,8 +1103,12 @@ function restaurantPos() {
         managerPin: '',
         managerPinError: '',
         ingredientCosts: @json($ingredientCosts ?? []),
+        // Inventory master switch — when company.inventory_enabled = false, ALL stock UI
+        // (popup, product-card dots/OUT pills) is suppressed via isInventoryEnabled() helper.
+        inventoryEnabled: {{ ($inventoryEnabled ?? false) ? 'true' : 'false' }},
+        isInventoryEnabled() { return this.inventoryEnabled === true; },
         lowStockAlerts: @json($lowStockAlerts ?? []),
-        showLowStockPopup: {{ ($lowStockAlerts ?? collect())->count() > 0 ? 'true' : 'false' }},
+        showLowStockPopup: {{ (($inventoryEnabled ?? false) && ($lowStockAlerts ?? collect())->count() > 0) ? 'true' : 'false' }},
         customerHistory: null,
         showCustomerHistory: false,
         loadingCustomerHistory: false,
@@ -1305,7 +1312,8 @@ function restaurantPos() {
         },
 
         handleProductClick(item) {
-            if (item.stockStatus === 'out' && this.blockOutOfStock) {
+            // Out-of-stock blocking only applies when inventory module is ON.
+            if (this.isInventoryEnabled() && item.stockStatus === 'out' && this.blockOutOfStock) {
                 this.showToast(item.name + ' is out of stock', 'error');
                 return;
             }

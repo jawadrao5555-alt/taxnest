@@ -124,12 +124,16 @@ class RestaurantPosController extends Controller
                 ->get()
             : collect();
 
+        // Frontend defensive double-guard — even if some downstream code populates lowStockAlerts
+        // (e.g. cache rehydrate, accidental flag flip), the inventoryEnabled gate keeps the UI hidden.
+        $inventoryEnabled = $inventoryOn;
+
         return view('pos.restaurant.pos', compact(
             'company', 'products', 'services', 'categories',
             'recipeLookup', 'tables', 'selectedTable', 'heldOrders',
             'customers', 'taxRate', 'taxRules', 'stockStatus', 'blockOutOfStock',
             'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts',
-            'lowStockAlerts'
+            'lowStockAlerts', 'inventoryEnabled'
         ));
     }
 

@@ -243,34 +243,48 @@ window.addEventListener('popstate', function() {
                     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                         <template x-for="(item, idx) in displayItems" :key="item.id + '-' + item.type">
                             <div :id="'grid-item-' + idx" class="prod-card bg-white dark:bg-gray-900 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800 shadow-sm fade-in" :class="[gridFocusMode && gridFocusIndex === idx ? 'ring-2 ring-purple-500 shadow-purple-200 dark:shadow-purple-900' : '', item.stockStatus === 'out' && blockOutOfStock ? 'stock-out' : (item.stockStatus === 'out' && !blockOutOfStock ? 'stock-out allow-add' : '')]" @click="handleProductClick(item)">
-                                <div class="relative aspect-[4/3] bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center overflow-hidden">
-                                    <template x-if="item.image">
-                                        <img :src="item.image" :alt="item.name" class="w-full h-full object-cover" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                    </template>
-                                    <div x-show="!item.image" class="flex flex-col items-center justify-center w-full h-full" :class="'letter-' + (item.name ? item.name.charAt(0).toUpperCase() : 'A')">
-                                        <span class="text-4xl font-black text-white/90 select-none drop-shadow-sm" x-text="item.name ? item.name.charAt(0).toUpperCase() : '?'"></span>
-                                        <span class="text-[9px] font-semibold text-white/60 mt-0.5 tracking-wider uppercase truncate max-w-[80%]" x-text="item.category || item.type"></span>
+                                {{-- IMAGE CARD: only render the big image area when a real uploaded image exists. --}}
+                                <template x-if="item.image">
+                                    <div class="relative aspect-[4/3] bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center overflow-hidden">
+                                        <img :src="item.image" :alt="item.name" class="w-full h-full object-cover" loading="lazy" onerror="this.style.display='none';">
+                                        <div class="absolute top-1.5 left-1.5 flex flex-col gap-1">
+                                            <template x-if="item.stockStatus === 'available'"><span class="stock-dot stock-available"></span></template>
+                                            <template x-if="item.stockStatus === 'low'"><span class="stock-dot stock-low" title="Low stock"></span></template>
+                                            <template x-if="item.stockStatus === 'out'"><span class="px-1.5 py-0.5 bg-red-500/90 text-white text-[8px] font-bold rounded-md">OUT</span></template>
+                                        </div>
+                                        <div class="absolute top-1.5 right-1.5 flex flex-col gap-1">
+                                            <template x-if="item.hasRecipe"><span class="px-1.5 py-0.5 bg-orange-500/90 text-white text-[8px] font-bold rounded-md flex items-center gap-0.5"><span class="text-[9px]">&#x1F373;</span> Recipe</span></template>
+                                            <template x-if="item.is_tax_exempt"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md">NO TAX</span></template>
+                                        </div>
+                                        <button @click.stop="handleProductClick(item)" class="quick-add absolute bottom-2 right-2 w-9 h-9 rounded-full bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-600/30 flex items-center justify-center transition-all">
+                                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                                        </button>
                                     </div>
-                                    <div class="absolute top-1.5 left-1.5 flex flex-col gap-1">
-                                        <template x-if="item.stockStatus === 'available'"><span class="stock-dot stock-available"></span></template>
+                                </template>
+                                {{-- TEXT-ONLY ROW: when no image, render a compact name+price list row — no placeholder, no letter badge. --}}
+                                <template x-if="!item.image">
+                                    <div class="relative flex items-center justify-end gap-1 px-3 pt-2.5 min-h-[26px]">
                                         <template x-if="item.stockStatus === 'low'"><span class="stock-dot stock-low" title="Low stock"></span></template>
                                         <template x-if="item.stockStatus === 'out'"><span class="px-1.5 py-0.5 bg-red-500/90 text-white text-[8px] font-bold rounded-md">OUT</span></template>
-                                    </div>
-                                    <div class="absolute top-1.5 right-1.5 flex flex-col gap-1">
                                         <template x-if="item.hasRecipe"><span class="px-1.5 py-0.5 bg-orange-500/90 text-white text-[8px] font-bold rounded-md flex items-center gap-0.5"><span class="text-[9px]">&#x1F373;</span> Recipe</span></template>
                                         <template x-if="item.is_tax_exempt"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md">NO TAX</span></template>
                                     </div>
-                                    <button @click.stop="handleProductClick(item)" class="quick-add absolute bottom-2 right-2 w-9 h-9 rounded-full bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-600/30 flex items-center justify-center transition-all">
-                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-                                    </button>
-                                </div>
+                                </template>
                                 <div class="px-3 py-2.5">
-                                    <p class="text-xs font-bold text-gray-900 dark:text-white truncate leading-tight" x-text="item.name"></p>
-                                    <div class="flex items-center justify-between mt-1.5">
+                                    <p class="font-bold text-gray-900 dark:text-white truncate leading-tight" :class="item.image ? 'text-xs' : 'text-sm'" x-text="item.name"></p>
+                                    <div class="flex items-center justify-between mt-1.5 gap-2">
                                         <span class="price-badge text-sm font-extrabold text-purple-600 dark:text-purple-400" x-text="'Rs. ' + Number(item.price).toLocaleString()"></span>
-                                        <template x-if="getCartQty(item) > 0">
-                                            <span class="cart-qty-badge text-[10px] bg-gradient-to-br from-purple-500 to-purple-700 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold shadow-lg shadow-purple-500/30" x-text="getCartQty(item)"></span>
-                                        </template>
+                                        <div class="flex items-center gap-2">
+                                            <template x-if="getCartQty(item) > 0">
+                                                <span class="cart-qty-badge text-[10px] bg-gradient-to-br from-purple-500 to-purple-700 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold shadow-lg shadow-purple-500/30" x-text="getCartQty(item)"></span>
+                                            </template>
+                                            {{-- Inline + button for the no-image text row (image cards already have the floating quick-add). --}}
+                                            <template x-if="!item.image">
+                                                <button @click.stop="handleProductClick(item)" class="w-8 h-8 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center shadow-md shadow-purple-600/30 transition-all">
+                                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                                                </button>
+                                            </template>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

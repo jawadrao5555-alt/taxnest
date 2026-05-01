@@ -434,15 +434,30 @@ class PosController extends Controller
         $company = Company::find($companyId);
 
         $request->validate([
-            'items' => 'required|array|min:1',
-            'items.*.name' => 'required|string',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.unit_price' => 'required|numeric|min:0',
+            'items' => 'required|array|min:1|max:200',
+            'items.*.name' => 'required|string|max:255',
+            'items.*.quantity' => 'required|integer|min:1|max:9999',
+            // Sane upper bound (Rs. 10M per unit) to limit damage from any
+            // tampered / malformed payload. POS line-item prices in Pakistan
+            // never legitimately exceed this.
+            'items.*.unit_price' => 'required|numeric|min:0|max:10000000',
             'payment_method' => 'required|in:cash,debit_card,credit_card,qr_payment',
             'discount_type' => 'required|in:percentage,amount',
             'discount_value' => 'nullable|numeric|min:0',
             'cash_received' => 'nullable|numeric|min:0',
         ]);
+
+        // Cashier discount guardrail — mirrors RestaurantPosController::holdOrder.
+        // Without this, a `pos_cashier` user could submit a 100 % percentage
+        // discount through the manual-cart bypass / legacy form post and bypass
+        // the per-company limit. Admin/manager roles are unaffected.
+        $posUser = auth('pos')->user();
+        if ($posUser && ($posUser->pos_role ?? null) === 'pos_cashier') {
+            $cashierMaxPct = (float) ($company->cashier_discount_limit ?? 50);
+            if ($request->discount_type === 'percentage' && (float) $request->discount_value > $cashierMaxPct) {
+                $request->merge(['discount_value' => $cashierMaxPct]);
+            }
+        }
 
         $companyItems = $this->resolveItemExemptions($request->items, $companyId);
         $subtotal = array_sum(array_column($companyItems, 'lineTotal'));
@@ -576,7 +591,11 @@ class PosController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->withInput()->with('error', 'Failed to create invoice: ' . $e->getMessage());
+            $errMsg = 'Failed to create invoice: ' . $e->getMessage();
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $errMsg], 500);
+            }
+            return back()->withInput()->with('error', $errMsg);
         }
 
         $inventoryResult = PosInventoryController::deductStockForInvoice(
@@ -615,8 +634,26 @@ class PosController extends Controller
             $praMessage = ' | Local invoice (PRA reporting is off).';
         }
 
+        $successMessage = 'Invoice Created Successfully! POS Invoice Number: ' . $invoiceNumber . $praMessage;
+
+        // JSON callers (Universal POS manual-cart bypass) expect a structured
+        // response so the receipt modal can render in-place. Legacy form-POST
+        // callers (pos/create-invoice.blade.php) continue to receive the
+        // traditional redirect-with-flash response.
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'transaction_id' => $transaction->id,
+                'invoice_number' => $invoiceNumber,
+                'total_amount' => $totalAmount,
+                'pra_invoice_number' => $transaction->pra_invoice_number ?? null,
+                'pra_status' => $transaction->pra_status ?? null,
+                'message' => $successMessage,
+            ]);
+        }
+
         return redirect()->route('pos.transaction.show', $transaction->id)
-            ->with('success', 'Invoice Created Successfully! POS Invoice Number: ' . $invoiceNumber . $praMessage);
+            ->with('success', $successMessage);
     }
 
     public function editTransaction($id)
@@ -661,15 +698,26 @@ class PosController extends Controller
         }
 
         $request->validate([
-            'items' => 'required|array|min:1',
-            'items.*.name' => 'required|string',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.unit_price' => 'required|numeric|min:0',
+            'items' => 'required|array|min:1|max:200',
+            'items.*.name' => 'required|string|max:255',
+            'items.*.quantity' => 'required|integer|min:1|max:9999',
+            'items.*.unit_price' => 'required|numeric|min:0|max:10000000',
             'payment_method' => 'required|in:cash,debit_card,credit_card,qr_payment',
             'discount_type' => 'required|in:percentage,amount',
             'discount_value' => 'nullable|numeric|min:0',
             'cash_received' => 'nullable|numeric|min:0',
         ]);
+
+        // Cashier discount guardrail (mirrors RestaurantPosController::holdOrder
+        // and storeInvoice). Stops a `pos_cashier` from bypassing the per-company
+        // percentage limit through the edit/update path.
+        $posUser = auth('pos')->user();
+        if ($posUser && ($posUser->pos_role ?? null) === 'pos_cashier') {
+            $cashierMaxPct = (float) ($company->cashier_discount_limit ?? 50);
+            if ($request->discount_type === 'percentage' && (float) $request->discount_value > $cashierMaxPct) {
+                $request->merge(['discount_value' => $cashierMaxPct]);
+            }
+        }
 
         $companyItems = $this->resolveItemExemptions($request->items, $companyId);
         $subtotal = array_sum(array_column($companyItems, 'lineTotal'));
@@ -2772,7 +2820,11 @@ class PosController extends Controller
                 }
             }
 
-            if (!$itemId && $itemType === 'product' && $itemName !== '') {
+            // Skip auto-create for cashier "manual" lines — these are ephemeral
+            // ad-hoc entries (Quick Type unmatched + "+ Manual" button in
+            // inventory-OFF mode) and must NOT pollute the product master.
+            // Frontend sends `_manual: true` in the payload to flag them.
+            if (!$itemId && $itemType === 'product' && $itemName !== '' && empty($item['_manual'])) {
                 $existing = PosProduct::where('company_id', $companyId)
                     ->whereRaw('LOWER(name) = ?', [strtolower($itemName)])
                     ->first();

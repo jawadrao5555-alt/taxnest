@@ -1168,6 +1168,9 @@ window.addEventListener('popstate', function() {
                         <div class="text-[11px] text-sky-700 dark:text-sky-300 leading-snug">
                             <span class="font-bold block">Tip</span>
                             Start typing item names &mdash; the parser will fuzzy-match against your products in real time. No qty? Defaults to 1.
+                            <template x-if="!isInventoryEnabled()">
+                                <span class="block mt-1 text-amber-700 dark:text-amber-400">Unmatched items? Inline price input dega &mdash; type Rs. and add as a manual line.</span>
+                            </template>
                         </div>
                     </div>
                 </template>
@@ -1182,38 +1185,58 @@ window.addEventListener('popstate', function() {
                                     <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
                                     <span x-text="quickTypeParsed.filter(p => p.match).length"></span> matched
                                 </span>
-                                <template x-if="quickTypeParsed.filter(p => !p.match).length > 0">
+                                {{-- Inventory ON → unmatched stays as red "not found" (cannot be added). --}}
+                                <template x-if="quickTypeParsed.filter(p => !p.match).length > 0 && isInventoryEnabled()">
                                     <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">
                                         <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
                                         <span x-text="quickTypeParsed.filter(p => !p.match).length"></span> not found
                                     </span>
                                 </template>
+                                {{-- Inventory OFF → unmatched becomes amber "manual entry" — cashier fills price inline. --}}
+                                <template x-if="quickTypeParsed.filter(p => !p.match).length > 0 && !isInventoryEnabled()">
+                                    <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300" :title="'Type a price for each unmatched line to add as a manual item'">
+                                        <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                                        <span x-text="quickTypeParsed.filter(p => !p.match).length"></span> manual
+                                    </span>
+                                </template>
                             </div>
-                            <span class="text-[11px] font-bold text-sky-700 dark:text-sky-300" x-text="'Rs. ' + Number(quickTypeParsed.filter(p => p.match).reduce((s, p) => s + (parseFloat(p.match.price) * p.qty), 0)).toLocaleString()"></span>
+                            <span class="text-[11px] font-bold text-sky-700 dark:text-sky-300" x-text="'Rs. ' + Number(quickTypeParsed.reduce((s, p) => p.match ? s + parseFloat(p.match.price) * p.qty : (!isInventoryEnabled() && parseFloat(p.manualPrice) > 0 ? s + parseFloat(p.manualPrice) * p.qty : s), 0)).toLocaleString()"></span>
                         </div>
                         <div class="divide-y divide-sky-100 dark:divide-sky-900/40 max-h-52 overflow-y-auto">
                             <template x-for="(p, idx) in quickTypeParsed" :key="idx">
-                                <div class="flex items-center gap-3 px-4 py-2 hover:bg-white/60 dark:hover:bg-black/20 transition" :class="p.match ? '' : 'opacity-70'">
+                                <div class="flex items-center gap-3 px-4 py-2 hover:bg-white/60 dark:hover:bg-black/20 transition" :class="(p.match || (!isInventoryEnabled() && parseFloat(p.manualPrice) > 0)) ? '' : 'opacity-70'">
                                     {{-- Status icon --}}
                                     <template x-if="p.match">
                                         <div class="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center flex-shrink-0 shadow-sm shadow-emerald-500/30">
                                             <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                                         </div>
                                     </template>
-                                    <template x-if="!p.match">
+                                    {{-- Unmatched icon: amber "+" when inventory OFF (manual entry possible), red "×" when inventory ON. --}}
+                                    <template x-if="!p.match && !isInventoryEnabled()">
+                                        <div class="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0" title="Manual entry — type a price">
+                                            <svg class="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                                        </div>
+                                    </template>
+                                    <template x-if="!p.match && isInventoryEnabled()">
                                         <div class="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center flex-shrink-0">
                                             <svg class="w-3.5 h-3.5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                                         </div>
                                     </template>
-                                    {{-- Qty pill --}}
-                                    <span class="font-mono text-[11px] font-extrabold w-9 text-center px-1.5 py-0.5 rounded-md flex-shrink-0" :class="p.match ? 'bg-sky-200/70 dark:bg-sky-800/60 text-sky-800 dark:text-sky-200' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 line-through'" x-text="p.qty + '×'"></span>
+                                    {{-- Qty pill: active style when matched OR (inventory-OFF AND manualPrice typed). --}}
+                                    <span class="font-mono text-[11px] font-extrabold w-9 text-center px-1.5 py-0.5 rounded-md flex-shrink-0" :class="(p.match || (!isInventoryEnabled() && parseFloat(p.manualPrice) > 0)) ? 'bg-sky-200/70 dark:bg-sky-800/60 text-sky-800 dark:text-sky-200' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 line-through'" x-text="p.qty + '×'"></span>
                                     {{-- Name --}}
                                     <span class="flex-1 text-xs font-semibold text-gray-800 dark:text-gray-200 truncate" x-text="p.match ? p.match.name : p.raw"></span>
-                                    {{-- Price / fallback note --}}
+                                    {{-- Right-side: matched price OR inline manual price input OR "not found" italic. --}}
                                     <template x-if="p.match">
                                         <span class="text-[11px] font-bold font-mono text-sky-700 dark:text-sky-300 flex-shrink-0" x-text="'Rs. ' + Number(parseFloat(p.match.price) * p.qty).toLocaleString()"></span>
                                     </template>
-                                    <template x-if="!p.match">
+                                    <template x-if="!p.match && !isInventoryEnabled()">
+                                        <div class="flex items-center gap-1 flex-shrink-0">
+                                            <span class="text-[10px] text-gray-400 dark:text-gray-500 font-mono">Rs.</span>
+                                            <input type="number" x-model="p.manualPrice" min="0" step="any" placeholder="price" class="w-20 text-[11px] font-mono font-bold text-right rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 px-2 py-0.5 focus:ring-2 focus:ring-amber-400 focus:border-amber-500 outline-none" @keydown.enter.prevent="$event.target.blur()" @click.stop />
+                                        </div>
+                                    </template>
+                                    <template x-if="!p.match && isInventoryEnabled()">
                                         <span class="text-[10px] italic text-red-500 dark:text-red-400 flex-shrink-0">not found</span>
                                     </template>
                                 </div>
@@ -1228,7 +1251,7 @@ window.addEventListener('popstate', function() {
                         <svg class="w-4 h-4 transition-transform group-hover:rotate-180 duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                         Random Product
                     </button>
-                    <button @click="applyQuickType()" :disabled="quickTypeParsed.filter(p => p.match).length === 0" class="flex-1 min-w-[160px] px-4 py-3 rounded-2xl bg-gradient-to-br from-sky-500 via-sky-600 to-blue-700 hover:from-sky-600 hover:via-sky-700 hover:to-blue-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-sky-500/30 hover:shadow-xl hover:shadow-sky-500/40 hover:-translate-y-0.5 active:translate-y-0">
+                    <button @click="applyQuickType()" :disabled="quickTypeParsed.filter(p => p.match).length === 0 && (isInventoryEnabled() || quickTypeParsed.filter(p => !p.match && parseFloat(p.manualPrice) > 0).length === 0)" class="flex-1 min-w-[160px] px-4 py-3 rounded-2xl bg-gradient-to-br from-sky-500 via-sky-600 to-blue-700 hover:from-sky-600 hover:via-sky-700 hover:to-blue-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-sky-500/30 hover:shadow-xl hover:shadow-sky-500/40 hover:-translate-y-0.5 active:translate-y-0">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                         Add to Cart
                         <kbd class="text-[9px] bg-white/25 backdrop-blur-sm px-1.5 py-0.5 rounded font-mono ring-1 ring-white/20">⌃↵</kbd>
@@ -2014,9 +2037,16 @@ function restaurantPos() {
             return [...products, ...services];
         },
         parseQuickTypeText() {
+            // Preserve any manual prices the cashier already typed for unmatched
+            // entries so re-parsing on every keystroke doesn't wipe their input.
+            // Keyed by LINE INDEX (not raw text) — this is duplicate-safe: two
+            // unmatched lines with the same name keep distinct prices.
+            const prevManual = (this.quickTypeParsed || []).map(p =>
+                (!p.match && p.manualPrice != null && p.manualPrice !== '') ? p.manualPrice : ''
+            );
             const lines = (this.quickTypeText || '').split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
             const pool = this.quickTypePool();
-            this.quickTypeParsed = lines.map(raw => {
+            this.quickTypeParsed = lines.map((raw, idx) => {
                 // Pull out the qty: number at start OR end. Default 1.
                 let qty = 1;
                 let name = raw;
@@ -2032,14 +2062,26 @@ function restaurantPos() {
                          || pool.find(p => p.name.toLowerCase().startsWith(needle))
                          || pool.find(p => p.name.toLowerCase().includes(needle))
                          || pool.find(p => p.name.toLowerCase().split(/\s+/).some(t => t.startsWith(needle)));
-                return { raw: name, qty, match: match || null };
+                const entry = { raw: name, qty, match: match || null, manualPrice: '' };
+                if (!entry.match && prevManual[idx] !== undefined && prevManual[idx] !== '') {
+                    entry.manualPrice = prevManual[idx];
+                }
+                return entry;
             });
         },
         applyQuickType() {
-            const matched = this.quickTypeParsed.filter(p => p.match);
-            if (matched.length === 0) { this.showToast('No items matched — check spelling', 'error'); return; }
             const inv = this.isInventoryEnabled();
-            let added = 0, skipped = 0;
+            const matched = this.quickTypeParsed.filter(p => p.match);
+            // Unmatched lines with a typed price become manual cart lines —
+            // inventory-OFF only, mirroring the "+ Manual" button restriction.
+            const manualEntries = !inv
+                ? this.quickTypeParsed.filter(p => !p.match && parseFloat(p.manualPrice) > 0)
+                : [];
+            if (matched.length === 0 && manualEntries.length === 0) {
+                this.showToast(inv ? 'No items matched — check spelling' : 'Type names ya unmatched lines ke prices fill karein', 'error');
+                return;
+            }
+            let added = 0, skipped = 0, manualAdded = 0;
             matched.forEach(p => {
                 // Honour the same stock-out gate as handleProductClick — Quick Type
                 // must NOT bypass blockOutOfStock on inventory-enabled companies.
@@ -2047,8 +2089,40 @@ function restaurantPos() {
                 const item = { id: p.match.id, type: p.match._type || p.match.type || 'product', name: p.match.name, price: p.match.price, is_tax_exempt: p.match.is_tax_exempt };
                 for (let i = 0; i < p.qty; i++) { this.addToCart(item); added++; }
             });
-            if (added > 0) this.showToast(`Added ${added} item(s)` + (skipped ? `, skipped ${skipped} out-of-stock` : ''), 'success');
-            else this.showToast('All matched items are out of stock', 'error');
+            // Push synthetic manual lines (no DB write — backend storeInvoice()
+            // accepts item_id=null lines as long as name/qty/unit_price are set).
+            // ONE line per parsed entry — qty goes into the line's quantity field
+            // so "Burger 3" becomes a single line with qty 3 (NOT three lines
+            // of qty 1). Matches the cashier's mental model and the cart's
+            // line-grouping for matched products.
+            manualEntries.forEach(p => {
+                const price = parseFloat(p.manualPrice);
+                this.cart.push({
+                    cart_uid: 'm' + Date.now() + '_' + Math.random().toString(36).slice(2,9),
+                    item_id: null,
+                    item_type: 'manual',
+                    item_name: p.raw,
+                    quantity: p.qty,
+                    unit_price: price,
+                    special_notes: '',
+                    is_tax_exempt: false,
+                    item_discount_type: 'percentage',
+                    item_discount_value: 0,
+                    showItemDiscount: false,
+                });
+                manualAdded++;
+                this.activeCartIndex = this.cart.length - 1;
+            });
+            const total = added + manualAdded;
+            if (total > 0) {
+                let msg = `Added ${total} item(s)`;
+                if (manualAdded > 0) msg += ` (${manualAdded} manual)`;
+                if (skipped) msg += `, skipped ${skipped} out-of-stock`;
+                this.showToast(msg, 'success');
+                this.cartAnimating = true; setTimeout(() => this.cartAnimating = false, 300);
+            } else {
+                this.showToast('All matched items are out of stock', 'error');
+            }
             this.showQuickType = false;
             this.quickTypeText = '';
             this.quickTypeParsed = [];
@@ -2689,6 +2763,19 @@ function restaurantPos() {
             }
 
             if (this.cart.length === 0) return;
+
+            // Manual-cart bypass — when cart contains "+ Manual" or Quick Type
+            // manual entries (item_id=null, item_type='manual'), the restaurant
+            // hold endpoint rejects them (validates item_id required|integer).
+            // Route directly to pos.invoice.store which has lax per-item
+            // validation and supports manual lines end-to-end. This path skips
+            // restaurant_orders/KOT entirely — manual items are billing-only by
+            // design and the "Send to Kitchen" button is already disabled when
+            // hasManualItems() is true (see Pay button area).
+            if (this.hasManualItems()) {
+                return await this.processPaymentManual(method);
+            }
+
             const now = Date.now();
             if (now - this.lastPayTime < 3000) return;
             this.lastPayTime = now;
@@ -2707,6 +2794,76 @@ function restaurantPos() {
                 this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
             } catch (e) { this.showToast('Network error', 'error'); }
             this.showPayModal = false; this.submitting = false;
+        },
+
+        // Manual-cart payment path — POSTs cart directly to pos.invoice.store
+        // (PosController::storeInvoice). That endpoint has lax per-item
+        // validation (only name/qty/unit_price required) and supports manual
+        // lines via the `_manual: true` flag (which suppresses auto-create-as-
+        // master-product in resolveItemExemptions). Returns JSON when
+        // wantsJson() — same shape used by payHeldOrderDirect for receipt
+        // modal rendering.
+        async processPaymentManual(method) {
+            const now = Date.now();
+            if (now - this.lastPayTime < 3000) return;
+            this.lastPayTime = now;
+            this.submitting = true; this.stockError = '';
+            const savedTotal = this.totalAmount;
+            try {
+                // storeInvoice expects: items[].{name, quantity, unit_price, type?, item_id?, is_tax_exempt?, _manual?}
+                // and discount_type/value/payment_method at top level.
+                const payload = {
+                    items: this.cart.map(c => ({
+                        name: c.item_name,
+                        quantity: c.quantity,
+                        unit_price: c.unit_price,
+                        type: c.item_type === 'service' ? 'service' : 'product',
+                        item_id: c.item_id || null,
+                        is_tax_exempt: !!c.is_tax_exempt,
+                        // Flag manual cart lines so the backend doesn't auto-
+                        // create a permanent product for them.
+                        _manual: (c.item_type === 'manual' || !c.item_id) ? true : false,
+                    })),
+                    payment_method: method,
+                    discount_type: this.discountType || 'percentage',
+                    discount_value: this.discountAmount > 0 ? this.discountValue : 0,
+                    customer_name: this.selectedCustomer?.name || null,
+                    customer_phone: this.selectedCustomer?.phone || null,
+                };
+                const res = await fetch('{{ route("pos.invoice.store") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify(payload),
+                });
+                let data = null;
+                try { data = await res.json(); } catch(_) {}
+                if (!res.ok || !data || !data.success) {
+                    this.showToast((data && data.message) || ('Failed (Error ' + res.status + ')'), 'error');
+                    this.submitting = false;
+                    return;
+                }
+                // Mirror payHeldOrderDirect success path so receipt modal works.
+                this.lastInvoiceNumber = data.invoice_number || '';
+                this.lastTransactionId = data.transaction_id || null;
+                this.lastOrderId = null; // no restaurant order for manual carts
+                this.lastTotal = savedTotal || data.total_amount || 0;
+                this.lastPaymentMethod = method;
+                this.showReceipt = true;
+                this.scheduleReceiptAutoClose();
+                this.$nextTick(() => { setTimeout(() => this.triggerConfetti(), 300); });
+                this.clearCart();
+                this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
+            } catch (e) {
+                console.error('Manual cart pay error:', e);
+                this.showToast('Network error', 'error');
+            }
+            this.showPayModal = false;
+            this.submitting = false;
         },
 
         payingHeldOrderId: null,

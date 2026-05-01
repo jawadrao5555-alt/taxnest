@@ -869,36 +869,51 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
+    {{-- ============================================================ --}}
+    {{-- COMPACT PAYMENT-SUCCESS POPUP                                --}}
+    {{-- - No inline receipt preview (was a "module"; now a popup).   --}}
+    {{-- - Top-right cross + Esc + click-outside all close it.        --}}
+    {{-- - Print/KOT buttons auto-close the popup AFTER the browser   --}}
+    {{-   print dialog dismisses (postMessage signal). The floating   --}}
+    {{--   "Last Sale" widget remains for any later reprint.          --}}
+    {{-- ============================================================ --}}
     <div x-cloak x-show="showReceipt" x-transition.opacity x-effect="if (!showReceipt) cancelPendingPrints()" @keydown.escape.window="if(showReceipt) { showReceipt = false; }" @click.self="showReceipt = false" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-        <div class="receipt-modal-enter bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" style="max-height:92vh;" x-transition.scale.90>
-            <div class="relative p-5 text-center bg-gradient-to-b from-green-50 to-white dark:from-green-900/20 dark:to-gray-900 flex-shrink-0" id="confettiContainer">
-                <div class="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center mb-3 shadow-lg shadow-green-600/30 success-icon-animate" style="animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)">
-                    <svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-dasharray="24" stroke-dashoffset="0" style="animation: checkDraw 0.5s ease 0.3s both;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+        <div class="receipt-modal-enter relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
+            {{-- Top-right cross --}}
+            <button @click="showReceipt = false" class="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/80 dark:bg-gray-800/80 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white flex items-center justify-center transition shadow-sm" title="Close (Esc)">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+
+            {{-- Header / success info --}}
+            <div class="relative px-5 pt-6 pb-5 text-center bg-gradient-to-b from-green-50 to-white dark:from-green-900/20 dark:to-gray-900" id="confettiContainer">
+                <div class="w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center mb-3 shadow-lg shadow-green-600/30 success-icon-animate" style="animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)">
+                    <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-dasharray="24" stroke-dashoffset="0" style="animation: checkDraw 0.5s ease 0.3s both;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                 </div>
-                <h3 class="text-xl font-extrabold text-gray-900 dark:text-white tracking-tight">Payment Complete!</h3>
-                <div class="flex items-center justify-center gap-3 mt-2">
-                    <span class="text-xs font-mono text-gray-400 dark:text-gray-500" x-text="lastInvoiceNumber"></span>
-                    <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" :class="lastPaymentMethod === 'cash' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'">
-                        <span class="w-1.5 h-1.5 rounded-full" :class="lastPaymentMethod === 'cash' ? 'bg-green-500' : 'bg-blue-500'"></span>
+                <h3 class="text-lg font-extrabold text-gray-900 dark:text-white tracking-tight">Payment Complete</h3>
+                <div class="flex items-center justify-center gap-2 mt-1.5">
+                    <span class="text-[11px] font-mono text-gray-400 dark:text-gray-500" x-text="lastInvoiceNumber"></span>
+                    <span class="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full" :class="lastPaymentMethod === 'cash' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'">
+                        <span class="w-1 h-1 rounded-full" :class="lastPaymentMethod === 'cash' ? 'bg-green-500' : 'bg-blue-500'"></span>
                         <span x-text="lastPaymentMethod"></span>
                     </span>
                 </div>
-                <div class="mt-2 py-2 px-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800/50 inline-block">
+                <div class="mt-3 py-2 px-5 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800/50 inline-block">
                     <p class="text-2xl font-extrabold text-green-600 dark:text-green-400" x-text="'Rs. ' + Number(lastTotal).toLocaleString()" style="font-variant-numeric: tabular-nums;"></p>
                 </div>
             </div>
-            <div class="flex-1 overflow-hidden bg-gray-50 dark:bg-gray-800/50 min-h-0" style="max-height: 45vh;">
-                <iframe x-ref="receiptIframe" class="w-full h-full border-0" :src="lastTransactionId ? '/pos/restaurant/receipt/' + lastTransactionId : ''" style="min-height:300px;"></iframe>
-            </div>
-            <div class="p-3 space-y-2 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
+
+            {{-- Action buttons --}}
+            <div class="p-3 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800">
                 {{-- KOT button shows ONLY when KOT auto-print is OFF (print_on_hold = false). --}}
                 {{-- When auto-print is ON, KOT prints automatically after invoice — button would be redundant. --}}
                 <div :class="kitchenSettings.print_on_hold ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-4 gap-2'">
-                    <button @click="printReceipt(null, true)" class="py-3 text-center rounded-xl bg-gradient-to-br from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800 text-white text-sm font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-1.5">
+                    {{-- Print → after print dialog dismisses, popup auto-closes. --}}
+                    <button @click="printReceipt(() => { showReceipt = false; }, true)" class="py-3 text-center rounded-xl bg-gradient-to-br from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800 text-white text-sm font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-1.5">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                         Print <kbd class="text-[8px] bg-purple-500/40 px-1 rounded font-mono">P</kbd>
                     </button>
-                    <button x-show="!kitchenSettings.print_on_hold" @click="printKitchenTicket(lastOrderId, null, true)" :disabled="!lastOrderId" class="py-3 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-md shadow-orange-500/20 flex items-center justify-center gap-1.5" title="Print Kitchen Order Ticket">
+                    {{-- KOT button only when auto-KOT is OFF; also auto-closes popup after print. --}}
+                    <button x-show="!kitchenSettings.print_on_hold" @click="printKitchenTicket(lastOrderId, () => { showReceipt = false; }, true)" :disabled="!lastOrderId" class="py-3 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-md shadow-orange-500/20 flex items-center justify-center gap-1.5" title="Print Kitchen Order Ticket">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
                         KOT <kbd class="text-[8px] bg-orange-500/40 px-1 rounded font-mono">K</kbd>
                     </button>
@@ -1445,8 +1460,8 @@ function restaurantPos() {
             if (this.showReceipt) {
                 if (e.key === 'Escape') { e.preventDefault(); this.showReceipt = false; }
                 else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); }
-                else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.printReceipt(null, true); }
-                else if (e.key === 'k' || e.key === 'K') { e.preventDefault(); this.printKitchenTicket(this.lastOrderId, null, true); }
+                else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.printReceipt(() => { this.showReceipt = false; }, true); }
+                else if (e.key === 'k' || e.key === 'K') { e.preventDefault(); this.printKitchenTicket(this.lastOrderId, () => { this.showReceipt = false; }, true); }
                 return;
             }
             if (this.showPayModal) {
@@ -1948,17 +1963,22 @@ function restaurantPos() {
                     this.$nextTick(() => {
                         this.queuePrintTimer(() => this.triggerConfetti(), 300);
 
+                        // After ALL auto-prints finish, close the success popup.
+                        // The floating "Last Sale" widget remains for any later reprint.
+                        const closePopup = () => { this.showReceipt = false; };
+
                         if (wantsAutoReceipt && wantsAutoKot) {
                             // Strict sequence: receipt dialog MUST close before KOT dialog opens.
                             this.queuePrintTimer(() => {
                                 this.printReceipt(() => {
-                                    this.queuePrintTimer(() => this.printKitchenTicket(kotOrderIdAtPay), 300);
+                                    this.queuePrintTimer(() => this.printKitchenTicket(kotOrderIdAtPay, closePopup), 300);
                                 });
                             }, 600);
                         } else if (wantsAutoReceipt) {
-                            this.queuePrintTimer(() => this.printReceipt(), 600);
+                            this.queuePrintTimer(() => this.printReceipt(closePopup), 600);
                         }
                         // No standalone "auto KOT only" branch — wantsAutoKot now implies wantsAutoReceipt.
+                        // If neither auto-print is enabled, popup stays open until user clicks Close/Esc/cross.
                     });
                 } else { if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; } this.showToast(data.message || 'Payment failed', 'error'); }
             } catch (e) { this.showToast('Payment error', 'error'); }

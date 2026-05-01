@@ -1076,12 +1076,17 @@ class RestaurantPosController extends Controller
             ->limit(8)
             ->get();
 
-        $lowStockItems = Ingredient::where('company_id', $companyId)
-            ->where('is_active', true)
-            ->whereColumn('current_stock', '<=', 'min_stock_level')
-            ->orderBy('current_stock')
-            ->limit(10)
-            ->get();
+        // Inventory master switch — when company has inventory_enabled = false,
+        // the dashboard low-stock badge/section must stay empty.
+        $inventoryOn = (bool)($company->inventory_enabled ?? false);
+        $lowStockItems = $inventoryOn
+            ? Ingredient::where('company_id', $companyId)
+                ->where('is_active', true)
+                ->whereColumn('current_stock', '<=', 'min_stock_level')
+                ->orderBy('current_stock')
+                ->limit(10)
+                ->get()
+            : collect();
 
         $recentOrders = RestaurantOrder::where('company_id', $companyId)
             ->with(['items', 'table'])

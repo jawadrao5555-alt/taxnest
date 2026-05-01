@@ -2012,7 +2012,16 @@ function restaurantPos() {
         async payHeldOrderDirect(orderId, method, savedTotal) {
             try {
                 const res = await fetch(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method }) });
-                const data = await res.json();
+                const rawText = await res.text();
+                let data;
+                try { data = JSON.parse(rawText); } catch (parseErr) {
+                    console.error('[PAY] Non-JSON response. Status:', res.status, 'Body:', rawText.slice(0, 500));
+                    this.showToast(`HTTP ${res.status} (non-JSON) — ${rawText.slice(0, 120) || 'empty body'}`, 'error');
+                    return;
+                }
+                if (!res.ok || !data.success) {
+                    console.error('[PAY] Failed. Status:', res.status, 'Method:', method, 'Response:', data);
+                }
                 if (data.success) {
                     this.heldOrders = this.heldOrders.filter(o => o.id !== orderId);
                     this.lastInvoiceNumber = data.invoice_number || ''; this.lastTransactionId = data.transaction_id || null;
@@ -2067,8 +2076,15 @@ function restaurantPos() {
                         // No standalone "auto KOT only" branch — wantsAutoKot now implies wantsAutoReceipt.
                         // Popup is ALWAYS user-dismissed regardless of auto-print settings.
                     });
-                } else { if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; } this.showToast(data.message || 'Payment failed', 'error'); }
-            } catch (e) { this.showToast('Payment error', 'error'); }
+                } else {
+                    if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; }
+                    const errMsg = data.message || (data.errors ? JSON.stringify(data.errors) : '') || `HTTP ${res.status} — empty response`;
+                    this.showToast(`[${method.toUpperCase()}] ${errMsg}`, 'error');
+                }
+            } catch (e) {
+                console.error('[PAY] Network/JS exception:', e);
+                this.showToast(`Payment error: ${e.message || e.name || 'unknown'}`, 'error');
+            }
         },
 
         recallOrder(order) {

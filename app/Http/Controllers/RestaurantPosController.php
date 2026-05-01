@@ -428,13 +428,30 @@ class RestaurantPosController extends Controller
         $company = Company::find($companyId);
         $user = Auth::guard('pos')->user();
 
+        Log::info('[PAY] Incoming', [
+            'order_id' => $orderId,
+            'company_id' => $companyId,
+            'user_id' => $user?->id,
+            'payment_method' => $request->input('payment_method'),
+            'payload' => $request->all(),
+        ]);
+
         if (!is_numeric($orderId) || $orderId < 1) {
             return response()->json(['success' => false, 'message' => 'Invalid order ID'], 400);
         }
 
-        $request->validate([
-            'payment_method' => 'nullable|string|in:cash,card,online,split',
-        ]);
+        try {
+            $request->validate([
+                'payment_method' => 'nullable|string|in:cash,card,online,split',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $ve) {
+            Log::warning('[PAY] Validation failed', ['errors' => $ve->errors(), 'input' => $request->all()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation: ' . collect($ve->errors())->flatten()->implode(' | '),
+                'errors' => $ve->errors(),
+            ], 422);
+        }
 
         $order = RestaurantOrder::where('company_id', $companyId)
             ->with('items')
@@ -588,17 +605,26 @@ class RestaurantPosController extends Controller
                 'invoice_number' => $invoiceNumber,
                 'total_amount' => $totalAmount,
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             DB::rollBack();
-            $errorDetail = $e->getMessage();
+            $errorDetail = $e->getMessage() ?: '(empty message)';
+            $errorClass = get_class($e);
+            $errorWhere = basename($e->getFile()) . ':' . $e->getLine();
             if ($e->getPrevious()) {
                 $errorDetail .= ' | PREVIOUS: ' . $e->getPrevious()->getMessage();
             }
             if ($e instanceof \Illuminate\Database\QueryException) {
                 $errorDetail .= ' | SQL: ' . $e->getSql() . ' | Bindings: ' . json_encode($e->getBindings());
             }
-            Log::error('Payment failed for order ' . $orderId . ': ' . $errorDetail);
-            return response()->json(['success' => false, 'message' => 'Payment failed: ' . $e->getMessage()], 500);
+            Log::error('[PAY] Failed order ' . $orderId . ' [' . $errorClass . ' @ ' . $errorWhere . ']: ' . $errorDetail, [
+                'payment_method' => $request->input('payment_method'),
+                'company_id' => $companyId,
+                'trace_top' => collect(explode("\n", $e->getTraceAsString()))->take(5)->implode(' | '),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Payment failed [' . class_basename($errorClass) . ' @ ' . $errorWhere . ']: ' . $errorDetail,
+            ], 500);
         }
     }
 

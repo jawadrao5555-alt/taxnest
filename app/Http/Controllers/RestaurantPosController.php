@@ -67,28 +67,36 @@ class RestaurantPosController extends Controller
         $taxRate = PosTaxRule::getRateForMethod('cash');
         $taxRules = PosTaxRule::where('is_active', true)->get()->keyBy('payment_method');
 
+        // Inventory master switch — when company has inventory_enabled = false, suppress
+        // ALL stock indicators (OUT/LOW dots, low-stock popup, block_out_of_stock).
+        // Recipes are still loaded (for ingredient-cost reporting), but no UI badges/alerts emitted.
+        $inventoryOn = (bool)($company->inventory_enabled ?? false);
+
         $stockStatus = [];
         $recipes = ProductRecipe::where('company_id', $companyId)
             ->with('ingredient')
             ->get()
             ->groupBy('product_id');
 
-        foreach ($recipes as $productId => $productRecipes) {
-            $status = 'available';
-            foreach ($productRecipes as $recipe) {
-                $ing = $recipe->ingredient;
-                if (!$ing || !$ing->is_active) continue;
-                if ((float)$ing->current_stock < (float)$recipe->quantity_needed) {
-                    $status = 'out';
-                    break;
-                } elseif ($ing->isLowStock()) {
-                    $status = 'low';
+        if ($inventoryOn) {
+            foreach ($recipes as $productId => $productRecipes) {
+                $status = 'available';
+                foreach ($productRecipes as $recipe) {
+                    $ing = $recipe->ingredient;
+                    if (!$ing || !$ing->is_active) continue;
+                    if ((float)$ing->current_stock < (float)$recipe->quantity_needed) {
+                        $status = 'out';
+                        break;
+                    } elseif ($ing->isLowStock()) {
+                        $status = 'low';
+                    }
                 }
+                $stockStatus[$productId] = $status;
             }
-            $stockStatus[$productId] = $status;
         }
 
-        $blockOutOfStock = (bool)($company->block_out_of_stock ?? false);
+        // block_out_of_stock is meaningless when inventory module is OFF — force false.
+        $blockOutOfStock = $inventoryOn ? (bool)($company->block_out_of_stock ?? false) : false;
 
         $user = Auth::guard('pos')->user();
         $posRole = $user->pos_role ?? 'pos_cashier';
@@ -107,11 +115,14 @@ class RestaurantPosController extends Controller
             $ingredientCosts[$productId] = round($cost, 2);
         }
 
-        $lowStockAlerts = Ingredient::where('company_id', $companyId)
-            ->where('is_active', true)
-            ->whereColumn('current_stock', '<=', 'min_stock_level')
-            ->select('name', 'current_stock', 'min_stock_level', 'unit')
-            ->get();
+        // Inventory OFF → no low-stock query at all (popup cannot open).
+        $lowStockAlerts = $inventoryOn
+            ? Ingredient::where('company_id', $companyId)
+                ->where('is_active', true)
+                ->whereColumn('current_stock', '<=', 'min_stock_level')
+                ->select('name', 'current_stock', 'min_stock_level', 'unit')
+                ->get()
+            : collect();
 
         return view('pos.restaurant.pos', compact(
             'company', 'products', 'services', 'categories',

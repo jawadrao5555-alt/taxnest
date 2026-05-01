@@ -48,6 +48,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Payment Method Summary (This Month)</h3>
+            <div class="overflow-x-auto -mx-5 px-5">
             <table class="w-full text-sm">
                 <thead>
                     <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-700">
@@ -74,10 +75,12 @@
                     @endforelse
                 </tbody>
             </table>
+            </div>
         </div>
 
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Top Selling Items (This Month)</h3>
+            <div class="overflow-x-auto -mx-5 px-5">
             <table class="w-full text-sm">
                 <thead>
                     <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-700">
@@ -100,6 +103,7 @@
                     @endforelse
                 </tbody>
             </table>
+            </div>
         </div>
     </div>
 

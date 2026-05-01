@@ -9,9 +9,9 @@
 
     {{-- Phase 6: Agent Status Banner (trust signal) --}}
     @if($__agentEnabled)
-    <div class="mb-4 flex items-center justify-between gap-3 rounded-lg border px-4 py-2.5 text-sm
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-y-1.5 gap-x-3 rounded-lg border px-4 py-2.5 text-sm
                 {{ $__agentOnline ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' }}">
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
             <span class="relative flex h-2.5 w-2.5">
                 @if($__agentOnline)
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -37,7 +37,7 @@
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
             {{ ($tab ?? 'pra') === 'local' ? 'Local Transactions' : 'POS Transactions' }}
         </h1>
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3">
             @php
                 $failedCount = \App\Models\PosTransaction::where('company_id', app('currentCompanyId'))
                     ->whereIn('pra_status', ['failed', 'offline', 'pending'])

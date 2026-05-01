@@ -23,7 +23,7 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
         <meta name="theme-color" content="#7c3aed">
-        <link rel="stylesheet" href="{{ asset('css/mobile.css') }}?v=1.3">
+        <link rel="stylesheet" href="{{ asset('css/mobile.css') }}?v=1.4">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
         <meta name="apple-mobile-web-app-title" content="Nest Pra Pos">
@@ -152,7 +152,7 @@
             }
         </script>
     </head>
-    <body class="h-screen overflow-hidden antialiased" data-theme="{{ $posTheme }}">
+    <body class="pos-layout-root h-screen overflow-hidden antialiased" data-theme="{{ $posTheme }}">
         <x-pwa-init />
         <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false, themeOpen: false, currentTheme: '{{ $posTheme }}' }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false">
 

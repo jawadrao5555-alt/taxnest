@@ -124,7 +124,7 @@
                                     <option value="unregistered" {{ $customer->type === 'unregistered' ? 'selected' : '' }}>Unregistered</option>
                                     <option value="registered" {{ $customer->type === 'registered' ? 'selected' : '' }}>Registered</option>
                                 </select>
-                                <div class="flex gap-2">
+                                <div class="flex gap-2 col-span-2 sm:col-span-1">
                                     <button type="submit" class="text-xs font-semibold text-white px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 transition">Save</button>
                                     <button type="button" @click="editing = false" class="text-xs text-gray-500 px-3 py-1.5">Cancel</button>
                                 </div>

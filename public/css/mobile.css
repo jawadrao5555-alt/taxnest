@@ -282,7 +282,10 @@ body {
     ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.45); border-radius: 4px; }
 }
 
-/* ----- 13. Form field spacing on mobile ----- */
+/* ----- 13. Form field spacing on mobile -----
+   Conservative auto-collapse for non-POS layouts (DI, Admin, FBR POS, Franchise, Guest):
+   on phones (<640px) any raw grid-cols-2/3/4 collapses to a single column. Many of those
+   layouts implicitly depend on this behaviour, so we leave it untouched. */
 @media (max-width: 640px) {
     .grid.grid-cols-2:not(.grid-cols-2-keep), .grid.grid-cols-3:not(.grid-cols-3-keep),
     .grid.grid-cols-4:not(.grid-cols-4-keep) {
@@ -291,6 +294,26 @@ body {
     }
     /* Restore 2-col when explicitly opted-in */
     .grid.grid-cols-2.grid-cols-2-keep { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+
+/* ----- 13b. POS layout opts OUT of the aggressive global collapse -----
+   POS pages were designed mobile-first with explicit grid-cols-2/3/4 intent
+   (KPI tiles, action button grids, payment tiles). The body in
+   resources/views/layouts/pos-app.blade.php carries `.pos-layout-root`, so this rule
+   only re-establishes developer intent INSIDE POS. Other layouts are untouched. */
+@media (max-width: 640px) {
+    .pos-layout-root .grid.grid-cols-2:not(.grid-cols-keep),
+    .pos-layout-root .grid.grid-cols-3:not(.grid-cols-keep),
+    .pos-layout-root .grid.grid-cols-4:not(.grid-cols-keep) {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 0.75rem !important;
+    }
+}
+@media (max-width: 360px) {
+    /* Ultra-narrow phones (iPhone SE 1st gen, etc.): collapse 4-col to single column inside POS */
+    .pos-layout-root .grid.grid-cols-4:not(.grid-cols-keep) {
+        grid-template-columns: 1fr !important;
+    }
 }
 
 /* ----- 14. KPI / stat card grids — 2-col on phones, 4-col on desktop ----- */

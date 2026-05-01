@@ -54,7 +54,8 @@
         .items-table .col-total { width: 22%; text-align: right; font-weight: bold; }
         .items-table tbody tr { border-bottom: 1px dashed #000; }
         .items-table tbody tr:last-child { border-bottom: none; }
-        .exempt-tag { font-size: 8px; font-weight: bold; color: #000; }
+        .exempt-tag { font-size: 8px; font-weight: 800; color: #000; border: 1px solid #000; padding: 0 3px; margin-left: 3px; vertical-align: middle; letter-spacing: 0.3px; }
+        .exempt-note { font-size: 9px; font-weight: 700; color: #000; text-align: center; margin: 4px 0 2px; padding: 3px 0; border-top: 1px dashed #000; border-bottom: 1px dashed #000; letter-spacing: 0.4px; }
 
         .totals-table { width: 100%; border-collapse: collapse; margin: 4px 0; }
         .totals-table td { font-size: 11px; padding: 3px 0; vertical-align: top; color: #000; font-weight: 600; }
@@ -163,7 +164,7 @@
         <tbody>
             @foreach($transaction->items as $item)
             <tr>
-                <td class="col-item">{{ $item->item_name }}</td>
+                <td class="col-item">{{ $item->item_name }}@if($item->is_tax_exempt)<span class="exempt-tag">NT</span>@endif</td>
                 <td class="col-qty">{{ rtrim(rtrim(number_format($item->quantity, 2, '.', ''), '0'), '.') ?: '0' }}</td>
                 <td class="col-rate">{{ number_format($item->unit_price, 0) }}</td>
                 <td class="col-total">{{ number_format($item->subtotal, 0) }}</td>
@@ -171,6 +172,10 @@
             @endforeach
         </tbody>
     </table>
+
+    @if($transaction->items->where('is_tax_exempt', true)->count() > 0)
+    <div class="exempt-note">NT = NO TAX (TAX-EXEMPT ITEM)</div>
+    @endif
 
     <div class="separator"></div>
 
@@ -183,6 +188,16 @@
         <tr>
             <td class="tot-label">Discount{{ $transaction->discount_type === 'percentage' ? ' ('.$transaction->discount_value.'%)' : '' }}:</td>
             <td class="tot-value">-PKR {{ number_format($transaction->discount_amount, 2) }}</td>
+        </tr>
+        @endif
+        @if(($transaction->exempt_amount ?? 0) > 0)
+        <tr>
+            <td class="tot-label">Tax-Exempt Items:</td>
+            <td class="tot-value">PKR {{ number_format($transaction->exempt_amount, 2) }}</td>
+        </tr>
+        <tr>
+            <td class="tot-label">Taxable Amount:</td>
+            <td class="tot-value">PKR {{ number_format(max($transaction->subtotal - $transaction->discount_amount - $transaction->exempt_amount, 0), 2) }}</td>
         </tr>
         @endif
         <tr>

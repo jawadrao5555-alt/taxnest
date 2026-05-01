@@ -119,7 +119,12 @@
                     <tbody>
                         @foreach($transaction->items as $item)
                         <tr class="border-b border-gray-50 dark:border-gray-800">
-                            <td class="py-2.5 text-gray-900 dark:text-white font-medium">{{ $item->item_name }}</td>
+                            <td class="py-2.5 text-gray-900 dark:text-white font-medium">
+                                {{ $item->item_name }}
+                                @if($item->is_tax_exempt)
+                                <span class="inline-block ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-600 align-middle">NT</span>
+                                @endif
+                            </td>
                             <td class="py-2.5">
                                 <span class="text-xs px-2 py-0.5 rounded {{ $item->item_type === 'service' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' }}">{{ ucfirst($item->item_type) }}</span>
                             </td>

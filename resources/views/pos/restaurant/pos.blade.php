@@ -831,6 +831,44 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
+    {{-- ============================================================ --}}
+    {{-- FLOATING "LAST SALE REPRINT" WIDGET                            --}}
+    {{-- Stays visible AFTER the success modal is dismissed (Esc/Close), --}}
+    {{-- giving the cashier a permanent way to reprint the receipt or KOT --}}
+    {{-- of the most recent sale until they start a new sale.            --}}
+    {{-- ============================================================ --}}
+    <div x-show="showLastSaleWidget && !showReceipt && lastTransactionId" x-transition.opacity
+         class="fixed bottom-4 right-4 z-40 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-emerald-200 dark:border-emerald-800/50 overflow-hidden"
+         style="min-width:280px; max-width:340px;">
+        <div class="bg-gradient-to-r from-emerald-500 to-green-600 px-4 py-2 flex items-center justify-between">
+            <div class="flex items-center gap-2 text-white">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span class="text-xs font-bold uppercase tracking-wider">Last Sale</span>
+            </div>
+            <button @click="dismissLastSaleWidget()" class="text-white/80 hover:text-white text-lg leading-none px-1" title="Dismiss">&times;</button>
+        </div>
+        <div class="px-4 py-3 space-y-2">
+            <div class="flex items-center justify-between text-xs">
+                <span class="font-mono text-gray-500 dark:text-gray-400" x-text="lastInvoiceNumber"></span>
+                <span class="font-bold text-emerald-600 dark:text-emerald-400" x-text="'Rs. ' + Number(lastTotal).toLocaleString()"></span>
+            </div>
+            <div class="grid grid-cols-3 gap-1.5">
+                <button @click="reprintLastReceipt()" class="py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold transition flex items-center justify-center gap-1" title="Reprint receipt">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                    Receipt
+                </button>
+                <button @click="reprintLastKot()" :disabled="!lastOrderId" class="py-2 rounded-lg bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white text-[11px] font-bold transition flex items-center justify-center gap-1" title="Reprint kitchen order ticket">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                    KOT
+                </button>
+                <button @click="reopenReceiptModal()" class="py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-[11px] font-bold transition flex items-center justify-center gap-1" title="Re-open success dialog">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                    View
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div x-show="showReceipt" x-transition.opacity x-effect="if (!showReceipt) cancelPendingPrints()" @keydown.escape.window="if(showReceipt) { showReceipt = false; }" @click.self="showReceipt = false" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="receipt-modal-enter bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" style="max-height:92vh;" x-transition.scale.90>
             <div class="relative p-5 text-center bg-gradient-to-b from-green-50 to-white dark:from-green-900/20 dark:to-gray-900 flex-shrink-0" id="confettiContainer">
@@ -856,11 +894,11 @@ window.addEventListener('popstate', function() {
                 {{-- KOT button shows ONLY when KOT auto-print is OFF (print_on_hold = false). --}}
                 {{-- When auto-print is ON, KOT prints automatically after invoice — button would be redundant. --}}
                 <div :class="kitchenSettings.print_on_hold ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-4 gap-2'">
-                    <button @click="printReceipt()" class="py-3 text-center rounded-xl bg-gradient-to-br from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800 text-white text-sm font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-1.5">
+                    <button @click="printReceipt(null, true)" class="py-3 text-center rounded-xl bg-gradient-to-br from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800 text-white text-sm font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-1.5">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                         Print <kbd class="text-[8px] bg-purple-500/40 px-1 rounded font-mono">P</kbd>
                     </button>
-                    <button x-show="!kitchenSettings.print_on_hold" @click="printKitchenTicket(lastOrderId)" :disabled="!lastOrderId" class="py-3 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-md shadow-orange-500/20 flex items-center justify-center gap-1.5" title="Print Kitchen Order Ticket">
+                    <button x-show="!kitchenSettings.print_on_hold" @click="printKitchenTicket(lastOrderId, null, true)" :disabled="!lastOrderId" class="py-3 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-md shadow-orange-500/20 flex items-center justify-center gap-1.5" title="Print Kitchen Order Ticket">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
                         KOT <kbd class="text-[8px] bg-orange-500/40 px-1 rounded font-mono">K</kbd>
                     </button>
@@ -1102,6 +1140,19 @@ function restaurantPos() {
         needsKotPrint: false,
         pendingPrintTimers: [],
         printSessionId: 0,
+        // Idempotency guards — prevent same-target double-fire (e.g. cashier double-clicks Print,
+        // or browser fires onload twice, or chain logic reschedules a stale timer). Each key holds
+        // the timestamp of the LAST successful print start; subsequent calls within DEDUP_MS are
+        // silently dropped. Hard fix for "KOT 2 dafa back-to-back" production bug.
+        _printDedupMs: 5000,
+        _lastReceiptPrintAt: 0,
+        _lastReceiptPrintTxnId: null,
+        _lastKotPrintAt: 0,
+        _lastKotPrintOrderId: null,
+        // Persistent last-sale snapshot — used by the floating "Reprint Last Sale" widget so
+        // cashier can reprint receipt/KOT even AFTER the success modal is dismissed via Esc.
+        // Stays populated until next sale starts (clearCart).
+        showLastSaleWidget: false,
         lastTotal: 0,
         lastPaymentMethod: '',
         submitting: false,
@@ -1394,8 +1445,8 @@ function restaurantPos() {
             if (this.showReceipt) {
                 if (e.key === 'Escape') { e.preventDefault(); this.showReceipt = false; }
                 else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); }
-                else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.printReceipt(); }
-                else if (e.key === 'k' || e.key === 'K') { e.preventDefault(); this.printKitchenTicket(this.lastOrderId); }
+                else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.printReceipt(null, true); }
+                else if (e.key === 'k' || e.key === 'K') { e.preventDefault(); this.printKitchenTicket(this.lastOrderId, null, true); }
                 return;
             }
             if (this.showPayModal) {
@@ -1503,11 +1554,15 @@ function restaurantPos() {
         clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm('Current order has ' + this.cart.length + ' item(s). Discard and start new sale?')) return; }
+            // Hide stale reprint widget — explicit "new sale" intent supersedes reprint access
+            this.showLastSaleWidget = false;
             this.clearCart(); this.showToast('New sale started', 'success');
         },
         voidOrder() {
             if (this.cart.length === 0) return;
             if (!confirm('Void current order? All items will be removed.')) return;
+            // Hide stale reprint widget — voiding implies starting fresh
+            this.showLastSaleWidget = false;
             this.clearCart(); this.showToast('Order voided', 'success');
         },
         selectTable(table) { this.selectedTable = table; this.orderType = 'dine_in'; this.showTablePicker = false; },
@@ -1708,8 +1763,28 @@ function restaurantPos() {
 
         startNewAfterPayment() {
             this.showReceipt = false;
+            // Hide reprint widget too — fresh sale begins
+            this.showLastSaleWidget = false;
             this.clearCart();
             this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); });
+        },
+
+        // Reprint actions for the floating widget — both forced (bypass dedup) so cashier
+        // intent is always honored even if a recent auto-chain already printed the same target.
+        reprintLastReceipt() {
+            if (!this.lastTransactionId) { this.showToast('No recent sale to reprint', 'error'); return; }
+            this.printReceipt(null, true);
+        },
+        reprintLastKot() {
+            if (!this.lastOrderId) { this.showToast('No recent KOT to reprint', 'error'); return; }
+            this.printKitchenTicket(this.lastOrderId, null, true);
+        },
+        reopenReceiptModal() {
+            if (!this.lastTransactionId) { this.showToast('No recent sale to view', 'error'); return; }
+            this.showReceipt = true;
+        },
+        dismissLastSaleWidget() {
+            this.showLastSaleWidget = false;
         },
 
         // Cancelable timer registry — prevents stray prints firing after the cashier closes
@@ -1794,17 +1869,38 @@ function restaurantPos() {
             frame.src = cacheBustedUrl;
         },
 
-        printReceipt(onAfterPrint) {
+        // `force=true` bypasses dedup — used for explicit user clicks (Print button on modal,
+        // floating reprint widget, keyboard shortcut). Auto-chain calls leave force=false so
+        // accidental double-fire (browser onload race / setTimeout reschedule) is suppressed.
+        printReceipt(onAfterPrint, force) {
             if (!this.lastTransactionId) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
+            const now = Date.now();
+            if (!force && this._lastReceiptPrintTxnId === this.lastTransactionId && (now - this._lastReceiptPrintAt) < this._printDedupMs) {
+                console.log('[POS] printReceipt deduped — same txn within ' + this._printDedupMs + 'ms');
+                if (typeof onAfterPrint === 'function') this.queuePrintTimer(onAfterPrint, 50);
+                return;
+            }
+            this._lastReceiptPrintAt = now;
+            this._lastReceiptPrintTxnId = this.lastTransactionId;
             const url = '/pos/restaurant/receipt/' + this.lastTransactionId + '?auto_print=1';
+            console.log('[POS] printReceipt → txn=' + this.lastTransactionId + (force ? ' (forced)' : ''));
             this._printViaIframe('print-receipt-frame', url, 'width=400,height=700', onAfterPrint);
         },
 
         // Silent KOT print via hidden iframe — no popup window blocks the cashier screen.
         // Falls back to popup only if iframe printing throws (rare cross-origin edge cases).
-        printKitchenTicket(orderId, onAfterPrint) {
+        printKitchenTicket(orderId, onAfterPrint, force) {
             if (!orderId) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
+            const now = Date.now();
+            if (!force && this._lastKotPrintOrderId === orderId && (now - this._lastKotPrintAt) < this._printDedupMs) {
+                console.log('[POS] printKitchenTicket deduped — same orderId within ' + this._printDedupMs + 'ms');
+                if (typeof onAfterPrint === 'function') this.queuePrintTimer(onAfterPrint, 50);
+                return;
+            }
+            this._lastKotPrintAt = now;
+            this._lastKotPrintOrderId = orderId;
             const url = '/pos/restaurant/orders/' + orderId + '/kitchen-ticket?auto_print=1';
+            console.log('[POS] printKitchenTicket → order=' + orderId + (force ? ' (forced)' : ''));
             this._printViaIframe('print-kot-frame', url, 'width=350,height=600', onAfterPrint);
         },
 
@@ -1830,6 +1926,9 @@ function restaurantPos() {
                     this.lastInvoiceNumber = data.invoice_number || ''; this.lastTransactionId = data.transaction_id || null;
                     this.lastOrderId = orderId;
                     this.lastTotal = savedTotal || data.total_amount || 0; this.lastPaymentMethod = method; this.showReceipt = true;
+                    // Persistent reprint widget — stays visible after Esc closes the success modal,
+                    // so cashier always has a way back to Print Receipt / Print KOT for the last sale.
+                    this.showLastSaleWidget = true;
 
                     // AUTO-PRINT SEQUENCE — invoice ALWAYS prints first, KOT ALWAYS prints after.
                     // Cashier requirement: KOT must NEVER appear before the invoice dialog.

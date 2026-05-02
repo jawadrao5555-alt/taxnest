@@ -445,6 +445,15 @@ window.addEventListener('popstate', function() {
             <span class="hidden sm:inline">New</span>
         </button>
 
+        {{-- ── PROVISIONAL BILLS (Local) — header shortcut. Same pattern as Held. ── --}}
+        {{-- Click → modal with Edit / Delete / Make Final actions inline. F10 shortcut. --}}
+        <button @click="openLocalBills()" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition" title="Provisional bills (local — not submitted to PRA). Press F10.">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+            <span class="text-[10px] bg-purple-400/30 px-1 rounded">F10</span>
+            <span class="hidden sm:inline">Local</span>
+            <span x-show="localBills.length > 0" class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-purple-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="localBills.length"></span>
+        </button>
+
         <button @click="activeHeldIndex = 0; showHeldOrders = !showHeldOrders" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             <span class="text-[10px] bg-amber-400/30 px-1 rounded">F3</span>
@@ -943,6 +952,81 @@ window.addEventListener('popstate', function() {
                         </div>
                     </div>
                 </template>
+            </div>
+        </div>
+    </div>
+
+    {{-- ─────────────────────────────────────────────────────────────────────── --}}
+    {{-- PROVISIONAL BILLS MODAL — opens from header "Local" button (F10).      --}}
+    {{-- Lists all bills with pra_status='local' for current company.           --}}
+    {{-- Inline actions: Edit (opens edit page) / Delete / Make Final (PRA).    --}}
+    {{-- Keyboard: ↑↓ navigate, Enter=Make Final, E=Edit, D=Delete, Esc=Close.  --}}
+    {{-- ─────────────────────────────────────────────────────────────────────── --}}
+    <div x-show="showLocalBills" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showLocalBills = false">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden" x-transition.scale.90>
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <svg class="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                        Provisional Bills <span class="text-xs font-medium text-purple-600 ml-1" x-text="'(' + localBills.length + ')'"></span>
+                    </h3>
+                    <p class="text-[10px] text-gray-500 mt-0.5">Not submitted to PRA yet • ↑↓ navigate • Enter=Make Final • E=Edit • D=Delete • Esc=Close</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button @click="loadLocalBills()" :disabled="localBillsLoading" class="text-xs text-purple-600 hover:text-purple-800 font-semibold px-2 py-1 rounded hover:bg-purple-100 disabled:opacity-50" title="Refresh list">
+                        <svg class="w-4 h-4" :class="localBillsLoading ? 'animate-spin' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    </button>
+                    <button @click="showLocalBills = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                </div>
+            </div>
+            <div class="max-h-[65vh] overflow-y-auto">
+                <template x-if="localBillsLoading && localBills.length === 0">
+                    <div class="p-12 text-center text-gray-400">
+                        <svg class="w-8 h-8 mx-auto mb-2 animate-spin text-purple-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                        <p class="text-sm">Loading provisional bills...</p>
+                    </div>
+                </template>
+                <template x-if="!localBillsLoading && localBills.length === 0">
+                    <div class="p-12 text-center text-gray-400">
+                        <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <p class="text-sm font-medium">No provisional bills</p>
+                        <p class="text-[11px] text-gray-400 mt-1">Bills saved as "Provisional" from the Pay modal will appear here.</p>
+                    </div>
+                </template>
+                <template x-for="(bill, bi) in localBills" :key="bill.id">
+                    <div class="p-4 border-b border-gray-100 dark:border-gray-800 transition-all" :class="activeLocalIndex === bi ? 'bg-purple-50 dark:bg-purple-900/15 ring-2 ring-purple-400 ring-inset' : ''">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-[10px] font-mono text-gray-400 w-5" x-text="bi + 1"></span>
+                                <span class="text-sm font-bold text-gray-900 dark:text-white" x-text="bill.invoice_number"></span>
+                                <span class="text-[9px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">Local</span>
+                                <template x-if="bill.customer_name">
+                                    <span class="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full font-medium" x-text="bill.customer_name"></span>
+                                </template>
+                            </div>
+                            <span class="text-sm font-bold text-purple-700 dark:text-purple-400" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
+                        </div>
+                        <p class="text-[11px] text-gray-500 ml-7 mb-2" x-text="bill.items_count + ' item(s) • ' + bill.created_human"></p>
+                        <div class="flex gap-2 ml-7">
+                            <a :href="'{{ url('/pos/transaction') }}/' + bill.id + '/edit'" class="flex-1 py-2 text-xs font-bold text-blue-700 border border-blue-300 rounded-xl hover:bg-blue-50 transition text-center flex items-center justify-center gap-1">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                Edit
+                            </a>
+                            <button @click="deleteProvisional(bill)" class="py-2 px-3 text-xs font-bold text-red-600 border border-red-300 rounded-xl hover:bg-red-50 transition flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V3a1 1 0 011-1h4a1 1 0 011 1v4"/></svg>
+                                Delete
+                            </button>
+                            <button @click="promoteProvisional(bill)" :disabled="!praEnabled" :title="praEnabled ? 'Submit this bill to PRA as final invoice' : 'PRA reporting is disabled — enable from settings'" class="flex-1 py-2 text-xs font-bold text-white bg-gradient-to-br from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 rounded-xl transition shadow-md shadow-purple-600/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                Make Final
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <div x-show="localBills.length > 0" class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-[11px] text-gray-500 flex items-center justify-between">
+                <span>💡 Provisional bills NOT reported to PRA — edit/delete anytime, or "Make Final" to lock & submit.</span>
+                <a href="{{ route('pos.transactions') }}?tab=local" class="text-purple-600 hover:underline font-semibold">Open full page →</a>
             </div>
         </div>
     </div>
@@ -1698,6 +1782,13 @@ function restaurantPos() {
         // button on transaction-show. Toggle key: P (while pay modal is open).
         saveAsProvisional: false,
         showHeldOrders: false,
+        // ── PROVISIONAL BILLS (header shortcut, F10) ──────────────────────────
+        // Lazy-loaded list of all bills with pra_status='local' for current company.
+        // Refreshed on page mount, after every bill save, and after each modal action.
+        localBills: [],
+        showLocalBills: false,
+        activeLocalIndex: 0,
+        localBillsLoading: false,
         showReceipt: false,
         showShortcuts: false,
         // Quick Type Mode — type free-form lines like "chai 2, samosa 1" → cart
@@ -1799,6 +1890,9 @@ function restaurantPos() {
             setTimeout(() => this.cacheProductData(), 800);
             document.addEventListener('keydown', (e) => this.handleKey(e));
             this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
+            // Lazy-load provisional bill list on mount (for header badge count).
+            // Failures are silent — badge just won't show until next refresh.
+            setTimeout(() => this.loadLocalBills(), 1200);
         },
 
         cacheProductData() {
@@ -2427,6 +2521,15 @@ function restaurantPos() {
             if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode(); this.mobileView = 'cart'; } return; }
             // F9 — Quick Type Mode (parses "chai 2, samosa 1" style input → cart)
             if (e.key === 'F9') { e.preventDefault(); this.openQuickType(); return; }
+            // F10 — Open Provisional Bills modal (Local — not yet submitted to PRA).
+            // GATED: only fires when no blocking modal is open, otherwise the
+            // F10 keystroke would steal focus from Pay/Held/Receipt/etc.
+            if (e.key === 'F10') {
+                e.preventDefault();
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills) return;
+                this.openLocalBills();
+                return;
+            }
 
             // CART QTY INPUT: special-case so arrow keys ALWAYS navigate cart rows
             // (single source of truth — eliminates double-firing skip bug 1→3→5).
@@ -2470,6 +2573,20 @@ function restaurantPos() {
                 else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.payHeldOrder(this.heldOrders[this.activeHeldIndex].id); }
                 else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); this.deleteHeldOrder(this.heldOrders[this.activeHeldIndex].id); }
                 else if (e.key === 'Escape') { e.preventDefault(); this.showHeldOrders = false; }
+                return;
+            }
+            // PROVISIONAL BILLS modal — keyboard navigation (mirror of held-orders shortcuts)
+            if (this.showLocalBills && this.localBills.length > 0) {
+                if (e.key === 'ArrowDown') { e.preventDefault(); this.activeLocalIndex = Math.min(this.activeLocalIndex + 1, this.localBills.length - 1); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeLocalIndex = Math.max(this.activeLocalIndex - 1, 0); }
+                else if (e.key === 'Enter') { e.preventDefault(); this.promoteProvisional(this.localBills[this.activeLocalIndex]); }
+                else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); window.location.href = '{{ url('/pos/transaction') }}/' + this.localBills[this.activeLocalIndex].id + '/edit'; }
+                else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); this.deleteProvisional(this.localBills[this.activeLocalIndex]); }
+                else if (e.key === 'Escape') { e.preventDefault(); this.showLocalBills = false; }
+                return;
+            }
+            if (this.showLocalBills) {
+                if (e.key === 'Escape') { e.preventDefault(); this.showLocalBills = false; }
                 return;
             }
             if (this.showManagerPinModal) {
@@ -2909,6 +3026,8 @@ function restaurantPos() {
                 this.runAutoPrintChain(null);
                 this.clearCart();
                 this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
+                // Refresh provisional badge count if this save was provisional.
+                if (provisional) { this.loadLocalBills(); }
             } catch (e) {
                 console.error('Manual cart pay error:', e);
                 this.showToast('Network error', 'error');
@@ -3054,6 +3173,74 @@ function restaurantPos() {
             });
         },
 
+        // ─── PROVISIONAL BILLS API helpers ──────────────────────────────────
+        // Lightweight fetch + inline action methods. All errors degrade to a
+        // toast — modal stays open so cashier doesn't lose context.
+        async loadLocalBills() {
+            this.localBillsLoading = true;
+            try {
+                const res = await fetch('{{ route('pos.api.provisional-bills') }}', {
+                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                });
+                if (!res.ok) { this.localBillsLoading = false; return; }
+                const data = await res.json();
+                if (data && data.success) {
+                    this.localBills = data.bills || [];
+                    if (this.activeLocalIndex >= this.localBills.length) {
+                        this.activeLocalIndex = Math.max(0, this.localBills.length - 1);
+                    }
+                }
+            } catch (e) { console.warn('loadLocalBills error', e); }
+            this.localBillsLoading = false;
+        },
+        openLocalBills() {
+            this.activeLocalIndex = 0;
+            this.showLocalBills = true;
+            this.loadLocalBills();
+        },
+        async deleteProvisional(bill) {
+            if (!bill) return;
+            if (!confirm('Delete provisional bill ' + (bill.invoice_number || '#' + bill.id) + '?\nThis cannot be undone.')) return;
+            try {
+                const res = await fetch('{{ url('/pos/api/provisional-bills') }}/' + bill.id + '/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                });
+                const data = await res.json();
+                if (data && data.success) {
+                    this.localBills = this.localBills.filter(b => b.id !== bill.id);
+                    if (this.activeLocalIndex >= this.localBills.length) this.activeLocalIndex = Math.max(0, this.localBills.length - 1);
+                    if (this.localBills.length === 0) { this.showLocalBills = false; this.activeLocalIndex = 0; }
+                    this.showToast('Provisional bill deleted', 'success');
+                } else {
+                    this.showToast((data && data.message) || 'Delete failed', 'error');
+                }
+            } catch (e) { console.error('deleteProvisional', e); this.showToast('Network error', 'error'); }
+        },
+        async promoteProvisional(bill) {
+            if (!bill) return;
+            if (!this.praEnabled) { this.showToast('PRA reporting is disabled — enable from settings', 'error'); return; }
+            if (!confirm('Submit bill ' + (bill.invoice_number || '#' + bill.id) + ' to PRA as a FINAL invoice?\n\nOnce reported, the bill will be locked — no more edit or delete. Continue?')) return;
+            try {
+                const res = await fetch('{{ url('/pos/api/provisional-bills') }}/' + bill.id + '/promote', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                });
+                const data = await res.json();
+                if (data && data.success) {
+                    // Remove from list (no longer provisional) regardless of submitted vs queued.
+                    this.localBills = this.localBills.filter(b => b.id !== bill.id);
+                    if (this.activeLocalIndex >= this.localBills.length) this.activeLocalIndex = Math.max(0, this.localBills.length - 1);
+                    if (this.localBills.length === 0) { this.showLocalBills = false; this.activeLocalIndex = 0; }
+                    this.showToast(data.message || 'Submitted to PRA', 'success');
+                } else {
+                    // Failed — refresh list so cashier sees current state.
+                    this.showToast((data && data.message) || 'Submit failed', 'error');
+                    this.loadLocalBills();
+                }
+            } catch (e) { console.error('promoteProvisional', e); this.showToast('Network error', 'error'); this.loadLocalBills(); }
+        },
+
         async deleteHeldOrder(orderId) {
             // Find order for friendlier confirm prompt
             const ord = this.heldOrders.find(o => o.id === orderId);
@@ -3097,6 +3284,8 @@ function restaurantPos() {
                     // print dialog is dismissed (was a race in the old setTimeout(200/1800) impl
                     // on slow networks where KOT iframe loaded before receipt iframe).
                     this.runAutoPrintChain(orderId);
+                    // Refresh provisional badge count when this save was provisional.
+                    if (provisional) { this.loadLocalBills(); }
                 } else { if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; } this.showToast(data.message || 'Payment failed', 'error'); }
             } catch (e) { this.showToast('Payment error', 'error'); }
         },

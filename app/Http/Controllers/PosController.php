@@ -989,6 +989,145 @@ class PosController extends Controller
         return back()->with('success', $message);
     }
 
+    /**
+     * ─────────────────────────────────────────────────────────────────────────
+     * PROVISIONAL BILLS API — header shortcut endpoints (universal POS).
+     * Returns lightweight JSON payload of all bills with pra_status='local'
+     * for the current company. Used by the "Local" header button + F10 modal.
+     * ─────────────────────────────────────────────────────────────────────────
+     */
+    public function apiProvisionalBills(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $bills = PosTransaction::where('company_id', $companyId)
+            ->where('pra_status', 'local')
+            ->orderBy('id', 'desc')
+            ->limit(100)
+            ->get(['id', 'invoice_number', 'customer_name', 'total_amount', 'created_at']);
+
+        $data = $bills->map(function ($b) {
+            return [
+                'id'             => $b->id,
+                'invoice_number' => $b->invoice_number,
+                'customer_name'  => $b->customer_name,
+                'total_amount'   => (float) $b->total_amount,
+                'items_count'    => PosTransactionItem::where('transaction_id', $b->id)->count(),
+                'created_human'  => $b->created_at?->diffForHumans(),
+                'created_at'     => $b->created_at?->toDateTimeString(),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'count'   => $data->count(),
+            'bills'   => $data,
+        ]);
+    }
+
+    /**
+     * Delete a provisional bill (only pra_status='local' allowed via this API).
+     * Submitted/pending bills MUST go through the regular delete route which
+     * enforces stricter checks.
+     */
+    public function apiDeleteProvisional(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $tx = PosTransaction::where('company_id', $companyId)->where('id', $id)->first();
+
+        if (!$tx) {
+            return response()->json(['success' => false, 'message' => 'Bill not found'], 404);
+        }
+        if ($tx->pra_status !== 'local') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only provisional (local) bills can be deleted via this endpoint.',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($tx) {
+            PosTransactionItem::where('transaction_id', $tx->id)->delete();
+            PosPayment::where('transaction_id', $tx->id)->delete();
+            $tx->delete();
+        });
+
+        return response()->json(['success' => true, 'message' => 'Provisional bill deleted', 'id' => $id]);
+    }
+
+    /**
+     * Promote a provisional ('local') bill to a final PRA submission. Mirrors
+     * the existing retryPra() flow but returns JSON for the inline modal.
+     * Flips pra_status='local' → 'pending' + invoice_mode='pra' before submit.
+     */
+    public function apiPromoteProvisional(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $tx = PosTransaction::where('company_id', $companyId)->where('id', $id)->first();
+
+        if (!$tx) {
+            return response()->json(['success' => false, 'message' => 'Bill not found'], 404);
+        }
+        if ($tx->pra_status !== 'local') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only provisional bills can be promoted. Current status: ' . $tx->pra_status,
+            ], 422);
+        }
+        if (!$company || !$company->pra_reporting_enabled) {
+            return response()->json([
+                'success' => false,
+                'message' => 'PRA reporting is currently disabled. Enable it from PRA Settings first.',
+            ], 422);
+        }
+
+        // Flip provisional → pending + lock to PRA mode (same as retryPra L897-902).
+        $tx->update([
+            'pra_status'        => 'pending',
+            'invoice_mode'      => 'pra',
+            'pra_response_code' => null,
+        ]);
+
+        // Agent-enabled: just leave it queued — desktop agent picks it up within 10s.
+        if ($company->agent_enabled) {
+            return response()->json([
+                'success' => true,
+                'queued'  => true,
+                'message' => '🟡 Re-queued for desktop agent — will sync within seconds.',
+                'id'      => $id,
+            ]);
+        }
+
+        try {
+            $praService = new PraIntegrationService($company);
+            $result = $praService->sendInvoice($tx);
+            $tx->refresh();
+
+            if (!empty($result['success'])) {
+                return response()->json([
+                    'success'    => true,
+                    'submitted'  => true,
+                    'message'    => 'PRA submission successful! PRA Fiscal Invoice Number: ' . ($tx->pra_invoice_number ?? 'N/A'),
+                    'pra_number' => $tx->pra_invoice_number,
+                    'id'         => $id,
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'PRA submission failed: ' . ($result['message'] ?? 'Unknown error'),
+                'id'      => $id,
+            ], 502);
+        } catch (\Exception $e) {
+            $tx->update(['pra_status' => 'offline']);
+            return response()->json([
+                'success' => false,
+                'offline' => true,
+                'message' => 'PRA connection failed — will sync automatically when restored.',
+                'id'      => $id,
+            ], 503);
+        }
+    }
+
     private function verifyPinSession(): bool
     {
         return session('confidential_pin_verified', false) === true;

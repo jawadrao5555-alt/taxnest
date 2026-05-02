@@ -1091,8 +1091,18 @@ class PosController extends Controller
             ->with(['items', 'terminal', 'creator'])
             ->findOrFail($id);
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.invoice-pdf', compact('transaction', 'company'));
-        $pdf->setPaper('a4', 'portrait');
+        // Use the same thermal receipt template as the screen-print path so the
+        // downloadable PDF matches what the cashier sees / prints. 80mm = 226.77pt
+        // wide; height set to A4-ish so DomPDF auto-paginates if a receipt grows
+        // unusually long. 58mm (164.41pt) for narrow thermal printers.
+        $printerSize = $company->receipt_printer_size ?? '80mm';
+        $receiptView = $printerSize === '58mm' ? 'pos.receipts.receipt_58mm' : 'pos.receipts.receipt_80mm';
+        $paperWidthPt = $printerSize === '58mm' ? 164.41 : 226.77;
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($receiptView, compact('transaction', 'company'))
+            ->setOption('isRemoteEnabled', true)
+            ->setOption('isHtml5ParserEnabled', true);
+        $pdf->setPaper([0, 0, $paperWidthPt, 1200], 'portrait');
 
         return $pdf->download("Invoice-{$transaction->invoice_number}.pdf");
     }
@@ -1133,8 +1143,17 @@ class PosController extends Controller
             abort(404);
         }
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.invoice-pdf', compact('transaction', 'company'));
-        $pdf->setPaper('a4', 'portrait');
+        // Match the thermal receipt format used everywhere else (screen, print,
+        // download). Share-link recipients (WhatsApp / Email) get the exact same
+        // receipt their cashier handed over.
+        $printerSize = $company->receipt_printer_size ?? '80mm';
+        $receiptView = $printerSize === '58mm' ? 'pos.receipts.receipt_58mm' : 'pos.receipts.receipt_80mm';
+        $paperWidthPt = $printerSize === '58mm' ? 164.41 : 226.77;
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($receiptView, compact('transaction', 'company'))
+            ->setOption('isRemoteEnabled', true)
+            ->setOption('isHtml5ParserEnabled', true);
+        $pdf->setPaper([0, 0, $paperWidthPt, 1200], 'portrait');
 
         return $pdf->stream("Invoice-{$transaction->invoice_number}.pdf");
     }

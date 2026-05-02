@@ -94,14 +94,11 @@
             var actions = document.getElementById('receiptActions');
             if (actions) actions.style.display = 'none';
         }
-        window.onafterprint = function() {
-            if (isInIframe) return;
-            if (window.opener) {
-                window.close();
-            } else {
-                window.location.href = '{{ route('pos.transactions') }}';
-            }
-        };
+        // After print: keep the window open so cashier can reprint or take other actions.
+        // Auto-close/redirect intentionally removed (user feedback: window was vanishing
+        // after print dialog closed, blocking reprint and KOT). The on-page "Print Receipt"
+        // and "Back to Transactions" buttons remain visible — user closes manually.
+        // Iframe path is unaffected; the iframe self-signals afterprint via postMessage below.
 
         // AUTO-PRINT + POSTMESSAGE SIGNAL (Restaurant POS sale-time chain)
         // ----------------------------------------------------------------

@@ -441,11 +441,18 @@ class PosController extends Controller
             // tampered / malformed payload. POS line-item prices in Pakistan
             // never legitimately exceed this.
             'items.*.unit_price' => 'required|numeric|min:0|max:10000000',
-            'payment_method' => 'required|in:cash,debit_card,credit_card,qr_payment',
+            'payment_method' => 'required|in:cash,card,debit_card,credit_card,qr_payment',
             'discount_type' => 'required|in:percentage,amount',
             'discount_value' => 'nullable|numeric|min:0',
             'cash_received' => 'nullable|numeric|min:0',
         ]);
+
+        // Normalize 'card' alias → 'debit_card' (front-end Universal POS sends 'card';
+        // PosTaxRule + PRA mapping use 'debit_card'). Without this, downstream tax
+        // lookup/PRA payment-mode mapping miss the rule and fall back to defaults.
+        if ($request->input('payment_method') === 'card') {
+            $request->merge(['payment_method' => 'debit_card']);
+        }
 
         // Cashier discount guardrail — mirrors RestaurantPosController::holdOrder.
         // Without this, a `pos_cashier` user could submit a 100 % percentage
@@ -702,11 +709,16 @@ class PosController extends Controller
             'items.*.name' => 'required|string|max:255',
             'items.*.quantity' => 'required|integer|min:1|max:9999',
             'items.*.unit_price' => 'required|numeric|min:0|max:10000000',
-            'payment_method' => 'required|in:cash,debit_card,credit_card,qr_payment',
+            'payment_method' => 'required|in:cash,card,debit_card,credit_card,qr_payment',
             'discount_type' => 'required|in:percentage,amount',
             'discount_value' => 'nullable|numeric|min:0',
             'cash_received' => 'nullable|numeric|min:0',
         ]);
+
+        // Normalize 'card' alias → 'debit_card' (see storeInvoice() for rationale).
+        if ($request->input('payment_method') === 'card') {
+            $request->merge(['payment_method' => 'debit_card']);
+        }
 
         // Cashier discount guardrail (mirrors RestaurantPosController::holdOrder
         // and storeInvoice). Stops a `pos_cashier` from bypassing the per-company

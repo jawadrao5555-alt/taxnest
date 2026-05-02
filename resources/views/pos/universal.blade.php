@@ -1343,8 +1343,17 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
-    <div x-show="showReceipt" x-cloak x-transition.opacity x-effect="if (!showReceipt) cancelPendingPrints()" @keydown.escape.window="if(showReceipt) { cancelReceiptAutoClose(); showReceipt = false; }" @click.self="cancelReceiptAutoClose(); showReceipt = false;" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-        <div class="receipt-modal-enter bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" style="max-height:92vh;" x-transition.scale.90>
+    {{-- Persistent Receipt Modal — Esc + backdrop-click are intentionally NOT bound here so       --}}
+    {{-- the cashier doesn't dismiss the popup by accident while reading totals or printing.        --}}
+    {{-- Esc on this popup belongs to the browser print dialog (closes that, not our popup).        --}}
+    {{-- Popup closes ONLY via: X (top-right cross), Close button, or "New Sale" button.            --}}
+    <div x-show="showReceipt" x-cloak x-transition.opacity x-effect="if (!showReceipt) cancelPendingPrints()" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="receipt-modal-enter relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" style="max-height:92vh;" x-transition.scale.90>
+            {{-- Top-right cross (primary close action) --}}
+            <button @click="showReceipt = false" class="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/80 dark:bg-gray-800/80 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white flex items-center justify-center transition shadow-sm" title="Close popup">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+
             <div class="relative p-5 text-center bg-gradient-to-b from-green-50 to-white dark:from-green-900/20 dark:to-gray-900 flex-shrink-0" id="confettiContainer">
                 <div class="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center mb-3 shadow-lg shadow-green-600/30 success-icon-animate" style="animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)">
                     <svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-dasharray="24" stroke-dashoffset="0" style="animation: checkDraw 0.5s ease 0.3s both;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
@@ -1364,25 +1373,32 @@ window.addEventListener('popstate', function() {
             <div class="flex-1 overflow-hidden bg-gray-50 dark:bg-gray-800/50 min-h-0" style="max-height: 45vh;">
                 <iframe x-ref="receiptIframe" class="w-full h-full border-0" :src="lastTransactionId ? '/pos/restaurant/receipt/' + lastTransactionId : ''" style="min-height:300px;"></iframe>
             </div>
-            {{-- Phase 5+ — simplified post-production view: only the receipt + a single Print action.
-                 'New Sale' and 'Close' buttons removed. Modal auto-dismisses (4s) so the cashier can chain
-                 sales hands-free; Esc / outside-click also dismiss; clicking Print cancels the auto-close. --}}
+            {{-- Persistent action bar: Print | KOT | New Sale | Close. Print/KOT fire prints      --}}
+            {{-- but popup STAYS OPEN so cashier can verify, reprint, or take other actions.       --}}
             <div class="p-3 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
-                <div class="flex gap-2">
-                    <button @click="cancelReceiptAutoClose(); printReceipt()" class="flex-1 py-3.5 text-center rounded-xl bg-gradient-to-br from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800 text-white text-base font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-2">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                        Print Receipt
-                        <kbd class="text-[10px] bg-purple-500/40 px-1.5 py-0.5 rounded font-mono ml-1">P</kbd>
+                <div class="grid grid-cols-4 gap-2">
+                    {{-- 1. Print Receipt (P) --}}
+                    <button @click="printReceipt()" :disabled="!lastTransactionId" class="py-3 text-center rounded-xl bg-gradient-to-br from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-1.5" title="Print customer receipt">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                        Print <kbd class="text-[8px] bg-purple-500/40 px-1 rounded font-mono">P</kbd>
                     </button>
-                    <button x-show="lastOrderId"
-                            @click="cancelReceiptAutoClose(); printKitchenTicket()"
-                            class="flex-1 py-3.5 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white text-base font-bold transition shadow-md shadow-orange-500/20 flex items-center justify-center gap-2"
-                            :title="autoKotEnabled ? 'Reprint kitchen ticket (auto-KOT is ON)' : 'Print kitchen ticket manually'">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-                        Print KOT
+                    {{-- 2. KOT (K) - shown only when an orderId exists (restaurant flow) --}}
+                    <button x-show="lastOrderId" @click="printKitchenTicket()" :disabled="!lastOrderId" class="py-3 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-md shadow-orange-500/20 flex items-center justify-center gap-1.5" title="Print Kitchen Order Ticket">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                        KOT <kbd class="text-[8px] bg-orange-500/40 px-1 rounded font-mono">K</kbd>
+                    </button>
+                    {{-- Spacer when KOT hidden so grid stays balanced --}}
+                    <div x-show="!lastOrderId"></div>
+                    {{-- 3. New Sale (Enter) --}}
+                    <button @click="startNewAfterPayment()" class="py-3 text-center rounded-xl bg-gradient-to-br from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white text-sm font-bold transition shadow-md shadow-green-600/20 flex items-center justify-center gap-1.5" title="Clear cart & start a new sale">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                        New <kbd class="text-[8px] bg-green-500/40 px-1 rounded font-mono">↵</kbd>
+                    </button>
+                    {{-- 4. Close popup (mouse only - Esc no longer bound to keep print dialog Esc clean) --}}
+                    <button @click="showReceipt = false" class="py-3 text-center rounded-xl bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 text-sm font-semibold transition flex items-center justify-center gap-1.5" title="Close this popup (does not start new sale)">
+                        Close
                     </button>
                 </div>
-                <p class="text-[10px] text-center text-gray-400 dark:text-gray-500 mt-2 tracking-wide">Auto-dismissing in a few seconds · press <kbd class="font-mono bg-gray-100 dark:bg-gray-800 px-1 rounded">Esc</kbd> to close now</p>
             </div>
         </div>
     </div>
@@ -2414,11 +2430,11 @@ function restaurantPos() {
             }
 
             if (this.showReceipt) {
-                // Phase 5+ — cancel the 4s auto-dismiss timer on any keyboard interaction
-                // so cashiers using the keyboard don't get the modal yanked away mid-action.
-                if (e.key === 'Escape') { e.preventDefault(); this.cancelReceiptAutoClose(); this.showReceipt = false; }
-                else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.cancelReceiptAutoClose(); this.startNewAfterPayment(); }
-                else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.cancelReceiptAutoClose(); this.printReceipt(); }
+                // Persistent popup — Esc is reserved for the browser print dialog (NOT this popup).
+                // Popup closes ONLY via X / Close / New Sale buttons.
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); }
+                else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.printReceipt(); }
+                else if ((e.key === 'k' || e.key === 'K') && this.lastOrderId) { e.preventDefault(); this.printKitchenTicket(); }
                 return;
             }
             if (this.showPayModal) {
@@ -3054,14 +3070,11 @@ function restaurantPos() {
             } catch (e) { this.showToast('Payment error', 'error'); }
         },
 
-        // Phase 5+ — auto-dismiss the success modal after a short delay so the
-        // cashier can keep ringing up sales hands-free. Cancels itself if the
-        // user clicks Print or interacts with the modal.
+        // Persistent receipt popup — auto-dismiss disabled. Popup stays open until the cashier
+        // explicitly closes via X / Close / New Sale buttons. Functions kept as no-ops so any
+        // legacy call-sites continue to work without throwing.
         scheduleReceiptAutoClose() {
-            if (this.receiptAutoCloseTimer) { clearTimeout(this.receiptAutoCloseTimer); }
-            this.receiptAutoCloseTimer = setTimeout(() => {
-                if (this.showReceipt) { this.startNewAfterPayment(); }
-            }, 4000);
+            if (this.receiptAutoCloseTimer) { clearTimeout(this.receiptAutoCloseTimer); this.receiptAutoCloseTimer = null; }
         },
 
         cancelReceiptAutoClose() {

@@ -1295,7 +1295,7 @@ window.addEventListener('popstate', function() {
                         Item Name
                     </label>
                     <input id="manualItemNameInput" x-model="manualItemName" type="text" required maxlength="255" placeholder="e.g. Special Order, Custom Service" autocomplete="off"
-                        class="w-full text-sm rounded-2xl border-2 border-emerald-200 dark:border-emerald-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-4 py-2.5 focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm hover:shadow-md">
+                        class="w-full text-sm rounded-2xl border-2 border-emerald-200 dark:border-emerald-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-4 py-2.5 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm hover:shadow-md">
                 </div>
 
                 {{-- Price --}}
@@ -1305,9 +1305,9 @@ window.addEventListener('popstate', function() {
                         Unit Price (Rs.)
                     </label>
                     <div class="relative">
-                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400 font-bold text-xs pointer-events-none">Rs.</span>
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-600 dark:text-emerald-400 font-bold text-xs pointer-events-none select-none">Rs.</span>
                         <input id="manualItemPriceInput" x-model="manualItemPrice" type="number" required min="0" step="0.01" placeholder="0.00"
-                            class="w-full text-sm rounded-2xl border-2 border-emerald-200 dark:border-emerald-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white pl-12 pr-4 py-2.5 focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono font-bold transition-all shadow-sm hover:shadow-md">
+                            class="w-full text-sm rounded-2xl border-2 border-emerald-200 dark:border-emerald-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white pl-14 pr-4 py-2.5 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono font-bold transition-all shadow-sm hover:shadow-md">
                     </div>
                     <p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1.5 px-1 italic">
                         Quantity aur tax cart se adjust kar sakte ho. Tax payment-method per auto (5% Card / 16% Cash / Exempt).

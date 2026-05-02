@@ -839,33 +839,47 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
-    <div x-show="showPayModal" x-cloak x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false">
+    <div x-show="showPayModal" x-cloak x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false; saveAsProvisional = false;">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
             <div class="p-5 text-center border-b border-gray-100 dark:border-gray-800">
-                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Payment</h3>
-                <p class="text-3xl font-extrabold text-purple-600 dark:text-purple-400 mt-2" x-text="'Rs. ' + Number(roundedTotal).toLocaleString()"></p>
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white" x-text="saveAsProvisional ? 'Save Provisional Bill' : 'Payment'"></h3>
+                <p class="text-3xl font-extrabold mt-2" :class="saveAsProvisional ? 'text-amber-600 dark:text-amber-400' : 'text-purple-600 dark:text-purple-400'" x-text="'Rs. ' + Number(roundedTotal).toLocaleString()"></p>
                 <p x-show="Math.abs(roundOff) > 0.001" class="text-[10px] text-gray-400 mt-0.5" x-text="(roundOff >= 0 ? 'rounded up by ' : 'rounded down by ') + 'Rs. ' + Math.abs(roundOff).toFixed(2)"></p>
                 <p x-show="stockError" class="text-xs text-red-500 mt-2 bg-red-50 dark:bg-red-900/20 p-2 rounded-lg" x-text="stockError"></p>
-                <p x-show="submitting" class="text-xs text-purple-500 mt-2">Processing payment...</p>
+                <p x-show="submitting && !saveAsProvisional" class="text-xs text-purple-500 mt-2">Processing payment...</p>
+                <p x-show="submitting && saveAsProvisional" class="text-xs text-amber-500 mt-2">Saving provisional bill...</p>
+            </div>
+            <div class="px-4 pt-3">
+                <label class="flex items-center gap-2 p-2.5 rounded-xl border-2 cursor-pointer transition select-none"
+                       :class="saveAsProvisional ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-amber-300'">
+                    <input type="checkbox" x-model="saveAsProvisional" :disabled="submitting" class="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 cursor-pointer">
+                    <div class="flex-1">
+                        <p class="text-xs font-bold text-gray-800 dark:text-gray-200">Save as Provisional</p>
+                        <p class="text-[10px] text-gray-500 dark:text-gray-400 leading-tight" x-text="saveAsProvisional ? 'Bill stays editable / deletable. Submit to PRA later.' : 'Final bill — will be reported to PRA immediately.'"></p>
+                    </div>
+                    <kbd class="text-[9px] text-gray-400 font-mono bg-white dark:bg-gray-900 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700">P</kbd>
+                </label>
             </div>
             <div class="p-4 grid grid-cols-2 gap-3">
-                <button @click="processPayment('cash')" :disabled="submitting" class="py-4 rounded-xl text-center bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 hover:bg-green-100 hover:border-green-400 transition disabled:opacity-50 group">
-                    <svg x-show="submitting" class="w-8 h-8 mx-auto text-green-600 mb-1 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                    <svg x-show="!submitting" class="w-8 h-8 mx-auto text-green-600 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                    <span class="text-sm font-bold text-green-700 dark:text-green-400" x-text="submitting ? 'Processing...' : 'Cash'"></span>
-                    <span class="block text-[10px] font-semibold text-green-600/60 mt-0.5" x-text="'Tax: ' + (taxRules['cash'] || 16) + '%'"></span>
-                    <kbd x-show="!submitting" class="block mt-0.5 text-[9px] text-green-500/60 font-mono">Press 1</kbd>
+                <button @click="processPayment('cash')" :disabled="submitting" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 group"
+                        :class="saveAsProvisional ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 hover:bg-amber-100 hover:border-amber-400' : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:bg-green-100 hover:border-green-400'">
+                    <svg x-show="submitting" class="w-8 h-8 mx-auto mb-1 animate-spin" :class="saveAsProvisional ? 'text-amber-600' : 'text-green-600'" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    <svg x-show="!submitting" class="w-8 h-8 mx-auto mb-1" :class="saveAsProvisional ? 'text-amber-600' : 'text-green-600'" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    <span class="text-sm font-bold" :class="saveAsProvisional ? 'text-amber-700 dark:text-amber-400' : 'text-green-700 dark:text-green-400'" x-text="submitting ? 'Processing...' : 'Cash'"></span>
+                    <span class="block text-[10px] font-semibold mt-0.5" :class="saveAsProvisional ? 'text-amber-600/60' : 'text-green-600/60'" x-text="'Tax: ' + (taxRules['cash'] || 16) + '%'"></span>
+                    <kbd x-show="!submitting" class="block mt-0.5 text-[9px] font-mono" :class="saveAsProvisional ? 'text-amber-500/60' : 'text-green-500/60'">Press 1</kbd>
                 </button>
-                <button @click="processPayment('card')" :disabled="submitting" class="py-4 rounded-xl text-center bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 hover:bg-blue-100 hover:border-blue-400 transition disabled:opacity-50 group">
-                    <svg x-show="submitting" class="w-8 h-8 mx-auto text-blue-600 mb-1 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                    <svg x-show="!submitting" class="w-8 h-8 mx-auto text-blue-600 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-                    <span class="text-sm font-bold text-blue-700 dark:text-blue-400" x-text="submitting ? 'Processing...' : 'Card'"></span>
-                    <span class="block text-[10px] font-semibold text-blue-600/60 mt-0.5" x-text="'Tax: ' + (taxRules['debit_card'] || taxRules['card'] || 5) + '%'"></span>
-                    <kbd x-show="!submitting" class="block mt-0.5 text-[9px] text-blue-500/60 font-mono">Press 2</kbd>
+                <button @click="processPayment('card')" :disabled="submitting" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 group"
+                        :class="saveAsProvisional ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 hover:bg-amber-100 hover:border-amber-400' : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 hover:border-blue-400'">
+                    <svg x-show="submitting" class="w-8 h-8 mx-auto mb-1 animate-spin" :class="saveAsProvisional ? 'text-amber-600' : 'text-blue-600'" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    <svg x-show="!submitting" class="w-8 h-8 mx-auto mb-1" :class="saveAsProvisional ? 'text-amber-600' : 'text-blue-600'" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                    <span class="text-sm font-bold" :class="saveAsProvisional ? 'text-amber-700 dark:text-amber-400' : 'text-blue-700 dark:text-blue-400'" x-text="submitting ? 'Processing...' : 'Card'"></span>
+                    <span class="block text-[10px] font-semibold mt-0.5" :class="saveAsProvisional ? 'text-amber-600/60' : 'text-blue-600/60'" x-text="'Tax: ' + (taxRules['debit_card'] || taxRules['card'] || 5) + '%'"></span>
+                    <kbd x-show="!submitting" class="block mt-0.5 text-[9px] font-mono" :class="saveAsProvisional ? 'text-amber-500/60' : 'text-blue-500/60'">Press 2</kbd>
                 </button>
             </div>
             <div class="p-4 pt-0">
-                <button @click="showPayModal = false" :disabled="submitting" class="w-full py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:text-gray-700 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition disabled:opacity-50">Cancel <span class="text-[9px] text-gray-400 font-mono ml-1">ESC</span></button>
+                <button @click="showPayModal = false; saveAsProvisional = false;" :disabled="submitting" class="w-full py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:text-gray-700 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition disabled:opacity-50">Cancel <span class="text-[9px] text-gray-400 font-mono ml-1">ESC</span></button>
             </div>
         </div>
     </div>
@@ -1678,6 +1692,11 @@ function restaurantPos() {
         heldOrders: @json($heldOrders),
         showTablePicker: false,
         showPayModal: false,
+        // PROVISIONAL BILL FLOW — when true, the Pay modal saves the bill with
+        // pra_status='local' (no PRA submission). Bill stays editable/deletable
+        // and can be promoted to final later via the "Submit to PRA — Make Final"
+        // button on transaction-show. Toggle key: P (while pay modal is open).
+        saveAsProvisional: false,
         showHeldOrders: false,
         showReceipt: false,
         showShortcuts: false,
@@ -2440,7 +2459,8 @@ function restaurantPos() {
             if (this.showPayModal) {
                 if (e.key === '1') { e.preventDefault(); this.processPayment('cash'); }
                 else if (e.key === '2') { e.preventDefault(); this.processPayment('card'); }
-                else if (e.key === 'Escape') { e.preventDefault(); this.showPayModal = false; }
+                else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.saveAsProvisional = !this.saveAsProvisional; }
+                else if (e.key === 'Escape') { e.preventDefault(); this.showPayModal = false; this.saveAsProvisional = false; }
                 return;
             }
             if (this.showHeldOrders && this.heldOrders.length > 0) {
@@ -2774,12 +2794,15 @@ function restaurantPos() {
 
         async processPayment(method) {
             if (this.submitting) return;
+            // Capture provisional flag once at submission start so a stray
+            // re-render/checkbox toggle mid-flight cannot flip the path.
+            const provisional = !!this.saveAsProvisional;
 
             if (this.payingHeldOrderId) {
                 this.submitting = true; this.stockError = '';
-                await this.payHeldOrderDirect(this.payingHeldOrderId, method, null);
+                await this.payHeldOrderDirect(this.payingHeldOrderId, method, null, provisional);
                 this.payingHeldOrderId = null;
-                this.showPayModal = false; this.submitting = false;
+                this.showPayModal = false; this.submitting = false; this.saveAsProvisional = false;
                 return;
             }
 
@@ -2794,7 +2817,7 @@ function restaurantPos() {
             // design and the "Send to Kitchen" button is already disabled when
             // hasManualItems() is true (see Pay button area).
             if (this.hasManualItems()) {
-                return await this.processPaymentManual(method);
+                return await this.processPaymentManual(method, provisional);
             }
 
             const now = Date.now();
@@ -2809,12 +2832,12 @@ function restaurantPos() {
                 const holdData = await holdRes.json();
                 if (!holdData.success) { this.showToast(holdData.message || 'Failed', 'error'); this.submitting = false; return; }
                 const savedTotal = this.totalAmount;
-                await this.payHeldOrderDirect(holdData.order.id, method, savedTotal);
+                await this.payHeldOrderDirect(holdData.order.id, method, savedTotal, provisional);
                 this.clearCart();
                 // Auto-focus phone input → ready for next sale, NO dead focus.
                 this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
             } catch (e) { this.showToast('Network error', 'error'); }
-            this.showPayModal = false; this.submitting = false;
+            this.showPayModal = false; this.submitting = false; this.saveAsProvisional = false;
         },
 
         // Manual-cart payment path — POSTs cart directly to pos.invoice.store
@@ -2824,7 +2847,7 @@ function restaurantPos() {
         // master-product in resolveItemExemptions). Returns JSON when
         // wantsJson() — same shape used by payHeldOrderDirect for receipt
         // modal rendering.
-        async processPaymentManual(method) {
+        async processPaymentManual(method, provisional = false) {
             const now = Date.now();
             if (now - this.lastPayTime < 3000) return;
             this.lastPayTime = now;
@@ -2850,6 +2873,10 @@ function restaurantPos() {
                     discount_value: this.discountAmount > 0 ? this.discountValue : 0,
                     customer_name: this.selectedCustomer?.name || null,
                     customer_phone: this.selectedCustomer?.phone || null,
+                    // PROVISIONAL BILL FLOW — when true, storeInvoice forces
+                    // pra_status='local' regardless of company.pra_reporting_enabled
+                    // and skips PRA submission. Bill stays editable / deletable.
+                    save_as_provisional: !!provisional,
                 };
                 const res = await fetch('{{ route("pos.invoice.store") }}', {
                     method: 'POST',
@@ -2888,6 +2915,7 @@ function restaurantPos() {
             }
             this.showPayModal = false;
             this.submitting = false;
+            this.saveAsProvisional = false;
         },
 
         payingHeldOrderId: null,
@@ -3049,9 +3077,12 @@ function restaurantPos() {
             } catch (e) { console.error('Delete held order error:', e); this.showToast('Error deleting order', 'error'); }
         },
 
-        async payHeldOrderDirect(orderId, method, savedTotal) {
+        async payHeldOrderDirect(orderId, method, savedTotal, provisional = false) {
             try {
-                const res = await fetch(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method }) });
+                // PROVISIONAL BILL FLOW — when true, RestaurantPosController::payOrder
+                // forces pra_status='local' and skips PRA submission. Bill remains
+                // editable / deletable until promoted via "Submit to PRA — Make Final".
+                const res = await fetch(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method, save_as_provisional: !!provisional }) });
                 const data = await res.json();
                 if (data.success) {
                     this.heldOrders = this.heldOrders.filter(o => o.id !== orderId);

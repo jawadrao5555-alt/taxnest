@@ -494,7 +494,12 @@ class PosController extends Controller
             }
         }
 
-        $praEnabled = (bool) $company->pra_reporting_enabled;
+        // PROVISIONAL BILL FLOW — when cashier explicitly saves as provisional, the bill is
+        // created with pra_status='local' regardless of company.pra_reporting_enabled, and
+        // PRA submission is skipped. Bill remains editable/deletable until promoted to final
+        // via retryPra (the "Submit to PRA — Make Final" button on transaction-show).
+        $saveAsProvisional = (bool) $request->input('save_as_provisional', false);
+        $praEnabled = (bool) $company->pra_reporting_enabled && !$saveAsProvisional;
         $invoiceMode = $praEnabled ? 'pra' : 'local';
         $initialPraStatus = $praEnabled ? 'pending' : 'local';
 
@@ -876,16 +881,25 @@ class PosController extends Controller
             return back()->with('error', 'This invoice has already been successfully submitted to PRA.');
         }
 
-        if ($transaction->pra_status === 'local') {
-            return back()->with('error', 'This is a local invoice created while PRA reporting was off. It cannot be synced to PRA.');
-        }
-
-        if (!in_array($transaction->pra_status, ['pending', 'failed', 'offline'])) {
-            return back()->with('error', 'This invoice cannot be retried. Current status: ' . $transaction->pra_status);
+        // Provisional ('local') bills CAN be promoted to final — this is the
+        // "Submit to PRA — Make Final" path. They will be re-queued as 'pending'
+        // and submitted just like any pending/failed/offline retry.
+        if (!in_array($transaction->pra_status, ['pending', 'failed', 'offline', 'local'])) {
+            return back()->with('error', 'This invoice cannot be submitted. Current status: ' . $transaction->pra_status);
         }
 
         if (!$company->pra_reporting_enabled) {
             return back()->with('error', 'PRA reporting is currently disabled. Enable it from PRA Settings first.');
+        }
+
+        // Promoting a provisional bill to final — flip mode + status before submission so
+        // generators / templates treat it as a real PRA invoice from this point onward.
+        if ($transaction->pra_status === 'local') {
+            $transaction->update([
+                'pra_status' => 'pending',
+                'invoice_mode' => 'pra',
+                'pra_response_code' => null,
+            ]);
         }
 
         // ENTERPRISE SAFE MODE — Phase 1: agent-enabled companies just re-queue; the agent polls every 10s.

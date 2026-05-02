@@ -473,7 +473,13 @@ class RestaurantPosController extends Controller
         $totalAmount = round($subtotal - $discountAmount + $taxAmount, 2);
         $totalItemDiscounts = $order->items->sum('item_discount_amount');
 
-        $praEnabled = (bool) $company->pra_reporting_enabled;
+        // PROVISIONAL BILL FLOW — when cashier saves as provisional, the bill is created
+        // with pra_status='local' regardless of company.pra_reporting_enabled, and PRA
+        // submission is skipped entirely. The bill remains editable / deletable until
+        // promoted to final via PosController::retryPra (the "Submit to PRA — Make Final"
+        // button on the transaction-show provisional card).
+        $saveAsProvisional = (bool) $request->input('save_as_provisional', false);
+        $praEnabled = (bool) $company->pra_reporting_enabled && !$saveAsProvisional;
         $invoiceMode = $praEnabled ? 'pra' : 'local';
 
         DB::beginTransaction();

@@ -227,7 +227,19 @@
             @if($transaction->pra_status === 'local')
             <div class="bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700 p-5">
                 <h3 class="text-sm font-semibold text-purple-700 dark:text-purple-300 mb-2">Provisional Bill</h3>
-                <p class="text-xs text-purple-600 dark:text-purple-400">This is a provisional bill for your reference. It was not reported to PRA.</p>
+                <p class="text-xs text-purple-600 dark:text-purple-400 mb-3">This is a provisional bill for your reference. It has NOT been reported to PRA — you can still edit, delete, or submit it as a final invoice.</p>
+                @php($company = \App\Models\Company::find(app('currentCompanyId')))
+                @if($company && $company->pra_reporting_enabled)
+                <form method="POST" action="{{ route('pos.transaction.retry-pra', $transaction->id) }}" onsubmit="return confirm('Submit this bill to PRA as a FINAL invoice?\n\nOnce reported, the bill will be locked — no more edit or delete. Continue?');">
+                    @csrf
+                    <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-lg transition shadow-md shadow-purple-600/20">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        Submit to PRA — Make Final
+                    </button>
+                </form>
+                @else
+                <p class="text-[11px] text-purple-500/80 dark:text-purple-400/70 italic">PRA reporting is currently disabled for this company. Enable it from PRA Settings to allow promoting provisional bills.</p>
+                @endif
             </div>
             @elseif($transaction->pra_status === 'offline')
             <div class="bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-700 p-5">

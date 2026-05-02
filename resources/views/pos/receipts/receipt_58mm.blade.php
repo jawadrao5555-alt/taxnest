@@ -201,16 +201,6 @@
             <td class="tot-value">-{{ number_format($transaction->discount_amount, 2) }}</td>
         </tr>
         @endif
-        @if(($transaction->exempt_amount ?? 0) > 0)
-        <tr>
-            <td class="tot-label">Exempt Items:</td>
-            <td class="tot-value">{{ number_format($transaction->exempt_amount, 2) }}</td>
-        </tr>
-        <tr>
-            <td class="tot-label">Taxable:</td>
-            <td class="tot-value">{{ number_format(max($transaction->subtotal - $transaction->discount_amount - $transaction->exempt_amount, 0), 2) }}</td>
-        </tr>
-        @endif
         <tr>
             <td class="tot-label">Tax ({{ number_format($transaction->tax_rate, 0) }}%):</td>
             <td class="tot-value">{{ number_format($transaction->tax_amount, 2) }}</td>

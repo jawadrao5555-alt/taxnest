@@ -717,7 +717,24 @@ window.addEventListener('popstate', function() {
                                     @click.stop="activeCartIndex = index; cartMode = true; $event.target.dataset._fresh = '1'; try { $event.target.select(); } catch(e){}"
                                     @mousedown.stop
                                     @focus.stop="activeCartIndex = index; cartMode = true; $event.target.dataset._fresh = '1'; try { $event.target.select(); } catch(e){}"
-                                    @keydown="if (/^[0-9]$/.test($event.key) && !$event.ctrlKey && !$event.metaKey && !$event.altKey && !$event.shiftKey) { const t = $event.target; if (t.dataset._fresh === '1') { $event.preventDefault(); t.value = $event.key; item.quantity = $event.key; t.dataset._fresh = '0'; try { t.setSelectionRange(1,1); } catch(e){} } }"
+                                    @keydown="
+                                        if (($event.key === 't' || $event.key === 'T') && !$event.ctrlKey && !$event.metaKey && !$event.altKey) {
+                                            $event.preventDefault();
+                                            $event.stopPropagation();
+                                            toggleItemTax(index);
+                                            return;
+                                        }
+                                        if (/^[0-9]$/.test($event.key) && !$event.ctrlKey && !$event.metaKey && !$event.altKey && !$event.shiftKey) {
+                                            const t = $event.target;
+                                            if (t.dataset._fresh === '1') {
+                                                $event.preventDefault();
+                                                t.value = $event.key;
+                                                item.quantity = $event.key;
+                                                t.dataset._fresh = '0';
+                                                try { t.setSelectionRange(1,1); } catch(e){}
+                                            }
+                                        }
+                                    "
                                     @input.stop="
                                         $event.target.dataset._fresh = '0';
                                         let v = ($event.target.value || '').replace(/[^0-9.]/g, '');

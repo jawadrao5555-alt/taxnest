@@ -614,7 +614,7 @@ window.addEventListener('popstate', function() {
                 <span class="text-sm font-bold text-gray-900 dark:text-white flex-1">Current Order</span>
                 <button x-show="cart.length > 0" @click="enterCartMode()" class="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-all"
                     :style="cartMode ? 'background:#7c3aed; color:white; box-shadow:0 2px 8px rgba(124,58,237,0.3);' : 'background:#f3e8ff; color:#7c3aed;'"
-                    :title="cartMode ? 'Cart Edit Mode ON — ↑↓ navigate, +/- qty, Del remove, Esc exit' : 'Enter Cart Edit Mode'">
+                    :title="cartMode ? 'Cart Edit Mode ON — ↑↓ navigate, +/- qty, T tax toggle, Del remove, Esc exit' : 'Enter Cart Edit Mode'">
                     <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     <span x-text="cartMode ? 'Editing' : 'Edit'"></span>
                 </button>
@@ -746,7 +746,7 @@ window.addEventListener('popstate', function() {
                         </div>
                         <div class="flex items-center gap-1.5 mt-1.5">
                             <input type="text" x-model="item.special_notes" @click.stop placeholder="Notes..." class="dense-input flex-1 text-[11px] bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg px-2 py-1 text-gray-600 dark:text-gray-400 focus:ring-purple-500 placeholder-gray-300">
-                            <button @click.stop="item.is_tax_exempt = !item.is_tax_exempt" class="text-[11px] font-extrabold px-2 py-1 rounded-md transition whitespace-nowrap ring-1" :class="item.is_tax_exempt ? 'bg-green-500 text-white ring-green-600 shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 ring-gray-300 dark:ring-gray-600 hover:ring-green-500 hover:text-green-600'" :title="item.is_tax_exempt ? 'Tax exempt — click to apply tax' : 'Apply tax exemption to this item'" x-text="item.is_tax_exempt ? 'NO TAX' : 'TAX'"></button>
+                            <button @click.stop="item.is_tax_exempt = !item.is_tax_exempt" class="text-[11px] font-extrabold px-2 py-1 rounded-md transition whitespace-nowrap ring-1" :class="item.is_tax_exempt ? 'bg-green-500 text-white ring-green-600 shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 ring-gray-300 dark:ring-gray-600 hover:ring-green-500 hover:text-green-600'" :title="item.is_tax_exempt ? 'Tax exempt — click or press T to apply tax' : 'Press T or click to apply tax exemption'" x-text="item.is_tax_exempt ? 'NO TAX (T)' : 'TAX (T)'"></button>
                             <button @click.stop="item.showItemDiscount = !item.showItemDiscount" class="text-[9px] font-bold px-1.5 py-1 rounded-md transition whitespace-nowrap" :class="(item.item_discount_value || 0) > 0 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-orange-500'" x-text="(item.item_discount_value || 0) > 0 ? ((item.item_discount_type || 'percentage') === 'percentage' ? '-' + item.item_discount_value + '%' : '-Rs.' + item.item_discount_value) : 'Disc'"></button>
                         </div>
                         <div x-show="item.showItemDiscount" x-transition class="mt-1 flex items-center gap-1">
@@ -2502,6 +2502,17 @@ function restaurantPos() {
             if (this.activeCartIndex >= this.cart.length) this.activeCartIndex = this.cart.length - 1;
         },
 
+        // T-key tax toggle — flips is_tax_exempt on the cart row at `index`.
+        // Wired to: (1) qty input field, (2) cart-mode global, (3) search mode (toggles last row).
+        // Shows a small toast so the cashier confirms the change happened off-screen.
+        toggleItemTax(index) {
+            if (index < 0 || index >= this.cart.length) return;
+            const item = this.cart[index];
+            item.is_tax_exempt = !item.is_tax_exempt;
+            this.showToast(item.is_tax_exempt ? `NO TAX — ${item.item_name || item.name || 'item'}` : `TAX ON — ${item.item_name || item.name || 'item'}`, item.is_tax_exempt ? 'success' : 'info');
+            this.animateQty(index);
+        },
+
         handleKey(e) {
             // ═══════════════════════════════════════════════════════════════
             // GLOBAL FUNCTION-KEY SHORTCUTS — fire FIRST, regardless of focus.
@@ -2543,6 +2554,7 @@ function restaurantPos() {
                 // Cart shortcuts still work while a qty input has focus.
                 if ((e.key === '+' || e.key === '=') && ci >= 0) { e.preventDefault(); this.updateQty(ci, 1); this.animateQty(ci); return; }
                 if (e.key === '-' && ci >= 0)                    { e.preventDefault(); this.updateQty(ci, -1); this.animateQty(ci); return; }
+                if ((e.key === 't' || e.key === 'T') && ci >= 0) { e.preventDefault(); this.toggleItemTax(ci); return; }
                 if (e.key === 'Escape')                          { e.preventDefault(); this.exitCartMode(); return; }
                 return;
             }
@@ -2638,6 +2650,7 @@ function restaurantPos() {
             if ((e.key === '+' || e.key === '=') && ci >= 0) { this.updateQty(ci, 1); this.animateQty(ci); return; }
             if (e.key === '-' && ci >= 0) { this.updateQty(ci, -1); this.animateQty(ci); return; }
             if (e.key === 'Delete' && ci >= 0) { this.removeFromCart(ci); this.fixCartIndex(); return; }
+            if ((e.key === 't' || e.key === 'T') && ci >= 0) { this.toggleItemTax(ci); return; }
             if (e.key === 'Enter' && this.cart.length) { this.showPayModal = true; return; }
             if (/^[a-zA-Z]$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
                 this.cartMode = false; this.activeCartIndex = -1;
@@ -2653,6 +2666,8 @@ function restaurantPos() {
             if ((e.key === '+' || e.key === '=') && this.cart.length > 0) { this.updateQty(this.cart.length - 1, 1); this.animateQty(this.cart.length - 1); return; }
             if (e.key === '-' && this.cart.length > 0) { this.updateQty(this.cart.length - 1, -1); this.animateQty(this.cart.length - 1); return; }
             if (e.key === 'Delete' && this.cart.length > 0) { this.removeFromCart(this.cart.length - 1); this.fixCartIndex(); return; }
+            // T — toggle tax on LAST cart row (no need to enter cart mode for quick toggle of last-added item)
+            if ((e.key === 't' || e.key === 'T') && this.cart.length > 0 && !e.ctrlKey && !e.metaKey) { e.preventDefault(); this.toggleItemTax(this.cart.length - 1); return; }
             if (e.key === 'Tab' && !e.shiftKey && !this.gridFocusMode) { e.preventDefault(); this.enterGridMode(); return; }
             if (e.key.length === 1 && /[a-zA-Z]/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey && !this.gridFocusMode) {
                 this.searchQuery += e.key;

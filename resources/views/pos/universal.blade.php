@@ -763,7 +763,7 @@ window.addEventListener('popstate', function() {
                         </div>
                         <div class="flex items-center gap-1.5 mt-1.5">
                             <input type="text" x-model="item.special_notes" @click.stop placeholder="Notes..." class="dense-input flex-1 text-[11px] bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg px-2 py-1 text-gray-600 dark:text-gray-400 focus:ring-purple-500 placeholder-gray-300">
-                            <button @click.stop="item.is_tax_exempt = !item.is_tax_exempt" class="text-[11px] font-extrabold px-2 py-1 rounded-md transition whitespace-nowrap ring-1" :class="item.is_tax_exempt ? 'bg-green-500 text-white ring-green-600 shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 ring-gray-300 dark:ring-gray-600 hover:ring-green-500 hover:text-green-600'" :title="item.is_tax_exempt ? 'Tax exempt — click or press Alt+T to apply tax' : 'Press Alt+T (anywhere) or T (cart mode) to apply tax exemption'" x-text="item.is_tax_exempt ? 'NO TAX (Alt+T)' : 'TAX (Alt+T)'"></button>
+                            <button @click.stop="item.is_tax_exempt = !item.is_tax_exempt" class="text-[11px] font-extrabold px-2 py-1 rounded-md transition whitespace-nowrap ring-1" :class="item.is_tax_exempt ? 'bg-green-500 text-white ring-green-600 shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 ring-gray-300 dark:ring-gray-600 hover:ring-green-500 hover:text-green-600'" :title="item.is_tax_exempt ? 'Tax exempt — click or press T to apply tax' : 'Press T (when search empty) or Alt+T (anywhere) to toggle tax'" x-text="item.is_tax_exempt ? 'NO TAX (T)' : 'TAX (T)'"></button>
                             <button @click.stop="item.showItemDiscount = !item.showItemDiscount" class="text-[9px] font-bold px-1.5 py-1 rounded-md transition whitespace-nowrap" :class="(item.item_discount_value || 0) > 0 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-orange-500'" x-text="(item.item_discount_value || 0) > 0 ? ((item.item_discount_type || 'percentage') === 'percentage' ? '-' + item.item_discount_value + '%' : '-Rs.' + item.item_discount_value) : 'Disc'"></button>
                         </div>
                         <div x-show="item.showItemDiscount" x-transition class="mt-1 flex items-center gap-1">
@@ -2547,15 +2547,43 @@ function restaurantPos() {
             if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) this.showPayModal = true; return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode(); this.mobileView = 'cart'; } return; }
-            // Alt+T — UNIVERSAL tax toggle (works EVERYWHERE: search input, qty input, cart mode, body).
-            // Plain T conflicts with typing product names in search ("tea", "tomato"), so we use Alt+T.
-            // Toggles tax on activeCartIndex if in cart mode, otherwise on the LAST cart item.
-            if (e.altKey && (e.key === 't' || e.key === 'T' || e.code === 'KeyT')) {
-                e.preventDefault();
-                if (this.cart.length === 0) { this.showToast('Cart is empty', 'warning'); return; }
-                const idx = (this.activeCartIndex >= 0 && this.activeCartIndex < this.cart.length) ? this.activeCartIndex : this.cart.length - 1;
-                this.toggleItemTax(idx);
-                return;
+            // ═══════════════════════════════════════════════════════════════
+            // T / Alt+T — UNIVERSAL TAX TOGGLE (must run BEFORE input-field gate)
+            // Smart routing:
+            //   • Alt+T — ALWAYS toggles (no matter what's focused / typed)
+            //   • Plain T — toggles when:
+            //       (a) target is body / non-input element, OR
+            //       (b) target is search input AND searchQuery is empty, OR
+            //       (c) target is qty input (handled at element level too)
+            //   This way "tea", "tomato" etc still work when user has started typing.
+            // Always operates on activeCartIndex if valid, else on the LAST cart row.
+            // ═══════════════════════════════════════════════════════════════
+            if ((e.key === 't' || e.key === 'T' || e.code === 'KeyT') && !e.ctrlKey && !e.metaKey) {
+                const tgt = e.target;
+                const isSearchInput = tgt && tgt === this.$refs.searchInput;
+                const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
+                const isQtyInput    = tgt && tgt.matches && tgt.matches('[data-qty-input]');
+                const isOtherInput  = tgt && tgt.closest && tgt.closest('input, textarea, select') && !isSearchInput && !isCustPhone && !isQtyInput;
+
+                let shouldToggle = false;
+                if (e.altKey) {
+                    shouldToggle = true; // Alt+T — always
+                } else if (isQtyInput) {
+                    shouldToggle = true; // qty input — element-level handler also catches, but safety here
+                } else if (isSearchInput && !this.searchQuery) {
+                    shouldToggle = true; // search empty — T is free for shortcut
+                } else if (!isSearchInput && !isCustPhone && !isOtherInput) {
+                    shouldToggle = true; // body / non-input
+                }
+
+                if (shouldToggle) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (this.cart.length === 0) { this.showToast('Cart is empty', 'warning'); return; }
+                    const idx = (this.activeCartIndex >= 0 && this.activeCartIndex < this.cart.length) ? this.activeCartIndex : this.cart.length - 1;
+                    this.toggleItemTax(idx);
+                    return;
+                }
             }
             // F9 — Quick Type Mode (parses "chai 2, samosa 1" style input → cart)
             if (e.key === 'F9') { e.preventDefault(); this.openQuickType(); return; }

@@ -874,7 +874,7 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
-    <div x-show="showPayModal" x-cloak x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false; saveAsProvisional = false;">
+    <div x-show="showPayModal" x-cloak x-transition.opacity x-effect="if (showPayModal) submitting = false" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false; saveAsProvisional = false;">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
             <div class="p-5 text-center border-b border-gray-100 dark:border-gray-800">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white" x-text="saveAsProvisional ? 'Save Provisional Bill' : 'Payment'"></h3>
@@ -2642,7 +2642,7 @@ function restaurantPos() {
             if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
             if (e.key === 'F6') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode('last'); this.mobileView = 'cart'; } return; }
             if (e.key === 'F7') { e.preventDefault(); this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); return; }
-            if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) this.showPayModal = true; return; }
+            if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) { this.submitting = false; this.showPayModal = true; } return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode(); this.mobileView = 'cart'; } return; }
             // ═══════════════════════════════════════════════════════════════
@@ -2792,26 +2792,33 @@ function restaurantPos() {
                 if (e.key === 'Escape')                          { e.preventDefault(); this.exitCartMode(); return; }
                 return;
             }
+            // ═══════════════════════════════════════════════════════════════
+            // MODAL-AWARE HANDLERS — these MUST run BEFORE the form-field gate.
+            // When a modal opens, focus often stays on a background input (search,
+            // qty, customer phone, or the modal's own checkbox like saveAsProvisional).
+            // Without this hoist, "1" / "2" inside Pay modal would just type into
+            // the focused input instead of triggering Cash/Card payment.
+            // ═══════════════════════════════════════════════════════════════
+            if (this.showPayModal) {
+                if (e.key === '1') { e.preventDefault(); e.stopPropagation(); this.processPayment('cash'); return; }
+                if (e.key === '2') { e.preventDefault(); e.stopPropagation(); this.processPayment('card'); return; }
+                if (e.key === 'p' || e.key === 'P') { e.preventDefault(); e.stopPropagation(); this.saveAsProvisional = !this.saveAsProvisional; return; }
+                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this.showPayModal = false; this.saveAsProvisional = false; return; }
+                return;
+            }
+            if (this.showReceipt) {
+                // Persistent popup — Esc is reserved for the browser print dialog (NOT this popup).
+                // Popup closes ONLY via X / Close / New Sale buttons.
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); return; }
+                if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.printReceipt(); return; }
+                if ((e.key === 'k' || e.key === 'K') && this.lastOrderId) { e.preventDefault(); this.printKitchenTicket(); return; }
+                return;
+            }
             // HARD SAFETY: any other keystroke originating from a form field exits immediately.
             if (e.target.closest('input, textarea, select')) {
                 return;
             }
 
-            if (this.showReceipt) {
-                // Persistent popup — Esc is reserved for the browser print dialog (NOT this popup).
-                // Popup closes ONLY via X / Close / New Sale buttons.
-                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); }
-                else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.printReceipt(); }
-                else if ((e.key === 'k' || e.key === 'K') && this.lastOrderId) { e.preventDefault(); this.printKitchenTicket(); }
-                return;
-            }
-            if (this.showPayModal) {
-                if (e.key === '1') { e.preventDefault(); this.processPayment('cash'); }
-                else if (e.key === '2') { e.preventDefault(); this.processPayment('card'); }
-                else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.saveAsProvisional = !this.saveAsProvisional; }
-                else if (e.key === 'Escape') { e.preventDefault(); this.showPayModal = false; this.saveAsProvisional = false; }
-                return;
-            }
             if (this.showHeldOrders && this.heldOrders.length > 0) {
                 if (e.key === 'ArrowDown') { e.preventDefault(); this.activeHeldIndex = Math.min(this.activeHeldIndex + 1, this.heldOrders.length - 1); }
                 else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeHeldIndex = Math.max(this.activeHeldIndex - 1, 0); }

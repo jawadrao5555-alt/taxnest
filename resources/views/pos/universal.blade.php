@@ -454,6 +454,15 @@ window.addEventListener('popstate', function() {
             <span x-show="localBills.length > 0" class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-purple-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="localBills.length"></span>
         </button>
 
+        {{-- ── FAILED BILLS — header shortcut. F11. Red theme = needs attention. ── --}}
+        {{-- Click → modal with Retry / Edit / Delete actions inline. --}}
+        <button @click="openFailedBills()" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 transition" title="Failed PRA submissions — needs retry. Press F11.">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            <span class="text-[10px] bg-red-400/30 px-1 rounded">F11</span>
+            <span class="hidden sm:inline">Failed</span>
+            <span x-show="failedBills.length > 0" class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-red-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold animate-pulse" x-text="failedBills.length"></span>
+        </button>
+
         <button @click="activeHeldIndex = 0; showHeldOrders = !showHeldOrders" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             <span class="text-[10px] bg-amber-400/30 px-1 rounded">F3</span>
@@ -762,14 +771,14 @@ window.addEventListener('popstate', function() {
                             </button>
                         </div>
                         <div class="flex items-center gap-1.5 mt-1.5">
-                            <input type="text" x-model="item.special_notes" @click.stop placeholder="Notes..." class="dense-input flex-1 text-[11px] bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg px-2 py-1 text-gray-600 dark:text-gray-400 focus:ring-purple-500 placeholder-gray-300">
+                            <input type="text" x-model="item.special_notes" :data-note-input="index" @click.stop placeholder="Notes... (N)" class="dense-input flex-1 text-[11px] bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg px-2 py-1 text-gray-600 dark:text-gray-400 focus:ring-purple-500 placeholder-gray-300">
                             <button @click.stop="item.is_tax_exempt = !item.is_tax_exempt" class="text-[11px] font-extrabold px-2 py-1 rounded-md transition whitespace-nowrap ring-1" :class="item.is_tax_exempt ? 'bg-green-500 text-white ring-green-600 shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 ring-gray-300 dark:ring-gray-600 hover:ring-green-500 hover:text-green-600'" :title="item.is_tax_exempt ? 'Tax exempt — click or press T to apply tax' : 'Press T (when search empty) or Alt+T (anywhere) to toggle tax'" x-text="item.is_tax_exempt ? 'NO TAX (T)' : 'TAX (T)'"></button>
                             <button @click.stop="item.showItemDiscount = !item.showItemDiscount" class="text-[9px] font-bold px-1.5 py-1 rounded-md transition whitespace-nowrap" :class="(item.item_discount_value || 0) > 0 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-orange-500'" x-text="(item.item_discount_value || 0) > 0 ? ((item.item_discount_type || 'percentage') === 'percentage' ? '-' + item.item_discount_value + '%' : '-Rs.' + item.item_discount_value) : 'Disc'"></button>
                         </div>
                         <div x-show="item.showItemDiscount" x-transition class="mt-1 flex items-center gap-1">
                             <button @click.stop="item.item_discount_type = 'percentage'" class="text-[9px] font-bold px-1.5 py-0.5 rounded transition" :class="(item.item_discount_type || 'percentage') === 'percentage' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400'">%</button>
                             <button @click.stop="item.item_discount_type = 'amount'" class="text-[9px] font-bold px-1.5 py-0.5 rounded transition" :class="item.item_discount_type === 'amount' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400'">Rs</button>
-                            <input type="number" x-model.number="item.item_discount_value" @click.stop min="0" step="any" placeholder="0" class="dense-input w-14 text-[10px] bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 text-gray-900 dark:text-white focus:ring-purple-500">
+                            <input type="number" x-model.number="item.item_discount_value" :data-discount-input="index" @click.stop min="0" step="any" placeholder="0" class="dense-input w-14 text-[10px] bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 text-gray-900 dark:text-white focus:ring-purple-500">
                             <button @click.stop="item.item_discount_value = 0; item.showItemDiscount = false" class="text-[9px] text-red-400 hover:text-red-600 px-1">X</button>
                         </div>
                     </div>
@@ -1044,6 +1053,87 @@ window.addEventListener('popstate', function() {
             <div x-show="localBills.length > 0" class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-[11px] text-gray-500 flex items-center justify-between">
                 <span>💡 Provisional bills NOT reported to PRA — edit/delete anytime, or "Make Final" to lock & submit.</span>
                 <a href="{{ route('pos.transactions') }}?tab=local" class="text-purple-600 hover:underline font-semibold">Open full page →</a>
+            </div>
+        </div>
+    </div>
+
+    {{-- ─────────────────────────────────────────────────────────────────────── --}}
+    {{-- FAILED BILLS MODAL — opens from header "Failed" button (F11).         --}}
+    {{-- Lists bills with pra_status IN (failed,offline,pending) needing retry. --}}
+    {{-- Inline actions: Retry (re-submit to PRA) / Edit / Delete.              --}}
+    {{-- Keyboard: ↑↓ navigate, Enter=Retry, E=Edit, D=Delete, Esc=Close.       --}}
+    {{-- ─────────────────────────────────────────────────────────────────────── --}}
+    <div x-show="showFailedBills" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showFailedBills = false">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden" x-transition.scale.90>
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <svg class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        Failed PRA Bills <span class="text-xs font-medium text-red-600 ml-1" x-text="'(' + failedBills.length + ')'"></span>
+                    </h3>
+                    <p class="text-[10px] text-gray-500 mt-0.5">Need retry • ↑↓ navigate • Enter=Retry • E=Edit • D=Delete • Esc=Close</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button @click="loadFailedBills()" :disabled="failedBillsLoading" class="text-xs text-red-600 hover:text-red-800 font-semibold px-2 py-1 rounded hover:bg-red-100 disabled:opacity-50" title="Refresh list">
+                        <svg class="w-4 h-4" :class="failedBillsLoading ? 'animate-spin' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    </button>
+                    <button @click="showFailedBills = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                </div>
+            </div>
+            <div class="max-h-[65vh] overflow-y-auto">
+                <template x-if="failedBillsLoading && failedBills.length === 0">
+                    <div class="p-12 text-center text-gray-400">
+                        <svg class="w-8 h-8 mx-auto mb-2 animate-spin text-red-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                        <p class="text-sm">Loading failed bills...</p>
+                    </div>
+                </template>
+                <template x-if="!failedBillsLoading && failedBills.length === 0">
+                    <div class="p-12 text-center text-gray-400">
+                        <svg class="w-12 h-12 mx-auto mb-3 text-green-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <p class="text-sm font-medium text-green-600">All bills synced! 🎉</p>
+                        <p class="text-[11px] text-gray-400 mt-1">No failed PRA submissions.</p>
+                    </div>
+                </template>
+                <template x-for="(bill, bi) in failedBills" :key="bill.id">
+                    <div class="p-4 border-b border-gray-100 dark:border-gray-800 transition-all" :class="activeFailedIndex === bi ? 'bg-red-50 dark:bg-red-900/15 ring-2 ring-red-400 ring-inset' : ''">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-[10px] font-mono text-gray-400 w-5" x-text="bi + 1"></span>
+                                <span class="text-sm font-bold text-gray-900 dark:text-white" x-text="bill.invoice_number"></span>
+                                <span class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide"
+                                      :class="bill.pra_status === 'failed' ? 'bg-red-100 text-red-700' : (bill.pra_status === 'offline' ? 'bg-orange-100 text-orange-700' : 'bg-yellow-100 text-yellow-700')"
+                                      x-text="bill.pra_status"></span>
+                                <template x-if="bill.customer_name">
+                                    <span class="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full font-medium" x-text="bill.customer_name"></span>
+                                </template>
+                            </div>
+                            <span class="text-sm font-bold text-red-700 dark:text-red-400" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
+                        </div>
+                        <p class="text-[11px] text-gray-500 ml-7 mb-1" x-text="bill.items_count + ' item(s) • ' + bill.created_human"></p>
+                        <template x-if="bill.error_code">
+                            <p class="text-[10px] text-red-500 ml-7 mb-2 font-mono truncate" x-text="'⚠ ' + bill.error_code"></p>
+                        </template>
+                        <div class="flex gap-2 ml-7 mt-2">
+                            <a :href="'{{ url('/pos/transaction') }}/' + bill.id + '/edit'" class="flex-1 py-2 text-xs font-bold text-blue-700 border border-blue-300 rounded-xl hover:bg-blue-50 transition text-center flex items-center justify-center gap-1">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                Edit
+                            </a>
+                            <button @click="deleteFailed(bill)" class="py-2 px-3 text-xs font-bold text-red-600 border border-red-300 rounded-xl hover:bg-red-50 transition flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V3a1 1 0 011-1h4a1 1 0 011 1v4"/></svg>
+                                Del
+                            </button>
+                            <button @click="retryFailed(bill)" :disabled="!praEnabled || bill._retrying" :title="praEnabled ? 'Retry PRA submission' : 'PRA reporting disabled'" class="flex-1 py-2 text-xs font-bold text-white bg-gradient-to-br from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 rounded-xl transition shadow-md shadow-red-600/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
+                                <svg x-show="!bill._retrying" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                <svg x-show="bill._retrying" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                <span x-text="bill._retrying ? 'Retrying...' : 'Retry'"></span>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <div x-show="failedBills.length > 0" class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-[11px] text-gray-500 flex items-center justify-between">
+                <span>💡 These bills haven't reached PRA — fix issues then Retry, or Delete if no longer needed.</span>
+                <a href="{{ route('pos.transactions') }}?tab=failed" class="text-red-600 hover:underline font-semibold">Open full page →</a>
             </div>
         </div>
     </div>
@@ -1806,6 +1896,13 @@ function restaurantPos() {
         showLocalBills: false,
         activeLocalIndex: 0,
         localBillsLoading: false,
+        // ── FAILED BILLS (header shortcut, F11) ───────────────────────────────
+        // Lazy-loaded list of all bills with pra_status IN (failed,offline,pending)
+        // that have NOT received a pra_invoice_number yet. Auto-refresh on mount.
+        failedBills: [],
+        showFailedBills: false,
+        activeFailedIndex: 0,
+        failedBillsLoading: false,
         showReceipt: false,
         showShortcuts: false,
         // Quick Type Mode — type free-form lines like "chai 2, samosa 1" → cart
@@ -1910,6 +2007,7 @@ function restaurantPos() {
             // Lazy-load provisional bill list on mount (for header badge count).
             // Failures are silent — badge just won't show until next refresh.
             setTimeout(() => this.loadLocalBills(), 1200);
+            setTimeout(() => this.loadFailedBills(), 1500);
         },
 
         cacheProductData() {
@@ -2592,9 +2690,90 @@ function restaurantPos() {
             // F10 keystroke would steal focus from Pay/Held/Receipt/etc.
             if (e.key === 'F10') {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills) return;
                 this.openLocalBills();
                 return;
+            }
+            // F11 — Open Failed Bills modal (PRA submissions that need retry).
+            // Same gating as F10. Browser's native F11 = fullscreen toggle is overridden.
+            if (e.key === 'F11') {
+                e.preventDefault();
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills) return;
+                this.openFailedBills();
+                return;
+            }
+            // ═══════════════════════════════════════════════════════════════
+            // D / Alt+D — UNIVERSAL DISCOUNT TOGGLE
+            // Toggles `item.showItemDiscount` on the active cart row (or last row).
+            // Same smart routing as T: works in body / empty search; Alt+D anywhere.
+            // After toggling ON, focuses the discount input via $nextTick.
+            // SKIPPED when any list-modal is open — those modals own the D key
+            // for their delete-row action (held/local/failed).
+            // ═══════════════════════════════════════════════════════════════
+            if ((e.key === 'd' || e.key === 'D' || e.code === 'KeyD') && !e.ctrlKey && !e.metaKey
+                && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills
+                && !this.showPayModal && !this.showReceipt && !this.showQuickType
+                && !this.showManualItem && !this.showCustomerPicker && !this.showShortcuts
+                && !this.showManagerPinModal) {
+                const tgt = e.target;
+                const isSearchInput = tgt && tgt === this.$refs.searchInput;
+                const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
+                const isOtherInput  = tgt && tgt.closest && tgt.closest('input, textarea, select') && !isSearchInput && !isCustPhone;
+                let shouldToggle = false;
+                if (e.altKey) shouldToggle = true;
+                else if (isSearchInput && !this.searchQuery) shouldToggle = true;
+                else if (!isSearchInput && !isCustPhone && !isOtherInput) shouldToggle = true;
+                if (shouldToggle) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (this.cart.length === 0) { this.showToast('Cart is empty', 'warning'); return; }
+                    const idx = (this.activeCartIndex >= 0 && this.activeCartIndex < this.cart.length) ? this.activeCartIndex : this.cart.length - 1;
+                    const item = this.cart[idx];
+                    item.showItemDiscount = !item.showItemDiscount;
+                    this.showToast(item.showItemDiscount ? `Discount panel opened — ${item.item_name || 'item'}` : `Discount closed`, item.showItemDiscount ? 'info' : 'warning');
+                    if (item.showItemDiscount) {
+                        this.$nextTick(() => {
+                            const el = document.querySelector(`[data-discount-input="${idx}"]`);
+                            if (el) { el.focus(); el.select && el.select(); }
+                        });
+                    }
+                    return;
+                }
+            }
+            // ═══════════════════════════════════════════════════════════════
+            // N / Alt+N — UNIVERSAL NOTE FOCUS
+            // Focuses the note input on active cart row (or last row).
+            // Same smart routing as T/D. Skipped when any modal is open so
+            // future modal "N" shortcuts have a clear path.
+            // ═══════════════════════════════════════════════════════════════
+            if ((e.key === 'n' || e.key === 'N' || e.code === 'KeyN') && !e.ctrlKey && !e.metaKey
+                && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills
+                && !this.showPayModal && !this.showReceipt && !this.showQuickType
+                && !this.showManualItem && !this.showCustomerPicker && !this.showShortcuts
+                && !this.showManagerPinModal) {
+                const tgt = e.target;
+                const isSearchInput = tgt && tgt === this.$refs.searchInput;
+                const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
+                const isOtherInput  = tgt && tgt.closest && tgt.closest('input, textarea, select') && !isSearchInput && !isCustPhone;
+                let shouldFocus = false;
+                if (e.altKey) shouldFocus = true;
+                else if (isSearchInput && !this.searchQuery) shouldFocus = true;
+                else if (!isSearchInput && !isCustPhone && !isOtherInput) shouldFocus = true;
+                if (shouldFocus) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (this.cart.length === 0) { this.showToast('Cart is empty', 'warning'); return; }
+                    const idx = (this.activeCartIndex >= 0 && this.activeCartIndex < this.cart.length) ? this.activeCartIndex : this.cart.length - 1;
+                    this.$nextTick(() => {
+                        const el = document.querySelector(`[data-note-input="${idx}"]`);
+                        if (el) {
+                            el.focus();
+                            el.select && el.select();
+                            this.showToast(`Note: ${this.cart[idx].item_name || 'item'}`, 'info');
+                        }
+                    });
+                    return;
+                }
             }
 
             // CART QTY INPUT: special-case so arrow keys ALWAYS navigate cart rows
@@ -2654,6 +2833,20 @@ function restaurantPos() {
             }
             if (this.showLocalBills) {
                 if (e.key === 'Escape') { e.preventDefault(); this.showLocalBills = false; }
+                return;
+            }
+            // FAILED BILLS modal — keyboard nav (mirror of provisional + held shortcuts)
+            if (this.showFailedBills && this.failedBills.length > 0) {
+                if (e.key === 'ArrowDown') { e.preventDefault(); this.activeFailedIndex = Math.min(this.activeFailedIndex + 1, this.failedBills.length - 1); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeFailedIndex = Math.max(this.activeFailedIndex - 1, 0); }
+                else if (e.key === 'Enter') { e.preventDefault(); this.retryFailed(this.failedBills[this.activeFailedIndex]); }
+                else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); window.location.href = '{{ url('/pos/transaction') }}/' + this.failedBills[this.activeFailedIndex].id + '/edit'; }
+                else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); this.deleteFailed(this.failedBills[this.activeFailedIndex]); }
+                else if (e.key === 'Escape') { e.preventDefault(); this.showFailedBills = false; }
+                return;
+            }
+            if (this.showFailedBills) {
+                if (e.key === 'Escape') { e.preventDefault(); this.showFailedBills = false; }
                 return;
             }
             if (this.showManagerPinModal) {
@@ -3098,6 +3291,8 @@ function restaurantPos() {
                 this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
                 // Refresh provisional badge count if this save was provisional.
                 if (provisional) { this.loadLocalBills(); }
+                // Refresh failed badge — successful sales might leave a previous fail intact.
+                this.loadFailedBills();
             } catch (e) {
                 console.error('Manual cart pay error:', e);
                 this.showToast('Network error', 'error');
@@ -3311,6 +3506,77 @@ function restaurantPos() {
             } catch (e) { console.error('promoteProvisional', e); this.showToast('Network error', 'error'); this.loadLocalBills(); }
         },
 
+        // ─── FAILED BILLS API helpers (F11 modal) ───────────────────────────
+        async loadFailedBills() {
+            this.failedBillsLoading = true;
+            try {
+                const res = await fetch('{{ route('pos.api.failed-bills') }}', {
+                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                });
+                if (!res.ok) { this.failedBillsLoading = false; return; }
+                const data = await res.json();
+                if (data && data.success) {
+                    this.failedBills = data.bills || [];
+                    if (this.activeFailedIndex >= this.failedBills.length) {
+                        this.activeFailedIndex = Math.max(0, this.failedBills.length - 1);
+                    }
+                }
+            } catch (e) { console.warn('loadFailedBills error', e); }
+            this.failedBillsLoading = false;
+        },
+        openFailedBills() {
+            this.activeFailedIndex = 0;
+            this.showFailedBills = true;
+            this.loadFailedBills();
+        },
+        async retryFailed(bill) {
+            if (!bill) return;
+            if (!this.praEnabled) { this.showToast('PRA reporting is disabled', 'error'); return; }
+            if (bill._retrying) return;
+            bill._retrying = true;
+            try {
+                const res = await fetch('{{ url('/pos/api/failed-bills') }}/' + bill.id + '/retry', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                });
+                const data = await res.json();
+                if (data && data.success) {
+                    this.failedBills = this.failedBills.filter(b => b.id !== bill.id);
+                    if (this.activeFailedIndex >= this.failedBills.length) this.activeFailedIndex = Math.max(0, this.failedBills.length - 1);
+                    if (this.failedBills.length === 0) { this.showFailedBills = false; this.activeFailedIndex = 0; }
+                    this.showToast(data.message || 'Submitted to PRA', 'success');
+                } else {
+                    bill._retrying = false;
+                    this.showToast((data && data.message) || 'Retry failed', 'error');
+                    this.loadFailedBills();
+                }
+            } catch (e) { bill._retrying = false; console.error('retryFailed', e); this.showToast('Network error', 'error'); this.loadFailedBills(); }
+        },
+        async deleteFailed(bill) {
+            if (!bill) return;
+            if (!confirm('Delete failed bill ' + (bill.invoice_number || '#' + bill.id) + '?\n\nThis will permanently remove it. Use only if the bill should NOT be sent to PRA.')) return;
+            // Only 'pending' status can be safely deleted via provisional API after flipping.
+            // For 'failed'/'offline' we use the regular delete route which expects form post.
+            try {
+                const fd = new FormData();
+                fd.append('_token', '{{ csrf_token() }}');
+                fd.append('_method', 'DELETE');
+                const res = await fetch('{{ url('/pos/transaction') }}/' + bill.id, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: fd,
+                });
+                if (res.ok || res.status === 302) {
+                    this.failedBills = this.failedBills.filter(b => b.id !== bill.id);
+                    if (this.activeFailedIndex >= this.failedBills.length) this.activeFailedIndex = Math.max(0, this.failedBills.length - 1);
+                    if (this.failedBills.length === 0) { this.showFailedBills = false; this.activeFailedIndex = 0; }
+                    this.showToast('Failed bill deleted', 'success');
+                } else {
+                    this.showToast('Delete failed (Error ' + res.status + ')', 'error');
+                }
+            } catch (e) { console.error('deleteFailed', e); this.showToast('Network error', 'error'); }
+        },
+
         async deleteHeldOrder(orderId) {
             // Find order for friendlier confirm prompt
             const ord = this.heldOrders.find(o => o.id === orderId);
@@ -3356,6 +3622,8 @@ function restaurantPos() {
                     this.runAutoPrintChain(orderId);
                     // Refresh provisional badge count when this save was provisional.
                     if (provisional) { this.loadLocalBills(); }
+                    // Refresh failed badge so cashier sees pending/failed state in real time.
+                    this.loadFailedBills();
                 } else { if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; } this.showToast(data.message || 'Payment failed', 'error'); }
             } catch (e) { this.showToast('Payment error', 'error'); }
         },

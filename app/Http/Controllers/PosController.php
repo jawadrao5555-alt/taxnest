@@ -1128,6 +1128,128 @@ class PosController extends Controller
         }
     }
 
+    /**
+     * List failed/offline PRA bills for the F11 header shortcut modal.
+     * Returns bills with pra_status IN ('failed','offline','pending') that
+     * have NOT yet received a pra_invoice_number (i.e. need cashier attention).
+     */
+    public function apiFailedBills(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $bills = PosTransaction::where('company_id', $companyId)
+            ->whereIn('pra_status', ['failed', 'offline', 'pending'])
+            ->whereNull('pra_invoice_number')
+            ->orderBy('id', 'desc')
+            ->limit(100)
+            ->get(['id', 'invoice_number', 'customer_name', 'total_amount', 'pra_status', 'pra_response_code', 'created_at']);
+
+        $data = $bills->map(function ($b) {
+            return [
+                'id'             => $b->id,
+                'invoice_number' => $b->invoice_number,
+                'customer_name'  => $b->customer_name,
+                'total_amount'   => (float) $b->total_amount,
+                'pra_status'     => $b->pra_status,
+                'error_code'     => $b->pra_response_code,
+                'items_count'    => PosTransactionItem::where('transaction_id', $b->id)->count(),
+                'created_human'  => $b->created_at?->diffForHumans(),
+                'created_at'     => $b->created_at?->toDateTimeString(),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'count'   => $data->count(),
+            'bills'   => $data,
+        ]);
+    }
+
+    /**
+     * Retry a failed/offline PRA submission via JSON (F11 modal action).
+     * Mirrors retryPra() but returns JSON instead of back()->with().
+     */
+    public function apiRetryFailed(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        if (!$company || !$company->pra_reporting_enabled) {
+            return response()->json([
+                'success' => false,
+                'message' => 'PRA reporting is currently disabled. Enable it from PRA Settings first.',
+            ], 422);
+        }
+
+        // ATOMIC CLAIM — race-safe. Conditional UPDATE returns affected-row
+        // count; if 0, another concurrent request already claimed/submitted
+        // this bill (double-click, two tabs, queue worker, etc.).
+        $claimed = PosTransaction::where('company_id', $companyId)
+            ->where('id', $id)
+            ->whereNull('pra_invoice_number')
+            ->whereIn('pra_status', ['pending', 'failed', 'offline'])
+            ->update(['pra_status' => 'pending', 'pra_response_code' => null]);
+
+        if ($claimed === 0) {
+            // Either bill doesn't exist, was already submitted, or another
+            // request claimed it. Re-fetch to give the cashier the right reason.
+            $tx = PosTransaction::where('company_id', $companyId)->where('id', $id)->first();
+            if (!$tx) {
+                return response()->json(['success' => false, 'message' => 'Bill not found'], 404);
+            }
+            if ($tx->pra_invoice_number) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Already submitted. PRA #: ' . $tx->pra_invoice_number,
+                ], 422);
+            }
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot retry — already in progress or status changed (' . $tx->pra_status . ')',
+            ], 409);
+        }
+
+        $tx = PosTransaction::where('company_id', $companyId)->where('id', $id)->first();
+
+        if ($company->agent_enabled) {
+            return response()->json([
+                'success' => true,
+                'queued'  => true,
+                'message' => '🟡 Re-queued for desktop agent — will sync within seconds.',
+                'id'      => $id,
+            ]);
+        }
+
+        try {
+            $praService = new PraIntegrationService($company);
+            $result = $praService->sendInvoice($tx);
+            $tx->refresh();
+
+            if (!empty($result['success'])) {
+                return response()->json([
+                    'success'    => true,
+                    'submitted'  => true,
+                    'message'    => 'PRA submission successful! PRA #: ' . ($tx->pra_invoice_number ?? 'N/A'),
+                    'pra_number' => $tx->pra_invoice_number,
+                    'id'         => $id,
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'PRA submission failed: ' . ($result['message'] ?? 'Unknown error'),
+                'id'      => $id,
+            ], 502);
+        } catch (\Exception $e) {
+            $tx->update(['pra_status' => 'offline']);
+            return response()->json([
+                'success' => false,
+                'offline' => true,
+                'message' => 'PRA connection failed — will sync automatically when restored.',
+                'id'      => $id,
+            ], 503);
+        }
+    }
+
     private function verifyPinSession(): bool
     {
         return session('confidential_pin_verified', false) === true;

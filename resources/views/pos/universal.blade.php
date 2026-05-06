@@ -861,6 +861,13 @@ window.addEventListener('popstate', function() {
                             <span x-show="heldOrders.length > 0" class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center held-badge-pulse shadow-sm shadow-red-500/50" x-text="heldOrders.length"></span>
                         </button>
                     </div>
+                    <!-- ─── SAVE PROVISIONAL — separate from Pay (no modal, no payment) ─── -->
+                    <button @click="saveProvisionalDirect()" :disabled="cart.length === 0 || submitting" class="w-full py-2.5 mb-2 rounded-xl text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-30 shadow-md shadow-amber-500/20 transition flex items-center justify-center gap-2">
+                        <svg x-show="!submitting" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                        <svg x-show="submitting" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        <span>Save Provisional</span>
+                        <kbd class="text-[9px] bg-amber-700/40 px-1.5 py-0.5 rounded font-mono">Shift+F8</kbd>
+                    </button>
                     <button @click="showPayModal = true" :disabled="cart.length === 0 || submitting" class="pay-btn-premium btn-ripple w-full py-4 rounded-2xl text-base font-extrabold text-white disabled:opacity-30">
                         <span class="flex items-center justify-center gap-2">
                             <svg x-show="submitting" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
@@ -874,47 +881,38 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
-    <div x-show="showPayModal" x-cloak x-transition.opacity x-effect="if (showPayModal) submitting = false" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false; saveAsProvisional = false;">
+    <!-- ═══════════════════════════════════════════════════════════════
+         PAY MODAL — Final payment ONLY (Cash / Card → PRA submit).
+         Provisional save is now a SEPARATE button + Shift+F8 shortcut
+         in the right sidebar (no modal, no checkbox, no key conflict).
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="showPayModal" x-cloak x-transition.opacity x-effect="if (showPayModal) { submitting = false; saveAsProvisional = false; }" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
             <div class="p-5 text-center border-b border-gray-100 dark:border-gray-800">
-                <h3 class="text-lg font-bold text-gray-900 dark:text-white" x-text="saveAsProvisional ? 'Save Provisional Bill' : 'Payment'"></h3>
-                <p class="text-3xl font-extrabold mt-2" :class="saveAsProvisional ? 'text-amber-600 dark:text-amber-400' : 'text-purple-600 dark:text-purple-400'" x-text="'Rs. ' + Number(roundedTotal).toLocaleString()"></p>
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Payment</h3>
+                <p class="text-3xl font-extrabold mt-2 text-purple-600 dark:text-purple-400" x-text="'Rs. ' + Number(roundedTotal).toLocaleString()"></p>
                 <p x-show="Math.abs(roundOff) > 0.001" class="text-[10px] text-gray-400 mt-0.5" x-text="(roundOff >= 0 ? 'rounded up by ' : 'rounded down by ') + 'Rs. ' + Math.abs(roundOff).toFixed(2)"></p>
                 <p x-show="stockError" class="text-xs text-red-500 mt-2 bg-red-50 dark:bg-red-900/20 p-2 rounded-lg" x-text="stockError"></p>
-                <p x-show="submitting && !saveAsProvisional" class="text-xs text-purple-500 mt-2">Processing payment...</p>
-                <p x-show="submitting && saveAsProvisional" class="text-xs text-amber-500 mt-2">Saving provisional bill...</p>
-            </div>
-            <div class="px-4 pt-3">
-                <label class="flex items-center gap-2 p-2.5 rounded-xl border-2 cursor-pointer transition select-none"
-                       :class="saveAsProvisional ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-amber-300'">
-                    <input type="checkbox" x-model="saveAsProvisional" :disabled="submitting" class="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 cursor-pointer">
-                    <div class="flex-1">
-                        <p class="text-xs font-bold text-gray-800 dark:text-gray-200">Save as Provisional</p>
-                        <p class="text-[10px] text-gray-500 dark:text-gray-400 leading-tight" x-text="saveAsProvisional ? 'Bill stays editable / deletable. Submit to PRA later.' : 'Final bill — will be reported to PRA immediately.'"></p>
-                    </div>
-                    <kbd class="text-[9px] text-gray-400 font-mono bg-white dark:bg-gray-900 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700">P</kbd>
-                </label>
+                <p x-show="submitting" class="text-xs text-purple-500 mt-2">Processing payment...</p>
             </div>
             <div class="p-4 grid grid-cols-2 gap-3">
-                <button @click="processPayment('cash')" :disabled="submitting" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 group"
-                        :class="saveAsProvisional ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 hover:bg-amber-100 hover:border-amber-400' : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:bg-green-100 hover:border-green-400'">
-                    <svg x-show="submitting" class="w-8 h-8 mx-auto mb-1 animate-spin" :class="saveAsProvisional ? 'text-amber-600' : 'text-green-600'" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                    <svg x-show="!submitting" class="w-8 h-8 mx-auto mb-1" :class="saveAsProvisional ? 'text-amber-600' : 'text-green-600'" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                    <span class="text-sm font-bold" :class="saveAsProvisional ? 'text-amber-700 dark:text-amber-400' : 'text-green-700 dark:text-green-400'" x-text="submitting ? 'Processing...' : 'Cash'"></span>
-                    <span class="block text-[10px] font-semibold mt-0.5" :class="saveAsProvisional ? 'text-amber-600/60' : 'text-green-600/60'" x-text="'Tax: ' + (taxRules['cash'] || 16) + '%'"></span>
-                    <kbd x-show="!submitting" class="block mt-0.5 text-[9px] font-mono" :class="saveAsProvisional ? 'text-amber-500/60' : 'text-green-500/60'">Press 1</kbd>
+                <button @click="processPayment('cash')" :disabled="submitting" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:bg-green-100 hover:border-green-400">
+                    <svg x-show="submitting" class="w-8 h-8 mx-auto mb-1 animate-spin text-green-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    <svg x-show="!submitting" class="w-8 h-8 mx-auto mb-1 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    <span class="text-sm font-bold text-green-700 dark:text-green-400" x-text="submitting ? 'Processing...' : 'Cash'"></span>
+                    <span class="block text-[10px] font-semibold mt-0.5 text-green-600/60" x-text="'Tax: ' + (taxRules['cash'] || 16) + '%'"></span>
+                    <kbd x-show="!submitting" class="block mt-0.5 text-[9px] font-mono text-green-500/60">Press 1</kbd>
                 </button>
-                <button @click="processPayment('card')" :disabled="submitting" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 group"
-                        :class="saveAsProvisional ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 hover:bg-amber-100 hover:border-amber-400' : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 hover:border-blue-400'">
-                    <svg x-show="submitting" class="w-8 h-8 mx-auto mb-1 animate-spin" :class="saveAsProvisional ? 'text-amber-600' : 'text-blue-600'" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                    <svg x-show="!submitting" class="w-8 h-8 mx-auto mb-1" :class="saveAsProvisional ? 'text-amber-600' : 'text-blue-600'" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-                    <span class="text-sm font-bold" :class="saveAsProvisional ? 'text-amber-700 dark:text-amber-400' : 'text-blue-700 dark:text-blue-400'" x-text="submitting ? 'Processing...' : 'Card'"></span>
-                    <span class="block text-[10px] font-semibold mt-0.5" :class="saveAsProvisional ? 'text-amber-600/60' : 'text-blue-600/60'" x-text="'Tax: ' + (taxRules['debit_card'] || taxRules['card'] || 5) + '%'"></span>
-                    <kbd x-show="!submitting" class="block mt-0.5 text-[9px] font-mono" :class="saveAsProvisional ? 'text-amber-500/60' : 'text-blue-500/60'">Press 2</kbd>
+                <button @click="processPayment('card')" :disabled="submitting" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 hover:border-blue-400">
+                    <svg x-show="submitting" class="w-8 h-8 mx-auto mb-1 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    <svg x-show="!submitting" class="w-8 h-8 mx-auto mb-1 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                    <span class="text-sm font-bold text-blue-700 dark:text-blue-400" x-text="submitting ? 'Processing...' : 'Card'"></span>
+                    <span class="block text-[10px] font-semibold mt-0.5 text-blue-600/60" x-text="'Tax: ' + (taxRules['debit_card'] || taxRules['card'] || 5) + '%'"></span>
+                    <kbd x-show="!submitting" class="block mt-0.5 text-[9px] font-mono text-blue-500/60">Press 2</kbd>
                 </button>
             </div>
             <div class="p-4 pt-0">
-                <button @click="showPayModal = false; saveAsProvisional = false;" :disabled="submitting" class="w-full py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:text-gray-700 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition disabled:opacity-50">Cancel <span class="text-[9px] text-gray-400 font-mono ml-1">ESC</span></button>
+                <button @click="showPayModal = false" :disabled="submitting" class="w-full py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:text-gray-700 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition disabled:opacity-50">Cancel <span class="text-[9px] text-gray-400 font-mono ml-1">ESC</span></button>
             </div>
         </div>
     </div>
@@ -2642,6 +2640,7 @@ function restaurantPos() {
             if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
             if (e.key === 'F6') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode('last'); this.mobileView = 'cart'; } return; }
             if (e.key === 'F7') { e.preventDefault(); this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); return; }
+            if (e.key === 'F8' && e.shiftKey) { e.preventDefault(); this.saveProvisionalDirect(); return; }
             if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) { this.submitting = false; this.showPayModal = true; } return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode(); this.mobileView = 'cart'; } return; }
@@ -2802,8 +2801,7 @@ function restaurantPos() {
             if (this.showPayModal) {
                 if (e.key === '1') { e.preventDefault(); e.stopPropagation(); this.processPayment('cash'); return; }
                 if (e.key === '2') { e.preventDefault(); e.stopPropagation(); this.processPayment('card'); return; }
-                if (e.key === 'p' || e.key === 'P') { e.preventDefault(); e.stopPropagation(); this.saveAsProvisional = !this.saveAsProvisional; return; }
-                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this.showPayModal = false; this.saveAsProvisional = false; return; }
+                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this.showPayModal = false; return; }
                 return;
             }
             if (this.showReceipt) {
@@ -3177,6 +3175,19 @@ function restaurantPos() {
             } catch (e) {
                 this.showToast('Network error', 'error');
             }
+        },
+
+        // ─── SAVE PROVISIONAL DIRECT — fully isolated from Pay modal ─────
+        // Sets provisional flag + uses default 'cash' method, then routes
+        // through the existing processPayment pipeline. No modal opens, no
+        // keyboard conflict, no checkbox confusion. User can later edit /
+        // delete / promote-to-final from F10 (Local) shortcut.
+        async saveProvisionalDirect() {
+            if (this.submitting) return;
+            if (this.cart.length === 0) { this.showToast('Cart is empty', 'error'); return; }
+            this.saveAsProvisional = true;
+            this.showPayModal = false;
+            await this.processPayment('cash');
         },
 
         async processPayment(method) {

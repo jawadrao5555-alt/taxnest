@@ -259,7 +259,7 @@ window.addEventListener('popstate', function() {
         <div class="relative flex-shrink-0" style="min-width:180px;max-width:220px;">
             <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
             <input type="search" x-ref="customerPhoneInput" x-model="customerPhoneQuery" @input="onCustomerPhoneInput()" @keydown.enter.prevent="onCustomerPhoneEnter()" @keydown.escape.prevent="customerPhoneDropdown = false" @keydown.tab.prevent="$refs.searchInput?.focus()" @click.away="customerPhoneDropdown = false" inputmode="tel" placeholder="Customer mobile..." class="w-full pl-9 pr-7 py-2.5 rounded-xl text-sm border-2 transition shadow-sm font-medium" :class="selectedCustomer ? 'border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200' : 'border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400'" autocomplete="one-time-code" name="pos_customer_phone_nofill" data-lpignore="true" data-form-type="other">
-            <kbd x-show="!customerPhoneQuery && !selectedCustomer && !customerSearching" class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded font-mono">F7</kbd>
+            <kbd x-show="!customerPhoneQuery && !selectedCustomer && !customerSearching" class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded font-mono">Alt+P</kbd>
             {{-- Inline search spinner --}}
             <svg x-show="customerSearching && !selectedCustomer" x-cloak class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -424,10 +424,10 @@ window.addEventListener('popstate', function() {
             <span class="text-[8px] font-mono bg-gray-200 dark:bg-gray-700 px-1 rounded hidden sm:inline">F1</span>
         </button>
 
-        <button @click="openQuickType()" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 hover:border-sky-300 transition flex-shrink-0" title="Quick Type Mode (F9) — type 'chai 2, samosa 1' or pick random product">
+        <button @click="openQuickType()" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 hover:border-sky-300 transition flex-shrink-0" title="Quick Type Mode (F7) — type 'chai 2, samosa 1' or pick random product">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
             <span class="hidden lg:inline">Quick</span>
-            <span class="text-[8px] font-mono bg-sky-200 dark:bg-sky-800/50 px-1 rounded hidden sm:inline">F9</span>
+            <span class="text-[8px] font-mono bg-sky-200 dark:bg-sky-800/50 px-1 rounded hidden sm:inline">F7</span>
         </button>
 
         {{-- Manual Item — only when inventory mode is OFF (Simple Mode).
@@ -866,7 +866,7 @@ window.addEventListener('popstate', function() {
                         <svg x-show="!submitting" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
                         <svg x-show="submitting" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                         <span>Save Provisional</span>
-                        <kbd class="text-[9px] bg-amber-700/40 px-1.5 py-0.5 rounded font-mono">Shift+F8</kbd>
+                        <kbd class="text-[9px] bg-amber-700/40 px-1.5 py-0.5 rounded font-mono">F9</kbd>
                     </button>
                     <button @click="showPayModal = true" :disabled="cart.length === 0 || submitting" class="pay-btn-premium btn-ripple w-full py-4 rounded-2xl text-base font-extrabold text-white disabled:opacity-30">
                         <span class="flex items-center justify-center gap-2">
@@ -883,7 +883,7 @@ window.addEventListener('popstate', function() {
 
     <!-- ═══════════════════════════════════════════════════════════════
          PAY MODAL — Final payment ONLY (Cash / Card → PRA submit).
-         Provisional save is now a SEPARATE button + Shift+F8 shortcut
+         Provisional save is now a SEPARATE button + F9 shortcut
          in the right sidebar (no modal, no checkbox, no key conflict).
          ═══════════════════════════════════════════════════════════════ -->
     <div x-show="showPayModal" x-cloak x-transition.opacity x-effect="if (showPayModal) { submitting = false; saveAsProvisional = false; }" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false">
@@ -1250,7 +1250,7 @@ window.addEventListener('popstate', function() {
                             </div>
                             <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
                                 <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Customer Select</span>
-                                <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">F7</kbd>
+                                <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">Alt+P</kbd>
                             </div>
                             <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
                                 <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Pay / Checkout</span>
@@ -1316,7 +1316,7 @@ window.addEventListener('popstate', function() {
          and the parser fuzzy-matches each entry against the product list,
          then bulk-adds to cart. Plus an "Add Random Product" button for
          lightning-fast demo / stress-testing.
-         Open: F9 or toolbar "Quick" button. Close: Esc.
+         Open: F7 or toolbar "Quick" button. Close: Esc.
          ═══════════════════════════════════════════════════════════════ --}}
     <div x-show="showQuickType" x-cloak x-transition.opacity @click.self="showQuickType = false" @keydown.escape.window="if(showQuickType) showQuickType = false" class="fixed inset-0 bg-gradient-to-br from-sky-950/70 via-black/70 to-blue-950/70 backdrop-blur-md z-50 flex items-center justify-center p-4" style="display:none;">
         <div x-show="showQuickType" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-90 translate-y-4" x-transition:enter-end="opacity-100 scale-100 translate-y-0" @click.stop class="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden ring-1 ring-sky-200/50 dark:ring-sky-800/50" style="box-shadow: 0 25px 80px -20px rgba(2, 132, 199, 0.55);">
@@ -1328,7 +1328,7 @@ window.addEventListener('popstate', function() {
                         <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     </div>
                     <div>
-                        <h3 class="text-white text-lg font-extrabold m-0 tracking-tight flex items-center gap-2">Quick Type <span class="text-[9px] font-bold bg-white/20 px-1.5 py-0.5 rounded-md ring-1 ring-white/30 uppercase tracking-wider">F9</span></h3>
+                        <h3 class="text-white text-lg font-extrabold m-0 tracking-tight flex items-center gap-2">Quick Type <span class="text-[9px] font-bold bg-white/20 px-1.5 py-0.5 rounded-md ring-1 ring-white/30 uppercase tracking-wider">F7</span></h3>
                         <p class="text-white/75 text-[11px] m-0 font-medium">Lightning-fast multi-add &mdash; type, parse, drop into cart.</p>
                     </div>
                 </div>
@@ -2639,9 +2639,13 @@ function restaurantPos() {
             if (e.key === 'F4') { e.preventDefault(); if (this.cart.length && confirm('Clear entire cart?')) { this.clearCart(); } return; }
             if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
             if (e.key === 'F6') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode('last'); this.mobileView = 'cart'; } return; }
-            if (e.key === 'F7') { e.preventDefault(); this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); return; }
-            if (e.key === 'F8' && e.shiftKey) { e.preventDefault(); this.saveProvisionalDirect(); return; }
+            // F7 → Quick Type (was customer-phone-focus, moved to Alt+P)
+            if (e.key === 'F7') { e.preventDefault(); this.openQuickType(); return; }
             if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) { this.submitting = false; this.showPayModal = true; } return; }
+            // F9 → Save Provisional (was Quick Type, moved to F7)
+            if (e.key === 'F9') { e.preventDefault(); this.saveProvisionalDirect(); return; }
+            // Alt+P → focus customer phone (was F7)
+            if (e.altKey && (e.key === 'p' || e.key === 'P')) { e.preventDefault(); this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode(); this.mobileView = 'cart'; } return; }
             // ═══════════════════════════════════════════════════════════════
@@ -2682,8 +2686,7 @@ function restaurantPos() {
                     return;
                 }
             }
-            // F9 — Quick Type Mode (parses "chai 2, samosa 1" style input → cart)
-            if (e.key === 'F9') { e.preventDefault(); this.openQuickType(); return; }
+            // (F7 / F9 hoisted above — kept here as no-op so future readers see the new mapping)
             // F10 — Open Provisional Bills modal (Local — not yet submitted to PRA).
             // GATED: only fires when no blocking modal is open, otherwise the
             // F10 keystroke would steal focus from Pay/Held/Receipt/etc.

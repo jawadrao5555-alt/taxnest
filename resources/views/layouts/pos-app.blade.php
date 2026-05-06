@@ -111,6 +111,94 @@
             .theme-swatch.active-theme { border-color: white; box-shadow: 0 0 0 2px rgba(255,255,255,0.3); }
             [x-cloak] { display: none !important; }
 
+            /* ═══════════════════════════════════════════════════════════════════
+               🎨 UNIVERSAL THEME OVERRIDE — applies selected theme to ALL purple
+               Tailwind utilities used across POS views (cart, search, badges,
+               buttons, modals, etc.). When data-theme=purple, hardcoded purple-X
+               classes match naturally. For any OTHER theme, these rules remap
+               purple-X → accent HSL derived from --accent-h / --accent-s.
+               Single source of truth — no per-view edits needed.
+               ═══════════════════════════════════════════════════════════════════ */
+            body:not([data-theme="purple"]) .bg-purple-50  { background-color: hsl(var(--accent-h), var(--accent-s), 97%) !important; }
+            body:not([data-theme="purple"]) .bg-purple-100 { background-color: hsl(var(--accent-h), var(--accent-s), 94%) !important; }
+            body:not([data-theme="purple"]) .bg-purple-200 { background-color: hsl(var(--accent-h), var(--accent-s), 86%) !important; }
+            body:not([data-theme="purple"]) .bg-purple-300 { background-color: hsl(var(--accent-h), var(--accent-s), 76%) !important; }
+            body:not([data-theme="purple"]) .bg-purple-400 { background-color: hsl(var(--accent-h), var(--accent-s), 65%) !important; }
+            body:not([data-theme="purple"]) .bg-purple-500 { background-color: hsl(var(--accent-h), var(--accent-s), 55%) !important; }
+            body:not([data-theme="purple"]) .bg-purple-600 { background-color: hsl(var(--accent-h), var(--accent-s), var(--accent-l)) !important; }
+            body:not([data-theme="purple"]) .bg-purple-700 { background-color: hsl(var(--accent-h), var(--accent-s), 40%) !important; }
+            body:not([data-theme="purple"]) .bg-purple-800 { background-color: hsl(var(--accent-h), var(--accent-s), 32%) !important; }
+            body:not([data-theme="purple"]) .bg-purple-900 { background-color: hsl(var(--accent-h), var(--accent-s), 22%) !important; }
+
+            body:not([data-theme="purple"]) .text-purple-300 { color: hsl(var(--accent-h), var(--accent-s), 76%) !important; }
+            body:not([data-theme="purple"]) .text-purple-400 { color: hsl(var(--accent-h), var(--accent-s), 65%) !important; }
+            body:not([data-theme="purple"]) .text-purple-500 { color: hsl(var(--accent-h), var(--accent-s), 55%) !important; }
+            body:not([data-theme="purple"]) .text-purple-600 { color: hsl(var(--accent-h), var(--accent-s), var(--accent-l)) !important; }
+            body:not([data-theme="purple"]) .text-purple-700 { color: hsl(var(--accent-h), var(--accent-s), 35%) !important; }
+            body:not([data-theme="purple"]) .text-purple-800 { color: hsl(var(--accent-h), var(--accent-s), 28%) !important; }
+            body:not([data-theme="purple"]) .text-purple-900 { color: hsl(var(--accent-h), var(--accent-s), 22%) !important; }
+
+            body:not([data-theme="purple"]) .border-purple-100 { border-color: hsl(var(--accent-h), var(--accent-s), 90%) !important; }
+            body:not([data-theme="purple"]) .border-purple-200 { border-color: hsl(var(--accent-h), var(--accent-s), 84%) !important; }
+            body:not([data-theme="purple"]) .border-purple-300 { border-color: hsl(var(--accent-h), var(--accent-s), 74%) !important; }
+            body:not([data-theme="purple"]) .border-purple-400 { border-color: hsl(var(--accent-h), var(--accent-s), 60%) !important; }
+            body:not([data-theme="purple"]) .border-purple-500 { border-color: hsl(var(--accent-h), var(--accent-s), 55%) !important; }
+            body:not([data-theme="purple"]) .border-purple-600 { border-color: hsl(var(--accent-h), var(--accent-s), var(--accent-l)) !important; }
+            body:not([data-theme="purple"]) .border-purple-700 { border-color: hsl(var(--accent-h), var(--accent-s), 40%) !important; }
+            body:not([data-theme="purple"]) .border-purple-800 { border-color: hsl(var(--accent-h), var(--accent-s), 32%) !important; }
+
+            body:not([data-theme="purple"]) .ring-purple-200 { --tw-ring-color: hsl(var(--accent-h), var(--accent-s), 84%) !important; }
+            body:not([data-theme="purple"]) .ring-purple-300 { --tw-ring-color: hsl(var(--accent-h), var(--accent-s), 74%) !important; }
+            body:not([data-theme="purple"]) .ring-purple-400 { --tw-ring-color: hsl(var(--accent-h), var(--accent-s), 60%) !important; }
+            body:not([data-theme="purple"]) .ring-purple-500 { --tw-ring-color: hsl(var(--accent-h), var(--accent-s), 55%) !important; }
+            body:not([data-theme="purple"]) .focus\:ring-purple-200:focus { --tw-ring-color: hsl(var(--accent-h), var(--accent-s), 84%) !important; }
+            body:not([data-theme="purple"]) .focus\:ring-purple-400:focus { --tw-ring-color: hsl(var(--accent-h), var(--accent-s), 60%) !important; }
+            body:not([data-theme="purple"]) .focus\:ring-purple-500:focus { --tw-ring-color: hsl(var(--accent-h), var(--accent-s), 55%) !important; }
+            body:not([data-theme="purple"]) .focus\:border-purple-400:focus { border-color: hsl(var(--accent-h), var(--accent-s), 60%) !important; }
+            body:not([data-theme="purple"]) .focus\:border-purple-500:focus { border-color: hsl(var(--accent-h), var(--accent-s), 55%) !important; }
+
+            /* Hover variants */
+            body:not([data-theme="purple"]) .hover\:bg-purple-50:hover  { background-color: hsl(var(--accent-h), var(--accent-s), 97%) !important; }
+            body:not([data-theme="purple"]) .hover\:bg-purple-100:hover { background-color: hsl(var(--accent-h), var(--accent-s), 94%) !important; }
+            body:not([data-theme="purple"]) .hover\:bg-purple-500:hover { background-color: hsl(var(--accent-h), var(--accent-s), 55%) !important; }
+            body:not([data-theme="purple"]) .hover\:bg-purple-600:hover { background-color: hsl(var(--accent-h), var(--accent-s), var(--accent-l)) !important; }
+            body:not([data-theme="purple"]) .hover\:bg-purple-700:hover { background-color: hsl(var(--accent-h), var(--accent-s), 40%) !important; }
+            body:not([data-theme="purple"]) .hover\:text-purple-300:hover { color: hsl(var(--accent-h), var(--accent-s), 76%) !important; }
+            body:not([data-theme="purple"]) .hover\:text-purple-700:hover { color: hsl(var(--accent-h), var(--accent-s), 35%) !important; }
+            body:not([data-theme="purple"]) .hover\:text-purple-800:hover { color: hsl(var(--accent-h), var(--accent-s), 28%) !important; }
+
+            /* Gradient stops (from / via / to) */
+            body:not([data-theme="purple"]) .from-purple-50  { --tw-gradient-from: hsl(var(--accent-h), var(--accent-s), 97%) var(--tw-gradient-from-position) !important; --tw-gradient-to: hsl(var(--accent-h) var(--accent-s) 97% / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+            body:not([data-theme="purple"]) .from-purple-100 { --tw-gradient-from: hsl(var(--accent-h), var(--accent-s), 94%) var(--tw-gradient-from-position) !important; --tw-gradient-to: hsl(var(--accent-h) var(--accent-s) 94% / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+            body:not([data-theme="purple"]) .from-purple-500 { --tw-gradient-from: hsl(var(--accent-h), var(--accent-s), 55%) var(--tw-gradient-from-position) !important; --tw-gradient-to: hsl(var(--accent-h) var(--accent-s) 55% / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+            body:not([data-theme="purple"]) .from-purple-600 { --tw-gradient-from: hsl(var(--accent-h), var(--accent-s), var(--accent-l)) var(--tw-gradient-from-position) !important; --tw-gradient-to: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+            body:not([data-theme="purple"]) .to-purple-500   { --tw-gradient-to: hsl(var(--accent-h), var(--accent-s), 55%) var(--tw-gradient-to-position) !important; }
+            body:not([data-theme="purple"]) .to-purple-600   { --tw-gradient-to: hsl(var(--accent-h), var(--accent-s), var(--accent-l)) var(--tw-gradient-to-position) !important; }
+            body:not([data-theme="purple"]) .to-purple-700   { --tw-gradient-to: hsl(var(--accent-h), var(--accent-s), 40%) var(--tw-gradient-to-position) !important; }
+            body:not([data-theme="purple"]) .via-purple-500  { --tw-gradient-stops: var(--tw-gradient-from), hsl(var(--accent-h), var(--accent-s), 55%) var(--tw-gradient-via-position), var(--tw-gradient-to) !important; }
+            body:not([data-theme="purple"]) .via-purple-600  { --tw-gradient-stops: var(--tw-gradient-from), hsl(var(--accent-h), var(--accent-s), var(--accent-l)) var(--tw-gradient-via-position), var(--tw-gradient-to) !important; }
+
+            /* Dark mode variants — softer / desaturated */
+            body:not([data-theme="purple"]) .dark .dark\:bg-purple-900 { background-color: hsl(var(--accent-h), var(--accent-s), 22%) !important; }
+            body:not([data-theme="purple"]) .dark .dark\:bg-purple-900\/10 { background-color: hsla(var(--accent-h), var(--accent-s), 22%, 0.1) !important; }
+            body:not([data-theme="purple"]) .dark .dark\:bg-purple-900\/20 { background-color: hsla(var(--accent-h), var(--accent-s), 22%, 0.2) !important; }
+            body:not([data-theme="purple"]) .dark .dark\:bg-purple-900\/30 { background-color: hsla(var(--accent-h), var(--accent-s), 22%, 0.3) !important; }
+            body:not([data-theme="purple"]) .dark .dark\:bg-purple-900\/40 { background-color: hsla(var(--accent-h), var(--accent-s), 22%, 0.4) !important; }
+            body:not([data-theme="purple"]) .dark .dark\:bg-purple-900\/50 { background-color: hsla(var(--accent-h), var(--accent-s), 22%, 0.5) !important; }
+            body:not([data-theme="purple"]) .dark .dark\:text-purple-300 { color: hsl(var(--accent-h), var(--accent-s), 76%) !important; }
+            body:not([data-theme="purple"]) .dark .dark\:text-purple-400 { color: hsl(var(--accent-h), var(--accent-s), 65%) !important; }
+            body:not([data-theme="purple"]) .dark .dark\:border-purple-700 { border-color: hsl(var(--accent-h), var(--accent-s), 40%) !important; }
+            body:not([data-theme="purple"]) .dark .dark\:border-purple-800 { border-color: hsl(var(--accent-h), var(--accent-s), 32%) !important; }
+            body:not([data-theme="purple"]) .dark .dark\:border-purple-900\/30 { border-color: hsla(var(--accent-h), var(--accent-s), 22%, 0.3) !important; }
+            body:not([data-theme="purple"]) .dark .dark\:hover\:bg-purple-900\/20:hover { background-color: hsla(var(--accent-h), var(--accent-s), 22%, 0.2) !important; }
+            body:not([data-theme="purple"]) .dark .dark\:hover\:text-purple-300:hover { color: hsl(var(--accent-h), var(--accent-s), 76%) !important; }
+
+            /* Misc — opacity variants of bg-purple-X used for soft pill backgrounds */
+            body:not([data-theme="purple"]) .bg-purple-100\/50 { background-color: hsla(var(--accent-h), var(--accent-s), 94%, 0.5) !important; }
+            body:not([data-theme="purple"]) .bg-purple-500\/20 { background-color: hsla(var(--accent-h), var(--accent-s), 55%, 0.2) !important; }
+            body:not([data-theme="purple"]) .bg-purple-500\/30 { background-color: hsla(var(--accent-h), var(--accent-s), 55%, 0.3) !important; }
+            body:not([data-theme="purple"]) .bg-purple-600\/20 { background-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.2) !important; }
+
             /* Desktop-app polish */
             html, body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
             .topnav-bar, .topnav-bar * , .nav-pill, .profile-dropdown, kbd { -webkit-user-select: none; user-select: none; }

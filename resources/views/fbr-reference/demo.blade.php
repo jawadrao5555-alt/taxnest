@@ -59,12 +59,29 @@
                 <template x-if="hsDetailLoading">
                     <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-500">🔍 Loading linked tax info…</div>
                 </template>
-                <template x-if="!hsDetailLoading && hsLinks.length === 0 && hsDetailLoaded">
+                <template x-if="!hsDetailLoading && hsLinks.length === 0 && hsLearned.length === 0 && hsDetailLoaded">
                     <div class="p-3 bg-amber-50 border border-amber-300 rounded-lg text-sm text-amber-800">
-                        ⚠️ Is HS code ke liye abhi tak rate mapping seed nahi hui. Aap admin panel se add kar sakte hain.
+                        ⚠️ Is HS code ke liye abhi tak rate mapping seed nahi hui. Admin panel se add karen ya invoice mein use ho jaye toh auto-learn ho jayegi.
                     </div>
                 </template>
-                <template x-for="link in hsLinks" :key="link.id">
+                <template x-for="link in hsLearned" :key="'auto-'+link.id">
+                    <div class="p-4 bg-gradient-to-r from-emerald-50 to-green-50 border-2 border-emerald-400 rounded-xl">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="text-xs font-bold text-emerald-700 uppercase">🤖 Auto-Learned From Real Invoicing</div>
+                            <span class="text-[10px] font-bold px-2 py-0.5 bg-emerald-600 text-white rounded-full">Confidence: <span x-text="link.confidence_score + '%'"></span></span>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                            <div><div class="text-[10px] text-slate-500 uppercase">Schedule</div><div class="font-bold text-slate-900" x-text="link.schedule_type || '—'"></div></div>
+                            <div><div class="text-[10px] text-slate-500 uppercase">Tax Rate</div><div class="font-bold text-emerald-700 text-base" x-text="link.rate_label"></div></div>
+                            <div><div class="text-[10px] text-slate-500 uppercase">Sale Type</div><div class="font-medium text-slate-800" x-text="link.sale_type || '—'"></div></div>
+                            <div><div class="text-[10px] text-slate-500 uppercase">SRO Number</div><div class="font-mono text-slate-800" x-text="link.sro_number || '—'"></div></div>
+                            <div><div class="text-[10px] text-slate-500 uppercase">Item Sr No</div><div class="font-mono font-bold text-blue-700" x-text="link.sr_no || '—'"></div></div>
+                            <div><div class="text-[10px] text-slate-500 uppercase">Used Count</div><div class="font-bold text-emerald-700" x-text="link.success_count + '×'"></div></div>
+                        </div>
+                        <div class="mt-2 text-xs text-slate-600 italic" x-text="'📝 ' + link.notes"></div>
+                    </div>
+                </template>
+                <template x-for="link in hsLinks" :key="'man-'+link.id">
                     <div class="p-4 bg-gradient-to-r from-blue-50 to-emerald-50 border-2 border-blue-300 rounded-xl">
                         <div class="text-xs font-bold text-blue-700 uppercase mb-2">🔗 Linked Tax Info — Auto-Applied for FBR Submission</div>
                         <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
@@ -317,7 +334,7 @@
 function demo() {
     return {
         hsQuery: '', hsResults: [], hsLoading: false, picked: null,
-        hsLinks: [], hsDetailLoading: false, hsDetailLoaded: false,
+        hsLinks: [], hsLearned: [], hsDetailLoading: false, hsDetailLoaded: false,
         sroQuery: '', sroResults: [], pickedSro: null,
         srQuery: '', srResults: [], pickedSr: null, pickedRate: '',
         rateTab: 'low', sampleAmount: 1000, activeRate: null, activePercent: 0, activeFixed: false,
@@ -337,11 +354,12 @@ function demo() {
         },
         async selectHs(r) {
             this.picked = r;
-            this.hsLinks = []; this.hsDetailLoaded = false; this.hsDetailLoading = true;
+            this.hsLinks = []; this.hsLearned = []; this.hsDetailLoaded = false; this.hsDetailLoading = true;
             try {
                 const res = await fetch('/api/fbr/hs-detail?code=' + encodeURIComponent(r.code));
                 const d = await res.json();
                 this.hsLinks = d.links || [];
+                this.hsLearned = d.learned || [];
             } finally { this.hsDetailLoading = false; this.hsDetailLoaded = true; }
         },
         async searchSro() {

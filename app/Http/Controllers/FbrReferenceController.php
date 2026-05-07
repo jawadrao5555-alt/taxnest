@@ -92,20 +92,42 @@ class FbrReferenceController extends Controller
 
         if (!$hs) return response()->json(['ok' => false, 'message' => 'HS code not found']);
 
-        // Try exact link first, then parent code link
+        // Try exact link first, then parent code link (manual seeded mappings)
         $links = DB::table('fbr_hs_rate_links')
                     ->where('is_active', 1)
                     ->where(function ($q) use ($code) {
                         $q->where('hs_code', $code)
                           ->orWhere('hs_code', explode('.', $code)[0]);
                     })
-                    ->get();
+                    ->get()
+                    ->map(function ($r) { $r->source = 'manual'; return $r; });
+
+        // Auto-learned mappings from real invoice usage (hs_usage_patterns)
+        $learned = collect();
+        if (\Illuminate\Support\Facades\Schema::hasTable('hs_usage_patterns')) {
+            $learned = DB::table('hs_usage_patterns')
+                ->where('hs_code', $code)
+                ->orderByDesc('success_count')
+                ->orderByDesc('confidence_score')
+                ->limit(10)
+                ->get()
+                ->map(function ($r) {
+                    $r->source        = 'auto';
+                    $r->rate_label    = $r->tax_rate !== null ? rtrim(rtrim(number_format((float) $r->tax_rate, 2), '0'), '.').'%' : '—';
+                    $r->sro_number    = $r->sro_schedule_no ?? null;
+                    $r->sr_no         = $r->sro_item_serial_no ?? null;
+                    $r->uom           = null;
+                    $r->notes         = "Used {$r->success_count}× in real invoices • Confidence: {$r->confidence_score}%";
+                    return $r;
+                });
+        }
 
         return response()->json([
-            'ok'          => true,
-            'hs'          => $hs,
-            'links'       => $links,
-            'has_mapping' => $links->isNotEmpty(),
+            'ok'           => true,
+            'hs'           => $hs,
+            'links'        => $links,
+            'learned'      => $learned,
+            'has_mapping'  => $links->isNotEmpty() || $learned->isNotEmpty(),
         ]);
     }
 

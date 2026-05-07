@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Services\SecurityLogService;
+use App\Models\InvoiceItem;
+use App\Observers\InvoiceItemObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -18,6 +20,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        InvoiceItem::observe(InvoiceItemObserver::class);
+
         $dbDefault = config('database.default');
         Log::info('DB_DRIVER', [
             'default' => $dbDefault,

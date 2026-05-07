@@ -608,6 +608,16 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
 
     Route::get('/hs-master-export', [HsMasterExportController::class, 'index'])->name('admin.hs-master-export');
 
+    // HS-Rate Links (manual mappings + auto-learned from invoicing)
+    Route::get('/hs-rate-links', [\App\Http\Controllers\Admin\HsRateLinksController::class, 'index'])->name('admin.hs-rate-links');
+    Route::post('/hs-rate-links', [\App\Http\Controllers\Admin\HsRateLinksController::class, 'store'])->name('admin.hs-rate-links.store');
+    Route::put('/hs-rate-links/{id}', [\App\Http\Controllers\Admin\HsRateLinksController::class, 'update'])->name('admin.hs-rate-links.update');
+    Route::delete('/hs-rate-links/{id}', [\App\Http\Controllers\Admin\HsRateLinksController::class, 'destroy'])->name('admin.hs-rate-links.destroy');
+    Route::post('/hs-rate-links/{id}/toggle', [\App\Http\Controllers\Admin\HsRateLinksController::class, 'toggle'])->name('admin.hs-rate-links.toggle');
+    Route::get('/hs-rate-links-export', [\App\Http\Controllers\Admin\HsRateLinksController::class, 'exportCsv'])->name('admin.hs-rate-links.export');
+    Route::get('/hs-rate-links-sample', [\App\Http\Controllers\Admin\HsRateLinksController::class, 'sampleCsv'])->name('admin.hs-rate-links.sample');
+    Route::post('/hs-rate-links-import', [\App\Http\Controllers\Admin\HsRateLinksController::class, 'importCsv'])->name('admin.hs-rate-links.import');
+
     Route::get('/hs-master', [GlobalHsMasterController::class, 'index'])->name('admin.hs-master');
     Route::post('/hs-master', [GlobalHsMasterController::class, 'store'])->name('admin.hs-master.store');
     Route::put('/hs-master/{id}', [GlobalHsMasterController::class, 'update'])->name('admin.hs-master.update');

@@ -34,7 +34,7 @@
         <div class="mt-3 max-h-96 overflow-y-auto divide-y divide-slate-100">
             <template x-if="hsLoading"><div class="p-3 text-slate-500 text-sm">Searching…</div></template>
             <template x-for="r in hsResults" :key="r.code">
-                <div class="p-3 hover:bg-emerald-50 flex items-start gap-3 cursor-pointer" @click="picked = r">
+                <div class="p-3 hover:bg-emerald-50 flex items-start gap-3 cursor-pointer" @click="selectHs(r)">
                     <span class="font-mono font-bold text-emerald-700 text-sm whitespace-nowrap" x-text="r.code"></span>
                     <div class="flex-1">
                         <span class="text-slate-700 text-sm" x-text="r.description || '(no description)'"></span>
@@ -49,9 +49,42 @@
             </template>
         </div>
         <template x-if="picked">
-            <div class="mt-3 p-3 bg-emerald-50 border border-emerald-300 rounded-lg">
-                <div class="text-xs font-semibold text-emerald-700 uppercase">Selected ✓</div>
-                <div class="font-mono font-bold text-emerald-900" x-text="picked.code + ' — ' + (picked.description || '')"></div>
+            <div class="mt-3 space-y-2">
+                <div class="p-3 bg-emerald-50 border border-emerald-300 rounded-lg">
+                    <div class="text-xs font-semibold text-emerald-700 uppercase">Selected ✓</div>
+                    <div class="font-mono font-bold text-emerald-900" x-text="picked.code + ' — ' + (picked.description || '')"></div>
+                </div>
+
+                <!-- LINKED TAX DETAILS -->
+                <template x-if="hsDetailLoading">
+                    <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-500">🔍 Loading linked tax info…</div>
+                </template>
+                <template x-if="!hsDetailLoading && hsLinks.length === 0 && hsDetailLoaded">
+                    <div class="p-3 bg-amber-50 border border-amber-300 rounded-lg text-sm text-amber-800">
+                        ⚠️ Is HS code ke liye abhi tak rate mapping seed nahi hui. Aap admin panel se add kar sakte hain.
+                    </div>
+                </template>
+                <template x-for="link in hsLinks" :key="link.id">
+                    <div class="p-4 bg-gradient-to-r from-blue-50 to-emerald-50 border-2 border-blue-300 rounded-xl">
+                        <div class="text-xs font-bold text-blue-700 uppercase mb-2">🔗 Linked Tax Info — Auto-Applied for FBR Submission</div>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                            <div><div class="text-[10px] text-slate-500 uppercase">Schedule</div><div class="font-bold text-slate-900" x-text="link.schedule_type"></div></div>
+                            <div><div class="text-[10px] text-slate-500 uppercase">Tax Rate</div><div class="font-bold text-emerald-700 text-base" x-text="link.rate_label"></div></div>
+                            <div><div class="text-[10px] text-slate-500 uppercase">Sale Type</div><div class="font-medium text-slate-800" x-text="link.sale_type || '—'"></div></div>
+                            <div><div class="text-[10px] text-slate-500 uppercase">SRO Number</div><div class="font-mono text-slate-800" x-text="link.sro_number || '—'"></div></div>
+                            <div><div class="text-[10px] text-slate-500 uppercase">Item Sr No (3rd Sch)</div><div class="font-mono font-bold text-blue-700" x-text="link.sr_no || '—'"></div></div>
+                            <div><div class="text-[10px] text-slate-500 uppercase">UoM</div><div class="font-medium text-slate-800" x-text="link.uom || '—'"></div></div>
+                        </div>
+                        <template x-if="link.notes">
+                            <div class="mt-2 text-xs text-slate-600 italic" x-text="'📝 ' + link.notes"></div>
+                        </template>
+                        <template x-if="link.tax_rate !== null">
+                            <div class="mt-3 pt-3 border-t border-blue-200 text-xs text-slate-700">
+                                💰 Tax on Rs.1000 = <span class="font-bold text-emerald-700">Rs.<span x-text="(1000 * (link.tax_rate / 100)).toFixed(2)"></span></span>
+                            </div>
+                        </template>
+                    </div>
+                </template>
             </div>
         </template>
     </section>
@@ -284,6 +317,7 @@
 function demo() {
     return {
         hsQuery: '', hsResults: [], hsLoading: false, picked: null,
+        hsLinks: [], hsDetailLoading: false, hsDetailLoaded: false,
         sroQuery: '', sroResults: [], pickedSro: null,
         srQuery: '', srResults: [], pickedSr: null, pickedRate: '',
         rateTab: 'low', sampleAmount: 1000, activeRate: null, activePercent: 0, activeFixed: false,
@@ -300,6 +334,15 @@ function demo() {
                 const d = await r.json();
                 this.hsResults = d.results || [];
             } finally { this.hsLoading = false; }
+        },
+        async selectHs(r) {
+            this.picked = r;
+            this.hsLinks = []; this.hsDetailLoaded = false; this.hsDetailLoading = true;
+            try {
+                const res = await fetch('/api/fbr/hs-detail?code=' + encodeURIComponent(r.code));
+                const d = await res.json();
+                this.hsLinks = d.links || [];
+            } finally { this.hsDetailLoading = false; this.hsDetailLoaded = true; }
         },
         async searchSro() {
             if (!this.sroQuery) { this.sroResults = []; return; }

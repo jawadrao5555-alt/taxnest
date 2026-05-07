@@ -77,6 +77,38 @@ class FbrReferenceController extends Controller
         ]);
     }
 
+    public function hsDetail(Request $request)
+    {
+        $code = trim((string) $request->input('code', ''));
+        if ($code === '') return response()->json(['ok' => false, 'message' => 'code required']);
+
+        $hs = DB::table('fbr_hs_codes as h')
+            ->leftJoin('fbr_hs_codes as p', function ($j) {
+                $j->on('p.code', '=', DB::raw("SUBSTRING_INDEX(h.code, '.', 1)"))
+                  ->whereRaw("LOCATE('.', h.code) > 0");
+            })
+            ->where('h.code', $code)
+            ->first(['h.code', DB::raw('COALESCE(h.description, p.description) as description')]);
+
+        if (!$hs) return response()->json(['ok' => false, 'message' => 'HS code not found']);
+
+        // Try exact link first, then parent code link
+        $links = DB::table('fbr_hs_rate_links')
+                    ->where('is_active', 1)
+                    ->where(function ($q) use ($code) {
+                        $q->where('hs_code', $code)
+                          ->orWhere('hs_code', explode('.', $code)[0]);
+                    })
+                    ->get();
+
+        return response()->json([
+            'ok'          => true,
+            'hs'          => $hs,
+            'links'       => $links,
+            'has_mapping' => $links->isNotEmpty(),
+        ]);
+    }
+
     public function searchItemSr(Request $request)
     {
         $q = trim((string) $request->input('q', ''));

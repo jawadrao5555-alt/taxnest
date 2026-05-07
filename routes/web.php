@@ -816,6 +816,7 @@ Route::get('/fbr/reference-demo', [\App\Http\Controllers\FbrReferenceController:
 Route::get('/api/fbr/hs-search', [\App\Http\Controllers\FbrReferenceController::class, 'searchHs'])->name('fbr.api.hs-search');
 Route::get('/api/fbr/sro-search', [\App\Http\Controllers\FbrReferenceController::class, 'searchSro'])->name('fbr.api.sro-search');
 Route::get('/api/fbr/item-sr-search', [\App\Http\Controllers\FbrReferenceController::class, 'searchItemSr'])->name('fbr.api.item-sr-search');
+Route::get('/api/fbr/hs-detail', [\App\Http\Controllers\FbrReferenceController::class, 'hsDetail'])->name('fbr.api.hs-detail');
 
 require __DIR__.'/auth.php';
 

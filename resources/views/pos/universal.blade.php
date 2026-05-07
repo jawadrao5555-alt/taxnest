@@ -2778,6 +2778,28 @@ function restaurantPos() {
                 }
             }
 
+            // ═══════════════════════════════════════════════════════════════
+            // MODAL-AWARE HANDLERS — these MUST run BEFORE the qty-input gate
+            // AND the form-field gate. When Pay modal opens, focus often stays
+            // on a background input (search, qty, customer phone) or jumps to
+            // the modal's own checkbox / cash-received field. Without this
+            // hoist, "1" / "2" would either type into the focused input OR get
+            // swallowed by the qty-input block below.
+            // ═══════════════════════════════════════════════════════════════
+            if (this.showPayModal) {
+                if (e.key === '1') { e.preventDefault(); e.stopPropagation(); this.processPayment('cash'); return; }
+                if (e.key === '2') { e.preventDefault(); e.stopPropagation(); this.processPayment('card'); return; }
+                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this.showPayModal = false; return; }
+                return;
+            }
+            if (this.showReceipt) {
+                // Persistent popup — Esc is reserved for the browser print dialog (NOT this popup).
+                // Popup closes ONLY via X / Close / New Sale buttons.
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); return; }
+                if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.printReceipt(); return; }
+                if ((e.key === 'k' || e.key === 'K') && this.lastOrderId) { e.preventDefault(); this.printKitchenTicket(); return; }
+                return;
+            }
             // CART QTY INPUT: special-case so arrow keys ALWAYS navigate cart rows
             // (single source of truth — eliminates double-firing skip bug 1→3→5).
             // All other keys (digits, dots, backspace) pass through to native input.
@@ -2792,27 +2814,6 @@ function restaurantPos() {
                 if (e.key === '-' && ci >= 0)                    { e.preventDefault(); this.updateQty(ci, -1); this.animateQty(ci); return; }
                 if ((e.key === 't' || e.key === 'T') && ci >= 0) { e.preventDefault(); this.toggleItemTax(ci); return; }
                 if (e.key === 'Escape')                          { e.preventDefault(); this.exitCartMode(); return; }
-                return;
-            }
-            // ═══════════════════════════════════════════════════════════════
-            // MODAL-AWARE HANDLERS — these MUST run BEFORE the form-field gate.
-            // When a modal opens, focus often stays on a background input (search,
-            // qty, customer phone, or the modal's own checkbox like saveAsProvisional).
-            // Without this hoist, "1" / "2" inside Pay modal would just type into
-            // the focused input instead of triggering Cash/Card payment.
-            // ═══════════════════════════════════════════════════════════════
-            if (this.showPayModal) {
-                if (e.key === '1') { e.preventDefault(); e.stopPropagation(); this.processPayment('cash'); return; }
-                if (e.key === '2') { e.preventDefault(); e.stopPropagation(); this.processPayment('card'); return; }
-                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this.showPayModal = false; return; }
-                return;
-            }
-            if (this.showReceipt) {
-                // Persistent popup — Esc is reserved for the browser print dialog (NOT this popup).
-                // Popup closes ONLY via X / Close / New Sale buttons.
-                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); return; }
-                if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.printReceipt(); return; }
-                if ((e.key === 'k' || e.key === 'K') && this.lastOrderId) { e.preventDefault(); this.printKitchenTicket(); return; }
                 return;
             }
             // HARD SAFETY: any other keystroke originating from a form field exits immediately.

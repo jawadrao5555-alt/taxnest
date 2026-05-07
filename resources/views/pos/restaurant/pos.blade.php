@@ -404,22 +404,13 @@ window.addEventListener('popstate', function() {
                                 <input type="text" inputmode="decimal" autocomplete="off"
                                     data-qty-input
                                     :data-qty-row="index"
-                                    :value="item.quantity"
-                                    @click.stop="activeCartIndex = index; cartMode = true"
+                                    x-init="$el.value = item.quantity"
+                                    x-effect="if (document.activeElement !== $el) { $el.value = item.quantity; }"
+                                    @click.stop="onQtyFocus(index, $event)"
                                     @mousedown.stop
-                                    @focus.stop="activeCartIndex = index; cartMode = true; $nextTick(() => $event.target.select())"
-                                    @input.stop="
-                                        let v = ($event.target.value || '').replace(/[^0-9.]/g, '');
-                                        const dot = v.indexOf('.');
-                                        if (dot !== -1) v = v.slice(0, dot + 1) + v.slice(dot + 1).replace(/\./g, '');
-                                        $event.target.value = v;
-                                        item.quantity = v;
-                                    "
-                                    @blur="
-                                        let n = parseFloat(item.quantity);
-                                        if (!Number.isFinite(n) || n < 1) n = 1;
-                                        item.quantity = Number.isInteger(n) ? n : Math.round(n * 1000) / 1000;
-                                    "
+                                    @focus.stop="onQtyFocus(index, $event)"
+                                    @input.stop="onQtyInput(index, $event)"
+                                    @blur="onQtyBlur(index, $event)"
                                     class="w-14 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner"
                                     :class="activeCartIndex === index ? 'qty-pop' : ''">
                                 <button @click.stop="updateQty(index, 1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
@@ -1452,6 +1443,32 @@ function restaurantPos() {
             let v = parseFloat(val);
             if (!Number.isFinite(v) || v < 1) v = 1;
             this.cart[index].quantity = v;
+        },
+        // ─── Qty input method handlers (refactored from inline expressions) ───
+        // Inline @input/@blur expressions were unreliable when paired with a
+        // reactive `:value` bind — Alpine could re-render mid-keystroke and
+        // wipe the new value. Method calls + x-effect (skipped while focused)
+        // give bullet-proof typing behavior.
+        onQtyFocus(index, e) {
+            this.activeCartIndex = index;
+            this.cartMode = true;
+            const t = e.target;
+            if (t) { try { t.select(); } catch(_){} }
+        },
+        onQtyInput(index, e) {
+            const t = e.target;
+            if (!t || !this.cart[index]) return;
+            let v = (t.value || '').replace(/[^0-9.]/g, '');
+            const dot = v.indexOf('.');
+            if (dot !== -1) v = v.slice(0, dot + 1) + v.slice(dot + 1).replace(/\./g, '');
+            t.value = v;
+            this.cart[index].quantity = v;
+        },
+        onQtyBlur(index, e) {
+            if (!this.cart[index]) return;
+            let n = parseFloat(this.cart[index].quantity);
+            if (!Number.isFinite(n) || n < 1) n = 1;
+            this.cart[index].quantity = Number.isInteger(n) ? n : Math.round(n * 1000) / 1000;
         },
         removeFromCart(index) {
             if (index < 0 || index >= this.cart.length) return;

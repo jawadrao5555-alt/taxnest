@@ -682,7 +682,7 @@ window.addEventListener('popstate', function() {
                 <template x-for="(item, index) in cart" :key="item.cart_uid">
                     <div class="cart-item cart-item-enter px-3 py-2.5 cursor-pointer relative"
                         :class="activeCartIndex === index ? 'cart-row-active' : ''"
-                        @click="activeCartIndex = index; cartMode = true;" :data-cart-index="index">
+                        @click="selectCartRow(index)" :data-cart-index="index">
                         <div class="flex items-center gap-2.5">
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-bold text-gray-900 dark:text-white truncate flex items-center gap-1.5">
@@ -722,42 +722,14 @@ window.addEventListener('popstate', function() {
                                 <input type="text" inputmode="decimal" autocomplete="off"
                                     data-qty-input
                                     :data-qty-row="index"
-                                    :value="item.quantity"
-                                    @click.stop="activeCartIndex = index; cartMode = true; $event.target.dataset._fresh = '1'; try { $event.target.select(); } catch(e){}"
+                                    x-init="$el.value = item.quantity"
+                                    x-effect="if (document.activeElement !== $el) { $el.value = item.quantity; }"
+                                    @click.stop="onQtyFocus(index, $event)"
                                     @mousedown.stop
-                                    @focus.stop="activeCartIndex = index; cartMode = true; $event.target.dataset._fresh = '1'; try { $event.target.select(); } catch(e){}"
-                                    @keydown="
-                                        if (($event.key === 't' || $event.key === 'T') && !$event.ctrlKey && !$event.metaKey && !$event.altKey) {
-                                            $event.preventDefault();
-                                            $event.stopPropagation();
-                                            toggleItemTax(index);
-                                            return;
-                                        }
-                                        if (/^[0-9]$/.test($event.key) && !$event.ctrlKey && !$event.metaKey && !$event.altKey && !$event.shiftKey) {
-                                            const t = $event.target;
-                                            if (t.dataset._fresh === '1') {
-                                                $event.preventDefault();
-                                                t.value = $event.key;
-                                                item.quantity = $event.key;
-                                                t.dataset._fresh = '0';
-                                                try { t.setSelectionRange(1,1); } catch(e){}
-                                            }
-                                        }
-                                    "
-                                    @input.stop="
-                                        $event.target.dataset._fresh = '0';
-                                        let v = ($event.target.value || '').replace(/[^0-9.]/g, '');
-                                        const dot = v.indexOf('.');
-                                        if (dot !== -1) v = v.slice(0, dot + 1) + v.slice(dot + 1).replace(/\./g, '');
-                                        $event.target.value = v;
-                                        item.quantity = v;
-                                    "
-                                    @blur="
-                                        $event.target.dataset._fresh = '0';
-                                        let n = parseFloat(item.quantity);
-                                        if (!Number.isFinite(n) || n < 1) n = 1;
-                                        item.quantity = Number.isInteger(n) ? n : Math.round(n * 1000) / 1000;
-                                    "
+                                    @focus.stop="onQtyFocus(index, $event)"
+                                    @keydown="onQtyKeydown(index, $event)"
+                                    @input.stop="onQtyInput(index, $event)"
+                                    @blur="onQtyBlur(index, $event)"
                                     class="w-16 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner px-1">
                                 <button @click.stop="updateQty(index, 1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M12 4v16m8-8H4"/></svg>
@@ -2624,6 +2596,68 @@ function restaurantPos() {
             item.is_tax_exempt = !item.is_tax_exempt;
             this.showToast(item.is_tax_exempt ? `NO TAX — ${item.item_name || item.name || 'item'}` : `TAX ON — ${item.item_name || item.name || 'item'}`, item.is_tax_exempt ? 'success' : 'info');
             this.animateQty(index);
+        },
+
+        // ═══════════════════════════════════════════════════════════════════
+        // QTY INPUT — explicit method handlers (replaces inline @keydown/@input
+        // expressions). Inline expression form was unreliable: Alpine 3 silently
+        // dropped subsequent attribute handlers when one expression had a parse
+        // edge case (e.g. unguarded `return;`). Method calls have zero parsing
+        // risk and let us reach the right cart row via index lookup.
+        // Pair this with x-effect (skips re-render while $el is focused) so the
+        // reactive :value binding doesn't fight the user's keystrokes.
+        // ═══════════════════════════════════════════════════════════════════
+        selectCartRow(index) {
+            if (index < 0 || index >= this.cart.length) return;
+            this.activeCartIndex = index;
+            this.cartMode = true;
+        },
+        onQtyFocus(index, e) {
+            this.activeCartIndex = index;
+            this.cartMode = true;
+            const t = e.target;
+            if (t) {
+                t.dataset._fresh = '1';
+                try { t.select(); } catch(_){}
+            }
+        },
+        onQtyKeydown(index, e) {
+            // T / t — toggle tax on this row
+            if ((e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleItemTax(index);
+                return;
+            }
+            // First digit after focus — replace existing value (fresh-digit pattern)
+            if (/^[0-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+                const t = e.target;
+                if (t && t.dataset._fresh === '1') {
+                    e.preventDefault();
+                    t.value = e.key;
+                    if (this.cart[index]) this.cart[index].quantity = e.key;
+                    t.dataset._fresh = '0';
+                    try { t.setSelectionRange(1, 1); } catch(_){}
+                }
+            }
+        },
+        onQtyInput(index, e) {
+            const t = e.target;
+            if (!t || !this.cart[index]) return;
+            t.dataset._fresh = '0';
+            let v = (t.value || '').replace(/[^0-9.]/g, '');
+            const dot = v.indexOf('.');
+            if (dot !== -1) v = v.slice(0, dot + 1) + v.slice(dot + 1).replace(/\./g, '');
+            t.value = v;
+            this.cart[index].quantity = v;
+        },
+        onQtyBlur(index, e) {
+            const t = e.target;
+            if (t) t.dataset._fresh = '0';
+            if (!this.cart[index]) return;
+            let n = parseFloat(this.cart[index].quantity);
+            if (!Number.isFinite(n) || n < 1) n = 1;
+            this.cart[index].quantity = Number.isInteger(n) ? n : Math.round(n * 1000) / 1000;
         },
 
         handleKey(e) {

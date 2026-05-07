@@ -811,5 +811,10 @@ Route::post('/api/push/unsubscribe', [\App\Http\Controllers\PushSubscriptionCont
     ->middleware('throttle:30,1')
     ->name('push.unsubscribe');
 
+// FBR Reference Data Demo (public — no auth, just shows the data is queryable)
+Route::get('/fbr/reference-demo', [\App\Http\Controllers\FbrReferenceController::class, 'demo'])->name('fbr.reference.demo');
+Route::get('/api/fbr/hs-search', [\App\Http\Controllers\FbrReferenceController::class, 'searchHs'])->name('fbr.api.hs-search');
+Route::get('/api/fbr/sro-search', [\App\Http\Controllers\FbrReferenceController::class, 'searchSro'])->name('fbr.api.sro-search');
+
 require __DIR__.'/auth.php';
 

@@ -39,16 +39,31 @@ class FbrReferenceController extends Controller
     public function searchHs(Request $request)
     {
         $q = trim((string) $request->input('q', ''));
-        $query = DB::table('fbr_hs_codes')->where('is_active', 1);
+        // Self-join: subcodes inherit parent description (e.g. 0902.1000 → "Tea" from 0902)
+        $query = DB::table('fbr_hs_codes as h')
+            ->leftJoin('fbr_hs_codes as p', function ($j) {
+                $j->on('p.code', '=', DB::raw("SUBSTRING_INDEX(h.code, '.', 1)"))
+                  ->whereRaw("LOCATE('.', h.code) > 0");
+            })
+            ->where('h.is_active', 1);
+
         if ($q !== '') {
             $query->where(function ($w) use ($q) {
-                $w->where('code', 'like', $q.'%')
-                  ->orWhere('description', 'like', '%'.$q.'%');
+                $w->where('h.code', 'like', $q.'%')
+                  ->orWhere('h.description', 'like', '%'.$q.'%')
+                  ->orWhere('p.description', 'like', '%'.$q.'%');
             });
         }
-        $rows = $query->orderByRaw('CASE WHEN code LIKE ? THEN 0 ELSE 1 END', [$q.'%'])
-                      ->limit(20)
-                      ->get(['code','description']);
+
+        $rows = $query->orderByRaw('CASE WHEN h.code LIKE ? THEN 0 ELSE 1 END', [$q.'%'])
+                      ->orderBy('h.code')
+                      ->limit(25)
+                      ->get([
+                          'h.code',
+                          DB::raw('COALESCE(h.description, p.description) as description'),
+                          DB::raw('CASE WHEN h.description IS NULL AND p.description IS NOT NULL THEN p.code ELSE NULL END as inherited_from'),
+                      ]);
+
         return response()->json(['count' => $rows->count(), 'results' => $rows]);
     }
 
@@ -58,7 +73,17 @@ class FbrReferenceController extends Controller
         $query = DB::table('fbr_sros')->where('is_active', 1);
         if ($q !== '') $query->where('sro_number', 'like', '%'.$q.'%');
         return response()->json([
-            'results' => $query->orderBy('sro_number')->limit(30)->pluck('sro_number'),
+            'results' => $query->orderBy('sro_number')->limit(40)->get(['sro_number']),
+        ]);
+    }
+
+    public function searchItemSr(Request $request)
+    {
+        $q = trim((string) $request->input('q', ''));
+        $query = DB::table('fbr_item_sr_numbers')->where('is_active', 1);
+        if ($q !== '') $query->where('sr_no', 'like', '%'.$q.'%');
+        return response()->json([
+            'results' => $query->orderByRaw('CAST(sr_no AS UNSIGNED), sr_no')->limit(50)->get(['sr_no']),
         ]);
     }
 }

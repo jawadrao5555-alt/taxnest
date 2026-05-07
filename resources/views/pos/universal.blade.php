@@ -3401,7 +3401,7 @@ function restaurantPos() {
             const messageHandler = (e) => {
                 if (!e.data || e.data.type !== 'pos_print_done' || e.data.signal !== signal) return;
                 if (isStale()) { removeHandler(); return; }
-                this.queuePrintTimer(fireOnce, 200);
+                this.queuePrintTimer(fireOnce, 50);
             };
             window.addEventListener('message', messageHandler);
             this.printMessageHandlers.push(messageHandler);
@@ -3435,27 +3435,33 @@ function restaurantPos() {
 
         // Print invoice → KOT in strict order. Used by auto-print on successful pay.
         // Receipt ALWAYS prints first; KOT chains after receipt's print dialog closes.
-        // Mirrors restaurant POS payHeldOrderDirect policy: when auto-KOT is enabled but
-        // auto-print is OFF, we STILL force the receipt to print first — otherwise the
-        // cashier would see the KOT dialog before the invoice (cashier-requested ordering).
+        //
+        // ✅ FIX (May-07): MASTER SWITCH — `autoPrintEnabled` now gates EVERYTHING.
+        // Previously KOT could auto-print even when receipt auto-print was OFF (because
+        // `autoKotEnabled` was an independent gate). Cashier complaint: turned auto-print
+        // off, KOT still fired. Now both require master `autoPrintEnabled = true`.
+        //
+        // ✅ FIX (May-07): Tightened gap between receipt-finish → KOT-start (300ms → 80ms)
+        // and initial chain start (400ms → 150ms) to feel snappier on thermal printers.
         runAutoPrintChain(orderId) {
+            // MASTER GATE — auto-print OFF means NOTHING fires automatically.
+            if (!this.autoPrintEnabled) return;
             const hasReceipt = !!this.lastTransactionId;
             const wantsKot = !!this.autoKotEnabled && !!orderId;
-            // Force receipt-first whenever KOT will print — even if autoPrintEnabled is false.
-            const wantsReceipt = hasReceipt && (!!this.autoPrintEnabled || wantsKot);
+            const wantsReceipt = hasReceipt;
             if (!wantsReceipt && !wantsKot) return;
             this.$nextTick(() => {
                 if (wantsReceipt && wantsKot) {
                     this.queuePrintTimer(() => {
                         this.printReceipt(() => {
-                            this.queuePrintTimer(() => this.printKitchenTicket(orderId), 300);
+                            this.queuePrintTimer(() => this.printKitchenTicket(orderId), 80);
                         });
-                    }, 400);
+                    }, 150);
                 } else if (wantsReceipt) {
-                    this.queuePrintTimer(() => this.printReceipt(), 400);
+                    this.queuePrintTimer(() => this.printReceipt(), 150);
                 } else if (wantsKot) {
                     // Pathological case: no transaction (so no receipt possible) but KOT requested.
-                    this.queuePrintTimer(() => this.printKitchenTicket(orderId), 400);
+                    this.queuePrintTimer(() => this.printKitchenTicket(orderId), 150);
                 }
             });
         },

@@ -217,7 +217,7 @@
                     window.addEventListener('afterprint', signalParent, { once: true });
                     setTimeout(signalParent, 20000);
                 }
-                setTimeout(function() { window.print(); }, 500);
+                setTimeout(function() { window.print(); }, 200);
             }
             const station = urlParams.get('station');
             if (station && !isInIframe) {

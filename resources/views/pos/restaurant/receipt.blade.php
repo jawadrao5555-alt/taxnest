@@ -264,7 +264,7 @@
                     // signal the parent after a generous wait so the chain still advances.
                     setTimeout(signalParent, 20000);
                 }
-                setTimeout(function() { window.print(); }, 500);
+                setTimeout(function() { window.print(); }, 200);
             }
         };
     </script>

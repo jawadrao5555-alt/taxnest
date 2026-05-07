@@ -1,0 +1,166 @@
+[taxnestc@eu1 ~]$ cd ~/public_html && \
+git pull origin main && \
+php artisan migrate --path=database/migrations/2026_05_07_120000_create_fbr_reference_tables.php --force && \
+php artisan db:seed --class=FbrReferenceSeeder --force && \
+php artisan route:clear && \
+php artisan view:clear && \
+php artisan view:cache && \
+echo "✅ DEPLOYED — open https://taxnest.com.pk/fbr/reference-demo"
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+
+   INFO  Nothing to migrate.
+
+
+   INFO  Seeding database.
+
+Reference dir not found: /home/taxnestc/public_html/storage/app/fbr_reference
+
+   INFO  Route cache cleared successfully.
+
+
+   INFO  Compiled views cleared successfully.
+
+
+   INFO  Blade templates cached successfully.
+
+✅ DEPLOYED — open https://taxnest.com.pk/fbr/reference-demo
+[taxnestc@eu1 public_html]$cd ~/public_html && \\
+git pull origin main && \
+php artisan db:seed --class=FbrReferenceSeeder --force && \
+php artisan view:clear && \
+php artisan view:cache && \
+echo "✅ DONE"
+remote: Enumerating objects: 21, done.
+remote: Counting objects: 100% (21/21), done.
+remote: Compressing objects: 100% (12/12), done.
+remote: Total 17 (delta 4), reused 17 (delta 4), pack-reused 0 (from 0)
+Unpacking objects: 100% (17/17), 71.67 KiB | 712.00 KiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+   ceb813a..485d4cc  main       -> origin/main
+Updating ceb813a..485d4cc
+Fast-forward
+ database/seeders/FbrReferenceSeeder.php            |    6 +-
+ database/seeders/fbr_reference/buyer_type.json     |    6 +
+ database/seeders/fbr_reference/description.json    | 9135 ++++++++++++++++++++
+ database/seeders/fbr_reference/document_type.json  |    6 +
+ database/seeders/fbr_reference/item_sr_no.json     |  724 ++
+ .../seeders/fbr_reference/petroleum_levy_on.json   |    4 +
+ database/seeders/fbr_reference/province.json       |   10 +
+ database/seeders/fbr_reference/rate.json           |  115 +
+ database/seeders/fbr_reference/reason.json         |    9 +
+ database/seeders/fbr_reference/sale_types.json     |   29 +
+ database/seeders/fbr_reference/sro.json            |   98 +
+ database/seeders/fbr_reference/uom.json            |   32 +
+ 12 files changed, 10173 insertions(+), 1 deletion(-)
+ create mode 100644 database/seeders/fbr_reference/buyer_type.json
+ create mode 100644 database/seeders/fbr_reference/description.json
+ create mode 100644 database/seeders/fbr_reference/document_type.json
+ create mode 100644 database/seeders/fbr_reference/item_sr_no.json
+ create mode 100644 database/seeders/fbr_reference/petroleum_levy_on.json
+ create mode 100644 database/seeders/fbr_reference/province.json
+ create mode 100644 database/seeders/fbr_reference/rate.json
+ create mode 100644 database/seeders/fbr_reference/reason.json
+ create mode 100644 database/seeders/fbr_reference/sale_types.json
+ create mode 100644 database/seeders/fbr_reference/sro.json
+ create mode 100644 database/seeders/fbr_reference/uom.json
+
+   INFO  Seeding database.
+
+HS Codes: 9130
+fbr_sros: 96
+fbr_sale_types: 27
+fbr_uoms: 30
+fbr_provinces: 8
+fbr_buyer_types: 4
+fbr_document_types: 4
+fbr_reasons: 7
+fbr_petroleum_levy_types: 2
+fbr_item_sr_numbers: 722
+fbr_rates: 113
+
+   INFO  Compiled views cleared successfully.
+
+
+
+   INFO  Blade templates cached successfully.
+
+✅ DONE
+[taxnestc@eu1 public_html]$cd ~/public_html && \\
+git pull origin main && \
+php artisan route:clear && \
+php artisan view:clear && \
+php artisan view:cache && \
+echo "✅ DONE"
+remote: Enumerating objects: 28, done.
+remote: Counting objects: 100% (28/28), done.
+remote: Compressing objects: 100% (3/3), done.
+remote: Total 16 (delta 12), reused 16 (delta 12), pack-reused 0 (from 0)
+Unpacking objects: 100% (16/16), 4.55 KiB | 776.00 KiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+   485d4cc..b5caa73  main       -> origin/main
+Updating 485d4cc..b5caa73
+Fast-forward
+ app/Http/Controllers/FbrReferenceController.php    | 39 ++++++++--
+ ...ml-git-pull-origin-main-php-a_1778143660623.txt | 91 ++++++++++++++++++++++
+ resources/views/fbr-reference/demo.blade.php       | 87 +++++++++++++++++++--
+ routes/web.php                                     |  1 +
+ 4 files changed, 205 insertions(+), 13 deletions(-)
+ create mode 100644 attached_assets/Pasted--taxnestc-eu1-cd-public-html-git-pull-origin-main-php-a_1778143660623.txt
+
+   INFO  Route cache cleared successfully.
+
+
+   INFO  Compiled views cleared successfully.
+
+
+
+   INFO  Blade templates cached successfully.
+
+✅ DONE                                                                                                     cd ~/public_html && git pull origin main &
+& php artisan view:clear && php artisan view:cache && echo "✅"n main && php artisan view:clear && php artisan view:cache && echo "✅"
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+
+   INFO  Compiled views cleared successfully.
+
+
+
+   INFO  Blade templates cached successfully.
+
+✅                          cd ~/public_html && \
+git pull origin main && \]$ cd ~/public_html && \
+php artisan migrate --path=database/migrations/2026_05_07_140000_create_fbr_hs_rate_links_table.php --force && \
+php artisan db:seed --class=FbrHsRateLinkSeeder --force && \0000_create_fbr_hs_rate_links_table.php --force && \
+php artisan route:clear && \FbrHsRateLinkSeeder --force && \
+php artisan view:clear && \\
+php artisan view:cache && \
+echo "✅ HS-RATE LINKS DEPLOYED"
+remote: Enumerating objects: 17, done.
+remote: Counting objects: 100% (17/17), done.
+remote: Compressing objects: 100% (2/2), done.
+remote: Total 11 (delta 8), reused 11 (delta 8), pack-reused 0 (from 0)
+Unpacking objects: 100% (11/11), 4.14 KiB | 1.03 MiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+   b5caa73..acf29e2  main       -> origin/main
+Updating b5caa73..acf29e2
+Fast-forward
+ ...ml-git-pull-origin-main-php-a_1778144341072.txt | 125 +++++++++++++++++++++
+ .../Sales_Invoice_Template_(6)_1778145255517.xlsm  | Bin 0 -> 285206 bytes
+ resources/views/fbr-reference/demo.blade.php       | 121 ++++++++++++++++++--
+ 3 files changed, 234 insertions(+), 12 deletions(-)
+ create mode 100644 attached_assets/Pasted--taxnestc-eu1-cd-public-html-git-pull-origin-main-php-a_1778144341072.txt
+ create mode 100644 attached_assets/Sales_Invoice_Template_(6)_1778145255517.xlsm
+
+In Filesystem.php line 152:
+
+  File does not exist at path /home/taxnestc/public_html/database/migrations/
+  2026_05_07_140000_create_fbr_hs_rate_links_table.php.
+
+
+[taxnestc@eu1 public_html]$

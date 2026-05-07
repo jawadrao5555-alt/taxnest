@@ -10,7 +10,11 @@ class FbrReferenceSeeder extends Seeder
 {
     public function run(): void
     {
-        $base = storage_path('app/fbr_reference');
+        $base = database_path('seeders/fbr_reference');
+        if (!is_dir($base)) {
+            $legacy = storage_path('app/fbr_reference');
+            if (is_dir($legacy)) $base = $legacy;
+        }
         if (!is_dir($base)) {
             $this->command->error("Reference dir not found: $base");
             return;

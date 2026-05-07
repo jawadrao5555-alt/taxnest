@@ -829,4 +829,3 @@ Route::get('/api/fbr/item-sr-search', [\App\Http\Controllers\FbrReferenceControl
 Route::get('/api/fbr/hs-detail', [\App\Http\Controllers\FbrReferenceController::class, 'hsDetail'])->name('fbr.api.hs-detail');
 
 require __DIR__.'/auth.php';
-

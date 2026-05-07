@@ -167,21 +167,112 @@
         </div>
     </div>
 
-    <!-- RATES TABLE -->
+    @php
+        $low=[]; $std=[]; $high=[]; $fixed=[];
+        foreach($rates as $r) {
+            if ($r->numeric_value === null) { $fixed[] = $r; continue; }
+            $p = $r->numeric_value * 100;
+            if ($p <= 5)        $low[]  = $r;
+            elseif ($p <= 20)   $std[]  = $r;
+            else                $high[] = $r;
+        }
+    @endphp
+
+    <!-- TAX RATE CALCULATOR -->
     <section class="bg-white rounded-2xl p-5 shadow-md border border-slate-200">
-        <h3 class="font-bold text-slate-800 mb-3">Tax Rates ({{ $rates->count() }})</h3>
-        <div class="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-8 gap-2 max-h-72 overflow-y-auto">
-            @foreach($rates as $r)
-                <div class="px-3 py-2 bg-slate-50 rounded-lg text-center border border-slate-200">
-                    <div class="font-mono font-bold text-sm text-slate-800">{{ $r->label }}</div>
-                    @if($r->numeric_value !== null)
-                        <div class="text-[10px] text-emerald-600">{{ $r->numeric_value * 100 }}%</div>
-                    @else
-                        <div class="text-[10px] text-amber-600">fixed</div>
-                    @endif
-                </div>
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-bold text-slate-800 text-lg">💰 Tax Rate Calculator ({{ $rates->count() }} rates)</h3>
+            <div class="flex items-center gap-2 text-sm">
+                <label class="text-slate-600 font-semibold">Sample Amount:</label>
+                <span class="text-slate-500">Rs.</span>
+                <input type="number" x-model.number="sampleAmount" class="w-28 px-2 py-1 border-2 border-slate-200 rounded-lg focus:border-emerald-500 outline-none font-mono">
+            </div>
+        </div>
+
+        <!-- TABS -->
+        <div class="flex gap-2 mb-3 border-b-2 border-slate-100 overflow-x-auto">
+            <button @click="rateTab='low'" :class="rateTab==='low' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700'" class="px-4 py-2 rounded-t-lg font-semibold text-sm whitespace-nowrap">
+                🟢 Low (0–5%) · {{ count($low) }}
+            </button>
+            <button @click="rateTab='std'" :class="rateTab==='std' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700'" class="px-4 py-2 rounded-t-lg font-semibold text-sm whitespace-nowrap">
+                🔵 Standard (5–20%) · {{ count($std) }}
+            </button>
+            <button @click="rateTab='high'" :class="rateTab==='high' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-700'" class="px-4 py-2 rounded-t-lg font-semibold text-sm whitespace-nowrap">
+                🔴 High (20%+) · {{ count($high) }}
+            </button>
+            <button @click="rateTab='fixed'" :class="rateTab==='fixed' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700'" class="px-4 py-2 rounded-t-lg font-semibold text-sm whitespace-nowrap">
+                🟡 Fixed (Rs.) · {{ count($fixed) }}
+            </button>
+        </div>
+
+        <!-- LOW RATES -->
+        <div x-show="rateTab==='low'" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
+            @foreach($low as $r)
+                <button @click="pickRate('{{ $r->label }}', {{ $r->numeric_value }}, false)"
+                        :class="activeRate==='{{ $r->label }}' ? 'ring-2 ring-emerald-500 bg-emerald-100' : ''"
+                        class="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-200 rounded-lg text-left transition">
+                    <div class="font-mono font-bold text-emerald-900 text-base">{{ $r->numeric_value * 100 }}%</div>
+                    <div class="text-[10px] text-emerald-700">label: {{ $r->label }}</div>
+                    <div class="text-[10px] text-slate-600 mt-1">Tax on Rs.<span x-text="sampleAmount"></span> = <span class="font-bold text-emerald-700">Rs.<span x-text="(sampleAmount * {{ $r->numeric_value }}).toFixed(2)"></span></span></div>
+                </button>
             @endforeach
         </div>
+
+        <!-- STANDARD RATES -->
+        <div x-show="rateTab==='std'" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
+            @foreach($std as $r)
+                <button @click="pickRate('{{ $r->label }}', {{ $r->numeric_value }}, false)"
+                        :class="activeRate==='{{ $r->label }}' ? 'ring-2 ring-blue-500 bg-blue-100' : ''"
+                        class="px-3 py-2 bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 rounded-lg text-left transition">
+                    <div class="font-mono font-bold text-blue-900 text-base">{{ $r->numeric_value * 100 }}%</div>
+                    <div class="text-[10px] text-blue-700">label: {{ $r->label }}</div>
+                    <div class="text-[10px] text-slate-600 mt-1">Tax on Rs.<span x-text="sampleAmount"></span> = <span class="font-bold text-blue-700">Rs.<span x-text="(sampleAmount * {{ $r->numeric_value }}).toFixed(2)"></span></span></div>
+                </button>
+            @endforeach
+        </div>
+
+        <!-- HIGH RATES -->
+        <div x-show="rateTab==='high'" class="grid grid-cols-2 md:grid-cols-4 gap-2">
+            @foreach($high as $r)
+                <button @click="pickRate('{{ $r->label }}', {{ $r->numeric_value }}, false)"
+                        :class="activeRate==='{{ $r->label }}' ? 'ring-2 ring-red-500 bg-red-100' : ''"
+                        class="px-3 py-2 bg-red-50 hover:bg-red-100 border-2 border-red-200 rounded-lg text-left transition">
+                    <div class="font-mono font-bold text-red-900 text-base">{{ $r->numeric_value * 100 }}%</div>
+                    <div class="text-[10px] text-slate-600 mt-1">Tax on Rs.<span x-text="sampleAmount"></span> = <span class="font-bold text-red-700">Rs.<span x-text="(sampleAmount * {{ $r->numeric_value }}).toFixed(2)"></span></span></div>
+                </button>
+            @endforeach
+        </div>
+
+        <!-- FIXED RATES -->
+        <div x-show="rateTab==='fixed'" class="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-8 gap-2 max-h-72 overflow-y-auto">
+            @foreach($fixed as $r)
+                <button @click="pickRate('{{ $r->label }}', null, true)"
+                        :class="activeRate==='{{ $r->label }}' ? 'ring-2 ring-amber-500 bg-amber-100' : ''"
+                        class="px-2 py-2 bg-amber-50 hover:bg-amber-100 border-2 border-amber-200 rounded-lg text-center transition">
+                    <div class="font-mono font-bold text-amber-900 text-xs">{{ $r->label }}</div>
+                    <div class="text-[9px] text-amber-700 mt-1">fixed/special</div>
+                </button>
+            @endforeach
+        </div>
+
+        <!-- LIVE PREVIEW -->
+        <template x-if="activeRate">
+            <div class="mt-4 p-4 bg-gradient-to-r from-emerald-50 to-blue-50 border-2 border-emerald-300 rounded-xl">
+                <div class="text-xs font-semibold text-emerald-700 uppercase mb-2">✓ Selected Rate — Live Calculation</div>
+                <div class="grid grid-cols-3 gap-3 text-sm">
+                    <div><div class="text-slate-500 text-xs">Rate Label</div><div class="font-mono font-bold text-slate-900" x-text="activeRate"></div></div>
+                    <template x-if="!activeFixed">
+                        <div><div class="text-slate-500 text-xs">Percentage</div><div class="font-bold text-emerald-700" x-text="(activePercent*100).toFixed(2) + '%'"></div></div>
+                    </template>
+                    <template x-if="activeFixed">
+                        <div><div class="text-slate-500 text-xs">Type</div><div class="font-bold text-amber-700">Fixed / Special</div></div>
+                    </template>
+                    <template x-if="!activeFixed">
+                        <div><div class="text-slate-500 text-xs">Tax on Rs.<span x-text="sampleAmount"></span></div><div class="font-bold text-emerald-700">Rs.<span x-text="(sampleAmount*activePercent).toFixed(2)"></span></div></div>
+                    </template>
+                </div>
+            </div>
+        </template>
     </section>
 
     <footer class="mt-8 text-center text-xs text-slate-400">
@@ -195,6 +286,12 @@ function demo() {
         hsQuery: '', hsResults: [], hsLoading: false, picked: null,
         sroQuery: '', sroResults: [], pickedSro: null,
         srQuery: '', srResults: [], pickedSr: null, pickedRate: '',
+        rateTab: 'low', sampleAmount: 1000, activeRate: null, activePercent: 0, activeFixed: false,
+        pickRate(label, percent, isFixed) {
+            this.activeRate = label;
+            this.activePercent = percent || 0;
+            this.activeFixed = isFixed;
+        },
         async searchHs() {
             if (!this.hsQuery) { this.hsResults = []; return; }
             this.hsLoading = true;

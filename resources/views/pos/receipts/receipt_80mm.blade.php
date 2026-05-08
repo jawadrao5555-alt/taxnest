@@ -134,8 +134,8 @@
         // BULLETPROOF LOGO LOADING — embeds logo as base64 data URI when file exists
         // on disk. Works in browser print, PDF render, and share flows without
         // depending on `php artisan storage:link` being run on the server.
-        // If file is missing, the block renders nothing (no broken alt text).
         $logoDataUri = null;
+        $logoMissing = false;
         if ($company->logo_path) {
             $logoFile = public_path('storage/' . $company->logo_path);
             if (!file_exists($logoFile)) { $logoFile = storage_path('app/public/' . $company->logo_path); }
@@ -143,8 +143,12 @@
                 $ext = strtolower(pathinfo($logoFile, PATHINFO_EXTENSION));
                 $mime = $ext === 'jpg' ? 'jpeg' : $ext;
                 $logoDataUri = 'data:image/' . $mime . ';base64,' . base64_encode(file_get_contents($logoFile));
+            } else {
+                $logoMissing = true;
             }
         }
+        $addressLine = trim(($company->address ?? '') . (($company->city) ? ', ' . $company->city : ''));
+        $phoneLine = trim(implode(' / ', array_filter([$company->phone ?? null, $company->mobile ?? null])));
     @endphp
     <div class="header text-center">
         @if($logoDataUri)
@@ -153,9 +157,16 @@
         </div>
         @endif
         <h1>{{ $company->name }}</h1>
-        @if($company->address)<p>{{ $company->address }}</p>@endif
-        @if($company->phone)<p>Tel: {{ $company->phone }}</p>@endif
-        @if($company->ntn)<p>NTN: {{ $company->ntn }}</p>@endif
+        @if($company->business_activity)<p style="font-style:italic;">{{ $company->business_activity }}</p>@endif
+        @if(!empty($addressLine))<p>{{ $addressLine }}</p>@endif
+        @if($phoneLine)<p>Tel: {{ $phoneLine }}</p>@endif
+        @if($company->email)<p>{{ $company->email }}</p>@endif
+        @if($company->website)<p>{{ $company->website }}</p>@endif
+        @if($company->ntn)<p><strong>NTN:</strong> {{ $company->ntn }}</p>@endif
+        @if(!empty($company->fbr_registration_no))<p><strong>STRN:</strong> {{ $company->fbr_registration_no }}</p>@endif
+        @if($logoMissing)
+        <p style="font-size:8px; color:#888; margin-top:3px;">(logo file not found on server — re-upload from Business Profile)</p>
+        @endif
     </div>
 
     <div class="separator"></div>

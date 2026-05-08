@@ -109,12 +109,15 @@ Route::get('/health', function () {
 });
 
 Route::get('/', function () {
-    $stats = [
-        'total_invoices' => \App\Models\Invoice::where('status', 'locked')->count()
+    $stats = ['total_invoices' => 0, 'total_companies' => 0];
+    try {
+        $stats['total_invoices'] = \App\Models\Invoice::where('status', 'locked')->count()
             + \App\Models\PosTransaction::where('pra_status', 'success')->count()
-            + \App\Models\FbrPosTransaction::where('fbr_status', 'success')->count(),
-        'total_companies' => \App\Models\Company::where('status', 'approved')->count(),
-    ];
+            + \App\Models\FbrPosTransaction::where('fbr_status', 'success')->count();
+        $stats['total_companies'] = \App\Models\Company::where('status', 'approved')->count();
+    } catch (\Throwable $e) {
+        \Log::warning('Landing stats unavailable: ' . $e->getMessage());
+    }
 
     return view('landing', [
         'showLogin' => false,

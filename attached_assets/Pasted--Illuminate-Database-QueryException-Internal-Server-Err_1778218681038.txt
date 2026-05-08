@@ -1,0 +1,124 @@
+# Illuminate\Database\QueryException - Internal Server Error
+
+SQLSTATE[HY000] [2002] Connection refused (Connection: mysql, Host: 127.0.0.1, Port: 9000, Database: taxnest_staging, SQL: select count(*) as aggregate from `invoices` where `status` = locked)
+
+PHP 8.4.16
+Laravel 12.51.0
+deeb2ffc-615d-44ed-a0cd-b1cde9f84756-00-24lu1hpq4f5ka.worf.replit.dev
+
+## Stack Trace
+
+0 - vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+1 - vendor/laravel/framework/src/Illuminate/Database/Connection.php:999
+2 - vendor/laravel/framework/src/Illuminate/Database/Connection.php:978
+3 - vendor/laravel/framework/src/Illuminate/Database/Connection.php:796
+4 - vendor/laravel/framework/src/Illuminate/Database/Connection.php:411
+5 - vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3438
+6 - vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3423
+7 - vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:4013
+8 - vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3422
+9 - vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3937
+10 - vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3865
+11 - vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+12 - routes/web.php:113
+13 - vendor/laravel/framework/src/Illuminate/Routing/CallableDispatcher.php:39
+14 - vendor/laravel/framework/src/Illuminate/Routing/Route.php:243
+15 - vendor/laravel/framework/src/Illuminate/Routing/Route.php:214
+16 - vendor/laravel/framework/src/Illuminate/Routing/Router.php:822
+17 - vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php:180
+18 - vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php:50
+19 - vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php:219
+20 - vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/VerifyCsrfToken.php:87
+21 - vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php:219
+22 - vendor/laravel/framework/src/Illuminate/View/Middleware/ShareErrorsFromSession.php:48
+23 - vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php:219
+24 - vendor/laravel/framework/src/Illuminate/Session/Middleware/StartSession.php:120
+25 - vendor/laravel/framework/src/Illuminate/Session/Middleware/StartSession.php:63
+26 - vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php:219
+27 - vendor/laravel/framework/src/Illuminate/Cookie/Middleware/AddQueuedCookiesToResponse.php:36
+28 - vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php:219
+29 - vendor/laravel/framework/src/Illuminate/Cookie/Middleware/EncryptCookies.php:74
+30 - vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php:219
+31 - vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php:137
+32 - vendor/laravel/framework/src/Illuminate/Routing/Router.php:821
+33 - vendor/laravel/framework/src/Illuminate/Routing/Router.php:800
+34 - vendor/laravel/framework/src/Illuminate/Routing/Router.php:764
+35 - vendor/laravel/framework/src/Illuminate/Routing/Router.php:753
+36 - vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php:200
+37 - vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php:180
+38 - app/Http/Middleware/SecurityHeaders.php:13
+39 - vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php:219
+40 - vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php:21
+41 - vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php:31
+42 - vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php:219
+43 - vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php:21
+44 - vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php:51
+45 - vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php:219
+46 - vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php:27
+47 - vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php:219
+48 - vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php:109
+49 - vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php:219
+50 - vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php:61
+51 - vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php:219
+52 - vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php:58
+53 - vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php:219
+54 - vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php:22
+55 - vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php:219
+56 - vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePathEncoding.php:26
+57 - vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php:219
+58 - vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php:137
+59 - vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php:175
+60 - vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php:144
+61 - vendor/laravel/framework/src/Illuminate/Foundation/Application.php:1220
+62 - public/index.php:30
+63 - vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php:23
+
+## Request
+
+GET /
+
+## Headers
+
+* **host**: deeb2ffc-615d-44ed-a0cd-b1cde9f84756-00-24lu1hpq4f5ka.worf.replit.dev
+* **user-agent**: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36
+* **accept**: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+* **accept-encoding**: gzip, deflate, br, zstd
+* **accept-language**: en-US,en;q=0.9
+* **cookie**: XSRF-TOKEN=eyJpdiI6IndtM0ZFSVdXbVF2cjFwMFFSMGJoUlE9PSIsInZhbHVlIjoibFFoMmNDd1ZVenh0UzdJamwrMWtWVWdweUNVczhGZFd0UXFtVkswTGhyMjNpWm9tWjV1ZXp3NDNyZ3RLRzRyWFl6RURvQUl1OXFBM1M3Q1QyM2xkSFdnVE5tcldHVEQ2VElDMEdONUJxWFdVbmlxZVJObWIvK240dW1ianoxSVUiLCJtYWMiOiIwYmY0MWZkMzM0MjU3Nzc0N2NhZWE1MzA5MzUwNzFlMWEwYjAwYmVhN2Q1YjFiOGFiOTI4ZTgzNmNiNWQwNDU2IiwidGFnIjoiIn0%3D; taxnest-session=eyJpdiI6InVCRG9VaExORUl5SE1laGFZZnRkY0E9PSIsInZhbHVlIjoiYWtYc0FxNHRxSkdMYUZYMjVwT2MxbTI2dER2SlZmTGY2a0U3RU1MenVlaklmcGVLaUNaU2YrbGFnd3pCQzZGSXJJa3Y2N2xXQ1kzakk0d2k2ZUR2cFRWSG1Ed1h2eUNmcDlIN2RuQVNCSFRYSTUzT2d3dFZRY05hSFljSUtBcFEiLCJtYWMiOiJhOWRiNzA4N2E3MTIzMzU2MTc4M2NiZWI0YzIwNjA2YTA3MTEwNmJiOGQ2MDU0ZDMwOTgyYmQ0MjYyZDUzMjkwIiwidGFnIjoiIn0%3D
+* **referer**: https://deeb2ffc-615d-44ed-a0cd-b1cde9f84756-00-24lu1hpq4f5ka.worf.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=default-laravel-server
+* **sec-ch-ua**: "Google Chrome";v="147", "Not.A/Brand";v="8", "Chromium";v="147"
+* **sec-ch-ua-mobile**: ?0
+* **sec-ch-ua-platform**: "Windows"
+* **sec-fetch-dest**: empty
+* **sec-fetch-mode**: navigate
+* **sec-fetch-site**: same-origin
+* **sec-fetch-storage-access**: active
+* **traceparent**: 00-69fd764c0000000076ec5e0111359b4e-13b8adfe318000cd-00
+* **tracestate**: dd=s:0;p:13b8adfe318000cd;t.tid:69fd764c00000000
+* **upgrade-insecure-requests**: 1
+* **x-datadog-parent-id**: 1421076989699162317
+* **x-datadog-sampling-priority**: 0
+* **x-datadog-tags**: _dd.p.tid=69fd764c00000000
+* **x-datadog-trace-id**: 8569327549655915342
+* **x-forwarded-for**: 182.181.115.108, 10.83.7.61, 127.0.0.1
+* **x-forwarded-proto**: https
+* **x-replit-user-bio**: 
+* **x-replit-user-id**: 
+* **x-replit-user-name**: 
+* **x-replit-user-profile-image**: 
+* **x-replit-user-roles**: 
+* **x-replit-user-teams**: 
+* **x-replit-user-url**: 
+
+## Route Context
+
+controller: Closure
+middleware: web
+
+## Route Parameters
+
+No route parameter data available.
+
+## Database Queries
+
+No database queries detected.

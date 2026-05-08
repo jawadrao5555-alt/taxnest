@@ -669,9 +669,27 @@ class FbrService
         }
 
         try {
-            return Crypt::decryptString($encryptedToken);
+            $plain = Crypt::decryptString($encryptedToken);
+            if (strlen($plain) < 8 || strlen($plain) > 512) {
+                \Log::error("FBR token decrypt produced suspicious length", [
+                    'company_id' => $company->id ?? null,
+                    'env' => $env,
+                    'plain_length' => strlen($plain),
+                ]);
+            }
+            return $plain;
         } catch (\Exception $e) {
-            return $encryptedToken;
+            \Log::error("FBR token decrypt FAILED — APP_KEY mismatch or corrupted token. Refusing to send raw encrypted blob to FBR.", [
+                'company_id' => $company->id ?? null,
+                'env' => $env,
+                'token_prefix' => substr($encryptedToken, 0, 12),
+                'token_length' => strlen($encryptedToken),
+                'error' => $e->getMessage(),
+            ]);
+            try {
+                \DB::table('companies')->where('id', $company->id)->update(['fbr_connection_status' => 'red']);
+            } catch (\Throwable $te) {}
+            return '';
         }
     }
 
@@ -1492,7 +1510,11 @@ class FbrService
             try {
                 return Crypt::decryptString($company->fbr_pos_token);
             } catch (\Exception $e) {
-                return $company->fbr_pos_token;
+                Log::error("FBR POS token decrypt FAILED — APP_KEY mismatch. Falling back to env tokens.", [
+                    'company_id' => $company->id ?? null,
+                    'env' => $env,
+                    'error' => $e->getMessage(),
+                ]);
             }
         }
 
@@ -1511,7 +1533,12 @@ class FbrService
         try {
             return Crypt::decryptString($encryptedToken);
         } catch (\Exception $e) {
-            return $encryptedToken;
+            Log::error("FBR POS env-token decrypt FAILED — APP_KEY mismatch. Refusing to send raw blob to FBR.", [
+                'company_id' => $company->id ?? null,
+                'env' => $env,
+                'error' => $e->getMessage(),
+            ]);
+            return '';
         }
     }
 

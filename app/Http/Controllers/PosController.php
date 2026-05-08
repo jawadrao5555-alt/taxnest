@@ -540,6 +540,7 @@ class PosController extends Controller
                     'submission_hash' => $submissionHash,
                     'locked_by_terminal_id' => null,
                     'lock_time' => null,
+                    'notes' => $request->input('kitchen_notes'),
                 ]);
 
                 $transaction->items()->delete();
@@ -572,6 +573,7 @@ class PosController extends Controller
                     'pra_status' => $initialPraStatus,
                     'submission_hash' => $submissionHash,
                     'created_by' => auth('pos')->id(),
+                    'notes' => $request->input('kitchen_notes'),
                 ]);
             }
 
@@ -777,6 +779,7 @@ class PosController extends Controller
                 'total_amount' => $totalAmount,
                 'payment_method' => $request->payment_method,
                 'pra_status' => $company->pra_reporting_enabled ? 'pending' : ($transaction->pra_status ?? 'local'),
+                'notes' => $request->input('kitchen_notes'),
             ]);
 
             $transaction->items()->delete();

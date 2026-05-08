@@ -519,6 +519,7 @@ class RestaurantPosController extends Controller
                 'pra_status' => $praEnabled ? 'pending' : 'local',
                 'submission_hash' => $submissionHash,
                 'created_by' => (int) $user->id,
+                'notes' => $order->kitchen_notes,
             ];
             $transaction = PosTransaction::create($transactionData);
 

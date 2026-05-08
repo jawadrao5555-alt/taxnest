@@ -175,7 +175,12 @@
         <tbody>
             @foreach($transaction->items as $item)
             <tr>
-                <td class="col-item">{{ $item->item_name }}@if($item->is_tax_exempt)<span class="exempt-tag">NT</span>@endif</td>
+                <td class="col-item">
+                    {{ $item->item_name }}@if($item->is_tax_exempt)<span class="exempt-tag">NT</span>@endif
+                    @if(!empty($item->special_notes))
+                        <div style="font-size:8px; font-weight:600; color:#000; padding:1px 0 0 3px; font-style:italic;">↳ {{ $item->special_notes }}</div>
+                    @endif
+                </td>
                 <td class="col-qty">{{ rtrim(rtrim(number_format($item->quantity, 2, '.', ''), '0'), '.') ?: '0' }}</td>
                 <td class="col-rate">{{ number_format($item->unit_price, 0) }}</td>
                 <td class="col-total">{{ number_format($item->subtotal, 0) }}</td>

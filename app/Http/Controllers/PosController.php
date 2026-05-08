@@ -586,6 +586,7 @@ class PosController extends Controller
                     'item_type' => $ri['type'],
                     'item_id' => $ri['item_id'],
                     'item_name' => $ri['name'],
+                    'special_notes' => $ri['notes'] ?? null,
                     'quantity' => $ri['quantity'],
                     'unit_price' => $ri['price'],
                     'subtotal' => $ri['lineTotal'],
@@ -791,6 +792,7 @@ class PosController extends Controller
                     'item_type' => $ri['type'],
                     'item_id' => $ri['item_id'],
                     'item_name' => $ri['name'],
+                    'special_notes' => $ri['notes'] ?? null,
                     'quantity' => $ri['quantity'],
                     'unit_price' => $ri['price'],
                     'subtotal' => $ri['lineTotal'],
@@ -3165,6 +3167,7 @@ class PosController extends Controller
                 'quantity' => $qty,
                 'lineTotal' => round($qty * $itemPrice, 2),
                 'isExempt' => $isExempt,
+                'notes' => isset($item['special_notes']) ? (string) $item['special_notes'] : null,
             ];
         }
         return $resolved;

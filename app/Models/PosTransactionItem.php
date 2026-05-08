@@ -8,6 +8,7 @@ class PosTransactionItem extends Model
 {
     protected $fillable = [
         'transaction_id', 'item_type', 'item_id', 'item_name',
+        'special_notes',
         'quantity', 'unit_price', 'subtotal',
         'is_tax_exempt', 'tax_rate', 'tax_amount',
         'item_discount_type', 'item_discount_value', 'item_discount_amount',

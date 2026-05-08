@@ -349,6 +349,134 @@ class AdminController extends Controller
         return view('admin.fbr-logs', compact('logs'));
     }
 
+    public function fbrDoctor(Request $request, $companyId)
+    {
+        $out = [];
+        $line = function ($label, $value = null) use (&$out) {
+            $out[] = $value === null ? $label : str_pad($label, 38) . ' : ' . $value;
+        };
+        $hr = function () use (&$out) { $out[] = str_repeat('=', 78); };
+
+        $company = Company::find($companyId);
+        if (!$company) {
+            return response('Company not found: ' . $companyId, 404)->header('Content-Type', 'text/plain');
+        }
+
+        $hr(); $line('FBR DOCTOR — Company #' . $company->id . ' (' . $company->name . ')'); $hr();
+        $line('Time', now()->toDateTimeString());
+        $line('App env', app()->environment());
+        $line('FBR environment', $company->fbr_environment ?? '<null>');
+        $line('FBR registration #', $company->fbr_registration_no ?? '<null>');
+        $line('Connection status', $company->fbr_connection_status ?? '<null>');
+        $out[] = '';
+
+        $hr(); $line('STEP 1 — APP_KEY consistency'); $hr();
+        $configKey = (string) config('app.key');
+        $envKey = '';
+        $envFile = base_path('.env');
+        if (is_readable($envFile)) {
+            foreach (file($envFile) as $ln) {
+                if (preg_match('/^APP_KEY=(.+)$/', trim($ln), $m)) { $envKey = trim($m[1], "\"'"); break; }
+            }
+        }
+        $line('config(app.key) prefix', substr($configKey, 0, 24) . '...');
+        $line('.env  APP_KEY  prefix', $envKey === '' ? '<unreadable>' : substr($envKey, 0, 24) . '...');
+        $match = ($envKey !== '' && trim($configKey) === $envKey);
+        $line('Match', $match ? 'YES ✓' : '*** NO — STALE CONFIG CACHE — run: php artisan config:clear && php artisan config:cache');
+        $line('Cached config file exists', file_exists(base_path('bootstrap/cache/config.php')) ? 'YES' : 'NO');
+        $out[] = '';
+
+        $hr(); $line('STEP 2 — Token decrypt test'); $hr();
+        $env = $company->fbr_environment ?? 'sandbox';
+        $rawToken = ($env === 'production') ? ($company->fbr_production_token ?? '') : ($company->fbr_sandbox_token ?? '');
+        $line('Raw token length in DB', (string) strlen($rawToken));
+        if (empty($rawToken)) {
+            $line('STATUS', '*** EMPTY — paste token at /company/fbr-settings');
+            $plain = null;
+        } else {
+            $line('Raw prefix', substr($rawToken, 0, 18) . '...');
+            try {
+                $plain = \Illuminate\Support\Facades\Crypt::decryptString($rawToken);
+                $line('Decrypt', 'OK ✓');
+                $line('Plain length', (string) strlen($plain));
+                $line('Plain prefix (safe)', substr($plain, 0, 8) . '...');
+                $line('UUID-shape', preg_match('/^[a-f0-9-]{36}$/i', $plain) ? 'YES (proper bearer)' : 'NO (unexpected format)');
+            } catch (\Throwable $e) {
+                $plain = null;
+                $line('Decrypt', '*** FAILED');
+                $line('Error', $e->getMessage());
+                $line('ROOT CAUSE', 'APP_KEY mismatch — token was encrypted with a DIFFERENT APP_KEY than is loaded now');
+            }
+        }
+        $out[] = '';
+
+        $hr(); $line('STEP 3 — Live curl to FBR PRODUCTION endpoint'); $hr();
+        if (!empty($plain)) {
+            $url = 'https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata';
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => '{}',
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Bearer ' . $plain],
+                CURLOPT_TIMEOUT => 15,
+            ]);
+            $body = curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err  = curl_error($ch);
+            curl_close($ch);
+            $line('URL', $url);
+            $line('HTTP code', (string) $code);
+            $line('cURL error', $err ?: '<none>');
+            $line('Response (first 400 chars)', substr((string) $body, 0, 400));
+            if (stripos((string) $body, '900901') !== false || $code === 401) {
+                $line('VERDICT', '*** TOKEN GENUINELY INVALID at FBR — regenerate at IRIS portal, then re-save at /company/fbr-settings');
+            } elseif ($code >= 200 && $code < 500 && stripos((string) $body, 'invalid') === false) {
+                $line('VERDICT', 'TOKEN ACCEPTED ✓ (FBR responded — payload-level errors are normal for empty body)');
+            } else {
+                $line('VERDICT', 'AMBIGUOUS — see response body above');
+            }
+        } else {
+            $line('SKIPPED', 'No plain token available (decrypt failed or empty)');
+        }
+        $out[] = '';
+
+        $hr(); $line('STEP 4 — Latest fbr_logs row for this company'); $hr();
+        $log = DB::table('fbr_logs as l')
+            ->join('invoices as i', 'i.id', '=', 'l.invoice_id')
+            ->where('i.company_id', $company->id)
+            ->orderBy('l.id', 'desc')
+            ->select('l.*')
+            ->first();
+        if ($log) {
+            $line('Log ID', (string) $log->id);
+            $line('Invoice ID', (string) $log->invoice_id);
+            $line('Status', (string) $log->status);
+            $line('Created', (string) $log->created_at);
+            $line('Response (first 400)', substr((string) $log->response_payload, 0, 400));
+        } else {
+            $line('No fbr_logs row found for this company.');
+        }
+        $out[] = '';
+
+        $hr(); $line('STEP 5 — How to fix'); $hr();
+        if (!$match) {
+            $line('1. SSH to cPanel and run', 'php artisan config:clear && php artisan cache:clear && php artisan config:cache');
+            $line('2. Then visit', '/company/fbr-settings → re-paste the production token → Save');
+        } elseif (!empty($plain) && (stripos((string) ($body ?? ''), '900901') !== false)) {
+            $line('1. IRIS portal pe ja kar', 'OLD token revoke karein, NEW production token generate karein');
+            $line('2. Visit', '/company/fbr-settings → naya token paste → Save');
+        } elseif (empty($rawToken)) {
+            $line('1. Visit', '/company/fbr-settings → production token paste → Save');
+        } else {
+            $line('Token decrypt + FBR ping both OK', '— token-side se sab theek hai. Agar abhi bhi 900901 aaye to logs check karein:');
+            $line('  tail -200 storage/logs/laravel.log', '| grep -i fbr');
+        }
+        $hr();
+
+        return response(implode("\n", $out))->header('Content-Type', 'text/plain; charset=utf-8');
+    }
+
     public function fbrPosLogs(Request $request)
     {
         $query = \App\Models\FbrPosLog::with(['transaction', 'company'])

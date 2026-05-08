@@ -575,6 +575,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/all-users', [AdminController::class, 'users']);
     Route::post('/all-users', [AdminController::class, 'storeUser']);
     Route::get('/fbr-logs', [AdminController::class, 'fbrLogs']);
+    Route::get('/fbr-doctor/{company}', [AdminController::class, 'fbrDoctor'])->name('admin.fbr.doctor');
     Route::get('/fbr/failed-invoices', [AdminController::class, 'failedFbrInvoices'])->name('admin.fbr.failed-invoices');
     Route::post('/fbr/retry/{invoice}', [AdminController::class, 'retryFbrInvoice'])->name('admin.fbr.retry');
     Route::get('/fbr-pos-logs', [AdminController::class, 'fbrPosLogs'])->name('admin.fbrPosLogs');

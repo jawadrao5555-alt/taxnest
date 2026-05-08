@@ -130,10 +130,26 @@
         });
     </script>
 
+    @php
+        // BULLETPROOF LOGO LOADING — embeds logo as base64 data URI when file exists
+        // on disk. Works in browser print, PDF render, and share flows without
+        // depending on `php artisan storage:link` being run on the server.
+        // If file is missing, the block renders nothing (no broken alt text).
+        $logoDataUri = null;
+        if ($company->logo_path) {
+            $logoFile = public_path('storage/' . $company->logo_path);
+            if (!file_exists($logoFile)) { $logoFile = storage_path('app/public/' . $company->logo_path); }
+            if (file_exists($logoFile)) {
+                $ext = strtolower(pathinfo($logoFile, PATHINFO_EXTENSION));
+                $mime = $ext === 'jpg' ? 'jpeg' : $ext;
+                $logoDataUri = 'data:image/' . $mime . ';base64,' . base64_encode(file_get_contents($logoFile));
+            }
+        }
+    @endphp
     <div class="header text-center">
-        @if($company->logo_path)
+        @if($logoDataUri)
         <div style="margin-bottom: 5px;">
-            <img src="{{ asset('storage/' . $company->logo_path) }}" alt="{{ $company->name }}" style="max-width: 150px; max-height: 55px; margin: 0 auto; display: block; object-fit: contain;">
+            <img src="{{ $logoDataUri }}" style="max-width: 150px; max-height: 55px; margin: 0 auto; display: block; object-fit: contain;">
         </div>
         @endif
         <h1>{{ $company->name }}</h1>

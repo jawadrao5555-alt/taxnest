@@ -120,9 +120,21 @@
     </script>
 
     <div class="header text-center">
-        @if($company->logo_path)
+        @php
+        $logoDataUri = null;
+        if ($company->logo_path) {
+            $logoFile = public_path('storage/' . $company->logo_path);
+            if (!file_exists($logoFile)) { $logoFile = storage_path('app/public/' . $company->logo_path); }
+            if (file_exists($logoFile)) {
+                $ext = strtolower(pathinfo($logoFile, PATHINFO_EXTENSION));
+                $mime = $ext === 'jpg' ? 'jpeg' : $ext;
+                $logoDataUri = 'data:image/' . $mime . ';base64,' . base64_encode(file_get_contents($logoFile));
+            }
+        }
+    @endphp
+        @if($logoDataUri)
         <div style="margin-bottom: 3px;">
-            <img src="{{ asset('storage/' . $company->logo_path) }}" alt="{{ $company->name }}" style="max-width: 110px; max-height: 40px; margin: 0 auto; display: block; object-fit: contain;">
+            <img src="{{ $logoDataUri }}" style="max-width: 110px; max-height: 40px; margin: 0 auto; display: block; object-fit: contain;">
         </div>
         @endif
         <h1>{{ $company->name }}</h1>

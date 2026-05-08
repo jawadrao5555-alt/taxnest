@@ -556,12 +556,18 @@
                         <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                             <h4 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Buyer Details</h4>
                             <p class="text-sm font-semibold text-gray-900">{{ $invoice->buyer_name }}</p>
-                            <p class="text-sm text-gray-600 dark:text-gray-400">NTN: {{ $invoice->buyer_ntn ?: 'N/A' }}</p>
+                            @if(!empty($invoice->buyer_ntn))
+                            <p class="text-sm text-gray-600 dark:text-gray-400">NTN: {{ $invoice->buyer_ntn }}</p>
+                            @endif
                             @if($invoice->buyer_cnic)
                             <p class="text-sm text-gray-600 dark:text-gray-400">CNIC: {{ $invoice->buyer_cnic }}</p>
                             @endif
+                            @if(!empty($invoice->buyer_address))
                             <p class="text-sm text-gray-600 dark:text-gray-400">Address: {{ $invoice->buyer_address }}</p>
-                            <p class="text-sm text-gray-600 dark:text-gray-400">Registration: <span class="font-medium {{ $invoice->buyer_registration_type === 'Registered' ? 'text-green-700' : 'text-gray-600 dark:text-gray-400' }}">{{ $invoice->buyer_registration_type ?? 'N/A' }}</span></p>
+                            @endif
+                            @if(!empty($invoice->buyer_registration_type))
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Registration: <span class="font-medium {{ $invoice->buyer_registration_type === 'Registered' ? 'text-green-700' : 'text-gray-600 dark:text-gray-400' }}">{{ $invoice->buyer_registration_type }}</span></p>
+                            @endif
                             @if($invoice->destination_province)
                             <p class="text-sm text-gray-600 dark:text-gray-400">Destination: {{ $invoice->destination_province }}</p>
                             @endif

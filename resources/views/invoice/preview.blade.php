@@ -84,7 +84,9 @@
                         <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                             <h4 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Buyer Details</h4>
                             <p class="text-sm font-semibold text-gray-900">{{ $invoice->buyer_name }}</p>
+                            @if(!empty($invoice->buyer_ntn))
                             <p class="text-sm text-gray-600 dark:text-gray-400">NTN: {{ $invoice->buyer_ntn }}</p>
+                            @endif
                         </div>
                         <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                             <h4 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Invoice Details</h4>

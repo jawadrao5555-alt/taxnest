@@ -63,11 +63,17 @@ class Subscription extends Model
 
     public function isTrialExpired(): bool
     {
+        if ($this->hasActiveOverride()) {
+            return false;
+        }
         return $this->trial_ends_at && $this->trial_ends_at->isPast();
     }
 
     public function isExpired(): bool
     {
+        if ($this->hasActiveOverride()) {
+            return false;
+        }
         return $this->end_date && \Carbon\Carbon::parse($this->end_date)->isPast();
     }
 

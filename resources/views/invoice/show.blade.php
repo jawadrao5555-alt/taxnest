@@ -200,10 +200,11 @@
                                 <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                 Download / Print
                             </button>
-                            <span class="inline-flex items-center px-2.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-medium">
-                                <svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                                WHT <span x-text="lockedWhtRate"></span>%
-                            </span>
+                            <button @click="selectedWht = lockedWhtRate; showWhtFirst = true" type="button" title="Click to change WHT rate"
+                                class="inline-flex items-center px-2.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 hover:border-blue-300 transition cursor-pointer">
+                                <svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                WHT <span x-text="lockedWhtRate"></span>% &nbsp;·&nbsp; Change
+                            </button>
                         </div>
                     </template>
                     <template x-if="!whtLocked">
@@ -219,7 +220,7 @@
                                 <p class="text-base font-bold text-gray-800 dark:text-gray-100">Select WHT Rate</p>
                                 <button @click="showWhtFirst = false" class="text-gray-400 hover:text-gray-600 dark:text-gray-400 text-xl leading-none">&times;</button>
                             </div>
-                            <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">WHT rate will be locked and applied to this invoice permanently.</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mb-3" x-text="whtLocked ? 'Update the WHT rate for this invoice. Audit log will track the change.' : 'WHT rate will be locked and applied to this invoice. PDF will open after saving.'"></p>
                             <div class="space-y-2 mb-4">
                                 <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
                                     :class="selectedWht == 0 ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50'">
@@ -248,7 +249,7 @@
                                 </label>
                             </div>
                             <button @click="saveWhtAndOpen()" :disabled="savingWht" class="w-full px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
-                                <span x-show="!savingWht">Lock WHT & Open PDF</span>
+                                <span x-show="!savingWht" x-text="whtLocked ? 'Update WHT & Open PDF' : 'Lock WHT & Open PDF'"></span>
                                 <span x-show="savingWht" x-cloak>Saving...</span>
                             </button>
                         </div>
@@ -272,7 +273,10 @@
                                 const body = new FormData();
                                 body.append('_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
                                 body.append('wht_rate', this.selectedWht);
-                                const res = await fetch('/invoice/{{ $invoice->id }}/update-wht-ajax', {
+                                const endpoint = this.whtLocked
+                                    ? '/invoice/{{ $invoice->id }}/correct-wht-ajax'
+                                    : '/invoice/{{ $invoice->id }}/update-wht-ajax';
+                                const res = await fetch(endpoint, {
                                     method: 'POST',
                                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                                     body: body

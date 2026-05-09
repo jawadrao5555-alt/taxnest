@@ -195,24 +195,19 @@
 
     <hr class="divider">
 
-    {{-- ===== QR CODE + FBR DIGITAL INVOICE BADGE ===== --}}
+    {{-- ===== QR CODE + FBR DIGITAL INVOICE BADGE (single, centered, premium) ===== --}}
     @if($invoice->fbr_invoice_number && !empty($qrBase64))
-    <div class="qr-block">
+    <div class="qr-block" style="padding: 12px 0 8px 0;">
         <table style="width: 100%; border-collapse: collapse;">
             <tr>
-                <td style="width: 33%; text-align: center; vertical-align: middle;">
+                <td style="width: 50%; text-align: right; padding-right: 18px; vertical-align: middle;">
                     @if(!empty($fbrLogoBase64))
-                        <img src="{{ $fbrLogoBase64 }}" alt="FBR Digital Invoice" style="height: 70px; width: auto;">
+                        <img src="{{ $fbrLogoBase64 }}" alt="FBR Digital Invoice" style="height: 80px; width: auto;">
                     @endif
                 </td>
-                <td style="width: 34%; text-align: center; vertical-align: middle;">
-                    <img src="{{ $qrBase64 }}" alt="QR Code" style="width: 90px; height: 90px;">
-                    <div class="qr-inv-no">Invoice #: {{ $invoice->fbr_invoice_number }}</div>
-                </td>
-                <td style="width: 33%; text-align: center; vertical-align: middle;">
-                    @if(!empty($fbrLogoBase64))
-                        <img src="{{ $fbrLogoBase64 }}" alt="FBR Digital Invoice" style="height: 70px; width: auto;">
-                    @endif
+                <td style="width: 50%; text-align: left; padding-left: 18px; vertical-align: middle;">
+                    <img src="{{ $qrBase64 }}" alt="QR Code" style="width: 96px; height: 96px; border: 1px solid #000000; padding: 3px; background: #ffffff;">
+                    <div class="qr-inv-no" style="margin-top: 6px; font-size: 10px;">FBR Inv #: {{ $invoice->fbr_invoice_number }}</div>
                 </td>
             </tr>
         </table>

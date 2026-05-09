@@ -194,24 +194,17 @@
                 @elseif($invoice->status === 'locked' && $invoice->fbr_status === 'production')
                 {{-- LOCKED+PRODUCTION: PDF with WHT lock, Print, Duplicate, WhatsApp --}}
                 <div x-data="lockedPdfHandler()" class="inline-flex items-center gap-2">
+                    {{-- Single Download/Print button — ALWAYS opens WHT modal first (pre-selected with current rate) --}}
+                    <button @click="selectedWht = lockedWhtRate; showWhtFirst = true" type="button"
+                        class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        Download / Print
+                    </button>
                     <template x-if="whtLocked">
-                        <div class="inline-flex items-center gap-2">
-                            <button @click="openPdfPopup()" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
-                                <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                                Download / Print
-                            </button>
-                            <button @click="selectedWht = lockedWhtRate; showWhtFirst = true" type="button" title="Click to change WHT rate"
-                                class="inline-flex items-center px-2.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 hover:border-blue-300 transition cursor-pointer">
-                                <svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                                WHT <span x-text="lockedWhtRate"></span>% &nbsp;·&nbsp; Change
-                            </button>
-                        </div>
-                    </template>
-                    <template x-if="!whtLocked">
-                        <button @click="showWhtFirst = true" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
-                            <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                            Download / Print
-                        </button>
+                        <span class="inline-flex items-center px-2.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-medium">
+                            <svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                            WHT <span x-text="lockedWhtRate"></span>% Locked
+                        </span>
                     </template>
 
                     <div x-show="showWhtFirst" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background-color: rgba(0,0,0,0.4);">

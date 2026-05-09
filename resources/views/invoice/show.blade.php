@@ -93,23 +93,16 @@
                     </button>
                 </form>
                 <div x-data="draftPdfHandler()" class="inline-flex items-center gap-2">
+                    {{-- Single Download/Print button — ALWAYS opens WHT modal first --}}
+                    <button @click="showWhtFirst = true" type="button" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        Download / Print
+                    </button>
                     <template x-if="whtLocked">
-                        <div class="inline-flex items-center gap-2">
-                            <button @click="openPdfPopup()" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
-                                <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                                Download / Print
-                            </button>
-                            <span class="inline-flex items-center px-3 py-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-sm font-medium">
-                                <svg class="w-3.5 h-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                                WHT <span x-text="selectedWht + '%'"></span> Locked
-                            </span>
-                        </div>
-                    </template>
-                    <template x-if="!whtLocked">
-                        <button @click="showWhtFirst = true" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
-                            <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                            Download PDF
-                        </button>
+                        <span class="inline-flex items-center px-2.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-medium">
+                            <svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                            WHT <span x-text="selectedWht + '%'"></span> Locked
+                        </span>
                     </template>
                     <div x-show="showWhtFirst" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background-color: rgba(0,0,0,0.4);">
                         <div @click.away="showWhtFirst = false" class="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 w-96 max-w-[90vw]">
@@ -175,6 +168,12 @@
                                 });
                                 const data = await res.json();
                                 if (data.status === 'ok') {
+                                    this.whtLocked = true;
+                                    this.showWhtFirst = false;
+                                    this.savingWht = false;
+                                    openInlinePdfPopup();
+                                    return;
+                                } else if (data.message && data.message.toLowerCase().includes('already locked')) {
                                     this.whtLocked = true;
                                     this.showWhtFirst = false;
                                     this.savingWht = false;
@@ -394,7 +393,85 @@
                     </button>
                 </form>
                 @endif
-                <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Download PDF</a>
+                {{-- Download/Print with WHT modal flow (pending_verification, locked non-production, etc.) --}}
+                <div x-data="otherPdfHandler()" class="inline-flex items-center gap-2">
+                    <button @click="showWhtFirst = true" type="button" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        Download / Print
+                    </button>
+                    <template x-if="whtLocked">
+                        <span class="inline-flex items-center px-2.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-medium">
+                            <svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                            WHT <span x-text="selectedWht"></span>% Locked
+                        </span>
+                    </template>
+                    <div x-show="showWhtFirst" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background-color: rgba(0,0,0,0.4);">
+                        <div @click.away="showWhtFirst = false" class="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 w-96 max-w-[90vw]">
+                            <div class="flex items-center justify-between mb-4">
+                                <p class="text-base font-bold text-gray-800 dark:text-gray-100">Select WHT Rate</p>
+                                <button @click="showWhtFirst = false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                            </div>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mb-3" x-text="whtLocked ? 'Update the WHT rate. Audit log will track the change.' : 'WHT rate will be applied to the PDF.'"></p>
+                            <div class="space-y-2 mb-4">
+                                @foreach([['0','No WHT (0%)','emerald'], ['0.5','WHT 0.5%','amber'], ['1','WHT 1%','blue'], ['2','WHT 2%','orange'], ['2.5','WHT 2.5%','red']] as $opt)
+                                <label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition"
+                                    :class="selectedWht == {{ $opt[0] }} ? 'border-{{ $opt[2] }}-400 bg-{{ $opt[2] }}-50' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50'">
+                                    <input type="radio" value="{{ $opt[0] }}" x-model.number="selectedWht" class="text-{{ $opt[2] }}-500">
+                                    <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">{{ $opt[1] }}</span>
+                                </label>
+                                @endforeach
+                            </div>
+                            <button @click="saveWhtAndOpen()" :disabled="savingWht" class="w-full px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
+                                <span x-show="!savingWht" x-text="whtLocked ? 'Update WHT & Open PDF' : 'Save WHT & Open PDF'"></span>
+                                <span x-show="savingWht" x-cloak>Saving...</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <script>
+                function otherPdfHandler() {
+                    return {
+                        whtLocked: {{ $invoice->wht_locked ? 'true' : 'false' }},
+                        showWhtFirst: false,
+                        selectedWht: {{ $invoice->wht_rate ?? 0 }},
+                        savingWht: false,
+                        async saveWhtAndOpen() {
+                            this.savingWht = true;
+                            try {
+                                const body = new FormData();
+                                body.append('_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
+                                body.append('wht_rate', this.selectedWht);
+                                const endpoint = this.whtLocked
+                                    ? '/invoice/{{ $invoice->id }}/correct-wht-ajax'
+                                    : '/invoice/{{ $invoice->id }}/update-wht-ajax';
+                                const res = await fetch(endpoint, {
+                                    method: 'POST',
+                                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                                    body: body
+                                });
+                                const data = await res.json();
+                                if (data.status === 'ok') {
+                                    this.whtLocked = true;
+                                    this.showWhtFirst = false;
+                                    this.savingWht = false;
+                                    window.open('/invoice/{{ $invoice->id }}/download', '_blank');
+                                    return;
+                                } else if (data.message && (data.message.toLowerCase().includes('already locked') || data.message.toLowerCase().includes('pending'))) {
+                                    this.showWhtFirst = false;
+                                    this.savingWht = false;
+                                    window.open('/invoice/{{ $invoice->id }}/download', '_blank');
+                                    return;
+                                } else {
+                                    alert(data.message || 'Failed to save WHT rate');
+                                }
+                            } catch(e) {
+                                alert('Network error saving WHT rate');
+                            }
+                            this.savingWht = false;
+                        }
+                    };
+                }
+                </script>
                 @endif
             </div>
         </div>

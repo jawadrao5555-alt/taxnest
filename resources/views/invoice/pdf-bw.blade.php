@@ -195,11 +195,27 @@
 
     <hr class="divider">
 
-    {{-- ===== QR CODE ONLY ===== --}}
+    {{-- ===== QR CODE + FBR DIGITAL INVOICE BADGE ===== --}}
     @if($invoice->fbr_invoice_number && !empty($qrBase64))
     <div class="qr-block">
-        <img src="{{ $qrBase64 }}" alt="QR Code" style="width: 90px; height: 90px;">
-        <div class="qr-inv-no">Invoice #: {{ $invoice->fbr_invoice_number }}</div>
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+                <td style="width: 33%; text-align: center; vertical-align: middle;">
+                    @if(!empty($fbrLogoBase64))
+                        <img src="{{ $fbrLogoBase64 }}" alt="FBR Digital Invoice" style="height: 70px; width: auto;">
+                    @endif
+                </td>
+                <td style="width: 34%; text-align: center; vertical-align: middle;">
+                    <img src="{{ $qrBase64 }}" alt="QR Code" style="width: 90px; height: 90px;">
+                    <div class="qr-inv-no">Invoice #: {{ $invoice->fbr_invoice_number }}</div>
+                </td>
+                <td style="width: 33%; text-align: center; vertical-align: middle;">
+                    @if(!empty($fbrLogoBase64))
+                        <img src="{{ $fbrLogoBase64 }}" alt="FBR Digital Invoice" style="height: 70px; width: auto;">
+                    @endif
+                </td>
+            </tr>
+        </table>
     </div>
     <hr class="divider">
     @endif

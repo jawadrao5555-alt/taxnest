@@ -12,6 +12,15 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* 🎯 GLOBAL FADED-TEXT CONTRAST BOOST — kills the "ghost text" look in dark mode
+           caused by Tailwind's text-gray-400/500 being too low-contrast on dark surfaces.
+           Mirrors the boost in layouts/app.blade.php (DI). */
+        .dark .text-gray-400 { color: #cbd5e1 !important; }
+        .dark .text-gray-500 { color: #94a3b8 !important; }
+        .dark .text-slate-400 { color: #cbd5e1 !important; }
+        .dark .text-slate-500 { color: #94a3b8 !important; }
+    </style>
 </head>
 <body class="h-full bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100" x-data="{ sidebarOpen: false }">
     <div class="flex h-full">

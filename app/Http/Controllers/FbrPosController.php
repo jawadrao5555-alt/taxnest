@@ -159,6 +159,7 @@ class FbrPosController extends Controller
             'payment_breakdown' => 'nullable|array',
             'payment_breakdown.*.method' => 'required_with:payment_breakdown|string',
             'payment_breakdown.*.amount' => 'required_with:payment_breakdown|numeric|min:0',
+            'tax_inclusive' => 'nullable|boolean',
             ]);
         } catch (\Illuminate\Validation\ValidationException $ve) {
             Log::warning('FBR POS Store: validation failed', [
@@ -185,6 +186,20 @@ class FbrPosController extends Controller
                     $uom = strtoupper($item['uom'] ?? 'U');
                     $valueInput = isset($item['value_input']) && $item['value_input'] !== ''
                         ? (float) $item['value_input'] : 0;
+
+                    // 🔒 FIXED-PRICE ENFORCEMENT (server-side guard against payload tampering)
+                    // If product is linked AND is_price_editable=false, force unit_price from DB
+                    // and reject any value-mode (Rs) entry. Cashier UI already hides these, but
+                    // a crafted request could otherwise bypass and submit arbitrary prices.
+                    if (!empty($item['product_id'])) {
+                        $product = \App\Models\Product::where('id', $item['product_id'])
+                            ->where('company_id', $companyId)
+                            ->first();
+                        if ($product && $product->is_price_editable === false) {
+                            $price = (float) $product->price;
+                            $valueInput = 0; // hard-reject value-mode for fixed-price products
+                        }
+                    }
 
                     // 🎯 VALUE MODE — derive qty from Rs amount (authoritative) for measure UoMs only
                     if ($valueInput > 0) {
@@ -220,11 +235,27 @@ class FbrPosController extends Controller
                     $isExempt = !empty($item['is_tax_exempt']);
                     $taxRate = $isExempt ? 0 : (float) ($item['tax_rate'] ?? $defaultTaxRate);
                     $itemDiscount = round((float) ($item['item_discount'] ?? 0), 2);
-                    $grossLine = round($price * $qty, 2);
-                    if ($itemDiscount > $grossLine) { $itemDiscount = $grossLine; }
-                    $lineSubtotal = round($grossLine - $itemDiscount, 2);
-                    $lineTax = round($lineSubtotal * $taxRate / 100, 2);
-                    $lineTotal = round($lineSubtotal + $lineTax, 2);
+
+                    // 🎯 TAX-INCLUSIVE MODE — cart-level toggle (e.g. "150 ka rice" should TOTAL 150)
+                    // unit_price is treated as INCLUSIVE of tax → reverse-calculate the net.
+                    // net_per_unit = unit_price / (1 + tax_rate/100)
+                    // tax_per_unit = unit_price - net_per_unit
+                    // lineTotal stays = unit_price * qty (after item discount applied to net)
+                    $taxInclusive = $request->boolean('tax_inclusive');
+                    if ($taxInclusive && $taxRate > 0) {
+                        $grossInclusiveLine = round($price * $qty, 2);
+                        if ($itemDiscount > $grossInclusiveLine) { $itemDiscount = $grossInclusiveLine; }
+                        $afterDiscInclusive = $grossInclusiveLine - $itemDiscount;
+                        $lineSubtotal = round($afterDiscInclusive / (1 + $taxRate / 100), 2);
+                        $lineTax = round($afterDiscInclusive - $lineSubtotal, 2);
+                        $lineTotal = round($lineSubtotal + $lineTax, 2);
+                    } else {
+                        $grossLine = round($price * $qty, 2);
+                        if ($itemDiscount > $grossLine) { $itemDiscount = $grossLine; }
+                        $lineSubtotal = round($grossLine - $itemDiscount, 2);
+                        $lineTax = round($lineSubtotal * $taxRate / 100, 2);
+                        $lineTotal = round($lineSubtotal + $lineTax, 2);
+                    }
 
                     $subtotal += $lineSubtotal;
                     $totalTax += $lineTax;
@@ -1570,6 +1601,7 @@ class FbrPosController extends Controller
             'barcode' => $request->barcode ?: null,
             'sku' => $request->sku ?: null,
             'default_price' => $request->default_price,
+            'is_price_editable' => $request->boolean('is_price_editable'),
             'hs_code' => $request->hs_code,
             'uom' => $request->uom ?? 'U',
             'tax_type' => $taxType,
@@ -1612,6 +1644,7 @@ class FbrPosController extends Controller
             'barcode' => $request->barcode ?: null,
             'sku' => $request->sku ?: null,
             'default_price' => $request->default_price,
+            'is_price_editable' => $request->boolean('is_price_editable'),
             'hs_code' => $request->hs_code,
             'uom' => $request->uom ?? 'U',
             'tax_type' => $taxType,
@@ -1654,7 +1687,7 @@ class FbrPosController extends Controller
                       ->orWhere('sku', $like, "%{$q}%");
             })
             ->take(15)
-            ->get(['id', 'name', 'hs_code', 'barcode', 'sku', 'default_price', 'default_tax_rate', 'tax_type', 'uom']);
+            ->get(['id', 'name', 'hs_code', 'barcode', 'sku', 'default_price', 'is_price_editable', 'default_tax_rate', 'tax_type', 'uom']);
 
         return response()->json($products);
     }
@@ -1671,7 +1704,7 @@ class FbrPosController extends Controller
             ->where(function ($q) use ($code) {
                 $q->where('barcode', $code)->orWhere('sku', $code);
             })
-            ->first(['id', 'name', 'hs_code', 'barcode', 'sku', 'default_price', 'default_tax_rate', 'tax_type', 'uom']);
+            ->first(['id', 'name', 'hs_code', 'barcode', 'sku', 'default_price', 'is_price_editable', 'default_tax_rate', 'tax_type', 'uom']);
 
         if (!$product) {
             return response()->json(['found' => false]);

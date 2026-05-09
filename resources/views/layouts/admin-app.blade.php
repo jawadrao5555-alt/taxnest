@@ -51,6 +51,16 @@
         .admin-header-border { border-color: var(--admin-sidebar-border) !important; background-color: var(--admin-sidebar) !important; }
         .admin-btn { background-color: var(--admin-accent) !important; }
         .admin-btn:hover { background-color: var(--admin-accent-hover) !important; }
+
+        /* 🎯 GLOBAL FADED-TEXT CONTRAST BOOST — kills the "ghost text" look in dark mode
+           caused by Tailwind's text-gray-400/500 being too low-contrast on dark surfaces.
+           Mirrors the boost in layouts/app.blade.php (DI). Applies app-wide. */
+        .dark .text-gray-400 { color: #cbd5e1 !important; }
+        .dark .text-gray-500 { color: #94a3b8 !important; }
+        .dark .text-slate-400 { color: #cbd5e1 !important; }
+        .dark .text-slate-500 { color: #94a3b8 !important; }
+        /* Light-mode safety: opacity-50/60 on body text inside content cards reads as faded ghost */
+        .premium-card .opacity-50, .stat-card .opacity-50 { opacity: 0.7; }
     </style>
 </head>
 <body class="h-full bg-gray-950 text-gray-100 admin-themed" x-data="{ sidebarOpen: false, themeOpen: false }">

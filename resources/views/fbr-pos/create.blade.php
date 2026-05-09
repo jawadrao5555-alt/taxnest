@@ -644,6 +644,7 @@ kbd {
                                                 :class="(item.mode || 'qty') === 'qty' ? 'bg-blue-600 text-white' : 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'"
                                                 class="px-1.5 py-0.5 transition" title="Quantity mode (Q)">QTY</button>
                                             <button type="button" tabindex="-1"
+                                                x-show="item.is_price_editable !== false"
                                                 @click="setMode(item, 'value')"
                                                 :disabled="!canUseValueMode(item)"
                                                 :class="(item.mode || 'qty') === 'value' ? 'bg-emerald-600 text-white' : 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'"
@@ -683,8 +684,9 @@ kbd {
                                         <button type="button" tabindex="-1" @click="incQty(item)"
                                             class="px-3 sm:px-3.5 border-l border-blue-200 dark:border-blue-800 bg-gradient-to-b from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-900/50 text-blue-700 dark:text-blue-300 text-base font-black hover:from-blue-100 hover:to-blue-200 dark:hover:from-blue-900/50 dark:hover:to-blue-900/70 active:scale-95 transition-all select-none">+</button>
                                     </div>
-                                    {{-- ⚡ INLINE REVERSE CALC — type Rs amount, qty auto-calculates (no mode toggle needed) --}}
-                                    <div x-show="(item.mode || 'qty') === 'qty' && parseFloat(item.unit_price) > 0"
+                                    {{-- ⚡ INLINE REVERSE CALC — type Rs amount, qty auto-calculates (no mode toggle needed)
+                                         Hidden for fixed-price products since cashier shouldn't dictate Rs amount. --}}
+                                    <div x-show="(item.mode || 'qty') === 'qty' && parseFloat(item.unit_price) > 0 && item.is_price_editable !== false"
                                          class="mt-1.5 flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 rounded-md px-1.5 py-1 ring-1 ring-emerald-200 dark:ring-emerald-800">
                                         <span class="text-[10px] font-black text-emerald-700 dark:text-emerald-300 leading-none whitespace-nowrap">Or Rs</span>
                                         <input type="text" inputmode="decimal" autocomplete="off" maxlength="10"
@@ -747,11 +749,17 @@ kbd {
                                     </div>
                                 </div>
                                 <div class="sm:col-span-2">
-                                    <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Unit Price *</label>
+                                    <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase flex items-center gap-1">
+                                        <span>Unit Price *</span>
+                                        <span x-show="item.is_price_editable === false" class="px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-[9px] font-black tracking-wider" title="Product is configured as fixed-price — cashier cannot edit">🔒 FIXED</span>
+                                    </label>
                                     <input type="number" :name="'items['+index+'][unit_price]'" x-model.number="item.unit_price" min="0.01" step="0.01" required
+                                        :readonly="item.is_price_editable === false"
+                                        :tabindex="item.is_price_editable === false ? -1 : 0"
                                         @input="syncValueFromQty(item)"
                                         @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
-                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                        :class="item.is_price_editable === false ? 'bg-amber-50 dark:bg-amber-900/20 cursor-not-allowed text-amber-900 dark:text-amber-200 font-bold' : 'dark:bg-gray-800 dark:text-white'"
+                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="0.00">
                                 </div>
                                 <div class="sm:col-span-1">
@@ -898,9 +906,22 @@ kbd {
                 </div>
 
                 <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 p-5">
+                    {{-- 🎯 CART-LEVEL TAX INCLUSIVE TOGGLE — when ON, all unit prices are treated as
+                         INCLUSIVE of GST (e.g. "150 ka rice" → bill total = 150, NOT 177).
+                         Backend reverse-calculates net = price / (1 + rate/100). --}}
+                    <label class="mb-3 flex items-start gap-2 cursor-pointer p-2.5 rounded-lg border-2 transition"
+                        :class="taxInclusive ? 'border-emerald-400 bg-emerald-50 dark:border-emerald-600 dark:bg-emerald-900/20' : 'border-slate-300 dark:border-slate-600 bg-white/60 dark:bg-slate-800/40'">
+                        <input type="checkbox" x-model="taxInclusive" class="mt-0.5 rounded border-gray-400 text-emerald-600 focus:ring-emerald-500">
+                        <div class="flex-1 leading-tight">
+                            <span class="text-xs font-black text-slate-800 dark:text-slate-100" x-text="taxInclusive ? '✓ PRICES INCLUDE TAX' : 'Prices EXCLUDE tax (default)'"></span>
+                            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5"
+                               x-text="taxInclusive ? 'e.g. Rs 150 item with 18% GST → bill total stays 150 (net 127.12 + tax 22.88).' : 'Tax is added on top of unit prices (e.g. 150 + 18% = 177).'"></p>
+                        </div>
+                    </label>
+                    <input type="hidden" name="tax_inclusive" :value="taxInclusive ? '1' : '0'">
                     <div class="space-y-2 text-sm">
                         <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold">
-                            <span>Subtotal</span>
+                            <span x-text="taxInclusive ? 'Net (Tax Excl.)' : 'Subtotal'"></span>
                             <span x-text="'PKR ' + formatNum(calcSubtotal())"></span>
                         </div>
                         <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold" x-show="calcDiscount() > 0">
@@ -1017,7 +1038,8 @@ kbd {
 function fbrPosInvoice() {
     return {
         uomOptions: ['U','PCS','KG','GM','LTR','ML','MTR','SQM','FT','IN','YDS','PKT','DOZ','BOX','CTN','BAG','BTL','TIN','CAN','BUN','ROL','SET'],
-        items: [{ _uid: 'r' + Date.now() + '_' + Math.random().toString(36).slice(2,7), item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, mode: 'qty', _valueInput: '', _amountInput: '', line_value: 0 }],
+        items: [{ _uid: 'r' + Date.now() + '_' + Math.random().toString(36).slice(2,7), item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, is_price_editable: true, mode: 'qty', _valueInput: '', _amountInput: '', line_value: 0 }],
+        taxInclusive: false,
         activeItemIndex: 0,
         // 🎯 Unified search dropdown state (merged with barcode/scan input)
         searchOpen: false,
@@ -1485,9 +1507,11 @@ function fbrPosInvoice() {
         },
         canUseValueMode(item) {
             // 🎯 VALUE MODE — only measure-based UoMs (matches FbrPosController::VALUE_MODE_UOMS)
+            // Also requires the product's price to be EDITABLE — fixed-price items can't use value mode.
             const u = (item.uom || '').toString().toUpperCase();
             const allowed = ['KG', 'GM', 'LTR', 'ML', 'MTR', 'SQM'];
-            return allowed.includes(u) && parseFloat(item.unit_price) > 0;
+            const editable = item.is_price_editable !== false;
+            return editable && allowed.includes(u) && parseFloat(item.unit_price) > 0;
         },
         setMode(item, mode) {
             if (mode !== 'qty' && mode !== 'value') return;
@@ -1561,7 +1585,7 @@ function fbrPosInvoice() {
             item.line_value = Math.round(qty * price * 100) / 100;
         },
         addItem() {
-            this.items.push({ _uid: 'r' + Date.now() + '_' + Math.random().toString(36).slice(2,7), item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, mode: 'qty', _valueInput: '', _amountInput: '', line_value: 0 });
+            this.items.push({ _uid: 'r' + Date.now() + '_' + Math.random().toString(36).slice(2,7), item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, is_price_editable: true, mode: 'qty', _valueInput: '', _amountInput: '', line_value: 0 });
             const newIdx = this.items.length - 1;
             this.activeItemIndex = newIdx;
             this.lastAddedIndex = newIdx;
@@ -1631,6 +1655,7 @@ function fbrPosInvoice() {
                 is_tax_exempt: isExempt,
                 item_discount: 0,
                 product_id: p.id,
+                is_price_editable: (p.is_price_editable === undefined || p.is_price_editable === null) ? true : !!p.is_price_editable,
                 mode: 'qty',
                 _valueInput: '',
                 _amountInput: '',
@@ -1769,10 +1794,23 @@ function fbrPosInvoice() {
         lineTotal(item) {
             const net = this.lineNet(item);
             const taxRate = item.is_tax_exempt ? 0 : (parseFloat(item.tax_rate) || 0);
+            // 🎯 Tax-INCLUSIVE: unit_price already includes tax → row total = net (gross-after-disc).
+            // Tax-EXCLUSIVE (default): add tax on top.
+            if (this.taxInclusive && taxRate > 0) return net;
             return net + (net * taxRate / 100);
         },
         calcSubtotal() {
-            return this.items.reduce((sum, item) => sum + this.lineNet(item), 0);
+            // 🎯 In tax-INCLUSIVE mode the per-line "subtotal" is the back-derived NET
+            // (gross / (1+rate/100)) so that subtotal + tax = gross (e.g. 150 stays 150).
+            return this.items.reduce((sum, item) => sum + this._lineNetForTotals(item), 0);
+        },
+        _lineNetForTotals(item) {
+            const net = this.lineNet(item);
+            const taxRate = item.is_tax_exempt ? 0 : (parseFloat(item.tax_rate) || 0);
+            if (this.taxInclusive && taxRate > 0) {
+                return Math.round((net / (1 + taxRate / 100)) * 100) / 100;
+            }
+            return net;
         },
         calcDiscount() {
             let sub = this.calcSubtotal();
@@ -1784,6 +1822,11 @@ function fbrPosInvoice() {
             return this.items.reduce((sum, item) => {
                 const net = this.lineNet(item);
                 const taxRate = item.is_tax_exempt ? 0 : (parseFloat(item.tax_rate) || 0);
+                if (this.taxInclusive && taxRate > 0) {
+                    // gross-of-tax → reverse: tax = gross - gross/(1+r/100)
+                    const baseNet = net / (1 + taxRate / 100);
+                    return sum + (net - baseNet);
+                }
                 return sum + (net * taxRate / 100);
             }, 0);
         },

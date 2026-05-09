@@ -36,6 +36,15 @@
                     <input type="number" step="0.01" min="0" name="default_price" x-model="price" required
                         class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500"
                         placeholder="0.00">
+                    <label class="mt-2 flex items-start gap-2 cursor-pointer p-2.5 rounded-lg border-2 transition"
+                        :class="isPriceEditable ? 'border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800'">
+                        <input type="checkbox" name="is_price_editable" value="1" x-model="isPriceEditable"
+                            class="mt-0.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                        <div>
+                            <span class="text-xs font-bold text-gray-800 dark:text-gray-100" x-text="isPriceEditable ? 'Price IS editable at POS' : 'Price is FIXED — locked at POS'"></span>
+                            <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5" x-text="isPriceEditable ? 'Cashier can change price + use Value-mode (Rs. amount entry)' : 'Cashier cannot change price. Value-mode (Rs. entry) hidden. Quantity entry only.'"></p>
+                        </div>
+                    </label>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">HS Code <span class="text-gray-400 text-xs">(Optional)</span></label>
@@ -185,6 +194,7 @@ function fbrProductForm() {
         taxType: '{{ old("tax_type", $product->tax_type ?? "taxable") }}',
         taxRate: '{{ old("default_tax_rate", $product->default_tax_rate ?? 18) }}',
         price: '{{ old("default_price", $product->default_price ?? 0) }}',
+        isPriceEditable: {{ old('is_price_editable', isset($product) ? ($product->is_price_editable ? 'true' : 'false') : 'true') }},
 
         get effectiveRate() {
             if (this.taxType === 'exempt') return 0;

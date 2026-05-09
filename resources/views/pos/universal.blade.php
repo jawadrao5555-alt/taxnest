@@ -323,7 +323,7 @@ window.addEventListener('popstate', function() {
 
         <div class="flex-1 relative">
             <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input type="search" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent="addHighlightedItem()" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="Search products... (type to filter, Enter to add)" class="search-glow w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition shadow-sm" autocomplete="one-time-code" name="pos_product_search_nofill" data-lpignore="true" data-form-type="other" role="combobox">
+            <input type="search" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent="addHighlightedItem()" @keydown.tab="if(!searchQuery && cart.length > 0){ $event.preventDefault(); enterCartMode('last'); }" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="Search products... (type to filter, Enter to add, Tab → cart)" class="search-glow w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition shadow-sm" autocomplete="one-time-code" name="pos_product_search_nofill" data-lpignore="true" data-form-type="other" role="combobox">
             <kbd x-show="!searchQuery" class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 font-mono">Ctrl+S</kbd>
             <button x-show="searchQuery" @click="searchQuery = ''; showSearchDropdown = false; filterProducts(); $refs.searchInput.focus()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -749,7 +749,7 @@ window.addEventListener('popstate', function() {
                         <div x-show="item.showItemDiscount" x-transition class="mt-1 flex items-center gap-1">
                             <button @click.stop="item.item_discount_type = 'percentage'" class="text-[9px] font-bold px-1.5 py-0.5 rounded transition" :class="(item.item_discount_type || 'percentage') === 'percentage' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400'">%</button>
                             <button @click.stop="item.item_discount_type = 'amount'" class="text-[9px] font-bold px-1.5 py-0.5 rounded transition" :class="item.item_discount_type === 'amount' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400'">Rs</button>
-                            <input type="number" x-model.number="item.item_discount_value" :data-discount-input="index"
+                            <input type="number" x-model.lazy.number="item.item_discount_value" :data-discount-input="index"
                                 @click.stop
                                 @keydown.enter.prevent.stop="$event.target.blur()"
                                 @keydown.escape.prevent.stop="$event.target.blur()"
@@ -2847,6 +2847,7 @@ function restaurantPos() {
                 const ci = this.activeCartIndex;
                 if (e.key === 'ArrowDown') { e.preventDefault(); this.moveCartSelection(1); return; }
                 if (e.key === 'ArrowUp')   { e.preventDefault(); this.moveCartSelection(-1); return; }
+                if (e.key === 'Tab')       { e.preventDefault(); this.moveCartSelection(e.shiftKey ? -1 : 1); return; }
                 if (e.key === 'Enter')     { e.preventDefault(); e.target.blur(); return; }
                 // Cart shortcuts still work while a qty input has focus.
                 if ((e.key === '+' || e.key === '=') && ci >= 0) { e.preventDefault(); this.updateQty(ci, 1); this.animateQty(ci); return; }

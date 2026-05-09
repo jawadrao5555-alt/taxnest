@@ -21,7 +21,13 @@ class Product extends Model
         'serial_number',
         'mrp',
         'default_price',
+        'is_price_editable',
         'is_active',
+    ];
+
+    protected $casts = [
+        'is_price_editable' => 'boolean',
+        'is_active' => 'boolean',
     ];
 
     protected static function booted()

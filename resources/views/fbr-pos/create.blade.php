@@ -727,18 +727,28 @@ kbd {
                             <input type="hidden" :name="'items['+index+'][value_input]'"
                                    :value="(item.mode || 'qty') === 'value' && parseFloat(item._valueInput) > 0 ? item._valueInput : ''">
 
-                            {{-- ═══ SIMPLE 3-COLUMN VISIBLE ROW — Name | Qty | Price ═══ --}}
+                            {{-- ═══ SIMPLE VISIBLE ROW — Name | UoM | Qty | Price ═══ --}}
                             <div class="grid grid-cols-12 gap-2 items-end">
-                                <div class="col-span-6">
+                                <div class="col-span-5">
                                     <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase">Product *</label>
                                     <input type="text" :name="'items['+index+'][item_name]'" x-model="item.item_name" required
                                         @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm font-semibold shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="Product name">
                                 </div>
+                                <div class="col-span-2">
+                                    <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase">UoM</label>
+                                    <select :name="'items['+index+'][uom]'" x-model="item.uom"
+                                        @change="if ((item.mode || 'qty') === 'value' && !canUseValueMode(item)) { setMode(item, 'qty'); toast('Switched to QTY — UoM not value-compatible', 'info'); } truncateQtyOnUomChange(item);"
+                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs shadow-sm focus:ring-blue-500 focus:border-blue-500 font-bold px-1">
+                                        <template x-for="u in uomOptions" :key="u">
+                                            <option :value="u" x-text="u"></option>
+                                        </template>
+                                    </select>
+                                </div>
                                 <div class="col-span-3">
                                     <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase flex items-center gap-1">
-                                        <span x-text="'Qty (' + item.uom + ')'"></span>
+                                        <span>Qty</span>
                                         <span x-show="isQtyDecimalAllowed(item)" class="text-emerald-600 dark:text-emerald-400 normal-case font-bold text-[9px]" title="Decimal quantities allowed for this UoM">·decimal</span>
                                     </label>
                                     <div class="flex items-stretch shadow-sm rounded-lg overflow-hidden ring-1 ring-blue-200 dark:ring-blue-800">
@@ -795,21 +805,11 @@ kbd {
                                  Hidden by default. All inputs stay in DOM via x-show so form submits all fields. --}}
                             <div x-show="editOpen" x-collapse class="mt-3 pt-3 border-t border-dashed border-slate-300 dark:border-slate-700">
                                 <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
-                                    <div class="sm:col-span-3">
+                                    <div class="sm:col-span-4">
                                         <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase">HS Code</label>
                                         <input type="text" :name="'items['+index+'][hs_code]'" x-model="item.hs_code"
                                             class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                             placeholder="00000000">
-                                    </div>
-                                    <div class="sm:col-span-3">
-                                        <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase">UoM</label>
-                                        <select :name="'items['+index+'][uom]'" x-model="item.uom"
-                                            @change="if ((item.mode || 'qty') === 'value' && !canUseValueMode(item)) { setMode(item, 'qty'); toast('Switched to QTY — UoM not value-compatible', 'info'); } truncateQtyOnUomChange(item);"
-                                            class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs shadow-sm focus:ring-blue-500 focus:border-blue-500 font-semibold">
-                                            <template x-for="u in uomOptions" :key="u">
-                                                <option :value="u" x-text="u"></option>
-                                            </template>
-                                        </select>
                                     </div>
                                     <div class="sm:col-span-2">
                                         <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase">Tax %</label>

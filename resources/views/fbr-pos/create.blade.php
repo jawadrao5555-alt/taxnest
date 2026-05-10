@@ -710,7 +710,22 @@ kbd {
                     </div>
                 </div>
 
-                {{-- ⬇ Totals/Cash/Confirm MOVED back to RIGHT column on user request — see after Promo Code --}}
+                {{-- 🎁 Promo Code — compact (moved from right column) --}}
+                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-3">
+                    <h3 class="text-xs font-black text-slate-900 dark:text-white mb-2 flex items-center gap-1.5 tracking-tight uppercase">
+                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-md bg-pink-600 text-white text-[10px] shadow-sm">🎁</span>
+                        Promo Code
+                    </h3>
+                    <div class="flex gap-1.5">
+                        <input type="text" x-model="promoCode" placeholder="Enter code" class="flex-1 uppercase rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1.5 shadow-sm">
+                        <button type="button" @click="applyPromo()" class="px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold">Apply</button>
+                    </div>
+                    <input type="hidden" name="promotion_id" x-model="promotionId">
+                    <input type="hidden" name="promotion_code" x-model="promoCode">
+                    <div x-show="promoMessage" :class="promoOk ? 'text-emerald-700' : 'text-red-700'" class="text-[11px] mt-1.5 font-semibold" x-text="promoMessage"></div>
+                </div>
+
+                {{-- ⬇ Totals/Cash/Confirm MOVED back to RIGHT column on user request --}}
             </aside>
 
             <div class="lg:col-span-2 lg:order-2 space-y-4">
@@ -922,19 +937,7 @@ kbd {
                 {{-- ✨ Customer block MOVED to TOP of LEFT column on user request --}}
 
                 {{-- Promo Code --}}
-                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-                    <h3 class="text-base font-black text-slate-900 dark:text-white mb-3 flex items-center gap-2 tracking-tight">
-                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-pink-600 text-white text-sm shadow-sm">🎁</span>
-                        Promo Code
-                    </h3>
-                    <div class="flex gap-2">
-                        <input type="text" x-model="promoCode" placeholder="Enter code" class="flex-1 uppercase rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm">
-                        <button type="button" @click="applyPromo()" class="px-3 bg-emerald-600 text-white rounded-lg text-sm font-bold">Apply</button>
-                    </div>
-                    <input type="hidden" name="promotion_id" x-model="promotionId">
-                    <input type="hidden" name="promotion_code" x-model="promoCode">
-                    <div x-show="promoMessage" :class="promoOk ? 'text-emerald-700' : 'text-red-700'" class="text-xs mt-2 font-semibold" x-text="promoMessage"></div>
-                </div>
+                {{-- ⬇ Promo Code MOVED to LEFT aside (bottom) on user request --}}
 
                 {{-- ═══════════ 💰 TOTALS + TAX-INCLUSIVE + CASH + CONFIRM (right column) ═══════════ --}}
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

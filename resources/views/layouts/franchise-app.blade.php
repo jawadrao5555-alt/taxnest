@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0d9488">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="stylesheet" href="{{ asset('css/mobile.css') }}?v=2.3">
+    <link rel="stylesheet" href="{{ asset('css/mobile.css') }}?v=2.5">
     <title>{{ $title ?? 'Franchise Panel' }} - TaxNest</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>

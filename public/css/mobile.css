@@ -648,3 +648,73 @@ pre, code { max-width: 100%; overflow-x: auto; word-break: break-word; }
     /* Fewer chrome pixels in landscape */
     header.sticky, .topnav-bar { padding-top: 0.25rem; padding-bottom: 0.25rem; }
 }
+
+/* ====================================================================
+   37. POS CASHIER TOUCH-TARGET ENFORCEMENT (≥44x44 finger-safe)
+   --------------------------------------------------------------------
+   On phones, every button inside a POS sale-screen container is forced
+   to a minimum 44x44 hit area so cashiers can tap reliably with fingers.
+   Scoped to POS containers ONLY (Alpine x-data of restaurantPos/fbrPosInvoice
+   + the .fbr-pos-stage class), so admin/DI/reports pages are unaffected.
+   ==================================================================== */
+@media (max-width: 768px) {
+    [x-data*="restaurantPos"] button,
+    [x-data*="restaurantPos"] [role="button"],
+    [x-data*="restaurantPos"] a.cat-pill,
+    [x-data*="fbrPosInvoice"] button,
+    [x-data*="fbrPosInvoice"] [role="button"],
+    .fbr-pos-stage button,
+    .fbr-pos-stage [role="button"] {
+        min-width: 44px !important;
+        min-height: 44px !important;
+        padding-left: max(0.5rem, env(safe-area-inset-left)) !important;
+        padding-right: 0.5rem !important;
+    }
+    /* Square icon-only buttons stay square (don't stretch wide) */
+    [x-data*="restaurantPos"] button.w-8,
+    [x-data*="restaurantPos"] button.w-9,
+    [x-data*="fbrPosInvoice"] button.w-9,
+    [x-data*="fbrPosInvoice"] button.w-10,
+    .fbr-pos-stage button.w-9,
+    .fbr-pos-stage button.w-10 {
+        width: 44px !important;
+        height: 44px !important;
+    }
+    /* Category pills / quick-add chips - keep visually compact but tappable */
+    [x-data*="restaurantPos"] .cat-pill,
+    [x-data*="restaurantPos"] .nav-pill {
+        min-height: 40px !important;
+        padding-top: 0.55rem !important;
+        padding-bottom: 0.55rem !important;
+    }
+    /* Cart row qty/delete buttons - critical zone, force 44x44 */
+    [x-data*="restaurantPos"] .cart-item button,
+    [x-data*="restaurantPos"] [class*="cart"] button.w-7,
+    [x-data*="restaurantPos"] [class*="cart"] button.h-7 {
+        min-width: 44px !important;
+        min-height: 44px !important;
+    }
+    /* Modal close buttons (×) - finger-safe (POS-scoped only) */
+    [x-data*="restaurantPos"] [class*="modal"] button:has(> svg[viewBox="0 0 24 24"]):not([class*="w-12"]):not([class*="w-16"]),
+    [x-data*="fbrPosInvoice"] [class*="modal"] button:has(> svg[viewBox="0 0 24 24"]):not([class*="w-12"]):not([class*="w-16"]),
+    .fbr-pos-stage [class*="modal"] button:has(> svg[viewBox="0 0 24 24"]):not([class*="w-12"]):not([class*="w-16"]) {
+        min-width: 44px !important;
+        min-height: 44px !important;
+    }
+    /* Bottom mobile action bar - inflate Pay/Complete CTAs (POS-scoped only) */
+    [x-data*="restaurantPos"] .lg\:hidden.fixed.bottom-0 button,
+    [x-data*="restaurantPos"] .md\:hidden.fixed.bottom-0 button,
+    [x-data*="fbrPosInvoice"] .lg\:hidden.fixed.bottom-0 button,
+    [x-data*="fbrPosInvoice"] .md\:hidden.fixed.bottom-0 button,
+    .fbr-pos-stage .lg\:hidden.fixed.bottom-0 button,
+    .fbr-pos-stage .md\:hidden.fixed.bottom-0 button {
+        min-height: 48px !important;
+        font-weight: 700;
+    }
+    /* Numpad keys (FBR POS / PRA POS) - large tap zones */
+    [x-data*="fbrPosInvoice"] .grid.grid-cols-3 > button,
+    [x-data*="restaurantPos"] .grid.grid-cols-3 > button {
+        min-height: 52px !important;
+        font-size: 1.1rem !important;
+    }
+}

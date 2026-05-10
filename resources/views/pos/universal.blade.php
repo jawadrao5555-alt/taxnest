@@ -3355,9 +3355,12 @@ function restaurantPos() {
                     body: JSON.stringify(payload),
                 });
                 let data = null;
-                try { data = await res.json(); } catch(_) {}
+                let rawBody = '';
+                try { rawBody = await res.text(); data = JSON.parse(rawBody); } catch(_) {}
                 if (!res.ok || !data || !data.success) {
-                    this.showToast((data && data.message) || ('Failed (Error ' + res.status + ')'), 'error');
+                    console.error('[storeInvoice] HTTP', res.status, res.statusText, rawBody.slice(0, 500));
+                    const msg = (data && (data.message || data.error)) || ('Failed (HTTP ' + res.status + ') — F12 console');
+                    this.showToast(msg, 'error');
                     this.submitting = false;
                     return;
                 }

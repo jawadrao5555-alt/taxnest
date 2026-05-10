@@ -628,7 +628,7 @@ kbd {
                                 <div class="sm:col-span-2">
                                     <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">UoM</label>
                                     <select :name="'items['+index+'][uom]'" x-model="item.uom"
-                                        @change="if ((item.mode || 'qty') === 'value' && !canUseValueMode(item)) { setMode(item, 'qty'); toast('Switched to QTY — UoM not value-compatible', 'info'); }"
+                                        @change="if ((item.mode || 'qty') === 'value' && !canUseValueMode(item)) { setMode(item, 'qty'); toast('Switched to QTY — UoM not value-compatible', 'info'); } truncateQtyOnUomChange(item);"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 font-semibold">
                                         <template x-for="u in uomOptions" :key="u">
                                             <option :value="u" x-text="u"></option>
@@ -660,7 +660,9 @@ kbd {
                                             :data-qty-row="index"
                                             :name="'items['+index+'][quantity]'"
                                             x-model="item.quantity"
-                                            @input="item.quantity = sanitizeQty($event.target.value); syncValueFromQty(item)"
+                                            :inputmode="isQtyDecimalAllowed(item) ? 'decimal' : 'numeric'"
+                                            @input="item.quantity = sanitizeQty($event.target.value, item); syncValueFromQty(item)"
+                                            @keydown="if (!isQtyDecimalAllowed(item) && ($event.key === '.' || $event.key === ',')) $event.preventDefault()"
                                             @focus="$event.target.select()"
                                             @blur="if(!item.quantity || parseFloat(item.quantity) <= 0){ item.quantity = 1; } syncValueFromQty(item);"
                                             @keydown.arrow-up.prevent="incQty(item); $event.target.select();"
@@ -1480,12 +1482,35 @@ function fbrPosInvoice() {
             this.cashReceived = notes * amount;
             this.$nextTick(() => this.$refs.cashInput && this.$refs.cashInput.focus());
         },
-        sanitizeQty(v) {
+        // 🚫 Decimal qty NOT allowed for unit-based UoMs (PCS/U/BOX/PKT/...).
+        // Mirrors FbrPosController::VALUE_MODE_UOMS allow-list: only KG/GM/LTR/ML/MTR/SQM
+        // accept fractional quantities — everything else is whole-number-only at the UI
+        // layer so cashiers can't even TYPE a decimal that the backend will reject later.
+        isQtyDecimalAllowed(item) {
+            const u = (item && item.uom || '').toString().toUpperCase();
+            return ['KG', 'GM', 'LTR', 'ML', 'MTR', 'SQM'].includes(u);
+        },
+        sanitizeQty(v, item) {
             if (v === '' || v === null || v === undefined) return '';
+            const allowDecimal = item ? this.isQtyDecimalAllowed(item) : true;
+            if (!allowDecimal) {
+                // Strip dots entirely → whole-number-only input for unit-based UoMs.
+                return String(v).replace(/[^0-9]/g, '');
+            }
             let s = String(v).replace(/[^0-9.]/g, '');
             const parts = s.split('.');
             if (parts.length > 2) s = parts[0] + '.' + parts.slice(1).join('');
             return s;
+        },
+        // When the cashier switches UoM (e.g. KG → PCS), truncate any fractional qty
+        // already typed so the row immediately complies with the new UoM's rules.
+        truncateQtyOnUomChange(item) {
+            if (!item) return;
+            if (!this.isQtyDecimalAllowed(item)) {
+                const intQty = Math.max(1, Math.floor(parseFloat(item.quantity) || 1));
+                item.quantity = String(intQty);
+                this.syncValueFromQty(item);
+            }
         },
         incQty(item) {
             let cur = parseFloat(item.quantity) || 0;

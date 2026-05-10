@@ -796,6 +796,28 @@ kbd {
                                 </div>
                             </div>
 
+                            {{-- ⚡ ALWAYS-VISIBLE Reverse Calc — type Rs (tax-INCLUSIVE) → qty auto.
+                                 e.g. price 100/kg + 18% GST: type 150 → qty ≈ 1.271 kg (Rs 150 includes tax).
+                                 If item is EXEMPT → qty = 150/100 = 1.5 kg (no tax). --}}
+                            <div x-show="parseFloat(item.unit_price) > 0 && item.is_price_editable !== false"
+                                 class="mt-2 flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg px-2 py-1.5 ring-1 ring-emerald-200 dark:ring-emerald-800">
+                                <span class="text-[10px] font-black text-emerald-700 dark:text-emerald-300 leading-none whitespace-nowrap">
+                                    Or Rs <span class="font-semibold normal-case opacity-80" x-text="item.is_tax_exempt ? '(exempt)' : '(incl. tax)'"></span>:
+                                </span>
+                                <input type="text" inputmode="decimal" autocomplete="off" maxlength="10"
+                                    x-model="item._amountInput"
+                                    @focus="$event.target.select(); item._amountInput = item.line_value > 0 ? String(item.line_value) : ''"
+                                    @input="item._amountInput = sanitizeQty($event.target.value); reverseCalcFromAmount(item, item._amountInput)"
+                                    @blur="item._amountInput = ''"
+                                    @keydown.enter.prevent="item._amountInput = ''; if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
+                                    class="flex-1 min-w-0 border-0 bg-white dark:bg-gray-800 dark:text-white text-sm font-bold tabular-nums shadow-inner rounded px-2 py-1 focus:ring-1 focus:ring-emerald-500 focus:outline-none text-right"
+                                    :placeholder="'e.g. ' + Math.round(parseFloat(item.unit_price) * (item.is_tax_exempt ? 1 : (1 + (parseFloat(item.tax_rate) || 0)/100)) * 2)"
+                                    title="Type Rs amount customer is paying (tax already included for tax items) → qty auto-calculates">
+                                <span x-show="parseFloat(item.quantity) > 0 && item.line_value > 0"
+                                      class="text-[10px] font-black text-emerald-700 dark:text-emerald-400 leading-none whitespace-nowrap"
+                                      x-text="'≈ ' + item.quantity + ' ' + item.uom"></span>
+                            </div>
+
                             {{-- Line total chip --}}
                             <div class="flex justify-end mt-1.5">
                                 <span class="line-total-chip text-sm" x-text="'PKR ' + formatNum(lineTotal(item))"></span>
@@ -835,22 +857,7 @@ kbd {
                                     </div>
                                 </div>
 
-                                {{-- Reverse calc (type Rs amount → qty auto-derives) — only visible inside Edit panel --}}
-                                <div x-show="parseFloat(item.unit_price) > 0 && item.is_price_editable !== false"
-                                     class="mt-2 flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 rounded-md px-2 py-1.5 ring-1 ring-emerald-200 dark:ring-emerald-800">
-                                    <span class="text-[10px] font-black text-emerald-700 dark:text-emerald-300 leading-none whitespace-nowrap">Or type Rs amount → qty auto:</span>
-                                    <input type="text" inputmode="decimal" autocomplete="off" maxlength="10"
-                                        x-model="item._amountInput"
-                                        @focus="$event.target.select(); item._amountInput = item.line_value > 0 ? String(item.line_value) : ''"
-                                        @input="item._amountInput = sanitizeQty($event.target.value); reverseCalcFromAmount(item, item._amountInput)"
-                                        @blur="item._amountInput = ''"
-                                        @keydown.enter.prevent="item._amountInput = ''; if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
-                                        class="flex-1 min-w-0 border-0 bg-white dark:bg-gray-800 dark:text-white text-xs font-bold tabular-nums shadow-inner rounded px-1 py-0.5 focus:ring-1 focus:ring-emerald-500 focus:outline-none text-right"
-                                        :placeholder="'e.g. ' + (parseFloat(item.unit_price) * 2).toFixed(0)">
-                                    <span x-show="parseFloat(item.quantity) > 0 && item.line_value > 0"
-                                          class="text-[9px] font-bold text-emerald-700 dark:text-emerald-400 leading-none whitespace-nowrap"
-                                          x-text="'≈ ' + item.quantity + ' ' + item.uom"></span>
-                                </div>
+                                {{-- Reverse calc moved to always-visible row above — Edit panel only carries advanced fields now --}}
                             </div>
                         </div>
                     </template>
@@ -1602,8 +1609,12 @@ function fbrPosInvoice() {
                 item._valueInput = item.line_value > 0 ? String(item.line_value) : '';
             }
         },
-        // ⚡ Inline reverse-calc: type Rs amount → quantity auto-derives from unit price
-        // Works in QTY mode (no need to switch to VAL mode). For KG/LTR allows 3-decimal precision.
+        // ⚡ Inline reverse-calc: type Rs amount → quantity auto-derives.
+        // ✅ TAX-INCLUSIVE: typed Rs is what customer actually pays (tax already baked in).
+        //    - Exempt item       → qty = amount / unit_price
+        //    - Tax item (e.g.18%) → qty = amount / (unit_price × (1 + tax/100))
+        // Example: 150 ka 1kg, price 100/kg, 18% GST → qty = 150 / (100 × 1.18) ≈ 1.271 kg
+        // Example: same case but EXEMPT → qty = 150 / 100 = 1.5 kg
         reverseCalcFromAmount(item, amountStr) {
             const raw = (amountStr || '').toString().trim();
             if (raw === '') return; // empty = user is backspacing; don't clobber qty
@@ -1611,18 +1622,22 @@ function fbrPosInvoice() {
             if (!isFinite(parsed) || parsed <= 0) return;
             const price = parseFloat(item.unit_price) || 0;
             if (price <= 0) return;
+            // Effective per-unit cost INCLUDING tax (so typed Rs = total customer pays)
+            const taxRate = item.is_tax_exempt ? 0 : (parseFloat(item.tax_rate) || 0);
+            const effPrice = price * (1 + taxRate / 100);
+            if (effPrice <= 0) return;
             const factor = this.getBaseFactor(item.uom); // KG/LTR=1000 (gm precision), else=1
             let qty;
             if (factor === 1) {
                 // Whole-unit items (PCS, BOX, etc.) — round to nearest whole, min 1
-                qty = Math.max(1, Math.round(parsed / price));
+                qty = Math.max(1, Math.round(parsed / effPrice));
             } else {
                 // Weight/volume — 3-decimal precision (≈1g for KG, ≈1ml for LTR)
-                qty = Math.round((parsed / price) * 1000) / 1000;
+                qty = Math.round((parsed / effPrice) * 1000) / 1000;
                 if (qty < 0.001) qty = 0.001;
             }
             item.quantity = String(qty);
-            item.line_value = Math.round(qty * price * 100) / 100;
+            item.line_value = Math.round(qty * price * 100) / 100; // line_value stays NET (tax-excl) — backend re-derives
         },
         addItem() {
             this.items.push({ _uid: 'r' + Date.now() + '_' + Math.random().toString(36).slice(2,7), item_name: '', hs_code: '', uom: 'U', quantity: 1, unit_price: 0, tax_rate: 18, is_tax_exempt: false, item_discount: 0, is_price_editable: true, mode: 'qty', _valueInput: '', _amountInput: '', line_value: 0 });

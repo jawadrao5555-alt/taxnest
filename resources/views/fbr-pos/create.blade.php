@@ -667,7 +667,13 @@ kbd {
                             <span><kbd>Alt</kbd>+<kbd>C</kbd> Customer · <kbd>Alt</kbd>+<kbd>P</kbd> Promo</span>
                             <span><kbd>Alt</kbd>+<kbd>M</kbd> cycle Method · <kbd>Alt</kbd>+<kbd>X</kbd> cycle Discount</span>
                             <span><kbd>Alt</kbd>+<kbd>I</kbd> toggle Tax-Incl · <kbd>Alt</kbd>+<kbd>A</kbd> Or-Rs bar</span>
-                            <span><kbd>Alt</kbd>+<kbd>R</kbd> Cash field · <kbd>Alt</kbd>+<kbd>Q</kbd> last qty</span>
+                            <span><kbd>Alt</kbd>+<kbd>R</kbd> Cash field · <kbd>Alt</kbd>+<kbd>Q</kbd> last qty · <kbd>Alt</kbd>+<kbd>N</kbd> +Row</span>
+                            <span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200 font-bold mt-1">Cart Navigation:</span>
+                            <span><kbd>PgUp</kbd>/<kbd>PgDn</kbd> Prev/Next Row · <kbd>Ctrl</kbd>+<kbd>Home</kbd>/<kbd>End</kbd> First/Last</span>
+                            <span><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>1..9</kbd> Jump to Row N</span>
+                            <span><kbd>Alt</kbd>+<kbd>Backspace</kbd> Delete Active Row</span>
+                            <span class="px-1.5 py-0.5 rounded bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200 font-bold mt-1">Qty fine-tune (in qty input):</span>
+                            <span><kbd>↑</kbd>/<kbd>↓</kbd> ±1 · <kbd>Shift</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> ±10 · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> ±0.1</span>
                             <span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 font-bold mt-1">Cash quick (Alt+):</span>
                             <span><kbd>Alt</kbd>+<kbd>1/2/3/4</kbd> +100/+500/+1K/+5K</span>
                             <span><kbd>Alt</kbd>+<kbd>5/6/7</kbd> 500/1000/5000 note · <kbd>Alt</kbd>+<kbd>0</kbd> Clear</span>
@@ -848,8 +854,18 @@ kbd {
                                             @keydown="if (!isQtyDecimalAllowed(item) && ($event.key === '.' || $event.key === ',')) $event.preventDefault()"
                                             @focus="$event.target.select()"
                                             @blur="if(!item.quantity || parseFloat(item.quantity) <= 0){ item.quantity = 1; } syncValueFromQty(item);"
-                                            @keydown.arrow-up.prevent="incQty(item); $event.target.select();"
-                                            @keydown.arrow-down.prevent="decQty(item); $event.target.select();"
+                                            @keydown.arrow-up.prevent="
+                                                if ($event.ctrlKey && $event.shiftKey) bumpActiveQty(0.1);
+                                                else if ($event.shiftKey) bumpActiveQty(10);
+                                                else incQty(item);
+                                                $event.target.select();
+                                            "
+                                            @keydown.arrow-down.prevent="
+                                                if ($event.ctrlKey && $event.shiftKey) bumpActiveQty(-0.1);
+                                                else if ($event.shiftKey) bumpActiveQty(-10);
+                                                else decQty(item);
+                                                $event.target.select();
+                                            "
                                             @keydown.escape.prevent="$refs.barcodeInput && $refs.barcodeInput.focus()"
                                             @keydown.enter.prevent="
                                                 if (item.product_id) { $refs.barcodeInput && $refs.barcodeInput.focus(); }
@@ -1194,6 +1210,34 @@ function fbrPosInvoice() {
                 if (e.altKey && (e.key === 'q' || e.key === 'Q')) {
                     e.preventDefault(); this.focusLastRowQty(); return;
                 }
+                // ═══════════ 🛒 CART-DIRECT NAVIGATION (PageUp/Down, Home/End, Alt+Backspace) ═══════════
+                // PageUp / PageDown — navigate to previous / next cart row (focus name)
+                if (e.key === 'PageUp' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                    e.preventDefault(); this.navRow(-1); return;
+                }
+                if (e.key === 'PageDown' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                    e.preventDefault(); this.navRow(1); return;
+                }
+                // Ctrl+Home / Ctrl+End — first / last row
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Home') {
+                    e.preventDefault(); this.focusRowName(0); return;
+                }
+                if ((e.ctrlKey || e.metaKey) && e.key === 'End') {
+                    e.preventDefault(); this.focusRowName(this.items.length - 1); return;
+                }
+                // Alt+Backspace — delete active row (easier alias for Ctrl+Del)
+                if (e.altKey && e.key === 'Backspace') {
+                    e.preventDefault(); this.deleteActiveRow(); return;
+                }
+                // Ctrl+Shift+1..9 — jump directly to row N
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && /^[1-9]$/.test(e.key)) {
+                    const n = parseInt(e.key, 10) - 1;
+                    if (n < this.items.length) { e.preventDefault(); this.focusRowName(n); return; }
+                }
+                // Alt+N — add a new product row + focus name (easy "direct add" alias for F6)
+                if (e.altKey && (e.key === 'n' || e.key === 'N')) {
+                    e.preventDefault(); this.addItem(); this.focusLastRowName(); return;
+                }
                 // ═══════════ 🎹 COMPLETE KEYBOARD-FRIENDLY ALT+ SHORTCUTS ═══════════
                 if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
                     const k = e.key.toLowerCase();
@@ -1432,6 +1476,70 @@ function fbrPosInvoice() {
                 const nameInput = lastRow.querySelector('input[name$="[item_name]"]');
                 if (nameInput) { nameInput.focus(); nameInput.select && nameInput.select(); }
             });
+        },
+        // 🎯 Focus a SPECIFIC row's name field (by index) + sets activeItemIndex
+        focusRowName(idx) {
+            if (idx < 0 || idx >= this.items.length) return;
+            this.activeItemIndex = idx;
+            this.$nextTick(() => {
+                const row = document.querySelector('.item-card[data-item-index="' + idx + '"]');
+                if (!row) return;
+                row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                const nameInput = row.querySelector('input[name$="[item_name]"]');
+                if (nameInput) { nameInput.focus(); nameInput.select && nameInput.select(); }
+            });
+        },
+        // 🎯 Focus a SPECIFIC row's qty field (by index)
+        focusRowQty(idx) {
+            if (idx < 0 || idx >= this.items.length) return;
+            this.activeItemIndex = idx;
+            this.$nextTick(() => {
+                const row = document.querySelector('.item-card[data-item-index="' + idx + '"]');
+                if (!row) return;
+                row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                const qtyInput = row.querySelector('input[name$="[quantity]"]');
+                if (qtyInput) { qtyInput.focus(); qtyInput.select && qtyInput.select(); }
+            });
+        },
+        // ⬆️⬇️ Move active row index UP or DOWN by delta and focus its name field
+        navRow(delta) {
+            const len = this.items.length;
+            if (!len) return;
+            const cur = (this.activeItemIndex >= 0 && this.activeItemIndex < len) ? this.activeItemIndex : (len - 1);
+            let next = cur + delta;
+            if (next < 0) next = 0;
+            if (next >= len) next = len - 1;
+            this.focusRowName(next);
+        },
+        // 🗑️ Delete the active row (with safety: keep at least one row)
+        deleteActiveRow() {
+            if (this.items.length <= 1) {
+                this.toast('At least one row required', 'error');
+                this.beep && this.beep(220, 0.2);
+                return;
+            }
+            const idx = (this.activeItemIndex >= 0 && this.activeItemIndex < this.items.length) ? this.activeItemIndex : (this.items.length - 1);
+            this.removeItem(idx);
+            this.toast('Row #' + (idx + 1) + ' removed', 'info');
+            this.$nextTick(() => {
+                const newIdx = Math.min(idx, this.items.length - 1);
+                this.focusRowName(newIdx);
+            });
+        },
+        // ➕➖ Bump qty of CURRENT active row by step (supports decimals like 0.1)
+        bumpActiveQty(step) {
+            const idx = (this.activeItemIndex >= 0 && this.activeItemIndex < this.items.length) ? this.activeItemIndex : (this.items.length - 1);
+            const item = this.items[idx];
+            if (!item) return;
+            // Respect decimal-allowed UoMs: round to 3 decimals to avoid floating drift
+            const allowDecimal = this.isQtyDecimalAllowed(item);
+            let cur = parseFloat(item.quantity) || 0;
+            let next = cur + step;
+            if (next < (allowDecimal ? 0.001 : 1)) next = allowDecimal ? 0.001 : 1;
+            if (allowDecimal) next = Math.round(next * 1000) / 1000;
+            else next = Math.max(1, Math.round(next));
+            item.quantity = String(next);
+            this.syncValueFromQty(item);
         },
         // 💳 F8 Payment Picker
         openPaymentPicker() {

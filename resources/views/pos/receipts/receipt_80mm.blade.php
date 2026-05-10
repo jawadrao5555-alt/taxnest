@@ -164,9 +164,6 @@
         @if($company->website)<p>{{ $company->website }}</p>@endif
         @if($company->ntn)<p><strong>NTN:</strong> {{ $company->ntn }}</p>@endif
         @if(!empty($company->fbr_registration_no))<p><strong>STRN:</strong> {{ $company->fbr_registration_no }}</p>@endif
-        @if($logoMissing)
-        <p style="font-size:8px; color:#888; margin-top:3px;">(logo file not found on server — re-upload from Business Profile)</p>
-        @endif
     </div>
 
     <div class="separator"></div>

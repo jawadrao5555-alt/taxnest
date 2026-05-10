@@ -149,9 +149,6 @@
         @if($company->email)<p>{{ $company->email }}</p>@endif
         @if($company->ntn)<p><strong>NTN:</strong> {{ $company->ntn }}</p>@endif
         @if(!empty($company->fbr_registration_no))<p><strong>STRN:</strong> {{ $company->fbr_registration_no }}</p>@endif
-        @if($logoMissing)
-        <p style="font-size:7px; color:#888;">(logo not found — re-upload)</p>
-        @endif
     </div>
 
     <div class="separator"></div>

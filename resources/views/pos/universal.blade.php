@@ -3283,7 +3283,10 @@ function restaurantPos() {
                 this.clearCart();
                 // Auto-focus phone input → ready for next sale, NO dead focus.
                 this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
-            } catch (e) { this.showToast('Network error', 'error'); }
+            } catch (e) {
+                console.error('[processPayment] FAIL', e);
+                this.showToast('Submit failed: ' + (e?.message || e?.name || 'unknown') + ' — check console (F12)', 'error');
+            }
             this.showPayModal = false; this.submitting = false; this.saveAsProvisional = false;
         },
 
@@ -3362,8 +3365,8 @@ function restaurantPos() {
                 // Refresh failed badge — successful sales might leave a previous fail intact.
                 this.loadFailedBills();
             } catch (e) {
-                console.error('Manual cart pay error:', e);
-                this.showToast('Network error', 'error');
+                console.error('[processPaymentManual] FAIL', e);
+                this.showToast('Manual pay failed: ' + (e?.message || e?.name || 'unknown') + ' — F12 console', 'error');
             }
             this.showPayModal = false;
             this.submitting = false;
@@ -3699,7 +3702,10 @@ function restaurantPos() {
                     // Refresh failed badge so cashier sees pending/failed state in real time.
                     this.loadFailedBills();
                 } else { if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; } this.showToast(data.message || 'Payment failed', 'error'); }
-            } catch (e) { this.showToast('Payment error', 'error'); }
+            } catch (e) {
+                console.error('[payHeldOrderDirect] FAIL', e);
+                this.showToast('Payment error: ' + (e?.message || e?.name || 'unknown') + ' — F12 console', 'error');
+            }
         },
 
         // Persistent receipt popup — auto-dismiss disabled. Popup stays open until the cashier

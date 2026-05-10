@@ -483,7 +483,47 @@ kbd {
         @csrf
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 items-start">
-            <div class="lg:col-span-2 space-y-4">
+            {{-- ═══ LEFT COLUMN — Frequently Sold Products quick-add tiles ═══
+                 Sticky on desktop so cashiers always see their high-velocity items
+                 (last 30-day top sellers). Click a tile → addProductItem(). --}}
+            <aside class="lg:col-span-1 lg:order-1 space-y-3 lg:sticky lg:top-16 lg:self-start">
+                <div class="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/40 rounded-2xl border-2 border-amber-300 dark:border-amber-700 shadow-md p-3">
+                    <div class="flex items-center justify-between mb-2 px-1">
+                        <h3 class="text-sm font-black text-amber-900 dark:text-amber-200 tracking-tight flex items-center gap-2">
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-amber-500 text-white text-xs shadow-sm">🔥</span>
+                            Quick Add
+                        </h3>
+                        <span class="text-[9px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">Top 30-day</span>
+                    </div>
+                    @if($frequentProducts->isEmpty())
+                        <p class="text-xs text-amber-700 dark:text-amber-300 text-center py-6 px-2 leading-relaxed">No sales yet — your routine top-sellers will appear here automatically.</p>
+                    @else
+                        <div class="grid grid-cols-2 gap-1.5 max-h-[calc(100vh-12rem)] overflow-y-auto pr-1">
+                            @foreach($frequentProducts as $fp)
+                                <button type="button"
+                                    @click='addProductItem(@json([
+                                        "id" => $fp->id,
+                                        "name" => $fp->name,
+                                        "default_price" => (float) $fp->default_price,
+                                        "default_tax_rate" => (float) ($fp->default_tax_rate ?? 18),
+                                        "tax_type" => $fp->tax_type ?? "standard",
+                                        "hs_code" => $fp->hs_code,
+                                        "sku" => $fp->sku,
+                                        "barcode" => $fp->barcode,
+                                        "default_uom" => $fp->default_uom ?? "U",
+                                        "is_price_editable" => (bool) ($fp->is_price_editable ?? true),
+                                    ]))'
+                                    class="group bg-white dark:bg-slate-900 hover:bg-amber-100 dark:hover:bg-amber-900/40 active:scale-95 border border-amber-200 dark:border-amber-800 rounded-lg p-2 text-left transition shadow-sm hover:shadow-md">
+                                    <p class="text-[11px] font-bold text-slate-900 dark:text-white leading-tight line-clamp-2 group-hover:text-amber-900 dark:group-hover:text-amber-100" title="{{ $fp->name }}">{{ $fp->name }}</p>
+                                    <p class="text-[10px] font-black text-emerald-700 dark:text-emerald-400 mt-0.5 tabular-nums">Rs {{ number_format((float) $fp->default_price, 0) }}</p>
+                                </button>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            </aside>
+
+            <div class="lg:col-span-2 lg:order-2 space-y-4">
                 <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-md p-4 sm:p-5">
                     <div class="flex items-center justify-between mb-3">
                         <h3 class="text-base font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
@@ -758,6 +798,7 @@ kbd {
                                     <input type="number" :name="'items['+index+'][unit_price]'" x-model.number="item.unit_price" min="0.01" step="0.01" required
                                         :readonly="item.is_price_editable === false"
                                         :tabindex="item.is_price_editable === false ? -1 : 0"
+                                        @focus="$event.target.select()"
                                         @input="syncValueFromQty(item)"
                                         @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
                                         :class="item.is_price_editable === false ? 'bg-amber-50 dark:bg-amber-900/20 cursor-not-allowed text-amber-900 dark:text-amber-200 font-bold' : 'dark:bg-gray-800 dark:text-white'"
@@ -768,6 +809,7 @@ kbd {
                                     <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Tax %</label>
                                     <input type="number" :name="'items['+index+'][tax_rate]'" x-model.number="item.tax_rate" min="0" max="100" step="0.01"
                                         :disabled="item.is_tax_exempt"
+                                        @focus="$event.target.select()"
                                         @keydown.tab="if(!$event.shiftKey && index === items.length - 1 && item.item_name && parseFloat(item.unit_price) > 0){ $event.preventDefault(); addItem(); }"
                                         @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 px-1"
@@ -784,6 +826,7 @@ kbd {
                                     <label class="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">
                                         <span>Item Discount (PKR):</span>
                                         <input type="number" :name="'items['+index+'][item_discount]'" x-model.number="item.item_discount" min="0" step="0.01"
+                                            @focus="$event.target.select()"
                                             class="w-24 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                             placeholder="0.00">
                                     </label>
@@ -823,9 +866,10 @@ kbd {
                         <span><kbd>F2</kbd> Cash · <kbd>F3</kbd> Numpad · <kbd>F4</kbd> Hold · <kbd>F5</kbd> Recall · <kbd>F12</kbd> Reprint</span>
                     </div>
                 </div>
-            </div>
 
-            <div class="space-y-4 lg:sticky lg:top-16 lg:self-start">
+                {{-- ═══ Customer · Promo · Payment now stacked BELOW cart in the SAME RIGHT column ═══
+                     (Was previously a separate sticky right sidebar — merged on user request so
+                     cashier sees Cart → Customer → Payment in one vertical flow on the right.) --}}
                 <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                     <h3 class="text-base font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2 tracking-tight">
                         <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-600 text-white text-sm shadow-sm">👤</span>
@@ -902,6 +946,7 @@ kbd {
                         <div x-show="discountType">
                             <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Discount Value</label>
                             <input type="number" name="discount_value" x-model.number="discountValue" min="0" step="0.01"
+                                @focus="$event.target.select()"
                                 class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
                         </div>
                     </div>
@@ -962,6 +1007,7 @@ kbd {
                                 <button type="button" @click="cashReceived = calcTotal(); $nextTick(() => $refs.cashInput && $refs.cashInput.focus())" class="text-emerald-600 hover:text-emerald-800 text-xs font-bold underline">EXACT</button>
                             </label>
                             <input type="number" name="cash_received" x-model.number="cashReceived" x-ref="cashInput"
+                                @focus="$event.target.select()"
                                 @keydown.enter.prevent=""
                                 step="0.01" min="0" placeholder="Tendered amount (F9 / Ctrl+B = pay)"
                                 class="w-full rounded-lg border-2 border-emerald-400 dark:border-emerald-600 dark:bg-gray-800 dark:text-white text-xl font-bold py-3 px-3 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
@@ -1011,6 +1057,7 @@ kbd {
                     <br>FBR submission happens <span class="font-bold">only</span> after you press "Confirm &amp; Complete" in the modal.
                 </p>
             </div>
+            {{-- /lg:col-span-2 RIGHT column (cart + customer + payment merged) --}}
         </div>
     </form>
 

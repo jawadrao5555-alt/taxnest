@@ -98,6 +98,32 @@ class FbrPosController extends Controller
         $products = Product::where('company_id', $companyId)->where('is_active', true)->orderBy('name')->get();
         $fbrReportingEnabled = (bool) $company->fbr_reporting_enabled;
 
+        // 🔥 Frequently sold products (last 30 days, top 12 by total qty sold)
+        // Used by the bottom "Quick Add" tile grid on the create page so cashiers can
+        // one-click add their routine high-velocity items without typing/searching.
+        $topIds = \DB::table('fbr_pos_transaction_items as fi')
+            ->join('fbr_pos_transactions as ft', 'ft.id', '=', 'fi.transaction_id')
+            ->where('ft.company_id', $companyId)
+            ->where('ft.created_at', '>=', now()->subDays(30))
+            ->whereNotNull('fi.product_id')
+            ->select('fi.product_id', \DB::raw('SUM(fi.quantity) as sold_qty'))
+            ->groupBy('fi.product_id')
+            ->orderByDesc('sold_qty')
+            ->limit(12)
+            ->pluck('fi.product_id')
+            ->all();
+        if (!empty($topIds)) {
+            $orderClause = 'FIELD(id,' . implode(',', array_map('intval', $topIds)) . ')';
+            $frequentProducts = Product::where('company_id', $companyId)
+                ->where('is_active', true)
+                ->whereIn('id', $topIds)
+                ->orderByRaw($orderClause)
+                ->get();
+        } else {
+            // Cold start (no sales yet) — fall back to the first 12 active products by name
+            $frequentProducts = $products->take(12)->values();
+        }
+
         // Phase 2: terminals, shift, loyalty, promotions
         $terminals = \App\Models\FbrPosTerminal::where('company_id', $companyId)->where('is_active', true)->orderBy('terminal_name')->get();
         $currentShift = \App\Models\FbrPosShift::where('company_id', $companyId)
@@ -109,7 +135,7 @@ class FbrPosController extends Controller
             ->where('is_active', true)->orderByDesc('id')->limit(20)->get();
 
         return view('fbr-pos.create', compact(
-            'company', 'products', 'fbrReportingEnabled',
+            'company', 'products', 'fbrReportingEnabled', 'frequentProducts',
             'terminals', 'currentShift', 'loyaltySettings', 'heldCount', 'activePromos'
         ));
     }

@@ -496,7 +496,7 @@ kbd {
                     <div class="space-y-2">
                         <div>
                             <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase">Name</label>
-                            <input type="text" name="customer_name" x-model="customerName" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Walk-in Customer">
+                            <input type="text" name="customer_name" x-ref="customerNameInput" x-model="customerName" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Walk-in Customer (Alt+C)">
                         </div>
                         <div>
                             <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase">Phone <span class="text-emerald-600 text-[9px]" x-show="loyaltyEnabled">(loyalty)</span></label>
@@ -658,20 +658,25 @@ kbd {
                         <svg class="w-4 h-4 text-slate-500 transition-transform" :class="shortcutsOpen ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <div x-show="shortcutsOpen" x-collapse class="px-3 pb-3">
-                        <div class="flex flex-col gap-1.5 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
-                            <span><kbd>Ctrl</kbd>+<kbd>K</kbd> Search → <kbd>↓</kbd><kbd>↑</kbd><kbd>Enter</kbd> add</span>
+                        <div class="flex flex-col gap-1 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+                            <span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 font-bold"><kbd>F8</kbd>/<kbd>F9</kbd>/<kbd>Ctrl</kbd>+<kbd>B</kbd>/<kbd>Alt</kbd>+<kbd>S</kbd> = PAYMENT</span>
                             <span class="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-bold"><kbd>Enter</kbd> = Add Product / Next Row</span>
-                            <span><kbd>Ctrl</kbd>+<kbd>D</kbd> Duplicate · <kbd>Ctrl</kbd>+<kbd>Del</kbd> Remove</span>
-                            <span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 font-bold"><kbd>F8</kbd>/<kbd>F9</kbd>/<kbd>Ctrl</kbd>+<kbd>B</kbd> = PAYMENT</span>
+                            <span><kbd>Ctrl</kbd>+<kbd>K</kbd> / <kbd>F7</kbd> Search · <kbd>↓</kbd><kbd>↑</kbd><kbd>Enter</kbd></span>
+                            <span><kbd>Ctrl</kbd>+<kbd>D</kbd> Dup · <kbd>Ctrl</kbd>+<kbd>Del</kbd> Remove · <kbd>F6</kbd> +Row</span>
+                            <span class="px-1.5 py-0.5 rounded bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200 font-bold mt-1">Field focus (Alt+):</span>
+                            <span><kbd>Alt</kbd>+<kbd>C</kbd> Customer · <kbd>Alt</kbd>+<kbd>P</kbd> Promo</span>
+                            <span><kbd>Alt</kbd>+<kbd>M</kbd> cycle Method · <kbd>Alt</kbd>+<kbd>X</kbd> cycle Discount</span>
+                            <span><kbd>Alt</kbd>+<kbd>I</kbd> toggle Tax-Incl · <kbd>Alt</kbd>+<kbd>A</kbd> Or-Rs bar</span>
+                            <span><kbd>Alt</kbd>+<kbd>R</kbd> Cash field · <kbd>Alt</kbd>+<kbd>Q</kbd> last qty</span>
+                            <span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 font-bold mt-1">Cash quick (Alt+):</span>
+                            <span><kbd>Alt</kbd>+<kbd>1/2/3/4</kbd> +100/+500/+1K/+5K</span>
+                            <span><kbd>Alt</kbd>+<kbd>5/6/7</kbd> 500/1000/5000 note · <kbd>Alt</kbd>+<kbd>0</kbd> Clear</span>
                             <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 font-bold mt-1">Quantity tricks:</span>
-                            <span><kbd>3</kbd>+<kbd>*</kbd> in scan → next adds qty 3</span>
-                            <span><kbd>*</kbd> alone → jump to last row qty</span>
-                            <span><kbd>+</kbd>/<kbd>-</kbd> in scan → bump last qty ±1</span>
-                            <span><kbd>↑</kbd>/<kbd>↓</kbd> in qty/value → ±1</span>
-                            <span><kbd>Ctrl</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> anywhere → last qty</span>
-                            <span><kbd>Alt</kbd>+<kbd>Q</kbd> → focus last qty</span>
+                            <span><kbd>3</kbd>+<kbd>*</kbd> scan → next adds qty 3 · <kbd>*</kbd> jump qty</span>
+                            <span><kbd>+</kbd>/<kbd>-</kbd> scan → bump last ±1 · <kbd>↑</kbd>/<kbd>↓</kbd> in qty</span>
+                            <span><kbd>Ctrl</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> anywhere → last qty ±1</span>
                             <span><kbd>Esc</kbd> in qty/value → back to scan</span>
-                            <span><kbd>F2</kbd> Cash · <kbd>F3</kbd> Numpad · <kbd>F4</kbd> Hold · <kbd>F5</kbd> Recall · <kbd>F12</kbd> Reprint</span>
+                            <span class="mt-1"><kbd>F2</kbd> Cash exact · <kbd>F3</kbd> Numpad · <kbd>F4</kbd> Hold · <kbd>F5</kbd> Recall · <kbd>F12</kbd> Reprint</span>
                         </div>
                     </div>
                 </div>
@@ -695,7 +700,7 @@ kbd {
                         </div>
                         <div>
                             <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Discount Type</label>
-                            <select name="discount_type" x-model="discountType" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <select name="discount_type" x-ref="discountTypeSelect" x-model="discountType" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
                                 <option value="">None</option>
                                 <option value="percentage">Percentage (%)</option>
                                 <option value="fixed">Fixed Amount (PKR)</option>
@@ -703,7 +708,7 @@ kbd {
                         </div>
                         <div x-show="discountType">
                             <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Discount Value</label>
-                            <input type="number" name="discount_value" x-model.number="discountValue" min="0" step="0.01"
+                            <input type="number" name="discount_value" x-ref="discountValueInput" x-model.number="discountValue" min="0" step="0.01"
                                 @focus="$event.target.select()"
                                 class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
                         </div>
@@ -758,6 +763,7 @@ kbd {
                                 <span class="block text-[9px] font-semibold opacity-70 normal-case" x-text="target ? ('row #' + (items.indexOf(target) + 1) + ' · ' + (target.item_name || '—')) : ''"></span>
                             </span>
                             <input type="text" inputmode="decimal" autocomplete="off" maxlength="10"
+                                x-ref="globalAmountInput"
                                 x-model="(target ? target._amountInput : '')"
                                 @focus="if (target) target._amountInput = ''"
                                 @input="if (target) { target._amountInput = sanitizeQty($event.target.value); reverseCalcFromAmount(target, target._amountInput); }"
@@ -948,7 +954,7 @@ kbd {
                                 <span class="text-[11px] font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">Promo Code</span>
                             </div>
                             <div class="flex gap-1.5">
-                                <input type="text" x-model="promoCode" placeholder="Enter code" class="flex-1 uppercase rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1 shadow-sm">
+                                <input type="text" x-ref="promoInput" x-model="promoCode" @keydown.enter.prevent="applyPromo()" placeholder="Code (Alt+P)" class="flex-1 uppercase rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1 shadow-sm">
                                 <button type="button" @click="applyPromo()" class="px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold">Apply</button>
                             </div>
                             <input type="hidden" name="promotion_id" x-model="promotionId">
@@ -1187,6 +1193,57 @@ function fbrPosInvoice() {
                 // ⌨️ NEW: Alt+Q (anywhere) — jump to last-added row's qty input
                 if (e.altKey && (e.key === 'q' || e.key === 'Q')) {
                     e.preventDefault(); this.focusLastRowQty(); return;
+                }
+                // ═══════════ 🎹 COMPLETE KEYBOARD-FRIENDLY ALT+ SHORTCUTS ═══════════
+                if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+                    const k = e.key.toLowerCase();
+                    // Alt+C — focus customer name
+                    if (k === 'c') { e.preventDefault(); const el = this.$refs.customerNameInput; if (el) { el.focus(); el.select && el.select(); } return; }
+                    // Alt+P — focus promo code
+                    if (k === 'p') { e.preventDefault(); const el = this.$refs.promoInput; if (el) { el.focus(); el.select && el.select(); } return; }
+                    // Alt+M — cycle payment method (cash → card → bank_transfer → online)
+                    if (k === 'm') {
+                        e.preventDefault();
+                        const order = ['cash','card','bank_transfer','online'];
+                        const idx = order.indexOf(this.paymentMethod);
+                        this.paymentMethod = order[(idx + 1) % order.length];
+                        this.toast('Payment: ' + this.paymentMethod.toUpperCase(), 'info');
+                        return;
+                    }
+                    // Alt+X — focus discount type (cycle: none → % → fixed)
+                    if (k === 'x') {
+                        e.preventDefault();
+                        const order = ['','percentage','fixed'];
+                        const idx = order.indexOf(this.discountType || '');
+                        this.discountType = order[(idx + 1) % order.length];
+                        this.toast('Discount: ' + (this.discountType || 'NONE').toUpperCase(), 'info');
+                        if (this.discountType) { this.$nextTick(() => { const el = this.$refs.discountValueInput; if (el) { el.focus(); el.select && el.select(); } }); }
+                        return;
+                    }
+                    // Alt+I — toggle TAX-INCLUSIVE
+                    if (k === 'i') {
+                        e.preventDefault();
+                        this.taxInclusive = !this.taxInclusive;
+                        this.toast(this.taxInclusive ? '✓ Prices INCLUDE tax' : 'Prices EXCLUDE tax', 'info');
+                        return;
+                    }
+                    // Alt+R — focus cash received (no auto-fill, vs F2 which auto-fills exact)
+                    if (k === 'r') { e.preventDefault(); const el = this.$refs.cashInput; if (el) { el.focus(); el.select && el.select(); } return; }
+                    // Alt+A — focus global "Or Rs" amount bar
+                    if (k === 'a') { e.preventDefault(); const el = this.$refs.globalAmountInput; if (el) { el.focus(); el.select && el.select(); } return; }
+                    // Alt+1..4 — quick tender +100 / +500 / +1K / +5K
+                    if (k === '1') { e.preventDefault(); this.addTender && this.addTender(100); return; }
+                    if (k === '2') { e.preventDefault(); this.addTender && this.addTender(500); return; }
+                    if (k === '3') { e.preventDefault(); this.addTender && this.addTender(1000); return; }
+                    if (k === '4') { e.preventDefault(); this.addTender && this.addTender(5000); return; }
+                    // Alt+5..7 — set note 500 / 1000 / 5000
+                    if (k === '5') { e.preventDefault(); this.setNote && this.setNote(500); return; }
+                    if (k === '6') { e.preventDefault(); this.setNote && this.setNote(1000); return; }
+                    if (k === '7') { e.preventDefault(); this.setNote && this.setNote(5000); return; }
+                    // Alt+0 — clear cash received
+                    if (k === '0') { e.preventDefault(); this.cashReceived = 0; this.toast('Cash cleared', 'info'); return; }
+                    // Alt+S — submit (alias for F8/F9 — open payment picker)
+                    if (k === 's') { e.preventDefault(); this.openPaymentPicker(); return; }
                 }
                 // ═══ PHASE 2 — V/Q mode toggle (only when no input focused) ═══
                 if ((e.key === 'v' || e.key === 'V' || e.key === 'q' || e.key === 'Q') && !e.ctrlKey && !e.metaKey && !e.altKey) {

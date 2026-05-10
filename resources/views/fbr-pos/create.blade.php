@@ -710,21 +710,7 @@ kbd {
                     </div>
                 </div>
 
-                {{-- 🎁 Promo Code — compact (moved from right column) --}}
-                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-3">
-                    <h3 class="text-xs font-black text-slate-900 dark:text-white mb-2 flex items-center gap-1.5 tracking-tight uppercase">
-                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-md bg-pink-600 text-white text-[10px] shadow-sm">🎁</span>
-                        Promo Code
-                    </h3>
-                    <div class="flex gap-1.5">
-                        <input type="text" x-model="promoCode" placeholder="Enter code" class="flex-1 uppercase rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1.5 shadow-sm">
-                        <button type="button" @click="applyPromo()" class="px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold">Apply</button>
-                    </div>
-                    <input type="hidden" name="promotion_id" x-model="promotionId">
-                    <input type="hidden" name="promotion_code" x-model="promoCode">
-                    <div x-show="promoMessage" :class="promoOk ? 'text-emerald-700' : 'text-red-700'" class="text-[11px] mt-1.5 font-semibold" x-text="promoMessage"></div>
-                </div>
-
+                {{-- ⬇ Promo Code MOVED into blue Totals card on user request (swap with tax-inclusive toggle) --}}
                 {{-- ⬇ Totals/Cash/Confirm MOVED back to RIGHT column on user request --}}
             </aside>
 
@@ -740,6 +726,18 @@ kbd {
                     </div>
 
                     {{-- ✨ Scan/search input MOVED to LEFT column above Quick Add tiles --}}
+
+                    {{-- 🎯 TAX-INCLUSIVE TOGGLE (moved from blue Totals card → top of cart on user request) --}}
+                    <label class="mb-3 flex items-start gap-2 cursor-pointer p-2 rounded-lg border-2 transition"
+                        :class="taxInclusive ? 'border-emerald-400 bg-emerald-50 dark:border-emerald-600 dark:bg-emerald-900/20' : 'border-slate-300 dark:border-slate-600 bg-white/60 dark:bg-slate-800/40'">
+                        <input type="checkbox" x-model="taxInclusive" class="mt-0.5 rounded border-gray-400 text-emerald-600 focus:ring-emerald-500">
+                        <div class="flex-1 leading-tight">
+                            <span class="text-[11px] font-black text-slate-800 dark:text-slate-100" x-text="taxInclusive ? '✓ PRICES INCLUDE TAX' : 'Prices EXCLUDE tax'"></span>
+                            <p class="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5"
+                               x-text="taxInclusive ? 'Rs 150 + 18% → total stays 150.' : 'Tax added on top (150 + 18% = 177).'"></p>
+                        </div>
+                    </label>
+                    <input type="hidden" name="tax_inclusive" :value="taxInclusive ? '1' : '0'">
 
                     {{-- ═══ 🎯 GLOBAL "Or Rs" REVERSE-CALC BAR (manual-typing billing) ═══
                          Sits at TOP of cart, OUTSIDE rows. Targets the ACTIVE / LAST row.
@@ -943,16 +941,20 @@ kbd {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {{-- LEFT half: Totals + Tax-Inclusive toggle --}}
                     <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 p-4">
-                        <label class="mb-3 flex items-start gap-2 cursor-pointer p-2 rounded-lg border-2 transition"
-                            :class="taxInclusive ? 'border-emerald-400 bg-emerald-50 dark:border-emerald-600 dark:bg-emerald-900/20' : 'border-slate-300 dark:border-slate-600 bg-white/60 dark:bg-slate-800/40'">
-                            <input type="checkbox" x-model="taxInclusive" class="mt-0.5 rounded border-gray-400 text-emerald-600 focus:ring-emerald-500">
-                            <div class="flex-1 leading-tight">
-                                <span class="text-[11px] font-black text-slate-800 dark:text-slate-100" x-text="taxInclusive ? '✓ PRICES INCLUDE TAX' : 'Prices EXCLUDE tax'"></span>
-                                <p class="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5"
-                                   x-text="taxInclusive ? 'Rs 150 + 18% → total stays 150.' : 'Tax added on top (150 + 18% = 177).'"></p>
+                        {{-- 🎁 Promo Code (moved from left aside → here on user request, replacing tax-inclusive toggle) --}}
+                        <div class="mb-3 p-2 rounded-lg border-2 border-pink-300 dark:border-pink-700 bg-white/70 dark:bg-slate-800/40">
+                            <div class="flex items-center gap-1.5 mb-1.5">
+                                <span class="inline-flex items-center justify-center w-5 h-5 rounded-md bg-pink-600 text-white text-[10px] shadow-sm">🎁</span>
+                                <span class="text-[11px] font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">Promo Code</span>
                             </div>
-                        </label>
-                        <input type="hidden" name="tax_inclusive" :value="taxInclusive ? '1' : '0'">
+                            <div class="flex gap-1.5">
+                                <input type="text" x-model="promoCode" placeholder="Enter code" class="flex-1 uppercase rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1 shadow-sm">
+                                <button type="button" @click="applyPromo()" class="px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold">Apply</button>
+                            </div>
+                            <input type="hidden" name="promotion_id" x-model="promotionId">
+                            <input type="hidden" name="promotion_code" x-model="promoCode">
+                            <div x-show="promoMessage" :class="promoOk ? 'text-emerald-700' : 'text-red-700'" class="text-[10px] mt-1 font-semibold" x-text="promoMessage"></div>
+                        </div>
                         <div class="space-y-1.5 text-sm">
                             <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold">
                                 <span x-text="taxInclusive ? 'Net (Tax Excl.)' : 'Subtotal'"></span>

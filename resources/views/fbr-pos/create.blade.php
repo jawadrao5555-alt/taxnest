@@ -487,6 +487,41 @@ kbd {
                  Sticky on desktop so cashiers always see their high-velocity items
                  (last 30-day top sellers). Click a tile → addProductItem(). --}}
             <aside class="lg:col-span-1 lg:order-1 space-y-3 lg:sticky lg:top-16 lg:self-start">
+                {{-- 👤 CUSTOMER — moved to TOP of LEFT column on user request --}}
+                <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-md p-3">
+                    <h3 class="text-sm font-black text-slate-900 dark:text-white mb-2 flex items-center gap-2 tracking-tight">
+                        <span class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-600 text-white text-xs shadow-sm">👤</span>
+                        Customer <span class="text-[9px] font-bold text-slate-500 dark:text-slate-400">(Optional)</span>
+                    </h3>
+                    <div class="space-y-2">
+                        <div>
+                            <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase">Name</label>
+                            <input type="text" name="customer_name" x-model="customerName" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Walk-in Customer">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase">Phone <span class="text-emerald-600 text-[9px]" x-show="loyaltyEnabled">(loyalty)</span></label>
+                            <div class="flex gap-1">
+                                <input type="text" name="customer_phone" x-model="customerPhone" @blur="lookupCustomer()" class="flex-1 min-w-0 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="0300-1234567">
+                                <button type="button" @click="lookupCustomer()" class="px-2.5 bg-blue-600 text-white rounded-lg text-xs font-bold">Find</button>
+                            </div>
+                            <input type="hidden" name="customer_id" x-model="customerId">
+                            <div x-show="customerPoints !== null" class="mt-1.5 bg-emerald-50 dark:bg-emerald-900/30 p-1.5 rounded text-[11px]">
+                                <strong x-text="customerName + ': ' + customerPoints + ' pts'"></strong>
+                                <template x-if="customerPoints >= loyaltyMinRedeem">
+                                    <div class="mt-1 flex items-center gap-1">
+                                        <input type="number" name="loyalty_points_redeemed" x-model.number="loyaltyRedeem" :max="customerPoints" min="0" class="w-20 border rounded px-1 py-0.5 text-xs" placeholder="Pts">
+                                        <span x-text="'= Rs ' + (loyaltyRedeem * loyaltyPointValue).toFixed(0)"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase">NTN</label>
+                            <input type="text" name="customer_ntn" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Optional">
+                        </div>
+                    </div>
+                </div>
+
                 {{-- 🎯 SCAN / SEARCH INPUT — moved here on user request so cart-build controls
                      stay on the LEFT and the actual cart fills the RIGHT column. --}}
                 <div class="bg-white dark:bg-slate-900 rounded-2xl border-2 border-indigo-300 dark:border-indigo-700 shadow-md p-3 relative" @click.outside="searchOpen = false">
@@ -877,42 +912,7 @@ kbd {
                     {{-- ✨ Keyboard hints strip MOVED to LEFT column (collapsible card under Quick Add) --}}
                 </div>
 
-                {{-- ═══ Customer · Promo · Payment now stacked BELOW cart in the SAME RIGHT column ═══
-                     (Was previously a separate sticky right sidebar — merged on user request so
-                     cashier sees Cart → Customer → Payment in one vertical flow on the right.) --}}
-                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-                    <h3 class="text-base font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2 tracking-tight">
-                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-600 text-white text-sm shadow-sm">👤</span>
-                        Customer <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400">(Optional)</span>
-                    </h3>
-                    <div class="space-y-3">
-                        <div>
-                            <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Name</label>
-                            <input type="text" name="customer_name" x-model="customerName" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Walk-in Customer">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Phone <span class="text-emerald-600 text-[10px]" x-show="loyaltyEnabled">(loyalty lookup)</span></label>
-                            <div class="flex gap-1">
-                                <input type="text" name="customer_phone" x-model="customerPhone" @blur="lookupCustomer()" class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="0300-1234567">
-                                <button type="button" @click="lookupCustomer()" class="px-3 bg-blue-600 text-white rounded-lg text-sm">Find</button>
-                            </div>
-                            <input type="hidden" name="customer_id" x-model="customerId">
-                            <div x-show="customerPoints !== null" class="mt-2 bg-emerald-50 dark:bg-emerald-900/30 p-2 rounded text-xs">
-                                <strong x-text="customerName + ': ' + customerPoints + ' pts'"></strong>
-                                <template x-if="customerPoints >= loyaltyMinRedeem">
-                                    <div class="mt-1 flex items-center gap-1">
-                                        <input type="number" name="loyalty_points_redeemed" x-model.number="loyaltyRedeem" :max="customerPoints" min="0" class="w-20 border rounded px-1 py-0.5 text-xs" placeholder="Pts">
-                                        <span x-text="'= Rs ' + (loyaltyRedeem * loyaltyPointValue).toFixed(0)"></span>
-                                    </div>
-                                </template>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">NTN</label>
-                            <input type="text" name="customer_ntn" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Optional">
-                        </div>
-                    </div>
-                </div>
+                {{-- ✨ Customer block MOVED to TOP of LEFT column on user request --}}
 
                 {{-- Promo Code --}}
                 <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">

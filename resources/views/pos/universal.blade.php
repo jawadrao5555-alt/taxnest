@@ -1549,7 +1549,7 @@ window.addEventListener('popstate', function() {
                 </div>
             </div>
             <div class="flex-1 overflow-hidden bg-gray-50 dark:bg-gray-800/50 min-h-0" style="max-height: 45vh;">
-                <iframe x-ref="receiptIframe" class="w-full h-full border-0" :src="lastTransactionId ? '/pos/restaurant/receipt/' + lastTransactionId : ''" style="min-height:300px;"></iframe>
+                <iframe x-ref="receiptIframe" class="w-full h-full border-0" :src="lastTransactionId ? (isRestaurantMode ? '/pos/restaurant/receipt/' + lastTransactionId : '/pos/transaction/' + lastTransactionId + '/receipt') : ''" style="min-height:300px;"></iframe>
             </div>
             {{-- Persistent action bar: Print | KOT | New Sale | Close. Print/KOT fire prints      --}}
             {{-- but popup STAYS OPEN so cashier can verify, reprint, or take other actions.       --}}
@@ -3488,7 +3488,7 @@ function restaurantPos() {
 
         printReceipt(onAfterPrint) {
             if (!this.lastTransactionId) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
-            const url = '/pos/restaurant/receipt/' + this.lastTransactionId + '?auto_print=1';
+            const url = (this.isRestaurantMode ? '/pos/restaurant/receipt/' : '/pos/transaction/') + this.lastTransactionId + (this.isRestaurantMode ? '?auto_print=1' : '/receipt?auto_print=1');
             this._printViaIframe('print-receipt-frame', url, 'width=400,height=700', onAfterPrint);
         },
 

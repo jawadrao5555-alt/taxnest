@@ -675,6 +675,137 @@ kbd {
                         </div>
                     </div>
                 </div>
+
+                {{-- ═════════ 💳 PAYMENT & DISCOUNT + TOTALS + CONFIRM (moved from right column) ═════════ --}}
+                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4">
+                    <h3 class="text-sm font-black text-slate-900 dark:text-white mb-3 flex items-center gap-2 tracking-tight">
+                        <span class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-indigo-600 text-white text-xs shadow-sm">💳</span>
+                        Payment &amp; Discount
+                    </h3>
+                    <div class="space-y-2.5">
+                        <div>
+                            <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Method *</label>
+                            <select name="payment_method" x-ref="paymentSelect" x-model="paymentMethod" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                <option value="cash">Cash</option>
+                                <option value="card">Card</option>
+                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="online">Online</option>
+                            </select>
+                            <p class="text-[10px] font-semibold text-slate-600 dark:text-slate-300 mt-1">Press <kbd class="px-1 bg-gray-200 dark:bg-gray-700 rounded text-[10px]">F8</kbd> for payment</p>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Discount Type</label>
+                            <select name="discount_type" x-model="discountType" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                <option value="">None</option>
+                                <option value="percentage">Percentage (%)</option>
+                                <option value="fixed">Fixed Amount (PKR)</option>
+                            </select>
+                        </div>
+                        <div x-show="discountType">
+                            <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Discount Value</label>
+                            <input type="number" name="discount_value" x-model.number="discountValue" min="0" step="0.01"
+                                @focus="$event.target.select()"
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 p-4">
+                    {{-- 🎯 CART-LEVEL TAX INCLUSIVE TOGGLE --}}
+                    <label class="mb-3 flex items-start gap-2 cursor-pointer p-2 rounded-lg border-2 transition"
+                        :class="taxInclusive ? 'border-emerald-400 bg-emerald-50 dark:border-emerald-600 dark:bg-emerald-900/20' : 'border-slate-300 dark:border-slate-600 bg-white/60 dark:bg-slate-800/40'">
+                        <input type="checkbox" x-model="taxInclusive" class="mt-0.5 rounded border-gray-400 text-emerald-600 focus:ring-emerald-500">
+                        <div class="flex-1 leading-tight">
+                            <span class="text-[11px] font-black text-slate-800 dark:text-slate-100" x-text="taxInclusive ? '✓ PRICES INCLUDE TAX' : 'Prices EXCLUDE tax'"></span>
+                            <p class="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5"
+                               x-text="taxInclusive ? 'Rs 150 + 18% → total stays 150.' : 'Tax added on top (150 + 18% = 177).'"></p>
+                        </div>
+                    </label>
+                    <input type="hidden" name="tax_inclusive" :value="taxInclusive ? '1' : '0'">
+                    <div class="space-y-1.5 text-sm">
+                        <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold">
+                            <span x-text="taxInclusive ? 'Net (Tax Excl.)' : 'Subtotal'"></span>
+                            <span x-text="'PKR ' + formatNum(calcSubtotal())"></span>
+                        </div>
+                        <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold" x-show="calcDiscount() > 0">
+                            <span>Discount</span>
+                            <span class="text-red-600" x-text="'-PKR ' + formatNum(calcDiscount())"></span>
+                        </div>
+                        <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold" x-show="promoDiscount > 0">
+                            <span>Promo <span class="text-xs" x-text="'(' + promoCode + ')'"></span></span>
+                            <span class="text-emerald-600" x-text="'-PKR ' + formatNum(promoDiscount)"></span>
+                        </div>
+                        <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold">
+                            <span>Tax</span>
+                            <span x-text="'PKR ' + formatNum(calcTax())"></span>
+                        </div>
+                        @if($fbrReportingEnabled)
+                        <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold">
+                            <span>FBR POS Fee <span class="text-[10px]">(SRO 1279/21)</span></span>
+                            <span>PKR 1.00</span>
+                        </div>
+                        @endif
+                        <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold" x-show="loyaltyRedeem > 0">
+                            <span>Loyalty <span class="text-xs" x-text="'(' + loyaltyRedeem + 'pts)'"></span></span>
+                            <span class="text-emerald-600" x-text="'-PKR ' + formatNum(loyaltyRedeem * loyaltyPointValue)"></span>
+                        </div>
+                        <div class="flex justify-between font-bold text-base text-blue-800 dark:text-blue-300 pt-2 border-t border-blue-200 dark:border-blue-700">
+                            <span>Total</span>
+                            <span x-text="'PKR ' + formatNum(calcTotal())"></span>
+                        </div>
+                    </div>
+
+                    {{-- ⚡ Fast Payment Section --}}
+                    <div class="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700 space-y-2">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center justify-between">
+                                <span>💵 Cash Received</span>
+                                <button type="button" @click="cashReceived = calcTotal(); $nextTick(() => $refs.cashInput && $refs.cashInput.focus())" class="text-emerald-600 hover:text-emerald-800 text-xs font-bold underline">EXACT</button>
+                            </label>
+                            <input type="number" name="cash_received" x-model.number="cashReceived" x-ref="cashInput"
+                                @focus="$event.target.select()"
+                                @keydown.enter.prevent=""
+                                step="0.01" min="0" placeholder="F9 / Ctrl+B = pay"
+                                class="w-full rounded-lg border-2 border-emerald-400 dark:border-emerald-600 dark:bg-gray-800 dark:text-white text-lg font-bold py-2.5 px-3 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                        </div>
+                        {{-- Quick tender buttons --}}
+                        <div class="grid grid-cols-4 gap-1">
+                            <button type="button" @click="addTender(100)" class="py-1.5 bg-gray-200 hover:bg-emerald-200 dark:bg-gray-700 dark:hover:bg-emerald-800 text-gray-900 dark:text-white rounded font-bold text-[11px]">+100</button>
+                            <button type="button" @click="addTender(500)" class="py-1.5 bg-gray-200 hover:bg-emerald-200 dark:bg-gray-700 dark:hover:bg-emerald-800 text-gray-900 dark:text-white rounded font-bold text-[11px]">+500</button>
+                            <button type="button" @click="addTender(1000)" class="py-1.5 bg-gray-200 hover:bg-emerald-200 dark:bg-gray-700 dark:hover:bg-emerald-800 text-gray-900 dark:text-white rounded font-bold text-[11px]">+1K</button>
+                            <button type="button" @click="addTender(5000)" class="py-1.5 bg-gray-200 hover:bg-emerald-200 dark:bg-gray-700 dark:hover:bg-emerald-800 text-gray-900 dark:text-white rounded font-bold text-[11px]">+5K</button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-1 mt-1">
+                            <button type="button" @click="setNote(500)" class="py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded font-bold text-[11px]">500 note</button>
+                            <button type="button" @click="setNote(1000)" class="py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded font-bold text-[11px]">1000 note</button>
+                            <button type="button" @click="setNote(5000)" class="py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded font-bold text-[11px]">5000 note</button>
+                            <button type="button" @click="cashReceived = 0" class="py-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-700 dark:text-red-300 rounded font-bold text-[11px]">Clear</button>
+                        </div>
+                        {{-- HUGE Change Due display --}}
+                        <div class="mt-2 p-2.5 rounded-lg text-center"
+                            :class="cashReceived <= 0 ? 'bg-gray-100 dark:bg-gray-800' : (changeDue() >= 0 ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-red-100 dark:bg-red-900/40')">
+                            <div class="text-[10px] font-semibold uppercase" :class="changeDue() >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'"
+                                x-text="cashReceived <= 0 ? 'CHANGE DUE' : (changeDue() >= 0 ? 'CHANGE TO RETURN' : 'STILL OWED')"></div>
+                            <div class="text-2xl font-black tabular-nums tracking-tight"
+                                :class="cashReceived <= 0 ? 'text-gray-400' : (changeDue() >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300')"
+                                x-text="'Rs ' + formatNum(Math.abs(changeDue()))"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" x-ref="completeBtn"
+                    @click="openPaymentPicker()"
+                    :disabled="!isOnline || submitting"
+                    :class="(isOnline && !submitting) ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-gray-400 text-gray-200 cursor-not-allowed'"
+                    class="w-full py-4 font-black rounded-xl transition text-base shadow-xl tracking-wide flex items-center justify-center gap-2">
+                    <svg x-show="submitting" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    <span x-show="isOnline && !submitting">✓ CONFIRM &amp; SUBMIT <span class="opacity-70 text-[10px] font-normal">(F8/F9)</span></span>
+                    <span x-show="submitting" x-cloak>SUBMITTING TO FBR...</span>
+                    <span x-show="!isOnline && !submitting" x-cloak>⚠ OFFLINE</span>
+                </button>
+                <p class="text-[10px] text-center font-semibold text-slate-600 dark:text-slate-300 leading-snug">
+                    📝 <span class="font-bold text-amber-600 dark:text-amber-400">PROVISIONAL</span> — FBR submit only after Confirm.
+                </p>
             </aside>
 
             <div class="lg:col-span-2 lg:order-2 space-y-4">
@@ -894,145 +1025,9 @@ kbd {
                     <div x-show="promoMessage" :class="promoOk ? 'text-emerald-700' : 'text-red-700'" class="text-xs mt-2 font-semibold" x-text="promoMessage"></div>
                 </div>
 
-                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-                    <h3 class="text-base font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2 tracking-tight">
-                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-indigo-600 text-white text-sm shadow-sm">💳</span>
-                        Payment &amp; Discount
-                    </h3>
-                    <div class="space-y-3">
-                        <div>
-                            <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Method *</label>
-                            <select name="payment_method" x-ref="paymentSelect" x-model="paymentMethod" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                                <option value="cash">Cash</option>
-                                <option value="card">Card</option>
-                                <option value="bank_transfer">Bank Transfer</option>
-                                <option value="online">Online</option>
-                            </select>
-                            <p class="text-[11px] font-semibold text-slate-600 dark:text-slate-300 mt-1">Press <kbd class="px-1 bg-gray-200 dark:bg-gray-700 rounded text-[10px]">F8</kbd> to pick payment method &amp; complete sale</p>
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Discount Type</label>
-                            <select name="discount_type" x-model="discountType" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                                <option value="">None</option>
-                                <option value="percentage">Percentage (%)</option>
-                                <option value="fixed">Fixed Amount (PKR)</option>
-                            </select>
-                        </div>
-                        <div x-show="discountType">
-                            <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Discount Value</label>
-                            <input type="number" name="discount_value" x-model.number="discountValue" min="0" step="0.01"
-                                @focus="$event.target.select()"
-                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 p-5">
-                    {{-- 🎯 CART-LEVEL TAX INCLUSIVE TOGGLE — when ON, all unit prices are treated as
-                         INCLUSIVE of GST (e.g. "150 ka rice" → bill total = 150, NOT 177).
-                         Backend reverse-calculates net = price / (1 + rate/100). --}}
-                    <label class="mb-3 flex items-start gap-2 cursor-pointer p-2.5 rounded-lg border-2 transition"
-                        :class="taxInclusive ? 'border-emerald-400 bg-emerald-50 dark:border-emerald-600 dark:bg-emerald-900/20' : 'border-slate-300 dark:border-slate-600 bg-white/60 dark:bg-slate-800/40'">
-                        <input type="checkbox" x-model="taxInclusive" class="mt-0.5 rounded border-gray-400 text-emerald-600 focus:ring-emerald-500">
-                        <div class="flex-1 leading-tight">
-                            <span class="text-xs font-black text-slate-800 dark:text-slate-100" x-text="taxInclusive ? '✓ PRICES INCLUDE TAX' : 'Prices EXCLUDE tax (default)'"></span>
-                            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5"
-                               x-text="taxInclusive ? 'e.g. Rs 150 item with 18% GST → bill total stays 150 (net 127.12 + tax 22.88).' : 'Tax is added on top of unit prices (e.g. 150 + 18% = 177).'"></p>
-                        </div>
-                    </label>
-                    <input type="hidden" name="tax_inclusive" :value="taxInclusive ? '1' : '0'">
-                    <div class="space-y-2 text-sm">
-                        <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold">
-                            <span x-text="taxInclusive ? 'Net (Tax Excl.)' : 'Subtotal'"></span>
-                            <span x-text="'PKR ' + formatNum(calcSubtotal())"></span>
-                        </div>
-                        <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold" x-show="calcDiscount() > 0">
-                            <span>Discount</span>
-                            <span class="text-red-600" x-text="'-PKR ' + formatNum(calcDiscount())"></span>
-                        </div>
-                        <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold" x-show="promoDiscount > 0">
-                            <span>Promo <span class="text-xs" x-text="'(' + promoCode + ')'"></span></span>
-                            <span class="text-emerald-600" x-text="'-PKR ' + formatNum(promoDiscount)"></span>
-                        </div>
-                        <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold">
-                            <span>Tax</span>
-                            <span x-text="'PKR ' + formatNum(calcTax())"></span>
-                        </div>
-                        @if($fbrReportingEnabled)
-                        <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold">
-                            <span>FBR POS Fee <span class="text-xs">(SRO 1279/2021)</span></span>
-                            <span>PKR 1.00</span>
-                        </div>
-                        @endif
-                        <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold" x-show="loyaltyRedeem > 0">
-                            <span>Loyalty Redeemed <span class="text-xs" x-text="'(' + loyaltyRedeem + ' pts)'"></span></span>
-                            <span class="text-emerald-600" x-text="'-PKR ' + formatNum(loyaltyRedeem * loyaltyPointValue)"></span>
-                        </div>
-                        <div class="flex justify-between font-bold text-lg text-blue-800 dark:text-blue-300 pt-2 border-t border-blue-200 dark:border-blue-700">
-                            <span>Total</span>
-                            <span x-text="'PKR ' + formatNum(calcTotal())"></span>
-                        </div>
-                    </div>
-
-                    {{-- ⚡ Fast Payment Section --}}
-                    <div class="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700 space-y-2">
-                        <div>
-                            <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center justify-between">
-                                <span>💵 Cash Received</span>
-                                <button type="button" @click="cashReceived = calcTotal(); $nextTick(() => $refs.cashInput && $refs.cashInput.focus())" class="text-emerald-600 hover:text-emerald-800 text-xs font-bold underline">EXACT</button>
-                            </label>
-                            <input type="number" name="cash_received" x-model.number="cashReceived" x-ref="cashInput"
-                                @focus="$event.target.select()"
-                                @keydown.enter.prevent=""
-                                step="0.01" min="0" placeholder="Tendered amount (F9 / Ctrl+B = pay)"
-                                class="w-full rounded-lg border-2 border-emerald-400 dark:border-emerald-600 dark:bg-gray-800 dark:text-white text-xl font-bold py-3 px-3 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-                        </div>
-                        {{-- Quick tender buttons --}}
-                        <div class="grid grid-cols-4 gap-1">
-                            <button type="button" @click="addTender(100)" class="py-2 bg-gray-200 hover:bg-emerald-200 dark:bg-gray-700 dark:hover:bg-emerald-800 text-gray-900 dark:text-white rounded font-bold text-xs">+100</button>
-                            <button type="button" @click="addTender(500)" class="py-2 bg-gray-200 hover:bg-emerald-200 dark:bg-gray-700 dark:hover:bg-emerald-800 text-gray-900 dark:text-white rounded font-bold text-xs">+500</button>
-                            <button type="button" @click="addTender(1000)" class="py-2 bg-gray-200 hover:bg-emerald-200 dark:bg-gray-700 dark:hover:bg-emerald-800 text-gray-900 dark:text-white rounded font-bold text-xs">+1K</button>
-                            <button type="button" @click="addTender(5000)" class="py-2 bg-gray-200 hover:bg-emerald-200 dark:bg-gray-700 dark:hover:bg-emerald-800 text-gray-900 dark:text-white rounded font-bold text-xs">+5K</button>
-                        </div>
-                        <div class="grid grid-cols-2 gap-1 mt-1">
-                            <button type="button" @click="setNote(500)" class="py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded font-bold text-xs">500 note</button>
-                            <button type="button" @click="setNote(1000)" class="py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded font-bold text-xs">1000 note</button>
-                            <button type="button" @click="setNote(5000)" class="py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded font-bold text-xs">5000 note</button>
-                            <button type="button" @click="cashReceived = 0" class="py-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-700 dark:text-red-300 rounded font-bold text-xs">Clear</button>
-                        </div>
-                        {{-- HUGE Change Due display --}}
-                        <div class="mt-2 p-3 rounded-lg text-center"
-                            :class="cashReceived <= 0 ? 'bg-gray-100 dark:bg-gray-800' : (changeDue() >= 0 ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-red-100 dark:bg-red-900/40')">
-                            <div class="text-xs font-semibold uppercase" :class="changeDue() >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'"
-                                x-text="cashReceived <= 0 ? 'CHANGE DUE' : (changeDue() >= 0 ? 'CHANGE TO RETURN' : 'STILL OWED')"></div>
-                            <div class="text-3xl font-black tabular-nums tracking-tight"
-                                :class="cashReceived <= 0 ? 'text-gray-400' : (changeDue() >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300')"
-                                x-text="'Rs ' + formatNum(Math.abs(changeDue()))"></div>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- ✅ NEW (Apr-26): Button is now type="button" — opens Payment Confirm picker.
-                     The actual form submission (DB row + FBR submission) ONLY happens after the
-                     cashier presses "Confirm & Complete Sale" inside the picker modal.
-                     This means the bill stays PROVISIONAL (just JS state) until payment is confirmed. --}}
-                <button type="button" x-ref="completeBtn"
-                    @click="openPaymentPicker()"
-                    :disabled="!isOnline || submitting"
-                    :class="(isOnline && !submitting) ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-gray-400 text-gray-200 cursor-not-allowed'"
-                    class="w-full py-5 font-black rounded-xl transition text-lg shadow-xl tracking-wide flex items-center justify-center gap-2">
-                    <svg x-show="submitting" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                    <span x-show="isOnline && !submitting">✓ CONFIRM PAYMENT &amp; SUBMIT <span class="opacity-70 text-xs font-normal">(F8 / F9)</span></span>
-                    <span x-show="submitting" x-cloak>SUBMITTING TO FBR...</span>
-                    <span x-show="!isOnline && !submitting" x-cloak>⚠ OFFLINE — RECONNECT TO SUBMIT</span>
-                </button>
-                {{-- Tiny clarifier under the button --}}
-                <p class="mt-2 text-[11px] text-center font-semibold text-slate-600 dark:text-slate-300 leading-snug">
-                    📝 Bill stays <span class="font-bold text-amber-600 dark:text-amber-400">PROVISIONAL</span> — edit/delete items above until you confirm payment.
-                    <br>FBR submission happens <span class="font-bold">only</span> after you press "Confirm &amp; Complete" in the modal.
-                </p>
+                {{-- ⬇ Payment & Discount + Totals + Confirm button MOVED to LEFT aside (bottom) on user request --}}
             </div>
-            {{-- /lg:col-span-2 RIGHT column (cart + customer + payment merged) --}}
+            {{-- /lg:col-span-2 RIGHT column (cart + promo) --}}
         </div>
     </form>
 

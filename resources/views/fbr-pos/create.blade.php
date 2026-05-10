@@ -1627,14 +1627,23 @@ function fbrPosInvoice() {
             const effPrice = price * (1 + taxRate / 100);
             if (effPrice <= 0) return;
             const factor = this.getBaseFactor(item.uom); // KG/LTR=1000 (gm precision), else=1
+            const exactQty = parsed / effPrice;
             let qty;
             if (factor === 1) {
                 // Whole-unit items (PCS, BOX, etc.) — round to nearest whole, min 1
-                qty = Math.max(1, Math.round(parsed / effPrice));
+                qty = Math.max(1, Math.round(exactQty));
             } else {
-                // Weight/volume — 3-decimal precision (≈1g for KG, ≈1ml for LTR)
-                qty = Math.round((parsed / effPrice) * 1000) / 1000;
+                // Weight/volume — start at 3-decimal precision (≈1g for KG, ≈1ml for LTR)
+                qty = Math.round(exactQty * 1000) / 1000;
                 if (qty < 0.001) qty = 0.001;
+                // ✅ EXACT-MATCH GUARANTEE: if 3-decimal qty produces a total that drifts
+                // ≥ 1 paisa away from typed amount (e.g. 200 → 200.01), upgrade to 6-decimal
+                // precision so the bill matches the customer's paid amount exactly.
+                const recomputedPaisa = Math.round(qty * effPrice * 100);
+                const targetPaisa = Math.round(parsed * 100);
+                if (Math.abs(recomputedPaisa - targetPaisa) >= 1) {
+                    qty = Math.round(exactQty * 1e6) / 1e6;
+                }
             }
             item.quantity = String(qty);
             item.line_value = Math.round(qty * price * 100) / 100; // line_value stays NET (tax-excl) — backend re-derives

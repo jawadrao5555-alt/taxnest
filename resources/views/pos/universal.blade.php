@@ -198,8 +198,6 @@ window.addEventListener('popstate', function() {
          so toggling immediately updates the receipt-iframe URL on the very next sale, no refresh needed. --}}
     <div class="flex items-center justify-end gap-4 px-3 py-1.5 bg-gradient-to-r from-purple-50 to-white dark:from-purple-900/10 dark:to-gray-900 border-b border-purple-100 dark:border-purple-900/30 flex-shrink-0"
          x-data="{
-            praEnabled: {{ ($company->pra_reporting_enabled ?? false) ? 'true' : 'false' }},
-            praLoading: false,
             autoPrintLoading: false,
             autoKotLoading: false
          }">
@@ -1864,6 +1862,13 @@ function restaurantPos() {
         // button on transaction-show. Toggle key: P (while pay modal is open).
         saveAsProvisional: false,
         showHeldOrders: false,
+        // ── PRA REPORTING TOGGLE (root scope so modals/buttons can read it) ───
+        // Mirrors $company->pra_reporting_enabled. Used by Provisional/Failed bill
+        // action buttons (:disabled="!praEnabled"). Was previously defined only in
+        // a nested x-data on the toggle strip → caused "praEnabled is not defined"
+        // Alpine crashes inside the modals which broke the whole page (incl. Pay).
+        praEnabled: {{ ($company->pra_reporting_enabled ?? false) ? 'true' : 'false' }},
+        praLoading: false,
         // ── PROVISIONAL BILLS (header shortcut, F10) ──────────────────────────
         // Lazy-loaded list of all bills with pra_status='local' for current company.
         // Refreshed on page mount, after every bill save, and after each modal action.

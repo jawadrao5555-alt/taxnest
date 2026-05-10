@@ -214,8 +214,8 @@ class PraIntegrationService
                     CURLOPT_POST => true,
                     CURLOPT_POSTFIELDS => $jsonPayload,
                     CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 25,           // was 45 — PRA usually responds in 2-5s
-                    CURLOPT_CONNECTTIMEOUT => 6,     // was 10 — fail fast on dead connection
+                    CURLOPT_TIMEOUT => 8,            // hard cap — never block cashier > 8s (was 25)
+                    CURLOPT_CONNECTTIMEOUT => 3,     // fail fast on dead connection (was 6)
                     CURLOPT_HTTPHEADER => [
                         'Content-Type: application/json',
                         'Accept: application/json',
@@ -245,8 +245,8 @@ class PraIntegrationService
                     CURLOPT_POST => true,
                     CURLOPT_POSTFIELDS => $jsonPayload,
                     CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 20,           // was 30 — production tuned
-                    CURLOPT_CONNECTTIMEOUT => 6,     // was 15 — fail fast
+                    CURLOPT_TIMEOUT => 8,            // hard cap — never block cashier > 8s (was 20)
+                    CURLOPT_CONNECTTIMEOUT => 3,     // fail fast on dead connection (was 6)
                     CURLOPT_HTTPHEADER => [
                         'Content-Type: application/json',
                         'Accept: application/json',

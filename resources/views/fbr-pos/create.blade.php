@@ -669,6 +669,7 @@ kbd {
                             <span><kbd>Alt</kbd>+<kbd>I</kbd> toggle Tax-Incl · <kbd>Alt</kbd>+<kbd>A</kbd> Or-Rs bar</span>
                             <span><kbd>Alt</kbd>+<kbd>R</kbd> Cash field · <kbd>Alt</kbd>+<kbd>Q</kbd> last qty · <kbd>Alt</kbd>+<kbd>N</kbd> +Row</span>
                             <span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200 font-bold mt-1">Cart Navigation:</span>
+                            <span class="font-bold"><kbd>Alt</kbd>+<kbd>G</kbd> = JUMP INTO CART (active row)</span>
                             <span><kbd>PgUp</kbd>/<kbd>PgDn</kbd> Prev/Next Row · <kbd>Ctrl</kbd>+<kbd>Home</kbd>/<kbd>End</kbd> First/Last</span>
                             <span><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>1..9</kbd> Jump to Row N</span>
                             <span><kbd>Alt</kbd>+<kbd>Backspace</kbd> Delete Active Row</span>
@@ -1237,6 +1238,13 @@ function fbrPosInvoice() {
                 // Alt+N — add a new product row + focus name (easy "direct add" alias for F6)
                 if (e.altKey && (e.key === 'n' || e.key === 'N')) {
                     e.preventDefault(); this.addItem(); this.focusLastRowName(); return;
+                }
+                // 🎯 Alt+G — "Go to cart" — jump straight into the cart's active row name field
+                if (e.altKey && (e.key === 'g' || e.key === 'G')) {
+                    e.preventDefault();
+                    const idx = (this.activeItemIndex >= 0 && this.activeItemIndex < this.items.length) ? this.activeItemIndex : (this.items.length - 1);
+                    this.focusRowName(idx);
+                    return;
                 }
                 // ═══════════ 🎹 COMPLETE KEYBOARD-FRIENDLY ALT+ SHORTCUTS ═══════════
                 if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {

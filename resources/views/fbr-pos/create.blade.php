@@ -821,6 +821,39 @@ kbd {
 
                     {{-- ✨ Scan/search input MOVED to LEFT column above Quick Add tiles --}}
 
+                    {{-- ═══ 🎯 GLOBAL "Or Rs" REVERSE-CALC BAR (manual-typing billing) ═══
+                         Sits at TOP of cart, OUTSIDE rows. Targets the ACTIVE / LAST row.
+                         Cashier types Rs amount customer is paying (tax-INCLUSIVE for tax items,
+                         exempt amount for exempt items) → qty of active row auto-derives.
+                         Only visible if at least one row has a unit price set. --}}
+                    <template x-if="items.length > 0">
+                        <div x-data="{
+                                get target() {
+                                    let i = (this.activeItemIndex >= 0 && this.activeItemIndex < this.items.length) ? this.activeItemIndex : (this.items.length - 1);
+                                    return this.items[i] || null;
+                                }
+                             }"
+                             x-show="target && parseFloat(target.unit_price) > 0 && target.is_price_editable !== false"
+                             class="mb-3 flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg px-3 py-2 ring-1 ring-emerald-200 dark:ring-emerald-800">
+                            <span class="text-[11px] font-black text-emerald-700 dark:text-emerald-300 leading-tight whitespace-nowrap">
+                                💰 Or Rs <span class="font-semibold normal-case opacity-80" x-text="target ? (target.is_tax_exempt ? '(exempt)' : '(incl. tax)') : ''"></span>
+                                <span class="block text-[9px] font-semibold opacity-70 normal-case" x-text="target ? ('row #' + (items.indexOf(target) + 1) + ' · ' + (target.item_name || '—')) : ''"></span>
+                            </span>
+                            <input type="text" inputmode="decimal" autocomplete="off" maxlength="10"
+                                x-model="(target ? target._amountInput : '')"
+                                @focus="if (target) target._amountInput = ''"
+                                @input="if (target) { target._amountInput = sanitizeQty($event.target.value); reverseCalcFromAmount(target, target._amountInput); }"
+                                @blur="if (target) target._amountInput = ''"
+                                @keydown.enter.prevent="if (target) { target._amountInput = ''; if (target.item_name && parseFloat(target.unit_price) > 0) { addItem(); focusLastRowName(); } }"
+                                class="flex-1 min-w-0 border-0 bg-white dark:bg-gray-800 dark:text-white text-base font-bold tabular-nums shadow-inner rounded px-3 py-1.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-right"
+                                :placeholder="target ? ('e.g. ' + Math.round(parseFloat(target.unit_price) * (target.is_tax_exempt ? 1 : (1 + (parseFloat(target.tax_rate) || 0)/100)) * 2)) : ''"
+                                title="Type Rs amount customer pays → active row's qty auto-calculates">
+                            <span x-show="target && parseFloat(target.quantity) > 0 && target.line_value > 0"
+                                  class="text-[11px] font-black text-emerald-700 dark:text-emerald-400 leading-none whitespace-nowrap"
+                                  x-text="target ? ('≈ ' + target.quantity + ' ' + target.uom) : ''"></span>
+                        </div>
+                    </template>
+
                     <template x-for="(item, index) in items" :key="item._uid">
                         <div class="item-card row-in border rounded-xl p-3 mb-2"
                              :data-item-index="index"
@@ -927,27 +960,8 @@ kbd {
                                 </div>
                             </div>
 
-                            {{-- ⚡ ALWAYS-VISIBLE Reverse Calc — type Rs (tax-INCLUSIVE) → qty auto.
-                                 e.g. price 100/kg + 18% GST: type 150 → qty ≈ 1.271 kg (Rs 150 includes tax).
-                                 If item is EXEMPT → qty = 150/100 = 1.5 kg (no tax). --}}
-                            <div x-show="parseFloat(item.unit_price) > 0 && item.is_price_editable !== false"
-                                 class="mt-2 flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg px-2 py-1.5 ring-1 ring-emerald-200 dark:ring-emerald-800">
-                                <span class="text-[10px] font-black text-emerald-700 dark:text-emerald-300 leading-none whitespace-nowrap">
-                                    Or Rs <span class="font-semibold normal-case opacity-80" x-text="item.is_tax_exempt ? '(exempt)' : '(incl. tax)'"></span>:
-                                </span>
-                                <input type="text" inputmode="decimal" autocomplete="off" maxlength="10"
-                                    x-model="item._amountInput"
-                                    @focus="item._amountInput = ''"
-                                    @input="item._amountInput = sanitizeQty($event.target.value); reverseCalcFromAmount(item, item._amountInput)"
-                                    @blur="item._amountInput = ''"
-                                    @keydown.enter.prevent="item._amountInput = ''; if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
-                                    class="flex-1 min-w-0 border-0 bg-white dark:bg-gray-800 dark:text-white text-sm font-bold tabular-nums shadow-inner rounded px-2 py-1 focus:ring-1 focus:ring-emerald-500 focus:outline-none text-right"
-                                    :placeholder="'e.g. ' + Math.round(parseFloat(item.unit_price) * (item.is_tax_exempt ? 1 : (1 + (parseFloat(item.tax_rate) || 0)/100)) * 2)"
-                                    title="Type Rs amount customer is paying (tax already included for tax items) → qty auto-calculates">
-                                <span x-show="parseFloat(item.quantity) > 0 && item.line_value > 0"
-                                      class="text-[10px] font-black text-emerald-700 dark:text-emerald-400 leading-none whitespace-nowrap"
-                                      x-text="'≈ ' + item.quantity + ' ' + item.uom"></span>
-                            </div>
+                            {{-- ⬆ Per-row "Or Rs" reverse-calc REMOVED — moved to single GLOBAL bar at top of cart.
+                                 Saaf cart rows; reverse-calc sirf manual-typing billing me kaam aata hai. --}}
 
                             {{-- Line total chip --}}
                             <div class="flex justify-end mt-1.5">

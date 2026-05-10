@@ -323,7 +323,7 @@
                 </div>
 
                 <div class="overflow-x-auto">
-                    <table class="min-w-full premium-table" id="invoiceTable">
+                    <table class="min-w-full premium-table table-cards" id="invoiceTable">
                         <thead class="bg-gradient-to-r from-gray-50 to-gray-100/80 dark:from-gray-800 dark:to-gray-800/80 sticky top-0 z-10">
                             <tr>
                                 @if($tab === 'completed')

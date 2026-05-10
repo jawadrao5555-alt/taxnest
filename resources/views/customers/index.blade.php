@@ -16,7 +16,7 @@
 
             <div class="premium-card overflow-hidden">
                 <div class="overflow-x-auto">
-                <table class="min-w-full premium-table">
+                <table class="min-w-full premium-table table-cards">
                     <thead class="bg-gradient-to-r from-gray-50 to-gray-100/80 dark:from-gray-800 dark:to-gray-800/80">
                         <tr>
                             <th class="text-left">Customer Name</th>
@@ -29,19 +29,19 @@
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                         @forelse($customers as $customer)
                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition" onclick="window.location='/customers/{{ urlencode($customer->customer_ntn) }}/ledger'">
-                            <td class="px-6 py-4 text-sm font-medium text-emerald-700 hover:text-emerald-900">
+                            <td data-label="Customer" class="px-6 py-4 text-sm font-medium text-emerald-700 hover:text-emerald-900">
                                 <a href="/customers/{{ urlencode($customer->customer_ntn) }}/ledger">{{ $customer->customer_name }}</a>
                             </td>
-                            <td class="px-6 py-4 text-sm font-mono text-gray-600 dark:text-gray-400">
+                            <td data-label="NTN" class="px-6 py-4 text-sm font-mono text-gray-600 dark:text-gray-400">
                                 @if(str_starts_with($customer->customer_ntn, 'WALK-IN-'))
                                     <span class="premium-badge bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 text-[10px]">Walk-in</span>
                                 @else
                                     {{ $customer->customer_ntn }}
                                 @endif
                             </td>
-                            <td class="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-gray-100 text-right">PKR {{ number_format($customer->total_invoiced, 2) }}</td>
-                            <td class="px-6 py-4 text-sm font-semibold text-green-600 text-right">PKR {{ number_format($customer->total_received, 2) }}</td>
-                            <td class="px-6 py-4 text-sm font-bold text-right {{ $customer->outstanding > 0 ? 'text-red-600' : 'text-green-600' }}">
+                            <td data-label="Invoiced" class="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-gray-100 text-right">PKR {{ number_format($customer->total_invoiced, 2) }}</td>
+                            <td data-label="Received" class="px-6 py-4 text-sm font-semibold text-green-600 text-right">PKR {{ number_format($customer->total_received, 2) }}</td>
+                            <td data-label="Outstanding" class="px-6 py-4 text-sm font-bold text-right {{ $customer->outstanding > 0 ? 'text-red-600' : 'text-green-600' }}">
                                 PKR {{ number_format($customer->outstanding, 2) }}
                             </td>
                         </tr>

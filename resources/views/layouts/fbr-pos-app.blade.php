@@ -15,7 +15,7 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
         <meta name="theme-color" content="#1e3a5f">
-        <link rel="stylesheet" href="{{ asset('css/mobile.css') }}?v=1.3">
+        <link rel="stylesheet" href="{{ asset('css/mobile.css') }}?v=2.1">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
         <meta name="apple-mobile-web-app-title" content="Nest FBR Pos">

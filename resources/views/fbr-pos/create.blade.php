@@ -487,6 +487,82 @@ kbd {
                  Sticky on desktop so cashiers always see their high-velocity items
                  (last 30-day top sellers). Click a tile → addProductItem(). --}}
             <aside class="lg:col-span-1 lg:order-1 space-y-3 lg:sticky lg:top-16 lg:self-start">
+                {{-- 🎯 SCAN / SEARCH INPUT — moved here on user request so cart-build controls
+                     stay on the LEFT and the actual cart fills the RIGHT column. --}}
+                <div class="bg-white dark:bg-slate-900 rounded-2xl border-2 border-indigo-300 dark:border-indigo-700 shadow-md p-3 relative" @click.outside="searchOpen = false">
+                    <div class="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/60 border border-indigo-200 dark:border-indigo-800 rounded-xl p-2 shadow-sm scan-pulse focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/20 transition">
+                        <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-600 text-white shadow-sm flex-shrink-0">
+                            <svg class="w-5 h-5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10m4-10v10m4-10v10m4-10v10m-12 0h16"/></svg>
+                        </span>
+                        <input type="text" x-ref="barcodeInput" x-model="barcodeBuffer"
+                            @input.debounce.250ms="
+                                const q = (barcodeBuffer || '').trim();
+                                if (q.length >= 2) {
+                                    fetch('{{ route('fbrpos.api.products.search') }}?q=' + encodeURIComponent(q))
+                                        .then(r => r.json())
+                                        .then(data => { searchResults = data; searchHi = 0; searchOpen = data.length > 0; })
+                                } else { searchResults = []; searchOpen = false; }
+                            "
+                            @keydown="handleScanInputShortcut($event)"
+                            @keydown.arrow-down.prevent="if (searchOpen && searchResults.length) { searchHi = (searchHi + 1) % searchResults.length; }"
+                            @keydown.arrow-up.prevent="if (searchOpen && searchResults.length) { searchHi = (searchHi - 1 + searchResults.length) % searchResults.length; }"
+                            @keydown.escape.prevent="if (qtyMultiplier > 1) { qtyMultiplier = 1; toast('Multiplier cleared', 'info'); } searchOpen = false; searchResults = []; searchHi = 0;"
+                            @keydown.enter.prevent="
+                                if (searchOpen && searchResults.length > 0) {
+                                    addProductItem(searchResults[searchHi]);
+                                    barcodeBuffer = ''; searchResults = []; searchOpen = false; searchHi = 0;
+                                    $nextTick(() => $refs.barcodeInput && $refs.barcodeInput.focus());
+                                } else {
+                                    scanBarcode();
+                                }
+                            "
+                            autocomplete="off"
+                            class="flex-1 min-w-0 bg-transparent border-0 focus:ring-0 text-sm font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:font-medium placeholder:text-xs placeholder:font-sans"
+                            placeholder="🔎 Name · SKU · Barcode · HS · scan">
+                        <span x-show="qtyMultiplier > 1"
+                              class="text-[10px] font-black px-2 py-0.5 bg-amber-500 text-white rounded-md shadow-sm tracking-wider animate-pulse"
+                              x-text="'× ' + qtyMultiplier"
+                              title="Quantity multiplier active — Esc to cancel"></span>
+                        <span class="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-600 text-white rounded shadow-sm tracking-wider">●</span>
+                    </div>
+                    <div x-show="scanStatus" :class="scanStatus.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'" class="text-[10px] font-bold mt-1 px-1" x-text="scanStatus && scanStatus.msg"></div>
+
+                    {{-- Autocomplete dropdown — appears under input as cashier types --}}
+                    <div x-show="searchOpen && searchResults.length > 0" x-cloak
+                         x-transition:enter="transition ease-out duration-150"
+                         x-transition:enter-start="opacity-0 -translate-y-1"
+                         x-transition:enter-end="opacity-100 translate-y-0"
+                         class="absolute left-2 right-2 top-full mt-1.5 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border-2 border-indigo-300 dark:border-indigo-700 z-40 max-h-80 overflow-y-auto">
+                        <div class="px-3 py-2 bg-indigo-50 dark:bg-indigo-950/40 border-b border-indigo-200 dark:border-indigo-800 flex items-center justify-between">
+                            <div class="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+                                <span x-text="searchResults.length"></span> match<span x-show="searchResults.length !== 1">es</span>
+                            </div>
+                            <div class="text-[10px] font-semibold text-slate-500 dark:text-slate-400">↑↓ Enter Esc</div>
+                        </div>
+                        <div class="p-2 space-y-1">
+                            <template x-for="(p, pi) in searchResults" :key="p.id">
+                                <button type="button" @click="addProductItem(p); barcodeBuffer = ''; searchResults = []; searchOpen = false; searchHi = 0; $nextTick(() => $refs.barcodeInput && $refs.barcodeInput.focus());"
+                                    :class="searchHi === pi ? 'bg-indigo-100 dark:bg-indigo-900/40 ring-2 ring-indigo-500' : 'hover:bg-slate-100 dark:hover:bg-slate-800/60'"
+                                    class="w-full text-left px-3 py-2 rounded-lg transition flex items-center justify-between">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <p class="text-sm font-bold text-slate-900 dark:text-white truncate" x-text="(p.name && p.name.trim()) ? p.name : (p.barcode || p.sku || ('Product #' + p.id))"></p>
+                                        </div>
+                                        <div class="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-0.5 flex items-center gap-2 flex-wrap">
+                                            <span class="text-emerald-700 dark:text-emerald-400 font-bold" x-text="'Rs ' + Number(p.default_price).toFixed(2)"></span>
+                                            <span class="text-slate-400">·</span>
+                                            <span x-text="'HS ' + (p.hs_code || '—')"></span>
+                                        </div>
+                                    </div>
+                                    <span class="text-xs font-bold px-2 py-0.5 rounded ml-2 shrink-0"
+                                        :class="p.tax_type === 'exempt' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'"
+                                        x-text="p.tax_type === 'exempt' ? 'EXEMPT' : (p.default_tax_rate + '%')"></span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/40 rounded-2xl border-2 border-amber-300 dark:border-amber-700 shadow-md p-3">
                     <div class="flex items-center justify-between mb-2 px-1">
                         <h3 class="text-sm font-black text-amber-900 dark:text-amber-200 tracking-tight flex items-center gap-2">
@@ -539,92 +615,7 @@ kbd {
                         <button type="button" @click="addItem()" class="text-sm text-indigo-700 dark:text-indigo-300 hover:text-indigo-900 dark:hover:text-indigo-100 font-bold border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg px-3 py-1.5 shadow-sm transition">+ Manual Row</button>
                     </div>
 
-                    {{-- 🎯 UNIFIED SMART INPUT — searches NAME · SKU · BARCODE · HS · scanner all in ONE field --}}
-                    <div class="mb-4 relative" @click.outside="searchOpen = false">
-                        <div class="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/60 border-2 border-indigo-300 dark:border-indigo-700 rounded-xl p-2.5 shadow-sm scan-pulse focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/20 transition">
-                            <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-600 text-white shadow-sm flex-shrink-0">
-                                <svg class="w-5 h-5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10m4-10v10m4-10v10m4-10v10m-12 0h16"/></svg>
-                            </span>
-                            <input type="text" x-ref="barcodeInput" x-model="barcodeBuffer"
-                                @input.debounce.250ms="
-                                    const q = (barcodeBuffer || '').trim();
-                                    if (q.length >= 2) {
-                                        fetch('{{ route('fbrpos.api.products.search') }}?q=' + encodeURIComponent(q))
-                                            .then(r => r.json())
-                                            .then(data => { searchResults = data; searchHi = 0; searchOpen = data.length > 0; })
-                                    } else { searchResults = []; searchOpen = false; }
-                                "
-                                @keydown="handleScanInputShortcut($event)"
-                                @keydown.arrow-down.prevent="if (searchOpen && searchResults.length) { searchHi = (searchHi + 1) % searchResults.length; }"
-                                @keydown.arrow-up.prevent="if (searchOpen && searchResults.length) { searchHi = (searchHi - 1 + searchResults.length) % searchResults.length; }"
-                                @keydown.escape.prevent="if (qtyMultiplier > 1) { qtyMultiplier = 1; toast('Multiplier cleared', 'info'); } searchOpen = false; searchResults = []; searchHi = 0;"
-                                @keydown.enter.prevent="
-                                    if (searchOpen && searchResults.length > 0) {
-                                        addProductItem(searchResults[searchHi]);
-                                        barcodeBuffer = ''; searchResults = []; searchOpen = false; searchHi = 0;
-                                        $nextTick(() => $refs.barcodeInput && $refs.barcodeInput.focus());
-                                    } else {
-                                        scanBarcode();
-                                    }
-                                "
-                                autocomplete="off"
-                                class="flex-1 bg-transparent border-0 focus:ring-0 text-base font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:font-medium placeholder:text-sm placeholder:font-sans"
-                                placeholder="🔎 Type name · SKU · barcode · HS code  ·  or scan with hardware scanner">
-                            <span x-show="qtyMultiplier > 1"
-                                  class="text-[10px] font-black px-2 py-0.5 bg-amber-500 text-white rounded-md shadow-sm tracking-wider animate-pulse"
-                                  x-text="'× ' + qtyMultiplier + ' NEXT'"
-                                  title="Quantity multiplier active — Esc to cancel"></span>
-                            <span class="text-[10px] font-bold px-2 py-0.5 bg-emerald-600 text-white rounded-md shadow-sm tracking-wider">● LIVE</span>
-                            <span x-show="scanStatus" :class="scanStatus.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'" class="text-xs font-bold" x-text="scanStatus.msg"></span>
-                        </div>
-
-                        {{-- Autocomplete dropdown — appears under input as cashier types --}}
-                        <div x-show="searchOpen && searchResults.length > 0" x-cloak
-                             x-transition:enter="transition ease-out duration-150"
-                             x-transition:enter-start="opacity-0 -translate-y-1"
-                             x-transition:enter-end="opacity-100 translate-y-0"
-                             class="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border-2 border-indigo-300 dark:border-indigo-700 z-40 max-h-80 overflow-y-auto">
-                            <div class="px-3 py-2 bg-indigo-50 dark:bg-indigo-950/40 border-b border-indigo-200 dark:border-indigo-800 flex items-center justify-between">
-                                <div class="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-                                    <span x-text="searchResults.length"></span> match<span x-show="searchResults.length !== 1">es</span>
-                                </div>
-                                <div class="text-[10px] font-semibold text-slate-500 dark:text-slate-400">↑↓ Enter Esc</div>
-                            </div>
-                            <div class="p-2 space-y-1">
-                                <template x-for="(p, pi) in searchResults" :key="p.id">
-                                    <button type="button" @click="addProductItem(p); barcodeBuffer = ''; searchResults = []; searchOpen = false; searchHi = 0; $nextTick(() => $refs.barcodeInput && $refs.barcodeInput.focus());"
-                                        :class="searchHi === pi ? 'bg-indigo-100 dark:bg-indigo-900/40 ring-2 ring-indigo-500' : 'hover:bg-slate-100 dark:hover:bg-slate-800/60'"
-                                        class="w-full text-left px-3 py-2 rounded-lg transition flex items-center justify-between">
-                                        <div class="flex-1 min-w-0">
-                                            <div class="flex items-center gap-2 flex-wrap">
-                                                <p class="text-sm font-bold text-slate-900 dark:text-white truncate" x-text="(p.name && p.name.trim()) ? p.name : (p.barcode || p.sku || ('Product #' + p.id))"></p>
-                                                <template x-if="matchType(p, barcodeBuffer)">
-                                                    <span class="text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wide"
-                                                          :class="{
-                                                              'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200': matchType(p, barcodeBuffer) === 'name',
-                                                              'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200': matchType(p, barcodeBuffer) === 'sku',
-                                                              'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/50 dark:text-cyan-200': matchType(p, barcodeBuffer) === 'barcode',
-                                                              'bg-pink-100 text-pink-800 dark:bg-pink-900/50 dark:text-pink-200': matchType(p, barcodeBuffer) === 'hs'
-                                                          }"
-                                                          x-text="matchType(p, barcodeBuffer)"></span>
-                                                </template>
-                                            </div>
-                                            <div class="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-0.5 flex items-center gap-2 flex-wrap">
-                                                <span class="text-emerald-700 dark:text-emerald-400 font-bold" x-text="'Rs ' + Number(p.default_price).toFixed(2)"></span>
-                                                <span class="text-slate-400">·</span>
-                                                <span x-text="'HS ' + (p.hs_code || '—')"></span>
-                                                <template x-if="p.sku"><span class="font-mono text-[10px] text-slate-600 dark:text-slate-400" x-text="'· SKU ' + p.sku"></span></template>
-                                                <template x-if="p.barcode"><span class="font-mono text-[10px] text-slate-600 dark:text-slate-400" x-text="'· ⠿ ' + p.barcode"></span></template>
-                                            </div>
-                                        </div>
-                                        <span class="text-xs font-bold px-2 py-0.5 rounded ml-2 shrink-0"
-                                            :class="p.tax_type === 'exempt' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'"
-                                            x-text="p.tax_type === 'exempt' ? 'EXEMPT' : (p.default_tax_rate + '%')"></span>
-                                    </button>
-                                </template>
-                            </div>
-                        </div>
-                    </div>
+                    {{-- ✨ Scan/search input MOVED to LEFT column above Quick Add tiles --}}
 
                     <template x-for="(item, index) in items" :key="item._uid">
                         <div class="item-card row-in border rounded-xl p-4 mb-3"

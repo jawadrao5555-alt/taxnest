@@ -598,6 +598,14 @@ kbd {
                     </div>
                 </div>
 
+                {{-- ➕ MANUAL ROW — moved here on user request, sits between scanner and Quick Add --}}
+                <button type="button" @click="addItem(); $nextTick(() => focusLastRowName());"
+                    class="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl border-2 border-dashed border-indigo-400 dark:border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 active:scale-[0.98] transition shadow-sm">
+                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-indigo-600 text-white text-sm font-black shadow-sm">+</span>
+                    <span class="text-sm font-bold text-indigo-700 dark:text-indigo-300">Manual Row</span>
+                    <span class="hidden xl:inline text-[10px] font-semibold text-slate-500 dark:text-slate-400">F6</span>
+                </button>
+
                 <div class="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/40 rounded-2xl border-2 border-amber-300 dark:border-amber-700 shadow-md p-3">
                     <div class="flex items-center justify-between mb-2 px-1">
                         <h3 class="text-sm font-black text-amber-900 dark:text-amber-200 tracking-tight flex items-center gap-2">
@@ -677,86 +685,65 @@ kbd {
                             Cart Items
                             <span x-show="items.length > 0" class="text-[10px] font-black px-2 py-0.5 rounded-full bg-indigo-600 text-white tracking-wider" x-text="items.length + (items.length === 1 ? ' ITEM' : ' ITEMS')"></span>
                         </h3>
-                        <button type="button" @click="addItem()" class="text-sm text-indigo-700 dark:text-indigo-300 hover:text-indigo-900 dark:hover:text-indigo-100 font-bold border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg px-3 py-1.5 shadow-sm transition">+ Manual Row</button>
+                        {{-- ✨ "+ Manual Row" button MOVED to LEFT column under scanner --}}
                     </div>
 
                     {{-- ✨ Scan/search input MOVED to LEFT column above Quick Add tiles --}}
 
                     <template x-for="(item, index) in items" :key="item._uid">
-                        <div class="item-card row-in border rounded-xl p-4 mb-3"
+                        <div class="item-card row-in border rounded-xl p-3 mb-2"
                              :data-item-index="index"
+                             x-data="{ editOpen: false }"
                              :class="[
                                 activeItemIndex === index ? 'is-active' : '',
                                 item.is_tax_exempt ? 'border-green-300 dark:border-green-700 bg-green-50/30 dark:bg-green-900/10' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900'
                              ]"
                              @focusin="activeItemIndex = index">
-                            <div class="flex items-center justify-between mb-3">
-                                <div class="flex items-center gap-2.5">
-                                    <span class="item-num-badge inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-black tabular-nums" x-text="index + 1"></span>
-                                    <span class="text-sm font-bold text-slate-900 dark:text-white" x-text="item.item_name || (item.product_id ? ('Product #' + item.product_id) : 'New Item')"></span>
+
+                            {{-- ═══ HEADER — # badge | name display | tax chip | actions ═══ --}}
+                            <div class="flex items-center justify-between mb-2 gap-2">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <span class="item-num-badge inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-black tabular-nums flex-shrink-0" x-text="index + 1"></span>
                                     <span x-show="item.is_tax_exempt"
-                                        class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">EXEMPT</span>
+                                        class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">EXEMPT</span>
                                     <span x-show="!item.is_tax_exempt && item.tax_rate != 18"
-                                        class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
-                                        x-text="item.tax_rate + '% TAX'"></span>
-                                    <span x-show="!item.is_tax_exempt && item.tax_rate == 18"
-                                        class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">18% GST</span>
+                                        class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
+                                        x-text="item.tax_rate + '%'"></span>
                                 </div>
-                                <div class="flex items-center gap-2">
-                                    <button type="button" @click="duplicateItem(index)" title="Duplicate row" class="text-blue-600 hover:text-blue-800 text-xs font-semibold">⎘ Duplicate</button>
-                                    <button type="button" @click="removeItem(index)" x-show="items.length > 1" class="text-red-500 hover:text-red-700 text-xs font-semibold">✕ Remove</button>
+                                <div class="flex items-center gap-1 flex-shrink-0">
+                                    <button type="button" @click="editOpen = !editOpen"
+                                        :class="editOpen ? 'bg-indigo-600 text-white' : 'text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700'"
+                                        class="text-[11px] font-bold px-2 py-1 rounded transition flex items-center gap-1"
+                                        title="Show advanced fields (HS code, UoM, tax %, discount, value mode)">
+                                        <span x-text="editOpen ? '▴' : '▾'"></span> Edit
+                                    </button>
+                                    <button type="button" @click="duplicateItem(index)" title="Duplicate row" class="text-blue-600 hover:text-blue-800 text-xs font-bold px-1">⎘</button>
+                                    <button type="button" @click="removeItem(index)" x-show="items.length > 1" title="Remove row" class="text-red-500 hover:text-red-700 text-xs font-bold px-1">✕</button>
                                 </div>
                             </div>
-                            <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                                <input type="hidden" :name="'items['+index+'][product_id]'" :value="item.product_id || ''">
-                                {{-- 🎯 VALUE MODE — hidden field carries Rs amount to backend (only when in VAL mode) --}}
-                                <input type="hidden" :name="'items['+index+'][value_input]'"
-                                       :value="(item.mode || 'qty') === 'value' && parseFloat(item._valueInput) > 0 ? item._valueInput : ''">
-                                <div class="sm:col-span-3">
-                                    <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Item Name *</label>
+
+                            {{-- ═══ ALWAYS-RENDERED HIDDEN INPUTS (form submission) ═══ --}}
+                            <input type="hidden" :name="'items['+index+'][product_id]'" :value="item.product_id || ''">
+                            <input type="hidden" :name="'items['+index+'][value_input]'"
+                                   :value="(item.mode || 'qty') === 'value' && parseFloat(item._valueInput) > 0 ? item._valueInput : ''">
+
+                            {{-- ═══ SIMPLE 3-COLUMN VISIBLE ROW — Name | Qty | Price ═══ --}}
+                            <div class="grid grid-cols-12 gap-2 items-end">
+                                <div class="col-span-6">
+                                    <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase">Product *</label>
                                     <input type="text" :name="'items['+index+'][item_name]'" x-model="item.item_name" required
                                         @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
-                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm font-semibold shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="Product name">
                                 </div>
-                                <div class="sm:col-span-2">
-                                    <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">HS Code <span class="text-slate-500 dark:text-slate-400 font-bold normal-case">(Opt.)</span></label>
-                                    <input type="text" :name="'items['+index+'][hs_code]'" x-model="item.hs_code"
-                                        @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
-                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                                        placeholder="00000000">
-                                </div>
-                                <div class="sm:col-span-2">
-                                    <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">UoM</label>
-                                    <select :name="'items['+index+'][uom]'" x-model="item.uom"
-                                        @change="if ((item.mode || 'qty') === 'value' && !canUseValueMode(item)) { setMode(item, 'qty'); toast('Switched to QTY — UoM not value-compatible', 'info'); } truncateQtyOnUomChange(item);"
-                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 font-semibold">
-                                        <template x-for="u in uomOptions" :key="u">
-                                            <option :value="u" x-text="u"></option>
-                                        </template>
-                                    </select>
-                                </div>
-                                <div class="sm:col-span-2">
-                                    <div class="flex items-center justify-between mb-1 gap-1">
-                                        <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 tracking-wide uppercase" x-text="(item.mode || 'qty') === 'value' ? 'Value (Rs) *' : 'Qty *'"></label>
-                                        <div class="inline-flex rounded-md overflow-hidden border border-gray-300 dark:border-gray-600 text-[9px] font-bold leading-none">
-                                            <button type="button" tabindex="-1"
-                                                @click="setMode(item, 'qty')"
-                                                :class="(item.mode || 'qty') === 'qty' ? 'bg-blue-600 text-white' : 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'"
-                                                class="px-1.5 py-0.5 transition" title="Quantity mode (Q)">QTY</button>
-                                            <button type="button" tabindex="-1"
-                                                x-show="item.is_price_editable !== false"
-                                                @click="setMode(item, 'value')"
-                                                :disabled="!canUseValueMode(item)"
-                                                :class="(item.mode || 'qty') === 'value' ? 'bg-emerald-600 text-white' : 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'"
-                                                :title="canUseValueMode(item) ? 'Value (Rs) mode — qty auto-derives from value' : (parseFloat(item.unit_price) <= 0 ? 'Set unit price first' : 'Value mode only for KG/GM/LTR/ML/MTR/SQM')"
-                                                class="px-1.5 py-0.5 transition disabled:opacity-40 disabled:cursor-not-allowed">VAL</button>
-                                        </div>
-                                    </div>
-                                    {{-- QTY MODE — bigger tactile +/- stepper, no mousedown intercept, direct typing always works --}}
-                                    <div x-show="(item.mode || 'qty') === 'qty'" class="flex items-stretch shadow-sm rounded-lg overflow-hidden ring-1 ring-blue-200 dark:ring-blue-800">
+                                <div class="col-span-3">
+                                    <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase flex items-center gap-1">
+                                        <span x-text="'Qty (' + item.uom + ')'"></span>
+                                        <span x-show="isQtyDecimalAllowed(item)" class="text-emerald-600 dark:text-emerald-400 normal-case font-bold text-[9px]" title="Decimal quantities allowed for this UoM">·decimal</span>
+                                    </label>
+                                    <div class="flex items-stretch shadow-sm rounded-lg overflow-hidden ring-1 ring-blue-200 dark:ring-blue-800">
                                         <button type="button" tabindex="-1" @click="decQty(item)"
-                                            class="px-3 sm:px-3.5 border-r border-blue-200 dark:border-blue-800 bg-gradient-to-b from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-900/50 text-blue-700 dark:text-blue-300 text-base font-black hover:from-blue-100 hover:to-blue-200 dark:hover:from-blue-900/50 dark:hover:to-blue-900/70 active:scale-95 transition-all select-none">−</button>
+                                            class="px-2 border-r border-blue-200 dark:border-blue-800 bg-gradient-to-b from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-900/50 text-blue-700 dark:text-blue-300 text-sm font-black hover:from-blue-100 hover:to-blue-200 active:scale-95 transition select-none">−</button>
                                         <input type="text" inputmode="decimal" autocomplete="off" maxlength="10"
                                             :data-qty-row="index"
                                             :name="'items['+index+'][quantity]'"
@@ -770,91 +757,22 @@ kbd {
                                             @keydown.arrow-down.prevent="decQty(item); $event.target.select();"
                                             @keydown.escape.prevent="$refs.barcodeInput && $refs.barcodeInput.focus()"
                                             @keydown.enter.prevent="
-                                                if (item.product_id) {
-                                                    /* Scanned item — go back to scan input for next item */
-                                                    $refs.barcodeInput && $refs.barcodeInput.focus();
-                                                } else if (item.item_name && parseFloat(item.unit_price) > 0) {
-                                                    /* Manual row — add another manual row */
-                                                    addItem(); focusLastRowName();
-                                                } else {
-                                                    $refs.barcodeInput && $refs.barcodeInput.focus();
-                                                }
+                                                if (item.product_id) { $refs.barcodeInput && $refs.barcodeInput.focus(); }
+                                                else if (item.item_name && parseFloat(item.unit_price) > 0) { addItem(); focusLastRowName(); }
+                                                else { $refs.barcodeInput && $refs.barcodeInput.focus(); }
                                             "
                                             required
-                                            class="w-full min-w-0 border-0 dark:bg-gray-800 dark:text-white text-base font-bold tabular-nums shadow-inner focus:ring-2 focus:ring-blue-500 focus:outline-none text-center px-1"
+                                            class="w-full min-w-0 border-0 dark:bg-gray-800 dark:text-white text-sm font-bold tabular-nums shadow-inner focus:ring-2 focus:ring-blue-500 focus:outline-none text-center px-1"
                                             placeholder="1"
-                                            title="↑/↓ +1/-1 · Esc back to scan · Enter back to scan">
+                                            title="↑/↓ +1/-1">
                                         <button type="button" tabindex="-1" @click="incQty(item)"
-                                            class="px-3 sm:px-3.5 border-l border-blue-200 dark:border-blue-800 bg-gradient-to-b from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-900/50 text-blue-700 dark:text-blue-300 text-base font-black hover:from-blue-100 hover:to-blue-200 dark:hover:from-blue-900/50 dark:hover:to-blue-900/70 active:scale-95 transition-all select-none">+</button>
-                                    </div>
-                                    {{-- ⚡ INLINE REVERSE CALC — type Rs amount, qty auto-calculates (no mode toggle needed)
-                                         Hidden for fixed-price products since cashier shouldn't dictate Rs amount. --}}
-                                    <div x-show="(item.mode || 'qty') === 'qty' && parseFloat(item.unit_price) > 0 && item.is_price_editable !== false"
-                                         class="mt-1.5 flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 rounded-md px-1.5 py-1 ring-1 ring-emerald-200 dark:ring-emerald-800">
-                                        <span class="text-[10px] font-black text-emerald-700 dark:text-emerald-300 leading-none whitespace-nowrap">Or Rs</span>
-                                        <input type="text" inputmode="decimal" autocomplete="off" maxlength="10"
-                                            x-model="item._amountInput"
-                                            @focus="$event.target.select(); item._amountInput = item.line_value > 0 ? String(item.line_value) : ''"
-                                            @input="item._amountInput = sanitizeQty($event.target.value); reverseCalcFromAmount(item, item._amountInput)"
-                                            @blur="item._amountInput = ''"
-                                            @keydown.enter.prevent="item._amountInput = ''; if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
-                                            class="flex-1 min-w-0 border-0 bg-white dark:bg-gray-800 dark:text-white text-xs font-bold tabular-nums shadow-inner rounded px-1 py-0.5 focus:ring-1 focus:ring-emerald-500 focus:outline-none text-right"
-                                            :placeholder="'e.g. ' + (parseFloat(item.unit_price) * 2).toFixed(0)"
-                                            title="Type Rs amount → quantity auto-calculates from unit price">
-                                        <span x-show="parseFloat(item.quantity) > 0 && item.line_value > 0"
-                                              class="text-[9px] font-bold text-emerald-700 dark:text-emerald-400 leading-none whitespace-nowrap"
-                                              x-text="'≈ ' + item.quantity + ' ' + item.uom"></span>
-                                    </div>
-                                    {{-- VALUE MODE --}}
-                                    <div x-show="(item.mode || 'qty') === 'value'" class="flex items-stretch">
-                                        <span class="px-2 inline-flex items-center rounded-l-lg border border-r-0 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 text-[11px] font-bold text-emerald-700 dark:text-emerald-300">Rs</span>
-                                        <input type="text" inputmode="decimal" autocomplete="off" maxlength="12"
-                                            :data-value-row="index"
-                                            x-model="item._valueInput"
-                                            @input="item._valueInput = sanitizeQty($event.target.value); applyValueInput(item)"
-                                            @focus="$nextTick(() => $event.target.select())"
-                                            @mousedown="if(document.activeElement !== $event.target){ $event.preventDefault(); $event.target.focus(); $event.target.select(); }"
-                                            @blur="commitValueInput(item)"
-                                            @keydown.arrow-up.prevent="
-                                                /* +1 unit-price worth */
-                                                const cur = parseFloat(item._valueInput) || 0;
-                                                const step = parseFloat(item.unit_price) || 1;
-                                                item._valueInput = (cur + step).toFixed(2);
-                                                applyValueInput(item);
-                                                $event.target.select();
-                                            "
-                                            @keydown.arrow-down.prevent="
-                                                const cur = parseFloat(item._valueInput) || 0;
-                                                const step = parseFloat(item.unit_price) || 1;
-                                                const next = Math.max(0, cur - step);
-                                                item._valueInput = next.toFixed(2);
-                                                applyValueInput(item);
-                                                $event.target.select();
-                                            "
-                                            @keydown.enter.prevent="
-                                                commitValueInput(item);
-                                                if (item.product_id) {
-                                                    $refs.barcodeInput && $refs.barcodeInput.focus();
-                                                } else if (item.item_name && parseFloat(item.unit_price) > 0) {
-                                                    addItem(); focusLastRowName();
-                                                } else {
-                                                    $refs.barcodeInput && $refs.barcodeInput.focus();
-                                                }
-                                            "
-                                            @keydown.escape.prevent="commitValueInput(item); $refs.barcodeInput && $refs.barcodeInput.focus();"
-                                            class="w-full min-w-0 rounded-r-lg border border-emerald-300 dark:border-emerald-700 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-emerald-500 focus:border-emerald-500 text-center font-semibold px-1"
-                                            placeholder="0.00"
-                                            title="↑/↓ ±1 unit-price worth · Esc back to scan · Enter back to scan">
-                                    </div>
-                                    {{-- Derived qty subscript (visible in value mode) --}}
-                                    <div x-show="(item.mode || 'qty') === 'value' && parseFloat(item.quantity) > 0" class="text-[10px] text-emerald-700 dark:text-emerald-400 mt-0.5 text-center font-semibold">
-                                        ≈ <span x-text="item.quantity"></span> <span x-text="item.uom"></span>
+                                            class="px-2 border-l border-blue-200 dark:border-blue-800 bg-gradient-to-b from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-900/50 text-blue-700 dark:text-blue-300 text-sm font-black hover:from-blue-100 hover:to-blue-200 active:scale-95 transition select-none">+</button>
                                     </div>
                                 </div>
-                                <div class="sm:col-span-2">
-                                    <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase flex items-center gap-1">
-                                        <span>Unit Price *</span>
-                                        <span x-show="item.is_price_editable === false" class="px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-[9px] font-black tracking-wider" title="Product is configured as fixed-price — cashier cannot edit">🔒 FIXED</span>
+                                <div class="col-span-3">
+                                    <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase flex items-center gap-1">
+                                        <span>Price *</span>
+                                        <span x-show="item.is_price_editable === false" class="px-1 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-[8px] font-black" title="Fixed-price product">🔒</span>
                                     </label>
                                     <input type="number" :name="'items['+index+'][unit_price]'" x-model.number="item.unit_price" min="0.01" step="0.01" required
                                         :readonly="item.is_price_editable === false"
@@ -863,36 +781,76 @@ kbd {
                                         @input="syncValueFromQty(item)"
                                         @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
                                         :class="item.is_price_editable === false ? 'bg-amber-50 dark:bg-amber-900/20 cursor-not-allowed text-amber-900 dark:text-amber-200 font-bold' : 'dark:bg-gray-800 dark:text-white'"
-                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 text-sm font-bold tabular-nums shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="0.00">
                                 </div>
-                                <div class="sm:col-span-1">
-                                    <label class="block text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1 tracking-wide uppercase">Tax %</label>
-                                    <input type="number" :name="'items['+index+'][tax_rate]'" x-model.number="item.tax_rate" min="0" max="100" step="0.01"
-                                        :disabled="item.is_tax_exempt"
-                                        @focus="$event.target.select()"
-                                        @keydown.tab="if(!$event.shiftKey && index === items.length - 1 && item.item_name && parseFloat(item.unit_price) > 0){ $event.preventDefault(); addItem(); }"
-                                        @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
-                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 px-1"
-                                        placeholder="18">
-                                </div>
                             </div>
-                            <div class="flex flex-wrap items-center justify-between mt-2 gap-3">
-                                <div class="flex items-center gap-3">
-                                    <label class="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer">
-                                        <input type="checkbox" :name="'items['+index+'][is_tax_exempt]'" x-model="item.is_tax_exempt" value="1"
-                                            class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
-                                        Tax Exempt
-                                    </label>
-                                    <label class="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">
-                                        <span>Item Discount (PKR):</span>
+
+                            {{-- Line total chip --}}
+                            <div class="flex justify-end mt-1.5">
+                                <span class="line-total-chip text-sm" x-text="'PKR ' + formatNum(lineTotal(item))"></span>
+                            </div>
+
+                            {{-- ═══ COLLAPSIBLE ADVANCED PANEL — HS · UoM · Tax % · Tax Exempt · Discount · Value Mode ═══
+                                 Hidden by default. All inputs stay in DOM via x-show so form submits all fields. --}}
+                            <div x-show="editOpen" x-collapse class="mt-3 pt-3 border-t border-dashed border-slate-300 dark:border-slate-700">
+                                <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                                    <div class="sm:col-span-3">
+                                        <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase">HS Code</label>
+                                        <input type="text" :name="'items['+index+'][hs_code]'" x-model="item.hs_code"
+                                            class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="00000000">
+                                    </div>
+                                    <div class="sm:col-span-3">
+                                        <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase">UoM</label>
+                                        <select :name="'items['+index+'][uom]'" x-model="item.uom"
+                                            @change="if ((item.mode || 'qty') === 'value' && !canUseValueMode(item)) { setMode(item, 'qty'); toast('Switched to QTY — UoM not value-compatible', 'info'); } truncateQtyOnUomChange(item);"
+                                            class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs shadow-sm focus:ring-blue-500 focus:border-blue-500 font-semibold">
+                                            <template x-for="u in uomOptions" :key="u">
+                                                <option :value="u" x-text="u"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    <div class="sm:col-span-2">
+                                        <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase">Tax %</label>
+                                        <input type="number" :name="'items['+index+'][tax_rate]'" x-model.number="item.tax_rate" min="0" max="100" step="0.01"
+                                            :disabled="item.is_tax_exempt"
+                                            @focus="$event.target.select()"
+                                            class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 px-1"
+                                            placeholder="18">
+                                    </div>
+                                    <div class="sm:col-span-2">
+                                        <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase">Item Disc (Rs)</label>
                                         <input type="number" :name="'items['+index+'][item_discount]'" x-model.number="item.item_discount" min="0" step="0.01"
                                             @focus="$event.target.select()"
-                                            class="w-24 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                            class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs shadow-sm focus:ring-blue-500 focus:border-blue-500"
                                             placeholder="0.00">
-                                    </label>
+                                    </div>
+                                    <div class="sm:col-span-2 flex items-end">
+                                        <label class="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 dark:text-slate-200 cursor-pointer w-full px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                                            <input type="checkbox" :name="'items['+index+'][is_tax_exempt]'" x-model="item.is_tax_exempt" value="1"
+                                                class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
+                                            Exempt
+                                        </label>
+                                    </div>
                                 </div>
-                                <span class="line-total-chip text-sm" x-text="'PKR ' + formatNum(lineTotal(item))"></span>
+
+                                {{-- Reverse calc (type Rs amount → qty auto-derives) — only visible inside Edit panel --}}
+                                <div x-show="parseFloat(item.unit_price) > 0 && item.is_price_editable !== false"
+                                     class="mt-2 flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 rounded-md px-2 py-1.5 ring-1 ring-emerald-200 dark:ring-emerald-800">
+                                    <span class="text-[10px] font-black text-emerald-700 dark:text-emerald-300 leading-none whitespace-nowrap">Or type Rs amount → qty auto:</span>
+                                    <input type="text" inputmode="decimal" autocomplete="off" maxlength="10"
+                                        x-model="item._amountInput"
+                                        @focus="$event.target.select(); item._amountInput = item.line_value > 0 ? String(item.line_value) : ''"
+                                        @input="item._amountInput = sanitizeQty($event.target.value); reverseCalcFromAmount(item, item._amountInput)"
+                                        @blur="item._amountInput = ''"
+                                        @keydown.enter.prevent="item._amountInput = ''; if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
+                                        class="flex-1 min-w-0 border-0 bg-white dark:bg-gray-800 dark:text-white text-xs font-bold tabular-nums shadow-inner rounded px-1 py-0.5 focus:ring-1 focus:ring-emerald-500 focus:outline-none text-right"
+                                        :placeholder="'e.g. ' + (parseFloat(item.unit_price) * 2).toFixed(0)">
+                                    <span x-show="parseFloat(item.quantity) > 0 && item.line_value > 0"
+                                          class="text-[9px] font-bold text-emerald-700 dark:text-emerald-400 leading-none whitespace-nowrap"
+                                          x-text="'≈ ' + item.quantity + ' ' + item.uom"></span>
+                                </div>
                             </div>
                         </div>
                     </template>

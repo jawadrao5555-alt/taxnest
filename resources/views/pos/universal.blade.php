@@ -1869,6 +1869,13 @@ function restaurantPos() {
         // Alpine crashes inside the modals which broke the whole page (incl. Pay).
         praEnabled: {{ ($company->pra_reporting_enabled ?? false) ? 'true' : 'false' }},
         praLoading: false,
+        // ── RESTAURANT MODE FLAG (gates hold/pay route selection) ────────────
+        // Restaurant endpoints (pos.restaurant.orders.hold + /pay) are blocked
+        // by RestaurantOnly middleware for retail POS companies (HTTP 403
+        // "Restaurant module not enabled"). For retail companies we route
+        // EVERY processPayment call through processPaymentManual which uses
+        // pos.invoice.store — a universal endpoint with no restaurant guard.
+        isRestaurantMode: {{ (($company->pos_type ?? '') === 'restaurant' || ($company->restaurant_mode ?? false)) ? 'true' : 'false' }},
         // ── PROVISIONAL BILLS (header shortcut, F10) ──────────────────────────
         // Lazy-loaded list of all bills with pra_status='local' for current company.
         // Refreshed on page mount, after every bill save, and after each modal action.
@@ -3263,7 +3270,10 @@ function restaurantPos() {
             // restaurant_orders/KOT entirely — manual items are billing-only by
             // design and the "Send to Kitchen" button is already disabled when
             // hasManualItems() is true (see Pay button area).
-            if (this.hasManualItems()) {
+            // Retail POS (non-restaurant) companies: restaurant hold endpoint
+            // returns 403. Route ALL payments through processPaymentManual
+            // which posts directly to pos.invoice.store (universal endpoint).
+            if (!this.isRestaurantMode || this.hasManualItems()) {
                 return await this.processPaymentManual(method, provisional);
             }
 

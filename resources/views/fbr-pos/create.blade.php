@@ -500,19 +500,24 @@ kbd {
                     @else
                         <div class="grid grid-cols-2 gap-1.5 max-h-[calc(100vh-12rem)] overflow-y-auto pr-1">
                             @foreach($frequentProducts as $fp)
+                                @php
+                                    $fpPayload = [
+                                        'id' => $fp->id,
+                                        'name' => $fp->name,
+                                        'default_price' => (float) $fp->default_price,
+                                        'default_tax_rate' => (float) ($fp->default_tax_rate ?? 18),
+                                        'tax_type' => $fp->tax_type ?? 'standard',
+                                        'hs_code' => $fp->hs_code,
+                                        'sku' => $fp->sku,
+                                        'barcode' => $fp->barcode,
+                                        'default_uom' => $fp->default_uom ?? 'U',
+                                        'is_price_editable' => (bool) ($fp->is_price_editable ?? true),
+                                    ];
+                                    // Use JSON_HEX_APOS so single quotes get escaped → safe to embed in @click="..."
+                                    $fpJson = json_encode($fpPayload, JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE);
+                                @endphp
                                 <button type="button"
-                                    @click='addProductItem(@json([
-                                        "id" => $fp->id,
-                                        "name" => $fp->name,
-                                        "default_price" => (float) $fp->default_price,
-                                        "default_tax_rate" => (float) ($fp->default_tax_rate ?? 18),
-                                        "tax_type" => $fp->tax_type ?? "standard",
-                                        "hs_code" => $fp->hs_code,
-                                        "sku" => $fp->sku,
-                                        "barcode" => $fp->barcode,
-                                        "default_uom" => $fp->default_uom ?? "U",
-                                        "is_price_editable" => (bool) ($fp->is_price_editable ?? true),
-                                    ]))'
+                                    @click="addProductItem({{ $fpJson }})"
                                     class="group bg-white dark:bg-slate-900 hover:bg-amber-100 dark:hover:bg-amber-900/40 active:scale-95 border border-amber-200 dark:border-amber-800 rounded-lg p-2 text-left transition shadow-sm hover:shadow-md">
                                     <p class="text-[11px] font-bold text-slate-900 dark:text-white leading-tight line-clamp-2 group-hover:text-amber-900 dark:group-hover:text-amber-100" title="{{ $fp->name }}">{{ $fp->name }}</p>
                                     <p class="text-[10px] font-black text-emerald-700 dark:text-emerald-400 mt-0.5 tabular-nums">Rs {{ number_format((float) $fp->default_price, 0) }}</p>

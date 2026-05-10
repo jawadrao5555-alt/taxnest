@@ -1,0 +1,133 @@
+ParseError
+resources/views/fbr-pos/create.blade.php:504
+Unclosed '[' on line 513 does not match ')'
+
+LARAVEL
+12.51.0
+PHP
+8.4.19
+UNHANDLED
+CODE 0
+500
+GET
+https://taxnest.com.pk/fbr-pos/create
+
+Exception trace
+resources/views/fbr-pos/create.blade.php
+resources/views/fbr-pos/create.blade.php:504
+
+499                        <p class="text-xs text-amber-700 dark:text-amber-300 text-center py-6 px-2 leading-relaxed">No sales yet — your routine top-sellers will appear here automatically.</p>
+500                    @else
+501                        <div class="grid grid-cols-2 gap-1.5 max-h-[calc(100vh-12rem)] overflow-y-auto pr-1">
+502                            @foreach($frequentProducts as $fp)
+503                                <button type="button"
+504                                    @click='addProductItem(@json([
+505                                        "id" => $fp->id,
+506                                        "name" => $fp->name,
+507                                        "default_price" => (float) $fp->default_price,
+508                                        "default_tax_rate" => (float) ($fp->default_tax_rate ?? 18),
+509                                        "tax_type" => $fp->tax_type ?? "standard",
+510                                        "hs_code" => $fp->hs_code,
+511                                        "sku" => $fp->sku,
+512                                        "barcode" => $fp->barcode,
+513                                        "default_uom" => $fp->default_uom ?? "U",
+514                                        "is_price_editable" => (bool) ($fp->is_price_editable ?? true),
+515                                    ]))'
+516
+12 vendor frames
+
+App\Http\Middleware\FbrPosAuth->handle()
+app/Http/Middleware/FbrPosAuth.php:49
+
+21 vendor frames
+
+App\Http\Middleware\SecurityHeaders->handle()
+app/Http/Middleware/SecurityHeaders.php:13
+
+23 vendor frames
+
+public/index.php
+public/index.php:30
+
+Queries
+1-10 of 14
+mysql
+select * from `sessions` where `id` = 'GZERqefLgjj7grC7qm0P9sSFbAPGb0XPVAVcqRBO' limit 1
+0.68ms
+mysql
+select * from `users` where `id` = 19 limit 1
+0.14ms
+mysql
+select * from `companies` where `companies`.`id` = '20' and `companies`.`deleted_at` is null limit 1
+0.28ms
+mysql
+select * from `branches` where `company_id` = '20' and `is_head_office` = 1 and `branches`.`company_id` = '20' limit 1
+0.13ms
+mysql
+select * from `branches` where `company_id` = '20' and (`is_active` = 1 or `is_active` is null) and `branches`.`company_id` = '20' order by `id` asc limit 1
+0.1ms
+mysql
+select * from `companies` where `companies`.`id` = '20' and `companies`.`deleted_at` is null limit 1
+0.2ms
+mysql
+select * from `products` where `company_id` = '20' and `is_active` = 1 and `products`.`company_id` = '20' order by `name` asc
+0.17ms
+mysql
+select `fi`.`product_id`, SUM(fi.quantity) as sold_qty from `fbr_pos_transaction_items` as `fi` inner join `fbr_pos_transactions` as `ft` on `ft`.`id` = `fi`.`transaction_id` where `ft`.`company_id` = '20' and `ft`.`created_at` >= '2026-04-10 16:55:22' and `fi`.`product_id` is not null group by `fi`.`product_id` order by `sold_qty` desc limit 12
+0.31ms
+mysql
+select * from `products` where `company_id` = '20' and `is_active` = 1 and `id` in ('8', '9', '10', '11') and `products`.`company_id` = '20' order by FIELD(id,8,9,10,11)
+0.19ms
+mysql
+select * from `fbr_pos_terminals` where `company_id` = '20' and `is_active` = 1 order by `terminal_name` asc
+0.13ms
+
+
+1
+2
+
+
+Headers
+accept
+text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+accept-encoding
+gzip, deflate, br, zstd
+accept-language
+en-US,en;q=0.9
+cookie
+XSRF-TOKEN=eyJpdiI6IjJHVjMyM1YyQmlWN2U4SG1keURPRWc9PSIsInZhbHVlIjoiY0lBa081c1E0Q0xOQlBYdFFNbU5NNE5TTkNUN3lCK1pPT2hxSkUwbmxzOFNIclZlcWdZRGhIVS9yRTBJaFZDSlllUTBDY1lDN0w3Y0JPZlVyNTRuTTc2ZDM2ZzFuU1NOSVFBQzRBTjhWZFQwdGdRMW1nY242blAvYTZHaVU0Um8iLCJtYWMiOiJjODQ1NjZiNjMyY2M1NzIzMTkxMzIwNGNmN2YzOGFlZDM5MmM3MjgxMzI5MmU2NTNjYTk5NGE5NmU1MmIwZjdmIiwidGFnIjoiIn0%3D; taxnest-session=eyJpdiI6IjZJTFZzZUVLaUJvRVFhMXFMa3hVbnc9PSIsInZhbHVlIjoiUHc3d1hBbHpKOWttc09Yd3NuL3pvMFlmSzZkM2FsQ1dzdDdhcnFaaVhldmR1bXEycHpFZ2p4eUlJS3pCNUZSeWxTRHNhMW9mdTRnVWNtdVhDMUlha3c4RjJYZjF4bkVFTmMrMDU4Nk5GMHVDRmIyZDgwcXFwZ0xlSURRK25WTDEiLCJtYWMiOiI5NWE1ZDgxM2U1YTUxZGE3ZmQ5M2M4OTk3NDUxZmQ5MWJkOGU5MjhkZjNjYzcxOWUwNTE2YzZiOWU4MDhiMTI1IiwidGFnIjoiIn0%3D
+host
+taxnest.com.pk
+referer
+https://taxnest.com.pk/fbr-pos/dashboard
+user-agent
+Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36
+sec-ch-ua-platform
+"Windows"
+sec-ch-ua
+"Chromium";v="148", "Google Chrome";v="148", "Not/A)Brand";v="99"
+upgrade-insecure-requests
+1
+sec-ch-ua-mobile
+?0
+sec-fetch-site
+same-origin
+sec-fetch-mode
+navigate
+sec-fetch-dest
+empty
+priority
+u=0, i
+x-https
+1
+Body
+// No request body
+Routing
+controller
+App\Http\Controllers\FbrPosController@create
+route name
+fbrpos.create
+middleware
+web, fbrpos.auth
+Routing parameters
+// No routing parameters

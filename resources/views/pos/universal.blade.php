@@ -3365,6 +3365,8 @@ function restaurantPos() {
                     return;
                 }
                 // Mirror payHeldOrderDirect success path so receipt modal works.
+                console.log('[storeInvoice] OK response:', data);
+                console.log('[storeInvoice] isRestaurantMode=', this.isRestaurantMode, 'transaction_id=', data.transaction_id);
                 this.lastInvoiceNumber = data.invoice_number || '';
                 this.lastTransactionId = data.transaction_id || null;
                 this.lastOrderId = null; // no restaurant order for manual carts
@@ -3489,6 +3491,7 @@ function restaurantPos() {
         printReceipt(onAfterPrint) {
             if (!this.lastTransactionId) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
             const url = (this.isRestaurantMode ? '/pos/restaurant/receipt/' : '/pos/transaction/') + this.lastTransactionId + (this.isRestaurantMode ? '?auto_print=1' : '/receipt?auto_print=1');
+            console.log('[printReceipt] URL=', url, 'isRestaurantMode=', this.isRestaurantMode);
             this._printViaIframe('print-receipt-frame', url, 'width=400,height=700', onAfterPrint);
         },
 

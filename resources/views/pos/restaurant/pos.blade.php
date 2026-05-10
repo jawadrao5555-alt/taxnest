@@ -328,8 +328,8 @@ window.addEventListener('popstate', function() {
                 style="position:fixed; bottom:24px; right:400px; z-index:60; background:linear-gradient(135deg,#7c3aed,#6d28d9); color:white; border:none; border-radius:16px; padding:10px 20px; font-size:13px; font-weight:700; cursor:pointer; box-shadow:0 8px 24px rgba(124,58,237,0.4), 0 2px 8px rgba(0,0,0,0.15); display:flex; align-items:center; gap:8px; transition:all 0.2s;"
                 x-transition
                 title="Jump to Cart & Edit (F6)"
-                @mouseenter="this.style.transform='scale(1.05)'; this.style.boxShadow='0 12px 32px rgba(124,58,237,0.5)'"
-                @mouseleave="this.style.transform='scale(1)'; this.style.boxShadow='0 8px 24px rgba(124,58,237,0.4)'">
+                @mouseenter="$el.style.transform='scale(1.05)'; $el.style.boxShadow='0 12px 32px rgba(124,58,237,0.5)'"
+                @mouseleave="$el.style.transform='scale(1)'; $el.style.boxShadow='0 8px 24px rgba(124,58,237,0.4)'">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
                 <span>Edit Cart</span>
                 <span style="background:rgba(255,255,255,0.25); padding:2px 8px; border-radius:8px; font-size:11px; font-weight:800;" x-text="cart.length"></span>

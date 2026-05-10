@@ -377,10 +377,53 @@ html, body { max-width: 100%; overflow-x: hidden; }
    pulled from data-label="..." attribute on each <td>. Falls back to
    horizontal-scroll behavior if data-label missing. */
 @media (max-width: 768px) {
-    table.table-cards { display: block; width: 100%; }
-    table.table-cards thead { display: none; }
-    table.table-cards tbody { display: block; }
-    table.table-cards tbody tr {
+    /* SMART card mode — only activates when the table actually uses data-label
+       on its cells. Tables without data-label fall through to safe
+       horizontal-scroll mode (preserves v1 behavior, no regression). */
+
+    /* === LEGACY-BROWSER SAFETY: where :has() is unsupported (Safari <15.4,
+       old Android WebView <105), force ALL .table-cards into horizontal-scroll
+       mode so nothing breaks visually. Modern browsers ignore this block. === */
+    @supports not selector(:has(*)) {
+        table.table-cards {
+            display: block;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            white-space: nowrap;
+        }
+        table.table-cards > thead,
+        table.table-cards > tbody,
+        table.table-cards > tfoot {
+            display: table; width: 100%; min-width: 600px;
+        }
+        table.table-cards > * > tr { display: table-row; }
+        table.table-cards > * > tr > th,
+        table.table-cards > * > tr > td { display: table-cell; }
+    }
+
+    /* === FALLBACK: tables WITHOUT data-label → horizontal scroll (v1 safe) === */
+    table.table-cards:not(:has(td[data-label])) {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+    }
+    table.table-cards:not(:has(td[data-label])) > thead,
+    table.table-cards:not(:has(td[data-label])) > tbody,
+    table.table-cards:not(:has(td[data-label])) > tfoot {
+        display: table;
+        width: 100%;
+        min-width: 600px;
+    }
+    table.table-cards:not(:has(td[data-label])) > * > tr { display: table-row; }
+    table.table-cards:not(:has(td[data-label])) > * > tr > th,
+    table.table-cards:not(:has(td[data-label])) > * > tr > td { display: table-cell; }
+
+    /* === TRUE CARD MODE: only when ≥1 td[data-label] exists === */
+    table.table-cards:has(td[data-label]) { display: block; width: 100%; }
+    table.table-cards:has(td[data-label]) thead { display: none; }
+    table.table-cards:has(td[data-label]) tbody { display: block; }
+    table.table-cards:has(td[data-label]) tbody tr {
         display: block;
         margin-bottom: 0.75rem;
         background: white;
@@ -390,34 +433,37 @@ html, body { max-width: 100%; overflow-x: hidden; }
         box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         position: relative;
     }
-    .dark table.table-cards tbody tr {
+    .dark table.table-cards:has(td[data-label]) tbody tr {
         background: rgba(17,24,39,0.7);
         border-color: rgba(55,65,81,0.6);
     }
-    table.table-cards tbody td {
-        display: flex !important;
+    /* Use plain display:flex (no !important) so Tailwind .hidden classes still work */
+    table.table-cards:has(td[data-label]) tbody td {
+        display: flex;
         justify-content: space-between;
         align-items: center;
         gap: 0.75rem;
-        padding: 0.4rem 0 !important;
-        border: none !important;
-        white-space: normal !important;
-        text-align: right !important;
+        padding: 0.4rem 0;
+        border: none;
+        white-space: normal;
+        text-align: right;
         font-size: 0.825rem;
         min-height: 28px;
     }
-    table.table-cards tbody td:first-child {
-        border-bottom: 1px solid rgba(229,231,235,0.7) !important;
-        padding-bottom: 0.55rem !important;
+    /* Honor Tailwind responsive-hide utilities — never override them */
+    table.table-cards:has(td[data-label]) tbody td.hidden { display: none; }
+    table.table-cards:has(td[data-label]) tbody td:first-child {
+        border-bottom: 1px solid rgba(229,231,235,0.7);
+        padding-bottom: 0.55rem;
         margin-bottom: 0.35rem;
         font-weight: 600;
         font-size: 0.95rem;
     }
-    .dark table.table-cards tbody td:first-child {
-        border-bottom-color: rgba(55,65,81,0.5) !important;
+    .dark table.table-cards:has(td[data-label]) tbody td:first-child {
+        border-bottom-color: rgba(55,65,81,0.5);
     }
-    table.table-cards tbody td:first-child::before { display: none; }
-    table.table-cards tbody td::before {
+    table.table-cards:has(td[data-label]) tbody td:first-child::before { display: none; }
+    table.table-cards:has(td[data-label]) tbody td::before {
         content: attr(data-label);
         font-weight: 500;
         font-size: 0.72rem;
@@ -426,29 +472,29 @@ html, body { max-width: 100%; overflow-x: hidden; }
         color: #6b7280;
         flex-shrink: 0;
     }
-    .dark table.table-cards tbody td::before { color: #94a3b8; }
-    table.table-cards tbody td:not([data-label])::before { display: none; }
+    .dark table.table-cards:has(td[data-label]) tbody td::before { color: #94a3b8; }
+    table.table-cards:has(td[data-label]) tbody td:not([data-label])::before { display: none; }
     /* Action cells get full width row at bottom */
-    table.table-cards tbody td.actions-cell,
-    table.table-cards tbody td:last-child:has(button, a) {
+    table.table-cards:has(td[data-label]) tbody td.actions-cell,
+    table.table-cards:has(td[data-label]) tbody td:last-child:has(button, a) {
         flex-wrap: wrap;
         justify-content: flex-end;
-        padding-top: 0.55rem !important;
+        padding-top: 0.55rem;
         margin-top: 0.35rem;
-        border-top: 1px solid rgba(229,231,235,0.7) !important;
+        border-top: 1px solid rgba(229,231,235,0.7);
     }
-    .dark table.table-cards tbody td.actions-cell,
-    .dark table.table-cards tbody td:last-child:has(button, a) {
-        border-top-color: rgba(55,65,81,0.5) !important;
+    .dark table.table-cards:has(td[data-label]) tbody td.actions-cell,
+    .dark table.table-cards:has(td[data-label]) tbody td:last-child:has(button, a) {
+        border-top-color: rgba(55,65,81,0.5);
     }
     /* Empty state row */
-    table.table-cards tbody tr:has(td[colspan]) {
+    table.table-cards:has(td[data-label]) tbody tr:has(td[colspan]) {
         text-align: center;
         padding: 1.5rem 1rem;
     }
-    table.table-cards tbody tr:has(td[colspan]) td {
-        display: block !important;
-        text-align: center !important;
+    table.table-cards:has(td[data-label]) tbody tr:has(td[colspan]) td {
+        display: block;
+        text-align: center;
     }
 }
 

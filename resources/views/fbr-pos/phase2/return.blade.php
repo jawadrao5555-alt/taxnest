@@ -13,7 +13,7 @@
     <form method="POST" action="{{ route('fbrpos.phase2.return.process', $original->id) }}" class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
         @csrf
         <h3 class="font-bold mb-3 dark:text-white">Select Items to Return</h3>
-        <table class="w-full text-sm mb-5">
+        <table class="w-full text-sm mb-5 table-cards">
             <thead class="bg-gray-50 dark:bg-gray-700 text-left">
                 <tr><th class="px-3 py-2">Item</th><th>Sold Qty</th><th>Returned</th><th>Unit Price</th><th>Return Qty</th></tr>
             </thead>

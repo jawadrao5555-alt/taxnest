@@ -24,7 +24,7 @@
 
                 @if($invoices->count() > 0)
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
+                    <table class="w-full text-sm table-cards">
                         <thead>
                             <tr class="bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-800">
                                 <th class="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-400">Invoice #</th>

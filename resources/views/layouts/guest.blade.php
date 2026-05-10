@@ -7,7 +7,7 @@
         <meta name="theme-color" content="#059669">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-        <link rel="stylesheet" href="{{ asset('css/mobile.css') }}?v=2.1">
+        <link rel="stylesheet" href="{{ asset('css/mobile.css') }}?v=2.3">
 
         <title>{{ config('app.name', 'TaxNest') }}</title>
 

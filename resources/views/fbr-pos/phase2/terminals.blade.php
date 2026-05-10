@@ -21,7 +21,7 @@
     </div>
 
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
-        <table class="w-full text-sm">
+        <table class="w-full text-sm table-cards">
             <thead class="bg-gray-50 dark:bg-gray-700 text-left">
                 <tr>
                     <th class="px-4 py-3">Name</th><th>Code</th><th>Location</th><th>Status</th><th class="text-right pr-4">Actions</th>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <link rel="stylesheet" href="{{ asset('css/mobile.css') }}?v=1.3">
+    <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.3') }}">
     <title>Invoice {{ $invoice->invoice_number }} - TaxNest</title>
     @vite(['resources/css/app.css'])
 </head>

@@ -44,7 +44,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
                 <h3 class="font-bold text-lg mb-3">🏆 Top 5 Products (last 30d)</h3>
-                <table class="w-full text-sm">
+                <table class="w-full text-sm table-cards">
                     <thead class="text-xs uppercase font-bold bg-emerald-100 dark:bg-emerald-900/30">
                         <tr><th class="px-2 py-2 text-left">#</th><th class="px-2 py-2 text-left">Product</th><th class="px-2 py-2 text-right">Units</th><th class="px-2 py-2 text-right">Revenue</th></tr>
                     </thead>
@@ -59,7 +59,7 @@
             </div>
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
                 <h3 class="font-bold text-lg mb-3">🐢 Worst 5 Products (last 30d)</h3>
-                <table class="w-full text-sm">
+                <table class="w-full text-sm table-cards">
                     <thead class="text-xs uppercase font-bold bg-rose-100 dark:bg-rose-900/30">
                         <tr><th class="px-2 py-2 text-left">#</th><th class="px-2 py-2 text-left">Product</th><th class="px-2 py-2 text-right">Units</th><th class="px-2 py-2 text-right">Revenue</th></tr>
                     </thead>

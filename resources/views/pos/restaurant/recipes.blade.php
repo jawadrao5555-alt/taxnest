@@ -34,7 +34,7 @@
                 <span class="text-sm font-semibold text-purple-600 dark:text-purple-400">Cost: Rs. {{ number_format($totalCost, 2) }}</span>
             </div>
             <div class="overflow-x-auto">
-                <table class="w-full text-sm">
+                <table class="w-full text-sm table-cards">
                     <thead>
                         <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-100 dark:border-gray-700">
                             <th class="px-5 py-2">Ingredient</th>

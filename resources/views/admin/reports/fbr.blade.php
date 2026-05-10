@@ -27,7 +27,7 @@
                 <h3 class="font-bold text-lg">Status breakdown</h3>
                 @include('admin.reports._export-buttons', ['route' => '/admin/reports/fbr'])
             </div>
-            <table class="w-full text-sm">
+            <table class="w-full text-sm table-cards">
                 <thead class="text-xs uppercase font-bold text-slate-700 dark:text-slate-300 bg-gray-100 dark:bg-gray-700">
                     <tr><th class="px-3 py-2 text-left">FBR Status</th><th class="px-3 py-2 text-right">Invoices</th><th class="px-3 py-2 text-right">Total (PKR)</th></tr>
                 </thead>

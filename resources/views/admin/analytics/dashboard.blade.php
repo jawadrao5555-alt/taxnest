@@ -65,7 +65,7 @@
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
                 <h3 class="font-bold text-lg text-slate-900 dark:text-white mb-4">📦 Top 5 Products</h3>
                 @if(count($kpis['top_5_products']))
-                    <table class="w-full text-sm">
+                    <table class="w-full text-sm table-cards">
                         <thead class="text-xs uppercase font-bold text-slate-600 dark:text-slate-400 border-b border-gray-200 dark:border-gray-700">
                             <tr><th class="text-left py-2">#</th><th class="text-left py-2">Product</th><th class="text-right py-2">Units</th><th class="text-right py-2">Revenue</th></tr>
                         </thead>

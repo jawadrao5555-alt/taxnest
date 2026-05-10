@@ -117,7 +117,7 @@
                         </div>
 
                         <div class="overflow-x-auto">
-                            <table class="w-full text-sm">
+                            <table class="w-full text-sm table-cards">
                                 <thead>
                                     <tr class="text-left text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
                                         <th class="pb-3 pr-4">HS Code</th>
@@ -215,7 +215,7 @@
                         </div>
 
                         <div class="overflow-x-auto">
-                            <table class="w-full text-sm">
+                            <table class="w-full text-sm table-cards">
                                 <thead>
                                     <tr class="text-left text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
                                         <th class="pb-3 pr-4">HS Code</th>
@@ -346,7 +346,7 @@
                             <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-5 md:col-span-2">
                                 <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Top Unmapped HS Codes (by frequency)</h3>
                                 <div class="overflow-x-auto">
-                                    <table class="w-full text-sm">
+                                    <table class="w-full text-sm table-cards">
                                         <thead>
                                             <tr class="text-left text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-600">
                                                 <th class="pb-2 pr-4">HS Code</th>
@@ -373,7 +373,7 @@
                             <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-5 md:col-span-2">
                                 <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Validation Rules Summary</h3>
                                 <div class="overflow-x-auto">
-                                    <table class="w-full text-sm">
+                                    <table class="w-full text-sm table-cards">
                                         <thead>
                                             <tr class="text-left text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-600">
                                                 <th class="pb-2 pr-4">Schedule Type</th>

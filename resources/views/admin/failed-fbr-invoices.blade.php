@@ -42,7 +42,7 @@
             </div>
 
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                <table class="min-w-full divide-y divide-gray-200">
+                <table class="min-w-full divide-y divide-gray-200 table-cards">
                     <thead class="bg-gray-50 dark:bg-gray-900">
                         <tr>
                             <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Invoice ID</th>

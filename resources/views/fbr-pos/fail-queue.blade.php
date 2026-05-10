@@ -76,7 +76,7 @@
     {{-- Table --}}
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 table-cards">
                 <thead class="bg-gray-50 dark:bg-gray-800/50">
                     <tr>
                         <th class="px-4 py-3 text-left text-[11px] uppercase tracking-wider font-bold text-gray-600 dark:text-gray-400">Invoice</th>

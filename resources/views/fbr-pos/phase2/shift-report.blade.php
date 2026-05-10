@@ -16,7 +16,7 @@
 
         <div class="border-t pt-4">
             <h3 class="font-bold mb-3 dark:text-white">Sales Summary</h3>
-            <table class="w-full text-sm">
+            <table class="w-full text-sm table-cards">
                 <tr><td class="py-1 dark:text-gray-300">Sales Count</td><td class="text-right font-semibold dark:text-white">{{ $shift->sales_count }}</td></tr>
                 <tr><td class="py-1 dark:text-gray-300">Returns Count</td><td class="text-right font-semibold dark:text-white">{{ $shift->returns_count }}</td></tr>
                 <tr><td class="py-1 dark:text-gray-300">Total Sales</td><td class="text-right font-semibold dark:text-white">Rs {{ number_format($shift->total_sales, 2) }}</td></tr>
@@ -27,7 +27,7 @@
 
         <div class="border-t pt-4">
             <h3 class="font-bold mb-3 dark:text-white">Payment Breakdown</h3>
-            <table class="w-full text-sm">
+            <table class="w-full text-sm table-cards">
                 <tr><td class="py-1 dark:text-gray-300">Cash</td><td class="text-right font-semibold dark:text-white">Rs {{ number_format($shift->total_cash, 2) }}</td></tr>
                 <tr><td class="py-1 dark:text-gray-300">Card</td><td class="text-right font-semibold dark:text-white">Rs {{ number_format($shift->total_card, 2) }}</td></tr>
                 <tr><td class="py-1 dark:text-gray-300">Other</td><td class="text-right font-semibold dark:text-white">Rs {{ number_format($shift->total_other, 2) }}</td></tr>
@@ -37,7 +37,7 @@
         @if($shift->status === 'closed')
         <div class="border-t pt-4">
             <h3 class="font-bold mb-3 dark:text-white">Cash Reconciliation</h3>
-            <table class="w-full text-sm">
+            <table class="w-full text-sm table-cards">
                 <tr><td class="py-1 dark:text-gray-300">Opening Cash</td><td class="text-right dark:text-white">Rs {{ number_format($shift->opening_cash, 2) }}</td></tr>
                 <tr><td class="py-1 dark:text-gray-300">+ Cash Sales</td><td class="text-right dark:text-white">Rs {{ number_format($shift->total_cash, 2) }}</td></tr>
                 <tr><td class="py-1 dark:text-gray-300">Expected in Drawer</td><td class="text-right font-semibold dark:text-white">Rs {{ number_format($shift->expected_cash, 2) }}</td></tr>
@@ -50,7 +50,7 @@
         @if($movements->count() > 0)
         <div class="border-t pt-4">
             <h3 class="font-bold mb-3 dark:text-white">Cash Movements</h3>
-            <table class="w-full text-sm">
+            <table class="w-full text-sm table-cards">
                 <thead class="text-xs text-gray-500"><tr><th class="text-left py-1">Time</th><th class="text-left">Type</th><th class="text-left">Reason</th><th class="text-right">Amount</th></tr></thead>
                 <tbody>
                 @foreach($movements as $m)

@@ -65,7 +65,7 @@
             <!-- Table -->
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
                 <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
+                    <table class="min-w-full text-sm table-cards">
                         <thead class="bg-gray-50 dark:bg-gray-900 text-xs uppercase text-gray-600 dark:text-gray-400">
                             <tr>
                                 <th class="px-3 py-3 text-left">HS Code</th>

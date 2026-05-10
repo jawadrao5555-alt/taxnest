@@ -54,7 +54,7 @@
             </div>
 
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700 table-cards">
                     <thead class="bg-slate-50 dark:bg-slate-800">
                         <tr>
                             <th class="px-3 py-3 text-left text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">Item Name</th>

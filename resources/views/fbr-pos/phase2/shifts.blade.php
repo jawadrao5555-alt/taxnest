@@ -53,7 +53,7 @@
 
     <h2 class="text-lg font-bold dark:text-white mt-6 mb-3">Shift History</h2>
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
-        <table class="w-full text-sm">
+        <table class="w-full text-sm table-cards">
             <thead class="bg-gray-50 dark:bg-gray-700 text-left">
                 <tr><th class="px-4 py-3">#</th><th>Opened</th><th>Closed</th><th>Sales</th><th>Cash</th><th>Variance</th><th>Status</th><th></th></tr>
             </thead>

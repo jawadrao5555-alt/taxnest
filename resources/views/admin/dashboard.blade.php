@@ -143,7 +143,7 @@
                         <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Recent Invoices (All Companies)</h3>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-cards">
                             <thead class="bg-gray-50 dark:bg-gray-800">
                                 <tr>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Invoice</th>
@@ -183,7 +183,7 @@
                         <span>Top 5 Companies by Revenue</span>
                     </h3>
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-cards">
                             <thead class="bg-gray-50 dark:bg-gray-800">
                                 <tr>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">#</th>
@@ -503,7 +503,7 @@
                 <div class="mb-6">
                     <h4 class="text-md font-semibold text-gray-700 dark:text-gray-300 mb-3">Companies at Risk</h4>
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 table-cards">
                             <thead class="bg-gray-50 dark:bg-gray-800">
                                 <tr>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Company Name</th>

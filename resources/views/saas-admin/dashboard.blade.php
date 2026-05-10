@@ -80,7 +80,7 @@
 
         <div x-show="activeTab === 'di'" class="bg-gray-900 border border-gray-800 border-t-0 rounded-b-xl overflow-hidden">
             <div class="overflow-x-auto">
-                <table class="w-full text-sm">
+                <table class="w-full text-sm table-cards">
                     <thead>
                         <tr class="text-left text-[10px] text-gray-500 dark:text-gray-400 uppercase border-b border-gray-800 bg-gray-800/30">
                             <th class="px-4 py-3">Company</th>
@@ -123,7 +123,7 @@
 
         <div x-show="activeTab === 'pos'" x-cloak class="bg-gray-900 border border-gray-800 border-t-0 rounded-b-xl overflow-hidden">
             <div class="overflow-x-auto">
-                <table class="w-full text-sm">
+                <table class="w-full text-sm table-cards">
                     <thead>
                         <tr class="text-left text-[10px] text-gray-500 dark:text-gray-400 uppercase border-b border-gray-800 bg-gray-800/30">
                             <th class="px-4 py-3">Company</th>
@@ -166,7 +166,7 @@
 
         <div x-show="activeTab === 'fbrpos'" x-cloak class="bg-gray-900 border border-gray-800 border-t-0 rounded-b-xl overflow-hidden">
             <div class="overflow-x-auto">
-                <table class="w-full text-sm">
+                <table class="w-full text-sm table-cards">
                     <thead>
                         <tr class="text-left text-[10px] text-gray-500 dark:text-gray-400 uppercase border-b border-gray-800 bg-gray-800/30">
                             <th class="px-4 py-3">Company</th>

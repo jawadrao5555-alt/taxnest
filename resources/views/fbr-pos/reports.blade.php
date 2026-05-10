@@ -32,7 +32,7 @@
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <h3 class="font-semibold text-gray-900 dark:text-white mb-4">Daily Sales — {{ now()->format('F Y') }}</h3>
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-cards">
                     <thead>
                         <tr>
                             <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>

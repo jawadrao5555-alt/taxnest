@@ -31,7 +31,7 @@
         </div>
 
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
-            <table class="w-full text-sm">
+            <table class="w-full text-sm table-cards">
                 <thead class="text-xs uppercase font-bold text-slate-700 dark:text-slate-300 bg-gray-100 dark:bg-gray-700">
                     <tr>
                         <th class="px-3 py-2 text-left">Product</th>

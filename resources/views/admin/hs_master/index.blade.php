@@ -52,7 +52,7 @@
                 </div>
 
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
+                    <table class="w-full text-sm table-cards">
                         <thead class="bg-gray-50 dark:bg-gray-900/50">
                             <tr>
                                 <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">HS Code</th>

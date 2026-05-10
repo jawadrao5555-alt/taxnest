@@ -101,7 +101,7 @@
                 </div>
 
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left">
+                    <table class="w-full text-sm text-left table-cards">
                         <thead class="bg-gray-50 dark:bg-gray-900/50 text-gray-600 dark:text-gray-400 text-xs uppercase tracking-wider">
                             <tr>
                                 <th class="px-4 py-3">HS Code</th>
@@ -267,7 +267,7 @@
                             <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-3">Recent Activity Log</h3>
                             @if(count($analyticsData['recent_responses']) > 0)
                                 <div class="overflow-x-auto">
-                                    <table class="w-full text-sm">
+                                    <table class="w-full text-sm table-cards">
                                         <thead class="bg-gray-50 dark:bg-gray-900/50 text-xs text-gray-600 dark:text-gray-400 uppercase">
                                             <tr>
                                                 <th class="px-3 py-2 text-left">Time</th>

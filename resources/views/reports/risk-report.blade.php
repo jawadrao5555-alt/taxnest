@@ -75,7 +75,7 @@
                 @if($report['risky_vendors']->count() > 0)
                 <h4 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-3">High-Risk Vendors</h4>
                 <div class="overflow-x-auto mb-8">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-cards">
                         <thead class="bg-gray-50 dark:bg-gray-800">
                             <tr>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Vendor NTN</th>

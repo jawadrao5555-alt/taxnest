@@ -8,7 +8,7 @@
                 <h3 class="font-bold text-lg">Product performance ({{ count($rows) }} unique items)</h3>
                 @include('admin.reports._export-buttons', ['route' => '/admin/reports/products'])
             </div>
-            <table class="w-full text-sm">
+            <table class="w-full text-sm table-cards">
                 <thead class="text-xs uppercase font-bold text-slate-700 dark:text-slate-300 bg-gray-100 dark:bg-gray-700">
                     <tr>@foreach($headers as $h)<th class="px-3 py-2 {{ $loop->first ? 'text-left' : 'text-right' }}">{{ $h }}</th>@endforeach</tr>
                 </thead>

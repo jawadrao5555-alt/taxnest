@@ -78,7 +78,7 @@
                                         </div>
 
                                         <div class="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
-                                            <table class="min-w-full text-xs">
+                                            <table class="min-w-full text-xs table-cards">
                                                 <thead class="bg-gray-50 dark:bg-gray-800">
                                                     <tr>
                                                         <th class="px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">Row</th>
@@ -868,7 +868,7 @@ function openUniqueBuyersModal() {
                 document.getElementById('uniqueBuyersContent').innerHTML = '<p class="text-center text-gray-500 py-8">No buyers found.</p>';
                 return;
             }
-            let html = '<table class="w-full text-sm"><thead><tr class="border-b border-gray-200 dark:border-gray-700">';
+            let html = '<table class="w-full text-sm table-cards"><thead><tr class="border-b border-gray-200 dark:border-gray-700">';
             html += '<th class="text-left py-2 px-2 text-xs font-medium text-gray-500 uppercase">#</th>';
             html += '<th class="text-left py-2 px-2 text-xs font-medium text-gray-500 uppercase">Buyer Name</th>';
             html += '<th class="text-left py-2 px-2 text-xs font-medium text-gray-500 uppercase">NTN</th>';

@@ -806,7 +806,7 @@ kbd {
                                 </span>
                                 <input type="text" inputmode="decimal" autocomplete="off" maxlength="10"
                                     x-model="item._amountInput"
-                                    @focus="$event.target.select(); item._amountInput = item.line_value > 0 ? String(item.line_value) : ''"
+                                    @focus="item._amountInput = ''"
                                     @input="item._amountInput = sanitizeQty($event.target.value); reverseCalcFromAmount(item, item._amountInput)"
                                     @blur="item._amountInput = ''"
                                     @keydown.enter.prevent="item._amountInput = ''; if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"

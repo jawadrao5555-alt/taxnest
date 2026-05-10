@@ -3273,9 +3273,14 @@ function restaurantPos() {
             this.submitting = true; this.stockError = '';
             try {
                 const holdRes = await fetch('{{ route("pos.restaurant.orders.hold") }}', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                     body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount }),
                 });
+                if (!holdRes.ok) {
+                    const bodyText = await holdRes.text().catch(() => '');
+                    console.error('[holdOrder] HTTP', holdRes.status, holdRes.statusText, bodyText.slice(0, 500));
+                    throw new Error('Hold HTTP ' + holdRes.status + ' ' + holdRes.statusText);
+                }
                 const holdData = await holdRes.json();
                 if (!holdData.success) { this.showToast(holdData.message || 'Failed', 'error'); this.submitting = false; return; }
                 const savedTotal = this.totalAmount;
@@ -3682,7 +3687,12 @@ function restaurantPos() {
                 // PROVISIONAL BILL FLOW — when true, RestaurantPosController::payOrder
                 // forces pra_status='local' and skips PRA submission. Bill remains
                 // editable / deletable until promoted via "Submit to PRA — Make Final".
-                const res = await fetch(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method, save_as_provisional: !!provisional }) });
+                const res = await fetch(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method, save_as_provisional: !!provisional }) });
+                if (!res.ok) {
+                    const bodyText = await res.text().catch(() => '');
+                    console.error('[payOrder] HTTP', res.status, res.statusText, bodyText.slice(0, 500));
+                    throw new Error('Pay HTTP ' + res.status + ' ' + res.statusText);
+                }
                 const data = await res.json();
                 if (data.success) {
                     this.heldOrders = this.heldOrders.filter(o => o.id !== orderId);

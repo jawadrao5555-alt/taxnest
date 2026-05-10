@@ -602,6 +602,36 @@ kbd {
                         </div>
                     @endif
                 </div>
+
+                {{-- ⌨️ Keyboard Shortcuts — moved to LEFT column on user request.
+                     Collapsible by default so it doesn't crowd the cart-build column. --}}
+                <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-md" x-data="{ shortcutsOpen: false }">
+                    <button type="button" @click="shortcutsOpen = !shortcutsOpen"
+                            class="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-2xl transition">
+                        <h3 class="text-sm font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-slate-700 dark:bg-slate-600 text-white text-xs shadow-sm">⌨️</span>
+                            Keyboard Shortcuts
+                        </h3>
+                        <svg class="w-4 h-4 text-slate-500 transition-transform" :class="shortcutsOpen ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="shortcutsOpen" x-collapse class="px-3 pb-3">
+                        <div class="flex flex-col gap-1.5 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+                            <span><kbd>Ctrl</kbd>+<kbd>K</kbd> Search → <kbd>↓</kbd><kbd>↑</kbd><kbd>Enter</kbd> add</span>
+                            <span class="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-bold"><kbd>Enter</kbd> = Add Product / Next Row</span>
+                            <span><kbd>Ctrl</kbd>+<kbd>D</kbd> Duplicate · <kbd>Ctrl</kbd>+<kbd>Del</kbd> Remove</span>
+                            <span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 font-bold"><kbd>F8</kbd>/<kbd>F9</kbd>/<kbd>Ctrl</kbd>+<kbd>B</kbd> = PAYMENT</span>
+                            <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 font-bold mt-1">Quantity tricks:</span>
+                            <span><kbd>3</kbd>+<kbd>*</kbd> in scan → next adds qty 3</span>
+                            <span><kbd>*</kbd> alone → jump to last row qty</span>
+                            <span><kbd>+</kbd>/<kbd>-</kbd> in scan → bump last qty ±1</span>
+                            <span><kbd>↑</kbd>/<kbd>↓</kbd> in qty/value → ±1</span>
+                            <span><kbd>Ctrl</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> anywhere → last qty</span>
+                            <span><kbd>Alt</kbd>+<kbd>Q</kbd> → focus last qty</span>
+                            <span><kbd>Esc</kbd> in qty/value → back to scan</span>
+                            <span><kbd>F2</kbd> Cash · <kbd>F3</kbd> Numpad · <kbd>F4</kbd> Hold · <kbd>F5</kbd> Recall · <kbd>F12</kbd> Reprint</span>
+                        </div>
+                    </div>
+                </div>
             </aside>
 
             <div class="lg:col-span-2 lg:order-2 space-y-4">
@@ -844,23 +874,7 @@ kbd {
                         </span>
                     </button>
 
-                    {{-- Keyboard hints strip --}}
-                    <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300 px-1">
-                        <span><kbd>Ctrl</kbd>+<kbd>K</kbd> Search → <kbd>↓</kbd><kbd>↑</kbd><kbd>Enter</kbd> add</span>
-                        <span class="px-2 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-bold"><kbd>Enter</kbd> = Add Product / Next Row</span>
-                        <span><kbd>Ctrl</kbd>+<kbd>D</kbd> Duplicate · <kbd>Ctrl</kbd>+<kbd>Del</kbd> Remove</span>
-                        <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 font-bold"><kbd>F8</kbd> / <kbd>F9</kbd> / <kbd>Ctrl</kbd>+<kbd>B</kbd> = OPEN PAYMENT CONFIRM</span>
-                        <span class="w-full"></span>
-                        <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 font-bold">Quantity tricks (no mouse needed):</span>
-                        <span><kbd>3</kbd>+<kbd>*</kbd> in scan box → next item adds with qty 3</span>
-                        <span><kbd>*</kbd> alone → jump to last row's qty</span>
-                        <span><kbd>+</kbd> / <kbd>-</kbd> in scan box → bump last row qty ±1</span>
-                        <span><kbd>↑</kbd>/<kbd>↓</kbd> inside qty/value field → ±1</span>
-                        <span><kbd>Ctrl</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> anywhere → bump last row qty</span>
-                        <span><kbd>Alt</kbd>+<kbd>Q</kbd> anywhere → focus last row qty</span>
-                        <span><kbd>Esc</kbd> in qty/value → back to scan input</span>
-                        <span><kbd>F2</kbd> Cash · <kbd>F3</kbd> Numpad · <kbd>F4</kbd> Hold · <kbd>F5</kbd> Recall · <kbd>F12</kbd> Reprint</span>
-                    </div>
+                    {{-- ✨ Keyboard hints strip MOVED to LEFT column (collapsible card under Quick Add) --}}
                 </div>
 
                 {{-- ═══ Customer · Promo · Payment now stacked BELOW cart in the SAME RIGHT column ═══

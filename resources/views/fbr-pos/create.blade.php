@@ -854,8 +854,11 @@ kbd {
                         </div>
                     </template>
 
+                    {{-- Scrollable cart container — caps height so cart never explodes the page; rows scroll within. --}}
+                    <div class="cart-rows-scroll overflow-y-auto pr-1 -mr-1 space-y-1.5"
+                         style="max-height: calc(100vh - 320px); min-height: 180px;">
                     <template x-for="(item, index) in items" :key="item._uid">
-                        <div class="item-card row-in border rounded-xl p-3 mb-2"
+                        <div class="item-card row-in border rounded-lg p-2"
                              :data-item-index="index"
                              x-data="{ editOpen: false }"
                              :class="[
@@ -865,9 +868,9 @@ kbd {
                              @focusin="activeItemIndex = index">
 
                             {{-- ═══ HEADER — # badge | name display | tax chip | actions ═══ --}}
-                            <div class="flex items-center justify-between mb-2 gap-2">
-                                <div class="flex items-center gap-2 min-w-0">
-                                    <span class="item-num-badge inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-black tabular-nums flex-shrink-0" x-text="index + 1"></span>
+                            <div class="flex items-center justify-between mb-1 gap-2">
+                                <div class="flex items-center gap-1.5 min-w-0">
+                                    <span class="item-num-badge inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-black tabular-nums flex-shrink-0" x-text="index + 1"></span>
                                     <span x-show="item.is_tax_exempt"
                                         class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">EXEMPT</span>
                                     <span x-show="!item.is_tax_exempt && item.tax_rate != 18"
@@ -891,33 +894,27 @@ kbd {
                             <input type="hidden" :name="'items['+index+'][value_input]'"
                                    :value="(item.mode || 'qty') === 'value' && parseFloat(item._valueInput) > 0 ? item._valueInput : ''">
 
-                            {{-- ═══ SIMPLE VISIBLE ROW — Name | UoM | Qty | Price ═══ --}}
-                            <div class="grid grid-cols-12 gap-2 items-end">
+                            {{-- ═══ COMPACT VISIBLE ROW — Name | UoM | Qty | Price (label-less, single tight grid) ═══ --}}
+                            <div class="grid grid-cols-12 gap-1.5 items-center">
                                 <div class="col-span-5">
-                                    <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase">Product *</label>
                                     <input type="text" :name="'items['+index+'][item_name]'" x-model="item.item_name" required
                                         @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
-                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm font-semibold shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                                        placeholder="Product name">
+                                        class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs font-semibold shadow-sm focus:ring-blue-500 focus:border-blue-500 py-1 px-2"
+                                        placeholder="Product">
                                 </div>
                                 <div class="col-span-2">
-                                    <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase">UoM</label>
                                     <select :name="'items['+index+'][uom]'" x-model="item.uom"
-                                        @change="if ((item.mode || 'qty') === 'value' && !canUseValueMode(item)) { setMode(item, 'qty'); toast('Switched to QTY — UoM not value-compatible', 'info'); } truncateQtyOnUomChange(item);"
-                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs shadow-sm focus:ring-blue-500 focus:border-blue-500 font-bold px-1">
+                                        @change="if ((item.mode || 'qty') === 'value' && !canUseValueMode(item)) { setMode(item, 'qty'); toast('Switched to QTY', 'info'); } truncateQtyOnUomChange(item);"
+                                        class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-[11px] shadow-sm focus:ring-blue-500 focus:border-blue-500 font-bold py-1 px-1">
                                         <template x-for="u in uomOptions" :key="u">
                                             <option :value="u" x-text="u"></option>
                                         </template>
                                     </select>
                                 </div>
                                 <div class="col-span-3">
-                                    <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase flex items-center gap-1">
-                                        <span>Qty</span>
-                                        <span x-show="isQtyDecimalAllowed(item)" class="text-emerald-600 dark:text-emerald-400 normal-case font-bold text-[9px]" title="Decimal quantities allowed for this UoM">·decimal</span>
-                                    </label>
-                                    <div class="flex items-stretch shadow-sm rounded-lg overflow-hidden ring-1 ring-blue-200 dark:ring-blue-800">
+                                    <div class="flex items-stretch shadow-sm rounded-md overflow-hidden ring-1 ring-blue-200 dark:ring-blue-800">
                                         <button type="button" tabindex="-1" @click="decQty(item)"
-                                            class="px-2 border-r border-blue-200 dark:border-blue-800 bg-gradient-to-b from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-900/50 text-blue-700 dark:text-blue-300 text-sm font-black hover:from-blue-100 hover:to-blue-200 active:scale-95 transition select-none">−</button>
+                                            class="px-1.5 border-r border-blue-200 dark:border-blue-800 bg-gradient-to-b from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-black hover:from-blue-100 hover:to-blue-200 active:scale-95 transition select-none">−</button>
                                         <input type="text" inputmode="decimal" autocomplete="off" maxlength="10"
                                             :data-qty-row="index"
                                             :name="'items['+index+'][quantity]'"
@@ -936,18 +933,14 @@ kbd {
                                                 else { $refs.barcodeInput && $refs.barcodeInput.focus(); }
                                             "
                                             required
-                                            class="w-full min-w-0 border-0 dark:bg-gray-800 dark:text-white text-sm font-bold tabular-nums shadow-inner focus:ring-2 focus:ring-blue-500 focus:outline-none text-center px-1"
+                                            class="w-full min-w-0 border-0 dark:bg-gray-800 dark:text-white text-xs font-bold tabular-nums shadow-inner focus:ring-2 focus:ring-blue-500 focus:outline-none text-center px-1 py-1"
                                             placeholder="1"
                                             title="↑/↓ +1/-1">
                                         <button type="button" tabindex="-1" @click="incQty(item)"
-                                            class="px-2 border-l border-blue-200 dark:border-blue-800 bg-gradient-to-b from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-900/50 text-blue-700 dark:text-blue-300 text-sm font-black hover:from-blue-100 hover:to-blue-200 active:scale-95 transition select-none">+</button>
+                                            class="px-1.5 border-l border-blue-200 dark:border-blue-800 bg-gradient-to-b from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-black hover:from-blue-100 hover:to-blue-200 active:scale-95 transition select-none">+</button>
                                     </div>
                                 </div>
-                                <div class="col-span-3">
-                                    <label class="block text-[10px] font-black text-slate-700 dark:text-slate-200 mb-0.5 tracking-wide uppercase flex items-center gap-1">
-                                        <span>Price *</span>
-                                        <span x-show="item.is_price_editable === false" class="px-1 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-[8px] font-black" title="Fixed-price product">🔒</span>
-                                    </label>
+                                <div class="col-span-2">
                                     <input type="number" :name="'items['+index+'][unit_price]'" x-model.number="item.unit_price" min="0.01" step="0.01" required
                                         :readonly="item.is_price_editable === false"
                                         :tabindex="item.is_price_editable === false ? -1 : 0"
@@ -955,17 +948,14 @@ kbd {
                                         @input="syncValueFromQty(item)"
                                         @keydown.enter.prevent="if(item.item_name && parseFloat(item.unit_price) > 0){ addItem(); focusLastRowName(); }"
                                         :class="item.is_price_editable === false ? 'bg-amber-50 dark:bg-amber-900/20 cursor-not-allowed text-amber-900 dark:text-amber-200 font-bold' : 'dark:bg-gray-800 dark:text-white'"
-                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 text-sm font-bold tabular-nums shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                                        placeholder="0.00">
+                                        class="w-full rounded-md border-gray-300 dark:border-gray-600 text-xs font-bold tabular-nums shadow-sm focus:ring-blue-500 focus:border-blue-500 py-1 px-1.5"
+                                        placeholder="Price">
                                 </div>
                             </div>
 
-                            {{-- ⬆ Per-row "Or Rs" reverse-calc REMOVED — moved to single GLOBAL bar at top of cart.
-                                 Saaf cart rows; reverse-calc sirf manual-typing billing me kaam aata hai. --}}
-
-                            {{-- Line total chip --}}
-                            <div class="flex justify-end mt-1.5">
-                                <span class="line-total-chip text-sm" x-text="'PKR ' + formatNum(lineTotal(item))"></span>
+                            {{-- Compact line total chip — bottom right --}}
+                            <div class="flex justify-end mt-1">
+                                <span class="line-total-chip text-[11px] py-0.5 px-2" x-text="'PKR ' + formatNum(lineTotal(item))"></span>
                             </div>
 
                             {{-- ═══ COLLAPSIBLE ADVANCED PANEL — HS · UoM · Tax % · Tax Exempt · Discount · Value Mode ═══
@@ -1006,16 +996,18 @@ kbd {
                             </div>
                         </div>
                     </template>
+                    </div>
+                    {{-- /cart-rows-scroll --}}
 
-                    {{-- ============ Premium "Add Next Item" CTA ============ --}}
+                    {{-- ============ Premium "Add Next Item" CTA — compact ============ --}}
                     <button type="button" @click="addItem()"
-                        class="add-cta group relative w-full mt-2 py-4 rounded-2xl border-2 border-dashed border-blue-300 dark:border-blue-700 hover:border-transparent transition-all flex items-center justify-center gap-3 overflow-hidden">
+                        class="add-cta group relative w-full mt-2 py-2.5 rounded-xl border-2 border-dashed border-blue-300 dark:border-blue-700 hover:border-transparent transition-all flex items-center justify-center gap-2 overflow-hidden">
                         <span class="add-cta-bg absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
                         <span class="add-cta-shine absolute inset-0 pointer-events-none"></span>
-                        <span class="relative z-10 w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xl font-black shadow-md group-hover:scale-110 group-hover:rotate-90 transition-all duration-300">+</span>
-                        <span class="relative z-10 text-blue-700 dark:text-blue-300 group-hover:text-white font-bold text-base tracking-wide transition-colors">Add Another Product</span>
-                        <span class="relative z-10 hidden sm:inline-flex items-center gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300 group-hover:text-white/80 ml-2 transition-colors">
-                            press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> or <kbd>F6</kbd>
+                        <span class="relative z-10 w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-black shadow-md group-hover:scale-110 group-hover:rotate-90 transition-all duration-300">+</span>
+                        <span class="relative z-10 text-blue-700 dark:text-blue-300 group-hover:text-white font-bold text-sm tracking-wide transition-colors">Add Another Product</span>
+                        <span class="relative z-10 hidden sm:inline-flex items-center gap-1 text-[10px] font-semibold text-slate-600 dark:text-slate-300 group-hover:text-white/80 ml-1 transition-colors">
+                            <kbd>Ctrl</kbd>+<kbd>Enter</kbd> · <kbd>F6</kbd>
                         </span>
                     </button>
 

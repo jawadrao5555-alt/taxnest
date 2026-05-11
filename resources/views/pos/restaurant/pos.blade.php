@@ -113,7 +113,7 @@ window.addEventListener('popstate', function() {
         <div class="relative flex-shrink-0" style="min-width:180px;max-width:220px;">
             <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
             <input type="search" x-ref="customerPhoneInput" x-model="customerPhoneQuery" @input="onCustomerPhoneInput()" @keydown.enter.prevent="onCustomerPhoneEnter()" @keydown.escape.prevent="customerPhoneDropdown = false" @keydown.tab.prevent="$refs.searchInput?.focus()" @click.away="customerPhoneDropdown = false" inputmode="tel" placeholder="Customer mobile..." class="w-full pl-9 pr-7 py-2.5 rounded-xl text-sm border-2 transition shadow-sm font-medium" :class="selectedCustomer ? 'border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200' : 'border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400'" autocomplete="one-time-code" name="pos_customer_phone_nofill" data-lpignore="true" data-form-type="other">
-            <kbd x-show="!customerPhoneQuery && !selectedCustomer" class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded font-mono">F7</kbd>
+            <kbd x-show="!customerPhoneQuery && !selectedCustomer" class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded font-mono">Alt+P</kbd>
             <button x-show="customerPhoneQuery || selectedCustomer" @click="clearCustomerInput()" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
@@ -186,6 +186,12 @@ window.addEventListener('popstate', function() {
         <button @click="priorityOrder = !priorityOrder" class="hidden sm:flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-semibold border transition" :class="priorityOrder ? 'bg-red-50 dark:bg-red-900/20 border-red-300 text-red-600' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50'">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
             <span>Rush</span>
+        </button>
+
+        <button @click="openQuickType()" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 hover:border-sky-300 transition flex-shrink-0" title="Quick Type Mode (F7) — type 'chai 2, samosa 1' or pick random product">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            <span class="hidden lg:inline">Quick</span>
+            <span class="text-[8px] font-mono bg-sky-200 dark:bg-sky-800/60 text-sky-700 dark:text-sky-300 px-1 rounded hidden sm:inline">F7</span>
         </button>
 
         <button @click="showShortcuts = true" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-purple-50 hover:text-purple-600 hover:border-purple-300 transition flex-shrink-0" title="Keyboard Shortcuts (F1)">
@@ -1049,6 +1055,111 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
+    {{-- ═══════════════════════════════════════════════════════════════
+         QUICK TYPE MODAL — multi-add by typing item names + qty.
+         Open: F7 or toolbar "Quick" button. Close: Esc.
+         ═══════════════════════════════════════════════════════════════ --}}
+    <div x-show="showQuickType" x-cloak x-transition.opacity @click.self="showQuickType = false" @keydown.escape.window="if(showQuickType) showQuickType = false" class="fixed inset-0 bg-gradient-to-br from-sky-950/70 via-black/70 to-blue-950/70 backdrop-blur-md z-50 flex items-center justify-center p-4" style="display:none;">
+        <div x-show="showQuickType" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-90 translate-y-4" x-transition:enter-end="opacity-100 scale-100 translate-y-0" @click.stop class="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden ring-1 ring-sky-200/50 dark:ring-sky-800/50" style="box-shadow: 0 25px 80px -20px rgba(2, 132, 199, 0.55);">
+            <div class="relative px-6 py-5 flex items-center justify-between" style="background:linear-gradient(135deg,#0284c7 0%,#0369a1 50%,#1e40af 100%);">
+                <div class="absolute inset-0 opacity-30 pointer-events-none" style="background:radial-gradient(circle at 20% 0%, rgba(255,255,255,0.4) 0%, transparent 40%);"></div>
+                <div class="relative flex items-center gap-3">
+                    <div class="w-11 h-11 bg-white/25 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg ring-1 ring-white/30">
+                        <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    </div>
+                    <div>
+                        <h3 class="text-white text-lg font-extrabold m-0 tracking-tight flex items-center gap-2">Quick Type <span class="text-[9px] font-bold bg-white/20 px-1.5 py-0.5 rounded-md ring-1 ring-white/30 uppercase tracking-wider">F7</span></h3>
+                        <p class="text-white/75 text-[11px] m-0 font-medium">Lightning-fast multi-add &mdash; type, parse, drop into cart.</p>
+                    </div>
+                </div>
+                <button @click="showQuickType = false" class="relative w-8 h-8 bg-white/15 hover:bg-white/30 rounded-xl text-white flex items-center justify-center transition-all hover:rotate-90 ring-1 ring-white/20" title="Close (Esc)">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="p-6 space-y-4 bg-gradient-to-b from-white to-sky-50/30 dark:from-gray-900 dark:to-sky-950/20">
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-[10px] font-extrabold uppercase tracking-[0.15em] text-sky-700 dark:text-sky-400 flex items-center gap-1.5">
+                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h7"/></svg>
+                            Items
+                        </label>
+                        <span class="text-[10px] text-gray-400 dark:text-gray-500 font-mono" x-show="quickTypeText.length > 0" x-text="(quickTypeText.split(/[,;\n]+/).filter(s=>s.trim()).length) + ' line(s)'"></span>
+                    </div>
+                    <div class="relative">
+                        <textarea x-model="quickTypeText" @input="parseQuickTypeText()" @keydown.ctrl.enter.prevent="applyQuickType()" @keydown.meta.enter.prevent="applyQuickType()" x-init="$nextTick(() => $el.focus())" rows="5" placeholder="chai 2&#10;samosa 1&#10;paratha 3&#10;&#10;(or comma-separated: chai 2, samosa 1)" class="w-full text-sm rounded-2xl border-2 border-sky-200 dark:border-sky-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-4 py-3 focus:ring-4 focus:ring-sky-500/20 focus:border-sky-500 font-mono leading-relaxed transition-all shadow-sm hover:shadow-md"></textarea>
+                    </div>
+                    <p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1.5 flex items-center gap-1">
+                        <svg class="w-3 h-3 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        Format: <span class="font-mono font-semibold">name qty</span> &nbsp;or&nbsp; <span class="font-mono font-semibold">qty name</span> &nbsp;&middot;&nbsp; one per line OR comma-separated
+                    </p>
+                </div>
+
+                <template x-if="quickTypeParsed.length === 0">
+                    <div class="text-center py-6 text-gray-400 dark:text-gray-500">
+                        <svg class="w-10 h-10 mx-auto mb-2 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        <p class="text-xs">Type item names above to see live preview</p>
+                    </div>
+                </template>
+
+                <template x-if="quickTypeParsed.length > 0">
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between px-1">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                                    <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                                    <span x-text="quickTypeParsed.filter(p => p.match).length"></span> matched
+                                </span>
+                                <template x-if="quickTypeParsed.filter(p => !p.match).length > 0 && isInventoryEnabled()">
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400 flex items-center gap-1">
+                                        <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                                        <span x-text="quickTypeParsed.filter(p => !p.match).length"></span> not found
+                                    </span>
+                                </template>
+                                <template x-if="quickTypeParsed.filter(p => !p.match).length > 0 && !isInventoryEnabled()">
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                        <span class="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
+                                        <span x-text="quickTypeParsed.filter(p => !p.match).length"></span> manual
+                                    </span>
+                                </template>
+                            </div>
+                            <span class="text-[11px] font-bold text-sky-700 dark:text-sky-300" x-text="'Rs. ' + Number(quickTypeParsed.reduce((s, p) => p.match ? s + parseFloat(p.match.price) * p.qty : (!isInventoryEnabled() && parseFloat(p.manualPrice) > 0 ? s + parseFloat(p.manualPrice) * p.qty : s), 0)).toLocaleString()"></span>
+                        </div>
+                        <div class="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                            <template x-for="(p, idx) in quickTypeParsed" :key="idx">
+                                <div class="flex items-center gap-2 p-2.5 rounded-xl border" :class="p.match ? 'bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800/50' : 'bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-800/50'">
+                                    <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" :class="p.match ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-red-100 dark:bg-red-900/40'">
+                                        <template x-if="p.match"><svg class="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg></template>
+                                        <template x-if="!p.match"><svg class="w-3.5 h-3.5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></template>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-xs font-bold truncate" :class="p.match ? 'text-emerald-900 dark:text-emerald-200' : 'text-red-700 dark:text-red-300'" x-text="p.match ? p.match.name : ('not found: ' + p.raw)"></p>
+                                        <p class="text-[10px] text-gray-500 dark:text-gray-400" x-show="p.match" x-text="'Rs. ' + Number(p.match ? p.match.price : 0).toLocaleString() + ' x ' + p.qty + ' = Rs. ' + Number((p.match ? p.match.price : 0) * p.qty).toLocaleString()"></p>
+                                    </div>
+                                    <template x-if="!p.match && !isInventoryEnabled()">
+                                        <input type="number" min="0" step="any" x-model="p.manualPrice" placeholder="Price" class="w-20 text-[11px] rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-gray-800 px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500" @click.stop>
+                                    </template>
+                                    <span class="text-[11px] font-bold flex-shrink-0 px-2 py-1 rounded-lg" :class="p.match ? 'bg-emerald-200/60 dark:bg-emerald-800/40 text-emerald-800 dark:text-emerald-200' : 'bg-red-200/60 dark:bg-red-800/40 text-red-700 dark:text-red-300'" x-text="'x' + p.qty"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+
+                <div class="flex flex-wrap gap-2 pt-1">
+                    <button @click="addRandomProduct()" :disabled="(!allProducts || allProducts.length === 0) && (!allServices || allServices.length === 0)" class="group flex-1 min-w-[160px] px-4 py-3 rounded-2xl bg-gradient-to-br from-amber-400 via-orange-500 to-orange-600 hover:from-amber-500 hover:via-orange-600 hover:to-orange-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 hover:shadow-xl hover:shadow-orange-500/40 hover:-translate-y-0.5 active:translate-y-0">
+                        <svg class="w-4 h-4 transition-transform group-hover:rotate-180 duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Random Product
+                    </button>
+                    <button @click="applyQuickType()" :disabled="quickTypeParsed.filter(p => p.match).length === 0 && (isInventoryEnabled() || quickTypeParsed.filter(p => !p.match && parseFloat(p.manualPrice) > 0).length === 0)" class="flex-1 min-w-[160px] px-4 py-3 rounded-2xl bg-gradient-to-br from-sky-500 via-sky-600 to-blue-700 hover:from-sky-600 hover:via-sky-700 hover:to-blue-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-sky-500/30 hover:shadow-xl hover:shadow-sky-500/40 hover:-translate-y-0.5 active:translate-y-0">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                        Add to Cart
+                        <kbd class="text-[9px] bg-white/25 backdrop-blur-sm px-1.5 py-0.5 rounded font-mono ring-1 ring-white/20">⌃↵</kbd>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- Low Stock Alert Popup — strictly gated by isInventoryEnabled().
          Even if some downstream code flips showLowStockPopup, this guard keeps it hidden. --}}
     <div x-cloak x-show="isInventoryEnabled() && showLowStockPopup && lowStockAlerts.length > 0" x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1217,6 +1328,10 @@ function restaurantPos() {
         lastPaymentMethod: '',
         submitting: false,
         cartAnimating: false,
+        // Quick Type modal state — mirrors universal POS
+        showQuickType: false,
+        quickTypeText: '',
+        quickTypeParsed: [],
         stockError: '',
         mobileView: 'menu',
         priorityOrder: false,
@@ -1411,6 +1526,110 @@ function restaurantPos() {
             this.updateDisplayItems();
         },
 
+        // ──────────────────────────────────────────────────────────────
+        // QUICK TYPE — multi-add by typing item names + qty (mirror of universal POS).
+        // Pool = products + services; fuzzy match by case-insensitive substring.
+        // Inventory-OFF: unmatched lines with typed prices become manual cart lines.
+        // ──────────────────────────────────────────────────────────────
+        openQuickType() {
+            this.showQuickType = true;
+            this.parseQuickTypeText();
+        },
+        quickTypePool() {
+            const products = (this.allProducts || []).filter(p => p && p.name).map(p => ({ ...p, _type: 'product' }));
+            const services = (this.allServices || []).filter(s => s && s.name).map(s => ({ ...s, _type: 'service' }));
+            return [...products, ...services];
+        },
+        parseQuickTypeText() {
+            const prevManual = (this.quickTypeParsed || []).map(p =>
+                (!p.match && p.manualPrice != null && p.manualPrice !== '') ? p.manualPrice : ''
+            );
+            const lines = (this.quickTypeText || '').split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
+            const pool = this.quickTypePool();
+            this.quickTypeParsed = lines.map((raw, idx) => {
+                let qty = 1;
+                let name = raw;
+                const mEnd = raw.match(/^(.*?)\s+(\d{1,3})$/);
+                const mStart = raw.match(/^(\d{1,3})\s+(.+)$/);
+                if (mEnd) { name = mEnd[1].trim(); qty = parseInt(mEnd[2], 10); }
+                else if (mStart) { qty = parseInt(mStart[1], 10); name = mStart[2].trim(); }
+                if (!Number.isFinite(qty) || qty < 1) qty = 1;
+                if (qty > 999) qty = 999;
+                const needle = name.toLowerCase();
+                let match = pool.find(p => p.name.toLowerCase() === needle)
+                         || pool.find(p => p.name.toLowerCase().startsWith(needle))
+                         || pool.find(p => p.name.toLowerCase().includes(needle))
+                         || pool.find(p => p.name.toLowerCase().split(/\s+/).some(t => t.startsWith(needle)));
+                const entry = { raw: name, qty, match: match || null, manualPrice: '' };
+                if (!entry.match && prevManual[idx] !== undefined && prevManual[idx] !== '') {
+                    entry.manualPrice = prevManual[idx];
+                }
+                return entry;
+            });
+        },
+        applyQuickType() {
+            const inv = this.isInventoryEnabled();
+            const matched = this.quickTypeParsed.filter(p => p.match);
+            const manualEntries = !inv
+                ? this.quickTypeParsed.filter(p => !p.match && parseFloat(p.manualPrice) > 0)
+                : [];
+            if (matched.length === 0 && manualEntries.length === 0) {
+                this.showToast(inv ? 'No items matched — check spelling' : 'Type names ya unmatched lines ke prices fill karein', 'error');
+                return;
+            }
+            let added = 0, skipped = 0, manualAdded = 0;
+            matched.forEach(p => {
+                if (inv && p.match.stockStatus === 'out' && this.blockOutOfStock) { skipped++; return; }
+                const item = { id: p.match.id, type: p.match._type || p.match.type || 'product', name: p.match.name, price: p.match.price, is_tax_exempt: p.match.is_tax_exempt };
+                for (let i = 0; i < p.qty; i++) { this.addToCart(item); added++; }
+            });
+            // Manual lines — restaurant cart shape (item_id=null, item_type='manual')
+            manualEntries.forEach(p => {
+                const price = parseFloat(p.manualPrice);
+                this.cart.push({
+                    cart_uid: 'm' + Date.now() + '_' + Math.random().toString(36).slice(2,9),
+                    item_id: null,
+                    item_type: 'manual',
+                    item_name: p.raw,
+                    quantity: p.qty,
+                    unit_price: price,
+                    special_notes: '',
+                    is_tax_exempt: false,
+                    item_discount_type: 'percentage',
+                    item_discount_value: 0,
+                    showItemDiscount: false,
+                });
+                manualAdded++;
+                this.activeCartIndex = this.cart.length - 1;
+            });
+            const total = added + manualAdded;
+            if (total > 0) {
+                let msg = `Added ${total} item(s)`;
+                if (manualAdded > 0) msg += ` (${manualAdded} manual)`;
+                if (skipped) msg += `, skipped ${skipped} out-of-stock`;
+                this.showToast(msg, 'success');
+                this.cartAnimating = true; setTimeout(() => this.cartAnimating = false, 300);
+            } else {
+                this.showToast('All matched items are out of stock', 'error');
+            }
+            this.showQuickType = false;
+            this.quickTypeText = '';
+            this.quickTypeParsed = [];
+        },
+        addRandomProduct() {
+            const inv = this.isInventoryEnabled();
+            const pool = this.quickTypePool().filter(p => {
+                if (p.is_active === false) return false;
+                if (!(parseFloat(p.price) > 0)) return false;
+                if (inv && p.stockStatus === 'out' && this.blockOutOfStock) return false;
+                return true;
+            });
+            if (pool.length === 0) { this.showToast('No products available', 'error'); return; }
+            const pick = pool[Math.floor(Math.random() * pool.length)];
+            this.addToCart({ id: pick.id, type: pick._type || pick.type || 'product', name: pick.name, price: pick.price, is_tax_exempt: pick.is_tax_exempt });
+            this.showToast('Random: ' + pick.name, 'success');
+        },
+
         addToCart(item) {
             const existing = this.cart.find(c => c.item_id === item.id && c.item_type === item.type);
             if (existing) {
@@ -1570,12 +1789,14 @@ function restaurantPos() {
             if (e.key === 'F4') { e.preventDefault(); if (this.cart.length && confirm('Clear entire cart?')) { this.clearCart(); } return; }
             if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
             if (e.key === 'F6') { e.preventDefault(); if (this.cart.length > 0) { this.cartMode = true; this.activeCartIndex = this.cart.length - 1; this.mobileView = 'cart'; } return; }
-            if (e.key === 'F7') { e.preventDefault(); this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); return; }
+            if (e.key === 'F7') { e.preventDefault(); this.openQuickType(); return; }
+            if (e.altKey && (e.key === 'p' || e.key === 'P')) { e.preventDefault(); this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); return; }
             if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) this.showPayModal = true; return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode(); this.mobileView = 'cart'; } return; }
 
             if (e.key === 'Escape') {
+                if (this.showQuickType) { this.showQuickType = false; return; }
                 if (this.showShortcuts) { this.showShortcuts = false; return; }
                 if (this.showNewCustomerModal) { this.showNewCustomerModal = false; return; }
                 if (this.showLowStockPopup) { this.showLowStockPopup = false; return; }

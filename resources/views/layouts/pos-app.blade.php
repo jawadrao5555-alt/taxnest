@@ -592,7 +592,7 @@
                     ['label' => 'Customers', 'url' => route('pos.customers'), 'icon' => '◉', 'kbd' => ''],
                     ['label' => 'Reports', 'url' => route('pos.reports'), 'icon' => '▤', 'kbd' => ''],
                     ['label' => 'Day Close', 'url' => route('pos.day-close'), 'icon' => '◆', 'kbd' => ''],
-                    ['label' => 'Billing & Plan', 'url' => route('pos.billing'), 'icon' => '$', 'kbd' => ''],
+                    ['label' => 'Billing & Plan', 'url' => route('pos.billing'), 'icon' => '₨', 'kbd' => ''],
                     ['label' => 'Business Profile', 'url' => route('pos.business-profile'), 'icon' => '◎', 'kbd' => ''],
                     ['label' => 'Toggle Fullscreen', 'action' => 'fullscreen', 'icon' => '⛶', 'kbd' => 'F11'],
                     ['label' => 'Toggle Dark Mode', 'action' => 'darkmode', 'icon' => '☾', 'kbd' => ''],

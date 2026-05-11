@@ -436,7 +436,7 @@ kbd {
         <div class="flex items-center gap-2">
             <button type="button" @click="holdSale()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black shadow-sm transition">⏸ Hold</button>
             <button type="button" @click="openRecall()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-sm transition">⏵ Recall <span x-show="heldList.length > 0" class="ml-1 bg-white text-indigo-700 rounded-full px-1.5 text-[10px] font-black" x-text="heldList.length"></span></button>
-            <a href="{{ route('fbrpos.phase2.shifts') }}" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-black shadow-sm transition">$ Drawer</a>
+            <a href="{{ route('fbrpos.phase2.shifts') }}" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-black shadow-sm transition">💵 Drawer</a>
         </div>
     </div>
 

@@ -315,7 +315,7 @@
 
                 init() {
                     // Phase 4: backfill stable _uid for every items[] row (server-rendered items
-                    // from @json don't have _uid). Required by :key="item._uid" to prevent
+                    // from @@json don't have _uid). Required by :key="item._uid" to prevent
                     // Alpine DOM-reuse bug when splicing rows (delete-wrong-item visual bug).
                     this.items = this.items.map(i => ({ ...i, _uid: i._uid || ('r' + Date.now() + '_' + Math.random().toString(36).slice(2,7)) }));
                     this.fetchTaxRate(this.paymentMethod);

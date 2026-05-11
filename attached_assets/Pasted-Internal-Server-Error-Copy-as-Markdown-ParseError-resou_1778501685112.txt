@@ -1,0 +1,138 @@
+Internal Server Error
+
+Copy as Markdown
+ParseError
+resources/views/pos/edit-transaction.blade.php:318
+syntax error, unexpected token ","
+
+LARAVEL
+12.51.0
+PHP
+8.4.19
+UNHANDLED
+CODE 0
+500
+GET
+https://taxnest.com.pk/pos/transaction/174/edit
+
+Exception trace
+resources/views/pos/edit-transaction.blade.php
+resources/views/pos/edit-transaction.blade.php:318
+
+313                    { value: 'qr_payment', label: 'QR / Raast', icon: '📱' }
+314                ],
+315
+316                init() {
+317                    // Phase 4: backfill stable _uid for every items[] row (server-rendered items
+318                    // from @json don't have _uid). Required by :key="item._uid" to prevent
+319                    // Alpine DOM-reuse bug when splicing rows (delete-wrong-item visual bug).
+320                    this.items = this.items.map(i => ({ ...i, _uid: i._uid || ('r' + Date.now() + '_' + Math.random().toString(36).slice(2,7)) }));
+321                    this.fetchTaxRate(this.paymentMethod);
+322                    this.recalculate();
+323                },
+324
+325                addItem() {
+326                    this.items.push({ _uid: 'r' + Date.now() + '_' + Math.random().toString(36).slice(2,7), type: 'product', item_id: '', name: '', quantity: 1, unit_price: 0 });
+327                },
+328
+329                removeItem(index) {
+330
+12 vendor frames
+
+App\Http\Middleware\PosAuth->handle()
+app/Http/Middleware/PosAuth.php:52
+
+21 vendor frames
+
+App\Http\Middleware\SecurityHeaders->handle()
+app/Http/Middleware/SecurityHeaders.php:13
+
+23 vendor frames
+
+public/index.php
+public/index.php:30
+
+Queries
+1-10 of 14
+mysql
+select * from `sessions` where `id` = 'WQXqiYOmHOk87Dce6LUwBN7q7aWVfl9VBjQWvaFE' limit 1
+0.66ms
+mysql
+delete from `sessions` where `last_activity` <= 1778494437
+0.76ms
+mysql
+select * from `users` where `id` = 13 limit 1
+0.17ms
+mysql
+select * from `companies` where `companies`.`id` = '13' and `companies`.`deleted_at` is null limit 1
+0.32ms
+mysql
+select * from `branches` where `company_id` = '13' and `is_head_office` = 1 and `branches`.`company_id` = '13' limit 1
+0.13ms
+mysql
+select * from `branches` where `company_id` = '13' and (`is_active` = 1 or `is_active` is null) and `branches`.`company_id` = '13' order by `id` asc limit 1
+0.11ms
+mysql
+select * from `companies` where `companies`.`id` = '13' and `companies`.`deleted_at` is null limit 1
+0.2ms
+mysql
+select * from `pos_transactions` where `company_id` = '13' and `pos_transactions`.`id` = '174' limit 1
+0.12ms
+mysql
+select * from `pos_transaction_items` where `pos_transaction_items`.`transaction_id` in (174)
+0.11ms
+mysql
+select * from `pos_products` where `company_id` = '13' and `is_active` = 1
+0.22ms
+
+
+1
+2
+
+
+Headers
+accept
+text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+accept-encoding
+gzip, deflate, br, zstd
+accept-language
+en-US,en;q=0.9
+cookie
+XSRF-TOKEN=eyJpdiI6IkpPT3NGemJhOW5vK28wSlJ4V290Umc9PSIsInZhbHVlIjoiQmF5OW9ERWdnSW1kcGdkSld3eGt1NkJFUC9HVE9PMTZxOHNoUmRYTU5hc1ZFRExRTCtkYTRYN1FnK2NiOE53OTI1Ukw2VmxrR2c3cU12bjY3UUF6OUx5V212Y2NZOGZqYW5wOUpadHRMblZvV0JrNk9EY25CN2F4RUFWR0FITm4iLCJtYWMiOiJkY2ExYjRhZmFlZWFlMTMzNmE2NzIwZTAzYzE3MmZkY2UyMmRmYmEwYjA1ZThiODU5YWViM2RkNzhkOTlmOGVkIiwidGFnIjoiIn0%3D; taxnest-session=eyJpdiI6IkZuTlh5bXlUZTFRcHRZSDV5Q3FQc3c9PSIsInZhbHVlIjoiM0Y3YjQ0TzZQMGJjWUExNGlMM1U1eW9iZ0NwaHNudzBRZ21Jc29pZDQ4dmpUMm54Zk4wOFQyeDRXYUZXVHdtZ1ArQm5JQjFDM3pqR2pVeXo3NE00YmFIdHQ4WVpkL1JQRWtQcnBxYXhvVk1JQ1JLVkxYa2MxQ1d3amc5S3FncFoiLCJtYWMiOiI3MzkzMzA2ODkxZWM2OGViZTBiMWJjMjM0Yzg5Yjg1MWE2M2U1NzEzZTYwYzM0NTdhMTNhOWI3NTdhNTBiZGU1IiwidGFnIjoiIn0%3D
+host
+taxnest.com.pk
+referer
+https://taxnest.com.pk/pos/invoice/create
+user-agent
+Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36
+sec-ch-ua-platform
+"Windows"
+sec-ch-ua
+"Chromium";v="148", "Google Chrome";v="148", "Not/A)Brand";v="99"
+upgrade-insecure-requests
+1
+sec-ch-ua-mobile
+?0
+sec-fetch-site
+same-origin
+sec-fetch-mode
+navigate
+sec-fetch-dest
+empty
+priority
+u=0, i
+x-https
+1
+Body
+// No request body
+Routing
+controller
+App\Http\Controllers\PosController@editTransaction
+route name
+pos.transaction.edit
+middleware
+web, pos.auth
+Routing parameters
+{
+    "id": "174"
+}

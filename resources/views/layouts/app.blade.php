@@ -135,7 +135,7 @@
 
             .sidebar-link { transition: all 0.2s ease; border-radius: 10px; }
             .sidebar-link:hover { background-color: rgba(249,250,251,0.9); }
-            .dark .sidebar-link:hover { background-color: rgba(55,65,81,0.6); }
+            .dark .sidebar-link:hover { background-color: rgba(75,85,99,0.85); color: #f3f4f6; }
             .sidebar-link.active {
                 background: linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(20,184,166,0.06) 100%);
                 font-weight: 600;
@@ -144,10 +144,12 @@
                 color: #047857;
             }
             .dark .sidebar-link.active {
-                background: linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(20,184,166,0.08) 100%);
+                background: linear-gradient(135deg, rgba(16,185,129,0.32) 0%, rgba(20,184,166,0.18) 100%);
                 border-left: 3px solid #34d399;
                 padding-left: 13px;
-                color: #6ee7b7;
+                color: #ffffff;
+                font-weight: 700;
+                box-shadow: inset 0 0 0 1px rgba(52,211,153,0.25);
             }
 
             .premium-table th {
@@ -208,7 +210,7 @@
         <div id="sidebarOverlay" class="fixed inset-0 bg-black/40 z-40 lg:hidden hidden" onclick="closeSidebar()"></div>
 
         <div class="flex h-full">
-            <nav id="sidebarDrawer" class="fixed left-0 top-0 w-64 h-full overflow-y-auto z-40 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 sidebar-scroll -translate-x-full lg:translate-x-0 transition-transform duration-200">
+            <nav id="sidebarDrawer" class="fixed left-0 top-0 w-64 h-full overflow-y-auto z-40 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 sidebar-scroll -translate-x-full lg:translate-x-0 transition-transform duration-200">
                 <div class="absolute top-3 right-3 z-10 lg:hidden">
                     <button onclick="closeSidebar()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>

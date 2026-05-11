@@ -434,6 +434,15 @@ kbd {
             @endif
         </div>
         <div class="flex items-center gap-2">
+            {{-- 🟢/🟡/🔴 Auto-Sync status pill (FBR POS) --}}
+            <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition"
+                 :class="syncStatus === 'online' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : (syncStatus === 'syncing' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-red-50 text-red-700 border-red-200')"
+                 :title="syncStatus === 'online' ? ('Auto-Sync Online' + (failedBills.length ? ' · ' + failedBills.length + ' pending' : '')) : (syncStatus === 'syncing' ? 'Syncing pending bills to FBR…' : 'Offline — bills will auto-sync when network returns')">
+                <span class="w-2 h-2 rounded-full"
+                      :class="syncStatus === 'online' ? 'bg-emerald-500' : (syncStatus === 'syncing' ? 'bg-amber-500 animate-pulse' : 'bg-red-500 animate-pulse')"></span>
+                <span x-text="syncStatus === 'online' ? 'Online' : (syncStatus === 'syncing' ? 'Syncing' : 'Offline')"></span>
+                <span x-show="failedBills.length > 0" class="ml-0.5 px-1.5 rounded-full text-[9px] font-black bg-red-600 text-white" x-text="failedBills.length"></span>
+            </div>
             <button type="button" @click="holdSale()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black shadow-sm transition">⏸ Hold</button>
             <button type="button" @click="openRecall()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-sm transition">⏵ Recall <span x-show="heldList.length > 0" class="ml-1 bg-white text-indigo-700 rounded-full px-1.5 text-[10px] font-black" x-text="heldList.length"></span></button>
             <a href="{{ route('fbrpos.phase2.shifts') }}" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-black shadow-sm transition">💵 Drawer</a>
@@ -1159,6 +1168,65 @@ function fbrPosInvoice() {
         _scanBuf: '',
         _scanLastTs: 0,
         _scanResetTimer: null,
+        // ── AUTO-SYNC ENGINE ──────────────────────────────────────────────
+        // Live network + pending-bill indicator. _syncTimer fires every 30 sec,
+        // pings the failed-bills endpoint (which doubles as connectivity probe),
+        // and silently retries the OLDEST pending bill. One per tick = no flood.
+        syncStatus: navigator.onLine ? 'online' : 'offline',
+        failedBills: [],
+        _syncTimer: null,
+        _autoSyncBusy: false,
+        async _loadFailedBills() {
+            try {
+                const res = await fetch('{{ route('fbrpos.api.failed-bills') }}', {
+                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                });
+                if (!res.ok) return false;
+                const data = await res.json();
+                if (data && data.success) { this.failedBills = data.bills || []; return true; }
+            } catch (e) { return false; }
+            return false;
+        },
+        _startAutoSync() {
+            if (this._syncTimer) return;
+            window.addEventListener('online', () => { this.syncStatus = 'online'; this._autoSyncTick(true); });
+            window.addEventListener('offline', () => { this.syncStatus = 'offline'; });
+            this._autoSyncTick();
+            this._syncTimer = setInterval(() => this._autoSyncTick(), 30000);
+        },
+        async _autoSyncTick(force = false) {
+            if (this._autoSyncBusy) return;
+            if (!navigator.onLine) { this.syncStatus = 'offline'; return; }
+            this._autoSyncBusy = true;
+            try {
+                const ok = await this._loadFailedBills();
+                if (!ok) { this.syncStatus = 'offline'; this._autoSyncBusy = false; return; }
+                if (this.failedBills.length === 0) { this.syncStatus = 'online'; this._autoSyncBusy = false; return; }
+                const candidate = [...this.failedBills].reverse().find(b => !b._retrying);
+                if (!candidate) { this.syncStatus = 'online'; this._autoSyncBusy = false; return; }
+                this.syncStatus = 'syncing';
+                candidate._retrying = true;
+                const url = '{{ url('/fbr-pos/api/failed-bills') }}/' + candidate.id + '/retry';
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                });
+                const data = await res.json().catch(() => ({}));
+                if (data && data.success) {
+                    this.failedBills = this.failedBills.filter(b => b.id !== candidate.id);
+                    if (typeof this.showToast === 'function') {
+                        this.showToast('🔄 Auto-synced ' + (candidate.invoice_number || '#' + candidate.id) + ' to FBR', 'success');
+                    }
+                } else {
+                    candidate._retrying = false;
+                }
+                this.syncStatus = 'online';
+            } catch (e) {
+                console.warn('fbr autoSyncTick', e);
+                this.syncStatus = navigator.onLine ? 'online' : 'offline';
+            }
+            this._autoSyncBusy = false;
+        },
         init() {
             // Phase 4: backfill stable _uid for every items[] row — required by
             // :key="item._uid" to prevent Alpine DOM-reuse delete-wrong-item bug.
@@ -1168,6 +1236,9 @@ function fbrPosInvoice() {
             this.$nextTick(() => { this.focusLastRowName(); });
             this.initBackgroundScanner();
             this.loadHeld();
+            // 🔄 Auto-Sync — kicks in after 4 sec, then every 30 sec.
+            // Live online/offline pill + silently retries pending bills to FBR.
+            setTimeout(() => this._startAutoSync(), 4000);
             // Global keyboard shortcuts
             window.addEventListener('keydown', (e) => {
                 // ✅ NEW (Apr-26): When ANY modal is open, defer ALL global shortcuts to the

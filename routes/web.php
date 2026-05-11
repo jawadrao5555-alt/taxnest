@@ -742,6 +742,9 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth'])->group(function () {
     Route::delete('/products/{id}', [FbrPosController::class, 'destroyProduct'])->name('fbrpos.products.destroy');
     Route::get('/api/products/search', [FbrPosController::class, 'searchProducts'])->name('fbrpos.api.products.search');
     Route::get('/api/products/barcode', [FbrPosController::class, 'lookupByBarcode'])->name('fbrpos.api.products.barcode');
+    // 🔄 Auto-Sync engine — silent 30-sec frontend poller + manual Failed modal
+    Route::get('/api/failed-bills', [FbrPosController::class, 'apiFailedBills'])->name('fbrpos.api.failed-bills');
+    Route::post('/api/failed-bills/{id}/retry', [FbrPosController::class, 'apiRetryFailed'])->name('fbrpos.api.failed.retry');
 
     // ============ Phase 2: Mall-Grade Universal Features ============
     // Terminals (multi-counter)

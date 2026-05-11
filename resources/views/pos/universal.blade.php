@@ -444,6 +444,17 @@ window.addEventListener('popstate', function() {
         </button>
 
         {{-- ── PROVISIONAL BILLS (Local) — header shortcut. Same pattern as Held. ── --}}
+        {{-- 🟢/🟡/🔴 Auto-Sync status pill — live network + pending-bill indicator --}}
+        <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition"
+             :class="syncStatus === 'online' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : (syncStatus === 'syncing' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800')"
+             :title="syncStatus === 'online' ? ('Auto-Sync Online' + (failedBills.length ? ' · ' + failedBills.length + ' pending' : '')) : (syncStatus === 'syncing' ? 'Syncing pending bills to PRA…' : 'Offline — bills will auto-sync when network returns')">
+            <span class="w-2 h-2 rounded-full"
+                  :class="syncStatus === 'online' ? 'bg-emerald-500' : (syncStatus === 'syncing' ? 'bg-amber-500 animate-pulse' : 'bg-red-500 animate-pulse')"></span>
+            <span x-text="syncStatus === 'online' ? 'Online' : (syncStatus === 'syncing' ? 'Syncing' : 'Offline')"></span>
+            <span x-show="failedBills.length > 0" class="ml-0.5 px-1.5 rounded-full text-[9px] font-black"
+                  :class="syncStatus === 'online' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'"
+                  x-text="failedBills.length"></span>
+        </div>
         {{-- Click → modal with Edit / Delete / Make Final actions inline. F10 shortcut. --}}
         <button @click="openLocalBills()" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition" title="Provisional bills (local — not submitted to PRA). Press F10.">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
@@ -1890,6 +1901,14 @@ function restaurantPos() {
         showFailedBills: false,
         activeFailedIndex: 0,
         failedBillsLoading: false,
+        // ── AUTO-SYNC ENGINE ──────────────────────────────────────────────
+        // syncStatus: 'online' | 'syncing' | 'offline'
+        // _syncTimer fires every 30 sec; pings count endpoint then silently
+        // retries one bill per tick (no PRA hammering on long outages).
+        // _autoSyncBusy = re-entrancy guard.
+        syncStatus: navigator.onLine ? 'online' : 'offline',
+        _syncTimer: null,
+        _autoSyncBusy: false,
         showReceipt: false,
         showShortcuts: false,
         // Quick Type Mode — type free-form lines like "chai 2, samosa 1" → cart
@@ -1995,6 +2014,56 @@ function restaurantPos() {
             // Failures are silent — badge just won't show until next refresh.
             setTimeout(() => this.loadLocalBills(), 1200);
             setTimeout(() => this.loadFailedBills(), 1500);
+            // 🔄 Auto-Sync — kicks in after 4 sec, then every 30 sec.
+            // Live-updates online/offline pill + silently retries pending bills.
+            setTimeout(() => this._startAutoSync(), 4000);
+        },
+
+        // ─── AUTO-SYNC ENGINE ──────────────────────────────────────────────
+        // Browser-side companion to the SyncPosOfflineInvoicesJob (cron).
+        // Every 30 sec: refresh online/offline state, count pending bills,
+        // and silently retry the OLDEST one. One bill per tick = no PRA flood.
+        _startAutoSync() {
+            if (this._syncTimer) return;
+            window.addEventListener('online', () => { this.syncStatus = 'online'; this._autoSyncTick(true); });
+            window.addEventListener('offline', () => { this.syncStatus = 'offline'; });
+            this._autoSyncTick();
+            this._syncTimer = setInterval(() => this._autoSyncTick(), 30000);
+        },
+        async _autoSyncTick(force = false) {
+            if (this._autoSyncBusy) return;
+            // Respect navigator.onLine but don't trust it 100% — we still try
+            // a lightweight count fetch which doubles as a connectivity probe.
+            if (!navigator.onLine) { this.syncStatus = 'offline'; return; }
+            this._autoSyncBusy = true;
+            try {
+                // Lightweight refresh of pending count (also serves as ping).
+                await this.loadFailedBills();
+                if (!this.praEnabled) { this.syncStatus = 'online'; this._autoSyncBusy = false; return; }
+                if (this.failedBills.length === 0) { this.syncStatus = 'online'; this._autoSyncBusy = false; return; }
+                // Pick OLDEST not-currently-retrying bill and submit silently.
+                const candidate = [...this.failedBills].reverse().find(b => !b._retrying);
+                if (!candidate) { this.syncStatus = 'online'; this._autoSyncBusy = false; return; }
+                this.syncStatus = 'syncing';
+                candidate._retrying = true;
+                const res = await fetch('{{ url('/pos/api/failed-bills') }}/' + candidate.id + '/retry', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                });
+                const data = await res.json().catch(() => ({}));
+                if (data && data.success) {
+                    this.failedBills = this.failedBills.filter(b => b.id !== candidate.id);
+                    // Mini toast — non-intrusive (existing showToast auto-dismisses).
+                    this.showToast('🔄 Auto-synced ' + (candidate.invoice_number || '#' + candidate.id) + ' to PRA', 'success');
+                } else {
+                    candidate._retrying = false;
+                }
+                this.syncStatus = 'online';
+            } catch (e) {
+                console.warn('autoSyncTick', e);
+                this.syncStatus = navigator.onLine ? 'online' : 'offline';
+            }
+            this._autoSyncBusy = false;
         },
 
         cacheProductData() {

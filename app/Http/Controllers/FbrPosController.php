@@ -1718,6 +1718,117 @@ class FbrPosController extends Controller
         return response()->json($products);
     }
 
+    /**
+     * 🔄 Auto-sync API — list FBR POS bills awaiting submission.
+     * Returns bills with fbr_status IN (failed, offline, pending) AND no
+     * fbr_invoice_number yet. Used by both header "Failed" modal and the
+     * silent 30-sec poller in fbr-pos/create.blade.php.
+     */
+    public function apiFailedBills(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $bills = FbrPosTransaction::where('company_id', $companyId)
+            ->whereIn('fbr_status', ['failed', 'offline', 'pending'])
+            ->whereNull('fbr_invoice_number')
+            ->where(function ($q) {
+                $q->whereNull('invoice_mode')->orWhere('invoice_mode', '!=', 'local');
+            })
+            ->orderBy('id', 'desc')
+            ->limit(100)
+            ->get(['id', 'invoice_number', 'customer_name', 'total_amount', 'fbr_status', 'created_at']);
+
+        $data = $bills->map(function ($b) {
+            return [
+                'id'             => $b->id,
+                'invoice_number' => $b->invoice_number,
+                'customer_name'  => $b->customer_name,
+                'total_amount'   => (float) $b->total_amount,
+                'fbr_status'     => $b->fbr_status,
+                'created_human'  => $b->created_at?->diffForHumans(),
+                'created_at'     => $b->created_at?->toDateTimeString(),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'count'   => $data->count(),
+            'bills'   => $data,
+        ]);
+    }
+
+    /**
+     * 🔄 Auto-sync API — retry a single failed FBR POS bill via JSON.
+     * Race-safe atomic claim prevents duplicate FBR submissions on
+     * double-click / concurrent poller / queued RetryFbrPosSubmissionJob.
+     */
+    public function apiRetryFailed(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+
+        // Atomic claim: flip from failed/offline → pending only if still
+        // un-submitted. Conditional UPDATE returns affected-row count;
+        // 0 = another caller already claimed it.
+        $claimed = FbrPosTransaction::where('company_id', $companyId)
+            ->where('id', $id)
+            ->whereNull('fbr_invoice_number')
+            ->whereIn('fbr_status', ['failed', 'offline', 'pending'])
+            ->where(function ($q) {
+                $q->whereNull('invoice_mode')->orWhere('invoice_mode', '!=', 'local');
+            })
+            ->update(['fbr_status' => 'pending', 'fbr_submission_hash' => null]);
+
+        if ($claimed === 0) {
+            $tx = FbrPosTransaction::where('company_id', $companyId)->where('id', $id)->first();
+            if (!$tx) {
+                return response()->json(['success' => false, 'message' => 'Bill not found'], 404);
+            }
+            if ($tx->fbr_invoice_number) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Already submitted. FBR #: ' . $tx->fbr_invoice_number,
+                ], 422);
+            }
+            if ($tx->invoice_mode === 'local') {
+                return response()->json(['success' => false, 'message' => 'Local bill — not submitted to FBR by design.'], 422);
+            }
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot retry — already in progress or status changed (' . $tx->fbr_status . ')',
+            ], 409);
+        }
+
+        $transaction = FbrPosTransaction::where('company_id', $companyId)
+            ->where('id', $id)
+            ->with(['items', 'company'])
+            ->first();
+
+        try {
+            $fbrService = new FbrService();
+            $result = $fbrService->submitFbrPosTransaction($transaction);
+            $transaction->refresh();
+
+            if (($result['status'] ?? '') === 'success') {
+                return response()->json([
+                    'success'   => true,
+                    'submitted' => true,
+                    'message'   => 'FBR submission successful! FBR #: ' . ($transaction->fbr_invoice_number ?? 'N/A'),
+                    'fbr_invoice_number' => $transaction->fbr_invoice_number,
+                    'id' => $transaction->id,
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'FBR retry failed: ' . implode(', ', $result['errors'] ?? ['Unknown error']),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Exception: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function lookupByBarcode(Request $request)
     {
         $companyId = app('currentCompanyId');

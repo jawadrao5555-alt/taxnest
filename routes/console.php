@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Schedule;
 use App\Jobs\NightlyComplianceCronJob;
 use App\Jobs\CheckFbrTokenExpiryJob;
 use App\Jobs\SyncPosOfflineInvoicesJob;
+use App\Jobs\SyncFbrPosOfflineInvoicesJob;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -14,4 +15,5 @@ Artisan::command('inspire', function () {
 Schedule::job(new NightlyComplianceCronJob)->daily()->at('02:00');
 Schedule::job(new CheckFbrTokenExpiryJob)->daily()->at('06:00');
 Schedule::job(new SyncPosOfflineInvoicesJob)->everyTwoMinutes();
+Schedule::job(new SyncFbrPosOfflineInvoicesJob)->everyTwoMinutes();
 Schedule::command('pos:clean-zombie-tables')->everyFifteenMinutes();

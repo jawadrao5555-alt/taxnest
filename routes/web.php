@@ -510,14 +510,19 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
         });
     });
 
+    // 🔧 Customer search/lookup/store — accessible from BOTH PRA POS (universal)
+    // and Restaurant POS. Previously these were trapped inside restaurant.only,
+    // which broke customer name/phone search on retail/general companies.
+    Route::get('/restaurant/api/customer-search', [RestaurantPosController::class, 'customerSearch'])->name('pos.restaurant.customer-search');
+    Route::get('/restaurant/api/customer-lookup', [RestaurantPosController::class, 'customerLookup'])->name('pos.restaurant.customer-lookup');
+    Route::post('/restaurant/api/customer-store', [RestaurantPosController::class, 'customerStore'])->name('pos.restaurant.customer-store');
+
     Route::middleware('restaurant.only')->group(function () {
     Route::get('/restaurant/pos', [RestaurantPosController::class, 'pos'])->name('pos.restaurant.pos');
     Route::post('/restaurant/orders/hold', [RestaurantPosController::class, 'holdOrder'])->name('pos.restaurant.orders.hold');
     Route::post('/restaurant/orders/{id}/pay', [RestaurantPosController::class, 'payOrder'])->name('pos.restaurant.orders.pay');
     Route::post('/restaurant/orders/{id}/delete', [RestaurantPosController::class, 'deleteOrder'])->name('pos.restaurant.orders.delete');
     Route::get('/restaurant/orders/by-table/{tableId}', [RestaurantPosController::class, 'getOrdersByTable'])->name('pos.restaurant.orders.by-table');
-    Route::get('/restaurant/api/customer-search', [RestaurantPosController::class, 'customerSearch'])->name('pos.restaurant.customer-search');
-    Route::post('/restaurant/api/customer-store', [RestaurantPosController::class, 'customerStore'])->name('pos.restaurant.customer-store');
     Route::get('/restaurant/tables', [RestaurantTableController::class, 'index'])->name('pos.restaurant.tables');
     Route::post('/restaurant/tables/{id}/lock', [RestaurantTableController::class, 'lockTable'])->name('pos.restaurant.tables.lock');
     Route::post('/restaurant/tables/{id}/unlock', [RestaurantTableController::class, 'unlockTable'])->name('pos.restaurant.tables.unlock');
@@ -531,7 +536,6 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::get('/restaurant/dashboard', [RestaurantPosController::class, 'dashboard'])->name('pos.restaurant.dashboard');
     Route::get('/restaurant/receipt/{id}', [RestaurantPosController::class, 'receipt'])->name('pos.restaurant.receipt');
     Route::get('/restaurant/api/check-stock', [RestaurantPosController::class, 'checkStock'])->name('pos.restaurant.check-stock');
-    Route::get('/restaurant/api/customer-lookup', [RestaurantPosController::class, 'customerLookup'])->name('pos.restaurant.customer-lookup');
     Route::post('/restaurant/api/refresh-product-image/{id}', [RestaurantPosController::class, 'refreshProductImage'])->name('pos.restaurant.refresh-image');
     Route::post('/restaurant/api/verify-manager-pin', [RestaurantPosController::class, 'verifyManagerPin'])->name('pos.restaurant.verify-manager-pin');
     Route::post('/restaurant/api/receipt-printed/{id}', [RestaurantPosController::class, 'markReceiptPrinted'])->name('pos.restaurant.receipt-printed');

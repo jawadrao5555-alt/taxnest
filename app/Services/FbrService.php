@@ -264,10 +264,142 @@ class FbrService
         ];
 
         if ($env === 'sandbox') {
-            $payload["scenarioId"] = "SN001";
+            $payload["scenarioId"] = $this->detectScenarioId($invoice, $payload);
         }
 
         return $payload;
+    }
+
+    /**
+     * Smart FBR Scenario detector.
+     * Auto-picks correct sandbox scenarioId based on first-item characteristics
+     * (3rd Schedule / Reduced / Exempt / Steel / Standard) + buyer registration.
+     *
+     * Override priority:
+     *   1. $invoice->fbr_scenario_id (explicit invoice-level override)
+     *   2. $invoice->items[0]->fbr_scenario_id (explicit item-level override)
+     *   3. Auto-detection (this method)
+     *
+     * Mapping (per FBR Excel scenario list):
+     *   SN001 — Goods at Standard Rate / Registered buyer
+     *   SN002 — Goods at Standard Rate / Unregistered buyer
+     *   SN003 — Steel Melting & Re-Rolling (HS 7204/7213/7214/7227/7228)
+     *   SN006 — Goods at Standard Rate (default) / Unregistered (legacy)
+     *   SN007 — Exempt Goods
+     *   SN008 — 3rd Schedule Goods / Registered
+     *   SN026 — Goods at Standard Rate / End Consumer
+     *   SN027 — 3rd Schedule Goods / End Consumer
+     *   SN028 — Goods at Reduced Rate (8th Schedule)
+     */
+    private function detectScenarioId($invoice, array $payload): string
+    {
+        if (!empty($invoice->fbr_scenario_id)) {
+            return strtoupper(trim($invoice->fbr_scenario_id));
+        }
+
+        $firstItem = $invoice->items->first();
+        if ($firstItem && !empty($firstItem->fbr_scenario_id)) {
+            return strtoupper(trim($firstItem->fbr_scenario_id));
+        }
+
+        if (!$firstItem) {
+            return 'SN001';
+        }
+
+        $saleType = strtolower($firstItem->sale_type ?? '');
+        $scheduleType = strtolower($firstItem->schedule_type ?? 'standard');
+        $hsCode = trim($firstItem->hs_code ?? '');
+        $taxRate = floatval($firstItem->tax_rate ?? 18);
+        $buyerRegType = strtolower($payload['buyerRegistrationType'] ?? 'unregistered');
+        $isRegistered = ($buyerRegType === 'registered');
+        $buyerNtn = trim($invoice->buyer_ntn ?? '');
+        $buyerCnic = trim($invoice->buyer_cnic ?? '');
+        $isEndConsumer = !$isRegistered && empty($buyerNtn);
+
+        $is3rdSchedule = (strpos($saleType, '3rd schedule') !== false || $scheduleType === 'third_schedule');
+        $isExempt = (strpos($saleType, 'exempt') !== false || $scheduleType === 'exempt');
+        $isReduced = (strpos($saleType, 'reduced') !== false || $scheduleType === 'reduced' || $scheduleType === '8th_schedule');
+        $isSteel = $this->isSteelHsCode($hsCode);
+
+        if ($isExempt) {
+            return 'SN007';
+        }
+
+        if ($isReduced) {
+            return 'SN028';
+        }
+
+        if ($isSteel) {
+            return 'SN003';
+        }
+
+        if ($is3rdSchedule) {
+            return $isRegistered ? 'SN008' : 'SN027';
+        }
+
+        if ($isRegistered) {
+            return 'SN001';
+        }
+
+        return $isEndConsumer ? 'SN026' : 'SN002';
+    }
+
+    /**
+     * Smart scenario detector for FBR POS transactions.
+     * Same logic as detectScenarioId() but adapted to FbrPosTransaction model
+     * (uses customer_* fields and items collection from POS transaction).
+     */
+    private function detectScenarioIdForFbrPos($transaction, array $payload): string
+    {
+        if (!empty($transaction->fbr_scenario_id)) {
+            return strtoupper(trim($transaction->fbr_scenario_id));
+        }
+
+        $items = $transaction->items ?? collect();
+        $firstItem = is_object($items) && method_exists($items, 'first') ? $items->first() : ($items[0] ?? null);
+
+        if ($firstItem && !empty($firstItem->fbr_scenario_id)) {
+            return strtoupper(trim($firstItem->fbr_scenario_id));
+        }
+
+        if (!$firstItem) {
+            $buyerNtn = trim($transaction->customer_ntn ?? '');
+            return !empty($buyerNtn) ? 'SN001' : 'SN002';
+        }
+
+        $saleType = strtolower($firstItem->sale_type ?? '');
+        $scheduleType = strtolower($firstItem->schedule_type ?? 'standard');
+        $hsCode = trim($firstItem->hs_code ?? '');
+        $buyerRegType = strtolower($payload['buyerRegistrationType'] ?? 'unregistered');
+        $isRegistered = ($buyerRegType === 'registered');
+        $buyerNtn = trim($transaction->customer_ntn ?? '');
+        $isEndConsumer = !$isRegistered && empty($buyerNtn);
+
+        $is3rdSchedule = (strpos($saleType, '3rd schedule') !== false || $scheduleType === 'third_schedule');
+        $isExempt = (strpos($saleType, 'exempt') !== false || $scheduleType === 'exempt');
+        $isReduced = (strpos($saleType, 'reduced') !== false || $scheduleType === 'reduced' || $scheduleType === '8th_schedule');
+        $isSteel = $this->isSteelHsCode($hsCode);
+
+        if ($isExempt) return 'SN007';
+        if ($isReduced) return 'SN028';
+        if ($isSteel) return 'SN003';
+        if ($is3rdSchedule) return $isRegistered ? 'SN008' : 'SN027';
+        if ($isRegistered) return 'SN001';
+        return $isEndConsumer ? 'SN026' : 'SN002';
+    }
+
+    /**
+     * Steel sector HS codes (Chapter 72: Iron & Steel - melted/re-rolled)
+     */
+    private function isSteelHsCode(string $hsCode): bool
+    {
+        if (empty($hsCode)) return false;
+        $hs = preg_replace('/[^0-9]/', '', $hsCode);
+        if (strlen($hs) < 4) return false;
+        $chapter = substr($hs, 0, 2);
+        $heading = substr($hs, 0, 4);
+        if ($chapter !== '72') return false;
+        return in_array($heading, ['7204', '7213', '7214', '7227', '7228'], true);
     }
 
     public function validatePayloadPreSubmission(array $payload): array
@@ -1494,9 +1626,7 @@ class FbrService
         ];
 
         if ($env === 'sandbox') {
-            $buyerNtn = trim($transaction->customer_ntn ?? '');
-            $isRegistered = !empty($buyerNtn) && (strlen(preg_replace('/[^0-9]/', '', $buyerNtn)) === 7 || strlen(preg_replace('/[^0-9]/', '', $buyerNtn)) === 13);
-            $payload['scenarioId'] = $isRegistered ? 'SN001' : 'SN006';
+            $payload['scenarioId'] = $this->detectScenarioIdForFbrPos($transaction, $payload);
         }
 
         return $payload;

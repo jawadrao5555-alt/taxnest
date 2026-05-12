@@ -1,0 +1,73 @@
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 1.25ms DONE
+  cache .......................................................... 6.29ms DONE
+  compiled ....................................................... 0.65ms DONE
+  events ......................................................... 0.35ms DONE
+  routes ......................................................... 0.29ms DONE
+  views .......................................................... 8.10ms DONE
+                                                                                                            cd ~/public_html && rm -f bootstrap/cache
+/{config,routes-v7,services}.php/public_html && rm -f bootstrap/cache/{config,routes-v7,services}.php
+[taxnestc@eu1 public_html]$ ^C         mysql -u YOUR_DB_USER -p YOUR_DB_NAME -e "UPDATE companies SET company_status='active' WHERE company_status='p
+ending'; UPDATE users SET is_active=1 WHERE is_active=0 OR is_active IS NULL;"ompanies SET company_status='active' WHERE company_status='pending'; UPEnter password: s_active=1 WHERE is_active=0 OR is_active IS NULL;"
+ERROR 1045 (28000): Access dmysql -u taxnestc_taxnest -p taxnestc_taxnest -e "SELECT id, name, status, company_status FROM companies ORDER BY id DESC
+ LIMIT 15;"^C^Cublic_html]$ mysql -u taxnestc_taxnest -p taxnestc_taxnest -e "S"Enter password: blic_html]$ mysql -u taxnestc_taxnest -p taxnestc_taxnest -e "SELECT id, name, status, company_status FROM companies ORDER BY id DESCERROR 1045 (28000): Access dmysql -u taxnestc_taxnest -p taxnestc_taxnest -e "S"
+Enter password: blic_html]$ mysql -u taxnestc_taxnest -p taxnestc_taxnest -e "SELECT id, name, status, company_status Fmysql -u taxnestc_taxnest -p taxnestc_taxnest -e "UPDATE companies SET company_status='active' WHERE company_status!='active'; UPDATE users SET is_active=1 WHERE is_active=0 OR is
+_active IS NULL; SELECT 'Fixed:' as msg, ROW_COUNT() as rows;"stc_taxnest -e "UPDATE companies SET company_status='active' WHERE company_status!='actEnter password: rs SET is_active=1 WHERE is_active=0 OR is_active IS NULL; SELECT 'Fixed:' as msg, ROW_COUNT() as rows;"
+ERROR 1045 (28000): Access denied for user 'taxnestc_taxnest'@'localhost' (using password: NO)
+[taxnestc@eu1 public_html]$ cd ~/public_html
+DB_NAME=$(grep '^DB_DATABASE=' .env | cut -d= -f2)
+DB_USER=$(grep '^DB_USERNAME=' .env | cut -d= -f2)
+DB_PASS=$(grep '^DB_PASSWORD=' .env | cut -d= -f2)
+mysql -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" <<'SQL'
+UPDATE companies SET company_status='active' WHERE company_status!='active';
+UPDATE users SET is_active=1 WHERE is_active=0 OR is_active IS NULL;
+SELECT id,name,status,company_status FROM companies ORDER BY id DESC LIMIT 10;
+SQL
+php artisan optimize:clear
+ERROR 1045 (28000): Access denied for user 'taxnestc_jawadrao5555'@'localhost' (using password: YES)
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 0.51ms DONE
+  cache .......................................................... 5.21ms DONE
+  compiled ....................................................... 0.61ms DONE
+  events ......................................................... 0.28ms DONE
+  routes ...................cd ~/public_html...................... 0.25ms DONE
+php artisan tinker --execute="DB::table('companies')->where('company_status','!=','active')->update(['company_status'=>'active']); DB::table('users')
+->where(function(\$q){\$q->where('is_active',0)->orWhereNull('is_active');})->u"
+CLI interactive shell disabled in producd ~/public_htmlt.'company_status','active')->count().PHP_EOL;"
+<?phprtisan tinker --execute="\$u = DB::table('users')->where('email','YOUR_EMAIL_HERE')->first(); \$c = \$u ? DB::table('companies')->find(\$u->comprequire __DIR__.'/vendor/autoload.php';company'=>\$c]);"where('email','YOUR_EMAIL_HERE')->first(); \$c = \$u ? DB::table('companies')->find(\$u->comp$app = require_once __DIR__.'/bootstrap/app.php';ronment.'company_status','active')->count().PHP_EOL;"
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+use Illuminate\Support\Facades\DB;
+<?php
+$c = DB::table('companies')->where('company_status','!=','active')->update(['company_status'=>'active']);
+$u = DB::table('users')->where(function($q){$q->where('is_active',0)->orWhereNull('is_active');})->update(['is_active'=>1]);
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+echo "✅ Companies fixed: $c\n";DB;
+echo "✅ Users activated: $u\n";
+echo "📊 Total companies: ".DB::table('companies')->count()."\n";')->update(['company_status'=>'active']);
+echo "📊 Active companies: ".DB::table('companies')->where('company_status','active')->count()."\n\n";date(['is_active'=>1]);
+echo "Last 10 companies:\n";
+foreach(DB::table('companies')->orderBy('id','desc')->limit(10)->get(['id','name','status','company_status','product_type']) as $row){
+    echo "  #{$row->id} | {$row->name} | status={$row->status} | company_status={$row->company_status} | type={$row->product_type}\n";
+}cho "📊 Total companies: ".DB::table('companies')->count()."\n";
+php /tmp/fix_login.phpes: ".DB::table('companies')->where('company_status','active')->count()."\n\n";
+[taxnestc@eu1 public_html]$ cd ~/public_html
+cat > /tmp/check_user.php <<'PHP'rderBy('id','desc')->limit(10)->get(['id','name','status','company_status','product_type']) as $row){
+<?phpcho "  #{$row->id} | {$row->name} | status={$row->status} | company_status={$row->company_status} | type={$row->product_type}\n";
+require __DIR__.'/vendor/autoload.php';
+$app = require_once __DIR__.'/bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+use Illuminate\Support\Facades\DB;
+
+$email = $argv[1] ?? '';
+$u = DB::table('users')->where('email',$email)->first();
+if(!$u){ echo "❌ User not found: $email\n"; exit; }
+$c = DB::table('companies')->find($u->company_id);
+echo "USER:\n"; print_r($u);
+echo "\nCOMPANY:\n"; print_r($c);
+PHP
+php /tmp/check_user.php "YOUR_EMAIL_HERE"
+[taxnestc@eu1 public_html]$

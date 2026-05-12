@@ -41,7 +41,9 @@ class RegisteredUserController extends Controller
                 'name' => $request->company_name,
                 'ntn' => $request->company_ntn,
                 'email' => $request->email,
-                'company_status' => 'pending',
+                'product_type' => 'di',
+                'company_status' => 'active',
+                'status' => 'pending',
             ]);
 
             $trialPlan = PricingPlan::where('is_trial', true)->first();

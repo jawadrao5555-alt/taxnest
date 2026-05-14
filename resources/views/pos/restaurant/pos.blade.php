@@ -1821,6 +1821,18 @@ function restaurantPos() {
             this.handleSearchKeys(e);
         },
 
+        // T-key tax toggle — flips is_tax_exempt on the cart row at `index`.
+        // Mirrored from universal.blade.php so Restaurant POS supports per-item NO-TAX.
+        toggleItemTax(index) {
+            if (index < 0 || index >= this.cart.length) return;
+            const item = this.cart[index];
+            if (!item) return;
+            item.is_tax_exempt = !item.is_tax_exempt;
+            if (typeof this.showToast === 'function') {
+                this.showToast(item.is_tax_exempt ? `NO TAX — ${item.item_name || item.name || 'item'}` : `TAX ON — ${item.item_name || item.name || 'item'}`, item.is_tax_exempt ? 'success' : 'info');
+            }
+        },
+
         handleCartKeys(e) {
             const ci = this.activeCartIndex;
             if (e.key === 'ArrowDown') { this.moveCartSelection(1); return; }
@@ -1829,6 +1841,8 @@ function restaurantPos() {
             if (e.key === '-' && ci >= 0) { this.updateQty(ci, -1); this.animateQty(ci); return; }
             if (e.key === 'Delete' && ci >= 0) { this.removeFromCart(ci); this.fixCartIndex(); return; }
             if (e.key === 'Enter' && this.cart.length) { this.showPayModal = true; return; }
+            // T toggles tax on currently-selected cart row (MUST come before the generic letter-key search catch-all)
+            if ((e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey && ci >= 0) { e.preventDefault(); this.toggleItemTax(ci); return; }
             if (/^[a-zA-Z]$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
                 this.cartMode = false; this.activeCartIndex = -1;
                 this.searchQuery += e.key; this.$refs.searchInput?.focus();
@@ -1842,6 +1856,10 @@ function restaurantPos() {
             if (e.key === '-' && this.cart.length > 0) { this.updateQty(this.cart.length - 1, -1); this.animateQty(this.cart.length - 1); return; }
             if (e.key === 'Delete' && this.cart.length > 0) { this.removeFromCart(this.cart.length - 1); this.fixCartIndex(); return; }
             if (e.key === 'Tab' && !e.shiftKey && !this.gridFocusMode) { e.preventDefault(); this.enterGridMode(); return; }
+            // T toggles tax on the last cart row when search box is empty (don't hijack typing into search)
+            if ((e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey && !e.altKey && !this.searchQuery && this.cart.length > 0 && !this.gridFocusMode) {
+                e.preventDefault(); this.toggleItemTax(this.cart.length - 1); return;
+            }
             if (e.key.length === 1 && /[a-zA-Z]/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey && !this.gridFocusMode) {
                 this.searchQuery += e.key;
                 this.$refs.searchInput?.focus();

@@ -1781,6 +1781,15 @@ function restaurantPos() {
             }
 
             // 🔒 ISOLATION: User typing in any input → keyboard engine never runs
+            // EXCEPTION 1: Alt+T anywhere (incl. inputs) toggles tax on last cart row — power-user shortcut
+            if (e.altKey && (e.key === 't' || e.key === 'T') && this.cart.length > 0) {
+                e.preventDefault(); this.toggleItemTax(this.cart.length - 1); return;
+            }
+            // EXCEPTION 2: Plain T inside the search input when searchQuery is empty (e.g. right after Enter-add)
+            // routes to tax-toggle of last cart row instead of typing 't' into search.
+            if (isInput && e.target === this.$refs.searchInput && !this.searchQuery && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.key === 't' || e.key === 'T') && this.cart.length > 0) {
+                e.preventDefault(); this.toggleItemTax(this.cart.length - 1); return;
+            }
             if (isInput) return;
 
             if (e.key === 'F1') { e.preventDefault(); this.showShortcuts = !this.showShortcuts; return; }

@@ -1368,7 +1368,7 @@ function restaurantPos() {
             const discountRatio = this.effectiveSubtotal > 0 ? (this.effectiveSubtotal - this.discountAmount) / this.effectiveSubtotal : 1;
             return Math.max(0, this.r2(taxable * Math.max(0, discountRatio)));
         },
-        get taxAmount() { return this.r2(this.taxableSubtotal * this.taxRate / 100); },
+        get taxAmount() { return Math.round(this.taxableSubtotal * this.taxRate / 100); },
         get totalAmount() { return Math.max(0, this.r2(this.effectiveSubtotal - this.discountAmount + this.taxAmount)); },
         get roundedTotal() { return Math.round(this.totalAmount); },
         get roundOff() { return this.r2(this.roundedTotal - this.totalAmount); },
@@ -1785,10 +1785,14 @@ function restaurantPos() {
             if (e.altKey && (e.key === 't' || e.key === 'T') && this.cart.length > 0) {
                 e.preventDefault(); this.toggleItemTax(this.cart.length - 1); return;
             }
-            // EXCEPTION 2: Plain T inside the search input when searchQuery is empty (e.g. right after Enter-add)
-            // routes to tax-toggle of last cart row instead of typing 't' into search.
-            if (isInput && e.target === this.$refs.searchInput && !this.searchQuery && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.key === 't' || e.key === 'T') && this.cart.length > 0) {
-                e.preventDefault(); this.toggleItemTax(this.cart.length - 1); return;
+            // EXCEPTION 2: Plain T while focused in any input — if that input is EMPTY and cart has items,
+            // route to tax-toggle of last cart row (covers: search input after Enter-add, qty inputs, etc).
+            if (isInput && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && (e.key === 't' || e.key === 'T') && this.cart.length > 0) {
+                const val = (e.target.value ?? '').toString();
+                const isSearch = e.target === this.$refs.searchInput || (e.target.getAttribute && e.target.getAttribute('x-ref') === 'searchInput') || e.target.matches?.('input[type="search"]');
+                if (isSearch && val === '') {
+                    e.preventDefault(); this.toggleItemTax(this.cart.length - 1); return;
+                }
             }
             if (isInput) return;
 

@@ -484,9 +484,9 @@ class PosController extends Controller
         $exemptAfterDiscount = round($afterDiscount - $taxableAfterDiscount, 2);
 
         $taxRate = PosTaxRule::getRateForMethod($request->payment_method);
-        $taxAmount = round($taxableAfterDiscount * $taxRate / 100, 2);
-        // Round to nearest integer rupee — matches frontend Math.round(roundedTotal).
-        // Pakistan POS convention: bills are always whole rupees, no paisa.
+        // Round tax to nearest whole rupee — matches frontend Math.round(taxAmount).
+        // Pakistan POS convention: tax + bill always whole rupees, no paisa.
+        $taxAmount = (float) round($taxableAfterDiscount * $taxRate / 100);
         $totalAmount = (float) round($afterDiscount + $taxAmount);
 
         if ($request->terminal_id) {
@@ -758,9 +758,9 @@ class PosController extends Controller
         $exemptAfterDiscount = round($afterDiscount - $taxableAfterDiscount, 2);
 
         $taxRate = PosTaxRule::getRateForMethod($request->payment_method);
-        $taxAmount = round($taxableAfterDiscount * $taxRate / 100, 2);
-        // Round to nearest integer rupee — matches frontend Math.round(roundedTotal).
-        // Pakistan POS convention: bills are always whole rupees, no paisa.
+        // Round tax to nearest whole rupee — matches frontend Math.round(taxAmount).
+        // Pakistan POS convention: tax + bill always whole rupees, no paisa.
+        $taxAmount = (float) round($taxableAfterDiscount * $taxRate / 100);
         $totalAmount = (float) round($afterDiscount + $taxAmount);
 
         DB::beginTransaction();

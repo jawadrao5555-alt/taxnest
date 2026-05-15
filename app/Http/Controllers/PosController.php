@@ -3115,23 +3115,25 @@ class PosController extends Controller
             $itemName = trim($item['name'] ?? '');
             $itemPrice = (float) ($item['unit_price'] ?? 0);
             $qty = (float) ($item['quantity'] ?? 0);
+            // Cashier's per-line T-toggle is authoritative — frontend already initializes
+            // is_tax_exempt from product master default when item is added to cart, then
+            // user may flip it via T-key. We MUST honor that override here.
             $isExempt = !empty($item['is_tax_exempt']);
 
             if ($itemId) {
                 if ($itemType === 'product') {
                     $obj = PosProduct::where('company_id', $companyId)->where('id', $itemId)->first();
-                    if ($obj) {
-                        $isExempt = (bool) $obj->is_tax_exempt;
-                    } else {
+                    if (!$obj) {
                         $itemId = null;
                     }
+                    // NOTE: Do NOT overwrite $isExempt from $obj->is_tax_exempt here.
+                    // Cart payload already reflects user's intent (master default OR T-toggle override).
                 } else {
                     $obj = PosService::where('company_id', $companyId)->where('id', $itemId)->first();
-                    if ($obj) {
-                        $isExempt = (bool) $obj->is_tax_exempt;
-                    } else {
+                    if (!$obj) {
                         $itemId = null;
                     }
+                    // Same as above — honor cart payload, not DB master.
                 }
             }
 

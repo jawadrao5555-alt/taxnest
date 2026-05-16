@@ -66,34 +66,42 @@ class RestaurantKdsController extends Controller
         $companyId = app('currentCompanyId');
         $code = trim((string) $request->input('code', ''));
 
-        // Accept "KOT-123", "KOT123", or plain "123"
-        if (!preg_match('/(\d+)\s*$/', $code, $m)) {
-            return response()->json(['success' => false, 'message' => 'Invalid barcode'], 400);
+        // Strict barcode contract — kitchen tickets always print "KOT-{id}". Reject anything
+        // else (incl. bare digits) so a stray scan of an unrelated barcode on the floor
+        // cannot accidentally mark a kitchen order ready.
+        if (!preg_match('/^KOT-(\d+)$/', $code, $m)) {
+            return response()->json(['success' => false, 'message' => 'Invalid KOT barcode'], 400);
         }
         $orderId = (int) $m[1];
+
+        // Atomic conditional update — race-safe. If another process (payment flow,
+        // cancel) flipped the order to completed/cancelled between our read and write,
+        // the WHERE clause excludes it and affected-rows = 0 → we return the correct
+        // "already X" response without overwriting a terminal state.
+        $affected = RestaurantOrder::where('company_id', $companyId)
+            ->where('id', $orderId)
+            ->whereIn('status', ['held', 'preparing'])
+            ->update(['status' => 'ready']);
 
         $order = RestaurantOrder::where('company_id', $companyId)->find($orderId);
         if (!$order) {
             return response()->json(['success' => false, 'message' => "Order #{$orderId} not found"], 404);
         }
 
-        if (in_array($order->status, ['completed', 'cancelled'])) {
+        if ($affected === 0) {
+            if ($order->status === 'ready') {
+                return response()->json([
+                    'success' => true,
+                    'already_ready' => true,
+                    'order_id' => $order->id,
+                    'message' => "Order {$order->order_number} already READY",
+                ]);
+            }
             return response()->json([
                 'success' => false,
                 'message' => "Order {$order->order_number} is already {$order->status}",
             ], 400);
         }
-
-        if ($order->status === 'ready') {
-            return response()->json([
-                'success' => true,
-                'already_ready' => true,
-                'order_id' => $order->id,
-                'message' => "Order {$order->order_number} already READY",
-            ]);
-        }
-
-        $order->update(['status' => 'ready']);
 
         return response()->json([
             'success' => true,

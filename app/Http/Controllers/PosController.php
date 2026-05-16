@@ -3371,6 +3371,15 @@ class PosController extends Controller
         $user = \Illuminate\Support\Facades\Auth::guard('pos')->user();
         $date = $request->input('date', today()->format('Y-m-d'));
 
+        // Destructive purge guard — only POS admin / company admin may request local-bill
+        // purge. Cashiers can still close the day, but their purge flag is silently
+        // ignored (no destructive operation under cashier authority).
+        $wantsPurge = $request->boolean('purge_local_bills');
+        $canPurge = $user && in_array(($user->pos_role ?? null), ['pos_admin', 'company_admin'], true);
+        if ($wantsPurge && !$canPurge) {
+            return back()->with('error', 'Only POS admin can purge local/provisional bills at day-close.');
+        }
+
         $existing = PosDayCloseReport::where('company_id', $companyId)
             ->where('report_date', $date)
             ->first();
@@ -3419,23 +3428,27 @@ class PosController extends Controller
         $hashString = json_encode($data);
         $data['hash'] = hash('sha256', $hashString);
 
-        PosDayCloseReport::create($data);
-
         // Vendor request — optional auto-purge of local/provisional bills at day-close.
         // Only deletes pra_status='local' bills (never PRA-submitted ones); fully audit-safe.
+        // Admin-only (guarded above). Wrapped in a single DB transaction so report creation
+        // and purge succeed/fail atomically — no half-purged state on partial failure.
         $purgedCount = 0;
-        if ($request->boolean('purge_local_bills')) {
-            $localBills = PosTransaction::where('company_id', $companyId)
-                ->whereDate('created_at', $date)
-                ->where('pra_status', 'local')
-                ->whereNull('pra_invoice_number')
-                ->get();
-            foreach ($localBills as $lb) {
-                $lb->items()->delete();
-                $lb->delete();
-                $purgedCount++;
+        \DB::transaction(function () use ($data, $companyId, $date, $wantsPurge, $canPurge, &$purgedCount) {
+            PosDayCloseReport::create($data);
+            if ($wantsPurge && $canPurge) {
+                $localBills = PosTransaction::where('company_id', $companyId)
+                    ->whereDate('created_at', $date)
+                    ->where('pra_status', 'local')
+                    ->whereNull('pra_invoice_number')
+                    ->lockForUpdate()
+                    ->get();
+                foreach ($localBills as $lb) {
+                    $lb->items()->delete();
+                    $lb->delete();
+                    $purgedCount++;
+                }
             }
-        }
+        });
 
         $msg = 'Day Close Report ' . $reportNumber . ' generated for ' . \Carbon\Carbon::parse($date)->format('d M Y');
         if ($purgedCount > 0) {

@@ -1,5 +1,5 @@
 <x-pos-layout>
-<div x-data="{ showAddModal: false, selectedProduct: '' }" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div x-data="{ showAddModal: false, selectedProduct: '', ingMode: 'existing' }" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Recipes (Bill of Materials)</h1>
@@ -84,7 +84,8 @@
     <div x-show="showAddModal" x-transition.opacity class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" @click.self="showAddModal = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md">
             <div class="p-5 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Add Recipe Ingredient</h3>
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Add Recipe + Ingredient</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Ek hi box — agar ingredient pehle se hai to select karen, warna naya bana lein.</p>
             </div>
             <form method="POST" action="{{ route('pos.restaurant.recipes.store') }}" class="p-5 space-y-4">
                 @csrf
@@ -97,21 +98,67 @@
                         @endforeach
                     </select>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ingredient</label>
-                    <select name="ingredient_id" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
-                        <option value="">Select ingredient...</option>
-                        @foreach($ingredients as $ingredient)
-                        <option value="{{ $ingredient->id }}">{{ $ingredient->name }} ({{ $ingredient->unit }})</option>
-                        @endforeach
-                    </select>
+
+                {{-- Unified Ingredient Section — toggle between existing/new --}}
+                <div class="border-2 border-dashed border-purple-300 dark:border-purple-700 rounded-lg p-3 bg-purple-50/30 dark:bg-purple-900/10">
+                    <div class="flex gap-2 mb-3">
+                        <button type="button" @click="ingMode = 'existing'"
+                                :class="ingMode === 'existing' ? 'bg-purple-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'"
+                                class="flex-1 py-1.5 text-xs font-semibold rounded-md border border-purple-300 dark:border-purple-700">
+                            ✓ Existing Ingredient
+                        </button>
+                        <button type="button" @click="ingMode = 'new'"
+                                :class="ingMode === 'new' ? 'bg-emerald-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'"
+                                class="flex-1 py-1.5 text-xs font-semibold rounded-md border border-emerald-300 dark:border-emerald-700">
+                            + New Ingredient
+                        </button>
+                    </div>
+
+                    <div x-show="ingMode === 'existing'">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ingredient</label>
+                        <select name="ingredient_id" :required="ingMode === 'existing'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+                            <option value="">Select ingredient...</option>
+                            @foreach($ingredients as $ingredient)
+                            <option value="{{ $ingredient->id }}">{{ $ingredient->name }} ({{ $ingredient->unit }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div x-show="ingMode === 'new'" class="space-y-2">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">New Ingredient Name</label>
+                            <input type="text" name="new_ingredient_name" :required="ingMode === 'new'"
+                                   class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"
+                                   placeholder="e.g., Atta, Chicken, Onion">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Unit</label>
+                                <select name="new_ingredient_unit" :required="ingMode === 'new'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm">
+                                    <option value="kg">kg</option>
+                                    <option value="g">g</option>
+                                    <option value="L">L</option>
+                                    <option value="ml">ml</option>
+                                    <option value="pcs">pcs</option>
+                                    <option value="dozen">dozen</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Cost / Unit (PKR)</label>
+                                <input type="number" name="new_ingredient_cost" step="0.01" min="0"
+                                       class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"
+                                       placeholder="0.00">
+                            </div>
+                        </div>
+                    </div>
                 </div>
+
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Quantity Needed (per unit sold)</label>
                     <input type="number" name="quantity_needed" step="0.0001" min="0.0001" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white" placeholder="e.g., 0.25 for 250g if unit is kg">
                 </div>
                 <div class="flex gap-2 pt-2">
-                    <button type="submit" class="flex-1 py-2.5 rounded-lg bg-purple-600 text-white hover:bg-purple-700 text-sm font-semibold">Add to Recipe</button>
+                    <button type="submit" class="flex-1 py-2.5 rounded-lg bg-purple-600 text-white hover:bg-purple-700 text-sm font-semibold">Save Recipe</button>
                     <button type="button" @click="showAddModal = false" class="px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm">Cancel</button>
                 </div>
             </form>

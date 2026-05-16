@@ -75,7 +75,11 @@
         .btn-reprint { background: #f59e0b; color: #fff; }
         .btn-station { background: #3b82f6; color: #fff; font-size: 11px; }
         .btn-station:hover { background: #2563eb; }
+        .kot-barcode-box { text-align: center; margin: 8px 0 4px; }
+        .kot-barcode-box svg { max-width: 95%; height: 50px; }
+        .kot-barcode-hint { font-size: 9px; color: #000; font-weight: bold; letter-spacing: 1px; margin-top: 2px; }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 </head>
 <body>
     <div class="text-center">
@@ -162,6 +166,10 @@
     </div>
 
     <div class="separator"></div>
+    <div class="kot-barcode-box">
+        <svg id="kotBarcode"></svg>
+        <div class="kot-barcode-hint">SCAN TO MARK READY</div>
+    </div>
     <p class="text-center bold text-sm">{{ $company->name ?? 'Restaurant' }}</p>
 
     <div class="no-print print-btn-row">
@@ -198,7 +206,25 @@
             }, 500);
         }
 
+        function renderBarcode() {
+            try {
+                if (typeof JsBarcode === 'function') {
+                    JsBarcode('#kotBarcode', 'KOT-{{ $order->id }}', {
+                        format: 'CODE128',
+                        width: 2,
+                        height: 50,
+                        displayValue: true,
+                        fontSize: 12,
+                        margin: 0,
+                        background: '#ffffff',
+                        lineColor: '#000000'
+                    });
+                }
+            } catch (e) { console.warn('Barcode render failed', e); }
+        }
+
         window.onload = function() {
+            renderBarcode();
             const urlParams = new URLSearchParams(window.location.search);
             const isInIframe = window.parent && window.parent !== window;
             const frameSignal = urlParams.get('_signal'); // sent by parent for postMessage routing

@@ -1499,7 +1499,45 @@ function restaurantPos() {
                 }
             });
         },
-        addHighlightedItem() { if (this.showSearchDropdown && this.searchSuggestions.length > 0) this.quickAddItem(this.searchSuggestions[this.highlightIndex]); },
+        addHighlightedItem() {
+            if (this.showSearchDropdown && this.searchSuggestions.length > 0) {
+                this.quickAddItem(this.searchSuggestions[this.highlightIndex]);
+                return;
+            }
+            // T006: No match → add manual line as-typed (vendor request).
+            // Format: "name price" OR just "name" (price=0, cashier can edit price after add).
+            // Uses the same {item_id:null, item_type:'manual'} cart shape that QuickType already
+            // produces, so RestaurantPosController::holdOrder() (which now accepts type=manual)
+            // can checkout/hold these lines without backend changes per call site.
+            const q = (this.searchQuery || '').trim();
+            if (!q) return;
+            const m = q.match(/^(.+?)\s+(\d+(?:\.\d+)?)$/);
+            const name = m ? m[1].trim() : q;
+            const price = m ? parseFloat(m[2]) : 0;
+            this.cart.push({
+                cart_uid: 'm' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
+                item_id: null,
+                item_type: 'manual',
+                item_name: name,
+                quantity: 1,
+                unit_price: price,
+                special_notes: '',
+                is_tax_exempt: false,
+                item_discount_type: 'percentage',
+                item_discount_value: 0,
+                showItemDiscount: false,
+            });
+            this.activeCartIndex = this.cart.length - 1;
+            this.searchQuery = '';
+            this.searchSuggestions = [];
+            this.showSearchDropdown = false;
+            this.filterProducts();
+            this.cartAnimating = true; setTimeout(() => this.cartAnimating = false, 300);
+            this.$nextTick(() => { this.$refs.searchInput?.focus(); });
+            if (typeof this.showToast === 'function') {
+                this.showToast(`Manual: ${name}${price ? ' @ Rs ' + price : ' (set price in cart)'}`, 'success');
+            }
+        },
         quickAddItem(item) {
             this.handleProductClick(item);
             this.searchQuery = ''; this.searchSuggestions = []; this.showSearchDropdown = false;
@@ -1763,6 +1801,7 @@ function restaurantPos() {
             if (this.showPayModal) {
                 if (e.key === '1') { e.preventDefault(); this.processPayment('cash'); }
                 else if (e.key === '2') { e.preventDefault(); this.processPayment('card'); }
+                else if (e.key === 'Enter') { e.preventDefault(); if (!this.submitting) this.processPayment('cash'); }
                 else if (e.key === 'Escape') { e.preventDefault(); this.showPayModal = false; }
                 return;
             }

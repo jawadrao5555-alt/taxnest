@@ -130,7 +130,6 @@ class IngredientController extends Controller
 
         $request->validate([
             'product_id' => 'required|integer',
-            'ingredient_id' => 'required|integer',
             'quantity_needed' => 'required|numeric|min:0.0001',
         ]);
 
@@ -139,14 +138,42 @@ class IngredientController extends Controller
             return back()->with('error', 'Invalid product.');
         }
 
-        $ingredient = Ingredient::where('company_id', $companyId)->where('id', $request->ingredient_id)->first();
+        // UNIFIED FLOW (vendor request — "ek hi box"): user can either pick existing ingredient
+        // OR create a new one inline by providing name + unit + cost in the same form.
+        $ingredient = null;
+        if ($request->filled('ingredient_id')) {
+            $ingredient = Ingredient::where('company_id', $companyId)->where('id', $request->ingredient_id)->first();
+        } elseif ($request->filled('new_ingredient_name')) {
+            $request->validate([
+                'new_ingredient_name' => 'required|string|max:120',
+                'new_ingredient_unit' => 'required|string|max:20',
+                'new_ingredient_cost' => 'nullable|numeric|min:0',
+            ]);
+            $name = trim($request->new_ingredient_name);
+            // Reuse existing ingredient if name+unit matches (avoid duplicates)
+            $ingredient = Ingredient::where('company_id', $companyId)
+                ->whereRaw('LOWER(name) = ?', [strtolower($name)])
+                ->where('unit', $request->new_ingredient_unit)
+                ->first();
+            if (!$ingredient) {
+                $ingredient = Ingredient::create([
+                    'company_id' => $companyId,
+                    'name' => $name,
+                    'unit' => $request->new_ingredient_unit,
+                    'cost_per_unit' => (float) ($request->new_ingredient_cost ?: 0),
+                    'current_stock' => 0,
+                    'low_stock_threshold' => 0,
+                    'is_active' => true,
+                ]);
+            }
+        }
         if (!$ingredient) {
-            return back()->with('error', 'Invalid ingredient.');
+            return back()->with('error', 'Please select an existing ingredient OR fill in new ingredient details.');
         }
 
         $exists = ProductRecipe::where('company_id', $companyId)
             ->where('product_id', $request->product_id)
-            ->where('ingredient_id', $request->ingredient_id)
+            ->where('ingredient_id', $ingredient->id)
             ->exists();
 
         if ($exists) {
@@ -156,11 +183,11 @@ class IngredientController extends Controller
         ProductRecipe::create([
             'company_id' => $companyId,
             'product_id' => $request->product_id,
-            'ingredient_id' => $request->ingredient_id,
+            'ingredient_id' => $ingredient->id,
             'quantity_needed' => $request->quantity_needed,
         ]);
 
-        return back()->with('success', 'Recipe ingredient added.');
+        return back()->with('success', "Recipe ingredient '{$ingredient->name}' added.");
     }
 
     public function updateRecipe(Request $request, $id)

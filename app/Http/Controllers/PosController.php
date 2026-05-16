@@ -3421,7 +3421,27 @@ class PosController extends Controller
 
         PosDayCloseReport::create($data);
 
-        return back()->with('success', 'Day Close Report ' . $reportNumber . ' generated successfully for ' . \Carbon\Carbon::parse($date)->format('d M Y'));
+        // Vendor request — optional auto-purge of local/provisional bills at day-close.
+        // Only deletes pra_status='local' bills (never PRA-submitted ones); fully audit-safe.
+        $purgedCount = 0;
+        if ($request->boolean('purge_local_bills')) {
+            $localBills = PosTransaction::where('company_id', $companyId)
+                ->whereDate('created_at', $date)
+                ->where('pra_status', 'local')
+                ->whereNull('pra_invoice_number')
+                ->get();
+            foreach ($localBills as $lb) {
+                $lb->items()->delete();
+                $lb->delete();
+                $purgedCount++;
+            }
+        }
+
+        $msg = 'Day Close Report ' . $reportNumber . ' generated for ' . \Carbon\Carbon::parse($date)->format('d M Y');
+        if ($purgedCount > 0) {
+            $msg .= " — {$purgedCount} local/provisional bill(s) purged.";
+        }
+        return back()->with('success', $msg);
     }
 
     public function dayCloseReportPdf($id)

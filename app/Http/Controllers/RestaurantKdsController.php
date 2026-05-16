@@ -55,6 +55,54 @@ class RestaurantKdsController extends Controller
         ]);
     }
 
+    /**
+     * Scan-to-Ready endpoint — kitchen scanner reads "KOT-{id}" barcode from
+     * the printed ticket. Bypasses normal transition validation (held→preparing→ready)
+     * and jumps directly to "ready" regardless of current state. This is the kitchen
+     * staff's "I'm done with this dish" signal.
+     */
+    public function scanComplete(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $code = trim((string) $request->input('code', ''));
+
+        // Accept "KOT-123", "KOT123", or plain "123"
+        if (!preg_match('/(\d+)\s*$/', $code, $m)) {
+            return response()->json(['success' => false, 'message' => 'Invalid barcode'], 400);
+        }
+        $orderId = (int) $m[1];
+
+        $order = RestaurantOrder::where('company_id', $companyId)->find($orderId);
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => "Order #{$orderId} not found"], 404);
+        }
+
+        if (in_array($order->status, ['completed', 'cancelled'])) {
+            return response()->json([
+                'success' => false,
+                'message' => "Order {$order->order_number} is already {$order->status}",
+            ], 400);
+        }
+
+        if ($order->status === 'ready') {
+            return response()->json([
+                'success' => true,
+                'already_ready' => true,
+                'order_id' => $order->id,
+                'message' => "Order {$order->order_number} already READY",
+            ]);
+        }
+
+        $order->update(['status' => 'ready']);
+
+        return response()->json([
+            'success' => true,
+            'order_id' => $order->id,
+            'order_number' => $order->order_number,
+            'message' => "✓ {$order->order_number} → READY",
+        ]);
+    }
+
     public function liveOrders()
     {
         $companyId = app('currentCompanyId');

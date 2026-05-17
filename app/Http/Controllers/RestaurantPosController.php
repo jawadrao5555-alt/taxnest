@@ -145,10 +145,8 @@ class RestaurantPosController extends Controller
 
         $request->validate([
             'items' => 'required|array|min:1',
-            'items.*.item_id' => 'nullable|integer',
-            'items.*.item_type' => 'required|in:product,service,manual',
-            'items.*.item_name' => 'nullable|string|max:200',
-            'items.*.unit_price' => 'nullable|numeric|min:0',
+            'items.*.item_id' => 'required|integer',
+            'items.*.item_type' => 'required|in:product,service',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.item_discount_type' => 'nullable|in:percentage,amount',
             'items.*.item_discount_value' => 'nullable|numeric|min:0|max:999999',
@@ -209,37 +207,6 @@ class RestaurantPosController extends Controller
                     'item_name' => $product->name,
                     'quantity' => $qty,
                     'unit_price' => (float)$product->price,
-                    'subtotal' => round($lineTotal - $itemDiscountAmount, 2),
-                    'special_notes' => $item['special_notes'] ?? null,
-                    'is_tax_exempt' => $itemExempt,
-                    'item_discount_type' => $itemDiscountValue > 0 ? $itemDiscountType : null,
-                    'item_discount_value' => $itemDiscountValue,
-                    'item_discount_amount' => $itemDiscountAmount,
-                ];
-            } elseif ($item['item_type'] === 'manual') {
-                // T006: Manual cart line (search Enter with no match, or QuickType unmatched line).
-                // No master product — name + price come from cashier; skip stock/recipe consumption.
-                $manualName = trim((string)($item['item_name'] ?? ''));
-                $manualPrice = (float)($item['unit_price'] ?? 0);
-                if ($manualName === '') {
-                    return response()->json(['success' => false, 'message' => 'Manual item name is required.'], 400);
-                }
-                $lineTotal = round($qty * $manualPrice, 2);
-                $itemDiscountType = $item['item_discount_type'] ?? null;
-                $itemDiscountValue = (float)($item['item_discount_value'] ?? 0);
-                $itemDiscountAmount = 0;
-                if ($itemDiscountValue > 0 && $itemDiscountType === 'percentage') {
-                    $itemDiscountAmount = round($lineTotal * min(100, $itemDiscountValue) / 100, 2);
-                } elseif ($itemDiscountValue > 0 && $itemDiscountType === 'amount') {
-                    $itemDiscountAmount = min($lineTotal, round($itemDiscountValue, 2));
-                }
-                $itemExempt = array_key_exists('is_tax_exempt', $item) ? (bool)$item['is_tax_exempt'] : false;
-                $resolvedItems[] = [
-                    'item_type' => 'manual',
-                    'item_id' => null,
-                    'item_name' => $manualName,
-                    'quantity' => $qty,
-                    'unit_price' => $manualPrice,
                     'subtotal' => round($lineTotal - $itemDiscountAmount, 2),
                     'special_notes' => $item['special_notes'] ?? null,
                     'is_tax_exempt' => $itemExempt,
@@ -563,7 +530,7 @@ class RestaurantPosController extends Controller
                 PosTransactionItem::create([
                     'transaction_id' => (int) $transaction->id,
                     'item_type' => $item->item_type,
-                    'item_id' => $item->item_id !== null ? (int) $item->item_id : null,
+                    'item_id' => (int) $item->item_id,
                     'item_name' => (string) $item->item_name,
                     'quantity' => $itemQty,
                     'unit_price' => (float) $item->unit_price,

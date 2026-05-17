@@ -18,6 +18,9 @@ class PosAuthController extends Controller
     {
         if (Auth::guard('pos')->check()) {
             $user = Auth::guard('pos')->user();
+            if (($user->pos_role ?? null) === 'archive_viewer') {
+                return redirect('/pos/archive');
+            }
             $loginCompany = Company::find($user->company_id);
             if ($loginCompany && $loginCompany->restaurant_mode) {
                 return redirect('/pos/restaurant/pos');
@@ -88,6 +91,12 @@ class PosAuthController extends Controller
                 Auth::guard('pos')->login($user, $remember);
                 $request->session()->regenerate();
                 $request->session()->forget('url.intended');
+
+                // Archive Viewer → isolated Archive Portal only. Same /pos/login URL,
+                // auto-detected by pos_role. POS admin/cashier never sees this account.
+                if (($user->pos_role ?? null) === 'archive_viewer') {
+                    return redirect('/pos/archive');
+                }
 
                 if ($company->restaurant_mode) {
                     return redirect('/pos/restaurant/pos');

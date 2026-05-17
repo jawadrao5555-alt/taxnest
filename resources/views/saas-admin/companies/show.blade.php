@@ -273,6 +273,74 @@
         </div>
     </div>
 
+    @if($company->product_type === 'pos' && auth('admin')->user()?->isSuperAdmin())
+    <div class="bg-gradient-to-br from-amber-950/40 to-slate-900 border border-amber-800/40 rounded-xl p-5 mt-6" x-data="{ showCreate: false, editingId: null }">
+        <div class="flex items-center justify-between mb-3">
+            <div>
+                <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                    <span class="text-amber-400">🗄️</span> Local Bills Archive — Viewer Accounts
+                </h3>
+                <p class="text-xs text-gray-400 mt-0.5">Dedicated read-only logins for the Local Bills Archive Portal. Login at <code class="text-amber-300">/pos/login</code> (auto-detected). POS admin/cashier ko ye accounts nazar nahi aate.</p>
+            </div>
+            <button type="button" @click="showCreate = !showCreate" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium rounded-lg transition">+ New Viewer</button>
+        </div>
+
+        <div x-show="showCreate" x-cloak class="bg-gray-900/60 border border-amber-800/30 rounded-lg p-4 mb-3">
+            <form method="POST" action="{{ route('saas.admin.companies.archive-viewer.store', $company->id) }}" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                @csrf
+                <input type="text" name="name" placeholder="Full Name" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 placeholder-gray-500">
+                <input type="email" name="email" placeholder="Email (login)" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 placeholder-gray-500">
+                <input type="text" name="password" placeholder="Password (min 8 chars)" required minlength="8" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 placeholder-gray-500">
+                <div class="sm:col-span-3 flex justify-end gap-2">
+                    <button type="button" @click="showCreate = false" class="px-3 py-1.5 bg-gray-800 text-gray-300 text-xs rounded-lg hover:bg-gray-700">Cancel</button>
+                    <button type="submit" class="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium rounded-lg">Create Account</button>
+                </div>
+            </form>
+        </div>
+
+        @if($archiveViewers->isEmpty())
+            <div class="text-center py-6 text-xs text-gray-500 border border-dashed border-gray-700 rounded-lg">No Archive Viewer accounts yet for this company.</div>
+        @else
+            <div class="space-y-2">
+                @foreach($archiveViewers as $av)
+                <div class="bg-gray-900/60 border border-gray-800 rounded-lg p-3" x-data="{ edit: false }">
+                    <div x-show="!edit" class="flex items-center justify-between gap-3 flex-wrap">
+                        <div class="flex-1 min-w-[180px]">
+                            <div class="text-sm font-medium text-white">{{ $av->name }} <span class="text-xs text-gray-500">#{{ $av->id }}</span></div>
+                            <div class="text-xs text-gray-400">{{ $av->email }}</div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded {{ $av->is_active ? 'bg-emerald-900/40 text-emerald-300' : 'bg-gray-800 text-gray-500' }}">{{ $av->is_active ? 'Active' : 'Inactive' }}</span>
+                            <button type="button" @click="edit = true" class="text-xs px-2.5 py-1 rounded bg-gray-800 text-gray-300 hover:bg-gray-700">Edit</button>
+                            <form method="POST" action="{{ route('saas.admin.companies.archive-viewer.toggle', [$company->id, $av->id]) }}" class="inline">
+                                @csrf
+                                <button type="submit" class="text-xs px-2.5 py-1 rounded {{ $av->is_active ? 'bg-amber-900/40 text-amber-300' : 'bg-emerald-900/40 text-emerald-300' }} hover:opacity-80">{{ $av->is_active ? 'Disable' : 'Enable' }}</button>
+                            </form>
+                            <form method="POST" action="{{ route('saas.admin.companies.archive-viewer.delete', [$company->id, $av->id]) }}" class="inline" onsubmit="return confirm('Delete this Archive Viewer account? They will lose access immediately.');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="text-xs px-2.5 py-1 rounded bg-red-900/40 text-red-300 hover:bg-red-900/60">Delete</button>
+                            </form>
+                        </div>
+                    </div>
+                    <form x-show="edit" x-cloak method="POST" action="{{ route('saas.admin.companies.archive-viewer.update', [$company->id, $av->id]) }}" class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1">
+                        @csrf
+                        @method('PUT')
+                        <input type="text" name="name" value="{{ $av->name }}" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
+                        <input type="email" name="email" value="{{ $av->email }}" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
+                        <input type="text" name="password" placeholder="New password (leave blank to keep)" minlength="8" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 placeholder-gray-500">
+                        <div class="sm:col-span-3 flex justify-end gap-2">
+                            <button type="button" @click="edit = false" class="px-3 py-1.5 bg-gray-800 text-gray-300 text-xs rounded-lg hover:bg-gray-700">Cancel</button>
+                            <button type="submit" class="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium rounded-lg">Save</button>
+                        </div>
+                    </form>
+                </div>
+                @endforeach
+            </div>
+        @endif
+    </div>
+    @endif
+
     <div x-show="showDeleteModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @click.self="showDeleteModal = false">
         <div class="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md mx-4" @click.stop>
             <h3 class="text-lg font-bold text-white mb-2">Move to Bin</h3>

@@ -146,6 +146,17 @@ Route::post('/pos/logout', [PosAuthController::class, 'logout'])->name('pos.logo
 
 Route::get('/pos/invoice/share/{token}', [PosController::class, 'publicInvoicePdf'])->name('pos.invoice.share');
 
+// ═══ Local Bills Archive Portal ═══
+// Isolated read-only portal for users with pos_role='archive_viewer'. Same /pos/login URL
+// (auto-detected). PosAuth middleware confines archive_viewer to /pos/archive/* and
+// blocks every other pos_role from these routes (404). Account created/managed only
+// by SaaS super-admin from /admin/companies/{id}.
+Route::middleware(['pos.auth'])->prefix('pos/archive')->group(function () {
+    Route::get('/', [\App\Http\Controllers\PosArchiveController::class, 'index'])->name('pos.archive.index');
+    Route::get('/export', [\App\Http\Controllers\PosArchiveController::class, 'exportCsv'])->name('pos.archive.export');
+    Route::get('/{id}', [\App\Http\Controllers\PosArchiveController::class, 'show'])->whereNumber('id')->name('pos.archive.show');
+});
+
 // Branch switcher — accessible by ANY authenticated guard (web/pos/fbrpos)
 Route::middleware('web')->post('/branch/switch', [BranchSwitchController::class, 'switch'])->name('branch.switch');
 
@@ -662,6 +673,12 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/companies/{id}/limits', [AdminCompanyController::class, 'updateLimits'])->name('saas.admin.companies.limits');
     Route::post('/companies/{id}/delete', [AdminCompanyController::class, 'softDelete'])->name('saas.admin.companies.delete');
     Route::post('/companies/{id}/change-type', [AdminCompanyController::class, 'changeProductType'])->name('saas.admin.companies.changeType');
+
+    // Archive Viewer (Local Bills Archive Portal) — super-admin only.
+    Route::post('/companies/{id}/archive-viewer', [AdminCompanyController::class, 'storeArchiveViewer'])->name('saas.admin.companies.archive-viewer.store');
+    Route::put('/companies/{id}/archive-viewer/{userId}', [AdminCompanyController::class, 'updateArchiveViewer'])->name('saas.admin.companies.archive-viewer.update');
+    Route::post('/companies/{id}/archive-viewer/{userId}/toggle', [AdminCompanyController::class, 'toggleArchiveViewer'])->name('saas.admin.companies.archive-viewer.toggle');
+    Route::delete('/companies/{id}/archive-viewer/{userId}', [AdminCompanyController::class, 'deleteArchiveViewer'])->name('saas.admin.companies.archive-viewer.delete');
     Route::post('/companies/{id}/override/lifetime', [AdminCompanyController::class, 'grantLifetime'])->name('saas.admin.companies.override.lifetime');
     Route::post('/companies/{id}/override/temporary', [AdminCompanyController::class, 'grantTemporary'])->name('saas.admin.companies.override.temporary');
     Route::post('/companies/{id}/override/grace', [AdminCompanyController::class, 'grantGrace'])->name('saas.admin.companies.override.grace');

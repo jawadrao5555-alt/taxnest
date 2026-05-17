@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class PosTransaction extends Model
@@ -16,7 +17,26 @@ class PosTransaction extends Model
         'share_token', 'share_token_created_at',
         'receipt_printed_at', 'reprint_count',
         'notes',
+        'is_archived', 'archived_at', 'archived_by_report_id',
     ];
+
+    /**
+     * Global scope: hide archived bills from ALL queries by default.
+     * Only the dedicated PosArchiveController (and the historical Day-Close PDF) bypass
+     * this via withoutGlobalScope('hide_archived'). POS admins, cashiers, dashboards,
+     * transactions list, invoice search — nothing sees archived bills.
+     */
+    protected static function booted(): void
+    {
+        static::addGlobalScope('hide_archived', function (Builder $q) {
+            // Only filter when the column exists (post-migration).
+            if (\Schema::hasColumn('pos_transactions', 'is_archived')) {
+                $q->where(function ($w) {
+                    $w->where('is_archived', false)->orWhereNull('is_archived');
+                });
+            }
+        });
+    }
 
     protected $casts = [
         'subtotal' => 'decimal:2',

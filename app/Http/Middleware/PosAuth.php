@@ -42,6 +42,26 @@ class PosAuth
 
         app()->instance('currentCompanyId', $user->company_id);
 
+        // ═══ Archive Viewer isolation ═══
+        // Users with pos_role='archive_viewer' are confined to /pos/archive/* and
+        // /pos/logout. They never see normal POS pages — any other /pos/* URL
+        // is redirected back to the archive portal. POS admin/cashier panels never
+        // expose this role (Team page filters it out).
+        if (($user->pos_role ?? null) === 'archive_viewer') {
+            $path = ltrim($request->path(), '/');
+            $allowed = str_starts_with($path, 'pos/archive')
+                || $path === 'pos/logout'
+                || $path === 'pos/login';
+            if (!$allowed) {
+                return redirect('/pos/archive');
+            }
+        } else {
+            // Conversely, non-archive users cannot access archive routes.
+            if (str_starts_with(ltrim($request->path(), '/'), 'pos/archive')) {
+                abort(404);
+            }
+        }
+
         // Resolve & bind active branch (returns null if no branches exist yet).
         // NOTE: use bind() not instance() — instance(name, null) is treated as "not bound" by Laravel.
         $branchId = app(\App\Services\BranchContextService::class)->getActiveBranchId();

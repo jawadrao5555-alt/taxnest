@@ -94,6 +94,7 @@ class PosController extends Controller
             ->where('t.company_id', $companyId)
             ->where('t.status', 'completed')
             ->where('t.created_at', '>=', $periodStart)
+            ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
             ->selectRaw('
                 COALESCE(SUM(i.subtotal), 0) as gross_revenue,
                 COALESCE(SUM(COALESCE(p.cost_price, 0) * i.quantity), 0) as total_cost
@@ -125,6 +126,7 @@ class PosController extends Controller
             ->where('t.company_id', $companyId)
             ->where('t.status', 'completed')
             ->where('t.created_at', '>=', $periodStart)
+            ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
             ->where('i.item_type', 'product')
             ->selectRaw('i.item_id, MAX(i.item_name) as name, SUM(i.quantity) as qty, SUM(i.subtotal) as revenue')
             ->groupBy('i.item_id')
@@ -139,6 +141,7 @@ class PosController extends Controller
             ->where('t.company_id', $companyId)
             ->where('t.status', 'completed')
             ->where('t.created_at', '>=', $periodStart)
+            ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
             ->where('i.item_type', 'product')
             ->selectRaw('
                 i.item_id, MAX(i.item_name) as name,
@@ -3432,27 +3435,35 @@ class PosController extends Controller
         // Only deletes pra_status='local' bills (never PRA-submitted ones); fully audit-safe.
         // Admin-only (guarded above). Wrapped in a single DB transaction so report creation
         // and purge succeed/fail atomically — no half-purged state on partial failure.
-        $purgedCount = 0;
-        \DB::transaction(function () use ($data, $companyId, $date, $wantsPurge, $canPurge, &$purgedCount) {
-            PosDayCloseReport::create($data);
+        // Archive (NOT delete) — local bills get is_archived=true and move to the
+        // separate Archive Portal (only accessible by users with pos_role='archive_viewer').
+        // No row destruction — fully reversible, audit-safe, and invisible to normal POS UI
+        // thanks to the global 'hide_archived' scope on PosTransaction.
+        $archivedCount = 0;
+        \DB::transaction(function () use ($data, $companyId, $date, $wantsPurge, $canPurge, &$archivedCount) {
+            $report = PosDayCloseReport::create($data);
             if ($wantsPurge && $canPurge) {
-                $localBills = PosTransaction::where('company_id', $companyId)
+                // Match the same definition used for stats above:
+                // pra_status IN ('local', NULL) AND no PRA invoice yet → counts as local/provisional.
+                $archivedCount = PosTransaction::withoutGlobalScope('hide_archived')
+                    ->where('company_id', $companyId)
                     ->whereDate('created_at', $date)
-                    ->where('pra_status', 'local')
+                    ->where(function ($q) {
+                        $q->where('pra_status', 'local')->orWhereNull('pra_status');
+                    })
                     ->whereNull('pra_invoice_number')
-                    ->lockForUpdate()
-                    ->get();
-                foreach ($localBills as $lb) {
-                    $lb->items()->delete();
-                    $lb->delete();
-                    $purgedCount++;
-                }
+                    ->where('is_archived', false)
+                    ->update([
+                        'is_archived' => true,
+                        'archived_at' => now(),
+                        'archived_by_report_id' => $report->id,
+                    ]);
             }
         });
 
         $msg = 'Day Close Report ' . $reportNumber . ' generated for ' . \Carbon\Carbon::parse($date)->format('d M Y');
-        if ($purgedCount > 0) {
-            $msg .= " — {$purgedCount} local/provisional bill(s) purged.";
+        if ($archivedCount > 0) {
+            $msg .= " — {$archivedCount} local/provisional bill(s) moved to Archive.";
         }
         return back()->with('success', $msg);
     }
@@ -3463,7 +3474,10 @@ class PosController extends Controller
         $company = Company::find($companyId);
         $report = PosDayCloseReport::where('company_id', $companyId)->findOrFail($id);
 
-        $transactions = PosTransaction::where('company_id', $companyId)
+        // Day-Close PDF shows HISTORICAL truth — include archived bills so the
+        // closed-day report stays consistent even after rows were archived.
+        $transactions = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
             ->whereDate('created_at', $report->report_date)
             ->with('creator')
             ->orderBy('created_at')

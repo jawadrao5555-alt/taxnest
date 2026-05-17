@@ -167,8 +167,8 @@
                 <label class="flex items-start gap-2 cursor-pointer">
                     <input type="checkbox" name="purge_local_bills" value="1" class="mt-0.5 rounded border-amber-400 text-amber-600 focus:ring-amber-500">
                     <div class="text-sm">
-                        <span class="font-bold text-amber-800 dark:text-amber-300">Remove all local/provisional bills ({{ $stats->local_invoices }})</span>
-                        <p class="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Auto-delete kar dega un bills ko jo `LOCAL-` prefix wale hain aur PRA pe submit nahi hue. PRA-submitted bills safe rahenge.</p>
+                        <span class="font-bold text-amber-800 dark:text-amber-300">Move all local/provisional bills to Archive ({{ $stats->local_invoices }})</span>
+                        <p class="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Yeh bills aapki normal POS screen se hat jayenge (safe rahenge — delete nahi hote). Sirf authorized Archive Viewer hi access kar payega. PRA-submitted bills bilkul untouched rahenge.</p>
                     </div>
                 </label>
             </div>

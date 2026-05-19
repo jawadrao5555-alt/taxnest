@@ -3202,21 +3202,25 @@ class PosController extends Controller
 
     private function generateLocalInvoiceNumber(int $companyId): string
     {
-        $year = now()->format('Y');
-
+        // Vendor-requested short format: L-001 (lifetime sequence per company, 3-digit pad,
+        // grows naturally past 999). Distinct from "POS-{year}-NNNNN" final invoices so cashiers
+        // can spot provisional bills at a glance in lists/receipts/PDFs.
+        // Exclude legacy "LOCAL-YYYY-NNNNN" rows from the new "L-NNN" sequence — the LIKE 'L-%'
+        // pattern would otherwise match both formats and corrupt the counter.
         $lastTransaction = PosTransaction::where('company_id', $companyId)
-            ->where('invoice_number', 'like', "LOCAL-{$year}-%")
+            ->where('invoice_number', 'like', 'L-%')
+            ->where('invoice_number', 'not like', 'LOCAL-%')
             ->orderBy('id', 'desc')
             ->lockForUpdate()
             ->first();
 
-        if ($lastTransaction && preg_match('/LOCAL-\d{4}-(\d+)/', $lastTransaction->invoice_number, $matches)) {
+        if ($lastTransaction && preg_match('/^L-(\d+)$/', $lastTransaction->invoice_number, $matches)) {
             $next = (int) $matches[1] + 1;
         } else {
             $next = 1;
         }
 
-        return 'LOCAL-' . $year . '-' . str_pad($next, 5, '0', STR_PAD_LEFT);
+        return 'L-' . str_pad($next, 3, '0', STR_PAD_LEFT);
     }
 
     public function billing()

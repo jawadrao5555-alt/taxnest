@@ -1499,7 +1499,44 @@ function restaurantPos() {
                 }
             });
         },
-        addHighlightedItem() { if (this.showSearchDropdown && this.searchSuggestions.length > 0) this.quickAddItem(this.searchSuggestions[this.highlightIndex]); },
+        addHighlightedItem() {
+            if (this.showSearchDropdown && this.searchSuggestions.length > 0) {
+                this.quickAddItem(this.searchSuggestions[this.highlightIndex]);
+                return;
+            }
+            // Vendor T006 — no product matched but cashier pressed Enter → add manual line
+            // "as-typed". Pattern: trailing number in query becomes the price (e.g. "Coke 150"
+            // → name=Coke price=150). No trailing number → prompt for price. Same cart shape
+            // as QuickType manual lines (item_type='manual', item_id=null).
+            const raw = (this.searchQuery || '').trim();
+            if (!raw) return;
+            let name = raw, price = null;
+            const m = raw.match(/^(.+?)\s+(\d+(?:\.\d+)?)$/);
+            if (m) { name = m[1].trim(); price = parseFloat(m[2]); }
+            if (price === null || isNaN(price)) {
+                const typed = prompt('No matching product. Enter price for "' + name + '" (PKR):', '');
+                if (typed === null) return;
+                price = parseFloat(typed);
+                if (isNaN(price) || price < 0) { this.showToast('Invalid price — manual line not added', 'error'); return; }
+            }
+            this.cart.push({
+                cart_uid: 'm' + Date.now() + '_' + Math.random().toString(36).slice(2,9),
+                item_id: null,
+                item_type: 'manual',
+                item_name: name,
+                quantity: 1,
+                unit_price: price,
+                special_notes: '',
+                is_tax_exempt: false,
+                item_discount_type: 'percentage',
+                item_discount_value: 0,
+                showItemDiscount: false,
+            });
+            this.searchQuery = ''; this.searchSuggestions = []; this.showSearchDropdown = false;
+            this.filterProducts();
+            this.showToast('Manual line added: ' + name + ' @ PKR ' + price, 'success');
+            this.$nextTick(() => { this.$refs.searchInput?.focus(); });
+        },
         quickAddItem(item) {
             this.handleProductClick(item);
             this.searchQuery = ''; this.searchSuggestions = []; this.showSearchDropdown = false;

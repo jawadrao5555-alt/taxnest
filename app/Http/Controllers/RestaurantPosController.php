@@ -143,10 +143,15 @@ class RestaurantPosController extends Controller
         $company = Company::find($companyId);
         $user = Auth::guard('pos')->user();
 
+        // T006 — `manual` item_type allows cashier-typed cart lines with no product master
+        // (Enter-fallback when no product matches search). item_id is null; item_name +
+        // unit_price are required and bounded. For product/service, item_id remains required.
         $request->validate([
             'items' => 'required|array|min:1',
-            'items.*.item_id' => 'required|integer',
-            'items.*.item_type' => 'required|in:product,service',
+            'items.*.item_type' => 'required|in:product,service,manual',
+            'items.*.item_id' => 'required_if:items.*.item_type,product,service|nullable|integer',
+            'items.*.item_name' => 'required_if:items.*.item_type,manual|nullable|string|max:120',
+            'items.*.unit_price' => 'required_if:items.*.item_type,manual|nullable|numeric|min:0|max:9999999',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.item_discount_type' => 'nullable|in:percentage,amount',
             'items.*.item_discount_value' => 'nullable|numeric|min:0|max:999999',
@@ -180,7 +185,38 @@ class RestaurantPosController extends Controller
         $resolvedItems = [];
         foreach ($request->items as $item) {
             $qty = (int)$item['quantity'];
-            if ($item['item_type'] === 'product') {
+            if ($item['item_type'] === 'manual') {
+                // T006 — cashier-typed cart line. Trust the typed price within validator bounds;
+                // no product/service lookup, no recipe/stock binding, no master record created.
+                $manualName = trim((string)($item['item_name'] ?? ''));
+                $manualPrice = round((float)($item['unit_price'] ?? 0), 2);
+                if ($manualName === '') {
+                    return response()->json(['success' => false, 'message' => 'Manual line: name is required'], 400);
+                }
+                $lineTotal = round($qty * $manualPrice, 2);
+                $itemDiscountType = $item['item_discount_type'] ?? null;
+                $itemDiscountValue = (float)($item['item_discount_value'] ?? 0);
+                $itemDiscountAmount = 0;
+                if ($itemDiscountValue > 0 && $itemDiscountType === 'percentage') {
+                    $itemDiscountAmount = round($lineTotal * min(100, $itemDiscountValue) / 100, 2);
+                } elseif ($itemDiscountValue > 0 && $itemDiscountType === 'amount') {
+                    $itemDiscountAmount = min($lineTotal, round($itemDiscountValue, 2));
+                }
+                $itemExempt = array_key_exists('is_tax_exempt', $item) ? (bool)$item['is_tax_exempt'] : false;
+                $resolvedItems[] = [
+                    'item_type' => 'manual',
+                    'item_id' => null,
+                    'item_name' => $manualName,
+                    'quantity' => $qty,
+                    'unit_price' => $manualPrice,
+                    'subtotal' => round($lineTotal - $itemDiscountAmount, 2),
+                    'special_notes' => $item['special_notes'] ?? null,
+                    'is_tax_exempt' => $itemExempt,
+                    'item_discount_type' => $itemDiscountValue > 0 ? $itemDiscountType : null,
+                    'item_discount_value' => $itemDiscountValue,
+                    'item_discount_amount' => $itemDiscountAmount,
+                ];
+            } elseif ($item['item_type'] === 'product') {
                 $product = PosProduct::where('company_id', $companyId)->where('id', $item['item_id'])->first();
                 if (!$product) {
                     return response()->json(['success' => false, 'message' => "Product not found: #{$item['item_id']}"], 400);
@@ -530,7 +566,8 @@ class RestaurantPosController extends Controller
                 PosTransactionItem::create([
                     'transaction_id' => (int) $transaction->id,
                     'item_type' => $item->item_type,
-                    'item_id' => (int) $item->item_id,
+                    // T006 — manual lines carry NULL item_id (no product/service master).
+                    'item_id' => $item->item_id !== null ? (int) $item->item_id : null,
                     'item_name' => (string) $item->item_name,
                     'quantity' => $itemQty,
                     'unit_price' => (float) $item->unit_price,
@@ -748,20 +785,24 @@ class RestaurantPosController extends Controller
 
     private function generateLocalInvoiceNumber($companyId)
     {
-        $year = date('Y');
-        $prefix = "LOCAL-{$year}-";
-        $all = PosTransaction::where('company_id', $companyId)
-            ->where('invoice_mode', 'local')
-            ->where('invoice_number', 'like', "{$prefix}%")
-            ->pluck('invoice_number');
+        // T004 — vendor-requested short L-NNN provisional invoice format, identical to
+        // PosController::generateLocalInvoiceNumber so retail + restaurant share one sequence
+        // per company. Exclude legacy "LOCAL-YYYY-NNNNN" rows from the new "L-%" pattern so
+        // the counter is not corrupted on companies that have legacy provisional bills.
+        $lastTransaction = PosTransaction::where('company_id', $companyId)
+            ->where('invoice_number', 'like', 'L-%')
+            ->where('invoice_number', 'not like', 'LOCAL-%')
+            ->orderBy('id', 'desc')
+            ->lockForUpdate()
+            ->first();
 
-        $maxNum = 0;
-        foreach ($all as $inv) {
-            if (preg_match('/LOCAL-' . $year . '-(\d+)/', $inv, $m)) {
-                $maxNum = max($maxNum, (int) $m[1]);
-            }
+        if ($lastTransaction && preg_match('/^L-(\d+)$/', $lastTransaction->invoice_number, $matches)) {
+            $next = (int) $matches[1] + 1;
+        } else {
+            $next = 1;
         }
-        return $prefix . str_pad($maxNum + 1, 5, '0', STR_PAD_LEFT);
+
+        return 'L-' . str_pad($next, 3, '0', STR_PAD_LEFT);
     }
 
     public function customerSearch(Request $request)

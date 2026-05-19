@@ -5,780 +5,936 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.5') }}">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <title>TaxNest — Pakistan's Most Advanced Tax Compliance Platform</title>
+    <title>TaxNest — Pakistan ka apna FBR & PRA Compliance Platform</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800&display=swap" rel="stylesheet">
+    <link href="https://fonts.bunny.net/css?family=fraunces:400,500,600,700,800,900|inter:400,500,600,700|noto-nastaliq-urdu:400,600,700|jetbrains-mono:500,600,700&display=swap" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
-        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        :root {
+            --ink: #1A1410;
+            --ink-soft: #3B322B;
+            --paper: #FAF6EE;
+            --paper-2: #F1EADA;
+            --paper-3: #E8DFC9;
+            --pak-green: #01411C;
+            --pak-green-2: #0F5132;
+            --pak-green-3: #1F7A47;
+            --maroon: #7B1F2B;
+            --maroon-soft: #A0394A;
+            --gold: #C9A227;
+            --gold-2: #E7BF3B;
+            --ochre: #B07A2F;
+            --ocean: #1F3A5F;
+        }
+        html, body { background: var(--paper); color: var(--ink); }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            font-feature-settings: "ss01", "cv11";
+            background-image:
+                radial-gradient(rgba(26,20,16,0.045) 1px, transparent 1px),
+                radial-gradient(rgba(26,20,16,0.025) 1px, transparent 1px);
+            background-size: 32px 32px, 7px 7px;
+            background-position: 0 0, 16px 16px;
+        }
+        .font-display { font-family: 'Fraunces', 'Times New Roman', serif; font-feature-settings: "ss01"; letter-spacing: -0.018em; }
+        .font-urdu { font-family: 'Noto Nastaliq Urdu', serif; }
+        .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
         [x-cloak] { display: none !important; }
-        .fade-up { opacity: 0; transform: translateY(24px); transition: opacity 0.7s ease, transform 0.7s ease; }
+        .ink-border { border: 2px solid var(--ink); }
+        .ink-border-thin { border: 1.5px solid var(--ink); }
+        .ink-shadow { box-shadow: 4px 4px 0 var(--ink); }
+        .ink-shadow-lg { box-shadow: 6px 6px 0 var(--ink); }
+        .ink-shadow-sm { box-shadow: 3px 3px 0 var(--ink); }
+        .gold-shadow { box-shadow: 4px 4px 0 var(--gold); }
+        .green-shadow { box-shadow: 4px 4px 0 var(--pak-green); }
+        .maroon-shadow { box-shadow: 4px 4px 0 var(--maroon); }
+        .paper-card { background: var(--paper); }
+        .paper-2 { background: var(--paper-2); }
+        .paper-3 { background: var(--paper-3); }
+
+        /* Hand-drawn squiggly underline */
+        .scribble-under { position: relative; display: inline-block; }
+        .scribble-under svg { position: absolute; left: -6px; right: -6px; bottom: -10px; width: calc(100% + 12px); height: 14px; }
+
+        /* Tilted stamp */
+        .stamp {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 12px;
+            font-family: 'Fraunces', serif;
+            font-weight: 700; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+            border: 2.5px solid currentColor; border-radius: 4px;
+            transform: rotate(-3deg);
+            background: rgba(255,255,255,0.4);
+        }
+        .stamp-tilt-right { transform: rotate(2.5deg); }
+        .stamp-tilt-left { transform: rotate(-3.5deg); }
+        .stamp::before, .stamp::after { content: '★'; opacity: 0.6; font-size: 10px; }
+
+        /* Sticker with chunky shadow */
+        .sticker {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 5px 11px;
+            border: 2px solid var(--ink);
+            background: var(--paper);
+            font-weight: 600; font-size: 11.5px;
+            box-shadow: 2px 2px 0 var(--ink);
+            border-radius: 999px;
+        }
+
+        /* Fade up reveal */
+        .fade-up { opacity: 0; transform: translateY(20px); transition: opacity 0.65s ease, transform 0.65s ease; }
         .fade-up.visible { opacity: 1; transform: translateY(0); }
-        .hero-glow {
-            background:
-                radial-gradient(ellipse 80% 60% at 50% -10%, rgba(16,185,129,0.22) 0%, transparent 70%),
-                radial-gradient(ellipse 60% 50% at 80% 50%, rgba(139,92,246,0.14) 0%, transparent 60%),
-                radial-gradient(ellipse 40% 40% at 20% 80%, rgba(6,182,212,0.10) 0%, transparent 50%);
+
+        /* Button: ink-on-paper chunky */
+        .btn-ink {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 13px 22px;
+            font-weight: 700; font-size: 14px;
+            background: var(--ink); color: var(--paper);
+            border: 2px solid var(--ink);
+            box-shadow: 4px 4px 0 var(--gold);
+            transition: transform 0.12s ease, box-shadow 0.12s ease;
         }
-        .card-hover { transition: transform 0.3s ease, box-shadow 0.3s ease; }
-        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 40px -12px rgba(0,0,0,0.12); }
-        .btn-glow { transition: all 0.25s ease; }
-        .btn-glow:hover { transform: translateY(-1px); box-shadow: 0 8px 24px -4px rgba(16,185,129,0.4); }
-        .btn-glow-purple { transition: all 0.25s ease; }
-        .btn-glow-purple:hover { transform: translateY(-1px); box-shadow: 0 8px 24px -4px rgba(139,92,246,0.4); }
-        .stat-glass { background: rgba(255,255,255,0.06); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.1); }
-        .stat-glass:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); transform: translateY(-2px); }
-        @keyframes float {
-            0%, 100% { transform: translateY(0px) translateX(0px); }
-            25% { transform: translateY(-20px) translateX(10px); }
-            50% { transform: translateY(-10px) translateX(-5px); }
-            75% { transform: translateY(-25px) translateX(5px); }
+        .btn-ink:hover { transform: translate(-2px,-2px); box-shadow: 6px 6px 0 var(--gold); }
+        .btn-ghost {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 13px 22px;
+            font-weight: 700; font-size: 14px;
+            background: var(--paper); color: var(--ink);
+            border: 2px solid var(--ink);
+            box-shadow: 4px 4px 0 var(--ink);
+            transition: transform 0.12s ease, box-shadow 0.12s ease;
         }
-        @keyframes float-reverse {
-            0%, 100% { transform: translateY(0px) translateX(0px); }
-            25% { transform: translateY(15px) translateX(-10px); }
-            50% { transform: translateY(5px) translateX(8px); }
-            75% { transform: translateY(20px) translateX(-5px); }
+        .btn-ghost:hover { transform: translate(-2px,-2px); box-shadow: 6px 6px 0 var(--ink); }
+        .btn-green {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 11px 18px;
+            font-weight: 700; font-size: 13px;
+            background: var(--pak-green); color: var(--paper);
+            border: 2px solid var(--ink);
+            box-shadow: 3px 3px 0 var(--ink);
+            transition: transform 0.12s ease, box-shadow 0.12s ease;
         }
-        @keyframes shimmer {
-            0% { background-position: -200% center; }
-            100% { background-position: 200% center; }
+        .btn-green:hover { transform: translate(-2px,-2px); box-shadow: 5px 5px 0 var(--ink); }
+        .btn-maroon { background: var(--maroon); color: var(--paper); }
+        .btn-ocean { background: var(--ocean); color: var(--paper); }
+
+        /* Section divider line */
+        .deco-line {
+            background-image: repeating-linear-gradient(90deg, var(--ink) 0 8px, transparent 8px 16px);
+            height: 2px;
+            border: 0;
         }
-        @keyframes pulse-glow {
-            0%, 100% { opacity: 0.4; transform: scale(1); }
-            50% { opacity: 0.7; transform: scale(1.05); }
+
+        /* Paper edge — torn / receipt feel */
+        .torn-bottom { mask-image: linear-gradient(180deg, #000 calc(100% - 10px), transparent); -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 10px), transparent); }
+
+        /* Hero kicker rotated */
+        .rotate-tag { transform: rotate(-1.5deg); display: inline-block; }
+
+        /* Big quote mark */
+        .quote-mark { font-family: 'Fraunces', serif; font-weight: 900; font-size: 96px; line-height: 0.6; color: var(--gold); }
+
+        /* Drop cap */
+        .drop-cap::first-letter {
+            font-family: 'Fraunces', serif;
+            font-weight: 900;
+            font-size: 4.4em;
+            float: left;
+            line-height: 0.85;
+            padding-right: 10px;
+            padding-top: 6px;
+            color: var(--pak-green);
         }
-        @keyframes countUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes slideInLeft { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
-        @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+
+        /* FBR/PRA stamp circular */
+        .ring-stamp {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 84px; height: 84px;
+            border: 3px solid var(--maroon);
+            color: var(--maroon);
+            border-radius: 50%;
+            font-family: 'Fraunces', serif;
+            font-weight: 700; font-size: 10.5px; letter-spacing: 0.16em;
+            text-align: center; line-height: 1.1;
+            transform: rotate(-12deg);
+            background: rgba(123,31,43,0.04);
+            text-transform: uppercase;
+        }
+        .ring-stamp.green { border-color: var(--pak-green); color: var(--pak-green); background: rgba(1,65,28,0.04); transform: rotate(8deg); }
+
+        /* Hover lift for ink-shadow cards */
+        .lift-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+        .lift-card:hover { transform: translate(-3px,-3px); box-shadow: 7px 7px 0 var(--ink); }
+
+        /* Marquee */
         @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-        .marquee-track { animation: marquee 25s linear infinite; }
-        .marquee-track:hover { animation-play-state: paused; }
-        .testimonial-card { background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.06) 100%); backdrop-filter: blur(20px); }
-        @keyframes typewriter { from { width: 0; } to { width: 100%; } }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-        .typing-cursor { animation: blink 1s step-end infinite; }
-        @keyframes gradientMove { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-        .gradient-animate { background-size: 200% auto; animation: gradientMove 4s ease infinite; }
-        @keyframes badgePulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.3); } 50% { box-shadow: 0 0 0 8px rgba(16,185,129,0); } }
-        .badge-pulse { animation: badgePulse 2s ease infinite; }
-        .trust-logo { opacity: 0.5; transition: opacity 0.3s; filter: grayscale(100%); }
-        .trust-logo:hover { opacity: 1; filter: grayscale(0%); }
-        .orb-1 { animation: float 8s ease-in-out infinite; }
-        .orb-2 { animation: float-reverse 10s ease-in-out infinite; }
-        .orb-3 { animation: float 12s ease-in-out infinite 2s; }
-        .shimmer-text {
-            background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0) 100%);
-            background-size: 200% 100%;
-            animation: shimmer 4s ease-in-out infinite;
+        .marquee-track { animation: marquee 38s linear infinite; }
+
+        /* Section heading wrapper */
+        .eyebrow {
+            display: inline-flex; align-items: center; gap: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11.5px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.22em;
+            color: var(--maroon);
         }
-        .gradient-border-top { border-top: 4px solid; border-image: linear-gradient(to right, #10b981, #14b8a6) 1; }
-        .gradient-border-top-purple { border-top: 4px solid; border-image: linear-gradient(to right, #8b5cf6, #a78bfa) 1; }
-        .pricing-glow { box-shadow: 0 0 80px -20px rgba(16,185,129,0.25), 0 0 40px -10px rgba(139,92,246,0.15); }
-        .grid-overlay {
-            background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-            background-size: 60px 60px;
+        .eyebrow::before { content: ''; width: 28px; height: 2px; background: var(--maroon); }
+
+        /* Numeric ticket-style table header */
+        .ticket-row { border-bottom: 1.5px dashed rgba(26,20,16,0.18); }
+
+        /* Hand-tag (price card corner) */
+        .hand-tag {
+            position: absolute; top: -14px; right: -14px;
+            background: var(--gold); color: var(--ink);
+            font-family: 'Fraunces', serif; font-weight: 800; font-size: 11px;
+            padding: 6px 12px; letter-spacing: 0.1em; text-transform: uppercase;
+            border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink);
+            transform: rotate(8deg);
         }
-        .product-card-glow-emerald { box-shadow: 0 0 0 1px rgba(16,185,129,0.1); }
-        .product-card-glow-emerald:hover { box-shadow: 0 0 40px -8px rgba(16,185,129,0.15), 0 20px 40px -12px rgba(0,0,0,0.1); }
-        .product-card-glow-purple { box-shadow: 0 0 0 1px rgba(139,92,246,0.1); }
-        .product-card-glow-purple:hover { box-shadow: 0 0 40px -8px rgba(139,92,246,0.15), 0 20px 40px -12px rgba(0,0,0,0.1); }
-        .product-card-glow-blue { box-shadow: 0 0 0 1px rgba(37,99,235,0.1); }
-        .product-card-glow-blue:hover { box-shadow: 0 0 40px -8px rgba(37,99,235,0.15), 0 20px 40px -12px rgba(0,0,0,0.1); }
-        .step-connector { position: relative; }
-        .step-connector::after { content: ''; position: absolute; top: 50%; right: -24px; width: 48px; height: 2px; background: linear-gradient(90deg, #10b981, #8b5cf6); opacity: 0.3; }
-        @media (max-width: 768px) { .step-connector::after { display: none; } }
-        .feature-icon-glow { box-shadow: 0 0 20px -4px currentColor; }
+
+        @media (max-width: 768px) {
+            .drop-cap::first-letter { font-size: 3.4em; }
+            .ring-stamp { width: 66px; height: 66px; font-size: 9px; }
+        }
     </style>
 </head>
-<body class="antialiased text-gray-700 scroll-smooth bg-white dark:bg-gray-900 overflow-x-hidden">
+<body class="antialiased scroll-smooth">
 
-    <nav class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-2xl border-b border-gray-100/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-        <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
-            <div class="flex items-center justify-between py-2.5 sm:py-0 sm:h-[60px]">
-                <a href="/" class="flex items-center space-x-2 flex-shrink-0">
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                        <svg class="w-4 h-4 sm:w-[18px] sm:h-[18px] text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+    {{-- ════════════════════════════════════════════════════════════════
+         TOP RIBBON — running announcement bar (ink on green)
+         ════════════════════════════════════════════════════════════════ --}}
+    <div class="bg-[color:var(--pak-green)] text-[color:var(--paper)] overflow-hidden border-b-2 border-[color:var(--ink)]">
+        <div class="py-2 whitespace-nowrap flex">
+            <div class="marquee-track flex shrink-0 items-center gap-10 text-[12px] font-medium tracking-wide pr-10">
+                @for ($i = 0; $i < 2; $i++)
+                    <span class="flex items-center gap-2"><span class="text-[color:var(--gold-2)] text-[14px]">★</span> Pakistan ka apna FBR + PRA Compliance Platform</span>
+                    <span class="opacity-50">/</span>
+                    <span>14-din free trial — koi credit card nahi</span>
+                    <span class="opacity-50">/</span>
+                    <span class="flex items-center gap-2"><span class="text-[color:var(--gold-2)]">●</span> Live PRAL API v1.12 connected</span>
+                    <span class="opacity-50">/</span>
+                    <span>Lahore · Karachi · Islamabad · Faisalabad</span>
+                    <span class="opacity-50">/</span>
+                    <span class="font-urdu text-[15px]">ٹیکس نَسٹ — آپ کا اپنا ساتھی</span>
+                    <span class="opacity-50">/</span>
+                @endfor
+            </div>
+        </div>
+    </div>
+
+    {{-- ════════════════════════════════════════════════════════════════
+         NAV — paper, chunky, no glassmorph
+         ════════════════════════════════════════════════════════════════ --}}
+    <nav class="sticky top-0 z-50 bg-[color:var(--paper)] border-b-2 border-[color:var(--ink)]">
+        <div class="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-10">
+            <div class="flex items-center justify-between h-[64px]">
+                <a href="/" class="flex items-center gap-2.5 shrink-0">
+                    <div class="w-9 h-9 bg-[color:var(--pak-green)] border-2 border-[color:var(--ink)] flex items-center justify-center" style="box-shadow: 2px 2px 0 var(--ink);">
+                        <span class="font-display font-black text-[color:var(--gold-2)] text-[16px]">T</span>
                     </div>
-                    <span class="text-sm sm:text-[17px] font-bold text-gray-900 tracking-tight">TaxNest</span>
+                    <div class="flex flex-col leading-none">
+                        <span class="font-display font-extrabold text-[19px] text-[color:var(--ink)] tracking-tight">TaxNest</span>
+                        <span class="font-mono text-[9px] text-[color:var(--maroon)] tracking-[0.2em] mt-0.5">EST · KARACHI</span>
+                    </div>
                 </a>
 
-                <div class="flex items-center flex-wrap justify-end gap-1 sm:gap-2">
-                    <a href="/digital-invoice" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-emerald-600 rounded-full hover:bg-emerald-700 transition shadow-sm">Digital Invoice</a>
-                    <a href="/pos" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-purple-600 rounded-full hover:bg-purple-700 transition shadow-sm">PRA POS</a>
-                    <a href="/fbr-pos-landing" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-blue-600 rounded-full hover:bg-blue-700 transition shadow-sm">FBR POS</a>
-                    <a href="#pricing" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition">Pricing</a>
-                    <a href="#features" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition">Docs</a>
-                    <a href="#contact" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition">Contact</a>
+                <div class="hidden md:flex items-center gap-1 text-[13.5px] font-medium">
+                    <a href="#products" class="px-3 py-2 hover:text-[color:var(--maroon)] transition">Products</a>
+                    <a href="#features" class="px-3 py-2 hover:text-[color:var(--maroon)] transition">Features</a>
+                    <a href="#pricing" class="px-3 py-2 hover:text-[color:var(--maroon)] transition">Pricing</a>
+                    <a href="#faq" class="px-3 py-2 hover:text-[color:var(--maroon)] transition">FAQ</a>
+                    <a href="#contact" class="px-3 py-2 hover:text-[color:var(--maroon)] transition">Contact</a>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <a href="/digital-invoice" class="hidden sm:inline-flex items-center text-[12.5px] font-semibold text-[color:var(--ink)] hover:underline underline-offset-4 decoration-[color:var(--gold)] decoration-2">Sign in</a>
+                    <a href="#products" class="btn-green !py-2 !px-3.5 !text-[12px]">
+                        Free Trial
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </a>
                 </div>
             </div>
         </div>
     </nav>
 
-    <section class="relative pt-32 pb-28 sm:pt-40 sm:pb-36 bg-[#0a0f1a] overflow-hidden">
-        <div class="hero-glow absolute inset-0"></div>
-        <div class="grid-overlay absolute inset-0"></div>
-        <div class="absolute inset-0 opacity-[0.03]" style="background-image: url('data:image/svg+xml,%3Csvg width=&quot;60&quot; height=&quot;60&quot; viewBox=&quot;0 0 60 60&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;%3E%3Cg fill=&quot;none&quot; fill-rule=&quot;evenodd&quot;%3E%3Cg fill=&quot;%23ffffff&quot; fill-opacity=&quot;1&quot;%3E%3Cpath d=&quot;M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z&quot;/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"></div>
+    {{-- ════════════════════════════════════════════════════════════════
+         HERO — asymmetric editorial, paper, no gradient soup
+         ════════════════════════════════════════════════════════════════ --}}
+    <section class="relative pt-14 pb-20 sm:pt-20 sm:pb-28 overflow-hidden">
+        <div class="absolute inset-0 pointer-events-none opacity-[0.5]" aria-hidden="true">
+            <div class="absolute top-20 -left-10 w-40 h-40 rounded-full" style="background: radial-gradient(circle, var(--gold) 0%, transparent 65%); opacity: 0.18;"></div>
+            <div class="absolute bottom-10 right-0 w-56 h-56 rounded-full" style="background: radial-gradient(circle, var(--pak-green) 0%, transparent 65%); opacity: 0.12;"></div>
+        </div>
 
-        <div class="orb-1 absolute top-20 left-[10%] w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div class="orb-2 absolute bottom-10 right-[15%] w-96 h-96 bg-purple-500/8 rounded-full blur-3xl pointer-events-none"></div>
-        <div class="orb-3 absolute top-1/2 left-[60%] w-64 h-64 bg-teal-400/8 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-10 relative">
+            <div class="grid lg:grid-cols-12 gap-10 lg:gap-14 items-start">
 
-        <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8 relative">
-            <div class="text-center max-w-3xl mx-auto">
-                <div class="inline-flex items-center px-4 py-2 bg-white/[0.07] rounded-full text-[13px] font-medium text-gray-300 mb-8 border border-white/[0.08] backdrop-blur-sm badge-pulse">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 mr-2.5 animate-pulse"></span>
-                    Trusted by 500+ Businesses Across Pakistan
-                    <svg class="w-3.5 h-3.5 ml-2 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>
+                {{-- Left: editorial column --}}
+                <div class="lg:col-span-7">
+                    <div class="rotate-tag mb-7">
+                        <span class="sticker">
+                            <span class="w-2 h-2 rounded-full bg-[color:var(--pak-green)]"></span>
+                            <span class="font-mono text-[10.5px] tracking-[0.16em]">FBR · PRAL · PRA · LIVE</span>
+                        </span>
+                    </div>
+
+                    <h1 class="font-display text-[40px] sm:text-[60px] lg:text-[74px] font-black text-[color:var(--ink)] leading-[0.96]">
+                        Pakistan ka
+                        <span class="scribble-under text-[color:var(--maroon)]">
+                            apna
+                            <svg viewBox="0 0 200 14" preserveAspectRatio="none" aria-hidden="true">
+                                <path d="M2 8 Q 30 2, 60 7 T 120 6 T 198 8" fill="none" stroke="#C9A227" stroke-width="3.5" stroke-linecap="round"/>
+                            </svg>
+                        </span>
+                        <br>
+                        tax compliance,
+                        <em class="not-italic text-[color:var(--pak-green)]">imandaarana</em> banaya.
+                    </h1>
+
+                    <p class="font-urdu text-[20px] sm:text-[24px] text-[color:var(--ink-soft)] mt-5 leading-[1.7] tracking-wide" dir="rtl">
+                        ایف بی آر، پی آر اے، اور پی او ایس — ایک ہی پلیٹ فارم پر، آپ کے کاروبار کے لیے۔
+                    </p>
+
+                    <p class="text-[16px] sm:text-[17px] text-[color:var(--ink-soft)] mt-6 leading-[1.75] max-w-[640px] drop-cap">
+                        Hum chaar saal se Karachi, Lahore aur Faisalabad ke 500+ businesses ke saath kaam kar rahe hain — chhote dukandaaron se le kar textile exporters tak. TaxNest sirf software nahi, ye aap ki team ka ek aur member hai jo FBR ke saath roz baat karta hai taa-keh aap ka kaaroobar saaf, paak aur compliant rahe.
+                    </p>
+
+                    <div class="mt-9 flex flex-wrap items-center gap-3">
+                        <a href="#products" class="btn-ink">
+                            14-din ka free trial shuru karein
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </a>
+                        <a href="#contact" class="btn-ghost">
+                            Hum se baat karein
+                        </a>
+                    </div>
+
+                    <div class="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] text-[color:var(--ink-soft)]">
+                        <span class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-[color:var(--pak-green)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Koi credit card zaroori nahi</span>
+                        <span class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-[color:var(--pak-green)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Jab chahein cancel karein</span>
+                        <span class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-[color:var(--pak-green)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Urdu + English support</span>
+                    </div>
                 </div>
 
-                <h1 class="text-[28px] sm:text-[52px] lg:text-[60px] font-extrabold text-white leading-[1.08] tracking-tight mb-6">
-                    Pakistan's
-                    <span class="relative inline-block">
-                        <span class="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent gradient-animate">#1</span>
-                    </span>
-                    Tax Compliance
-                    <span class="block mt-1 sm:mt-2">
-                        <span class="bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-300 bg-clip-text text-transparent gradient-animate" x-data="{ words: ['Platform', 'Solution', 'Engine'], current: 0, display: 'Platform' }" x-init="setInterval(() => { current = (current + 1) % words.length; display = words[current]; }, 3000)" x-text="display" x-transition></span>
-                    </span>
-                </h1>
+                {{-- Right: hand-collaged preview card with stamps --}}
+                <div class="lg:col-span-5 relative">
+                    <div class="absolute -top-6 -left-6 z-20 hidden sm:block">
+                        <div class="ring-stamp">FBR<br>Approved<br>★ 2026 ★</div>
+                    </div>
+                    <div class="absolute -bottom-8 -right-4 z-20 hidden sm:block">
+                        <div class="ring-stamp green">PRA<br>Verified<br>IMS v1.2</div>
+                    </div>
 
-                <p class="text-[17px] sm:text-lg text-gray-400 leading-relaxed mb-10 max-w-2xl mx-auto">
-                    FBR Digital Invoicing, PRA POS, and FBR POS — three fully isolated products in one enterprise platform. Real-time compliant, zero downtime.
-                </p>
+                    <div class="relative ink-border bg-[color:var(--paper)] ink-shadow-lg p-1.5">
+                        <div class="paper-2 ink-border-thin">
+                            {{-- Receipt header --}}
+                            <div class="px-5 pt-5 pb-3 border-b-2 border-dashed border-[color:var(--ink)]">
+                                <div class="flex items-center justify-between text-[10.5px] font-mono tracking-widest text-[color:var(--ink-soft)]">
+                                    <span>INVOICE · #DI-2026-04891</span>
+                                    <span class="text-[color:var(--pak-green)]">● LIVE</span>
+                                </div>
+                                <div class="mt-3 flex items-end justify-between gap-3">
+                                    <div>
+                                        <p class="font-display font-black text-[22px] text-[color:var(--ink)] leading-tight">Karachi Textiles Co.</p>
+                                        <p class="text-[11px] text-[color:var(--ink-soft)] mt-0.5">NTN 3620291786117 · STRN 1234567</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-[10px] font-mono uppercase tracking-wider text-[color:var(--maroon)]">FBR IRN</p>
+                                        <p class="font-mono text-[11px] text-[color:var(--ink)] font-bold">7F3A·91C2·44</p>
+                                    </div>
+                                </div>
+                            </div>
 
-                <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
-                    <a href="#products" class="btn-glow group inline-flex items-center px-8 py-4 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-xl text-[15px] font-bold hover:from-emerald-500 hover:to-teal-600 w-full sm:w-auto justify-center shadow-xl shadow-emerald-500/30">
-                        Start 14-Day Free Trial
-                        <svg class="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
-                    </a>
-                    <a href="#products" class="group inline-flex items-center px-8 py-4 bg-white/[0.06] text-gray-300 border border-white/[0.12] rounded-xl text-[15px] font-semibold hover:bg-white/[0.15] hover:text-white hover:border-white/[0.2] transition w-full sm:w-auto justify-center backdrop-blur-sm">
-                        Explore Products
-                        <svg class="w-4 h-4 ml-2 group-hover:translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                    </a>
-                </div>
+                            {{-- Line items --}}
+                            <div class="px-5 py-4 space-y-2.5">
+                                @foreach([
+                                    ['Cotton Yarn 30/1 (HS 5205.4200)', '85 kg', '78,200'],
+                                    ['Polyester Blend Fabric', '120 m', '36,000'],
+                                    ['Dyeing & Finishing', '1 lot', '12,500'],
+                                ] as $line)
+                                <div class="flex items-baseline justify-between gap-3 text-[13px] ticket-row pb-2.5">
+                                    <div class="flex-1">
+                                        <p class="font-medium text-[color:var(--ink)]">{{ $line[0] }}</p>
+                                        <p class="text-[10.5px] text-[color:var(--ink-soft)] font-mono">{{ $line[1] }}</p>
+                                    </div>
+                                    <span class="font-mono font-semibold text-[color:var(--ink)]">Rs {{ $line[2] }}</span>
+                                </div>
+                                @endforeach
+                            </div>
 
-                <div class="flex items-center justify-center gap-6 mt-8 text-[12px] text-gray-500">
-                    <span class="flex items-center gap-1.5"><svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> No credit card</span>
-                    <span class="flex items-center gap-1.5"><svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> 14-day trial</span>
-                    <span class="flex items-center gap-1.5"><svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Cancel anytime</span>
+                            {{-- Total --}}
+                            <div class="px-5 py-3 bg-[color:var(--paper-3)] border-t-2 border-[color:var(--ink)] flex items-center justify-between">
+                                <span class="font-display font-bold text-[14px]">Total + 17% GST</span>
+                                <span class="font-display font-black text-[20px] text-[color:var(--pak-green)]">Rs 148,239</span>
+                            </div>
+
+                            {{-- Status row --}}
+                            <div class="px-5 py-3 flex items-center justify-between text-[11px] border-t-2 border-dashed border-[color:var(--ink)]">
+                                <span class="flex items-center gap-1.5 text-[color:var(--pak-green)] font-mono font-bold">
+                                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                    SUBMITTED TO FBR · 2.4s
+                                </span>
+                                <span class="font-mono text-[color:var(--ink-soft)]">19 May 2026</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-5 text-center">
+                        <p class="font-display italic text-[13px] text-[color:var(--ink-soft)]">— Live sample from a real customer's dashboard —</p>
+                    </div>
                 </div>
             </div>
 
-            <div id="heroStats" class="mt-20 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto">
-                <div class="stat-glass rounded-2xl p-5 text-center transition-all duration-300">
-                    <div class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center mx-auto mb-3">
-                        <svg class="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-                    </div>
-                    <p class="text-2xl sm:text-3xl font-bold text-white"><span class="counter-val" data-target="99.9" data-decimal="1" data-step="2" data-suffix="%">0%</span></p>
-                    <p class="text-xs text-gray-400 mt-1">Uptime SLA</p>
+            {{-- Stat strip --}}
+            <div id="heroStats" class="mt-16 grid grid-cols-2 lg:grid-cols-4 gap-4">
+                @php
+                $invoiceTarget = isset($stats['total_invoices']) && $stats['total_invoices'] > 0 ? $stats['total_invoices'] : 50000;
+                $compTarget = isset($stats['total_companies']) && $stats['total_companies'] > 0 ? $stats['total_companies'] : 500;
+                $statBlocks = [
+                    ['99.9', '%',   'Uptime',        'Saal bhar chalta hai',         'var(--pak-green)'],
+                    [$invoiceTarget, '+', 'Invoices', 'FBR/PRA ko submit ho chuke',  'var(--maroon)'],
+                    [$compTarget,    '+', 'Companies', 'Pakistan bhar mein',           'var(--ocean)'],
+                    ['3',             '',  'Products', 'Ek hi platform par',           'var(--ochre)'],
+                ];
+                @endphp
+                @foreach($statBlocks as $idx => $s)
+                <div class="paper-card ink-border p-5 lift-card ink-shadow-sm relative">
+                    <div class="absolute top-2 right-3 font-mono text-[9.5px] text-[color:var(--ink-soft)] tracking-widest">0{{ $idx + 1 }}</div>
+                    <p class="font-display font-black text-[36px] sm:text-[42px] leading-none" style="color: {{ $s[4] }};">
+                        <span class="counter-val" data-target="{{ $s[0] }}" data-decimal="{{ str_contains($s[0],'.') ? 1 : 0 }}" data-suffix="{{ $s[1] }}">0</span>
+                    </p>
+                    <p class="font-display font-bold text-[14px] mt-2 text-[color:var(--ink)]">{{ $s[2] }}</p>
+                    <p class="text-[11.5px] text-[color:var(--ink-soft)] mt-0.5">{{ $s[3] }}</p>
                 </div>
-                <div class="stat-glass rounded-2xl p-5 text-center transition-all duration-300">
-                    <div class="w-10 h-10 rounded-xl bg-teal-500/20 flex items-center justify-center mx-auto mb-3">
-                        <svg class="w-5 h-5 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                    </div>
-                    @php $invoiceTarget = isset($stats['total_invoices']) && $stats['total_invoices'] > 0 ? $stats['total_invoices'] : 50000; @endphp
-                    <p class="text-2xl sm:text-3xl font-bold text-white"><span class="counter-val" data-target="{{ $invoiceTarget }}" data-format="k" data-suffix="+">0</span></p>
-                    <p class="text-xs text-gray-400 mt-1">Invoices Processed</p>
-                </div>
-                <div class="stat-glass rounded-2xl p-5 text-center transition-all duration-300">
-                    <div class="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center mx-auto mb-3">
-                        <svg class="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                    </div>
-                    @php $compTarget = isset($stats['total_companies']) && $stats['total_companies'] > 0 ? $stats['total_companies'] : 500; @endphp
-                    <p class="text-2xl sm:text-3xl font-bold text-white"><span class="counter-val" data-target="{{ $compTarget }}" data-suffix="+">0</span></p>
-                    <p class="text-xs text-gray-400 mt-1">Companies Trust Us</p>
-                </div>
-                <div class="stat-glass rounded-2xl p-5 text-center transition-all duration-300">
-                    <div class="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center mx-auto mb-3">
-                        <svg class="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
-                    </div>
-                    <p class="text-2xl sm:text-3xl font-bold text-white"><span class="counter-val" data-target="3" data-step="1" data-interval="300">0</span></p>
-                    <p class="text-xs text-gray-400 mt-1">Integrated Products</p>
-                </div>
+                @endforeach
             </div>
         </div>
     </section>
 
-    <div class="relative bg-gradient-to-r from-gray-50 via-white to-gray-50 border-b border-gray-100 py-6">
-        <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/40 to-transparent"></div>
-        <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
-            <div class="flex flex-wrap items-center justify-center gap-3 sm:gap-5">
-                <div class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50/80 rounded-full border border-emerald-200/50">
-                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                    <span class="text-[12px] font-semibold text-emerald-800">FBR API v1.12</span>
-                </div>
-                <div class="flex items-center gap-2 px-3 py-1.5 bg-purple-50/80 rounded-full border border-purple-200/50">
-                    <svg class="w-3.5 h-3.5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span class="text-[12px] font-semibold text-purple-800">PRA IMS v1.2</span>
-                </div>
-                <div class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50/80 rounded-full border border-emerald-200/50">
-                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                    <span class="text-[12px] font-semibold text-emerald-800">SHA-256 Encrypted</span>
-                </div>
-                <div class="flex items-center gap-2 px-3 py-1.5 bg-blue-50/80 rounded-full border border-blue-200/50">
-                    <svg class="w-3.5 h-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                    <span class="text-[12px] font-semibold text-blue-800">Real-time Sync</span>
-                </div>
-                <div class="flex items-center gap-2 px-3 py-1.5 bg-teal-50/80 rounded-full border border-teal-200/50">
-                    <svg class="w-3.5 h-3.5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                    <span class="text-[12px] font-semibold text-teal-800">PWA + Offline</span>
-                </div>
-                <div class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50/80 rounded-full border border-emerald-200/50">
-                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-                    <span class="text-[12px] font-semibold text-emerald-800">99.9% Uptime</span>
-                </div>
+    {{-- ════════════════════════════════════════════════════════════════
+         TRUST RIBBON — chunky tags
+         ════════════════════════════════════════════════════════════════ --}}
+    <div class="py-7 border-y-2 border-[color:var(--ink)] bg-[color:var(--paper-2)]">
+        <div class="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-10">
+            <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-3">
+                <span class="eyebrow !text-[color:var(--ink-soft)] mr-3">Verified by</span>
+                <span class="sticker"><span class="w-1.5 h-1.5 rounded-full bg-[color:var(--pak-green)]"></span> FBR PRAL API v1.12</span>
+                <span class="sticker"><span class="w-1.5 h-1.5 rounded-full bg-[color:var(--maroon)]"></span> PRA IMS API v1.2</span>
+                <span class="sticker"><span class="w-1.5 h-1.5 rounded-full bg-[color:var(--ocean)]"></span> SHA-256 audit logs</span>
+                <span class="sticker"><span class="w-1.5 h-1.5 rounded-full bg-[color:var(--ochre)]"></span> Real-time sync</span>
+                <span class="sticker"><span class="w-1.5 h-1.5 rounded-full bg-[color:var(--pak-green)]"></span> PWA · offline-ready</span>
             </div>
         </div>
     </div>
 
-    <section class="py-16 bg-[#0a0f1a] overflow-hidden relative">
-        <div class="absolute inset-0 opacity-[0.02]" style="background-image: url('data:image/svg+xml,%3Csvg width=&quot;60&quot; height=&quot;60&quot; viewBox=&quot;0 0 60 60&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;%3E%3Cg fill=&quot;none&quot; fill-rule=&quot;evenodd&quot;%3E%3Cg fill=&quot;%23ffffff&quot; fill-opacity=&quot;1&quot;%3E%3Cpath d=&quot;M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z&quot;/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"></div>
-        <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
-            <div class="text-center mb-10 fade-up">
-                <p class="text-[13px] font-semibold text-emerald-400 uppercase tracking-widest mb-2">What Our Clients Say</p>
-                <h2 class="text-[24px] sm:text-[28px] font-bold text-white tracking-tight">Trusted by Businesses Across Pakistan</h2>
+    {{-- ════════════════════════════════════════════════════════════════
+         TESTIMONIALS — editorial paper quote cards
+         ════════════════════════════════════════════════════════════════ --}}
+    <section class="py-20 lg:py-24">
+        <div class="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-10">
+            <div class="max-w-2xl mb-12 fade-up">
+                <span class="eyebrow">Yeh hain humare log</span>
+                <h2 class="font-display text-[36px] sm:text-[46px] font-black leading-[1.02] text-[color:var(--ink)] mt-4">
+                    Pakistan bhar ke kaarobaari humein
+                    <span class="text-[color:var(--maroon)] italic">apna kehte hain.</span>
+                </h2>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 fade-up">
-                @php
-                $testimonials = [
-                    ['We switched from manual FBR filing to TaxNest and saved 15+ hours per month. The HS Intelligence Engine alone is worth it.', 'Ahmed K.', 'CEO, Textile Exports Ltd', 'emerald'],
-                    ['NestPOS transformed our retail billing. PRA compliance was a nightmare before — now it\'s completely automatic.', 'Fatima S.', 'Owner, Fashion Hub POS', 'purple'],
-                    ['The FBR POS module handles everything from invoice creation to tax reporting. Our accountant is finally happy.', 'Rahim M.', 'Director, Electronics Store', 'blue'],
-                ];
-                @endphp
-                @foreach($testimonials as $t)
-                <div class="testimonial-card rounded-2xl p-6 border border-white/[0.08] hover:border-white/[0.15] transition-all duration-300 hover:-translate-y-1">
-                    <div class="flex items-center gap-1 mb-4">
-                        @for($s=0;$s<5;$s++)
-                        <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        @endfor
-                    </div>
-                    <p class="text-[14px] text-gray-300 leading-relaxed mb-5">"{{ $t[0] }}"</p>
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold" style="background: linear-gradient(135deg, {{ $t[3] === 'emerald' ? '#059669,#10b981' : ($t[3] === 'purple' ? '#7c3aed,#8b5cf6' : '#2563eb,#3b82f6') }});">{{ substr($t[1],0,1) }}</div>
+
+            @php
+            $testimonials = [
+                ['Pehle hum FBR par manually file karte the — har mahine 15 ghante zaaya hote the. TaxNest ke baad sab kuch chand minutes mein ho jata hai. HS Intelligence engine to commaal hi hai.', 'Ahmed Khalid', 'CEO, Textile Exports Ltd, Faisalabad', 'AK', 'var(--pak-green)'],
+                ['NestPOS hamare boutique ka rang badal diya hai. PRA compliance ek dard tha — ab automatic hai. Cashier sirf bill banata hai, baaki TaxNest sambhal leta hai.', 'Fatima Sajjad', 'Owner, Fashion Hub POS, Lahore', 'FS', 'var(--maroon)'],
+                ['Hamari electronics shop mein FBR POS lagaye hue 8 mahine ho gaye. Ek bhi invoice fail nahi hua. Accountant sahab ab khush hain, ye apne aap mein mojza hai.', 'Rahim Mehmood', 'Director, Electronics Store, Karachi', 'RM', 'var(--ocean)'],
+            ];
+            @endphp
+
+            <div class="grid md:grid-cols-3 gap-6 fade-up">
+                @foreach($testimonials as $idx => $t)
+                <article class="relative paper-card ink-border p-7 lift-card ink-shadow {{ $idx % 2 === 1 ? 'md:mt-8' : '' }}">
+                    <span class="quote-mark absolute -top-2 left-5" aria-hidden="true">"</span>
+                    <p class="font-display text-[17px] leading-[1.55] text-[color:var(--ink)] mt-7 mb-6">{{ $t[0] }}</p>
+                    <div class="flex items-center gap-3 pt-4 border-t-2 border-dashed border-[color:var(--ink)]">
+                        <div class="w-11 h-11 flex items-center justify-center font-display font-black text-[15px] text-[color:var(--paper)] border-2 border-[color:var(--ink)]" style="background: {{ $t[4] }};">{{ $t[3] }}</div>
                         <div>
-                            <p class="text-sm font-semibold text-white">{{ $t[1] }}</p>
-                            <p class="text-xs text-gray-500">{{ $t[2] }}</p>
+                            <p class="font-bold text-[14px] text-[color:var(--ink)]">{{ $t[1] }}</p>
+                            <p class="text-[11.5px] text-[color:var(--ink-soft)]">{{ $t[2] }}</p>
                         </div>
                     </div>
+                </article>
+                @endforeach
+            </div>
+        </div>
+    </section>
+
+    <hr class="deco-line max-w-[1240px] mx-auto">
+
+    {{-- ════════════════════════════════════════════════════════════════
+         HOW IT WORKS — three numbered cards, slightly off-grid
+         ════════════════════════════════════════════════════════════════ --}}
+    <section class="py-20 lg:py-24 paper-2">
+        <div class="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-10">
+            <div class="text-center max-w-2xl mx-auto mb-14 fade-up">
+                <span class="eyebrow !justify-center" style="display:inline-flex;">Bas teen qadam</span>
+                <h2 class="font-display text-[36px] sm:text-[46px] font-black mt-4 leading-[1.02]">Kaise shuru karein?</h2>
+                <p class="mt-4 text-[16px] text-[color:var(--ink-soft)] leading-relaxed">Account banayein, FBR/PRA jod lein, invoice banana shuru — sab kuch 10 minute mein.</p>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-8 fade-up">
+                @php $steps = [
+                    ['01', 'Account banayein', 'Sirf 30 second mein sign up. Apna pasandeeda product chunein — Digital Invoice, PRA POS, ya FBR POS. Pehle 14 din bilkul free.', 'var(--pak-green)'],
+                    ['02', 'FBR ya PRA se connect karein', 'Apna NTN daalein, sandbox token connect karein, business profile complete karein. 5 minute se zyada nahi lagega.', 'var(--maroon)'],
+                    ['03', 'Bill banana shuru', 'Pehla invoice banayein. Real-time mein FBR ya PRA ko submit ho jayega. Bas — aap compliant hain.', 'var(--ocean)'],
+                ]; @endphp
+                @foreach($steps as $i => $step)
+                <div class="paper-card ink-border p-7 lift-card ink-shadow {{ $i === 1 ? 'md:mt-10' : '' }} {{ $i === 2 ? 'md:mt-5' : '' }} relative">
+                    <div class="absolute -top-5 -left-3 px-3 py-1 ink-border font-display font-black text-[14px] bg-[color:var(--gold-2)]" style="box-shadow: 2px 2px 0 var(--ink); transform: rotate(-3deg);">
+                        STEP {{ $step[0] }}
+                    </div>
+                    <p class="font-mono text-[40px] font-bold opacity-20 mt-1" style="color: {{ $step[3] }};">{{ $step[0] }}</p>
+                    <h3 class="font-display font-black text-[22px] mt-2 leading-tight">{{ $step[1] }}</h3>
+                    <p class="text-[14px] text-[color:var(--ink-soft)] mt-3 leading-relaxed">{{ $step[2] }}</p>
                 </div>
                 @endforeach
             </div>
         </div>
     </section>
 
-    <section class="py-20 lg:py-24 bg-white dark:bg-gray-900">
-        <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
-            <div class="text-center mb-14 fade-up">
-                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Get Started in Minutes</p>
-                <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">How It Works</h2>
-                <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">Three simple steps to complete tax compliance</p>
+    {{-- ════════════════════════════════════════════════════════════════
+         PRODUCTS — three offset cards with rotating badges
+         ════════════════════════════════════════════════════════════════ --}}
+    <section id="products" class="py-20 lg:py-28">
+        <div class="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-10">
+            <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 mb-14 fade-up">
+                <div class="max-w-xl">
+                    <span class="eyebrow">Hamari teen products</span>
+                    <h2 class="font-display text-[36px] sm:text-[46px] font-black mt-4 leading-[1.02]">
+                        Ek platform —
+                        <span class="text-[color:var(--maroon)]">teen alag</span> solutions.
+                    </h2>
+                </div>
+                <p class="text-[15px] text-[color:var(--ink-soft)] leading-relaxed max-w-md">Teeno products 100% isolated hain — alag database, alag login, alag dashboard. Aap jo chahein chunein, ya teeno ek saath use karein.</p>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto fade-up">
-                <div class="text-center step-connector">
-                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-100 to-teal-50 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-emerald-500/10">
-                        <span class="text-2xl font-black text-emerald-600">1</span>
+
+            <div class="grid lg:grid-cols-3 gap-7 fade-up">
+                @php $products = [
+                    [
+                        'href' => '/digital-invoice', 'badge' => 'Enterprise', 'badge_bg' => 'var(--pak-green)',
+                        'title' => 'Digital Invoice', 'sub' => 'FBR Compliance System',
+                        'desc' => 'Enterprise-grade FBR digital invoicing PRAL API v1.12 ke saath. Real-time submission, compliance scoring, aur HS Intelligence AI built-in.',
+                        'features' => ['FBR API v1.12', 'HS Intelligence AI', 'Risk Detection', 'PDF + QR codes', 'MIS Analytics', 'Multi-Branch'],
+                        'accent' => 'var(--pak-green)', 'mt' => '',
+                        'tag' => 'For FBR filers',
+                    ],
+                    [
+                        'href' => '/pos', 'badge' => 'Most Popular', 'badge_bg' => 'var(--maroon)',
+                        'title' => 'NestPOS', 'sub' => 'PRA Point-of-Sale',
+                        'desc' => 'Punjab Revenue Authority ke liye complete POS solution. Thermal printer, offline billing, auto-sync — sab built-in.',
+                        'features' => ['PRA IMS v1.2', 'Thermal receipts', 'Offline + sync', 'Restaurant + retail', 'Inventory engine', 'Keyboard-only flow'],
+                        'accent' => 'var(--maroon)', 'mt' => 'lg:mt-10',
+                        'tag' => 'For dukandaar & retail',
+                    ],
+                    [
+                        'href' => '/fbr-pos-landing', 'badge' => 'Naya', 'badge_bg' => 'var(--ocean)',
+                        'title' => 'FBR POS', 'sub' => 'FBR-Integrated POS',
+                        'desc' => 'FBR direct API ke saath POS billing. Automated tax compliance, retry system, aur comprehensive reporting — chhote budget mein.',
+                        'features' => ['Direct FBR API', 'Auto tax calc', 'Retry system', 'Tax reports', 'Confidential PIN', 'Smart scanning'],
+                        'accent' => 'var(--ocean)', 'mt' => 'lg:mt-5',
+                        'tag' => 'For FBR POS shops',
+                    ],
+                ]; @endphp
+
+                @foreach($products as $idx => $p)
+                <article class="relative paper-card ink-border lift-card ink-shadow-lg {{ $p['mt'] }}">
+                    <div class="absolute -top-3 -right-3 z-10">
+                        <span class="inline-block px-3 py-1.5 ink-border font-display font-black text-[11px] uppercase tracking-widest text-[color:var(--paper)]" style="background: {{ $p['badge_bg'] }}; box-shadow: 2.5px 2.5px 0 var(--ink); transform: rotate({{ $idx === 1 ? '4' : ($idx === 0 ? '-3' : '5') }}deg);">{{ $p['badge'] }}</span>
                     </div>
-                    <h3 class="text-[16px] font-bold text-gray-900 mb-2">Register & Choose Product</h3>
-                    <p class="text-[13px] text-gray-500 leading-relaxed">Sign up in 30 seconds. Pick Digital Invoice, PRA POS, or FBR POS. Get a 14-day free trial instantly.</p>
-                </div>
-                <div class="text-center step-connector">
-                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-100 to-violet-50 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-purple-500/10">
-                        <span class="text-2xl font-black text-purple-600">2</span>
+
+                    <div class="px-6 py-5 border-b-2 border-[color:var(--ink)]" style="background: {{ $p['accent'] }};">
+                        <p class="font-mono text-[10.5px] uppercase tracking-[0.2em] text-[color:var(--paper)] opacity-80">{{ $p['tag'] }}</p>
+                        <h3 class="font-display font-black text-[28px] text-[color:var(--paper)] leading-tight mt-1">{{ $p['title'] }}</h3>
+                        <p class="font-display italic text-[14px] text-[color:var(--paper)] opacity-90 mt-0.5">{{ $p['sub'] }}</p>
                     </div>
-                    <h3 class="text-[16px] font-bold text-gray-900 mb-2">Configure & Connect FBR/PRA</h3>
-                    <p class="text-[13px] text-gray-500 leading-relaxed">Enter your NTN, connect to FBR or PRA API, set up your business profile. Takes under 5 minutes.</p>
-                </div>
-                <div class="text-center">
-                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-100 to-sky-50 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-blue-500/10">
-                        <span class="text-2xl font-black text-blue-600">3</span>
+
+                    <div class="p-6">
+                        <p class="text-[14px] text-[color:var(--ink-soft)] leading-relaxed mb-5">{{ $p['desc'] }}</p>
+
+                        <ul class="grid grid-cols-2 gap-2 mb-6">
+                            @foreach($p['features'] as $f)
+                            <li class="flex items-center text-[12.5px] text-[color:var(--ink)]">
+                                <svg class="w-3.5 h-3.5 mr-1.5 shrink-0" style="color: {{ $p['accent'] }};" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                {{ $f }}
+                            </li>
+                            @endforeach
+                        </ul>
+
+                        <a href="{{ $p['href'] }}" class="inline-flex items-center gap-2 w-full justify-center py-3 ink-border font-display font-bold text-[14px] text-[color:var(--paper)]" style="background: {{ $p['accent'] }}; box-shadow: 3px 3px 0 var(--ink);">
+                            Explore {{ $p['title'] }}
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </a>
                     </div>
-                    <h3 class="text-[16px] font-bold text-gray-900 mb-2">Create & Submit Invoices</h3>
-                    <p class="text-[13px] text-gray-500 leading-relaxed">Start creating compliant invoices immediately. Real-time submission to FBR/PRA with instant confirmation.</p>
-                </div>
+                </article>
+                @endforeach
             </div>
         </div>
     </section>
 
-    <section id="products" class="py-24 lg:py-28 bg-gray-50 dark:bg-gray-800">
-        <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
-            <div class="text-center mb-16 fade-up">
-                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Three Products, One Platform</p>
-                <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Choose Your Solution</h2>
-                <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">All three products are 100% isolated — separate data, separate logins, separate dashboards.</p>
+    {{-- ════════════════════════════════════════════════════════════════
+         FEATURES — capabilities band on green
+         ════════════════════════════════════════════════════════════════ --}}
+    <section id="features" class="py-20 lg:py-24 border-y-2 border-[color:var(--ink)]" style="background: var(--pak-green); color: var(--paper);">
+        <div class="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-10">
+            <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 mb-12 fade-up">
+                <div class="max-w-xl">
+                    <span class="eyebrow !text-[color:var(--gold-2)]">Platform capabilities</span>
+                    <h2 class="font-display text-[36px] sm:text-[46px] font-black mt-4 leading-[1.02] text-[color:var(--paper)]">
+                        Enterprise-grade engine,
+                        <span class="text-[color:var(--gold-2)] italic">desi</span> simplicity.
+                    </h2>
+                </div>
+                <p class="text-[15px] opacity-85 leading-relaxed max-w-md">Yeh saari cheezein har plan mein shaamil hain — chhote plan se enterprise tak. Koi hidden charge nahi.</p>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-                <div class="relative card-hover bg-white dark:bg-gray-900 rounded-2xl product-card-glow-emerald overflow-hidden hover:-translate-y-2 hover:shadow-xl transition-all duration-300 gradient-border-top">
-                    <div class="absolute top-3 right-3">
-                        <span class="inline-flex items-center px-2.5 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full uppercase tracking-wide">Enterprise</span>
-                    </div>
-                    <div class="p-7">
-                        <div class="flex items-center space-x-3 mb-5">
-                            <div class="w-14 h-14 rounded-[14px] bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                                <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                            </div>
-                            <div>
-                                <h3 class="text-lg font-bold text-gray-900">Digital Invoice</h3>
-                                <p class="text-[12px] text-emerald-600 font-semibold">FBR Compliance System</p>
-                            </div>
-                        </div>
-                        <p class="text-[14px] text-gray-600 leading-relaxed mb-5">Enterprise-grade FBR digital invoicing with PRAL API v1.12 integration, real-time submission, and compliance scoring.</p>
-                        <div class="grid grid-cols-2 gap-2.5 mb-6">
-                            @foreach(['FBR API v1.12', 'HS Intelligence AI', 'Risk Detection', 'PDF + QR Codes', 'MIS Analytics', 'Multi-Branch'] as $feature)
-                            <div class="flex items-center text-[12px] text-gray-700">
-                                <svg class="w-3.5 h-3.5 text-emerald-500 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                {{ $feature }}
-                            </div>
-                            @endforeach
-                        </div>
-                        <a href="/digital-invoice" class="btn-glow block w-full py-3 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white rounded-xl text-[13px] font-semibold hover:from-emerald-600 hover:to-emerald-800 shadow-md hover:shadow-lg text-center">
-                            Explore Digital Invoice
-                        </a>
-                    </div>
-                </div>
+            @php $caps = [
+                ['Real-time PRAL API submission', 'FBR ko bill foran chala jata hai, 2 second se kam mein.'],
+                ['PRA + FBR POS fiscal reporting', 'Daily, monthly, aur custom date range mein automatic reports.'],
+                ['Offline billing + auto sync', 'Internet band ho? Koi mas\'la nahi. Wapas aate hi sab sync ho jayega.'],
+                ['Inventory + reporting engine', 'Stock movement, COGS, low-stock alerts — sab automatic.'],
+                ['Compliance scoring + risk alerts', 'Aap ka FBR risk score live track hota hai, alerts milte hain.'],
+                ['SHA-256 immutable audit logs', 'Har action tamper-proof hash ke saath log hota hai.'],
+                ['Multi-branch invoicing', 'Ek company, multiple branches — har branch ka apna numbering.'],
+                ['Thermal receipt printing', '58mm aur 80mm thermal printer fully support karte hain.'],
+            ]; @endphp
 
-                <div class="relative card-hover bg-white dark:bg-gray-900 rounded-2xl product-card-glow-purple overflow-hidden hover:-translate-y-2 hover:shadow-xl transition-all duration-300 gradient-border-top-purple ring-2 ring-purple-200/50">
-                    <div class="absolute top-3 right-3">
-                        <span class="inline-flex items-center px-2.5 py-1 bg-gradient-to-r from-purple-500 to-violet-600 text-white text-[10px] font-bold rounded-full uppercase tracking-wide shadow-lg shadow-purple-500/20">Most Popular</span>
-                    </div>
-                    <div class="p-7">
-                        <div class="flex items-center space-x-3 mb-5">
-                            <div class="w-14 h-14 rounded-[14px] bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
-                                <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                            </div>
-                            <div>
-                                <h3 class="text-lg font-bold text-gray-900">PRA POS</h3>
-                                <p class="text-[12px] text-purple-600 font-semibold">PRA Point of Sale</p>
-                            </div>
-                        </div>
-                        <p class="text-[14px] text-gray-600 leading-relaxed mb-5">Complete POS billing with PRA fiscal device integration via PRAL IMS API v1.2, thermal receipts, and real-time tax calculations.</p>
-                        <div class="grid grid-cols-2 gap-2.5 mb-6">
-                            @foreach(['PRA IMS v1.2', 'Thermal Receipts', 'Multi-Terminal', 'Smart Billing', 'Cash/Card/QR Tax', 'Offline Billing'] as $feature)
-                            <div class="flex items-center text-[12px] text-gray-700">
-                                <svg class="w-3.5 h-3.5 text-purple-500 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                {{ $feature }}
-                            </div>
-                            @endforeach
-                        </div>
-                        <a href="/pos" class="btn-glow-purple block w-full py-3 bg-gradient-to-r from-purple-500 to-purple-700 text-white rounded-xl text-[13px] font-semibold hover:from-purple-600 hover:to-purple-800 shadow-lg shadow-purple-500/20 hover:shadow-xl text-center">
-                            Explore PRA POS
-                        </a>
-                    </div>
-                </div>
-
-                <div class="relative card-hover bg-white dark:bg-gray-900 rounded-2xl product-card-glow-blue overflow-hidden hover:-translate-y-2 hover:shadow-xl transition-all duration-300" style="border-top: 4px solid; border-image: linear-gradient(to right, #2563eb, #3b82f6) 1;">
-                    <div class="absolute top-3 right-3">
-                        <span class="inline-flex items-center px-2.5 py-1 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full uppercase tracking-wide">New</span>
-                    </div>
-                    <div class="p-7">
-                        <div class="flex items-center space-x-3 mb-5">
-                            <div class="w-14 h-14 rounded-[14px] flex items-center justify-center shadow-lg shadow-blue-600/30" style="background: linear-gradient(135deg, #1e40af, #2563eb);">
-                                <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                            </div>
-                            <div>
-                                <h3 class="text-lg font-bold text-gray-900">FBR POS</h3>
-                                <p class="text-[12px] text-blue-700 font-semibold">FBR Point of Sale</p>
-                            </div>
-                        </div>
-                        <p class="text-[14px] text-gray-600 leading-relaxed mb-5">FBR-integrated POS billing with direct API submission, real-time compliance, automated tax calculation, and comprehensive reports.</p>
-                        <div class="grid grid-cols-2 gap-2.5 mb-6">
-                            @foreach(['FBR Direct API', 'Smart Billing', 'Tax Compliance', 'Retry System', 'Tax Reports', 'Multi-User'] as $feature)
-                            <div class="flex items-center text-[12px] text-gray-700">
-                                <svg class="w-3.5 h-3.5 text-blue-500 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                {{ $feature }}
-                            </div>
-                            @endforeach
-                        </div>
-                        <a href="/fbr-pos-landing" class="block w-full py-3 bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-xl text-[13px] font-semibold hover:from-blue-600 hover:to-blue-800 shadow-md hover:shadow-lg text-center transition">
-                            Explore FBR POS
-                        </a>
-                    </div>
-                </div>
-            </div>
-
-            <div class="mt-8 text-center">
-                <div class="inline-flex items-center px-5 py-2.5 bg-amber-50 border border-amber-200/60 rounded-xl">
-                    <svg class="w-4 h-4 text-amber-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                    <span class="text-[13px] font-medium text-amber-800">100% isolated — separate databases, logins, and data. No cross-contamination.</span>
-                </div>
-            </div>
-        </div>
-    </section>
-
-
-    <section id="features" class="py-24 lg:py-28 bg-gray-50">
-        <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
-            <div class="text-center mb-16 fade-up">
-                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Enterprise Architecture</p>
-                <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Built Different From Day One</h2>
-                <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">Purpose-built for Pakistan's tax ecosystem with enterprise-grade infrastructure.</p>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 fade-up">
-                @php
-                $features = [
-                    ['Real-time FBR + PRA Sync', 'Direct PRAL API v1.12 for FBR Digital Invoice, IMS API v1.2 for PRA POS, and FBR Direct API for FBR POS. Synchronous submission with instant responses.', 'M13 10V3L4 14h7v7l9-11h-7z', '#ecfdf5', '#059669'],
-                    ['HS Intelligence Engine', '6-factor AI model learns from every submission. Auto-suggests HS codes, SRO numbers, and tax rates.', 'M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z', '#eff6ff', '#2563eb'],
-                    ['Risk Intelligence Engine', 'Pre-submission risk detection with anomaly scoring, compliance warnings, and automatic blocking.', 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z', '#faf5ff', '#9333ea'],
-                    ['6-Phase Idempotency Shield', 'Enterprise-grade duplicate prevention. Per-invoice guards with SHA-256 hashing and auto-recovery.', 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', '#fff7ed', '#ea580c'],
-                    ['Immutable Audit Logs', 'SHA-256 signed audit trail with integrity verification and tamper-proof activity tracking.', 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z', '#eef2ff', '#4f46e5'],
-                    ['Multi-Tenant Architecture', 'Complete company isolation with approval workflow, multi-branch invoicing, and role-based access.', 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4', '#ecfeff', '#0891b2'],
-                    ['Token Health Monitor', 'Real-time FBR/PRA token status, connectivity checks, expiry alerts, and health diagnostics.', 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z', '#fff1f2', '#e11d48'],
-                    ['6 Login Methods', 'Email, Phone, Username, CNIC, NTN, or FBR Registration. Maximum flexibility for all business types.', 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z', '#fffbeb', '#d97706'],
-                    ['PWA + Keyboard Shortcuts', 'Install on any device. Ctrl+S save, Ctrl+Enter submit, offline drafts, and instant transitions.', 'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z', '#f0fdfa', '#0d9488'],
-                ];
-                @endphp
-                @foreach($features as $f)
-                <div class="group card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 ring-1 ring-gray-100 hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-                    <div class="w-12 h-12 rounded-xl flex items-center justify-center mb-4 shadow-sm transition-all duration-300" style="background-color: {{ $f[3] }};">
-                        <svg class="w-6 h-6" style="color: {{ $f[4] }};" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $f[2] }}"/></svg>
-                    </div>
-                    <h3 class="text-[15px] font-bold text-gray-900 mb-2">{{ $f[0] }}</h3>
-                    <p class="text-[13px] text-gray-600 leading-relaxed">{{ $f[1] }}</p>
+            <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-7 fade-up">
+                @foreach($caps as $i => $c)
+                <div class="relative">
+                    <p class="font-mono text-[11px] text-[color:var(--gold-2)] tracking-[0.18em] mb-1.5">{{ str_pad($i + 1, 2, '0', STR_PAD_LEFT) }} —</p>
+                    <h3 class="font-display font-bold text-[16px] leading-snug">{{ $c[0] }}</h3>
+                    <p class="text-[12.5px] opacity-75 mt-2 leading-relaxed">{{ $c[1] }}</p>
                 </div>
                 @endforeach
             </div>
+        </div>
+    </section>
 
-            <div class="mt-14 fade-up">
-                <div class="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl shadow-xl overflow-hidden max-w-4xl mx-auto">
-                    <div class="absolute inset-0 opacity-[0.04]" style="background-image: url('data:image/svg+xml,%3Csvg width=&quot;40&quot; height=&quot;40&quot; viewBox=&quot;0 0 40 40&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;%3E%3Cg fill=&quot;%23ffffff&quot; fill-opacity=&quot;1&quot; fill-rule=&quot;evenodd&quot;%3E%3Cpath d=&quot;M0 40L40 0H20L0 20M40 40V20L20 40&quot;/%3E%3C/g%3E%3C/svg%3E');"></div>
-                    <div class="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-emerald-500 via-teal-400 to-purple-500"></div>
-                    <div class="relative px-6 py-6 sm:px-8 sm:py-7">
-                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
-                            <div class="flex items-center gap-3">
-                                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 flex-shrink-0">
-                                    <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
-                                </div>
-                                <h3 class="text-[15px] font-bold text-white tracking-tight">Platform Capabilities</h3>
-                            </div>
-                            <span class="inline-flex items-center px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-[11px] font-semibold text-emerald-400 tracking-wide">BUILT FOR ENTERPRISE</span>
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-2.5">
-                            @foreach([
-                                'Real-time FBR PRAL API',
-                                'PRA + FBR POS fiscal reporting',
-                                'Offline billing + auto sync',
-                                'Inventory + reporting engine',
-                                'Compliance scoring + risk alerts',
-                                'SHA-256 immutable audit logs',
-                                'Multi-branch invoicing',
-                                'Thermal receipt printing'
-                            ] as $cap)
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                                <span class="text-[13px] text-gray-300 font-medium">{{ $cap }}</span>
-                            </div>
-                            @endforeach
-                        </div>
-                    </div>
-                </div>
+    {{-- ════════════════════════════════════════════════════════════════
+         COMPARISON — paper table, hand-stamped checks
+         ════════════════════════════════════════════════════════════════ --}}
+    <section class="py-20 lg:py-24">
+        <div class="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-10">
+            <div class="text-center max-w-xl mx-auto mb-12 fade-up">
+                <span class="eyebrow !justify-center" style="display:inline-flex;">Aap ka faisla aasaan</span>
+                <h2 class="font-display text-[36px] sm:text-[44px] font-black mt-4 leading-[1.02]">
+                    TaxNest vs <span class="line-through opacity-50 decoration-[color:var(--maroon)] decoration-[3px]">purana software</span>
+                </h2>
+                <p class="mt-4 text-[15px] text-[color:var(--ink-soft)]">Generic accounting tools aur TaxNest mein bunyaadi farq dekhein.</p>
+            </div>
+
+            <div class="paper-card ink-border ink-shadow overflow-hidden fade-up">
+                <table class="w-full">
+                    <thead>
+                        <tr style="background: var(--ink); color: var(--paper);">
+                            <th class="text-left py-4 px-5 font-display font-bold text-[14px]">Capability</th>
+                            <th class="text-center py-4 px-5 font-display font-bold text-[14px] w-[130px]" style="color: var(--gold-2);">TaxNest</th>
+                            <th class="text-center py-4 px-5 font-display font-bold text-[14px] w-[130px] opacity-70">Doosre</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @php
+                        $comparisons = [
+                            ['Direct FBR PRAL API v1.12', true, false],
+                            ['PRA IMS API v1.2 (POS)', true, false],
+                            ['Synchronous Real-time Submission', true, false],
+                            ['HS Intelligence Engine (AI)', true, false],
+                            ['Risk Detection & Compliance Scoring', true, false],
+                            ['6-Phase Idempotency Shield', true, false],
+                            ['Auto-Recovery for Stuck Invoices', true, false],
+                            ['3rd Schedule Goods Support', true, false],
+                            ['6 Login Methods (Email/CNIC/NTN)', true, false],
+                            ['SHA-256 Immutable Audit Logs', true, false],
+                            ['Multi-Branch + Company Isolation', true, 'partial'],
+                            ['FBR + PRA Token Health Monitor', true, false],
+                            ['PWA + Keyboard Shortcuts', true, false],
+                            ['FBR POS Direct API Submission', true, false],
+                            ['DI + PRA POS + FBR POS Isolation', true, false],
+                        ];
+                        @endphp
+                        @foreach($comparisons as $i => $c)
+                        <tr class="{{ $i % 2 === 0 ? 'paper-card' : 'paper-2' }} border-b border-dashed border-[color:var(--ink)]" style="border-color: rgba(26,20,16,0.18);">
+                            <td class="py-3 px-5 text-[13.5px] font-medium text-[color:var(--ink)]">{{ $c[0] }}</td>
+                            <td class="py-3 px-5 text-center">
+                                <span class="inline-flex items-center justify-center w-7 h-7 ink-border" style="background: var(--pak-green); box-shadow: 1.5px 1.5px 0 var(--ink);">
+                                    <svg class="w-3.5 h-3.5 text-[color:var(--paper)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                </span>
+                            </td>
+                            <td class="py-3 px-5 text-center">
+                                @if($c[2] === 'partial')
+                                    <span class="font-mono text-[10.5px] font-bold uppercase px-2 py-1 ink-border-thin text-[color:var(--ochre)]" style="background: rgba(176,122,47,0.12);">Limited</span>
+                                @else
+                                    <span class="font-mono text-[18px] font-bold text-[color:var(--maroon)] opacity-60">—</span>
+                                @endif
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
             </div>
         </div>
     </section>
 
-    <section class="py-24 lg:py-28 bg-white dark:bg-gray-900">
-        <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
-            <div class="text-center mb-16 fade-up">
-                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Comparison</p>
-                <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">TaxNest vs Traditional Software</h2>
-                <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto">See how TaxNest compares to generic accounting tools</p>
+    {{-- ════════════════════════════════════════════════════════════════
+         PRICING — 3 hand-tagged cards
+         ════════════════════════════════════════════════════════════════ --}}
+    <section id="pricing" class="py-20 lg:py-24 paper-2 border-y-2 border-[color:var(--ink)]">
+        <div class="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-10">
+            <div class="text-center max-w-2xl mx-auto mb-14 fade-up">
+                <span class="eyebrow !justify-center" style="display:inline-flex;">Pricing</span>
+                <h2 class="font-display text-[36px] sm:text-[46px] font-black mt-4 leading-[1.02]">Saadi, saaf, koi chhupi baat nahi.</h2>
+                <p class="mt-4 text-[16px] text-[color:var(--ink-soft)] leading-relaxed">Har product ka apna plan hai. Apna pasandeeda chunein, 14 din free trial use karein, aur pasand aaye to continue karein.</p>
             </div>
 
-            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-md border border-gray-200 overflow-hidden max-w-4xl mx-auto fade-up">
-                <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead>
-                            <tr class="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900">
-                                <th class="text-left py-4 px-6 text-[13px] font-medium text-gray-300">Capability</th>
-                                <th class="text-center py-4 px-6 text-[13px] font-bold text-emerald-400">TaxNest</th>
-                                <th class="text-center py-4 px-6 text-[13px] font-bold text-gray-400">Others</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-50">
-                            @php
-                            $comparisons = [
-                                ['Direct FBR PRAL API v1.12', true, false],
-                                ['PRA IMS API v1.2 (POS)', true, false],
-                                ['Synchronous Real-time Submission', true, false],
-                                ['HS Intelligence Engine (AI)', true, false],
-                                ['Risk Detection & Compliance Scoring', true, false],
-                                ['6-Phase Idempotency Shield', true, false],
-                                ['Auto-Recovery for Stuck Invoices', true, false],
-                                ['3rd Schedule Goods Support', true, false],
-                                ['6 Login Methods (Email/CNIC/NTN)', true, false],
-                                ['SHA-256 Immutable Audit Logs', true, false],
-                                ['Multi-Branch + Company Isolation', true, 'partial'],
-                                ['FBR + PRA Token Health Monitor', true, false],
-                                ['PWA + Keyboard Shortcuts', true, false],
-                                ['FBR POS Direct API Submission', true, false],
-                                ['Separate DI + PRA POS + FBR POS Isolation', true, false],
-                            ];
-                            @endphp
-                            @foreach($comparisons as $comp)
-                            <tr class="hover:bg-gray-50/50 transition">
-                                <td class="py-3.5 px-6 text-[13px] font-medium text-gray-700">{{ $comp[0] }}</td>
-                                <td class="py-3.5 px-6 text-center">
-                                    @if($comp[1] === true)
-                                    <svg class="w-5 h-5 text-emerald-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                    @endif
-                                </td>
-                                <td class="py-3.5 px-6 text-center">
-                                    @if($comp[2] === true)
-                                    <svg class="w-5 h-5 text-emerald-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                    @elseif($comp[2] === 'partial')
-                                    <span class="text-[11px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Limited</span>
-                                    @else
-                                    <svg class="w-4 h-4 text-gray-300 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                                    @endif
-                                </td>
-                            </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
+            <div class="grid md:grid-cols-3 gap-7 max-w-5xl mx-auto fade-up">
+                @php $priceCards = [
+                    [
+                        'href' => '/digital-invoice#pricing', 'title' => 'Digital Invoice', 'sub' => 'FBR-compliant invoicing',
+                        'desc' => 'Multiple billing cycles (Monthly, Quarterly, Semi-Annual, Annual) with volume discounts up to 6%.',
+                        'cta' => 'DI plans dekhein', 'accent' => 'var(--pak-green)', 'tag' => 'Starts free',
+                    ],
+                    [
+                        'href' => '/pos#pricing', 'title' => 'NestPOS', 'sub' => 'PRA-integrated POS',
+                        'desc' => 'Annual billing only with 6% discount baked in. Restaurant + retail variants included.',
+                        'cta' => 'POS plans dekhein', 'accent' => 'var(--maroon)', 'tag' => 'Pasandeeda',
+                    ],
+                    [
+                        'href' => '/fbr-pos-landing#pricing', 'title' => 'FBR POS', 'sub' => 'FBR-integrated POS',
+                        'desc' => 'Low-budget billing cycles with direct FBR API submission and automated tax compliance.',
+                        'cta' => 'FBR POS plans', 'accent' => 'var(--ocean)', 'tag' => 'Budget friendly',
+                    ],
+                ]; @endphp
+
+                @foreach($priceCards as $i => $pc)
+                <div class="relative paper-card ink-border ink-shadow-lg lift-card p-7 {{ $i === 1 ? 'md:-mt-4' : '' }}">
+                    @if($i === 1)<div class="hand-tag">{{ $pc['tag'] }}</div>@endif
+                    <p class="font-mono text-[10.5px] uppercase tracking-[0.2em]" style="color: {{ $pc['accent'] }};">{{ $pc['sub'] }}</p>
+                    <h3 class="font-display font-black text-[26px] mt-1.5 text-[color:var(--ink)]">{{ $pc['title'] }}</h3>
+                    <p class="text-[13.5px] text-[color:var(--ink-soft)] mt-3 leading-relaxed mb-7 min-h-[60px]">{{ $pc['desc'] }}</p>
+                    <a href="{{ $pc['href'] }}" class="w-full inline-flex items-center justify-center gap-2 py-3 font-display font-bold text-[14px] ink-border text-[color:var(--paper)]" style="background: {{ $pc['accent'] }}; box-shadow: 3px 3px 0 var(--ink);">
+                        {{ $pc['cta'] }}
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </a>
                 </div>
+                @endforeach
             </div>
         </div>
     </section>
 
-    <section id="pricing" class="py-24 lg:py-28 bg-gray-50">
-        <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
-            <div class="text-center mb-16 fade-up">
-                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Pricing</p>
-                <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Simple, Transparent Pricing</h2>
-                <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">Each product has its own plans. Visit the product page for details and start your 14-day free trial.</p>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto fade-up">
-                <div class="relative card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 p-8 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-                    <div class="absolute inset-0 rounded-xl bg-gradient-to-br from-emerald-500/5 to-teal-500/5 pointer-events-none"></div>
-                    <div class="relative">
-                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center mx-auto mb-5 shadow-sm">
-                            <svg class="w-7 h-7 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                        </div>
-                        <h3 class="text-lg font-bold text-gray-900 mb-2">Digital Invoice</h3>
-                        <p class="text-[14px] text-gray-500 mb-6 leading-relaxed">FBR-compliant invoicing with multiple billing cycles and volume discounts</p>
-                        <a href="/digital-invoice#pricing" class="btn-glow inline-flex items-center px-6 py-3 bg-emerald-600 text-white rounded-[10px] text-[14px] font-semibold hover:bg-emerald-700 transition">
-                            View DI Plans
-                            <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                        </a>
-                    </div>
-                </div>
-                <div class="relative card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 p-8 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-                    <div class="absolute inset-0 rounded-xl bg-gradient-to-br from-purple-500/5 to-violet-500/5 pointer-events-none"></div>
-                    <div class="relative">
-                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-50 to-violet-50 flex items-center justify-center mx-auto mb-5 shadow-sm">
-                            <svg class="w-7 h-7 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                        </div>
-                        <h3 class="text-lg font-bold text-gray-900 mb-2">NestPOS</h3>
-                        <p class="text-[14px] text-gray-500 mb-6 leading-relaxed">PRA point of sale with annual billing and built-in 6% discount</p>
-                        <a href="/pos#pricing" class="btn-glow-purple inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-[10px] text-[14px] font-semibold hover:bg-purple-700">
-                            View POS Plans
-                            <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                        </a>
-                    </div>
-                </div>
-                <div class="relative card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 p-8 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-                    <div class="absolute inset-0 rounded-xl bg-gradient-to-br from-blue-500/5 to-sky-500/5 pointer-events-none"></div>
-                    <div class="relative">
-                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-50 to-sky-50 flex items-center justify-center mx-auto mb-5 shadow-sm">
-                            <svg class="w-7 h-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                        </div>
-                        <h3 class="text-lg font-bold text-gray-900 mb-2">FBR POS</h3>
-                        <p class="text-[14px] text-gray-500 mb-6 leading-relaxed">FBR-integrated POS with direct API submission and low-budget billing cycles</p>
-                        <a href="/fbr-pos-landing#pricing" class="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-[10px] text-[14px] font-semibold hover:bg-blue-700 transition">
-                            View FBR POS Plans
-                            <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section id="faq" class="py-24 lg:py-28 bg-white dark:bg-gray-900">
-        <div class="max-w-3xl mx-auto px-5 sm:px-8">
+    {{-- ════════════════════════════════════════════════════════════════
+         FAQ — paper accordion
+         ════════════════════════════════════════════════════════════════ --}}
+    <section id="faq" class="py-20 lg:py-24">
+        <div class="max-w-[920px] mx-auto px-4 sm:px-6 lg:px-10">
             <div class="text-center mb-12 fade-up">
-                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">FAQ</p>
-                <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Frequently Asked Questions</h2>
+                <span class="eyebrow !justify-center" style="display:inline-flex;">FAQ</span>
+                <h2 class="font-display text-[36px] sm:text-[46px] font-black mt-4 leading-[1.02]">Aap ke sawaal —
+                    <span class="italic text-[color:var(--maroon)]">hamare jawaab.</span>
+                </h2>
             </div>
+
+            @php
+            $faqs = [
+                ['TaxNest kya hai?', 'TaxNest Pakistan ka sab se advanced tax compliance platform hai jis mein <strong>3 alag products</strong> hain — <strong>Digital Invoice</strong> FBR compliance ke liye (Federal Board of Revenue), <strong>NestPOS</strong> PRA compliance ke liye (Punjab Revenue Authority), aur <strong>FBR POS</strong> jo FBR-integrated point of sale billing ke liye hai. Teeno products bilkul alag-alag database, login aur dashboard rakhte hain.'],
+                ['Digital Invoice, NestPOS, aur FBR POS mein farq kya hai?', '<strong>Digital Invoice</strong> un businesses ke liye hai jo FBR ko PRAL API v1.12 ke zariye invoices submit karte hain. HS Intelligence, compliance scoring, risk detection, aur enterprise analytics shaamil hain.<br><br><strong>NestPOS</strong> retail/service businesses ke liye PRA fiscal device integration ke saath POS hai (PRAL IMS API v1.2). Thermal receipt printing, multi-terminal support, aur real-time tax calculations.<br><br><strong>FBR POS</strong> direct FBR API submission ke saath POS hai — FBR-compliant POS billing jis mein automated tax calculation aur retry system hai.'],
+                ['Kya teeno products ka data alag hai?', 'Bilkul, 100%. Digital Invoice, NestPOS, aur FBR POS — har ek ka apna database, apna login page, apna dashboard, aur apne user accounts hain. Teeno systems ke darmiyan zero cross-contamination hai.'],
+                ['Free trial milta hai?', 'Ji haan! Teeno products mein 14-din free trial milta hai. Koi credit card zaroori nahi. Trial ke daur mein saari features tak full access hota hai, 20 invoices/transactions tak.'],
+                ['FBR/PRA compliance kaise kaam karta hai?', '<strong>FBR (Digital Invoice):</strong> PRAL API v1.12 ka real-time synchronous submission. Invoices validate hote hain, compliance ke liye score milte hain, aur HS codes, tax rates aur QR codes ke saath submit hote hain.<br><br><strong>NestPOS:</strong> PRAL IMS API v1.2 fiscal device integration. Har transaction fiscalize ho kar PRA fiscal invoice number + QR code paata hai.<br><br><strong>FBR POS:</strong> Direct FBR API real-time POS invoice submission ke saath automated tax compliance aur retry system.'],
+                ['Security ka kya nizaam hai?', 'TaxNest SHA-256 encrypted immutable audit logs use karta hai, role-based access control, company isolation middleware, 6-phase idempotency shield (duplicate prevention ke liye), aur HTTPS encryption. Har critical operation tamper-proof hashing ke saath log hota hai.'],
+            ];
+            @endphp
+
             <div class="space-y-3 fade-up" x-data="{ open: null }">
-                @php
-                $faqs = [
-                    ['What is TaxNest?', 'TaxNest is Pakistan\'s most advanced tax compliance platform with three products: <strong>Digital Invoice</strong> for FBR compliance (Federal Board of Revenue), <strong>NestPOS</strong> for PRA compliance (Punjab Revenue Authority), and <strong>FBR POS</strong> for FBR-integrated point of sale billing. All three products are completely isolated with separate databases, logins, and dashboards.'],
-                    ['What is the difference between Digital Invoice, NestPOS, and FBR POS?', '<strong>Digital Invoice</strong> is for businesses that need to submit invoices to FBR via PRAL API v1.12. It includes HS Intelligence, compliance scoring, risk detection, and enterprise analytics.<br><br><strong>NestPOS</strong> is a Point of Sale system for retail/service businesses that need PRA fiscal device integration via PRAL IMS API v1.2. It includes thermal receipt printing, multi-terminal support, and real-time tax calculations.<br><br><strong>FBR POS</strong> is a Point of Sale system with direct FBR API submission, designed for businesses that need FBR-compliant POS billing with automated tax calculation and retry system.'],
-                    ['Are all three products data separate?', 'Yes, 100%. Digital Invoice, NestPOS, and FBR POS each have separate databases, separate login pages, separate dashboards, and separate user accounts. There is zero cross-contamination of data between any of the three systems.'],
-                    ['Is there a free trial?', 'Yes! All three products come with a 14-day free trial. No credit card required. You get full access to all features during the trial period with up to 20 invoices/transactions.'],
-                    ['How does FBR/PRA compliance work?', '<strong>FBR (Digital Invoice):</strong> Uses PRAL API v1.12 for real-time synchronous invoice submission. Invoices are validated, scored for compliance, and submitted with HS codes, tax rates, and QR codes.<br><br><strong>NestPOS:</strong> Uses PRAL IMS API v1.2 for fiscal device integration. Each transaction is fiscalized and assigned a PRA fiscal invoice number with QR code.<br><br><strong>FBR POS:</strong> Uses direct FBR API for real-time POS invoice submission with automated tax compliance, retry system, and comprehensive tax reports.'],
-                    ['What security measures are in place?', 'TaxNest uses SHA-256 encrypted immutable audit logs, role-based access control, company isolation middleware, 6-phase idempotency shield for duplicate prevention, and HTTPS encryption. All critical operations are logged with tamper-proof hashing.'],
-                ];
-                @endphp
-                @foreach($faqs as $i => $faq)
-                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200/80 overflow-hidden transition-shadow duration-300" :class="open === {{ $i+1 }} ? 'shadow-lg ring-1 ring-emerald-100' : 'shadow-sm'">
-                    <button @click="open = open === {{ $i+1 }} ? null : {{ $i+1 }}" class="w-full flex items-center justify-between p-5 text-left">
-                        <span class="text-[14px] font-semibold text-gray-900 pr-4">{{ $faq[0] }}</span>
-                        <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0" :class="open === {{ $i+1 }} ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                @foreach($faqs as $i => $f)
+                <div class="paper-card ink-border transition-shadow" :class="open === {{ $i+1 }} ? 'ink-shadow' : ''">
+                    <button @click="open = open === {{ $i+1 }} ? null : {{ $i+1 }}" class="w-full flex items-center justify-between p-5 text-left gap-4">
+                        <div class="flex items-center gap-3">
+                            <span class="font-mono font-bold text-[12px] text-[color:var(--maroon)] tracking-[0.16em] shrink-0">Q.{{ str_pad($i+1, 2, '0', STR_PAD_LEFT) }}</span>
+                            <span class="font-display font-bold text-[16.5px] text-[color:var(--ink)]">{{ $f[0] }}</span>
+                        </div>
+                        <span class="w-7 h-7 ink-border flex items-center justify-center shrink-0 font-display font-black text-[16px]" :class="open === {{ $i+1 }} ? 'bg-[color:var(--ink)] text-[color:var(--paper)]' : 'bg-[color:var(--paper-2)]'" x-text="open === {{ $i+1 }} ? '−' : '+'"></span>
                     </button>
-                    <div x-show="open === {{ $i+1 }}" x-collapse class="px-5 pb-5 text-[13px] text-gray-500 leading-relaxed">
-                        {!! $faq[1] !!}
-                    </div>
+                    <div x-show="open === {{ $i+1 }}" x-collapse class="px-5 pb-5 pl-[68px] text-[14px] text-[color:var(--ink-soft)] leading-[1.75]">{!! $f[1] !!}</div>
                 </div>
                 @endforeach
             </div>
         </div>
     </section>
 
-    <section id="contact" class="py-24 lg:py-28 bg-gray-50">
-        <div class="max-w-3xl mx-auto px-5 sm:px-8">
+    {{-- ════════════════════════════════════════════════════════════════
+         CONTACT — paper cards on cream
+         ════════════════════════════════════════════════════════════════ --}}
+    <section id="contact" class="py-20 lg:py-24 paper-2 border-t-2 border-[color:var(--ink)]">
+        <div class="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-10">
             <div class="text-center mb-12 fade-up">
-                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Get in Touch</p>
-                <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Contact Us</h2>
-                <p class="mt-4 text-[17px] text-gray-500">Have questions? We're here to help you choose the right solution.</p>
+                <span class="eyebrow !justify-center" style="display:inline-flex;">Hum se baat karein</span>
+                <h2 class="font-display text-[36px] sm:text-[44px] font-black mt-4 leading-[1.02]">Sawaalat? Hum sun rahe hain.</h2>
+                <p class="mt-3 text-[15px] text-[color:var(--ink-soft)]">Email, phone ya WhatsApp — jo aap ko pasand ho.</p>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 fade-up">
-                <div class="card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 p-6 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-                    <div class="w-11 h-11 bg-gradient-to-br from-emerald-400/20 to-teal-400/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                    </div>
-                    <h3 class="text-[14px] font-semibold text-gray-900 mb-1">Email</h3>
-                    <p class="text-[13px] text-gray-500">support@taxnest.com</p>
+
+            <div class="grid md:grid-cols-3 gap-5 fade-up">
+                @php $contacts = [
+                    ['Email', 'support@taxnest.com', '24 ghante ke andar reply', 'var(--pak-green)'],
+                    ['Phone & WhatsApp', '+92-XXX-XXXXXXX', 'Mon-Sat · 10am - 7pm PKT', 'var(--maroon)'],
+                    ['Office', 'Karachi, Pakistan', 'Lahore + Islamabad branches', 'var(--ocean)'],
+                ]; @endphp
+                @foreach($contacts as $i => $c)
+                <div class="paper-card ink-border p-6 lift-card ink-shadow text-center {{ $i === 1 ? 'md:-mt-3' : '' }}">
+                    <p class="font-mono text-[10.5px] uppercase tracking-[0.2em]" style="color: {{ $c[3] }};">{{ $c[0] }}</p>
+                    <p class="font-display font-black text-[20px] text-[color:var(--ink)] mt-2.5">{{ $c[1] }}</p>
+                    <p class="text-[12.5px] text-[color:var(--ink-soft)] mt-1.5">{{ $c[2] }}</p>
                 </div>
-                <div class="card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 p-6 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-                    <div class="w-11 h-11 bg-gradient-to-br from-blue-400/20 to-indigo-400/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                    </div>
-                    <h3 class="text-[14px] font-semibold text-gray-900 mb-1">Phone</h3>
-                    <p class="text-[13px] text-gray-500">+92-XXX-XXXXXXX</p>
-                </div>
-                <div class="card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 p-6 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-                    <div class="w-11 h-11 bg-gradient-to-br from-purple-400/20 to-violet-400/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                    </div>
-                    <h3 class="text-[14px] font-semibold text-gray-900 mb-1">Location</h3>
-                    <p class="text-[13px] text-gray-500">Pakistan</p>
-                </div>
+                @endforeach
             </div>
         </div>
     </section>
 
-    <section class="py-20 bg-[#0a0f1a] relative overflow-hidden">
-        <div class="hero-glow absolute inset-0 opacity-60"></div>
-        <div class="orb-1 absolute top-0 left-[20%] w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div class="orb-2 absolute bottom-0 right-[20%] w-56 h-56 bg-purple-500/8 rounded-full blur-3xl pointer-events-none"></div>
-        <div class="max-w-3xl mx-auto px-5 sm:px-8 text-center relative">
-            <h2 class="text-[28px] sm:text-[32px] font-bold text-white tracking-tight mb-4">Ready to Get Compliant?</h2>
-            <p class="text-gray-400 mb-8 text-[17px]">Choose a product to explore features, pricing, and get started.</p>
-            <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
-                <a href="/digital-invoice" class="btn-glow px-6 py-3 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-[10px] text-[14px] font-semibold hover:from-emerald-500 hover:to-teal-600 w-full sm:w-auto flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                    Digital Invoice
-                </a>
-                <a href="/pos" class="btn-glow-purple px-6 py-3 bg-gradient-to-r from-purple-500 to-violet-600 text-white border border-purple-400/20 rounded-[10px] text-[14px] font-semibold hover:from-purple-600 hover:to-violet-700 transition w-full sm:w-auto flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                    PRA POS
-                </a>
-                <a href="/fbr-pos-landing" class="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white border border-blue-400/20 rounded-[10px] text-[14px] font-semibold hover:from-blue-600 hover:to-blue-700 transition w-full sm:w-auto flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                    FBR POS
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <footer class="bg-[#0a0f1a] pt-14 pb-8 relative">
-        <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent"></div>
-        <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-8 pb-10 border-b border-white/[0.06]">
-                <div>
-                    <div class="flex items-center space-x-2 mb-4">
-                        <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                            <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+    {{-- ════════════════════════════════════════════════════════════════
+         FINAL CTA — poster on ink
+         ════════════════════════════════════════════════════════════════ --}}
+    <section class="py-20 lg:py-24 relative border-y-2 border-[color:var(--ink)]" style="background: var(--ink); color: var(--paper);">
+        <div class="absolute inset-0 pointer-events-none opacity-[0.07]"
+             style="background-image: radial-gradient(var(--gold-2) 1.5px, transparent 1.5px); background-size: 26px 26px;"></div>
+        <div class="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-10 relative">
+            <div class="grid lg:grid-cols-12 gap-10 items-center">
+                <div class="lg:col-span-7">
+                    <span class="eyebrow !text-[color:var(--gold-2)]">Aakhri qadam</span>
+                    <h2 class="font-display text-[42px] sm:text-[56px] font-black leading-[1.0] mt-4">
+                        Aaj se hi
+                        <span class="text-[color:var(--gold-2)] italic">compliant</span><br>
+                        kaarobar shuru karein.
+                    </h2>
+                    <p class="text-[16px] mt-5 opacity-80 leading-relaxed max-w-lg">Koi setup fee nahi, koi credit card nahi. Apna pasandeeda product chunein, 30 second mein account banayein, aur pehla invoice abhi banayein.</p>
+                </div>
+                <div class="lg:col-span-5 space-y-3">
+                    <a href="/digital-invoice" class="w-full flex items-center justify-between gap-3 px-5 py-4 ink-border" style="background: var(--paper); color: var(--ink); box-shadow: 4px 4px 0 var(--gold-2);">
+                        <div>
+                            <p class="font-display font-black text-[16px]">Digital Invoice</p>
+                            <p class="font-mono text-[10.5px] tracking-[0.16em] uppercase opacity-70">FBR compliance</p>
                         </div>
-                        <span class="text-[14px] font-bold text-white">TaxNest</span>
-                    </div>
-                    <p class="text-[12px] text-gray-500 leading-relaxed">Pakistan's most advanced tax compliance platform.</p>
-                </div>
-                <div>
-                    <h4 class="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-4">Products</h4>
-                    <div class="space-y-2.5">
-                        <a href="/digital-invoice" class="block text-[13px] text-gray-500 hover:text-emerald-400 transition">Digital Invoice</a>
-                        <a href="/pos" class="block text-[13px] text-gray-500 hover:text-purple-400 transition">PRA POS</a>
-                        <a href="/fbr-pos-landing" class="block text-[13px] text-gray-500 hover:text-blue-400 transition">FBR POS</a>
-                    </div>
-                </div>
-                <div>
-                    <h4 class="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-4">Resources</h4>
-                    <div class="space-y-2.5">
-                        <a href="#features" class="block text-[13px] text-gray-500 hover:text-white transition">Documentation</a>
-                        <a href="#features" class="block text-[13px] text-gray-500 hover:text-white transition">API Guide</a>
-                    </div>
-                </div>
-                <div>
-                    <h4 class="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-4">Company</h4>
-                    <div class="space-y-2.5">
-                        <a href="#faq" class="block text-[13px] text-gray-500 hover:text-white transition">About</a>
-                        <a href="#contact" class="block text-[13px] text-gray-500 hover:text-white transition">Contact</a>
-                    </div>
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </a>
+                    <a href="/pos" class="w-full flex items-center justify-between gap-3 px-5 py-4 ink-border" style="background: var(--paper); color: var(--ink); box-shadow: 4px 4px 0 var(--gold-2);">
+                        <div>
+                            <p class="font-display font-black text-[16px]">NestPOS</p>
+                            <p class="font-mono text-[10.5px] tracking-[0.16em] uppercase opacity-70">PRA POS</p>
+                        </div>
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </a>
+                    <a href="/fbr-pos-landing" class="w-full flex items-center justify-between gap-3 px-5 py-4 ink-border" style="background: var(--paper); color: var(--ink); box-shadow: 4px 4px 0 var(--gold-2);">
+                        <div>
+                            <p class="font-display font-black text-[16px]">FBR POS</p>
+                            <p class="font-mono text-[10.5px] tracking-[0.16em] uppercase opacity-70">FBR-integrated POS</p>
+                        </div>
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </a>
                 </div>
             </div>
-            <div class="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <p class="text-[12px] text-gray-600">&copy; {{ date('Y') }} TaxNest. All rights reserved.</p>
-                <div class="flex items-center space-x-5">
-                    <span class="flex items-center text-[11px] text-gray-600"><svg class="w-3 h-3 mr-1 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>FBR API v1.12</span>
-                    <span class="flex items-center text-[11px] text-gray-600"><svg class="w-3 h-3 mr-1 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>PRA IMS v1.2</span>
-                    <span class="flex items-center text-[11px] text-gray-600"><svg class="w-3 h-3 mr-1 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>SHA-256</span>
+        </div>
+    </section>
+
+    {{-- ════════════════════════════════════════════════════════════════
+         FOOTER — paper, signed
+         ════════════════════════════════════════════════════════════════ --}}
+    <footer class="py-14 paper-2">
+        <div class="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-10">
+            <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 pb-10 border-b-2 border-dashed border-[color:var(--ink)]">
+                <div>
+                    <div class="flex items-center gap-2.5 mb-3">
+                        <div class="w-9 h-9 bg-[color:var(--pak-green)] border-2 border-[color:var(--ink)] flex items-center justify-center" style="box-shadow: 2px 2px 0 var(--ink);">
+                            <span class="font-display font-black text-[color:var(--gold-2)] text-[16px]">T</span>
+                        </div>
+                        <span class="font-display font-extrabold text-[18px]">TaxNest</span>
+                    </div>
+                    <p class="text-[13px] text-[color:var(--ink-soft)] leading-relaxed max-w-[240px]">Pakistan ka apna FBR aur PRA compliance platform. Banaya gaya Karachi mein, soch ke saath.</p>
+                    <p class="font-urdu text-[15px] text-[color:var(--maroon)] mt-3" dir="rtl">آپ کا اپنا ساتھی</p>
                 </div>
+
+                <div>
+                    <h4 class="font-mono text-[10.5px] uppercase tracking-[0.2em] text-[color:var(--maroon)] mb-4">Products</h4>
+                    <ul class="space-y-2.5 text-[13.5px]">
+                        <li><a href="/digital-invoice" class="hover:underline underline-offset-4 decoration-[color:var(--gold)] decoration-2">Digital Invoice</a></li>
+                        <li><a href="/pos" class="hover:underline underline-offset-4 decoration-[color:var(--gold)] decoration-2">NestPOS (PRA)</a></li>
+                        <li><a href="/fbr-pos-landing" class="hover:underline underline-offset-4 decoration-[color:var(--gold)] decoration-2">FBR POS</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 class="font-mono text-[10.5px] uppercase tracking-[0.2em] text-[color:var(--maroon)] mb-4">Company</h4>
+                    <ul class="space-y-2.5 text-[13.5px]">
+                        <li><a href="#features" class="hover:underline underline-offset-4 decoration-[color:var(--gold)] decoration-2">Features</a></li>
+                        <li><a href="#pricing" class="hover:underline underline-offset-4 decoration-[color:var(--gold)] decoration-2">Pricing</a></li>
+                        <li><a href="#faq" class="hover:underline underline-offset-4 decoration-[color:var(--gold)] decoration-2">FAQ</a></li>
+                        <li><a href="#contact" class="hover:underline underline-offset-4 decoration-[color:var(--gold)] decoration-2">Contact</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 class="font-mono text-[10.5px] uppercase tracking-[0.2em] text-[color:var(--maroon)] mb-4">Legal</h4>
+                    <ul class="space-y-2.5 text-[13.5px]">
+                        <li><a href="#" class="hover:underline underline-offset-4 decoration-[color:var(--gold)] decoration-2">Privacy Policy</a></li>
+                        <li><a href="#" class="hover:underline underline-offset-4 decoration-[color:var(--gold)] decoration-2">Terms of Service</a></li>
+                        <li><a href="#" class="hover:underline underline-offset-4 decoration-[color:var(--gold)] decoration-2">Refund Policy</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="pt-7 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-[12px] text-[color:var(--ink-soft)]">
+                <p>© {{ date('Y') }} TaxNest. Made in Karachi <span class="text-[color:var(--maroon)]">★</span> with chai, code aur compliance.</p>
+                <p class="font-mono tracking-[0.16em] uppercase">v · {{ date('Y.m') }} · live</p>
             </div>
         </div>
     </footer>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            var fadeObserver = new IntersectionObserver(function(entries) {
-                entries.forEach(function(entry) {
-                    if (entry.isIntersecting) {
-                        entry.target.classList.add('visible');
-                    }
-                });
-            }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
-            document.querySelectorAll('.fade-up').forEach(function(el) {
-                fadeObserver.observe(el);
-            });
+    // Fade-up reveal
+    (function() {
+        const obs = new IntersectionObserver((entries) => {
+            entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
+        }, { threshold: 0.1 });
+        document.querySelectorAll('.fade-up').forEach(el => obs.observe(el));
+    })();
 
-            var statsEl = document.getElementById('heroStats');
-            if (statsEl) {
-                var statsAnimated = false;
-                var statsObserver = new IntersectionObserver(function(entries) {
-                    if (entries[0].isIntersecting && !statsAnimated) {
-                        statsAnimated = true;
-                        document.querySelectorAll('.counter-val').forEach(function(el) {
-                            var target = parseFloat(el.dataset.target);
-                            var decimal = parseInt(el.dataset.decimal || '0');
-                            var suffix = el.dataset.suffix || '';
-                            var format = el.dataset.format || '';
-                            var interval = parseInt(el.dataset.interval || '25');
-                            var steps = parseInt(el.dataset.step || Math.ceil(target / 50)) || 1;
-                            var current = 0;
-                            var iv = setInterval(function() {
-                                current += steps;
-                                if (current >= target) { current = target; clearInterval(iv); }
-                                var display = '';
-                                if (format === 'k' && current >= 1000) {
-                                    display = (current / 1000).toFixed(current >= 10000 ? 0 : 1) + 'k';
-                                } else if (decimal > 0) {
-                                    display = current.toFixed(decimal);
-                                } else {
-                                    display = Math.round(current).toLocaleString();
-                                }
-                                el.textContent = display + suffix;
-                            }, interval);
-                        });
-                    }
-                }, { threshold: 0.3 });
-                statsObserver.observe(statsEl);
-            }
-        });
+    // Counter animation
+    (function() {
+        const counters = document.querySelectorAll('.counter-val');
+        const animate = (el) => {
+            const target = parseFloat(el.dataset.target || '0');
+            const decimal = parseInt(el.dataset.decimal || '0');
+            const suffix = el.dataset.suffix || '';
+            const duration = 1400;
+            const start = performance.now();
+            const step = (now) => {
+                const p = Math.min((now - start) / duration, 1);
+                const eased = 1 - Math.pow(1 - p, 3);
+                const val = target * eased;
+                let display;
+                if (target >= 10000) {
+                    display = Math.floor(val).toLocaleString('en-US');
+                } else if (decimal > 0) {
+                    display = val.toFixed(decimal);
+                } else {
+                    display = Math.floor(val).toString();
+                }
+                el.textContent = display + suffix;
+                if (p < 1) requestAnimationFrame(step);
+            };
+            requestAnimationFrame(step);
+        };
+        const obs = new IntersectionObserver((entries) => {
+            entries.forEach(e => { if (e.isIntersecting) { animate(e.target); obs.unobserve(e.target); } });
+        }, { threshold: 0.4 });
+        counters.forEach(c => obs.observe(c));
+    })();
     </script>
-
 </body>
 </html>

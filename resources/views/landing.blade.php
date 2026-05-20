@@ -16,9 +16,9 @@
         .fade-up.visible { opacity: 1; transform: translateY(0); }
         .hero-glow {
             background:
-                radial-gradient(ellipse 80% 60% at 50% -10%, rgba(46,160,179,0.28) 0%, transparent 70%),
-                radial-gradient(ellipse 60% 50% at 80% 50%, rgba(231,191,59,0.10) 0%, transparent 60%),
-                radial-gradient(ellipse 40% 40% at 20% 80%, rgba(27,124,140,0.18) 0%, transparent 50%);
+                radial-gradient(ellipse 80% 60% at 50% -10%, rgba(27,124,140,0.10) 0%, transparent 70%),
+                radial-gradient(ellipse 60% 50% at 80% 50%, rgba(231,191,59,0.07) 0%, transparent 60%),
+                radial-gradient(ellipse 40% 40% at 20% 80%, rgba(10,77,92,0.06) 0%, transparent 50%);
         }
         .card-hover { transition: transform 0.3s ease, box-shadow 0.3s ease; }
         .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 40px -12px rgba(0,0,0,0.12); }
@@ -26,8 +26,8 @@
         .btn-glow:hover { transform: translateY(-1px); box-shadow: 0 8px 24px -4px rgba(10,77,92,0.45); }
         .btn-glow-purple { transition: all 0.25s ease; }
         .btn-glow-purple:hover { transform: translateY(-1px); box-shadow: 0 8px 24px -4px rgba(139,92,246,0.4); }
-        .stat-glass { background: rgba(255,255,255,0.06); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.1); }
-        .stat-glass:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); transform: translateY(-2px); }
+        .stat-glass { background: rgba(255,255,255,0.85); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(10,77,92,0.10); box-shadow: 0 2px 8px -2px rgba(10,77,92,0.06); }
+        .stat-glass:hover { background: #ffffff; border-color: rgba(10,77,92,0.18); transform: translateY(-2px); box-shadow: 0 8px 20px -6px rgba(10,77,92,0.12); }
         @keyframes float {
             0%, 100% { transform: translateY(0px) translateX(0px); }
             25% { transform: translateY(-20px) translateX(10px); }
@@ -54,7 +54,7 @@
         @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
         .marquee-track { animation: marquee 25s linear infinite; }
         .marquee-track:hover { animation-play-state: paused; }
-        .testimonial-card { background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.06) 100%); backdrop-filter: blur(20px); }
+        .testimonial-card { background: #ffffff; box-shadow: 0 1px 3px rgba(10,77,92,0.04), 0 4px 12px -4px rgba(10,77,92,0.06); }
         @keyframes typewriter { from { width: 0; } to { width: 100%; } }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
         .typing-cursor { animation: blink 1s step-end infinite; }
@@ -76,7 +76,7 @@
         .gradient-border-top-purple { border-top: 4px solid; border-image: linear-gradient(to right, #8b5cf6, #a78bfa) 1; }
         .pricing-glow { box-shadow: 0 0 80px -20px rgba(16,185,129,0.25), 0 0 40px -10px rgba(139,92,246,0.15); }
         .grid-overlay {
-            background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-image: linear-gradient(rgba(10,77,92,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(10,77,92,0.04) 1px, transparent 1px);
             background-size: 60px 60px;
         }
         .product-card-glow-emerald { box-shadow: 0 0 0 1px rgba(16,185,129,0.1); }
@@ -121,24 +121,23 @@
         </div>
     </nav>
 
-    <section class="relative pt-32 pb-28 sm:pt-40 sm:pb-36 overflow-hidden" style="background:#13202B;">
+    <section class="relative pt-32 pb-28 sm:pt-40 sm:pb-36 overflow-hidden" style="background:#FAF7F2;">
         <div class="hero-glow absolute inset-0"></div>
         <div class="grid-overlay absolute inset-0"></div>
-        <div class="absolute inset-0 opacity-[0.03]" style="background-image: url('data:image/svg+xml,%3Csvg width=&quot;60&quot; height=&quot;60&quot; viewBox=&quot;0 0 60 60&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;%3E%3Cg fill=&quot;none&quot; fill-rule=&quot;evenodd&quot;%3E%3Cg fill=&quot;%23ffffff&quot; fill-opacity=&quot;1&quot;%3E%3Cpath d=&quot;M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z&quot;/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"></div>
 
-        <div class="orb-1 absolute top-20 left-[10%] w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div class="orb-2 absolute bottom-10 right-[15%] w-96 h-96 bg-purple-500/8 rounded-full blur-3xl pointer-events-none"></div>
-        <div class="orb-3 absolute top-1/2 left-[60%] w-64 h-64 bg-teal-400/8 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="orb-1 absolute top-20 left-[10%] w-72 h-72 bg-teal-300/25 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="orb-2 absolute bottom-10 right-[15%] w-96 h-96 bg-amber-200/30 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="orb-3 absolute top-1/2 left-[60%] w-64 h-64 bg-emerald-200/25 rounded-full blur-3xl pointer-events-none"></div>
 
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8 relative">
             <div class="text-center max-w-3xl mx-auto">
-                <div class="inline-flex items-center px-4 py-2 bg-white/[0.07] rounded-full text-[13px] font-medium text-gray-300 mb-8 border border-white/[0.08] backdrop-blur-sm badge-pulse">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 mr-2.5 animate-pulse"></span>
+                <div class="inline-flex items-center px-4 py-2 bg-white rounded-full text-[13px] font-medium text-gray-700 mb-8 border border-gray-200 shadow-sm badge-pulse">
+                    <span class="w-2 h-2 rounded-full mr-2.5 animate-pulse" style="background:#0F6171;"></span>
                     Trusted by 500+ Businesses Across Pakistan
-                    <svg class="w-3.5 h-3.5 ml-2 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>
+                    <svg class="w-3.5 h-3.5 ml-2" style="color:#0F6171;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>
                 </div>
 
-                <h1 class="text-[28px] sm:text-[52px] lg:text-[60px] font-extrabold text-white leading-[1.08] tracking-tight mb-6">
+                <h1 class="text-[28px] sm:text-[52px] lg:text-[60px] font-extrabold text-gray-900 leading-[1.08] tracking-tight mb-6">
                     Pakistan's
                     <span class="relative inline-block">
                         <span class="gradient-animate" style="background:linear-gradient(90deg,#2EA0B3 0%,#1B7C8C 45%,#E7BF3B 100%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;">#1</span>
@@ -149,7 +148,7 @@
                     </span>
                 </h1>
 
-                <p class="text-[17px] sm:text-lg text-gray-400 leading-relaxed mb-10 max-w-2xl mx-auto">
+                <p class="text-[17px] sm:text-lg text-gray-600 leading-relaxed mb-10 max-w-2xl mx-auto">
                     FBR Digital Invoicing, PRA POS, and FBR POS — three fully isolated products in one enterprise platform. Real-time compliant, zero downtime.
                 </p>
 
@@ -158,49 +157,49 @@
                         Start 14-Day Free Trial
                         <svg class="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
                     </a>
-                    <a href="#products" class="group inline-flex items-center px-8 py-4 bg-white/[0.06] text-gray-300 border border-white/[0.12] rounded-xl text-[15px] font-semibold hover:bg-white/[0.15] hover:text-white hover:border-white/[0.2] transition w-full sm:w-auto justify-center backdrop-blur-sm">
+                    <a href="#products" class="group inline-flex items-center px-8 py-4 bg-white text-gray-700 border border-gray-300 rounded-xl text-[15px] font-semibold hover:bg-gray-50 hover:text-gray-900 hover:border-gray-400 transition w-full sm:w-auto justify-center shadow-sm">
                         Explore Products
                         <svg class="w-4 h-4 ml-2 group-hover:translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </a>
                 </div>
 
-                <div class="flex items-center justify-center gap-6 mt-8 text-[12px] text-gray-500">
-                    <span class="flex items-center gap-1.5"><svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> No credit card</span>
-                    <span class="flex items-center gap-1.5"><svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> 14-day trial</span>
-                    <span class="flex items-center gap-1.5"><svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Cancel anytime</span>
+                <div class="flex items-center justify-center gap-6 mt-8 text-[12px] text-gray-600">
+                    <span class="flex items-center gap-1.5"><svg class="w-4 h-4" style="color:#0F6171;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> No credit card</span>
+                    <span class="flex items-center gap-1.5"><svg class="w-4 h-4" style="color:#0F6171;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> 14-day trial</span>
+                    <span class="flex items-center gap-1.5"><svg class="w-4 h-4" style="color:#0F6171;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Cancel anytime</span>
                 </div>
             </div>
 
             <div id="heroStats" class="mt-20 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto">
                 <div class="stat-glass rounded-2xl p-5 text-center transition-all duration-300">
-                    <div class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center mx-auto mb-3">
-                        <svg class="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                    <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-5 h-5 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
                     </div>
-                    <p class="text-2xl sm:text-3xl font-bold text-white"><span class="counter-val" data-target="99.9" data-decimal="1" data-step="2" data-suffix="%">0%</span></p>
-                    <p class="text-xs text-gray-400 mt-1">Uptime SLA</p>
+                    <p class="text-2xl sm:text-3xl font-bold text-gray-900"><span class="counter-val" data-target="99.9" data-decimal="1" data-step="2" data-suffix="%">0%</span></p>
+                    <p class="text-xs text-gray-600 mt-1">Uptime SLA</p>
                 </div>
                 <div class="stat-glass rounded-2xl p-5 text-center transition-all duration-300">
-                    <div class="w-10 h-10 rounded-xl bg-teal-500/20 flex items-center justify-center mx-auto mb-3">
-                        <svg class="w-5 h-5 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                    <div class="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-5 h-5 text-teal-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                     </div>
                     @php $invoiceTarget = isset($stats['total_invoices']) && $stats['total_invoices'] > 0 ? $stats['total_invoices'] : 50000; @endphp
-                    <p class="text-2xl sm:text-3xl font-bold text-white"><span class="counter-val" data-target="{{ $invoiceTarget }}" data-format="k" data-suffix="+">0</span></p>
-                    <p class="text-xs text-gray-400 mt-1">Invoices Processed</p>
+                    <p class="text-2xl sm:text-3xl font-bold text-gray-900"><span class="counter-val" data-target="{{ $invoiceTarget }}" data-format="k" data-suffix="+">0</span></p>
+                    <p class="text-xs text-gray-600 mt-1">Invoices Processed</p>
                 </div>
                 <div class="stat-glass rounded-2xl p-5 text-center transition-all duration-300">
-                    <div class="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center mx-auto mb-3">
-                        <svg class="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-5 h-5 text-purple-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                     </div>
                     @php $compTarget = isset($stats['total_companies']) && $stats['total_companies'] > 0 ? $stats['total_companies'] : 500; @endphp
-                    <p class="text-2xl sm:text-3xl font-bold text-white"><span class="counter-val" data-target="{{ $compTarget }}" data-suffix="+">0</span></p>
-                    <p class="text-xs text-gray-400 mt-1">Companies Trust Us</p>
+                    <p class="text-2xl sm:text-3xl font-bold text-gray-900"><span class="counter-val" data-target="{{ $compTarget }}" data-suffix="+">0</span></p>
+                    <p class="text-xs text-gray-600 mt-1">Companies Trust Us</p>
                 </div>
                 <div class="stat-glass rounded-2xl p-5 text-center transition-all duration-300">
-                    <div class="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center mx-auto mb-3">
-                        <svg class="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                    <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-5 h-5 text-blue-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                     </div>
-                    <p class="text-2xl sm:text-3xl font-bold text-white"><span class="counter-val" data-target="3" data-step="1" data-interval="300">0</span></p>
-                    <p class="text-xs text-gray-400 mt-1">Integrated Products</p>
+                    <p class="text-2xl sm:text-3xl font-bold text-gray-900"><span class="counter-val" data-target="3" data-step="1" data-interval="300">0</span></p>
+                    <p class="text-xs text-gray-600 mt-1">Integrated Products</p>
                 </div>
             </div>
         </div>
@@ -238,12 +237,12 @@
         </div>
     </div>
 
-    <section class="py-16 overflow-hidden relative" style="background:#13202B;">
-        <div class="absolute inset-0 opacity-[0.02]" style="background-image: url('data:image/svg+xml,%3Csvg width=&quot;60&quot; height=&quot;60&quot; viewBox=&quot;0 0 60 60&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;%3E%3Cg fill=&quot;none&quot; fill-rule=&quot;evenodd&quot;%3E%3Cg fill=&quot;%23ffffff&quot; fill-opacity=&quot;1&quot;%3E%3Cpath d=&quot;M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z&quot;/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"></div>
+    <section class="py-16 overflow-hidden relative" style="background:#FAF7F2;">
+        <div class="absolute inset-0 border-t border-b border-gray-200"></div>
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
-            <div class="text-center mb-10 fade-up">
-                <p class="text-[13px] font-semibold text-emerald-400 uppercase tracking-widest mb-2">What Our Clients Say</p>
-                <h2 class="text-[24px] sm:text-[28px] font-bold text-white tracking-tight">Trusted by Businesses Across Pakistan</h2>
+            <div class="text-center mb-10 fade-up relative">
+                <p class="text-[13px] font-semibold uppercase tracking-widest mb-2" style="color:#0A4D5C;">What Our Clients Say</p>
+                <h2 class="text-[24px] sm:text-[28px] font-bold text-gray-900 tracking-tight">Trusted by Businesses Across Pakistan</h2>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-5 fade-up">
                 @php
@@ -254,18 +253,18 @@
                 ];
                 @endphp
                 @foreach($testimonials as $t)
-                <div class="testimonial-card rounded-2xl p-6 border border-white/[0.08] hover:border-white/[0.15] transition-all duration-300 hover:-translate-y-1">
+                <div class="testimonial-card rounded-2xl p-6 border border-gray-200 hover:border-gray-300 transition-all duration-300 hover:-translate-y-1">
                     <div class="flex items-center gap-1 mb-4">
                         @for($s=0;$s<5;$s++)
                         <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
                         @endfor
                     </div>
-                    <p class="text-[14px] text-gray-300 leading-relaxed mb-5">"{{ $t[0] }}"</p>
+                    <p class="text-[14px] text-gray-700 leading-relaxed mb-5">"{{ $t[0] }}"</p>
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold" style="background: linear-gradient(135deg, {{ $t[3] === 'emerald' ? '#059669,#10b981' : ($t[3] === 'purple' ? '#7c3aed,#8b5cf6' : '#2563eb,#3b82f6') }});">{{ substr($t[1],0,1) }}</div>
                         <div>
-                            <p class="text-sm font-semibold text-white">{{ $t[1] }}</p>
-                            <p class="text-xs text-gray-500">{{ $t[2] }}</p>
+                            <p class="text-sm font-semibold text-gray-900">{{ $t[1] }}</p>
+                            <p class="text-xs text-gray-600">{{ $t[2] }}</p>
                         </div>
                     </div>
                 </div>
@@ -667,13 +666,13 @@
         </div>
     </section>
 
-    <section class="py-20 relative overflow-hidden" style="background:#13202B;">
-        <div class="hero-glow absolute inset-0 opacity-60"></div>
-        <div class="orb-1 absolute top-0 left-[20%] w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div class="orb-2 absolute bottom-0 right-[20%] w-56 h-56 bg-purple-500/8 rounded-full blur-3xl pointer-events-none"></div>
+    <section class="py-20 relative overflow-hidden border-t border-gray-200" style="background:#FAF7F2;">
+        <div class="hero-glow absolute inset-0 opacity-80"></div>
+        <div class="orb-1 absolute top-0 left-[20%] w-48 h-48 bg-teal-200/30 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="orb-2 absolute bottom-0 right-[20%] w-56 h-56 bg-amber-200/25 rounded-full blur-3xl pointer-events-none"></div>
         <div class="max-w-3xl mx-auto px-5 sm:px-8 text-center relative">
-            <h2 class="text-[28px] sm:text-[32px] font-bold text-white tracking-tight mb-4">Ready to Get Compliant?</h2>
-            <p class="text-gray-400 mb-8 text-[17px]">Choose a product to explore features, pricing, and get started.</p>
+            <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight mb-4">Ready to Get Compliant?</h2>
+            <p class="text-gray-600 mb-8 text-[17px]">Choose a product to explore features, pricing, and get started.</p>
             <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <a href="/digital-invoice" class="btn-glow px-6 py-3 text-white rounded-[10px] text-[14px] font-semibold w-full sm:w-auto flex items-center justify-center gap-2 shadow-lg" style="background:linear-gradient(135deg,#0F6171 0%,#0A4D5C 100%);box-shadow:0 10px 24px -6px rgba(10,77,92,0.45);" onmouseover="this.style.background='linear-gradient(135deg,#0A4D5C 0%,#063B47 100%)'" onmouseout="this.style.background='linear-gradient(135deg,#0F6171 0%,#0A4D5C 100%)'">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
@@ -691,10 +690,10 @@
         </div>
     </section>
 
-    <footer class="pt-14 pb-8 relative" style="background:#13202B;">
-        <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent"></div>
+    <footer class="pt-14 pb-8 relative border-t border-gray-200" style="background:#F2EDE3;">
+        <div class="absolute inset-x-0 top-0 h-px" style="background:linear-gradient(90deg,transparent,rgba(10,77,92,0.25),transparent);"></div>
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-8 pb-10 border-b border-white/[0.06]">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-8 pb-10 border-b border-gray-200">
                 <div>
                     <div class="flex items-center gap-2 mb-4">
                         <svg class="w-7 h-7" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="TaxNest">
@@ -705,39 +704,39 @@
                             <rect x="13.5" y="18"   width="11" height="1.5" rx="0.4" fill="#F6F2E9" opacity="0.85"/>
                             <rect x="13.5" y="21.5" width="13" height="2.5" rx="0.4" fill="#E7BF3B"/>
                         </svg>
-                        <span class="text-[14px] font-bold text-white">TaxNest</span>
+                        <span class="text-[14px] font-bold text-gray-900">TaxNest</span>
                     </div>
-                    <p class="text-[12px] text-gray-500 leading-relaxed">Pakistan's most advanced tax compliance platform.</p>
+                    <p class="text-[12px] text-gray-600 leading-relaxed">Pakistan's most advanced tax compliance platform.</p>
                 </div>
                 <div>
-                    <h4 class="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-4">Products</h4>
+                    <h4 class="text-[11px] font-semibold text-gray-700 uppercase tracking-widest mb-4">Products</h4>
                     <div class="space-y-2.5">
-                        <a href="/digital-invoice" class="block text-[13px] text-gray-500 hover:text-emerald-400 transition">Digital Invoice</a>
-                        <a href="/pos" class="block text-[13px] text-gray-500 hover:text-purple-400 transition">PRA POS</a>
-                        <a href="/fbr-pos-landing" class="block text-[13px] text-gray-500 hover:text-blue-400 transition">FBR POS</a>
-                    </div>
-                </div>
-                <div>
-                    <h4 class="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-4">Resources</h4>
-                    <div class="space-y-2.5">
-                        <a href="#features" class="block text-[13px] text-gray-500 hover:text-white transition">Documentation</a>
-                        <a href="#features" class="block text-[13px] text-gray-500 hover:text-white transition">API Guide</a>
+                        <a href="/digital-invoice" class="block text-[13px] text-gray-600 hover:text-emerald-700 transition">Digital Invoice</a>
+                        <a href="/pos" class="block text-[13px] text-gray-600 hover:text-purple-700 transition">PRA POS</a>
+                        <a href="/fbr-pos-landing" class="block text-[13px] text-gray-600 hover:text-blue-700 transition">FBR POS</a>
                     </div>
                 </div>
                 <div>
-                    <h4 class="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-4">Company</h4>
+                    <h4 class="text-[11px] font-semibold text-gray-700 uppercase tracking-widest mb-4">Resources</h4>
                     <div class="space-y-2.5">
-                        <a href="#faq" class="block text-[13px] text-gray-500 hover:text-white transition">About</a>
-                        <a href="#contact" class="block text-[13px] text-gray-500 hover:text-white transition">Contact</a>
+                        <a href="#features" class="block text-[13px] text-gray-600 hover:text-gray-900 transition">Documentation</a>
+                        <a href="#features" class="block text-[13px] text-gray-600 hover:text-gray-900 transition">API Guide</a>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="text-[11px] font-semibold text-gray-700 uppercase tracking-widest mb-4">Company</h4>
+                    <div class="space-y-2.5">
+                        <a href="#faq" class="block text-[13px] text-gray-600 hover:text-gray-900 transition">About</a>
+                        <a href="#contact" class="block text-[13px] text-gray-600 hover:text-gray-900 transition">Contact</a>
                     </div>
                 </div>
             </div>
             <div class="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <p class="text-[12px] text-gray-600">&copy; {{ date('Y') }} TaxNest. All rights reserved.</p>
                 <div class="flex items-center space-x-5">
-                    <span class="flex items-center text-[11px] text-gray-600"><svg class="w-3 h-3 mr-1 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>FBR API v1.12</span>
-                    <span class="flex items-center text-[11px] text-gray-600"><svg class="w-3 h-3 mr-1 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>PRA IMS v1.2</span>
-                    <span class="flex items-center text-[11px] text-gray-600"><svg class="w-3 h-3 mr-1 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>SHA-256</span>
+                    <span class="flex items-center text-[11px] text-gray-600"><svg class="w-3 h-3 mr-1 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>FBR API v1.12</span>
+                    <span class="flex items-center text-[11px] text-gray-600"><svg class="w-3 h-3 mr-1 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>PRA IMS v1.2</span>
+                    <span class="flex items-center text-[11px] text-gray-600"><svg class="w-3 h-3 mr-1 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>SHA-256</span>
                 </div>
             </div>
         </div>

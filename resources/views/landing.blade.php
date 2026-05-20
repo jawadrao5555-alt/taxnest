@@ -23,7 +23,7 @@
         .card-hover { transition: transform 0.3s ease, box-shadow 0.3s ease; }
         .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 40px -12px rgba(0,0,0,0.12); }
         .btn-glow { transition: all 0.25s ease; }
-        .btn-glow:hover { transform: translateY(-1px); box-shadow: 0 8px 24px -4px rgba(16,185,129,0.4); }
+        .btn-glow:hover { transform: translateY(-1px); box-shadow: 0 8px 24px -4px rgba(10,77,92,0.45); }
         .btn-glow-purple { transition: all 0.25s ease; }
         .btn-glow-purple:hover { transform: translateY(-1px); box-shadow: 0 8px 24px -4px rgba(139,92,246,0.4); }
         .stat-glass { background: rgba(255,255,255,0.06); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.1); }
@@ -96,10 +96,16 @@
     <nav class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-2xl border-b border-gray-100/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="flex items-center justify-between py-2.5 sm:py-0 sm:h-[60px]">
-                <a href="/" class="flex items-center space-x-2 flex-shrink-0">
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                        <svg class="w-4 h-4 sm:w-[18px] sm:h-[18px] text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                    </div>
+                <a href="/" class="flex items-center gap-2 flex-shrink-0">
+                    {{-- Custom folded-receipt mark with gold total stripe --}}
+                    <svg class="w-7 h-7 sm:w-8 sm:h-8" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="TaxNest">
+                        <path d="M10 4 L31 4 L31 33 L27.5 29.5 L24 33 L20.5 29.5 L17 33 L13.5 29.5 L10 33 Z" fill="#0A4D5C"/>
+                        <path d="M26 4 L31 4 L31 9 Z" fill="#1B7C8C"/>
+                        <rect x="13.5" y="11"   width="9"  height="1.5" rx="0.4" fill="#F6F2E9" opacity="0.95"/>
+                        <rect x="13.5" y="14.5" width="13" height="1.5" rx="0.4" fill="#F6F2E9" opacity="0.70"/>
+                        <rect x="13.5" y="18"   width="11" height="1.5" rx="0.4" fill="#F6F2E9" opacity="0.85"/>
+                        <rect x="13.5" y="21.5" width="13" height="2.5" rx="0.4" fill="#E7BF3B"/>
+                    </svg>
                     <span class="text-sm sm:text-[17px] font-bold text-gray-900 tracking-tight">TaxNest</span>
                 </a>
 
@@ -135,11 +141,11 @@
                 <h1 class="text-[28px] sm:text-[52px] lg:text-[60px] font-extrabold text-white leading-[1.08] tracking-tight mb-6">
                     Pakistan's
                     <span class="relative inline-block">
-                        <span class="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent gradient-animate">#1</span>
+                        <span class="gradient-animate" style="background:linear-gradient(90deg,#2EA0B3 0%,#1B7C8C 45%,#E7BF3B 100%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;">#1</span>
                     </span>
                     Tax Compliance
                     <span class="block mt-1 sm:mt-2">
-                        <span class="bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-300 bg-clip-text text-transparent gradient-animate" x-data="{ words: ['Platform', 'Solution', 'Engine'], current: 0, display: 'Platform' }" x-init="setInterval(() => { current = (current + 1) % words.length; display = words[current]; }, 3000)" x-text="display" x-transition></span>
+                        <span class="gradient-animate" style="background:linear-gradient(90deg,#2EA0B3 0%,#1B7C8C 50%,#0F6171 100%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;" x-data="{ words: ['Platform', 'Solution', 'Engine'], current: 0, display: 'Platform' }" x-init="setInterval(() => { current = (current + 1) % words.length; display = words[current]; }, 3000)" x-text="display" x-transition></span>
                     </span>
                 </h1>
 
@@ -148,7 +154,7 @@
                 </p>
 
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
-                    <a href="#products" class="btn-glow group inline-flex items-center px-8 py-4 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-xl text-[15px] font-bold hover:from-emerald-500 hover:to-teal-600 w-full sm:w-auto justify-center shadow-xl shadow-emerald-500/30">
+                    <a href="#products" class="btn-glow group inline-flex items-center px-8 py-4 text-white rounded-xl text-[15px] font-bold w-full sm:w-auto justify-center shadow-xl" style="background:linear-gradient(135deg,#0F6171 0%,#0A4D5C 100%);box-shadow:0 12px 32px -8px rgba(10,77,92,0.5);" onmouseover="this.style.background='linear-gradient(135deg,#0A4D5C 0%,#063B47 100%)'" onmouseout="this.style.background='linear-gradient(135deg,#0F6171 0%,#0A4D5C 100%)'">
                         Start 14-Day Free Trial
                         <svg class="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
                     </a>
@@ -669,7 +675,7 @@
             <h2 class="text-[28px] sm:text-[32px] font-bold text-white tracking-tight mb-4">Ready to Get Compliant?</h2>
             <p class="text-gray-400 mb-8 text-[17px]">Choose a product to explore features, pricing, and get started.</p>
             <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
-                <a href="/digital-invoice" class="btn-glow px-6 py-3 bg-gradient-to-r from-emerald-400 to-teal-500 text-white rounded-[10px] text-[14px] font-semibold hover:from-emerald-500 hover:to-teal-600 w-full sm:w-auto flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25">
+                <a href="/digital-invoice" class="btn-glow px-6 py-3 text-white rounded-[10px] text-[14px] font-semibold w-full sm:w-auto flex items-center justify-center gap-2 shadow-lg" style="background:linear-gradient(135deg,#0F6171 0%,#0A4D5C 100%);box-shadow:0 10px 24px -6px rgba(10,77,92,0.45);" onmouseover="this.style.background='linear-gradient(135deg,#0A4D5C 0%,#063B47 100%)'" onmouseout="this.style.background='linear-gradient(135deg,#0F6171 0%,#0A4D5C 100%)'">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                     Digital Invoice
                 </a>
@@ -690,10 +696,15 @@
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-8 pb-10 border-b border-white/[0.06]">
                 <div>
-                    <div class="flex items-center space-x-2 mb-4">
-                        <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                            <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                        </div>
+                    <div class="flex items-center gap-2 mb-4">
+                        <svg class="w-7 h-7" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="TaxNest">
+                            <path d="M10 4 L31 4 L31 33 L27.5 29.5 L24 33 L20.5 29.5 L17 33 L13.5 29.5 L10 33 Z" fill="#0A4D5C"/>
+                            <path d="M26 4 L31 4 L31 9 Z" fill="#1B7C8C"/>
+                            <rect x="13.5" y="11"   width="9"  height="1.5" rx="0.4" fill="#F6F2E9" opacity="0.95"/>
+                            <rect x="13.5" y="14.5" width="13" height="1.5" rx="0.4" fill="#F6F2E9" opacity="0.70"/>
+                            <rect x="13.5" y="18"   width="11" height="1.5" rx="0.4" fill="#F6F2E9" opacity="0.85"/>
+                            <rect x="13.5" y="21.5" width="13" height="2.5" rx="0.4" fill="#E7BF3B"/>
+                        </svg>
                         <span class="text-[14px] font-bold text-white">TaxNest</span>
                     </div>
                     <p class="text-[12px] text-gray-500 leading-relaxed">Pakistan's most advanced tax compliance platform.</p>

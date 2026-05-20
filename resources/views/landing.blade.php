@@ -16,9 +16,9 @@
         .fade-up.visible { opacity: 1; transform: translateY(0); }
         .hero-glow {
             background:
-                radial-gradient(ellipse 80% 60% at 50% -10%, rgba(16,185,129,0.22) 0%, transparent 70%),
-                radial-gradient(ellipse 60% 50% at 80% 50%, rgba(139,92,246,0.14) 0%, transparent 60%),
-                radial-gradient(ellipse 40% 40% at 20% 80%, rgba(6,182,212,0.10) 0%, transparent 50%);
+                radial-gradient(ellipse 80% 60% at 50% -10%, rgba(46,160,179,0.28) 0%, transparent 70%),
+                radial-gradient(ellipse 60% 50% at 80% 50%, rgba(231,191,59,0.10) 0%, transparent 60%),
+                radial-gradient(ellipse 40% 40% at 20% 80%, rgba(27,124,140,0.18) 0%, transparent 50%);
         }
         .card-hover { transition: transform 0.3s ease, box-shadow 0.3s ease; }
         .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 40px -12px rgba(0,0,0,0.12); }
@@ -121,7 +121,7 @@
         </div>
     </nav>
 
-    <section class="relative pt-32 pb-28 sm:pt-40 sm:pb-36 bg-[#0a0f1a] overflow-hidden">
+    <section class="relative pt-32 pb-28 sm:pt-40 sm:pb-36 overflow-hidden" style="background:#13202B;">
         <div class="hero-glow absolute inset-0"></div>
         <div class="grid-overlay absolute inset-0"></div>
         <div class="absolute inset-0 opacity-[0.03]" style="background-image: url('data:image/svg+xml,%3Csvg width=&quot;60&quot; height=&quot;60&quot; viewBox=&quot;0 0 60 60&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;%3E%3Cg fill=&quot;none&quot; fill-rule=&quot;evenodd&quot;%3E%3Cg fill=&quot;%23ffffff&quot; fill-opacity=&quot;1&quot;%3E%3Cpath d=&quot;M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z&quot;/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"></div>
@@ -238,7 +238,7 @@
         </div>
     </div>
 
-    <section class="py-16 bg-[#0a0f1a] overflow-hidden relative">
+    <section class="py-16 overflow-hidden relative" style="background:#13202B;">
         <div class="absolute inset-0 opacity-[0.02]" style="background-image: url('data:image/svg+xml,%3Csvg width=&quot;60&quot; height=&quot;60&quot; viewBox=&quot;0 0 60 60&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;%3E%3Cg fill=&quot;none&quot; fill-rule=&quot;evenodd&quot;%3E%3Cg fill=&quot;%23ffffff&quot; fill-opacity=&quot;1&quot;%3E%3Cpath d=&quot;M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z&quot;/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"></div>
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="text-center mb-10 fade-up">
@@ -667,7 +667,7 @@
         </div>
     </section>
 
-    <section class="py-20 bg-[#0a0f1a] relative overflow-hidden">
+    <section class="py-20 relative overflow-hidden" style="background:#13202B;">
         <div class="hero-glow absolute inset-0 opacity-60"></div>
         <div class="orb-1 absolute top-0 left-[20%] w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
         <div class="orb-2 absolute bottom-0 right-[20%] w-56 h-56 bg-purple-500/8 rounded-full blur-3xl pointer-events-none"></div>
@@ -691,7 +691,7 @@
         </div>
     </section>
 
-    <footer class="bg-[#0a0f1a] pt-14 pb-8 relative">
+    <footer class="pt-14 pb-8 relative" style="background:#13202B;">
         <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent"></div>
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-8 pb-10 border-b border-white/[0.06]">

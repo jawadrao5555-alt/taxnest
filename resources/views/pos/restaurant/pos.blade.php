@@ -1786,16 +1786,19 @@ function restaurantPos() {
             const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 
             if (this.showReceipt) {
-                // Esc is INTENTIONALLY NOT bound on the success popup.
-                // Reason: when a browser print dialog is open over the popup, Esc must close
-                // ONLY that dialog (browser-native). If we also closed the popup on Esc, the
-                // cashier loses context the moment they cancel a print. So Esc is a no-op here
-                // and the popup is dismissed only via X / Close button / "New Sale" (Enter).
+                // Esc closes the success popup (per cashier feedback — mouse use was needed).
+                // If a browser print dialog is on top, Esc closes that first (native browser
+                // intercepts) — only the second Esc reaches us and dismisses the popup.
                 // Enter-only (NOT Space) starts a new sale — Space is too easy to hit by accident.
+                if (e.key === 'Escape') { e.preventDefault(); this.showReceipt = false; return; }
                 if (e.key === 'Enter') { e.preventDefault(); this.startNewAfterPayment(); }
                 else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.printReceipt(null, true); }
                 else if (e.key === 'k' || e.key === 'K') { e.preventDefault(); this.printKitchenTicket(this.lastOrderId, null, true); }
                 return;
+            }
+            // Esc dismisses the floating Last Sale widget when no modal is open.
+            if (this.showLastSaleWidget && e.key === 'Escape' && !isInput) {
+                e.preventDefault(); this.dismissLastSaleWidget(); return;
             }
             if (this.showPayModal) {
                 if (e.key === '1') { e.preventDefault(); this.processPayment('cash'); }
@@ -2169,6 +2172,7 @@ function restaurantPos() {
             this.showReceipt = true;
         },
         dismissLastSaleWidget() {
+            if (this._lastSaleWidgetTimer) { clearTimeout(this._lastSaleWidgetTimer); this._lastSaleWidgetTimer = null; }
             this.showLastSaleWidget = false;
         },
 
@@ -2340,9 +2344,11 @@ function restaurantPos() {
                     this.receiptPrintStatus = 'idle';
                     this.kotPrintStatus = 'idle';
                     this.showReceipt = true;
-                    // Persistent reprint widget — stays visible after the success popup is closed
-                    // (via X / Close / New Sale), so cashier always has a way back to reprint.
+                    // Reprint widget — shows after the success popup is closed (X / Close / New Sale).
+                    // Auto-dismisses after 6s (cashier feedback: no mouse needed) — Esc also closes it.
                     this.showLastSaleWidget = true;
+                    if (this._lastSaleWidgetTimer) clearTimeout(this._lastSaleWidgetTimer);
+                    this._lastSaleWidgetTimer = setTimeout(() => { this.showLastSaleWidget = false; }, 6000);
 
                     // AUTO-PRINT SEQUENCE — invoice ALWAYS prints first, KOT ALWAYS prints after.
                     // Cashier requirement: KOT must NEVER appear before the invoice dialog.

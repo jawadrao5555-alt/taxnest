@@ -2913,8 +2913,10 @@ function restaurantPos() {
                 return;
             }
             if (this.showReceipt) {
-                // Persistent popup — Esc is reserved for the browser print dialog (NOT this popup).
-                // Popup closes ONLY via X / Close / New Sale buttons.
+                // Esc closes the success popup (per cashier feedback — mouse use was needed).
+                // If a browser print dialog is on top, Esc closes that first (native) — second Esc
+                // reaches us and dismisses the popup.
+                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this.showReceipt = false; return; }
                 if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); return; }
                 if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.printReceipt(); return; }
                 if ((e.key === 'k' || e.key === 'K') && this.lastOrderId) { e.preventDefault(); this.printKitchenTicket(); return; }

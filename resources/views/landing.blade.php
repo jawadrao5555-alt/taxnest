@@ -26,8 +26,8 @@
         .btn-glow:hover { transform: translateY(-1px); box-shadow: 0 8px 24px -4px rgba(10,77,92,0.45); }
         .btn-glow-purple { transition: all 0.25s ease; }
         .btn-glow-purple:hover { transform: translateY(-1px); box-shadow: 0 8px 24px -4px rgba(139,92,246,0.4); }
-        .stat-glass { background: rgba(255,255,255,0.85); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(10,77,92,0.10); box-shadow: 0 2px 8px -2px rgba(10,77,92,0.06); }
-        .stat-glass:hover { background: #ffffff; border-color: rgba(10,77,92,0.18); transform: translateY(-2px); box-shadow: 0 8px 20px -6px rgba(10,77,92,0.12); }
+        .stat-glass { background: rgba(255,255,255,0.92); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(10,77,92,0.18); box-shadow: 0 4px 12px -4px rgba(10,77,92,0.10); }
+        .stat-glass:hover { background: #ffffff; border-color: rgba(10,77,92,0.28); transform: translateY(-2px); box-shadow: 0 12px 24px -8px rgba(10,77,92,0.18); }
         @keyframes float {
             0%, 100% { transform: translateY(0px) translateX(0px); }
             25% { transform: translateY(-20px) translateX(10px); }
@@ -54,7 +54,7 @@
         @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
         .marquee-track { animation: marquee 25s linear infinite; }
         .marquee-track:hover { animation-play-state: paused; }
-        .testimonial-card { background: #ffffff; box-shadow: 0 1px 3px rgba(10,77,92,0.04), 0 4px 12px -4px rgba(10,77,92,0.06); }
+        .testimonial-card { background: #ffffff; box-shadow: 0 2px 4px rgba(10,77,92,0.06), 0 8px 20px -6px rgba(10,77,92,0.10); }
         @keyframes typewriter { from { width: 0; } to { width: 100%; } }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
         .typing-cursor { animation: blink 1s step-end infinite; }
@@ -121,7 +121,7 @@
         </div>
     </nav>
 
-    <section class="relative pt-32 pb-28 sm:pt-40 sm:pb-36 overflow-hidden" style="background:#FAF7F2;">
+    <section class="relative pt-32 pb-28 sm:pt-40 sm:pb-36 overflow-hidden" style="background:#EFE6D2;">
         <div class="hero-glow absolute inset-0"></div>
         <div class="grid-overlay absolute inset-0"></div>
 
@@ -237,7 +237,7 @@
         </div>
     </div>
 
-    <section class="py-16 overflow-hidden relative" style="background:#FAF7F2;">
+    <section class="py-16 overflow-hidden relative" style="background:#EFE6D2;">
         <div class="absolute inset-0 border-t border-b border-gray-200"></div>
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="text-center mb-10 fade-up relative">
@@ -666,7 +666,7 @@
         </div>
     </section>
 
-    <section class="py-20 relative overflow-hidden border-t border-gray-200" style="background:#FAF7F2;">
+    <section class="py-20 relative overflow-hidden border-t border-gray-200" style="background:#EFE6D2;">
         <div class="hero-glow absolute inset-0 opacity-80"></div>
         <div class="orb-1 absolute top-0 left-[20%] w-48 h-48 bg-teal-200/30 rounded-full blur-3xl pointer-events-none"></div>
         <div class="orb-2 absolute bottom-0 right-[20%] w-56 h-56 bg-amber-200/25 rounded-full blur-3xl pointer-events-none"></div>
@@ -690,7 +690,7 @@
         </div>
     </section>
 
-    <footer class="pt-14 pb-8 relative border-t border-gray-200" style="background:#F2EDE3;">
+    <footer class="pt-14 pb-8 relative border-t border-gray-200" style="background:#E0D2B3;">
         <div class="absolute inset-x-0 top-0 h-px" style="background:linear-gradient(90deg,transparent,rgba(10,77,92,0.25),transparent);"></div>
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-8 pb-10 border-b border-gray-200">

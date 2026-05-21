@@ -1,0 +1,104 @@
+[taxnestc@eu1 ~]$ cd ~/public_html && git pull origin main && composer install --no-dev --optimize-autoloader && php artisan migracd ~/public_html && git pull origin main && composer install --no-dev --optimize-autoloader && php artisan migrate --force && php artisan config:clear && php artisan cache:clear && php artisan route:clear && php artisan view:clear && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan db -e "UPDATE companies SET fbr_environment='production', company_status='active', status='approved' WHERE id=18; UPDATE fbr_hs_rate_linksSET uom='Thousand Unit' WHERE hs_code LIKE '2402%';" && php artisan queue:restart && echo "✅ DEPLOY COMPLETE"
+remote: Enumerating objects: 178, done.
+remote: Counting objects: 100% (178/178), done.
+remote: Compressing objects: 100% (32/32), done.
+remote: Total 141 (delta 117), reused 133 (delta 109), pack-reused 0 (from 0)
+Receiving objects: 100% (141/141), 181.52 KiB | 1.81 MiB/s, done.
+Resolving deltas: 100% (117/117), completed with 35 local objects.
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+   82d249d..31fcf40  main       -> origin/main
+Updating 82d249d..31fcf40
+Fast-forward
+ app/Http/Controllers/IngredientController.php      |  39 ++++-
+ app/Http/Controllers/PosArchiveController.php      | 128 +++++++++++++++
+ app/Http/Controllers/PosAuthController.php         |   9 ++
+ app/Http/Controllers/PosController.php             |  67 +++++++-
+ app/Http/Controllers/RestaurantKdsController.php   |  56 +++++++
+ app/Http/Controllers/RestaurantPosController.php   |  73 +++++++--
+ .../SaasAdmin/AdminCompanyController.php           | 115 ++++++++++++-
+ app/Http/Middleware/PosAuth.php                    |  20 +++
+ app/Models/PosTransaction.php                      |  20 +++
+ app/Services/FbrService.php                        |   4 +-
+ app/Services/SroSuggestionService.php              |   2 +-
+ .../Annexure_A_Report_(23)_1779351286352.pdf       | Bin 0 -> 93070 bytes
+ ...000_add_archive_columns_to_pos_transactions.php |  29 ++++
+ ...0000_make_item_id_nullable_for_manual_lines.php |  37 +++++
+ ...0100_expand_pos_transaction_items_item_type.php |  47 ++++++
+ database/seeders/FbrHsRateLinkSeeder.php           |   2 +-
+ .../views/components/application-logo.blade.php    |  13 +-
+ resources/views/landing.blade.php                  | 178 +++++++++++----------
+ resources/views/pos/archive/index.blade.php        |  85 ++++++++++
+ resources/views/pos/archive/layout.blade.php       |  60 +++++++
+ resources/views/pos/archive/show.blade.php         |  62 +++++++
+ resources/views/pos/day-close.blade.php            |  11 ++
+ resources/views/pos/restaurant/kds.blade.php       | 119 +++++++++++++-
+ .../views/pos/restaurant/kitchen-ticket.blade.php  |  26 +++
+ resources/views/pos/restaurant/pos.blade.php       |  60 ++++++-
+ resources/views/pos/restaurant/recipes.blade.php   |  69 ++++++--
+ resources/views/pos/universal.blade.php            |   6 +-
+ .../views/saas-admin/companies/show.blade.php      |  68 ++++++++
+ routes/web.php                                     |  18 +++
+ scripts/fbr_run_scenarios.php                      | 162 +++++++++++++++++++
+ 30 files changed, 1438 insertions(+), 147 deletions(-)
+ create mode 100644 app/Http/Controllers/PosArchiveController.php
+ create mode 100644 attached_assets/Annexure_A_Report_(23)_1779351286352.pdf
+ create mode 100644 database/migrations/2026_05_16_080000_add_archive_columns_to_pos_transactions.php
+ create mode 100644 database/migrations/2026_05_19_120000_make_item_id_nullable_for_manual_lines.php
+ create mode 100644 database/migrations/2026_05_19_120100_expand_pos_transaction_items_item_type.php
+ create mode 100644 resources/views/pos/archive/index.blade.php
+ create mode 100644 resources/views/pos/archive/layout.blade.php
+ create mode 100644 resources/views/pos/archive/show.blade.php
+ create mode 100644 scripts/fbr_run_scenarios.php
+Installing dependencies from lock file
+Verifying lock file contents can be installed on current platform.
+Nothing to install, update or remove
+Generating optimized autoload files
+> Illuminate\Foundation\ComposerScripts::postAutoloadDump
+> @php artisan package:discover --ansi
+
+   INFO  Discovering packages.
+
+  barryvdh/laravel-dompdf ............................................... DONE
+  laravel/tinker ........................................................ DONE
+  nesbot/carbon ......................................................... DONE
+  nunomaduro/termwind ................................................... DONE
+  simplesoftwareio/simple-qrcode ........................................ DONE
+
+62 packages you are using are looking for funding.
+Use the `composer fund` command to find out more!
+
+   INFO  Running migrations.
+
+  2026_05_16_080000_add_archive_columns_to_pos_transactions ..... 62.75ms DONE
+  2026_05_19_120000_make_item_id_nullable_for_manual_lines ...... 11.47ms DONE
+  2026_05_19_120100_expand_pos_transaction_items_item_type ....... 6.78ms DONE
+
+
+   INFO  Configuration cache cleared successfully.
+
+
+   INFO  Application cache cleared successfully.
+
+
+   INFO  Route cache cleared successfully.
+
+
+   INFO  Compiled views cleared successfully.
+
+
+   INFO  Configuration cached successfully.
+
+
+   INFO  Routes cached successfully.
+
+
+
+   INFO  Blade templates cached successfully.
+
+
+
+  The "-e" option does not exist.
+
+
+[taxnestc@eu1 public_html]$

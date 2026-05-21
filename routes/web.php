@@ -178,6 +178,11 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
     Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
     Route::get('/invoices/unique-buyers', [InvoiceController::class, 'uniqueBuyers'])->name('invoices.unique-buyers');
     Route::get('/invoices/bulk-pdf', [InvoiceController::class, 'bulkDownloadPdf'])->name('invoices.bulk-pdf');
+    Route::post('/invoices/toggle-wht-pdf', function (\Illuminate\Http\Request $r) {
+        $on = $r->boolean('on');
+        session(['pdf_show_wht' => $on]);
+        return response()->json(['status' => 'ok', 'pdf_show_wht' => $on]);
+    })->name('invoices.toggle-wht-pdf');
 
     Route::middleware(['role:company_admin,employee'])->group(function () {
         Route::get('/invoice/create', [InvoiceController::class, 'create'])->name('invoice.create');

@@ -10,7 +10,29 @@
                     </nav>
                     <h2 class="font-extrabold text-2xl text-gray-900 dark:text-white leading-tight tracking-tight">Invoices</h2>
                 </div>
-                <div class="flex gap-2">
+                <div class="flex gap-2 items-center flex-wrap">
+                    {{-- WHT-on-PDF toggle (session-based, all PDF templates respect this) --}}
+                    <div x-data="{ on: {{ session('pdf_show_wht', false) ? 'true' : 'false' }}, saving: false }"
+                         class="inline-flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
+                        <span class="text-[11px] font-bold uppercase tracking-wide text-gray-600 dark:text-gray-300">WHT on PDF</span>
+                        <button type="button"
+                                @click="
+                                    saving = true;
+                                    let fd = new FormData();
+                                    fd.append('_token', document.querySelector('meta[name=csrf-token]')?.content || '');
+                                    fd.append('on', on ? '0' : '1');
+                                    fetch('{{ route('invoices.toggle-wht-pdf') }}', { method: 'POST', headers: {'Accept':'application/json','X-Requested-With':'XMLHttpRequest'}, body: fd })
+                                        .then(r => r.json())
+                                        .then(d => { on = !!d.pdf_show_wht; saving = false; })
+                                        .catch(() => { saving = false; alert('Toggle failed'); });
+                                "
+                                :class="on ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'"
+                                class="relative inline-flex h-5 w-10 items-center rounded-full transition focus:outline-none disabled:opacity-50"
+                                :disabled="saving">
+                            <span :class="on ? 'translate-x-5' : 'translate-x-0.5'" class="inline-block h-4 w-4 transform rounded-full bg-white transition shadow"></span>
+                        </button>
+                        <span x-text="on ? 'ON' : 'OFF'" :class="on ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500'" class="text-[10px] font-bold w-8"></span>
+                    </div>
                     <div x-data="csvImport()" x-cloak>
                         <button @click="openModal()" class="btn-premium inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 border border-transparent rounded-xl font-bold text-xs text-white uppercase tracking-widest hover:from-blue-700 hover:to-blue-800 transition">
                             <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
@@ -293,42 +315,37 @@
                         </div>
                     </form>
 
-                    {{-- Bulk PDF / ZIP download for the current filter range --}}
+                    {{-- Bulk PDF / ZIP download — date range OR all invoices --}}
                     <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
                         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <div class="text-xs text-gray-600 dark:text-gray-400">
                                 <span class="font-semibold text-gray-800 dark:text-gray-200">Bulk PDF Download:</span>
-                                Pick a month or a From/To range above, then click the button. All completed invoices in that range will be packed into a single ZIP (max 500 per zip).
+                                Pick a month or From/To range above (max 500), or click "Download ALL" to grab every completed invoice (latest 500).
                             </div>
-                            <form method="GET" action="{{ route('invoices.bulk-pdf') }}" class="flex items-center gap-2">
-                                @if(request('month'))
-                                    <input type="hidden" name="month" value="{{ request('month') }}">
-                                @endif
-                                @if(request('date_from'))
-                                    <input type="hidden" name="from" value="{{ request('date_from') }}">
-                                @endif
-                                @if(request('date_to'))
-                                    <input type="hidden" name="to" value="{{ request('date_to') }}">
-                                @endif
-                                @if(request('fbr_status'))
-                                    <input type="hidden" name="fbr_status" value="{{ request('fbr_status') }}">
-                                @endif
-                                @if(request('doc_type'))
-                                    <input type="hidden" name="doc_type" value="{{ request('doc_type') }}">
-                                @endif
-                                <button type="submit"
-                                        onclick="this.querySelector('span').textContent='Preparing ZIP...'; this.disabled=true; setTimeout(()=>{this.disabled=false; this.querySelector('span').textContent='Download All as ZIP';}, 8000);"
-                                        class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg text-sm font-bold hover:from-indigo-700 hover:to-purple-700 transition shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-wait">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                {{-- Date-range based ZIP --}}
+                                <form method="GET" action="{{ route('invoices.bulk-pdf') }}" class="inline-flex items-center">
+                                    @if(request('month'))<input type="hidden" name="month" value="{{ request('month') }}">@endif
+                                    @if(request('date_from'))<input type="hidden" name="from" value="{{ request('date_from') }}">@endif
+                                    @if(request('date_to'))<input type="hidden" name="to" value="{{ request('date_to') }}">@endif
+                                    @if(request('fbr_status'))<input type="hidden" name="fbr_status" value="{{ request('fbr_status') }}">@endif
+                                    @if(request('doc_type'))<input type="hidden" name="doc_type" value="{{ request('doc_type') }}">@endif
+                                    <button type="submit"
+                                            onclick="this.querySelector('span').textContent='Preparing...'; this.disabled=true; setTimeout(()=>{this.disabled=false; this.querySelector('span').textContent='ZIP (Filtered)';}, 8000);"
+                                            class="inline-flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg text-xs font-bold hover:from-indigo-700 hover:to-purple-700 transition shadow-md disabled:opacity-60 disabled:cursor-wait">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                        <span>ZIP (Filtered)</span>
+                                    </button>
+                                </form>
+                                {{-- All invoices (no date filter) --}}
+                                <a href="{{ route('invoices.bulk-pdf', ['all' => 1]) }}"
+                                   onclick="if(!confirm('Download ALL completed invoices as ZIP (max 500 latest)?')){event.preventDefault();}"
+                                   class="inline-flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-xs font-bold hover:from-emerald-700 hover:to-teal-700 transition shadow-md">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                                    <span>Download All as ZIP</span>
-                                </button>
-                            </form>
+                                    Download ALL
+                                </a>
+                            </div>
                         </div>
-                        @if(!request('month') && !request('date_from') && !request('date_to'))
-                            <p class="mt-2 text-xs text-amber-600 dark:text-amber-400 font-medium">
-                                ⚠ No date filter selected — clicking ZIP will fail. Pick a Tax Period (month) or From/To range first.
-                            </p>
-                        @endif
                     </div>
                 </div>
             </div>

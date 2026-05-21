@@ -1492,23 +1492,30 @@ class InvoiceController extends Controller
         $from = $request->get('from') ?: $request->get('date_from');
         $to   = $request->get('to')   ?: $request->get('date_to');
         $month = $request->get('month');
+        $all = $request->boolean('all');
 
         if ($month && preg_match('/^\d{4}-\d{2}$/', $month)) {
             $from = $month . '-01';
             $to   = date('Y-m-t', strtotime($from));
         }
 
-        if (!$from || !$to || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
-            return back()->with('error', 'Bulk PDF: please provide a valid date range (from / to) or month.');
-        }
-        if (strtotime($from) > strtotime($to)) {
-            return back()->with('error', 'Bulk PDF: "from" date must be on or before "to" date.');
+        // If "all" mode is requested, bypass date validation
+        if (!$all) {
+            if (!$from || !$to || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
+                return back()->with('error', 'Bulk PDF: please provide a valid date range (from / to) or month, or use "Download ALL" option.');
+            }
+            if (strtotime($from) > strtotime($to)) {
+                return back()->with('error', 'Bulk PDF: "from" date must be on or before "to" date.');
+            }
         }
 
         $query = Invoice::where('company_id', $companyId)
-            ->whereDate('invoice_date', '>=', $from)
-            ->whereDate('invoice_date', '<=', $to)
             ->whereIn('status', ['locked', 'pending_verification']);
+
+        if (!$all) {
+            $query->whereDate('invoice_date', '>=', $from)
+                  ->whereDate('invoice_date', '<=', $to);
+        }
 
         if ($fs = $request->get('fbr_status')) {
             if (in_array($fs, ['production', 'sandbox', 'validated', 'pending', 'failed'])) {
@@ -1523,13 +1530,18 @@ class InvoiceController extends Controller
 
         $total = (clone $query)->count();
         if ($total === 0) {
-            return back()->with('error', 'Bulk PDF: no completed invoices found in the selected range.');
+            return back()->with('error', 'Bulk PDF: no completed invoices found.');
         }
 
         // Safety cap — large bulk runs should be chunked from the UI
         $MAX = 500;
         if ($total > $MAX) {
-            return back()->with('error', "Bulk PDF: range contains {$total} invoices. Please pick a smaller window (max {$MAX} per zip).");
+            if ($all) {
+                // ALL mode: auto-limit to latest $MAX invoices (do not error)
+                $query = (clone $query)->orderByDesc('invoice_date')->orderByDesc('id')->limit($MAX);
+            } else {
+                return back()->with('error', "Bulk PDF: range contains {$total} invoices. Please pick a smaller window (max {$MAX} per zip) or use 'Download ALL' to grab latest {$MAX}.");
+            }
         }
 
         if (!class_exists(\ZipArchive::class)) {
@@ -1538,14 +1550,15 @@ class InvoiceController extends Controller
 
         $tmpDir = storage_path('app/tmp-bulk-pdf');
         if (!is_dir($tmpDir)) @mkdir($tmpDir, 0775, true);
-        $zipPath = $tmpDir . '/bulk-invoices-' . $companyId . '-' . $from . '_to_' . $to . '-' . uniqid() . '.zip';
+        $rangeTag = $all ? ('all-' . date('Ymd')) : ($from . '_to_' . $to);
+        $zipPath = $tmpDir . '/bulk-invoices-' . $companyId . '-' . $rangeTag . '-' . uniqid() . '.zip';
 
         $zip = new \ZipArchive();
         if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
             return back()->with('error', 'Bulk PDF: could not create zip file on server.');
         }
 
-        $invoices = $query->orderBy('invoice_date')->orderBy('id')->get();
+        $invoices = $all ? $query->get() : $query->orderBy('invoice_date')->orderBy('id')->get();
         $failed = [];
         $usedNames = [];
 
@@ -1597,7 +1610,7 @@ class InvoiceController extends Controller
 
         $company = \App\Models\Company::find($companyId);
         $companySlug = $company ? preg_replace('/[^A-Za-z0-9._-]+/', '_', $company->name) : 'company';
-        $downloadName = "invoices_{$companySlug}_{$from}_to_{$to}.zip";
+        $downloadName = "invoices_{$companySlug}_{$rangeTag}.zip";
 
         $size = filesize($zipPath);
 

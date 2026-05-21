@@ -342,7 +342,7 @@
                             <td class="t-value" style="color: #ea580c;">PKR {{ number_format($totalFurtherTax, 2) }}</td>
                         </tr>
                         @endif
-                        @if(false)
+                        @if(session('pdf_show_wht', false) && ($wht_rate ?? 0) > 0)
                         <tr>
                             <td class="t-label">WHT ({{ $wht_rate }}%)</td>
                             <td class="t-value">PKR {{ number_format($wht_amount ?? 0, 2) }}</td>
@@ -350,7 +350,7 @@
                         @endif
                         <tr class="total-row">
                             <td class="t-label">TOTAL</td>
-                            <td class="t-value">PKR {{ number_format($invoice->total_amount, 2) }}</td>
+                            <td class="t-value">PKR {{ number_format(session('pdf_show_wht', false) && ($wht_rate ?? 0) > 0 ? ($net_receivable ?? $invoice->total_amount) : $invoice->total_amount, 2) }}</td>
                         </tr>
                     </table>
                 </div>

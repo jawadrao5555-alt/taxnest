@@ -1599,7 +1599,33 @@ class InvoiceController extends Controller
         $companySlug = $company ? preg_replace('/[^A-Za-z0-9._-]+/', '_', $company->name) : 'company';
         $downloadName = "invoices_{$companySlug}_{$from}_to_{$to}.zip";
 
-        return response()->download($zipPath, $downloadName)->deleteFileAfterSend(true);
+        $size = filesize($zipPath);
+
+        // Disable any prior output buffering so the full file streams correctly
+        // (php artisan serve / fastcgi sometimes truncate without this).
+        while (ob_get_level() > 0) { @ob_end_clean(); }
+
+        // Stream the ZIP in 256 KB chunks with explicit Content-Length.
+        // Avoids the dev-server / proxy truncation seen with ->download() for large files.
+        return response()->stream(function () use ($zipPath) {
+            $handle = fopen($zipPath, 'rb');
+            if ($handle === false) return;
+            while (!feof($handle)) {
+                echo fread($handle, 262144);
+                @ob_flush();
+                @flush();
+            }
+            fclose($handle);
+            @unlink($zipPath);
+        }, 200, [
+            'Content-Type'              => 'application/zip',
+            'Content-Disposition'       => 'attachment; filename="' . $downloadName . '"',
+            'Content-Length'            => (string) $size,
+            'Content-Transfer-Encoding' => 'binary',
+            'Cache-Control'             => 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma'                    => 'public',
+            'X-Accel-Buffering'         => 'no',
+        ]);
     }
 
     public function updateWht(Request $request, Invoice $invoice)

@@ -421,7 +421,7 @@
                             <td class="tv">PKR {{ number_format($totalFurtherTax, 2) }}</td>
                         </tr>
                         @endif
-                        @if(($wht_rate ?? 0) > 0)
+                        @if(false)
                         <tr>
                             <td class="tl">WHT ({{ $wht_rate }}%)</td>
                             <td class="tv">PKR {{ number_format($wht_amount ?? 0, 2) }}</td>
@@ -429,7 +429,7 @@
                         @endif
                         <tr class="grand">
                             <td class="tl">TOTAL</td>
-                            <td class="tv">PKR {{ number_format(($wht_rate ?? 0) > 0 ? ($net_receivable ?? $invoice->total_amount) : $invoice->total_amount, 2) }}</td>
+                            <td class="tv">PKR {{ number_format($invoice->total_amount, 2) }}</td>
                         </tr>
                     </table>
                 </div>

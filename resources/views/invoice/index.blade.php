@@ -540,19 +540,13 @@
                                             <button type="submit" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition">Retry</button>
                                         </form>
                                         @endif
-                                        <div x-data="{ showWhtModal: false, pdfWhtRate: {{ $invoice->wht_rate ?? 0 }}, whtLocked: {{ $invoice->wht_locked ? 'true' : 'false' }}, saving: false }" class="inline-block">
-                                            <template x-if="whtLocked">
-                                                <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg text-[10px] font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 transition" title="Download PDF (D)">
-                                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                                                    PDF
-                                                </a>
-                                            </template>
-                                            <template x-if="!whtLocked">
-                                                <button @click="showWhtModal = true" class="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg text-[10px] font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 transition" title="Download PDF (D)">
-                                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                                                    PDF
-                                                </button>
-                                            </template>
+                                        {{-- WHT modal removed per user request — PDF downloads directly --}}
+                                        <div class="inline-block">
+                                            <a href="/invoice/{{ $invoice->id }}/download" target="_blank" class="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg text-[10px] font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 transition" title="Download PDF (D)">
+                                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                                PDF
+                                            </a>
+                                            @if(false)
                                             <div x-show="showWhtModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background-color: rgba(0,0,0,0.4);">
                                                 <div @click.away="showWhtModal = false" class="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800 p-6 w-80 max-w-[90vw]">
                                                     <div class="flex items-center justify-between mb-4">
@@ -608,6 +602,7 @@
                                                     </button>
                                                 </div>
                                             </div>
+                                            @endif
                                         </div>
                                     @endif
                                     </div>

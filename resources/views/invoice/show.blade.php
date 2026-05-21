@@ -142,8 +142,8 @@
                     </button>
                 </form>
                 <div x-data="draftPdfHandler()" class="inline-flex items-center gap-2">
-                    {{-- Single Download/Print button — ALWAYS opens WHT modal first --}}
-                    <button @click="showWhtFirst = true" type="button" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
+                    {{-- WHT modal disabled per user request — PDF opens directly --}}
+                    <button @click="window.open('/invoice/{{ $invoice->id }}/download', '_blank')" type="button" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
                         <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                         Download / Print
                     </button>
@@ -242,8 +242,8 @@
                 @elseif($invoice->status === 'locked' && $invoice->fbr_status === 'production')
                 {{-- LOCKED+PRODUCTION: PDF with WHT lock, Print, Duplicate, WhatsApp --}}
                 <div x-data="lockedPdfHandler()" class="inline-flex items-center gap-2">
-                    {{-- Single Download/Print button — ALWAYS opens WHT modal first (pre-selected with current rate) --}}
-                    <button @click="selectedWht = lockedWhtRate; showWhtFirst = true" type="button"
+                    {{-- WHT modal disabled per user request — PDF opens directly --}}
+                    <button @click="window.open('/invoice/{{ $invoice->id }}/download', '_blank')" type="button"
                         class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
                         <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                         Download / Print
@@ -444,7 +444,8 @@
                 @endif
                 {{-- Download/Print with WHT modal flow (pending_verification, locked non-production, etc.) --}}
                 <div x-data="otherPdfHandler()" class="inline-flex items-center gap-2">
-                    <button @click="showWhtFirst = true" type="button" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
+                    {{-- WHT modal disabled per user request — PDF opens directly --}}
+                    <button @click="window.open('/invoice/{{ $invoice->id }}/download', '_blank')" type="button" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">
                         <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                         Download / Print
                     </button>

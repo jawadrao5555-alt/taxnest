@@ -226,8 +226,8 @@ class FbrService
                     $sroValue = '5th Schedule';
                     $serialNo = $item->serial_no ?? "";
                 } elseif (stripos($sroValue, '8th') !== false || $isReduced) {
-                    $sroValue = '8th Schedule';
-                    $serialNo = $item->serial_no ?? "";
+                    $sroValue = 'EIGHTH SCHEDULE Table 1';
+                    $serialNo = $item->serial_no ?: "1";
                 }
                 $itemPayload["sroScheduleNo"] = $sroValue;
                 $itemPayload["sroItemSerialNo"] = $serialNo;

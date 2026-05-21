@@ -36,7 +36,7 @@ class SroSuggestionService
             'default' => ['sro' => '5th Schedule', 'serial' => '1', 'description' => '5th Schedule - Zero Rated Supply'],
         ],
         'reduced' => [
-            'default' => ['sro' => '8th Schedule', 'serial' => '1', 'description' => 'Reduced rate supply under 8th Schedule'],
+            'default' => ['sro' => 'EIGHTH SCHEDULE Table 1', 'serial' => '1', 'description' => 'Reduced rate supply under 8th Schedule (FBR sandbox-verified)'],
         ],
     ];
 

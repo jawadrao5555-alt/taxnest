@@ -15,7 +15,7 @@ class FbrHsRateLinkSeeder extends Seeder
             ['hs_code' => '3105.1000', 'schedule_type' => '3rd_schedule', 'tax_rate' => 5.00,  'rate_label' => '5%',  'sale_type' => '3rd Schedule Goods', 'sro_number' => '3rd Schedule goods', 'sr_no' => '51',  'uom' => 'KG',  'notes' => 'Fertilizer compounds'],
             ['hs_code' => '3105.2000', 'schedule_type' => '3rd_schedule', 'tax_rate' => 5.00,  'rate_label' => '5%',  'sale_type' => '3rd Schedule Goods', 'sro_number' => '3rd Schedule goods', 'sr_no' => '51',  'uom' => 'KG',  'notes' => 'NPK Fertilizer'],
             ['hs_code' => '8517.1300', 'schedule_type' => '3rd_schedule', 'tax_rate' => 18.00, 'rate_label' => '18%', 'sale_type' => '3rd Schedule Goods', 'sro_number' => '3rd Schedule goods', 'sr_no' => '50',  'uom' => 'NO',  'notes' => 'Smartphones / Mobile sets'],
-            ['hs_code' => '2402.2000', 'schedule_type' => '3rd_schedule', 'tax_rate' => 18.00, 'rate_label' => '18%', 'sale_type' => '3rd Schedule Goods', 'sro_number' => '3rd Schedule goods', 'sr_no' => '5',   'uom' => 'NO',  'notes' => 'Cigarettes containing tobacco'],
+            ['hs_code' => '2402.2000', 'schedule_type' => '3rd_schedule', 'tax_rate' => 18.00, 'rate_label' => '18%', 'sale_type' => '3rd Schedule Goods', 'sro_number' => '3rd Schedule goods', 'sr_no' => '5',   'uom' => 'Thousand Unit',  'notes' => 'Cigarettes containing tobacco (FBR sandbox-verified UoM)'],
             ['hs_code' => '3401.1100', 'schedule_type' => '3rd_schedule', 'tax_rate' => 18.00, 'rate_label' => '18%', 'sale_type' => '3rd Schedule Goods', 'sro_number' => '3rd Schedule goods', 'sr_no' => '21',  'uom' => 'KG',  'notes' => 'Toilet soap'],
 
             // === STANDARD RATE ===

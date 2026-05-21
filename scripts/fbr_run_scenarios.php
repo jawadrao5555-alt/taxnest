@@ -65,25 +65,25 @@ $scenarios = [
     'SN002' => ['buyer' => $walkInBuyer, 'item' => item([
         'productDescription' => 'Standard Rate Goods Walk-in (SN002)',
     ])],
-    // SN008 — 3rd Schedule Goods / Registered (use valid 3rd Schedule HS: 3401.1100 toilet soap)
+    // SN008 — 3rd Schedule Goods / Registered (real product: PHILIP MORRIS cigarettes 2402.2000)
     'SN008' => ['buyer' => $registeredBuyer, 'item' => item([
-        'hsCode'                          => '3401.1100',
-        'productDescription'              => '3rd Schedule Toilet Soap Registered (SN008)',
+        'hsCode'                          => '2402.2000',
+        'productDescription'              => 'Cigarettes 3rd Schedule Registered (SN008)',
         'saleType'                        => '3rd Schedule Goods',
         'fixedNotifiedValueOrRetailPrice' => 100.00,
-        'uoM'                             => 'KG',
+        'uoM'                             => 'Thousand Unit',
     ])],
     // SN026 — Standard Rate / End Consumer (walk-in)
     'SN026' => ['buyer' => $walkInBuyer, 'item' => item([
         'productDescription' => 'Standard Rate End Consumer (SN026)',
     ])],
-    // SN027 — 3rd Schedule Goods / End Consumer (walk-in)
+    // SN027 — 3rd Schedule Goods / End Consumer (real product: cigarettes 2402.2000)
     'SN027' => ['buyer' => $walkInBuyer, 'item' => item([
-        'hsCode'                          => '3401.1100',
-        'productDescription'              => '3rd Schedule End Consumer (SN027)',
+        'hsCode'                          => '2402.2000',
+        'productDescription'              => 'Cigarettes 3rd Schedule Walk-in (SN027)',
         'saleType'                        => '3rd Schedule Goods',
         'fixedNotifiedValueOrRetailPrice' => 100.00,
-        'uoM'                             => 'KG',
+        'uoM'                             => 'Thousand Unit',
     ])],
     // SN028 — Goods at Reduced Rate (8th Schedule), walk-in
     'SN028' => ['buyer' => $walkInBuyer, 'item' => item([

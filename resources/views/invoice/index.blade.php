@@ -292,8 +292,53 @@
                             <a href="/invoices?tab=completed" class="px-4 py-2 bg-gray-200 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-300 transition">Reset</a>
                         </div>
                     </form>
+
+                    {{-- Bulk PDF / ZIP download for the current filter range --}}
+                    <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div class="text-xs text-gray-600 dark:text-gray-400">
+                                <span class="font-semibold text-gray-800 dark:text-gray-200">Bulk PDF Download:</span>
+                                Pick a month or a From/To range above, then click the button. All completed invoices in that range will be packed into a single ZIP (max 500 per zip).
+                            </div>
+                            <form method="GET" action="{{ route('invoices.bulk-pdf') }}" class="flex items-center gap-2">
+                                @if(request('month'))
+                                    <input type="hidden" name="month" value="{{ request('month') }}">
+                                @endif
+                                @if(request('date_from'))
+                                    <input type="hidden" name="from" value="{{ request('date_from') }}">
+                                @endif
+                                @if(request('date_to'))
+                                    <input type="hidden" name="to" value="{{ request('date_to') }}">
+                                @endif
+                                @if(request('fbr_status'))
+                                    <input type="hidden" name="fbr_status" value="{{ request('fbr_status') }}">
+                                @endif
+                                @if(request('doc_type'))
+                                    <input type="hidden" name="doc_type" value="{{ request('doc_type') }}">
+                                @endif
+                                <button type="submit"
+                                        onclick="this.querySelector('span').textContent='Preparing ZIP...'; this.disabled=true; setTimeout(()=>{this.disabled=false; this.querySelector('span').textContent='Download All as ZIP';}, 8000);"
+                                        class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg text-sm font-bold hover:from-indigo-700 hover:to-purple-700 transition shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-wait">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                    <span>Download All as ZIP</span>
+                                </button>
+                            </form>
+                        </div>
+                        @if(!request('month') && !request('date_from') && !request('date_to'))
+                            <p class="mt-2 text-xs text-amber-600 dark:text-amber-400 font-medium">
+                                ⚠ No date filter selected — clicking ZIP will fail. Pick a Tax Period (month) or From/To range first.
+                            </p>
+                        @endif
+                    </div>
                 </div>
             </div>
+            @endif
+
+            {{-- Flash error messages (bulk PDF, etc.) --}}
+            @if(session('error'))
+                <div class="mb-4 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-sm text-red-800 dark:text-red-300 font-medium">
+                    {{ session('error') }}
+                </div>
             @endif
 
             <div x-data="invoiceKeyboardNav()" @keydown.window="handleKeydown($event)" class="premium-card overflow-hidden">

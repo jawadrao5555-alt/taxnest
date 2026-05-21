@@ -1477,6 +1477,131 @@ class InvoiceController extends Controller
         return $pdf->download($filename);
     }
 
+    /**
+     * Bulk download all invoices in a date range (or month) as a single ZIP of PDFs.
+     * Accepts: from=YYYY-MM-DD & to=YYYY-MM-DD  OR  month=YYYY-MM
+     * Optional: fbr_status, doc_type, status (default: locked + pending_verification)
+     */
+    public function bulkDownloadPdf(Request $request)
+    {
+        @set_time_limit(600);
+        @ini_set('memory_limit', '1024M');
+
+        $companyId = app('currentCompanyId');
+
+        $from = $request->get('from') ?: $request->get('date_from');
+        $to   = $request->get('to')   ?: $request->get('date_to');
+        $month = $request->get('month');
+
+        if ($month && preg_match('/^\d{4}-\d{2}$/', $month)) {
+            $from = $month . '-01';
+            $to   = date('Y-m-t', strtotime($from));
+        }
+
+        if (!$from || !$to || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
+            return back()->with('error', 'Bulk PDF: please provide a valid date range (from / to) or month.');
+        }
+        if (strtotime($from) > strtotime($to)) {
+            return back()->with('error', 'Bulk PDF: "from" date must be on or before "to" date.');
+        }
+
+        $query = Invoice::where('company_id', $companyId)
+            ->whereDate('invoice_date', '>=', $from)
+            ->whereDate('invoice_date', '<=', $to)
+            ->whereIn('status', ['locked', 'pending_verification']);
+
+        if ($fs = $request->get('fbr_status')) {
+            if (in_array($fs, ['production', 'sandbox', 'validated', 'pending', 'failed'])) {
+                $query->where('fbr_status', $fs);
+            }
+        }
+        if ($dt = $request->get('doc_type')) {
+            if (in_array($dt, ['Sale Invoice', 'Credit Note', 'Debit Note'])) {
+                $query->where('document_type', $dt);
+            }
+        }
+
+        $total = (clone $query)->count();
+        if ($total === 0) {
+            return back()->with('error', 'Bulk PDF: no completed invoices found in the selected range.');
+        }
+
+        // Safety cap — large bulk runs should be chunked from the UI
+        $MAX = 500;
+        if ($total > $MAX) {
+            return back()->with('error', "Bulk PDF: range contains {$total} invoices. Please pick a smaller window (max {$MAX} per zip).");
+        }
+
+        if (!class_exists(\ZipArchive::class)) {
+            return back()->with('error', 'Bulk PDF: server is missing the PHP zip extension. Contact your hoster.');
+        }
+
+        $tmpDir = storage_path('app/tmp-bulk-pdf');
+        if (!is_dir($tmpDir)) @mkdir($tmpDir, 0775, true);
+        $zipPath = $tmpDir . '/bulk-invoices-' . $companyId . '-' . $from . '_to_' . $to . '-' . uniqid() . '.zip';
+
+        $zip = new \ZipArchive();
+        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+            return back()->with('error', 'Bulk PDF: could not create zip file on server.');
+        }
+
+        $invoices = $query->orderBy('invoice_date')->orderBy('id')->get();
+        $failed = [];
+        $usedNames = [];
+
+        foreach ($invoices as $invoice) {
+            try {
+                $data = $this->buildPdfData($invoice);
+                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-bw', $data);
+                $pdf->setPaper('A4', 'portrait');
+
+                $base = $invoice->fbr_invoice_number
+                    ?: ($invoice->internal_invoice_number
+                        ?: ($invoice->invoice_number ?: ('invoice-' . $invoice->id)));
+                $safe = preg_replace('/[^A-Za-z0-9._-]+/', '_', (string) $base);
+                $name = $safe . '.pdf';
+                $n = 1;
+                while (isset($usedNames[$name])) {
+                    $name = $safe . '__' . (++$n) . '.pdf';
+                }
+                $usedNames[$name] = true;
+
+                $zip->addFromString($name, $pdf->output());
+            } catch (\Throwable $e) {
+                $failed[] = ($invoice->internal_invoice_number ?: $invoice->id) . ': ' . $e->getMessage();
+            }
+        }
+
+        // Manifest CSV inside the zip
+        $manifest = "Internal No,FBR No,Date,Buyer,NTN,Subtotal,Sales Tax,WHT,Total,Status\n";
+        foreach ($invoices as $inv) {
+            $manifest .= implode(',', [
+                '"' . ($inv->internal_invoice_number ?? '') . '"',
+                '"' . ($inv->fbr_invoice_number ?? '') . '"',
+                '"' . $inv->invoice_date . '"',
+                '"' . str_replace('"', '""', $inv->buyer_name ?? '') . '"',
+                '"' . ($inv->buyer_ntn ?? '') . '"',
+                number_format((float)($inv->total_value_excluding_st ?? ($inv->total_amount - $inv->total_sales_tax)), 2, '.', ''),
+                number_format((float)$inv->total_sales_tax, 2, '.', ''),
+                number_format((float)$inv->wht_amount, 2, '.', ''),
+                number_format((float)$inv->total_amount, 2, '.', ''),
+                '"' . $inv->status . '"',
+            ]) . "\n";
+        }
+        $zip->addFromString('_manifest.csv', $manifest);
+        if (!empty($failed)) {
+            $zip->addFromString('_failed.txt', implode("\n", $failed));
+        }
+
+        $zip->close();
+
+        $company = \App\Models\Company::find($companyId);
+        $companySlug = $company ? preg_replace('/[^A-Za-z0-9._-]+/', '_', $company->name) : 'company';
+        $downloadName = "invoices_{$companySlug}_{$from}_to_{$to}.zip";
+
+        return response()->download($zipPath, $downloadName)->deleteFileAfterSend(true);
+    }
+
     public function updateWht(Request $request, Invoice $invoice)
     {
         $companyId = app('currentCompanyId');

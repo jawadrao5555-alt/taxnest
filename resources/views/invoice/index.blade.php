@@ -333,6 +333,8 @@
                             <div class="flex items-center gap-2 flex-wrap">
                                 {{-- Date-range based ZIP --}}
                                 <form method="GET" action="{{ route('invoices.bulk-pdf') }}" class="inline-flex items-center">
+                                    {{-- all=1 fallback so empty filter still works (date filter applied if present) --}}
+                                    <input type="hidden" name="all" value="1">
                                     @if(request('month'))<input type="hidden" name="month" value="{{ request('month') }}">@endif
                                     @if(request('date_from'))<input type="hidden" name="from" value="{{ request('date_from') }}">@endif
                                     @if(request('date_to'))<input type="hidden" name="to" value="{{ request('date_to') }}">@endif

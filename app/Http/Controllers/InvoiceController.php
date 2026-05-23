@@ -1499,22 +1499,21 @@ class InvoiceController extends Controller
             $to   = date('Y-m-t', strtotime($from));
         }
 
-        // If "all" mode is requested, bypass date validation
-        if (!$all) {
-            if (!$from || !$to || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
-                return back()->with('error', 'Bulk PDF: please provide a valid date range (from / to) or month, or use "Download ALL" option.');
-            }
-            if (strtotime($from) > strtotime($to)) {
-                return back()->with('error', 'Bulk PDF: "from" date must be on or before "to" date.');
-            }
+        // Validate date format only if provided (no longer required — empty = no date filter)
+        $hasFrom = $from && preg_match('/^\d{4}-\d{2}-\d{2}$/', $from);
+        $hasTo   = $to   && preg_match('/^\d{4}-\d{2}-\d{2}$/', $to);
+        if ($hasFrom && $hasTo && strtotime($from) > strtotime($to)) {
+            return back()->with('error', 'Bulk PDF: "from" date must be on or before "to" date.');
         }
 
         $query = Invoice::where('company_id', $companyId)
             ->whereIn('status', ['locked', 'pending_verification']);
 
-        if (!$all) {
-            $query->whereDate('invoice_date', '>=', $from)
-                  ->whereDate('invoice_date', '<=', $to);
+        // Apply date filter whenever provided — regardless of $all flag.
+        // $all only means "no date required + auto-cap to latest 500".
+        if (!$all || $hasFrom || $hasTo) {
+            if ($hasFrom) $query->whereDate('invoice_date', '>=', $from);
+            if ($hasTo)   $query->whereDate('invoice_date', '<=', $to);
         }
 
         if ($fs = $request->get('fbr_status')) {
@@ -1530,18 +1529,13 @@ class InvoiceController extends Controller
 
         $total = (clone $query)->count();
         if ($total === 0) {
-            return back()->with('error', 'Bulk PDF: no completed invoices found.');
+            return back()->with('error', 'Bulk PDF: no completed invoices found for the selected filters.');
         }
 
-        // Safety cap — large bulk runs should be chunked from the UI
+        // Safety cap — always auto-limit to latest 500 (no error, no user friction)
         $MAX = 500;
         if ($total > $MAX) {
-            if ($all) {
-                // ALL mode: auto-limit to latest $MAX invoices (do not error)
-                $query = (clone $query)->orderByDesc('invoice_date')->orderByDesc('id')->limit($MAX);
-            } else {
-                return back()->with('error', "Bulk PDF: range contains {$total} invoices. Please pick a smaller window (max {$MAX} per zip) or use 'Download ALL' to grab latest {$MAX}.");
-            }
+            $query = (clone $query)->orderByDesc('invoice_date')->orderByDesc('id')->limit($MAX);
         }
 
         if (!class_exists(\ZipArchive::class)) {

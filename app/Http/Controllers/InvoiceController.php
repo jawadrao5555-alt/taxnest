@@ -1612,25 +1612,22 @@ class InvoiceController extends Controller
         $companySlug = $company ? preg_replace('/[^A-Za-z0-9._-]+/', '_', $company->name) : 'company';
         $downloadName = "invoices_{$companySlug}_{$rangeTag}.zip";
 
-        $size = filesize($zipPath);
+        // Load full ZIP into memory string, delete temp file, return as single response.
+        // This avoids streaming/chunking truncation seen on php artisan serve / cPanel proxies.
+        // Memory: ini_set('memory_limit', '1024M') is set at top of method — safe up to ~500MB ZIPs.
+        $content = file_get_contents($zipPath);
+        @unlink($zipPath);
 
-        // Disable any prior output buffering so the full file streams correctly
-        // (php artisan serve / fastcgi sometimes truncate without this).
+        if ($content === false || $content === '') {
+            return back()->with('error', 'Bulk PDF: failed to read generated ZIP file.');
+        }
+
+        $size = strlen($content);
+
+        // Kill any prior output buffering so headers + binary body go cleanly
         while (ob_get_level() > 0) { @ob_end_clean(); }
 
-        // Stream the ZIP in 256 KB chunks with explicit Content-Length.
-        // Avoids the dev-server / proxy truncation seen with ->download() for large files.
-        return response()->stream(function () use ($zipPath) {
-            $handle = fopen($zipPath, 'rb');
-            if ($handle === false) return;
-            while (!feof($handle)) {
-                echo fread($handle, 262144);
-                @ob_flush();
-                @flush();
-            }
-            fclose($handle);
-            @unlink($zipPath);
-        }, 200, [
+        return response($content, 200, [
             'Content-Type'              => 'application/zip',
             'Content-Disposition'       => 'attachment; filename="' . $downloadName . '"',
             'Content-Length'            => (string) $size,

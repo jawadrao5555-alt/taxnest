@@ -7,6 +7,7 @@
     $userName = $fbrUser->name ?? 'User';
     $userInitial = strtoupper(substr($userName, 0, 1));
     $dashboardStyle = $fbrCompany->pos_dashboard_style ?? 'square-classic';
+    $fbrTheme = $fbrCompany->pos_theme ?? 'blue';
 @endphp
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="{{ $isDarkMode ? 'dark' : '' }}">
     <head>
@@ -67,12 +68,24 @@
             .main-scroll::-webkit-scrollbar { width: 6px; }
             .main-scroll::-webkit-scrollbar-thumb { background: rgba(156,163,175,0.3); border-radius: 4px; }
             .main-scroll::-webkit-scrollbar-track { background: transparent; }
+            /* ═══════════════════════════════════════════════════════════════════
+               🎨 FBR POS THEME ENGINE — same 6 themes as PRA POS for consistency
+               ═══════════════════════════════════════════════════════════════════ */
+            [data-theme="purple"]   { --nav-bg: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4c1d95 100%); --accent-h: 263; --accent-s: 70%; --accent-l: 50%; }
+            [data-theme="blue"]     { --nav-bg: linear-gradient(135deg, #050b18 0%, #0b1d3d 28%, #1e3a8a 62%, #1d4ed8 100%); --accent-h: 217; --accent-s: 91%; --accent-l: 48%; }
+            [data-theme="emerald"]  { --nav-bg: linear-gradient(135deg, #022c22 0%, #064e3b 40%, #047857 100%); --accent-h: 160; --accent-s: 84%; --accent-l: 39%; }
+            [data-theme="orange"]   { --nav-bg: linear-gradient(135deg, #431407 0%, #7c2d12 40%, #c2410c 100%); --accent-h: 21;  --accent-s: 90%; --accent-l: 48%; }
+            [data-theme="midnight"] { --nav-bg: linear-gradient(135deg, #0a0a0a 0%, #171717 40%, #262626 100%); --accent-h: 0;   --accent-s: 0%;  --accent-l: 45%; }
+            [data-theme="rose"]     { --nav-bg: linear-gradient(135deg, #4c0519 0%, #881337 40%, #be123c 100%); --accent-h: 347; --accent-s: 77%; --accent-l: 50%; }
+
+            .theme-swatch { width: 28px; height: 28px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; transition: all 0.15s ease; }
+            .theme-swatch:hover { transform: scale(1.15); }
+            .theme-swatch.active-theme { border-color: white; box-shadow: 0 0 0 2px rgba(255,255,255,0.3); }
+
             /* === FBR POS Premium Header === */
             .topnav-bar {
-                background:
-                    radial-gradient(1100px 220px at 12% -50%, rgba(96,165,250,0.28), transparent 60%),
-                    radial-gradient(900px 180px at 88% -40%, rgba(251,191,36,0.16), transparent 65%),
-                    linear-gradient(135deg, #050b18 0%, #0b1d3d 28%, #1e3a8a 62%, #1d4ed8 100%);
+                background: var(--nav-bg,
+                    linear-gradient(135deg, #050b18 0%, #0b1d3d 28%, #1e3a8a 62%, #1d4ed8 100%));
                 box-shadow:
                     0 1px 0 rgba(255,255,255,0.08) inset,
                     0 8px 24px -10px rgba(0,0,0,0.55),
@@ -143,6 +156,83 @@
             }
             .dark .fbr-banner-success { background: linear-gradient(135deg, rgba(6,78,59,0.40), rgba(6,95,70,0.30)); border-color: rgba(16,185,129,0.45); }
             [x-cloak] { display: none !important; }
+
+            /* ═══════════════════════════════════════════════════════════════════
+               🎨 UNIVERSAL THEME OVERRIDE — remaps hardcoded blue-X classes used
+               throughout FBR POS views to the selected theme's accent HSL.
+               When data-theme=blue (default), hardcoded blue matches naturally.
+               For any OTHER theme, these rules remap blue-X → accent HSL.
+               ═══════════════════════════════════════════════════════════════════ */
+            body:not([data-theme="blue"]) .bg-blue-50  { background-color: hsl(var(--accent-h), var(--accent-s), 97%) !important; }
+            body:not([data-theme="blue"]) .bg-blue-100 { background-color: hsl(var(--accent-h), var(--accent-s), 94%) !important; }
+            body:not([data-theme="blue"]) .bg-blue-200 { background-color: hsl(var(--accent-h), var(--accent-s), 86%) !important; }
+            body:not([data-theme="blue"]) .bg-blue-300 { background-color: hsl(var(--accent-h), var(--accent-s), 76%) !important; }
+            body:not([data-theme="blue"]) .bg-blue-400 { background-color: hsl(var(--accent-h), var(--accent-s), 65%) !important; }
+            body:not([data-theme="blue"]) .bg-blue-500 { background-color: hsl(var(--accent-h), var(--accent-s), 55%) !important; }
+            body:not([data-theme="blue"]) .bg-blue-600 { background-color: hsl(var(--accent-h), var(--accent-s), var(--accent-l)) !important; }
+            body:not([data-theme="blue"]) .bg-blue-700 { background-color: hsl(var(--accent-h), var(--accent-s), 40%) !important; }
+            body:not([data-theme="blue"]) .bg-blue-800 { background-color: hsl(var(--accent-h), var(--accent-s), 32%) !important; }
+            body:not([data-theme="blue"]) .bg-blue-900 { background-color: hsl(var(--accent-h), var(--accent-s), 22%) !important; }
+
+            body:not([data-theme="blue"]) .text-blue-300 { color: hsl(var(--accent-h), var(--accent-s), 76%) !important; }
+            body:not([data-theme="blue"]) .text-blue-400 { color: hsl(var(--accent-h), var(--accent-s), 65%) !important; }
+            body:not([data-theme="blue"]) .text-blue-500 { color: hsl(var(--accent-h), var(--accent-s), 55%) !important; }
+            body:not([data-theme="blue"]) .text-blue-600 { color: hsl(var(--accent-h), var(--accent-s), var(--accent-l)) !important; }
+            body:not([data-theme="blue"]) .text-blue-700 { color: hsl(var(--accent-h), var(--accent-s), 35%) !important; }
+            body:not([data-theme="blue"]) .text-blue-800 { color: hsl(var(--accent-h), var(--accent-s), 28%) !important; }
+            body:not([data-theme="blue"]) .text-blue-900 { color: hsl(var(--accent-h), var(--accent-s), 22%) !important; }
+
+            body:not([data-theme="blue"]) .border-blue-100 { border-color: hsl(var(--accent-h), var(--accent-s), 90%) !important; }
+            body:not([data-theme="blue"]) .border-blue-200 { border-color: hsl(var(--accent-h), var(--accent-s), 84%) !important; }
+            body:not([data-theme="blue"]) .border-blue-300 { border-color: hsl(var(--accent-h), var(--accent-s), 74%) !important; }
+            body:not([data-theme="blue"]) .border-blue-400 { border-color: hsl(var(--accent-h), var(--accent-s), 60%) !important; }
+            body:not([data-theme="blue"]) .border-blue-500 { border-color: hsl(var(--accent-h), var(--accent-s), 55%) !important; }
+            body:not([data-theme="blue"]) .border-blue-600 { border-color: hsl(var(--accent-h), var(--accent-s), var(--accent-l)) !important; }
+            body:not([data-theme="blue"]) .border-blue-700 { border-color: hsl(var(--accent-h), var(--accent-s), 40%) !important; }
+            body:not([data-theme="blue"]) .border-blue-800 { border-color: hsl(var(--accent-h), var(--accent-s), 32%) !important; }
+
+            body:not([data-theme="blue"]) .ring-blue-200 { --tw-ring-color: hsl(var(--accent-h), var(--accent-s), 84%) !important; }
+            body:not([data-theme="blue"]) .ring-blue-300 { --tw-ring-color: hsl(var(--accent-h), var(--accent-s), 74%) !important; }
+            body:not([data-theme="blue"]) .ring-blue-400 { --tw-ring-color: hsl(var(--accent-h), var(--accent-s), 60%) !important; }
+            body:not([data-theme="blue"]) .ring-blue-500 { --tw-ring-color: hsl(var(--accent-h), var(--accent-s), 55%) !important; }
+            body:not([data-theme="blue"]) .focus\:ring-blue-200:focus { --tw-ring-color: hsl(var(--accent-h), var(--accent-s), 84%) !important; }
+            body:not([data-theme="blue"]) .focus\:ring-blue-400:focus { --tw-ring-color: hsl(var(--accent-h), var(--accent-s), 60%) !important; }
+            body:not([data-theme="blue"]) .focus\:ring-blue-500:focus { --tw-ring-color: hsl(var(--accent-h), var(--accent-s), 55%) !important; }
+            body:not([data-theme="blue"]) .focus\:border-blue-400:focus { border-color: hsl(var(--accent-h), var(--accent-s), 60%) !important; }
+            body:not([data-theme="blue"]) .focus\:border-blue-500:focus { border-color: hsl(var(--accent-h), var(--accent-s), 55%) !important; }
+
+            body:not([data-theme="blue"]) .hover\:bg-blue-50:hover  { background-color: hsl(var(--accent-h), var(--accent-s), 97%) !important; }
+            body:not([data-theme="blue"]) .hover\:bg-blue-100:hover { background-color: hsl(var(--accent-h), var(--accent-s), 94%) !important; }
+            body:not([data-theme="blue"]) .hover\:bg-blue-500:hover { background-color: hsl(var(--accent-h), var(--accent-s), 55%) !important; }
+            body:not([data-theme="blue"]) .hover\:bg-blue-600:hover { background-color: hsl(var(--accent-h), var(--accent-s), var(--accent-l)) !important; }
+            body:not([data-theme="blue"]) .hover\:bg-blue-700:hover { background-color: hsl(var(--accent-h), var(--accent-s), 40%) !important; }
+            body:not([data-theme="blue"]) .hover\:text-blue-300:hover { color: hsl(var(--accent-h), var(--accent-s), 76%) !important; }
+            body:not([data-theme="blue"]) .hover\:text-blue-700:hover { color: hsl(var(--accent-h), var(--accent-s), 35%) !important; }
+            body:not([data-theme="blue"]) .hover\:text-blue-800:hover { color: hsl(var(--accent-h), var(--accent-s), 28%) !important; }
+
+            body:not([data-theme="blue"]) .from-blue-50  { --tw-gradient-from: hsl(var(--accent-h), var(--accent-s), 97%) var(--tw-gradient-from-position) !important; --tw-gradient-to: hsl(var(--accent-h) var(--accent-s) 97% / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+            body:not([data-theme="blue"]) .from-blue-100 { --tw-gradient-from: hsl(var(--accent-h), var(--accent-s), 94%) var(--tw-gradient-from-position) !important; --tw-gradient-to: hsl(var(--accent-h) var(--accent-s) 94% / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+            body:not([data-theme="blue"]) .from-blue-500 { --tw-gradient-from: hsl(var(--accent-h), var(--accent-s), 55%) var(--tw-gradient-from-position) !important; --tw-gradient-to: hsl(var(--accent-h) var(--accent-s) 55% / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+            body:not([data-theme="blue"]) .from-blue-600 { --tw-gradient-from: hsl(var(--accent-h), var(--accent-s), var(--accent-l)) var(--tw-gradient-from-position) !important; --tw-gradient-to: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+            body:not([data-theme="blue"]) .to-blue-500   { --tw-gradient-to: hsl(var(--accent-h), var(--accent-s), 55%) var(--tw-gradient-to-position) !important; }
+            body:not([data-theme="blue"]) .to-blue-600   { --tw-gradient-to: hsl(var(--accent-h), var(--accent-s), var(--accent-l)) var(--tw-gradient-to-position) !important; }
+            body:not([data-theme="blue"]) .to-blue-700   { --tw-gradient-to: hsl(var(--accent-h), var(--accent-s), 40%) var(--tw-gradient-to-position) !important; }
+            body:not([data-theme="blue"]) .via-blue-500  { --tw-gradient-stops: var(--tw-gradient-from), hsl(var(--accent-h), var(--accent-s), 55%) var(--tw-gradient-via-position), var(--tw-gradient-to) !important; }
+            body:not([data-theme="blue"]) .via-blue-600  { --tw-gradient-stops: var(--tw-gradient-from), hsl(var(--accent-h), var(--accent-s), var(--accent-l)) var(--tw-gradient-via-position), var(--tw-gradient-to) !important; }
+
+            body:not([data-theme="blue"]) .dark .dark\:bg-blue-900 { background-color: hsl(var(--accent-h), var(--accent-s), 22%) !important; }
+            body:not([data-theme="blue"]) .dark .dark\:bg-blue-900\/10 { background-color: hsla(var(--accent-h), var(--accent-s), 22%, 0.1) !important; }
+            body:not([data-theme="blue"]) .dark .dark\:bg-blue-900\/20 { background-color: hsla(var(--accent-h), var(--accent-s), 22%, 0.2) !important; }
+            body:not([data-theme="blue"]) .dark .dark\:bg-blue-900\/30 { background-color: hsla(var(--accent-h), var(--accent-s), 22%, 0.3) !important; }
+            body:not([data-theme="blue"]) .dark .dark\:text-blue-300 { color: hsl(var(--accent-h), var(--accent-s), 76%) !important; }
+            body:not([data-theme="blue"]) .dark .dark\:text-blue-400 { color: hsl(var(--accent-h), var(--accent-s), 65%) !important; }
+            body:not([data-theme="blue"]) .dark .dark\:border-blue-700 { border-color: hsl(var(--accent-h), var(--accent-s), 40%) !important; }
+            body:not([data-theme="blue"]) .dark .dark\:border-blue-800 { border-color: hsl(var(--accent-h), var(--accent-s), 32%) !important; }
+
+            body:not([data-theme="blue"]) .bg-blue-100\/50 { background-color: hsla(var(--accent-h), var(--accent-s), 94%, 0.5) !important; }
+            body:not([data-theme="blue"]) .bg-blue-500\/20 { background-color: hsla(var(--accent-h), var(--accent-s), 55%, 0.2) !important; }
+            body:not([data-theme="blue"]) .bg-blue-600\/20 { background-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.2) !important; }
+            body:not([data-theme="blue"]) .bg-blue-600\/30 { background-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.3) !important; }
         </style>
         {{-- PWA service worker (FBR POS scope) --}}
         <script>
@@ -153,9 +243,9 @@
             }
         </script>
     </head>
-    <body class="h-screen overflow-hidden antialiased">
+    <body class="h-screen overflow-hidden antialiased" data-theme="{{ $fbrTheme }}">
         <x-pwa-init />
-        <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false">
+        <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false, themeOpen: false, currentTheme: '{{ $fbrTheme }}' }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false">
 
             <header class="topnav-bar flex-shrink-0 relative z-50">
                 <div class="flex items-center justify-between px-3 sm:px-5 h-12">
@@ -189,6 +279,28 @@
                     <div class="flex items-center gap-2">
                         <x-pwa-install color="blue" label="Install" />
                         <x-pwa-refresh-btn color="blue" />
+
+                        {{-- 🎨 Theme Switcher (Customize) --}}
+                        <div class="relative">
+                            <button @click="themeOpen = !themeOpen; profileOpen = false" class="p-2 rounded-lg text-white hover:bg-white/15 transition" title="Customize Theme">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+                            </button>
+                            <div x-show="themeOpen" x-cloak @click.outside="themeOpen = false" x-transition class="absolute right-0 top-full mt-2 bg-white dark:bg-gray-900 rounded-xl shadow-2xl shadow-black/20 border border-gray-200/80 dark:border-gray-700/80 p-3 z-[100] w-48">
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">FBR POS Theme</p>
+                                <div class="grid grid-cols-3 gap-2">
+                                    <button @click="currentTheme='purple'; document.body.setAttribute('data-theme','purple'); fetch('{{ route('fbrpos.settings.theme') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'purple'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='purple' && 'active-theme'" style="background:linear-gradient(135deg,#312e81,#7c3aed)" title="Royal Purple"></button>
+                                    <button @click="currentTheme='blue'; document.body.setAttribute('data-theme','blue'); fetch('{{ route('fbrpos.settings.theme') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'blue'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='blue' && 'active-theme'" style="background:linear-gradient(135deg,#1e3a5f,#2563eb)" title="Ocean Blue"></button>
+                                    <button @click="currentTheme='emerald'; document.body.setAttribute('data-theme','emerald'); fetch('{{ route('fbrpos.settings.theme') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'emerald'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='emerald' && 'active-theme'" style="background:linear-gradient(135deg,#064e3b,#059669)" title="Emerald Green"></button>
+                                    <button @click="currentTheme='orange'; document.body.setAttribute('data-theme','orange'); fetch('{{ route('fbrpos.settings.theme') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'orange'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='orange' && 'active-theme'" style="background:linear-gradient(135deg,#7c2d12,#ea580c)" title="Sunset Orange"></button>
+                                    <button @click="currentTheme='midnight'; document.body.setAttribute('data-theme','midnight'); fetch('{{ route('fbrpos.settings.theme') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'midnight'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='midnight' && 'active-theme'" style="background:linear-gradient(135deg,#171717,#404040)" title="Midnight Dark"></button>
+                                    <button @click="currentTheme='rose'; document.body.setAttribute('data-theme','rose'); fetch('{{ route('fbrpos.settings.theme') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'rose'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='rose' && 'active-theme'" style="background:linear-gradient(135deg,#881337,#e11d48)" title="Rose Pink"></button>
+                                </div>
+                                <div class="mt-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                                    <p class="text-[9px] text-gray-400 text-center" x-text="currentTheme.charAt(0).toUpperCase() + currentTheme.slice(1) + ' Theme'"></p>
+                                </div>
+                            </div>
+                        </div>
+
                         <span class="hidden lg:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider fbr-badge-premium">
                             <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z"/></svg>
                             FBR CERTIFIED

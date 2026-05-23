@@ -22,6 +22,18 @@ class FbrPosController extends Controller
     // Per FBR PRAL spec: weight/volume/length UoMs accept decimal qty; piece-based UoMs do not.
     const VALUE_MODE_UOMS = ['KG', 'GM', 'LTR', 'ML', 'MTR', 'SQM'];
 
+    public function updateTheme(Request $request)
+    {
+        $theme = $request->input('theme', 'blue');
+        $allowed = ['purple', 'blue', 'emerald', 'orange', 'midnight', 'rose'];
+        if (!in_array($theme, $allowed)) {
+            return response()->json(['success' => false, 'message' => 'Invalid theme'], 422);
+        }
+        $companyId = Auth::guard('fbrpos')->user()->company_id ?? app('currentCompanyId');
+        Company::where('id', $companyId)->update(['pos_theme' => $theme]);
+        return response()->json(['success' => true, 'theme' => $theme]);
+    }
+
     public function updateDashboardStyle(Request $request)
     {
         if (Auth::guard('fbrpos')->user()->role !== 'company_admin') {

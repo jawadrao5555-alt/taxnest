@@ -288,12 +288,12 @@
                             <span class="hidden md:inline text-[9px] opacity-70 ml-1">F10</span>
                         </button>
 
-                        {{-- 🟥 Failed Bills (F11) — pulsing red badge --}}
-                        <button @click="openFailed()" type="button" class="relative hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-red-600/85 hover:bg-red-600 ring-1 ring-red-300/40 transition" title="Failed Bills (F11)">
+                        {{-- 🟥 Failed Bills (Shift+F11) — F11 plain stays for browser fullscreen --}}
+                        <button @click="openFailed()" type="button" class="relative hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-red-600/85 hover:bg-red-600 ring-1 ring-red-300/40 transition" title="Failed Bills (Shift+F11)">
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/></svg>
                             <span>Failed</span>
                             <span x-show="failedCount > 0" x-cloak x-text="failedCount" class="ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-white text-red-700 text-[10px] font-black animate-pulse"></span>
-                            <span class="hidden md:inline text-[9px] opacity-70 ml-1">F11</span>
+                            <span class="hidden md:inline text-[9px] opacity-70 ml-1">⇧F11</span>
                         </button>
 
                         {{-- 🎨 Theme Switcher (Customize) --}}
@@ -628,16 +628,20 @@
                     _csrf: document.querySelector('meta[name="csrf-token"]')?.content || '',
                     init() {
                         this.refreshCounts();
-                        setInterval(() => this.refreshCounts(), 45000);
-                        // 🎹 F10 = Local, F11 = Failed (override page-level bindings)
+                        // 🔋 Visibility-aware polling — only refresh when tab visible. 2-min interval (was 45s) to reduce DB load
+                        setInterval(() => {
+                            if (document.visibilityState === 'visible') this.refreshCounts();
+                        }, 120000);
+                        document.addEventListener('visibilitychange', () => {
+                            if (document.visibilityState === 'visible') this.refreshCounts();
+                        });
+                        // 🎹 F10 = Local, Shift+F11 = Failed (plain F11 stays for browser fullscreen + page's toggleFullscreen)
                         window.addEventListener('keydown', (e) => {
-                            const tag = (e.target?.tagName || '').toUpperCase();
-                            const inField = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag) || e.target?.isContentEditable;
-                            if (e.key === 'F10') {
+                            if (e.key === 'F10' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
                                 e.preventDefault();
                                 e.stopImmediatePropagation();
                                 this.openLocal();
-                            } else if (e.key === 'F11') {
+                            } else if (e.key === 'F11' && e.shiftKey) {
                                 e.preventDefault();
                                 e.stopImmediatePropagation();
                                 this.openFailed();
@@ -707,10 +711,20 @@
                             method: 'POST',
                             headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': this._csrf},
                             credentials: 'same-origin'
-                        }).then(r => r.json());
+                        }).then(r => r.json()).catch(() => ({success: false, message: 'Network error'}));
                         if (r.success) {
-                            this.localOpen = false;
-                            window.location.href = r.redirect || '{{ route('fbrpos.failQueue') }}';
+                            // Remove from local list in place — no redirect to avoid cart loss on /create
+                            this.localBills = this.localBills.filter(b => b.id !== id);
+                            this.localCount = this.localBills.length;
+                            if (this.localSelectedIdx >= this.localBills.length) this.localSelectedIdx = Math.max(0, this.localBills.length - 1);
+                            // Refresh failed count (promoted bill now sits in fail queue as pending)
+                            this.refreshCounts();
+                            // Only redirect if user is on a "safe" page (NOT /fbr-pos/create where cart would be lost)
+                            const onCreate = location.pathname.indexOf('/fbr-pos/create') === 0;
+                            if (!onCreate && this.localBills.length === 0) {
+                                this.localOpen = false;
+                                window.location.href = r.redirect || '{{ route('fbrpos.failQueue') }}';
+                            }
                         } else { alert(r.message || 'Promote failed'); }
                     },
                     async retryFailed(id) {

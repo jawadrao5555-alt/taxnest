@@ -245,7 +245,7 @@
     </head>
     <body class="h-screen overflow-hidden antialiased" data-theme="{{ $fbrTheme }}">
         <x-pwa-init />
-        <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false, themeOpen: false, currentTheme: '{{ $fbrTheme }}' }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false">
+        <div class="flex flex-col h-full" x-data="fbrPosHeader('{{ $fbrTheme }}')" x-init="init()" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false; localOpen = false; failedOpen = false">
 
             <header class="topnav-bar flex-shrink-0 relative z-50">
                 <div class="flex items-center justify-between px-3 sm:px-5 h-12">
@@ -279,6 +279,22 @@
                     <div class="flex items-center gap-2">
                         <x-pwa-install color="blue" label="Install" />
                         <x-pwa-refresh-btn color="blue" />
+
+                        {{-- 🟦 Local Bills (F10) — Provisional / Saved bills --}}
+                        <button @click="openLocal()" type="button" class="relative hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/20 transition" title="Local Bills (F10)">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+                            <span>Local</span>
+                            <span x-show="localCount > 0" x-cloak x-text="localCount" class="ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-amber-400 text-amber-950 text-[10px] font-black"></span>
+                            <span class="hidden md:inline text-[9px] opacity-70 ml-1">F10</span>
+                        </button>
+
+                        {{-- 🟥 Failed Bills (F11) — pulsing red badge --}}
+                        <button @click="openFailed()" type="button" class="relative hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-red-600/85 hover:bg-red-600 ring-1 ring-red-300/40 transition" title="Failed Bills (F11)">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/></svg>
+                            <span>Failed</span>
+                            <span x-show="failedCount > 0" x-cloak x-text="failedCount" class="ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-white text-red-700 text-[10px] font-black animate-pulse"></span>
+                            <span class="hidden md:inline text-[9px] opacity-70 ml-1">F11</span>
+                        </button>
 
                         {{-- 🎨 Theme Switcher (Customize) --}}
                         <div class="relative">
@@ -462,7 +478,7 @@
 
                 {{ $slot }}
             </main>
-        </div>
+            {{-- NOTE: outer fbrPosHeader x-data div closes AFTER modals (~line 610) so localOpen/failedOpen + handlers stay in scope --}}
         <x-pwa-push scope="fbrpos" />
 
         @php
@@ -498,5 +514,227 @@
         })();
         </script>
         <x-pwa-update color="blue" />
+
+
+        {{-- ═══════════════════════════════════════════════════════════════════
+             🎯 UNIVERSAL HEADER MODALS — Local Bills (F10) + Failed Bills (F11)
+             Always-on. Available on every FBR POS page via fbrPosHeader() x-data.
+             ═══════════════════════════════════════════════════════════════════ --}}
+
+        {{-- LOCAL BILLS MODAL (inside fbrPosHeader x-data scope) --}}
+        <div x-show="localOpen" x-cloak @keydown.window="if(localOpen) handleLocalKeys($event)"
+             class="fixed inset-0 z-[200] flex items-start justify-center pt-16 px-4 bg-black/50 backdrop-blur-sm"
+             @click.self="localOpen = false">
+            <div class="w-full max-w-2xl bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden" x-transition>
+                <div class="px-5 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-gradient-to-r from-amber-50 to-amber-100 dark:from-amber-950/30 dark:to-amber-900/20">
+                    <div>
+                        <h3 class="text-base font-black text-amber-900 dark:text-amber-200 flex items-center gap-2">
+                            <span>🟦 Local / Provisional Bills</span>
+                            <span x-text="localCount + ' total'" class="px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-800 text-[10px] font-bold"></span>
+                        </h3>
+                        <p class="text-[11px] text-amber-700 dark:text-amber-300 mt-0.5">↑↓ navigate · Enter promote to FBR · D delete · Esc close</p>
+                    </div>
+                    <button @click="localOpen = false" class="p-1.5 rounded-lg hover:bg-amber-200/50 dark:hover:bg-amber-800/40"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                </div>
+                <div class="max-h-[60vh] overflow-y-auto">
+                    <template x-if="localBills.length === 0">
+                        <div class="p-10 text-center text-gray-400 text-sm">No local bills. Saved-but-unsubmitted bills appear here.</div>
+                    </template>
+                    <template x-for="(bill, idx) in localBills" :key="bill.id">
+                        <div :class="idx === localSelectedIdx ? 'bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-500' : 'border-l-4 border-transparent'"
+                             class="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800/40 cursor-pointer"
+                             @click="localSelectedIdx = idx">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-mono font-bold text-sm text-gray-800 dark:text-gray-200" x-text="bill.invoice_number"></span>
+                                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 font-bold uppercase tracking-wide">Local</span>
+                                </div>
+                                <div class="text-[11px] text-gray-500 mt-0.5" x-text="bill.customer_name + ' · ' + bill.created_at"></div>
+                            </div>
+                            <div class="text-right ml-3">
+                                <div class="font-black text-base text-gray-900 dark:text-white">Rs <span x-text="Number(bill.total_amount).toLocaleString()"></span></div>
+                                <div class="flex gap-1 mt-1">
+                                    <button @click.stop="promoteLocal(bill.id)" class="text-[10px] px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold">↑ Promote</button>
+                                    <button @click.stop="deleteLocal(bill.id)" class="text-[10px] px-2 py-0.5 rounded bg-red-600 hover:bg-red-700 text-white font-bold">Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        {{-- FAILED BILLS MODAL (inside fbrPosHeader x-data scope) --}}
+        <div x-show="failedOpen" x-cloak @keydown.window="if(failedOpen) handleFailedKeys($event)"
+             class="fixed inset-0 z-[200] flex items-start justify-center pt-16 px-4 bg-black/50 backdrop-blur-sm"
+             @click.self="failedOpen = false">
+            <div class="w-full max-w-2xl bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden" x-transition>
+                <div class="px-5 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-gradient-to-r from-red-50 to-red-100 dark:from-red-950/30 dark:to-red-900/20">
+                    <div>
+                        <h3 class="text-base font-black text-red-900 dark:text-red-200 flex items-center gap-2">
+                            <span>🟥 Failed FBR Bills</span>
+                            <span x-text="failedCount + ' total'" class="px-2 py-0.5 rounded-full bg-red-200 dark:bg-red-800 text-[10px] font-bold"></span>
+                        </h3>
+                        <p class="text-[11px] text-red-700 dark:text-red-300 mt-0.5">↑↓ navigate · Enter retry · D delete · Esc close</p>
+                    </div>
+                    <button @click="failedOpen = false" class="p-1.5 rounded-lg hover:bg-red-200/50 dark:hover:bg-red-800/40"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                </div>
+                <div class="max-h-[60vh] overflow-y-auto">
+                    <template x-if="failedBills.length === 0">
+                        <div class="p-10 text-center text-gray-400 text-sm">No failed bills. FBR-rejected or pending bills will appear here.</div>
+                    </template>
+                    <template x-for="(bill, idx) in failedBills" :key="bill.id">
+                        <div :class="idx === failedSelectedIdx ? 'bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500' : 'border-l-4 border-transparent'"
+                             class="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800/40 cursor-pointer"
+                             @click="failedSelectedIdx = idx">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-mono font-bold text-sm text-gray-800 dark:text-gray-200" x-text="bill.invoice_number"></span>
+                                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 font-bold uppercase tracking-wide" x-text="bill.fbr_status || 'failed'"></span>
+                                </div>
+                                <div class="text-[11px] text-gray-500 mt-0.5 truncate" x-text="(bill.customer_name || 'Walk-in') + ' · ' + (bill.created_at || '')"></div>
+                                <template x-if="bill.error_message">
+                                    <div class="text-[10px] text-red-600 dark:text-red-400 mt-0.5 truncate" x-text="bill.error_message"></div>
+                                </template>
+                            </div>
+                            <div class="text-right ml-3">
+                                <div class="font-black text-base text-gray-900 dark:text-white">Rs <span x-text="Number(bill.total_amount).toLocaleString()"></span></div>
+                                <div class="flex gap-1 mt-1">
+                                    <button @click.stop="retryFailed(bill.id)" :disabled="bill._retrying" class="text-[10px] px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold">↻ <span x-text="bill._retrying ? 'Retrying' : 'Retry'"></span></button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+        </div>{{-- /fbrPosHeader x-data root --}}
+
+        <script>
+            function fbrPosHeader(initialTheme) {
+                return {
+                    profileOpen: false,
+                    mobileMenuOpen: false,
+                    themeOpen: false,
+                    currentTheme: initialTheme || 'blue',
+                    localOpen: false,
+                    failedOpen: false,
+                    localBills: [],
+                    failedBills: [],
+                    localCount: 0,
+                    failedCount: 0,
+                    localSelectedIdx: 0,
+                    failedSelectedIdx: 0,
+                    _csrf: document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    init() {
+                        this.refreshCounts();
+                        setInterval(() => this.refreshCounts(), 45000);
+                        // 🎹 F10 = Local, F11 = Failed (override page-level bindings)
+                        window.addEventListener('keydown', (e) => {
+                            const tag = (e.target?.tagName || '').toUpperCase();
+                            const inField = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag) || e.target?.isContentEditable;
+                            if (e.key === 'F10') {
+                                e.preventDefault();
+                                e.stopImmediatePropagation();
+                                this.openLocal();
+                            } else if (e.key === 'F11') {
+                                e.preventDefault();
+                                e.stopImmediatePropagation();
+                                this.openFailed();
+                            }
+                        }, true); // capture phase — runs before page handlers
+                    },
+                    async refreshCounts() {
+                        try {
+                            const [lr, fr] = await Promise.all([
+                                fetch('{{ route('fbrpos.api.provisional-bills') }}', {credentials: 'same-origin'}).then(r => r.json()).catch(() => ({count: 0})),
+                                fetch('{{ route('fbrpos.api.failed-bills') }}', {credentials: 'same-origin'}).then(r => r.json()).catch(() => ({count: 0})),
+                            ]);
+                            this.localCount = lr.count || (lr.bills || []).length || 0;
+                            this.failedCount = fr.count || (fr.bills || []).length || 0;
+                        } catch (e) { /* silent */ }
+                    },
+                    async openLocal() {
+                        this.failedOpen = false;
+                        this.localOpen = true;
+                        this.localSelectedIdx = 0;
+                        try {
+                            const r = await fetch('{{ route('fbrpos.api.provisional-bills') }}', {credentials: 'same-origin'}).then(r => r.json());
+                            this.localBills = r.bills || [];
+                            this.localCount = this.localBills.length;
+                        } catch (e) { this.localBills = []; }
+                    },
+                    async openFailed() {
+                        this.localOpen = false;
+                        this.failedOpen = true;
+                        this.failedSelectedIdx = 0;
+                        try {
+                            const r = await fetch('{{ route('fbrpos.api.failed-bills') }}', {credentials: 'same-origin'}).then(r => r.json());
+                            this.failedBills = (r.bills || []).map(b => ({...b, _retrying: false}));
+                            this.failedCount = this.failedBills.length;
+                        } catch (e) { this.failedBills = []; }
+                    },
+                    handleLocalKeys(e) {
+                        const tag = (e.target?.tagName || '').toUpperCase();
+                        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
+                        if (e.key === 'ArrowDown') { e.preventDefault(); this.localSelectedIdx = Math.min(this.localSelectedIdx + 1, this.localBills.length - 1); }
+                        else if (e.key === 'ArrowUp') { e.preventDefault(); this.localSelectedIdx = Math.max(this.localSelectedIdx - 1, 0); }
+                        else if (e.key === 'Enter') { e.preventDefault(); const b = this.localBills[this.localSelectedIdx]; if (b) this.promoteLocal(b.id); }
+                        else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); const b = this.localBills[this.localSelectedIdx]; if (b) this.deleteLocal(b.id); }
+                    },
+                    handleFailedKeys(e) {
+                        const tag = (e.target?.tagName || '').toUpperCase();
+                        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
+                        if (e.key === 'ArrowDown') { e.preventDefault(); this.failedSelectedIdx = Math.min(this.failedSelectedIdx + 1, this.failedBills.length - 1); }
+                        else if (e.key === 'ArrowUp') { e.preventDefault(); this.failedSelectedIdx = Math.max(this.failedSelectedIdx - 1, 0); }
+                        else if (e.key === 'Enter') { e.preventDefault(); const b = this.failedBills[this.failedSelectedIdx]; if (b) this.retryFailed(b.id); }
+                    },
+                    async deleteLocal(id) {
+                        if (!confirm('Delete this local bill permanently?')) return;
+                        const r = await fetch(`/fbr-pos/api/provisional-bills/${id}/delete`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': this._csrf},
+                            credentials: 'same-origin'
+                        }).then(r => r.json());
+                        if (r.success) {
+                            this.localBills = this.localBills.filter(b => b.id !== id);
+                            this.localCount = this.localBills.length;
+                            if (this.localSelectedIdx >= this.localBills.length) this.localSelectedIdx = Math.max(0, this.localBills.length - 1);
+                        } else { alert(r.message || 'Failed to delete'); }
+                    },
+                    async promoteLocal(id) {
+                        const r = await fetch(`/fbr-pos/api/provisional-bills/${id}/promote`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': this._csrf},
+                            credentials: 'same-origin'
+                        }).then(r => r.json());
+                        if (r.success) {
+                            this.localOpen = false;
+                            window.location.href = r.redirect || '{{ route('fbrpos.failQueue') }}';
+                        } else { alert(r.message || 'Promote failed'); }
+                    },
+                    async retryFailed(id) {
+                        const bill = this.failedBills.find(b => b.id === id);
+                        if (!bill || bill._retrying) return;
+                        bill._retrying = true;
+                        try {
+                            const r = await fetch(`/fbr-pos/api/failed-bills/${id}/retry`, {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': this._csrf},
+                                credentials: 'same-origin'
+                            }).then(r => r.json());
+                            if (r.success) {
+                                this.failedBills = this.failedBills.filter(b => b.id !== id);
+                                this.failedCount = this.failedBills.length;
+                                if (this.failedSelectedIdx >= this.failedBills.length) this.failedSelectedIdx = Math.max(0, this.failedBills.length - 1);
+                            } else {
+                                bill._retrying = false;
+                                alert(r.message || 'Retry failed');
+                            }
+                        } catch (e) { bill._retrying = false; alert('Network error'); }
+                    },
+                };
+            }
+        </script>
     </body>
 </html>

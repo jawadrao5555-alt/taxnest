@@ -22,6 +22,68 @@ class FbrPosController extends Controller
     // Per FBR PRAL spec: weight/volume/length UoMs accept decimal qty; piece-based UoMs do not.
     const VALUE_MODE_UOMS = ['KG', 'GM', 'LTR', 'ML', 'MTR', 'SQM'];
 
+    // ═══════════════════════════════════════════════════════════════════
+    // 🎯 Universal Header API — Local (Provisional) Bills + Failed Bills
+    // Powers the F10 / F11 header shortcuts available on every FBR POS page
+    // ═══════════════════════════════════════════════════════════════════
+    public function apiProvisionalBills(Request $request)
+    {
+        $companyId = Auth::guard('fbrpos')->user()->company_id ?? app('currentCompanyId');
+        $bills = \App\Models\FbrPosTransaction::where('company_id', $companyId)
+            ->where('invoice_mode', 'local')
+            ->where('fbr_status', 'local')
+            ->orderByDesc('id')
+            ->limit(50)
+            ->get(['id', 'invoice_number', 'total_amount', 'created_at', 'customer_name'])
+            ->map(function ($b) {
+                return [
+                    'id' => $b->id,
+                    'invoice_number' => $b->invoice_number,
+                    'total_amount' => (float) $b->total_amount,
+                    'customer_name' => $b->customer_name ?? 'Walk-in',
+                    'created_at' => optional($b->created_at)->format('d M, h:i A'),
+                ];
+            });
+        return response()->json(['success' => true, 'bills' => $bills, 'count' => $bills->count()]);
+    }
+
+    public function apiDeleteProvisional(Request $request, $id)
+    {
+        $companyId = Auth::guard('fbrpos')->user()->company_id ?? app('currentCompanyId');
+        $bill = \App\Models\FbrPosTransaction::where('company_id', $companyId)
+            ->where('id', $id)
+            ->where('invoice_mode', 'local')
+            ->where('fbr_status', 'local')
+            ->first();
+        if (!$bill) {
+            return response()->json(['success' => false, 'message' => 'Provisional bill not found'], 404);
+        }
+        \DB::transaction(function () use ($bill) {
+            \App\Models\FbrPosTransactionItem::where('transaction_id', $bill->id)->delete();
+            $bill->delete();
+        });
+        return response()->json(['success' => true]);
+    }
+
+    public function apiPromoteProvisional(Request $request, $id)
+    {
+        $companyId = Auth::guard('fbrpos')->user()->company_id ?? app('currentCompanyId');
+        // 🔒 Race-safe atomic claim: only flips if still local — prevents double-promote
+        $affected = \App\Models\FbrPosTransaction::where('id', $id)
+            ->where('company_id', $companyId)
+            ->where('invoice_mode', 'local')
+            ->where('fbr_status', 'local')
+            ->update([
+                'invoice_mode' => 'fbr',
+                'fbr_status' => 'pending',
+                'updated_at' => now(),
+            ]);
+        if ($affected === 0) {
+            return response()->json(['success' => false, 'message' => 'Bill not found or already promoted'], 409);
+        }
+        return response()->json(['success' => true, 'redirect' => route('fbrpos.failQueue')]);
+    }
+
     public function updateTheme(Request $request)
     {
         $theme = $request->input('theme', 'blue');

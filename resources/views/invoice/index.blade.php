@@ -368,6 +368,29 @@
                 </div>
             @endif
 
+            {{-- Bulk PDF batch links (when range > 500 invoices) --}}
+            @if(session('bulk_pdf_batches'))
+                @php $b = session('bulk_pdf_batches'); @endphp
+                <div class="mb-4 px-4 py-4 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-300 dark:border-indigo-700">
+                    <div class="flex items-center gap-2 mb-3">
+                        <svg class="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                        <p class="text-sm font-bold text-indigo-900 dark:text-indigo-200">
+                            {{ $b['total'] }} invoices found — split into {{ count($b['batches']) }} ZIP files ({{ $b['per_zip'] }} per ZIP)
+                        </p>
+                    </div>
+                    <p class="text-xs text-indigo-700 dark:text-indigo-300 mb-3">Click each batch button below to download. Newest invoices come first.</p>
+                    <div class="flex flex-wrap gap-2">
+                        @foreach($b['batches'] as $bt)
+                            <a href="{{ $bt['url'] }}"
+                               class="inline-flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg text-xs font-bold hover:from-indigo-700 hover:to-purple-700 transition shadow-md">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                Batch {{ $bt['n'] }} <span class="opacity-75">({{ $bt['from'] }}–{{ $bt['to'] }})</span>
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             <div x-data="invoiceKeyboardNav()" @keydown.window="handleKeydown($event)" class="premium-card overflow-hidden">
                 <div class="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800/60 dark:to-gray-900">
                     <div class="flex items-center gap-3">

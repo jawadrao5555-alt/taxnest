@@ -1532,10 +1532,39 @@ class InvoiceController extends Controller
             return back()->with('error', 'Bulk PDF: no completed invoices found for the selected filters.');
         }
 
-        // Safety cap — always auto-limit to latest 500 (no error, no user friction)
+        // Batch system: 500 invoices per ZIP. If total > 500 and no explicit batch,
+        // show user a list of batch links so they can download all of them in chunks.
         $MAX = 500;
+        $batch = max(1, (int) $request->get('batch', 0));
+        $totalBatches = (int) ceil($total / $MAX);
+
+        if ($total > $MAX && !$request->has('batch')) {
+            // No explicit batch requested → tell user how to grab all of them.
+            // Build batch URLs preserving current filter params.
+            $params = $request->only(['from','to','date_from','date_to','month','fbr_status','doc_type','all']);
+            $batchLinks = [];
+            for ($b = 1; $b <= $totalBatches; $b++) {
+                $batchLinks[] = [
+                    'n'    => $b,
+                    'from' => ($b - 1) * $MAX + 1,
+                    'to'   => min($b * $MAX, $total),
+                    'url'  => route('invoices.bulk-pdf', array_merge($params, ['batch' => $b])),
+                ];
+            }
+            return back()
+                ->with('bulk_pdf_batches', [
+                    'total'    => $total,
+                    'per_zip'  => $MAX,
+                    'batches'  => $batchLinks,
+                ])
+                ->with('error', "Bulk PDF: filter ne {$total} invoices return ki hain. {$totalBatches} ZIP files mein download karein (500 per ZIP).");
+        }
+
+        // Order newest first, then offset/limit by batch
+        $query = (clone $query)->orderByDesc('invoice_date')->orderByDesc('id');
         if ($total > $MAX) {
-            $query = (clone $query)->orderByDesc('invoice_date')->orderByDesc('id')->limit($MAX);
+            $offset = ($batch - 1) * $MAX;
+            $query = $query->offset($offset)->limit($MAX);
         }
 
         if (!class_exists(\ZipArchive::class)) {
@@ -1544,7 +1573,9 @@ class InvoiceController extends Controller
 
         $tmpDir = storage_path('app/tmp-bulk-pdf');
         if (!is_dir($tmpDir)) @mkdir($tmpDir, 0775, true);
-        $rangeTag = $all ? ('all-' . date('Ymd')) : ($from . '_to_' . $to);
+        $rangeBase = ($hasFrom && $hasTo) ? ($from . '_to_' . $to) : ('all-' . date('Ymd'));
+        $batchTag  = ($total > $MAX) ? ('-batch' . $batch . 'of' . $totalBatches) : '';
+        $rangeTag  = $rangeBase . $batchTag;
         $zipPath = $tmpDir . '/bulk-invoices-' . $companyId . '-' . $rangeTag . '-' . uniqid() . '.zip';
 
         $zip = new \ZipArchive();

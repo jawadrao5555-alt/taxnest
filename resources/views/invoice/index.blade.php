@@ -11,6 +11,14 @@
                     <h2 class="font-extrabold text-2xl text-gray-900 dark:text-white leading-tight tracking-tight">Invoices</h2>
                 </div>
                 <div class="flex gap-2 items-center flex-wrap">
+                    {{-- Download ALL invoices as ZIP (works on any tab, no date filter) --}}
+                    <a href="{{ route('invoices.bulk-pdf', ['all' => 1]) }}"
+                       onclick="if(!confirm('Download ALL completed invoices as ZIP (latest 500)?\n\nNote: this may take 30-60 seconds.')){event.preventDefault();return false;} this.classList.add('opacity-60','pointer-events-none'); this.querySelector('span').textContent='Preparing ZIP...';"
+                       class="inline-flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:from-emerald-700 hover:to-teal-700 transition shadow-md"
+                       title="Download all completed invoices in one ZIP">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        <span>Download ALL ZIP</span>
+                    </a>
                     {{-- WHT-on-PDF toggle (session-based, all PDF templates respect this) --}}
                     <div x-data="{ on: {{ session('pdf_show_wht', false) ? 'true' : 'false' }}, saving: false }"
                          class="inline-flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">

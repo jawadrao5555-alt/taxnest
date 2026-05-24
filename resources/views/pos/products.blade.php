@@ -185,9 +185,30 @@
                  x-data="{
                     open: false,
                     rows: [],
+                    copySrc: '',
                     ings: @js(($ingredients ?? collect())->map(fn($i)=>['id'=>$i->id,'name'=>$i->name,'unit'=>$i->unit])->values()),
+                    existingRecipes: @js($existingRecipes ?? []),
                     add() { this.rows.push({ mode:'existing', ingredient_id:'', new_name:'', new_unit:'KGS', new_cost:'', quantity_needed:'' }); },
-                    toggle() { this.open = !this.open; if (this.open && this.rows.length === 0) this.add(); }
+                    toggle() { this.open = !this.open; if (this.open && this.rows.length === 0) this.add(); },
+                    copyFromRecipe() {
+                        const pid = parseInt(this.copySrc);
+                        if (!pid) return;
+                        const src = this.existingRecipes.find(r => r.product_id === pid);
+                        if (!src) return;
+                        // Drop any blank starter row, then append all ingredients from the source recipe
+                        this.rows = this.rows.filter(r => r.ingredient_id || r.new_name || (parseFloat(r.quantity_needed) > 0));
+                        src.ingredients.forEach(ing => {
+                            this.rows.push({
+                                mode: 'existing',
+                                ingredient_id: String(ing.ingredient_id),
+                                new_name: '',
+                                new_unit: 'KGS',
+                                new_cost: '',
+                                quantity_needed: ing.quantity_needed
+                            });
+                        });
+                        this.copySrc = '';
+                    }
                  }">
                 <button type="button" @click="toggle()"
                         class="w-full flex items-center justify-between px-4 py-2.5 rounded-lg border-2 transition-all"
@@ -209,7 +230,24 @@
 
                 <div x-show="open" x-transition class="mt-3 space-y-2" x-cloak>
                     <div class="text-[11px] text-gray-600 dark:text-gray-400 bg-purple-50/50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800 rounded-lg px-3 py-2">
-                        <strong class="text-purple-700 dark:text-purple-300">Tip:</strong> "Qty Needed" = ek product banane ke liye kitna ingredient lagta hai (e.g. Burger ke liye 0.2 kg meat). Naya ingredient ho to <strong>"New"</strong> select kar ke usi waqt naam, unit, cost dijiye — alag se Ingredients page jane ki zarurat nahi.
+                        <strong class="text-purple-700 dark:text-purple-300">Tip:</strong> "Qty Needed" = ek product banane ke liye kitna ingredient lagta hai (e.g. Burger ke liye 0.2 kg meat). Naya ingredient ho to <strong>"New"</strong> select kar ke usi waqt naam, unit, cost dijiye — alag se Ingredients page jane ki zarurat nahi. Ya niche se kisi <strong>existing product ki recipe copy</strong> bhi kar sakte hain.
+                    </div>
+
+                    {{-- Copy from existing recipe (product name aur ingredient name alag ho sakte hain — yeh sirf rows pre-fill karta hai) --}}
+                    <div x-show="existingRecipes.length > 0"
+                         class="flex flex-wrap items-center gap-2 p-2.5 rounded-lg bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border border-indigo-200 dark:border-indigo-800">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 flex items-center gap-1">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            Copy from existing recipe:
+                        </span>
+                        <select x-model="copySrc" @change="copyFromRecipe()"
+                                class="flex-1 min-w-[180px] text-xs rounded-md border border-indigo-300 dark:border-indigo-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white px-2 py-1.5 focus:ring-2 focus:ring-indigo-500">
+                            <option value="">— pick a product to copy its ingredients —</option>
+                            <template x-for="r in existingRecipes" :key="r.product_id">
+                                <option :value="r.product_id" x-text="r.product_name + '  (' + r.ingredients.length + ' ingredient' + (r.ingredients.length===1?'':'s') + ')'"></option>
+                            </template>
+                        </select>
+                        <span class="text-[10px] text-indigo-600 dark:text-indigo-400 italic">Append hoga — phir edit kar sakte ho</span>
                     </div>
 
                     <template x-for="(row, idx) in rows" :key="idx">

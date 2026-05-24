@@ -2397,7 +2397,38 @@ class PosController extends Controller
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'unit', 'cost_per_unit']);
-        return view('pos.products', compact('products', 'posType', 'categoryFields', 'ingredients'));
+        // Existing-recipe quick-copy source: products in this company that already have a recipe.
+        // Cashier can pick one to auto-populate ingredient rows (then tweak names/qty).
+        $existingRecipes = [];
+        if (class_exists(\App\Models\ProductRecipe::class)) {
+            $recipeRows = \App\Models\ProductRecipe::where('company_id', $companyId)
+                ->with(['product:id,name', 'ingredient:id,name,unit,cost_per_unit'])
+                ->get();
+            $grouped = $recipeRows->groupBy('product_id');
+            foreach ($grouped as $productId => $rows) {
+                $prodName = optional($rows->first()->product)->name;
+                if (!$prodName) continue;
+                $items = [];
+                foreach ($rows as $r) {
+                    if (!$r->ingredient) continue;
+                    $items[] = [
+                        'ingredient_id'   => (int) $r->ingredient_id,
+                        'name'            => $r->ingredient->name,
+                        'unit'            => $r->ingredient->unit,
+                        'quantity_needed' => (float) $r->quantity_needed,
+                    ];
+                }
+                if (!empty($items)) {
+                    $existingRecipes[] = [
+                        'product_id'   => (int) $productId,
+                        'product_name' => $prodName,
+                        'ingredients'  => $items,
+                    ];
+                }
+            }
+            usort($existingRecipes, fn($a, $b) => strcasecmp($a['product_name'], $b['product_name']));
+        }
+        return view('pos.products', compact('products', 'posType', 'categoryFields', 'ingredients', 'existingRecipes'));
     }
 
     /**

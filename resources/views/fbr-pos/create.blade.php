@@ -265,6 +265,156 @@ kbd {
         <svg class="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m-2.829-9.9a5 5 0 010 7.072M9 12h.01M3 3l18 18"/></svg>
         Internet required for FBR submission. Bill saving is disabled until you reconnect.
     </div>
+
+    {{-- ═══════════════════════════════════════════════════════════════════
+         🚀 SMART PENDING DAY-CLOSE MODAL (rush / holiday recovery)
+         Auto-detects past days with sales but no Z-report.
+         Offers one-click "Close All" so cashier can start new sale clean.
+         ═══════════════════════════════════════════════════════════════════ --}}
+    @if(!empty($pendingDayCloses))
+    <div x-data="{
+            open: true,
+            busy: false,
+            pending: @js($pendingDayCloses),
+            closedReports: [],
+            errorMsg: '',
+            totalBills() { return this.pending.reduce((s,p) => s + p.count, 0); },
+            totalAmount() { return this.pending.reduce((s,p) => s + parseFloat(p.total || 0), 0); },
+            fmt(n) { return 'Rs ' + Number(n||0).toLocaleString('en-PK', {minimumFractionDigits: 0, maximumFractionDigits: 0}); },
+            async closeAll() {
+                if (this.busy) return;
+                this.busy = true; this.errorMsg = '';
+                try {
+                    const r = await fetch('{{ route('fbrpos.api.auto-close-day') }}', {
+                        method: 'POST',
+                        headers: {'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}','Accept':'application/json'},
+                        body: JSON.stringify({all: true})
+                    });
+                    const data = await r.json();
+                    if (data.ok) {
+                        this.closedReports = data.closed || [];
+                        setTimeout(() => { this.open = false; window.location.reload(); }, 1800);
+                    } else {
+                        this.errorMsg = data.error || 'Auto-close failed';
+                        this.busy = false;
+                    }
+                } catch (e) {
+                    this.errorMsg = 'Network error: ' + e.message;
+                    this.busy = false;
+                }
+            },
+            async closeOne(date) {
+                if (this.busy) return;
+                this.busy = true; this.errorMsg = '';
+                try {
+                    const r = await fetch('{{ route('fbrpos.api.auto-close-day') }}', {
+                        method: 'POST',
+                        headers: {'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}','Accept':'application/json'},
+                        body: JSON.stringify({date: date})
+                    });
+                    const data = await r.json();
+                    if (data.ok) {
+                        this.pending = this.pending.filter(p => p.date !== date);
+                        if (this.pending.length === 0) {
+                            setTimeout(() => { this.open = false; window.location.reload(); }, 1000);
+                        }
+                    } else {
+                        this.errorMsg = data.error || 'Close failed';
+                    }
+                } catch (e) {
+                    this.errorMsg = 'Network error: ' + e.message;
+                }
+                this.busy = false;
+            }
+         }"
+         x-show="open" x-cloak
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+         class="fixed inset-0 z-[180] bg-black/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+        <div @click.outside="open = false"
+             x-transition:enter="transition ease-out duration-300 delay-100"
+             x-transition:enter-start="opacity-0 scale-90 translate-y-8"
+             x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+             class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-amber-300 dark:border-amber-700">
+
+            {{-- Header --}}
+            <div class="px-5 py-4 bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur">
+                        <svg class="w-6 h-6 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-extrabold tracking-tight">Pending Day Close</h2>
+                        <p class="text-xs text-amber-50/95 mt-0.5">
+                            <span x-text="pending.length"></span> din(s) ka day-close pending hai —
+                            <span x-text="totalBills()"></span> bills ·
+                            <span x-text="fmt(totalAmount())"></span>
+                        </p>
+                    </div>
+                </div>
+                <button @click="open = false" class="p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/15 transition" title="Skip for now">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            {{-- Body --}}
+            <div class="px-5 py-4 overflow-y-auto flex-1">
+                <div class="rounded-lg bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 p-3 mb-4 text-sm text-amber-900 dark:text-amber-100">
+                    <p class="font-semibold mb-0.5">📌 Smart Recovery</p>
+                    <p class="text-xs opacity-90">Rush ya holiday mein day-close miss ho gaya? Koi baat nahi — yahan se ek click mein pichlay din(s) close karke nayi sale shuru karein. Each Z-Report ko bilkul waisay hi generate kiya jata hai jaise manual close.</p>
+                </div>
+
+                <div x-show="errorMsg" x-cloak class="mb-3 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-sm text-red-700 dark:text-red-200 font-semibold" x-text="errorMsg"></div>
+
+                <div x-show="closedReports.length > 0" x-cloak class="mb-3 px-3 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-300 dark:border-emerald-700 text-sm text-emerald-800 dark:text-emerald-200">
+                    <p class="font-bold flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                        <span x-text="closedReports.length"></span> Z-Report(s) generated! Refreshing…
+                    </p>
+                </div>
+
+                <div class="space-y-2">
+                    <template x-for="p in pending" :key="p.date">
+                        <div class="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-100 to-orange-200 dark:from-amber-900/50 dark:to-orange-900/50 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-4 h-4 text-amber-700 dark:text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                </div>
+                                <div class="min-w-0">
+                                    <p class="text-sm font-bold text-slate-900 dark:text-white truncate" x-text="p.date_display"></p>
+                                    <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                                        <span x-text="p.count"></span> bills ·
+                                        <span x-text="fmt(p.total)"></span>
+                                    </p>
+                                </div>
+                            </div>
+                            <button @click="closeOne(p.date)" :disabled="busy" class="flex-shrink-0 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold transition flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M5 13l4 4L19 7"/></svg>
+                                Close
+                            </button>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            {{-- Footer --}}
+            <div class="px-5 py-3.5 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between gap-3 flex-shrink-0">
+                <a href="{{ route('fbrpos.day-close') }}" class="text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                    Review Manually
+                </a>
+                <div class="flex items-center gap-2">
+                    <button @click="open = false" :disabled="busy" class="px-4 py-2 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition">Later</button>
+                    <button @click="closeAll()" :disabled="busy" class="px-5 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-extrabold shadow-lg shadow-emerald-500/30 transition flex items-center gap-2">
+                        <svg x-show="!busy" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        <svg x-show="busy" x-cloak class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                        <span x-text="busy ? 'Closing…' : 'Auto Close All & Start Fresh'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
     {{-- 🎯 Sticky Premium Total Banner --}}
     <div class="sticky-banner sticky top-0 z-40 -mx-3 sm:-mx-4 px-3 sm:px-5 py-2.5 mb-3 bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white shadow-xl flex items-center justify-between gap-3 backdrop-blur supports-[backdrop-filter]:bg-slate-900/85 border-b border-white/10">
         <div class="flex items-center gap-3 sm:gap-5 min-w-0">

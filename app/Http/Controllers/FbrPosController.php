@@ -165,12 +165,138 @@ class FbrPosController extends Controller
         ));
     }
 
+    /**
+     * 🧮 Detect dates that have sales but no Day Close report (EXCLUDES today).
+     * Used by smart "pending day close" modal on /create — auto-closes pending days
+     * when cashier opens POS after a rush/holiday with unclosed shifts.
+     */
+    private function getPendingDayCloses(int $companyId, int $limit = 10): array
+    {
+        $today = today()->format('Y-m-d');
+        $closedDates = FbrDayCloseReport::where('company_id', $companyId)
+            ->pluck('report_date')
+            ->map(fn($d) => $d instanceof \Carbon\Carbon ? $d->format('Y-m-d') : (string) $d)
+            ->all();
+
+        $rows = \DB::table('fbr_pos_transactions')
+            ->select(
+                \DB::raw('DATE(created_at) as d'),
+                \DB::raw('COUNT(*) as cnt'),
+                \DB::raw('SUM(total_amount) as total')
+            )
+            ->where('company_id', $companyId)
+            ->whereDate('created_at', '<', $today)
+            ->when(!empty($closedDates), fn($q) => $q->whereNotIn(\DB::raw('DATE(created_at)'), $closedDates))
+            ->groupBy('d')
+            ->orderBy('d', 'desc')
+            ->limit($limit)
+            ->get();
+
+        return $rows->map(fn($r) => [
+            'date' => $r->d,
+            'count' => (int) $r->cnt,
+            'total' => (float) $r->total,
+            'date_display' => \Carbon\Carbon::parse($r->d)->format('d M Y, D'),
+        ])->all();
+    }
+
+    /**
+     * 🧾 Shared day-close writer — used by both manual closeDayReport()
+     * and the auto-close-on-next-open flow. Idempotent: returns existing report
+     * if already closed; null if no transactions for that date.
+     */
+    private function performDayClose(int $companyId, string $date, ?int $userId, ?string $notes = null): ?FbrDayCloseReport
+    {
+        $existing = FbrDayCloseReport::where('company_id', $companyId)
+            ->where('report_date', $date)->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        $transactions = FbrPosTransaction::where('company_id', $companyId)
+            ->whereDate('created_at', $date)
+            ->with('creator')->orderBy('created_at')->get();
+        if ($transactions->isEmpty()) {
+            return null;
+        }
+
+        $reportCount = FbrDayCloseReport::where('company_id', $companyId)->count();
+        $reportNumber = 'ZRPT-' . str_pad($reportCount + 1, 5, '0', STR_PAD_LEFT);
+
+        $data = [
+            'company_id' => $companyId,
+            'report_date' => $date,
+            'report_number' => $reportNumber,
+            'total_invoices' => $transactions->count(),
+            'fbr_invoices' => $transactions->where('fbr_status', 'submitted')->count(),
+            'local_invoices' => $transactions->where('fbr_status', 'local')->count(),
+            'failed_invoices' => $transactions->whereIn('fbr_status', ['failed', 'pending'])->count(),
+            'gross_sales' => $transactions->sum('subtotal'),
+            'total_discount' => $transactions->sum('discount_amount'),
+            'net_sales' => $transactions->sum('subtotal') - $transactions->sum('discount_amount'),
+            'total_tax' => $transactions->sum('tax_amount'),
+            'total_fbr_fee' => $transactions->sum('fbr_service_charge'),
+            'total_amount' => $transactions->sum('total_amount'),
+            'cash_amount' => $transactions->where('payment_method', 'cash')->sum('total_amount'),
+            'card_amount' => $transactions->where('payment_method', 'card')->sum('total_amount'),
+            'other_amount' => $transactions->whereNotIn('payment_method', ['cash', 'card'])->sum('total_amount'),
+            'first_invoice_number' => $transactions->first()->invoice_number ?? null,
+            'last_invoice_number' => $transactions->last()->invoice_number ?? null,
+            'first_invoice_time' => $transactions->first()->created_at ?? null,
+            'last_invoice_time' => $transactions->last()->created_at ?? null,
+            'closed_by' => $userId,
+            'notes' => $notes,
+        ];
+        $data['hash'] = hash('sha256', json_encode($data));
+        return FbrDayCloseReport::create($data);
+    }
+
+    /**
+     * 🚀 API: Auto-close one or all pending past day(s).
+     * Safety: NEVER closes today or future dates.
+     * Body: { date: 'YYYY-MM-DD' } OR { all: true }
+     */
+    public function apiAutoCloseDay(Request $request)
+    {
+        try {
+            $companyId = app('currentCompanyId');
+            $userId = Auth::guard('fbrpos')->id();
+            $today = today()->format('Y-m-d');
+
+            $closed = [];
+            if ($request->boolean('all')) {
+                foreach ($this->getPendingDayCloses($companyId, 30) as $p) {
+                    $r = $this->performDayClose($companyId, $p['date'], $userId, 'Auto-closed on next open (rush recovery)');
+                    if ($r) $closed[] = ['number' => $r->report_number, 'date' => $p['date']];
+                }
+            } else {
+                $date = $request->input('date');
+                if (!$date) {
+                    return response()->json(['ok' => false, 'error' => 'date required'], 422);
+                }
+                if ($date >= $today) {
+                    return response()->json(['ok' => false, 'error' => 'Cannot auto-close today or future dates'], 422);
+                }
+                $r = $this->performDayClose($companyId, $date, $userId, 'Auto-closed on next open (rush recovery)');
+                if ($r) $closed[] = ['number' => $r->report_number, 'date' => $date];
+            }
+
+            return response()->json(['ok' => true, 'closed' => $closed, 'count' => count($closed)]);
+        } catch (\Throwable $e) {
+            \Log::error('apiAutoCloseDay failed: ' . $e->getMessage());
+            return response()->json(['ok' => false, 'error' => 'Server error: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function create()
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $products = Product::where('company_id', $companyId)->where('is_active', true)->orderBy('name')->get();
         $fbrReportingEnabled = (bool) $company->fbr_reporting_enabled;
+
+        // 🧮 Pending Day-Close detection (rush/holiday recovery)
+        $pendingDayCloses = $this->getPendingDayCloses($companyId, 10);
 
         // 🔥 Frequently sold products (last 30 days, top 12 by total qty sold)
         // Used by the bottom "Quick Add" tile grid on the create page so cashiers can
@@ -210,7 +336,8 @@ class FbrPosController extends Controller
 
         return view('fbr-pos.create', compact(
             'company', 'products', 'fbrReportingEnabled', 'frequentProducts',
-            'terminals', 'currentShift', 'loyaltySettings', 'heldCount', 'activePromos'
+            'terminals', 'currentShift', 'loyaltySettings', 'heldCount', 'activePromos',
+            'pendingDayCloses'
         ));
     }
 

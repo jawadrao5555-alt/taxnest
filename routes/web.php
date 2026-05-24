@@ -766,6 +766,8 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth'])->group(function () {
     Route::get('/day-close', [FbrPosController::class, 'dayCloseReport'])->name('fbrpos.day-close');
     Route::post('/day-close', [FbrPosController::class, 'closeDayReport'])->name('fbrpos.close-day');
     Route::get('/day-close/{id}/pdf', [FbrPosController::class, 'dayCloseReportPdf'])->name('fbrpos.day-close-pdf');
+    // 🚀 Smart auto-close (rush/holiday recovery — closes any past day with sales but no Z-report)
+    Route::post('/api/auto-close-day', [FbrPosController::class, 'apiAutoCloseDay'])->name('fbrpos.api.auto-close-day');
 
     Route::get('/products', [FbrPosController::class, 'products'])->name('fbrpos.products');
     Route::get('/products/create', [FbrPosController::class, 'createProduct'])->name('fbrpos.products.create');

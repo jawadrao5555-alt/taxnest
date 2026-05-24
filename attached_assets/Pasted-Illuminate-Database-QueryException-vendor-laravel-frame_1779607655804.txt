@@ -1,0 +1,107 @@
+Illuminate\Database\QueryException
+vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+SQLSTATE[HY000] [2002] Connection refused (Connection: mysql, Host: 127.0.0.1, Port: 9000, Database: taxnest_staging, SQL: select * from `pricing_plans` where `is_trial` = 0 and `product_type` = pos order by `price` asc)
+
+LARAVEL
+12.51.0
+PHP
+8.4.16
+UNHANDLED
+CODE 2002
+500
+GET
+https://deeb2ffc-615d-44ed-a0cd-b1cde9f84756-00-24lu1hpq4f5ka.worf.replit.dev/pos
+
+Exception trace
+11 vendor frames
+
+routes/web.php
+routes/web.php:138
+
+133Route::get('/di', function () {
+134    return redirect('/digital-invoice');
+135});
+136
+137Route::get('/pos', function () {
+138    $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'pos')->orderBy('price')->get();
+139    return view('pos.landing', ['plans' => $plans]);
+140})->name('pos.landing');
+141Route::get('/pos/login', [PosAuthController::class, 'showLogin'])->name('pos.login');
+142Route::post('/pos/login', [PosAuthController::class, 'login']);
+143Route::get('/pos/register', [PosAuthController::class, 'showRegister'])->name('pos.register');
+144Route::post('/pos/register', [PosAuthController::class, 'register']);
+145Route::post('/pos/logout', [PosAuthController::class, 'logout'])->name('pos.logout');
+146
+147Route::get('/pos/invoice/share/{token}', [PosController::class, 'publicInvoicePdf'])->name('pos.invoice.share');
+148
+149// ═══ Local Bills Archive Portal ═══
+150
+25 vendor frames
+
+App\Http\Middleware\SecurityHeaders->handle(object(Illuminate\Http\Request), object(Closure))
+app/Http/Middleware/SecurityHeaders.php:13
+
+23 vendor frames
+
+public/index.php
+public/index.php:30
+
+1 vendor frame
+
+Queries
+// No queries executed
+Headers
+host
+deeb2ffc-615d-44ed-a0cd-b1cde9f84756-00-24lu1hpq4f5ka.worf.replit.dev
+user-agent
+Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36
+accept
+text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+accept-encoding
+gzip, deflate, br, zstd
+accept-language
+en-US,en;q=0.9
+cookie
+XSRF-TOKEN=eyJpdiI6IlhRQnN2TklpS1JpSmRBYktiV2RvZnc9PSIsInZhbHVlIjoiTUk2dlRVMlVYM2RPaWdiNy9nQTA0OWpuU0hEQlRDMFBnblhSMGJ5NlFhQU1DcFF1bFBidHc0OE14MkU3OUF0S2xLSlRCeUxqTVExcHc5azVvMFBULzZOUUZHSnlhanFWZkR1Q0ZyK3dkWk44L3RUalVKam5BN0craHZjVDN0di8iLCJtYWMiOiI1OTJmZGQwNmYyNmJmZDdiYmVlN2I3YTQwZDcyYmFkZDFlOGJlNjNmMGRlZjc2NmUxNGQ4YzhjZDhkYjY5NjQzIiwidGFnIjoiIn0%3D; taxnest-session=eyJpdiI6Impka0RCV2s5WFhsQ0gyR2xzRGhiUFE9PSIsInZhbHVlIjoiNmtyRkFjUnpIYjY0QmxCVVFmeU9OY1VhTmdTazl3UXFma3R4UEswR0FuRjNpei8vdHhPWVBXZDBJSDhwQnRpcm5LM0E0WitjYTM0Nk1BNWZ5SkdPcG1KUzR2cDFzTHpqeFZGdmRMMDJicUwxVGMxWU5UQ3k3blI1TE5TRHdDYmIiLCJtYWMiOiI4NjdhOTRmODhiNjkzMTc2YzE0MTc5MGI2NDViYTNmNTM2NzdlNDY2MzAyYjIxNGVlZDE4ZmU2MzNlOGEzZThiIiwidGFnIjoiIn0%3D
+referer
+https://deeb2ffc-615d-44ed-a0cd-b1cde9f84756-00-24lu1hpq4f5ka.worf.replit.dev/
+sec-ch-ua
+"Chromium";v="148", "Google Chrome";v="148", "Not/A)Brand";v="99"
+sec-ch-ua-mobile
+?0
+sec-ch-ua-platform
+"Windows"
+sec-fetch-dest
+empty
+sec-fetch-mode
+navigate
+sec-fetch-site
+same-origin
+sec-fetch-storage-access
+active
+upgrade-insecure-requests
+1
+x-forwarded-for
+39.53.68.158, 10.83.8.34, 10.56.13.161, 127.0.0.1
+x-forwarded-host
+deeb2ffc-615d-44ed-a0cd-b1cde9f84756-00-24lu1hpq4f5ka.worf.replit.dev
+x-forwarded-proto
+https
+x-replit-user-bio
+x-replit-user-id
+x-replit-user-name
+x-replit-user-profile-image
+x-replit-user-roles
+x-replit-user-teams
+x-replit-user-url
+Body
+// No request body
+Routing
+controller
+Closure
+route name
+pos.landing
+middleware
+web
+Routing parameters
+// No routing parameters

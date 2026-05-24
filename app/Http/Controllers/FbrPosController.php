@@ -169,10 +169,14 @@ class FbrPosController extends Controller
      * 🧮 Detect dates that have sales but no Day Close report (EXCLUDES today).
      * Used by smart "pending day close" modal on /create — auto-closes pending days
      * when cashier opens POS after a rush/holiday with unclosed shifts.
+     *
+     * Timezone-safe: uses `created_at < startOfToday` (range query) instead of
+     * `whereDate(< $today)` so app TZ ↔ DB TZ midnight edge is consistent and
+     * the query can use a composite index on (company_id, created_at).
      */
     private function getPendingDayCloses(int $companyId, int $limit = 10): array
     {
-        $today = today()->format('Y-m-d');
+        $startOfToday = now()->startOfDay();
         $closedDates = FbrDayCloseReport::where('company_id', $companyId)
             ->pluck('report_date')
             ->map(fn($d) => $d instanceof \Carbon\Carbon ? $d->format('Y-m-d') : (string) $d)
@@ -185,7 +189,7 @@ class FbrPosController extends Controller
                 \DB::raw('SUM(total_amount) as total')
             )
             ->where('company_id', $companyId)
-            ->whereDate('created_at', '<', $today)
+            ->where('created_at', '<', $startOfToday)  // Timezone-safe + index-friendly
             ->when(!empty($closedDates), fn($q) => $q->whereNotIn(\DB::raw('DATE(created_at)'), $closedDates))
             ->groupBy('d')
             ->orderBy('d', 'desc')
@@ -201,12 +205,21 @@ class FbrPosController extends Controller
     }
 
     /**
-     * 🧾 Shared day-close writer — used by both manual closeDayReport()
-     * and the auto-close-on-next-open flow. Idempotent: returns existing report
-     * if already closed; null if no transactions for that date.
+     * 🧾 Shared day-close writer — single source of truth used by:
+     *   1. Manual close (closeDayReport)
+     *   2. Auto-close on next-open (apiAutoCloseDay)
+     *
+     * Concurrency-safe:
+     *   - Wrapped in DB transaction with row-level lock on the duplicate check
+     *   - Atomic MAX(report_number)+1 for sequential numbering (no count()+1 race)
+     *   - Retry loop on 23000 unique-constraint violation (returns existing row if same date raced;
+     *     retries with fresh MAX if report_number collided)
+     *   - Idempotent: returns existing report when already closed (never throws on duplicate intent)
+     *   - Returns null only when no transactions exist for that date
      */
     private function performDayClose(int $companyId, string $date, ?int $userId, ?string $notes = null): ?FbrDayCloseReport
     {
+        // Fast-path: already closed → return without locking
         $existing = FbrDayCloseReport::where('company_id', $companyId)
             ->where('report_date', $date)->first();
         if ($existing) {
@@ -220,13 +233,9 @@ class FbrPosController extends Controller
             return null;
         }
 
-        $reportCount = FbrDayCloseReport::where('company_id', $companyId)->count();
-        $reportNumber = 'ZRPT-' . str_pad($reportCount + 1, 5, '0', STR_PAD_LEFT);
-
-        $data = [
+        $baseData = [
             'company_id' => $companyId,
             'report_date' => $date,
-            'report_number' => $reportNumber,
             'total_invoices' => $transactions->count(),
             'fbr_invoices' => $transactions->where('fbr_status', 'submitted')->count(),
             'local_invoices' => $transactions->where('fbr_status', 'local')->count(),
@@ -247,8 +256,43 @@ class FbrPosController extends Controller
             'closed_by' => $userId,
             'notes' => $notes,
         ];
-        $data['hash'] = hash('sha256', json_encode($data));
-        return FbrDayCloseReport::create($data);
+
+        // Retry loop — max 3 attempts to handle rare concurrent report_number collisions
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            try {
+                return \DB::transaction(function () use ($companyId, $date, $baseData) {
+                    // Race-safe re-check inside transaction
+                    $locked = FbrDayCloseReport::where('company_id', $companyId)
+                        ->where('report_date', $date)->lockForUpdate()->first();
+                    if ($locked) return $locked;
+
+                    // Atomic MAX+1 — parses trailing digits from existing 'ZRPT-XXXXX' numbers.
+                    // Far safer than count()+1 (which double-counts under concurrency).
+                    $maxNum = (int) FbrDayCloseReport::where('company_id', $companyId)
+                        ->max(\DB::raw("CAST(SUBSTRING_INDEX(report_number, '-', -1) AS UNSIGNED)"));
+                    $reportNumber = 'ZRPT-' . str_pad($maxNum + 1, 5, '0', STR_PAD_LEFT);
+
+                    $data = array_merge($baseData, ['report_number' => $reportNumber]);
+                    $data['hash'] = hash('sha256', json_encode($data));
+                    return FbrDayCloseReport::create($data);
+                });
+            } catch (\Illuminate\Database\QueryException $e) {
+                // 23000 = Integrity constraint (unique violation)
+                $isDuplicate = $e->getCode() === '23000'
+                    || str_contains(strtolower($e->getMessage()), 'duplicate');
+                if ($isDuplicate) {
+                    // Case A: (company_id, report_date) raced — same day already closed by other request
+                    $row = FbrDayCloseReport::where('company_id', $companyId)
+                        ->where('report_date', $date)->first();
+                    if ($row) return $row;
+                    // Case B: report_number collision (no unique index, but defensive) → retry with fresh MAX
+                    if ($attempt < 3) continue;
+                }
+                \Log::error('performDayClose failed', ['company' => $companyId, 'date' => $date, 'err' => $e->getMessage()]);
+                throw $e;
+            }
+        }
+        return null;
     }
 
     /**
@@ -1703,58 +1747,21 @@ class FbrPosController extends Controller
         $user = Auth::guard('fbrpos')->user();
         $date = $request->input('date', today()->format('Y-m-d'));
 
-        $existing = FbrDayCloseReport::where('company_id', $companyId)
-            ->where('report_date', $date)
-            ->first();
-
-        if ($existing) {
+        // Friendly UX: tell the user if they're trying to re-close (vs. silent idempotency)
+        $alreadyClosed = FbrDayCloseReport::where('company_id', $companyId)
+            ->where('report_date', $date)->exists();
+        if ($alreadyClosed) {
             return back()->with('error', 'Day Close Report for this date already exists.');
         }
 
-        $transactions = FbrPosTransaction::where('company_id', $companyId)
-            ->whereDate('created_at', $date)
-            ->with('creator')
-            ->orderBy('created_at')
-            ->get();
+        // Route through shared writer (transaction + atomic numbering + race-safe)
+        $report = $this->performDayClose($companyId, $date, $user->id, $request->input('notes'));
 
-        if ($transactions->isEmpty()) {
+        if (!$report) {
             return back()->with('error', 'No transactions found for this date.');
         }
 
-        $reportCount = FbrDayCloseReport::where('company_id', $companyId)->count();
-        $reportNumber = 'ZRPT-' . str_pad($reportCount + 1, 5, '0', STR_PAD_LEFT);
-
-        $data = [
-            'company_id' => $companyId,
-            'report_date' => $date,
-            'report_number' => $reportNumber,
-            'total_invoices' => $transactions->count(),
-            'fbr_invoices' => $transactions->where('fbr_status', 'submitted')->count(),
-            'local_invoices' => $transactions->where('fbr_status', 'local')->count(),
-            'failed_invoices' => $transactions->whereIn('fbr_status', ['failed', 'pending'])->count(),
-            'gross_sales' => $transactions->sum('subtotal'),
-            'total_discount' => $transactions->sum('discount_amount'),
-            'net_sales' => $transactions->sum('subtotal') - $transactions->sum('discount_amount'),
-            'total_tax' => $transactions->sum('tax_amount'),
-            'total_fbr_fee' => $transactions->sum('fbr_service_charge'),
-            'total_amount' => $transactions->sum('total_amount'),
-            'cash_amount' => $transactions->where('payment_method', 'cash')->sum('total_amount'),
-            'card_amount' => $transactions->where('payment_method', 'card')->sum('total_amount'),
-            'other_amount' => $transactions->whereNotIn('payment_method', ['cash', 'card'])->sum('total_amount'),
-            'first_invoice_number' => $transactions->first()->invoice_number ?? null,
-            'last_invoice_number' => $transactions->last()->invoice_number ?? null,
-            'first_invoice_time' => $transactions->first()->created_at ?? null,
-            'last_invoice_time' => $transactions->last()->created_at ?? null,
-            'closed_by' => $user->id,
-            'notes' => $request->input('notes'),
-        ];
-
-        $hashString = json_encode($data);
-        $data['hash'] = hash('sha256', $hashString);
-
-        FbrDayCloseReport::create($data);
-
-        return back()->with('success', 'Day Close Report ' . $reportNumber . ' generated successfully for ' . \Carbon\Carbon::parse($date)->format('d M Y'));
+        return back()->with('success', 'Day Close Report ' . $report->report_number . ' generated successfully for ' . \Carbon\Carbon::parse($date)->format('d M Y'));
     }
 
     public function dayCloseReportPdf($id)

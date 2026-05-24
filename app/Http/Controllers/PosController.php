@@ -2392,7 +2392,12 @@ class PosController extends Controller
         $company = \App\Models\Company::find($companyId);
         $posType = $company->pos_type ?? 'retail';
         $categoryFields = PosProduct::categoryFields()[$posType] ?? [];
-        return view('pos.products', compact('products', 'posType', 'categoryFields'));
+        // For unified Product+Recipe modal: existing ingredients dropdown source
+        $ingredients = \App\Models\Ingredient::where('company_id', $companyId)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'unit', 'cost_per_unit']);
+        return view('pos.products', compact('products', 'posType', 'categoryFields', 'ingredients'));
     }
 
     /**
@@ -2548,7 +2553,69 @@ class PosController extends Controller
             }
         }
 
-        $product = PosProduct::create($data);
+        // ═══ Unified Product + Recipe (Single Box) ═══
+        // Wraps PosProduct creation AND optional recipe rows in one transaction
+        // so a failed ingredient/recipe write rolls back the product too — no orphans.
+        // Tracks counts so the cashier sees exactly what landed and what was skipped.
+        $recipeAdded = 0;
+        $recipeSkipped = 0;
+        $product = \DB::transaction(function () use ($data, $request, $companyId, &$recipeAdded, &$recipeSkipped) {
+            $product = PosProduct::create($data);
+
+            if ($request->has('ingredients') && is_array($request->input('ingredients'))) {
+                foreach ($request->input('ingredients') as $row) {
+                    if (!is_array($row)) continue;
+                    $qty = $row['quantity_needed'] ?? null;
+                    if ($qty === null || $qty === '' || !is_numeric($qty) || (float)$qty <= 0) {
+                        // Only count as skipped if the row had any meaningful intent
+                        if (!empty($row['ingredient_id']) || !empty($row['new_name'])) $recipeSkipped++;
+                        continue;
+                    }
+
+                    $ingredient = null;
+                    if (!empty($row['ingredient_id'])) {
+                        $ingredient = \App\Models\Ingredient::where('company_id', $companyId)
+                            ->where('id', $row['ingredient_id'])->first();
+                    } elseif (!empty($row['new_name']) && !empty($row['new_unit'])) {
+                        $name = trim($row['new_name']);
+                        $unit = trim($row['new_unit']);
+                        // Reuse if same name+unit already exists (case-insensitive) to avoid dupes
+                        $ingredient = \App\Models\Ingredient::where('company_id', $companyId)
+                            ->whereRaw('LOWER(name) = ?', [strtolower($name)])
+                            ->where('unit', $unit)
+                            ->first();
+                        if (!$ingredient) {
+                            $ingredient = \App\Models\Ingredient::create([
+                                'company_id' => $companyId,
+                                'name' => $name,
+                                'unit' => $unit,
+                                'cost_per_unit' => isset($row['new_cost']) && is_numeric($row['new_cost']) ? (float)$row['new_cost'] : 0,
+                                'current_stock' => 0,
+                                'min_stock_level' => 0,
+                                'is_active' => true,
+                            ]);
+                        }
+                    }
+                    if (!$ingredient) { $recipeSkipped++; continue; }
+
+                    // Avoid duplicate (product, ingredient) pair
+                    $exists = \App\Models\ProductRecipe::where('company_id', $companyId)
+                        ->where('product_id', $product->id)
+                        ->where('ingredient_id', $ingredient->id)
+                        ->exists();
+                    if ($exists) { $recipeSkipped++; continue; }
+
+                    \App\Models\ProductRecipe::create([
+                        'company_id' => $companyId,
+                        'product_id' => $product->id,
+                        'ingredient_id' => $ingredient->id,
+                        'quantity_needed' => (float)$qty,
+                    ]);
+                    $recipeAdded++;
+                }
+            }
+            return $product;
+        });
 
         // Auto-fetch image ONLY if cashier explicitly chose image_mode=auto.
         // Default (none) leaves the image field blank so the list shows
@@ -2562,7 +2629,15 @@ class PosController extends Controller
             } catch (\Exception $e) {}
         }
 
-        return back()->with('success', 'Product added successfully.');
+        // Build feedback message with recipe context so cashier sees exactly what landed
+        $msg = 'Product added successfully.';
+        if ($recipeAdded > 0) {
+            $msg .= " Recipe: {$recipeAdded} ingredient" . ($recipeAdded === 1 ? '' : 's') . " linked.";
+        }
+        if ($recipeSkipped > 0) {
+            $msg .= " ({$recipeSkipped} recipe row" . ($recipeSkipped === 1 ? '' : 's') . " skipped — missing qty or duplicate.)";
+        }
+        return back()->with('success', $msg);
     }
 
     public function downloadProductTemplate()

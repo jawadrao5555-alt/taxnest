@@ -162,7 +162,7 @@ class IngredientController extends Controller
                     'unit' => $request->new_ingredient_unit,
                     'cost_per_unit' => (float) ($request->new_ingredient_cost ?: 0),
                     'current_stock' => 0,
-                    'low_stock_threshold' => 0,
+                    'min_stock_level' => 0,
                     'is_active' => true,
                 ]);
             }

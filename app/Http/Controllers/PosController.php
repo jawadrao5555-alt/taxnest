@@ -2562,8 +2562,17 @@ class PosController extends Controller
         $product = \DB::transaction(function () use ($data, $request, $companyId, &$recipeAdded, &$recipeSkipped) {
             $product = PosProduct::create($data);
 
-            if ($request->has('ingredients') && is_array($request->input('ingredients'))) {
-                foreach ($request->input('ingredients') as $row) {
+            // Prefer JSON payload (robust to Alpine template-nesting); fall back to array form fields.
+            $ingredientRows = [];
+            if ($request->filled('ingredients_json')) {
+                $decoded = json_decode((string) $request->input('ingredients_json'), true);
+                if (is_array($decoded)) $ingredientRows = $decoded;
+            } elseif ($request->has('ingredients') && is_array($request->input('ingredients'))) {
+                $ingredientRows = $request->input('ingredients');
+            }
+
+            if (!empty($ingredientRows)) {
+                foreach ($ingredientRows as $row) {
                     if (!is_array($row)) continue;
                     $qty = $row['quantity_needed'] ?? null;
                     if ($qty === null || $qty === '' || !is_numeric($qty) || (float)$qty <= 0) {

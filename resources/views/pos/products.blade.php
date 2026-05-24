@@ -201,6 +201,12 @@
                     <svg class="w-4 h-4 transition-transform" :class="open && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                 </button>
 
+                {{-- SINGLE SOURCE OF TRUTH: serialize rows to hidden JSON on every change.
+                     Controller parses ingredients_json first; this completely bypasses Alpine
+                     <template x-if/x-for> form-submission edge cases that caused recipes to
+                     silently drop on save. Inputs below are UI-only (no name attribute). --}}
+                <input type="hidden" name="ingredients_json" :value="JSON.stringify(rows)">
+
                 <div x-show="open" x-transition class="mt-3 space-y-2" x-cloak>
                     <div class="text-[11px] text-gray-600 dark:text-gray-400 bg-purple-50/50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800 rounded-lg px-3 py-2">
                         <strong class="text-purple-700 dark:text-purple-300">Tip:</strong> "Qty Needed" = ek product banane ke liye kitna ingredient lagta hai (e.g. Burger ke liye 0.2 kg meat). Naya ingredient ho to <strong>"New"</strong> select kar ke usi waqt naam, unit, cost dijiye — alag se Ingredients page jane ki zarurat nahi.
@@ -217,53 +223,47 @@
                                 </select>
                             </div>
 
-                            {{-- Existing ingredient picker (only renders when mode=existing → not submitted otherwise) --}}
-                            <template x-if="row.mode === 'existing'">
-                                <div class="col-span-12 sm:col-span-5">
-                                    <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400 mb-1">Pick Ingredient</label>
-                                    <select :name="`ingredients[${idx}][ingredient_id]`" x-model="row.ingredient_id"
-                                            class="w-full text-xs rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white px-2 py-1.5 focus:ring-2 focus:ring-purple-500">
-                                        <option value="">— select —</option>
-                                        <template x-for="ing in ings" :key="ing.id">
-                                            <option :value="ing.id" x-text="ing.name + ' (' + ing.unit + ')'"></option>
-                                        </template>
-                                    </select>
-                                    <template x-if="ings.length === 0">
-                                        <p class="text-[10px] text-amber-600 dark:text-amber-400 mt-1">Koi ingredient nahi — niche "+ New" choose karke create karein.</p>
+                            {{-- Existing ingredient picker --}}
+                            <div class="col-span-12 sm:col-span-5" x-show="row.mode === 'existing'">
+                                <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400 mb-1">Pick Ingredient</label>
+                                <select x-model="row.ingredient_id"
+                                        class="w-full text-xs rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white px-2 py-1.5 focus:ring-2 focus:ring-purple-500">
+                                    <option value="">— select —</option>
+                                    <template x-for="ing in ings" :key="ing.id">
+                                        <option :value="ing.id" x-text="ing.name + ' (' + ing.unit + ')'"></option>
                                     </template>
-                                </div>
-                            </template>
+                                </select>
+                                <p x-show="ings.length === 0" class="text-[10px] text-amber-600 dark:text-amber-400 mt-1">Koi ingredient nahi — "+ New" choose karke create karein.</p>
+                            </div>
 
-                            {{-- New ingredient inline (only renders when mode=new) --}}
-                            <template x-if="row.mode === 'new'">
-                                <div class="col-span-12 sm:col-span-5 grid grid-cols-3 gap-1.5">
-                                    <div>
-                                        <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400 mb-1">New Name *</label>
-                                        <input type="text" :name="`ingredients[${idx}][new_name]`" x-model="row.new_name" placeholder="e.g. Chicken Breast" class="w-full text-xs rounded-md border border-emerald-300 dark:border-emerald-700 bg-emerald-50/30 dark:bg-emerald-900/10 text-gray-900 dark:text-white px-2 py-1.5 focus:ring-2 focus:ring-emerald-500">
-                                    </div>
-                                    <div>
-                                        <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400 mb-1">Unit *</label>
-                                        <select :name="`ingredients[${idx}][new_unit]`" x-model="row.new_unit" class="w-full text-xs rounded-md border border-emerald-300 dark:border-emerald-700 bg-emerald-50/30 dark:bg-emerald-900/10 text-gray-900 dark:text-white px-1.5 py-1.5">
-                                            <option value="KGS">KGS</option>
-                                            <option value="GMS">GMS</option>
-                                            <option value="LTR">LTR</option>
-                                            <option value="ML">ML</option>
-                                            <option value="PCS">PCS</option>
-                                            <option value="DOZ">DOZ</option>
-                                            <option value="PKT">PKT</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400 mb-1">Cost/Unit</label>
-                                        <input type="number" :name="`ingredients[${idx}][new_cost]`" x-model="row.new_cost" step="0.01" min="0" placeholder="0" class="w-full text-xs rounded-md border border-emerald-300 dark:border-emerald-700 bg-emerald-50/30 dark:bg-emerald-900/10 text-gray-900 dark:text-white px-2 py-1.5 focus:ring-2 focus:ring-emerald-500">
-                                    </div>
+                            {{-- New ingredient inline --}}
+                            <div class="col-span-12 sm:col-span-5 grid grid-cols-3 gap-1.5" x-show="row.mode === 'new'">
+                                <div>
+                                    <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400 mb-1">New Name *</label>
+                                    <input type="text" x-model="row.new_name" placeholder="e.g. Chicken Breast" class="w-full text-xs rounded-md border border-emerald-300 dark:border-emerald-700 bg-emerald-50/30 dark:bg-emerald-900/10 text-gray-900 dark:text-white px-2 py-1.5 focus:ring-2 focus:ring-emerald-500">
                                 </div>
-                            </template>
+                                <div>
+                                    <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400 mb-1">Unit *</label>
+                                    <select x-model="row.new_unit" class="w-full text-xs rounded-md border border-emerald-300 dark:border-emerald-700 bg-emerald-50/30 dark:bg-emerald-900/10 text-gray-900 dark:text-white px-1.5 py-1.5">
+                                        <option value="KGS">KGS</option>
+                                        <option value="GMS">GMS</option>
+                                        <option value="LTR">LTR</option>
+                                        <option value="ML">ML</option>
+                                        <option value="PCS">PCS</option>
+                                        <option value="DOZ">DOZ</option>
+                                        <option value="PKT">PKT</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400 mb-1">Cost/Unit</label>
+                                    <input type="number" x-model="row.new_cost" step="0.01" min="0" placeholder="0" class="w-full text-xs rounded-md border border-emerald-300 dark:border-emerald-700 bg-emerald-50/30 dark:bg-emerald-900/10 text-gray-900 dark:text-white px-2 py-1.5 focus:ring-2 focus:ring-emerald-500">
+                                </div>
+                            </div>
 
                             {{-- Quantity needed per 1 product --}}
                             <div class="col-span-8 sm:col-span-4">
                                 <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400 mb-1">Qty Needed (per 1 product) *</label>
-                                <input type="number" :name="`ingredients[${idx}][quantity_needed]`" x-model="row.quantity_needed" step="0.0001" min="0" placeholder="e.g. 0.2"
+                                <input type="number" x-model="row.quantity_needed" step="0.0001" min="0" placeholder="e.g. 0.2"
                                        class="w-full text-xs rounded-md border border-purple-300 dark:border-purple-700 bg-purple-50/30 dark:bg-purple-900/10 text-gray-900 dark:text-white px-2 py-1.5 focus:ring-2 focus:ring-purple-500">
                             </div>
 
@@ -279,6 +279,12 @@
                             class="w-full text-xs font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-900/50 border-2 border-dashed border-purple-300 dark:border-purple-700 rounded-lg py-2 transition">
                         + Add Another Ingredient
                     </button>
+
+                    {{-- Live preview of what will be saved (debug-friendly for cashier) --}}
+                    <div x-show="rows.length > 0" class="text-[11px] text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2 font-mono">
+                        <span class="font-bold">Save par:</span>
+                        <span x-text="rows.filter(r => r.quantity_needed > 0 && (r.ingredient_id || (r.new_name && r.new_unit))).length"></span> ingredient(s) link honge.
+                    </div>
                 </div>
             </div>
 

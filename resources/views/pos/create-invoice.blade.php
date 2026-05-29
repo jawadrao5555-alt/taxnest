@@ -492,18 +492,19 @@
                                         tabindex="-1"
                                         class="px-2.5 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 active:bg-emerald-100 dark:active:bg-emerald-900/50 font-bold text-lg leading-none transition select-none"
                                         aria-label="Decrease quantity">−</button>
+                                    {{-- Qty typing FIX: method-based handlers + x-effect (skipped while focused).
+                                         x-model.number on a type=text field was wiping keystrokes mid-type
+                                         (same issue universal/restaurant POS already fixed this way). --}}
                                     <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6"
+                                        data-qty-input
                                         :data-qty-row="index"
-                                        x-model.number="item.quantity"
-                                        @input.debounce.20ms="recalculate(); $event.target.dataset._fresh = '0'"
-                                        @focus="$event.target.dataset._fresh = '1'; try { $event.target.select(); } catch(e){}"
-                                        @click.stop="$event.target.dataset._fresh = '1'; try { $event.target.select(); } catch(e){}"
-                                        @blur="$event.target.dataset._fresh = '0'; if (!Number.isFinite(item.quantity) || item.quantity < 1) { item.quantity = 1; } recalculate();"
-                                        @keydown.arrow-up.prevent="cartNav(-1, index)"
-                                        @keydown.arrow-down.prevent="cartNav(1, index)"
-                                        @keydown.enter.prevent="cartNav(1, index)"
-                                        @keydown.escape.prevent="$event.target.blur()"
-                                        @keydown="if (/^[0-9]$/.test($event.key) && !$event.ctrlKey && !$event.metaKey && !$event.altKey && !$event.shiftKey) { const t = $event.target; if (t.dataset._fresh === '1') { $event.preventDefault(); t.value = $event.key; item.quantity = parseInt($event.key,10) || 0; t.dispatchEvent(new Event('input',{bubbles:true})); t.dataset._fresh = '0'; try { t.setSelectionRange(1,1); } catch(e){} } }"
+                                        x-init="$el.value = item.quantity"
+                                        x-effect="if (document.activeElement !== $el) { $el.value = item.quantity; }"
+                                        @focus="onQtyFocus(index, $event)"
+                                        @click.stop="onQtyFocus(index, $event)"
+                                        @input="onQtyInput(index, $event)"
+                                        @blur="onQtyBlur(index, $event)"
+                                        @keydown="onQtyKeydown(index, $event)"
                                         class="flex-1 min-w-0 bg-transparent text-center text-base font-bold tabular-nums text-gray-900 dark:text-gray-100 px-1 py-2 border-0 focus:outline-none focus:ring-0">
                                     <button type="button"
                                         @click.stop="qtyInc(index)"
@@ -785,6 +786,52 @@
                             } catch (e) {}
                         }
                     });
+                },
+                // ─── Qty input method handlers (bullet-proof typing) ───
+                // Replaces fragile x-model.number + inline expressions. x-effect on the
+                // element re-syncs $el.value ONLY when not focused, so live typing is
+                // never wiped by a reactive re-render mid-keystroke.
+                onQtyFocus(index, e) {
+                    this.activeItemIndex = index;
+                    const t = e.target;
+                    if (t) { t.dataset._fresh = '1'; try { t.select(); } catch (_) {} }
+                },
+                onQtyInput(index, e) {
+                    const t = e.target;
+                    if (!t || !this.items[index]) return;
+                    t.dataset._fresh = '0';
+                    // Integer-only qty (recalculate uses parseInt) — strip everything else.
+                    let v = (t.value || '').replace(/[^0-9]/g, '');
+                    t.value = v;
+                    this.items[index].quantity = v === '' ? '' : (parseInt(v, 10) || 0);
+                    this.recalculate();
+                },
+                onQtyBlur(index, e) {
+                    const t = e.target;
+                    if (t) t.dataset._fresh = '0';
+                    if (!this.items[index]) return;
+                    let n = parseInt(this.items[index].quantity, 10);
+                    if (!Number.isFinite(n) || n < 1) n = 1;
+                    this.items[index].quantity = n;
+                    this.recalculate();
+                },
+                onQtyKeydown(index, e) {
+                    if (e.key === 'ArrowUp')   { e.preventDefault(); this.cartNav(-1, index); return; }
+                    if (e.key === 'ArrowDown') { e.preventDefault(); this.cartNav(1, index); return; }
+                    if (e.key === 'Enter')     { e.preventDefault(); this.cartNav(1, index); return; }
+                    if (e.key === 'Escape')    { e.preventDefault(); e.target.blur(); return; }
+                    // Fresh-digit: first digit after focus (text is selected) replaces value.
+                    if (/^[0-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+                        const t = e.target;
+                        if (t && t.dataset._fresh === '1') {
+                            e.preventDefault();
+                            t.value = e.key;
+                            this.items[index].quantity = parseInt(e.key, 10) || 0;
+                            t.dataset._fresh = '0';
+                            try { t.setSelectionRange(1, 1); } catch (_) {}
+                            this.recalculate();
+                        }
+                    }
                 },
                 // ═══ END PHASE 1 cart keyboard engine ═══
 

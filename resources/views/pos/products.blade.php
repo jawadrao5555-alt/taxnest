@@ -58,7 +58,7 @@
     </div>
 
     <div id="addProductForm" class="hidden mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-md p-5"
-         x-data="{ exempt: false }">
+         x-data="{ exempt: false, price: '', cost: '' }">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">Add New Product</h3>
 
         {{-- PRA POS tax model helper: keeps UX simple per Pakistan PRA flow --}}
@@ -72,71 +72,118 @@
             </div>
         </div>
 
-        <form method="POST" action="{{ route('pos.products.store') }}" enctype="multipart/form-data" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <form method="POST" action="{{ route('pos.products.store') }}" enctype="multipart/form-data" class="space-y-5">
             @csrf
-            <div>
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Product Name *</label>
-                <input type="text" name="name" required placeholder="Enter product name" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+
+            {{-- ── SECTION: Basic Information ── --}}
+            <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/20 p-4">
+                <div class="flex items-center gap-2 mb-3">
+                    <svg class="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z"/></svg>
+                    <span class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Basic Information</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Product Name *</label>
+                        <input type="text" name="name" required placeholder="Enter product name" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Category</label>
+                        <input type="text" name="category" placeholder="e.g. Food, Electronics" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">SKU</label>
+                        <input type="text" name="sku" placeholder="Product SKU" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div class="sm:col-span-2 lg:col-span-3">
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Description <span class="text-gray-400">(optional)</span></label>
+                        <input type="text" name="description" placeholder="Short description" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Barcode</label>
+                        <input type="text" name="barcode" placeholder="Barcode number" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                    </div>
+                </div>
             </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Price (PKR) *</label>
-                <input type="number" name="price" required step="0.01" min="0" placeholder="0.00" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+
+            {{-- ── SECTION: Pricing & Tax ── --}}
+            <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/20 p-4">
+                <div class="flex items-center gap-2 mb-3">
+                    <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Pricing &amp; Tax</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Price (PKR) *</label>
+                        <input type="number" name="price" x-model.number="price" required step="0.01" min="0" placeholder="0.00" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Cost Price <span class="text-gray-400">(for profit)</span></label>
+                        <input type="number" name="cost_price" x-model.number="cost" step="0.01" min="0" placeholder="0.00" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                    {{-- Unified Tax cell: rate + exempt toggle, both prominent --}}
+                    <div class="rounded-lg border-2 p-2.5 transition-all"
+                         :class="exempt ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20' : 'border-purple-200 dark:border-purple-800 bg-purple-50/30 dark:bg-purple-900/10'">
+                        <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">Tax Setup</label>
+                        {{-- When exempt is on, the visible input is disabled (won't submit). This hidden input ensures tax_rate=0 still posts. --}}
+                        <template x-if="exempt"><input type="hidden" name="tax_rate" value="0"></template>
+                        <input type="number" name="tax_rate" step="0.01" min="0" max="100"
+                               :placeholder="exempt ? '0 (exempt)' : '16'"
+                               :disabled="exempt"
+                               class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5 focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-gray-700">
+                        <label class="flex items-center gap-2 mt-2 cursor-pointer select-none">
+                            <input type="checkbox" name="is_tax_exempt" value="1" x-model="exempt"
+                                   class="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                            <span class="text-xs font-bold uppercase tracking-wider"
+                                  :class="exempt ? 'text-amber-700 dark:text-amber-300' : 'text-gray-600 dark:text-gray-400'">
+                                Tax Exempt (Tax-Free)
+                            </span>
+                        </label>
+                    </div>
+                </div>
+                {{-- Live profit / margin preview (computes as you type) --}}
+                <div x-show="Number(price) > 0 && Number(cost) > 0 && Number(cost) <= Number(price)" x-cloak
+                     class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2">
+                    <span>Margin: <span class="font-extrabold" x-text="Math.round((Number(price) - Number(cost)) / Number(price) * 100) + '%'"></span></span>
+                    <span>Profit / unit: <span class="font-extrabold" x-text="'Rs ' + (Number(price) - Number(cost)).toFixed(2)"></span></span>
+                </div>
+                <div x-show="Number(price) > 0 && Number(cost) > Number(price)" x-cloak
+                     class="mt-3 flex items-center gap-2 text-xs font-semibold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
+                    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                    Cost price, sale price se zyada hai — yeh product loss par jayega.
+                </div>
             </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Cost Price <span class="text-gray-400">(for profit)</span></label>
-                <input type="number" name="cost_price" step="0.01" min="0" placeholder="0.00" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-emerald-500">
+            {{-- ── SECTION: Inventory & Unit ── --}}
+            <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/20 p-4">
+                <div class="flex items-center gap-2 mb-3">
+                    <svg class="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    <span class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Inventory &amp; Unit</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Unit (UOM)</label>
+                        <select name="uom" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                            <option value="NOS">NOS (Numbers)</option>
+                            <option value="KGS">KGS (Kilograms)</option>
+                            <option value="LTR">LTR (Liters)</option>
+                            <option value="MTR">MTR (Meters)</option>
+                            <option value="PCS">PCS (Pieces)</option>
+                            <option value="PKT">PKT (Packets)</option>
+                            <option value="BOX">BOX (Boxes)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Opening Stock <span class="text-gray-400">(blank = not tracked)</span></label>
+                        <input type="number" name="stock_quantity" step="1" min="0" placeholder="e.g. 50" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Low-Stock Alert At</label>
+                        <input type="number" name="low_stock_threshold" step="1" min="0" value="10" placeholder="10" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-amber-500">
+                    </div>
+                </div>
             </div>
-            {{-- Unified Tax cell: rate + exempt toggle, both prominent --}}
-            <div class="rounded-lg border-2 p-2.5 transition-all"
-                 :class="exempt ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20' : 'border-purple-200 dark:border-purple-800 bg-purple-50/30 dark:bg-purple-900/10'">
-                <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">Tax Setup</label>
-                {{-- When exempt is on, the visible input is disabled (won't submit). This hidden input ensures tax_rate=0 still posts. --}}
-                <template x-if="exempt"><input type="hidden" name="tax_rate" value="0"></template>
-                <input type="number" name="tax_rate" step="0.01" min="0" max="100"
-                       :placeholder="exempt ? '0 (exempt)' : '16'"
-                       :disabled="exempt"
-                       class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5 focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-gray-700">
-                <label class="flex items-center gap-2 mt-2 cursor-pointer select-none">
-                    <input type="checkbox" name="is_tax_exempt" value="1" x-model="exempt"
-                           class="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
-                    <span class="text-xs font-bold uppercase tracking-wider"
-                          :class="exempt ? 'text-amber-700 dark:text-amber-300' : 'text-gray-600 dark:text-gray-400'">
-                        Tax Exempt (Tax-Free)
-                    </span>
-                </label>
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Category</label>
-                <input type="text" name="category" placeholder="e.g. Food, Electronics" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">SKU</label>
-                <input type="text" name="sku" placeholder="Product SKU" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Barcode</label>
-                <input type="text" name="barcode" placeholder="Barcode number" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Unit (UOM)</label>
-                <select name="uom" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
-                    <option value="NOS">NOS (Numbers)</option>
-                    <option value="KGS">KGS (Kilograms)</option>
-                    <option value="LTR">LTR (Liters)</option>
-                    <option value="MTR">MTR (Meters)</option>
-                    <option value="PCS">PCS (Pieces)</option>
-                    <option value="PKT">PKT (Packets)</option>
-                    <option value="BOX">BOX (Boxes)</option>
-                </select>
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Opening Stock <span class="text-gray-400">(blank = not tracked)</span></label>
-                <input type="number" name="stock_quantity" step="1" min="0" placeholder="e.g. 50" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-emerald-500">
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Low-Stock Alert At</label>
-                <input type="number" name="low_stock_threshold" step="1" min="0" value="10" placeholder="10" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-amber-500">
-            </div>
+
+            {{-- ── SECTION: Product Image ── --}}
+            <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/20 p-4">
             <div x-data="{ mode: 'none' }">
                 <label class="flex items-center justify-between text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     <span class="flex items-center gap-1.5">
@@ -174,9 +221,14 @@
                     System khud product ke naam ki picture internet se laye ga.
                 </div>
             </div>
+            </div>
             @if(count($categoryFields) > 0)
-            <div class="col-span-full border-t border-gray-200 dark:border-gray-700 pt-3 mt-1">
-                <p class="text-xs font-bold uppercase tracking-widest text-purple-600 dark:text-purple-400 mb-3">{{ ucfirst($posType) }} Fields</p>
+            {{-- ── SECTION: Category-specific Fields ── --}}
+            <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/20 p-4">
+                <div class="flex items-center gap-2 mb-3">
+                    <svg class="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                    <span class="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">{{ ucfirst($posType) }} Fields</span>
+                </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     @include('pos.partials.category-fields', ['categoryFields' => $categoryFields, 'product' => null])
                 </div>

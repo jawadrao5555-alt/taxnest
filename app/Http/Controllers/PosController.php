@@ -2525,6 +2525,8 @@ class PosController extends Controller
             'barcode' => 'nullable|string|max:100',
             'uom' => 'nullable|string|max:20',
             'description' => 'nullable|string|max:500',
+            'stock_quantity' => 'nullable|integer|min:0',
+            'low_stock_threshold' => 'nullable|integer|min:0',
             'image' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:2048',
             'batch_number' => 'nullable|string|max:100',
             'expiry_date' => 'nullable|date',
@@ -2559,6 +2561,8 @@ class PosController extends Controller
             'description' => $request->description,
             'price' => $request->price,
             'cost_price' => $request->filled('cost_price') ? $request->cost_price : 0,
+            'stock_quantity' => $request->filled('stock_quantity') ? (int) $request->stock_quantity : null,
+            'low_stock_threshold' => $request->filled('low_stock_threshold') ? (int) $request->low_stock_threshold : 10,
             // Backend hardening: exempt MUST persist tax_rate=0 regardless of what (if anything) UI submitted
             'tax_rate' => $isExempt ? 0 : ($request->tax_rate ?? 0),
             'category' => $request->category,
@@ -2850,6 +2854,8 @@ class PosController extends Controller
             'barcode' => 'nullable|string|max:100',
             'uom' => 'nullable|string|max:20',
             'description' => 'nullable|string|max:500',
+            'stock_quantity' => 'nullable|integer|min:0',
+            'low_stock_threshold' => 'nullable|integer|min:0',
             'image' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:2048',
             'batch_number' => 'nullable|string|max:100',
             'expiry_date' => 'nullable|date',
@@ -2876,6 +2882,8 @@ class PosController extends Controller
             $request->only(['name', 'description', 'price', 'category', 'sku', 'barcode', 'uom']),
             [
                 'cost_price' => $request->filled('cost_price') ? $request->cost_price : 0,
+                'stock_quantity' => $request->filled('stock_quantity') ? (int) $request->stock_quantity : null,
+                'low_stock_threshold' => $request->filled('low_stock_threshold') ? (int) $request->low_stock_threshold : ($product->low_stock_threshold ?? 10),
                 // Backend hardening: exempt MUST force tax_rate=0; otherwise honor submitted value (or keep current if absent)
                 'tax_rate' => $isExempt ? 0 : ($request->has('tax_rate') ? $request->tax_rate : $product->tax_rate),
                 'is_tax_exempt' => $isExempt,
@@ -2941,6 +2949,71 @@ class PosController extends Controller
         $product = PosProduct::where('company_id', $companyId)->findOrFail($id);
         $product->update(['is_active' => !$product->is_active]);
         return back()->with('success', $product->is_active ? 'Product activated.' : 'Product deactivated.');
+    }
+
+    /**
+     * Bulk actions on selected products (company-scoped).
+     * action: activate | deactivate | delete | category (with category_value).
+     */
+    public function bulkProductAction(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $request->validate([
+            'action' => 'required|string|in:activate,deactivate,delete,category',
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer',
+            'category_value' => 'nullable|string|max:100',
+        ]);
+
+        $query = PosProduct::where('company_id', $companyId)->whereIn('id', $request->ids);
+        $count = (clone $query)->count();
+
+        switch ($request->action) {
+            case 'activate':
+                $query->update(['is_active' => true]);
+                $msg = "{$count} product(s) activated.";
+                break;
+            case 'deactivate':
+                $query->update(['is_active' => false]);
+                $msg = "{$count} product(s) deactivated.";
+                break;
+            case 'category':
+                $query->update(['category' => $request->category_value ?: null]);
+                $msg = "{$count} product(s) re-categorized.";
+                break;
+            case 'delete':
+                // Clean up images before delete
+                foreach ((clone $query)->whereNotNull('image')->pluck('image') as $img) {
+                    if ($img && \Illuminate\Support\Facades\Storage::disk('public')->exists('products/' . $img)) {
+                        \Illuminate\Support\Facades\Storage::disk('public')->delete('products/' . $img);
+                    }
+                }
+                $query->delete();
+                $msg = "{$count} product(s) deleted.";
+                break;
+            default:
+                $msg = 'No action taken.';
+        }
+
+        return back()->with('success', $msg);
+    }
+
+    /**
+     * Printable barcode/price label sheet for selected products (or all).
+     * Renders A4 grid of labels; client-side JsBarcode draws Code128 from
+     * barcode (fallback: sku, then PRA-<id>).
+     */
+    public function productLabels(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $ids = array_filter(array_map('intval', explode(',', (string) $request->query('ids', ''))));
+        $query = PosProduct::where('company_id', $companyId)->orderBy('name');
+        if (!empty($ids)) {
+            $query->whereIn('id', $ids);
+        }
+        $products = $query->get();
+        $company = \App\Models\Company::find($companyId);
+        return view('pos.product-labels', compact('products', 'company'));
     }
 
     public function customers()

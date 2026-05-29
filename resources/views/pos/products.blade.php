@@ -129,6 +129,14 @@
                     <option value="BOX">BOX (Boxes)</option>
                 </select>
             </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Opening Stock <span class="text-gray-400">(blank = not tracked)</span></label>
+                <input type="number" name="stock_quantity" step="1" min="0" placeholder="e.g. 50" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Low-Stock Alert At</label>
+                <input type="number" name="low_stock_threshold" step="1" min="0" value="10" placeholder="10" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-amber-500">
+            </div>
             <div x-data="{ mode: 'none' }">
                 <label class="flex items-center justify-between text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     <span class="flex items-center gap-1.5">
@@ -332,169 +340,453 @@
         </form>
     </div>
 
-    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-md overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm table-cards">
-                <thead>
-                    <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-                        <th class="px-4 py-3">Product</th>
-                        <th class="px-4 py-3 hidden md:table-cell">Category</th>
-                        <th class="px-4 py-3 hidden lg:table-cell">SKU</th>
-                        <th class="px-4 py-3 text-right">Price</th>
-                        <th class="px-4 py-3 text-right hidden sm:table-cell">Tax %</th>
-                        <th class="px-4 py-3 text-center hidden sm:table-cell">Status</th>
-                        <th class="px-4 py-3 text-center">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100 dark:divide-gray-800" x-data="{ editingId: null }">
-                    @forelse($products as $product)
-                    <tr class="{{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }} {{ !$product->is_active ? 'opacity-50' : '' }}" x-show="editingId !== {{ $product->id }}">
-                        <td class="px-4 py-3">
-                            <div class="flex items-center gap-3">
-                                @if($product->image)
-                                    <img src="{{ asset('storage/products/' . $product->image) }}" alt="{{ $product->name }}" class="w-10 h-10 rounded-lg object-cover bg-gray-100 dark:bg-gray-700 flex-shrink-0 border border-gray-200 dark:border-gray-700 shadow-sm" onerror="this.style.display='none'">
-                                @else
-                                    {{-- name-only mode: deterministic-color initials chip (hash → unique HSL hue per product).
-                                         Text uses fixed L=20% with high saturation → guaranteed ≥4.5:1 contrast (WCAG AA) on bg L=92%. --}}
-                                    @php
-                                        $hue = crc32($product->name) % 360;
-                                        $bgStyle = "background: linear-gradient(135deg, hsl({$hue}, 70%, 92%) 0%, hsl(" . (($hue + 30) % 360) . ", 70%, 88%) 100%); color: hsl({$hue}, 80%, 20%); border-color: hsl({$hue}, 55%, 75%); box-shadow: 0 2px 6px -2px hsl({$hue}, 60%, 70%);";
-                                    @endphp
-                                    <div class="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center text-[12px] font-extrabold border tracking-tight" style="{{ $bgStyle }}">
-                                        {{ strtoupper(mb_substr($product->name, 0, 2)) }}
+    @php
+        $catFieldNames = array_values($categoryFields ?? []);
+        $boolCatFields = ['prescription_required', 'weight_based', 'custom_order'];
+        $productsJson = $products->map(function ($p) use ($catFieldNames, $boolCatFields) {
+            $row = [
+                'id' => $p->id,
+                'name' => $p->name,
+                'description' => $p->description,
+                'price' => (float) $p->price,
+                'cost_price' => (float) ($p->cost_price ?? 0),
+                'tax_rate' => (float) $p->tax_rate,
+                'is_tax_exempt' => (bool) $p->is_tax_exempt,
+                'category' => $p->category,
+                'sku' => $p->sku,
+                'barcode' => $p->barcode,
+                'uom' => $p->uom ?? 'NOS',
+                'is_active' => (bool) $p->is_active,
+                'stock_quantity' => $p->stock_quantity,
+                'low_stock_threshold' => $p->low_stock_threshold ?? 10,
+                'image' => $p->image,
+                'image_url' => $p->image ? asset('storage/products/' . $p->image) : null,
+            ];
+            foreach ($catFieldNames as $cf) {
+                $val = $p->$cf;
+                if ($val instanceof \Carbon\Carbon) $val = $val->format('Y-m-d');
+                if (in_array($cf, $boolCatFields)) $val = (bool) $val;
+                $row[$cf] = $val;
+            }
+            return $row;
+        })->values();
+    @endphp
+
+    <div x-data="productCatalog()" x-cloak>
+        <style>[x-cloak]{display:none!important;}</style>
+
+        {{-- ═══ STATS BAR ═══ --}}
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
+            <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-3.5 shadow-sm">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Total Products</div>
+                <div class="text-2xl font-extrabold text-gray-900 dark:text-white mt-0.5" x-text="stats.total"></div>
+            </div>
+            <div class="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10 p-3.5 shadow-sm">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Active</div>
+                <div class="text-2xl font-extrabold text-emerald-700 dark:text-emerald-300 mt-0.5" x-text="stats.active"></div>
+            </div>
+            <div class="rounded-xl border p-3.5 shadow-sm transition-colors"
+                 :class="stats.lowStock > 0 ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'">
+                <div class="text-[10px] font-bold uppercase tracking-wider" :class="stats.lowStock > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-400'">Low Stock</div>
+                <div class="text-2xl font-extrabold mt-0.5" :class="stats.lowStock > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'" x-text="stats.lowStock"></div>
+            </div>
+            <div class="rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-900/10 p-3.5 shadow-sm">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Stock Value</div>
+                <div class="text-lg font-extrabold text-purple-700 dark:text-purple-300 mt-1.5" x-text="'Rs ' + fmt(stats.stockValue)"></div>
+            </div>
+            <div class="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10 p-3.5 shadow-sm col-span-2 sm:col-span-1">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Avg Margin</div>
+                <div class="text-2xl font-extrabold text-blue-700 dark:text-blue-300 mt-0.5" x-text="stats.avgMargin !== null ? stats.avgMargin + '%' : '—'"></div>
+            </div>
+        </div>
+
+        {{-- ═══ TOOLBAR ═══ --}}
+        <div class="flex flex-col lg:flex-row lg:items-center gap-2 mb-3">
+            <div class="relative flex-1">
+                <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input type="text" x-model="search" placeholder="Search name, SKU, barcode, category…"
+                       class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white pl-9 pr-3 py-2 focus:ring-2 focus:ring-purple-500">
+            </div>
+            <select x-model="catFilter" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                <option value="">All Categories</option>
+                <template x-for="c in categories" :key="c"><option :value="c" x-text="c"></option></template>
+            </select>
+            <select x-model="statusFilter" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                <option value="">All Status</option>
+                <option value="active">Active only</option>
+                <option value="inactive">Inactive only</option>
+                <option value="low">Low stock</option>
+            </select>
+            <select x-model="sortKey" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                <option value="name">Name</option>
+                <option value="price">Price</option>
+                <option value="stock_quantity">Stock</option>
+                <option value="margin">Margin</option>
+                <option value="category">Category</option>
+            </select>
+            <button @click="sortDir = (sortDir === 'asc' ? 'desc' : 'asc')" :title="sortDir === 'asc' ? 'Ascending' : 'Descending'"
+                    class="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                <span x-text="sortDir === 'asc' ? '↑' : '↓'" class="font-bold"></span>
+            </button>
+            <div class="flex rounded-lg border border-gray-300 dark:border-gray-700 overflow-hidden">
+                <button @click="view = 'table'" :class="view === 'table' ? 'bg-purple-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-500'" class="px-3 py-2" title="Table view">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+                <button @click="view = 'grid'" :class="view === 'grid' ? 'bg-purple-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-500'" class="px-3 py-2" title="Grid view">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
+                </button>
+            </div>
+            <a :href="labelsUrl()" target="_blank"
+               class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                <span x-text="selected.length > 0 ? 'Print ' + selected.length : 'Print Labels'"></span>
+            </a>
+        </div>
+
+        {{-- ═══ BULK ACTION BAR ═══ --}}
+        <div x-show="selected.length > 0" x-transition
+             class="flex flex-wrap items-center gap-2 mb-3 p-3 rounded-xl bg-purple-600 text-white shadow-lg">
+            <span class="font-bold text-sm" x-text="selected.length + ' selected'"></span>
+            <div class="flex-1"></div>
+            <button @click="doBulk('activate')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">Activate</button>
+            <button @click="doBulk('deactivate')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">Deactivate</button>
+            <button @click="doBulk('category')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">Set Category</button>
+            <button @click="doBulk('delete')" class="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-xs font-semibold">Delete</button>
+            <button @click="clearSelect()" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold">Clear</button>
+        </div>
+
+        {{-- ═══ TABLE VIEW ═══ --}}
+        <div x-show="view === 'table'" class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-md overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                            <th class="px-3 py-3 w-8"><input type="checkbox" @change="toggleAll($event)" :checked="allVisibleSelected" class="rounded border-gray-300 text-purple-600 focus:ring-purple-500"></th>
+                            <th class="px-4 py-3">Product</th>
+                            <th class="px-4 py-3 hidden md:table-cell">Category</th>
+                            <th class="px-4 py-3 hidden lg:table-cell">SKU</th>
+                            <th class="px-4 py-3 text-center">Stock</th>
+                            <th class="px-4 py-3 text-right">Price</th>
+                            <th class="px-4 py-3 text-right hidden sm:table-cell">Margin</th>
+                            <th class="px-4 py-3 text-right hidden sm:table-cell">Tax %</th>
+                            <th class="px-4 py-3 text-center hidden sm:table-cell">Status</th>
+                            <th class="px-4 py-3 text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                        <template x-for="p in filtered" :key="p.id">
+                            <tr :class="!p.is_active ? 'opacity-50' : ''">
+                                <td class="px-3 py-3"><input type="checkbox" :value="p.id" x-model.number="selected" class="rounded border-gray-300 text-purple-600 focus:ring-purple-500"></td>
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-3">
+                                        <template x-if="p.image_url">
+                                            <img :src="p.image_url" :alt="p.name" class="w-10 h-10 rounded-lg object-cover bg-gray-100 dark:bg-gray-700 flex-shrink-0 border border-gray-200 dark:border-gray-700 shadow-sm" onerror="this.style.display='none'">
+                                        </template>
+                                        <template x-if="!p.image_url">
+                                            <div class="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center text-[12px] font-extrabold border tracking-tight" :style="chipStyle(p.name)" x-text="initials(p.name)"></div>
+                                        </template>
+                                        <div class="min-w-0">
+                                            <span class="font-medium text-gray-900 dark:text-white" x-text="p.name"></span>
+                                            <span x-show="p.is_tax_exempt" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 ml-1">EXEMPT</span>
+                                            <div x-show="p.description" class="text-[10px] text-gray-400 truncate max-w-[180px]" x-text="p.description"></div>
+                                        </div>
                                     </div>
-                                @endif
-                                <div>
-                                    <span class="font-medium text-gray-900 dark:text-white">{{ $product->name }}</span>
-                                    @if($product->is_tax_exempt)
-                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 ml-1">EXEMPT</span>
-                                    @endif
-                                    @if($product->description)
-                                    <div class="text-[10px] text-gray-400 truncate max-w-[180px]">{{ $product->description }}</div>
-                                    @endif
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ $product->category ?? '—' }}</td>
-                        <td class="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">{{ $product->sku ?? '—' }}</td>
-                        <td class="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">PKR {{ number_format($product->price, 2) }}</td>
-                        <td class="px-4 py-3 text-right text-gray-500 hidden sm:table-cell">{{ $product->tax_rate }}%</td>
-                        <td class="px-4 py-3 text-center hidden sm:table-cell">
-                            <form method="POST" action="{{ route('pos.products.toggle', $product->id) }}" class="inline">
-                                @csrf
-                                <button type="submit" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $product->is_active ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' }}">
-                                    {{ $product->is_active ? 'Active' : 'Inactive' }}
-                                </button>
-                            </form>
-                        </td>
-                        <td class="px-4 py-3 text-center">
-                            <div class="flex items-center justify-center gap-1">
-                                <button @click="editingId = (editingId === {{ $product->id }} ? null : {{ $product->id }})" class="text-xs text-purple-600 hover:text-purple-700 px-2 py-1">Edit</button>
-                                <form method="POST" action="{{ route('pos.products.delete', $product->id) }}" onsubmit="return confirm('Delete this product?')" class="inline">
-                                    @csrf @method('DELETE')
-                                    <button type="submit" class="text-xs text-red-500 hover:text-red-600 px-2 py-1">Delete</button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr x-show="editingId === {{ $product->id }}" x-cloak class="bg-purple-50/50 dark:bg-purple-900/10">
-                        <td colspan="7" class="px-4 py-3">
-                            <form method="POST" action="{{ route('pos.products.update', $product->id) }}" enctype="multipart/form-data"
-                                  x-data="{ exempt: {{ $product->is_tax_exempt ? 'true' : 'false' }} }"
-                                  class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 items-end">
-                                @csrf @method('PUT')
-                                <input type="text" name="name" value="{{ $product->name }}" required placeholder="Name" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full col-span-2 sm:col-span-1">
-                                <input type="number" name="price" value="{{ $product->price }}" step="0.01" required placeholder="Price" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
-                                <input type="number" name="cost_price" value="{{ $product->cost_price ?? 0 }}" step="0.01" min="0" placeholder="Cost" title="Cost Price" class="text-sm rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10 text-gray-900 dark:text-white px-2 py-1.5 w-full">
-                                {{-- Unified Tax Setup cell: rate + exempt toggle (consolidated, no longer buried) --}}
-                                <div class="rounded-lg border-2 px-2 py-1.5 transition-all"
-                                     :class="exempt ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20' : 'border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800'">
-                                    {{-- Hidden submit-safe input ensures tax_rate=0 posts when visible input is disabled --}}
-                                    <template x-if="exempt"><input type="hidden" name="tax_rate" value="0"></template>
-                                    <input type="number" name="tax_rate" value="{{ $product->tax_rate }}" step="0.01" min="0" max="100"
-                                           :placeholder="exempt ? '0 (exempt)' : 'Tax %'"
-                                           :disabled="exempt"
-                                           class="text-sm rounded border-0 bg-transparent text-gray-900 dark:text-white px-1 py-0 w-full focus:ring-0 focus:outline-none disabled:opacity-50">
-                                    <label class="flex items-center gap-1.5 mt-0.5 cursor-pointer select-none">
-                                        <input type="checkbox" name="is_tax_exempt" value="1" x-model="exempt"
-                                               class="w-3.5 h-3.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
-                                        <span class="text-[10px] font-bold uppercase tracking-wider"
-                                              :class="exempt ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500 dark:text-gray-400'">
-                                            Tax Exempt
+                                </td>
+                                <td class="px-4 py-3 text-gray-500 hidden md:table-cell" x-text="p.category || '—'"></td>
+                                <td class="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell" x-text="p.sku || '—'"></td>
+                                <td class="px-4 py-3 text-center">
+                                    <template x-if="p.stock_quantity === null">
+                                        <span class="text-gray-300 dark:text-gray-600">—</span>
+                                    </template>
+                                    <template x-if="p.stock_quantity !== null">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold"
+                                              :class="isLow(p) ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'">
+                                            <span x-text="p.stock_quantity"></span>
+                                            <svg x-show="isLow(p)" class="w-3 h-3 ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
                                         </span>
-                                    </label>
-                                </div>
-                                <input type="text" name="category" value="{{ $product->category }}" placeholder="Category" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
-                                <input type="text" name="sku" value="{{ $product->sku }}" placeholder="SKU" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
-                                <input type="text" name="barcode" value="{{ $product->barcode }}" placeholder="Barcode" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
-                                <select name="uom" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
+                                    </template>
+                                </td>
+                                <td class="px-4 py-3 text-right font-medium text-gray-900 dark:text-white" x-text="'PKR ' + fmt(p.price)"></td>
+                                <td class="px-4 py-3 text-right hidden sm:table-cell">
+                                    <template x-if="marginPct(p) !== null">
+                                        <span class="font-semibold" :class="marginPct(p) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'" x-text="marginPct(p) + '%'"></span>
+                                    </template>
+                                    <template x-if="marginPct(p) === null"><span class="text-gray-300 dark:text-gray-600">—</span></template>
+                                </td>
+                                <td class="px-4 py-3 text-right text-gray-500 hidden sm:table-cell" x-text="p.tax_rate + '%'"></td>
+                                <td class="px-4 py-3 text-center hidden sm:table-cell">
+                                    <button @click="toggleStatus(p)" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                                            :class="p.is_active ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'"
+                                            x-text="p.is_active ? 'Active' : 'Inactive'"></button>
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    <div class="flex items-center justify-center gap-1">
+                                        <button @click="openEdit(p)" class="text-xs text-purple-600 hover:text-purple-700 px-2 py-1 font-semibold">Edit</button>
+                                        <button @click="deleteOne(p)" class="text-xs text-red-500 hover:text-red-600 px-2 py-1">Delete</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr x-show="filtered.length === 0">
+                            <td colspan="10" class="px-4 py-12 text-center text-gray-500" x-text="products.length === 0 ? 'No products yet. Click \'+ Add Product\' to create your first POS product.' : 'No products match your search/filters.'"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {{-- ═══ GRID VIEW ═══ --}}
+        <div x-show="view === 'grid'" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            <template x-for="p in filtered" :key="'g'+p.id">
+                <div class="relative rounded-xl border bg-white dark:bg-gray-900 shadow-sm overflow-hidden transition hover:shadow-md"
+                     :class="[!p.is_active ? 'opacity-60' : '', selected.includes(p.id) ? 'border-purple-500 ring-2 ring-purple-300' : 'border-gray-200 dark:border-gray-800']">
+                    <div class="absolute top-2 left-2 z-10">
+                        <input type="checkbox" :value="p.id" x-model.number="selected" class="rounded border-gray-300 text-purple-600 focus:ring-purple-500 bg-white/90 shadow">
+                    </div>
+                    <span x-show="isLow(p)" class="absolute top-2 right-2 z-10 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white shadow">LOW</span>
+                    <div class="aspect-square bg-gray-50 dark:bg-gray-800 flex items-center justify-center">
+                        <template x-if="p.image_url"><img :src="p.image_url" :alt="p.name" class="w-full h-full object-cover" onerror="this.style.display='none'"></template>
+                        <template x-if="!p.image_url"><div class="w-16 h-16 rounded-xl flex items-center justify-center text-xl font-extrabold border" :style="chipStyle(p.name)" x-text="initials(p.name)"></div></template>
+                    </div>
+                    <div class="p-3">
+                        <div class="font-semibold text-sm text-gray-900 dark:text-white truncate" x-text="p.name"></div>
+                        <div class="text-[11px] text-gray-400 truncate" x-text="p.category || '—'"></div>
+                        <div class="flex items-center justify-between mt-1.5">
+                            <span class="font-extrabold text-gray-900 dark:text-white" x-text="'Rs ' + fmt(p.price)"></span>
+                            <template x-if="p.stock_quantity !== null">
+                                <span class="text-xs font-bold" :class="isLow(p) ? 'text-red-600' : 'text-gray-500'" x-text="'Stk ' + p.stock_quantity"></span>
+                            </template>
+                        </div>
+                        <div class="flex items-center gap-1 mt-2">
+                            <button @click="openEdit(p)" class="flex-1 text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 rounded-md py-1">Edit</button>
+                            <button @click="toggleStatus(p)" class="text-xs px-2 py-1 rounded-md" :class="p.is_active ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20' : 'text-gray-500 bg-gray-100 dark:bg-gray-800'" x-text="p.is_active ? 'On' : 'Off'"></button>
+                            <button @click="deleteOne(p)" class="text-xs px-2 py-1 rounded-md text-red-500 bg-red-50 dark:bg-red-900/20">✕</button>
+                        </div>
+                    </div>
+                </div>
+            </template>
+            <div x-show="filtered.length === 0" class="col-span-full px-4 py-12 text-center text-gray-500" x-text="products.length === 0 ? 'No products yet.' : 'No products match your search/filters.'"></div>
+        </div>
+
+        {{-- ═══ EDIT MODAL ═══ --}}
+        <div x-show="editing" x-transition.opacity class="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto bg-black/50" @click.self="editing = null" x-cloak>
+            <div class="w-full max-w-2xl my-8 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl" @keydown.escape.window="editing = null">
+                <template x-if="editing">
+                    <form :action="updateUrl(editing.id)" method="POST" enctype="multipart/form-data" class="p-5">
+                        @csrf @method('PUT')
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-base font-bold text-gray-900 dark:text-white">Edit Product</h3>
+                            <button type="button" @click="editing = null" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <div class="sm:col-span-2 lg:col-span-3">
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Product Name *</label>
+                                <input type="text" name="name" x-model="editing.name" required class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Price (PKR) *</label>
+                                <input type="number" name="price" x-model="editing.price" step="0.01" min="0" required class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Cost Price</label>
+                                <input type="number" name="cost_price" x-model="editing.cost_price" step="0.01" min="0" class="w-full text-sm rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-emerald-500">
+                            </div>
+                            <div class="rounded-lg border-2 p-2.5 transition-all" :class="editing.is_tax_exempt ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20' : 'border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800'">
+                                <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Tax Setup</label>
+                                <template x-if="editing.is_tax_exempt"><input type="hidden" name="tax_rate" value="0"></template>
+                                <input type="number" name="tax_rate" x-model="editing.tax_rate" step="0.01" min="0" max="100" :disabled="editing.is_tax_exempt" :placeholder="editing.is_tax_exempt ? '0 (exempt)' : 'Tax %'" class="w-full text-sm rounded border-0 bg-transparent text-gray-900 dark:text-white px-1 py-0 focus:ring-0 disabled:opacity-50">
+                                <label class="flex items-center gap-1.5 mt-1 cursor-pointer select-none">
+                                    <input type="checkbox" name="is_tax_exempt" value="1" x-model="editing.is_tax_exempt" class="w-3.5 h-3.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                                    <span class="text-[10px] font-bold uppercase tracking-wider" :class="editing.is_tax_exempt ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500'">Tax Exempt</span>
+                                </label>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Stock <span class="text-gray-400">(blank=untracked)</span></label>
+                                <input type="number" name="stock_quantity" x-model="editing.stock_quantity" step="1" min="0" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-emerald-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Low-Stock Alert At</label>
+                                <input type="number" name="low_stock_threshold" x-model="editing.low_stock_threshold" step="1" min="0" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-amber-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Category</label>
+                                <input type="text" name="category" x-model="editing.category" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">SKU</label>
+                                <input type="text" name="sku" x-model="editing.sku" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Barcode</label>
+                                <input type="text" name="barcode" x-model="editing.barcode" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Unit (UOM)</label>
+                                <select name="uom" x-model="editing.uom" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
                                     @foreach(['NOS','KGS','LTR','MTR','PCS','PKT','BOX'] as $u)
-                                    <option value="{{ $u }}" {{ $product->uom === $u ? 'selected' : '' }}>{{ $u }}</option>
+                                    <option value="{{ $u }}">{{ $u }}</option>
                                     @endforeach
                                 </select>
-                                @php
-                                    $editHash = crc32($product->name);
-                                    $editHue = $editHash % 360;
-                                @endphp
-                                <div x-data="{ emode: 'keep' }">
-                                    <div class="flex items-center gap-2 mb-1.5">
-                                        @if($product->image)
-                                        <img src="{{ asset('storage/products/' . $product->image) }}" class="w-9 h-9 rounded-lg object-cover border-2 border-purple-200 dark:border-purple-800 shadow-sm" onerror="this.style.display='none'">
+                            </div>
+                            <div class="sm:col-span-2 lg:col-span-3">
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Description</label>
+                                <input type="text" name="description" x-model="editing.description" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                            </div>
+                            {{-- Image mode --}}
+                            <div class="sm:col-span-2 lg:col-span-3" x-data="{ emode: 'keep' }">
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Image</label>
+                                <div class="flex flex-wrap gap-1.5 mb-1.5">
+                                    <template x-for="m in ['keep','upload','auto','remove']" :key="m">
+                                        <label class="cursor-pointer text-[11px] font-bold px-3 py-1.5 rounded-lg border-2 transition-all capitalize"
+                                               :class="emode === m ? 'bg-purple-100 dark:bg-purple-900/40 border-purple-400 text-purple-700 dark:text-purple-300' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500'">
+                                            <input type="radio" name="image_mode" :value="m" x-model="emode" class="sr-only">
+                                            <span x-text="m === 'remove' ? 'No Image' : m"></span>
+                                        </label>
+                                    </template>
+                                </div>
+                                <input type="file" name="image" accept="image/jpeg,image/jpg,image/png,image/webp" x-show="emode === 'upload'" class="w-full text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700">
+                                <input type="hidden" name="remove_image" :value="emode === 'remove' ? '1' : '0'">
+                            </div>
+                            @if(count($categoryFields) > 0)
+                            <div class="sm:col-span-2 lg:col-span-3 border-t border-gray-200 dark:border-gray-700 pt-3">
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-purple-500 mb-2">{{ ucfirst($posType) }} Fields</p>
+                                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                    @foreach($categoryFields as $cf)
+                                        @php
+                                            $label = ucwords(str_replace('_', ' ', $cf));
+                                            $isBool = in_array($cf, ['prescription_required','weight_based','custom_order']);
+                                            $type = $cf === 'expiry_date' ? 'date' : (in_array($cf, ['warranty_months','service_duration','bulk_discount_qty','bulk_discount_pct']) ? 'number' : 'text');
+                                        @endphp
+                                        @if($isBool)
+                                        <label class="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 px-2 py-2 rounded-lg border border-gray-200 dark:border-gray-700">
+                                            <input type="checkbox" name="{{ $cf }}" value="1" x-model="editing.{{ $cf }}" class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                                            {{ $label }}
+                                        </label>
                                         @else
-                                        <div class="w-9 h-9 rounded-lg flex items-center justify-center text-[10px] font-extrabold border-2 shadow-sm" style="background: hsl({{ $editHue }}, 65%, 92%); color: hsl({{ $editHue }}, 80%, 20%); border-color: hsl({{ $editHue }}, 55%, 75%);">{{ strtoupper(mb_substr($product->name, 0, 2)) }}</div>
+                                        <div>
+                                            <label class="block text-[10px] font-medium text-gray-500 mb-1">{{ $label }}</label>
+                                            <input type="{{ $type }}" name="{{ $cf }}" x-model="editing.{{ $cf }}" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 focus:ring-2 focus:ring-purple-500">
+                                        </div>
                                         @endif
-                                        <span class="text-[9px] uppercase tracking-wider font-bold text-gray-400">Image Mode</span>
-                                    </div>
-                                    <div class="flex flex-wrap gap-1 mb-1.5">
-                                        <label class="cursor-pointer text-[10px] font-bold px-2 py-1 rounded-lg border-2 transition-all flex items-center gap-1 peer-focus-visible:ring-2 peer-focus-visible:ring-offset-1 peer-focus-visible:ring-purple-500" :class="emode === 'keep' ? 'bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 border-gray-400 text-gray-800 dark:text-gray-100 shadow-sm scale-105' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:border-gray-400'">
-                                            <input type="radio" name="image_mode" value="keep" x-model="emode" class="sr-only peer" checked>
-                                            <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                            Keep
-                                        </label>
-                                        <label class="cursor-pointer text-[10px] font-bold px-2 py-1 rounded-lg border-2 transition-all flex items-center gap-1 peer-focus-visible:ring-2 peer-focus-visible:ring-offset-1 peer-focus-visible:ring-purple-500" :class="emode === 'upload' ? 'bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900/40 dark:to-purple-800/30 border-purple-400 text-purple-700 dark:text-purple-300 shadow-sm scale-105' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:border-purple-300'">
-                                            <input type="radio" name="image_mode" value="upload" x-model="emode" class="sr-only peer">
-                                            <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                                            Upload
-                                        </label>
-                                        <label class="cursor-pointer text-[10px] font-bold px-2 py-1 rounded-lg border-2 transition-all flex items-center gap-1 peer-focus-visible:ring-2 peer-focus-visible:ring-offset-1 peer-focus-visible:ring-purple-500" :class="emode === 'auto' ? 'bg-gradient-to-br from-amber-100 to-orange-200 dark:from-amber-900/40 dark:to-orange-800/30 border-amber-400 text-amber-700 dark:text-amber-300 shadow-sm scale-105' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:border-amber-300'">
-                                            <input type="radio" name="image_mode" value="auto" x-model="emode" class="sr-only peer">
-                                            <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                                            Auto
-                                        </label>
-                                        <label class="cursor-pointer text-[10px] font-bold px-2 py-1 rounded-lg border-2 transition-all flex items-center gap-1 peer-focus-visible:ring-2 peer-focus-visible:ring-offset-1 peer-focus-visible:ring-purple-500" :class="emode === 'remove' ? 'bg-gradient-to-br from-red-100 to-rose-200 dark:from-red-900/40 dark:to-rose-800/30 border-red-400 text-red-700 dark:text-red-300 shadow-sm scale-105' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:border-red-300'">
-                                            <input type="radio" name="image_mode" value="remove" x-model="emode" class="sr-only peer">
-                                            <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22"/></svg>
-                                            No Image
-                                        </label>
-                                    </div>
-                                    <input type="file" name="image" accept="image/jpeg,image/jpg,image/png,image/webp"
-                                        x-show="emode === 'upload'" x-transition.opacity
-                                        class="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-purple-50 file:text-purple-700">
-                                    {{-- Backwards-compat: controller still honours remove_image=1 --}}
-                                    <input type="hidden" name="remove_image" :value="emode === 'remove' ? '1' : '0'">
+                                    @endforeach
                                 </div>
-                                @if(count($categoryFields) > 0)
-                                <div class="col-span-full border-t border-gray-200 dark:border-gray-700 pt-2 mt-1">
-                                    <p class="text-[10px] font-bold uppercase tracking-widest text-purple-500 mb-2">{{ ucfirst($posType) }} Fields</p>
-                                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                                        @include('pos.partials.category-fields', ['categoryFields' => $categoryFields, 'product' => $product, 'isCompact' => true])
-                                    </div>
-                                </div>
-                                @endif
-                                <div class="flex gap-2 col-span-2 sm:col-span-1">
-                                    <button type="submit" class="text-xs font-semibold text-white px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 transition">Save</button>
-                                    <button type="button" @click="editingId = null" class="text-xs text-gray-500 px-3 py-1.5">Cancel</button>
-                                </div>
-                            </form>
-                        </td>
-                    </tr>
-                    @empty
-                    <tr><td colspan="7" class="px-4 py-12 text-center text-gray-500">No products yet. Click "+ Add Product" to create your first POS product.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
+                            </div>
+                            @endif
+                        </div>
+                        <div class="flex justify-end gap-2 mt-5">
+                            <button type="button" @click="editing = null" class="px-4 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">Cancel</button>
+                            <button type="submit" class="px-5 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold shadow">Save Changes</button>
+                        </div>
+                    </form>
+                </template>
+            </div>
         </div>
     </div>
+
+    <script>
+        function productCatalog() {
+            return {
+                products: @json($productsJson),
+                search: '', catFilter: '', statusFilter: '', sortKey: 'name', sortDir: 'asc',
+                view: 'table', selected: [], editing: null,
+                csrf: '{{ csrf_token() }}',
+                updateBase: '{{ route('pos.products.update', ['id' => '__ID__']) }}',
+                toggleBase: '{{ route('pos.products.toggle', ['id' => '__ID__']) }}',
+                bulkUrl: '{{ route('pos.products.bulk') }}',
+                labelsBase: '{{ route('pos.products.labels') }}',
+
+                updateUrl(id) { return this.updateBase.replace('__ID__', id); },
+                toggleUrl(id) { return this.toggleBase.replace('__ID__', id); },
+                labelsUrl() { return this.selected.length > 0 ? this.labelsBase + '?ids=' + this.selected.join(',') : this.labelsBase; },
+
+                fmt(n) { return (Math.round((Number(n) || 0) * 100) / 100).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 }); },
+                initials(name) { return (name || '').substring(0, 2).toUpperCase(); },
+                hue(name) { let h = 0; for (let i = 0; i < (name || '').length; i++) { h = (h * 31 + name.charCodeAt(i)) >>> 0; } return h % 360; },
+                chipStyle(name) {
+                    const h = this.hue(name);
+                    return `background: linear-gradient(135deg, hsl(${h},70%,92%), hsl(${(h + 30) % 360},70%,88%)); color: hsl(${h},80%,20%); border-color: hsl(${h},55%,75%);`;
+                },
+                isLow(p) { return p.stock_quantity !== null && Number(p.stock_quantity) <= Number(p.low_stock_threshold ?? 10); },
+                marginPct(p) { const c = Number(p.cost_price) || 0; const pr = Number(p.price) || 0; if (c <= 0 || pr <= 0) return null; return Math.round(((pr - c) / pr) * 100); },
+
+                get categories() {
+                    return [...new Set(this.products.map(p => p.category).filter(Boolean))].sort();
+                },
+                get filtered() {
+                    let list = this.products.slice();
+                    const q = this.search.trim().toLowerCase();
+                    if (q) {
+                        list = list.filter(p =>
+                            (p.name || '').toLowerCase().includes(q) ||
+                            (p.sku || '').toLowerCase().includes(q) ||
+                            (p.barcode || '').toLowerCase().includes(q) ||
+                            (p.category || '').toLowerCase().includes(q));
+                    }
+                    if (this.catFilter) list = list.filter(p => p.category === this.catFilter);
+                    if (this.statusFilter === 'active') list = list.filter(p => p.is_active);
+                    else if (this.statusFilter === 'inactive') list = list.filter(p => !p.is_active);
+                    else if (this.statusFilter === 'low') list = list.filter(p => this.isLow(p));
+                    const dir = this.sortDir === 'asc' ? 1 : -1;
+                    const key = this.sortKey;
+                    list.sort((a, b) => {
+                        let av, bv;
+                        if (key === 'margin') { av = this.marginPct(a) ?? -Infinity; bv = this.marginPct(b) ?? -Infinity; }
+                        else if (key === 'price') { av = Number(a.price) || 0; bv = Number(b.price) || 0; }
+                        else if (key === 'stock_quantity') { av = a.stock_quantity ?? -Infinity; bv = b.stock_quantity ?? -Infinity; }
+                        else { av = (a[key] || '').toString().toLowerCase(); bv = (b[key] || '').toString().toLowerCase(); }
+                        if (av < bv) return -1 * dir;
+                        if (av > bv) return 1 * dir;
+                        return 0;
+                    });
+                    return list;
+                },
+                get stats() {
+                    const total = this.products.length;
+                    const active = this.products.filter(p => p.is_active).length;
+                    const lowStock = this.products.filter(p => this.isLow(p)).length;
+                    const stockValue = this.products.reduce((s, p) => s + (Number(p.price) || 0) * (Number(p.stock_quantity) || 0), 0);
+                    const margins = this.products.map(p => this.marginPct(p)).filter(m => m !== null);
+                    const avgMargin = margins.length ? Math.round(margins.reduce((a, b) => a + b, 0) / margins.length) : null;
+                    return { total, active, lowStock, stockValue, avgMargin };
+                },
+                get allVisibleSelected() {
+                    const ids = this.filtered.map(p => p.id);
+                    return ids.length > 0 && ids.every(id => this.selected.includes(id));
+                },
+                toggleAll(e) {
+                    const ids = this.filtered.map(p => p.id);
+                    if (e.target.checked) { this.selected = [...new Set([...this.selected, ...ids])]; }
+                    else { this.selected = this.selected.filter(id => !ids.includes(id)); }
+                },
+                clearSelect() { this.selected = []; },
+                openEdit(p) { this.editing = JSON.parse(JSON.stringify(p)); },
+                postForm(action, fields) {
+                    const f = document.createElement('form');
+                    f.method = 'POST'; f.action = action;
+                    const add = (n, v) => { const i = document.createElement('input'); i.type = 'hidden'; i.name = n; i.value = v; f.appendChild(i); };
+                    add('_token', this.csrf);
+                    for (const [k, v] of Object.entries(fields)) {
+                        if (Array.isArray(v)) v.forEach(val => add(k + '[]', val));
+                        else add(k, v);
+                    }
+                    document.body.appendChild(f); f.submit();
+                },
+                toggleStatus(p) { this.postForm(this.toggleUrl(p.id), {}); },
+                deleteOne(p) { if (confirm('Delete "' + p.name + '"?')) this.postForm(this.updateUrl(p.id), { _method: 'DELETE' }); },
+                doBulk(action) {
+                    if (this.selected.length === 0) return;
+                    const fields = { action: action, ids: this.selected };
+                    if (action === 'delete') { if (!confirm('Delete ' + this.selected.length + ' product(s)? This cannot be undone.')) return; }
+                    if (action === 'category') {
+                        const cat = prompt('Set category for ' + this.selected.length + ' product(s) (leave blank to clear):', '');
+                        if (cat === null) return;
+                        fields.category_value = cat;
+                    }
+                    this.postForm(this.bulkUrl, fields);
+                },
+            };
+        }
+    </script>
 
     <div class="mt-4 text-xs text-gray-400 text-center">
         These products are exclusive to NestPOS (PRA). Digital Invoice and FBR POS products are managed separately in their own systems.

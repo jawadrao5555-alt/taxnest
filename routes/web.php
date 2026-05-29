@@ -469,6 +469,7 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::post('/api/products/{id}/quick-price', [PosController::class, 'apiQuickUpdatePrice'])->name('pos.api.products.quick-price');
     Route::match(['get', 'post'], '/my-profile', [PosController::class, 'userProfile'])->name('pos.user-profile');
     Route::get('/products', [PosController::class, 'products'])->name('pos.products');
+    Route::get('/products/labels', [PosController::class, 'productLabels'])->name('pos.products.labels');
     Route::get('/customers', [PosController::class, 'customers'])->name('pos.customers');
     Route::post('/customers', [PosController::class, 'storeCustomer'])->name('pos.customers.store');
 
@@ -487,6 +488,7 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
         Route::post('/products', [PosController::class, 'storeProduct'])->name('pos.products.store')->middleware('plan.limit:products');
         Route::get('/products/template', [PosController::class, 'downloadProductTemplate'])->name('pos.products.template');
         Route::post('/products/import', [PosController::class, 'importProducts'])->name('pos.products.import');
+        Route::post('/products/bulk', [PosController::class, 'bulkProductAction'])->name('pos.products.bulk');
         Route::put('/products/{id}', [PosController::class, 'updateProduct'])->name('pos.products.update');
         Route::delete('/products/{id}', [PosController::class, 'deleteProduct'])->name('pos.products.delete');
         Route::post('/products/{id}/toggle', [PosController::class, 'toggleProduct'])->name('pos.products.toggle');

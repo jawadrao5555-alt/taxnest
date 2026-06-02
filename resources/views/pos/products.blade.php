@@ -151,6 +151,14 @@
                     <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
                     Cost price, sale price se zyada hai — yeh product loss par jayega.
                 </div>
+                {{-- Sale screen visibility toggle --}}
+                <label class="mt-3 flex items-center gap-2.5 cursor-pointer select-none rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2.5 hover:border-emerald-300">
+                    <input type="checkbox" name="show_on_sale" value="1" checked class="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                    <span class="flex-1">
+                        <span class="block text-xs font-bold text-gray-700 dark:text-gray-300">Sale screen par dikhayein</span>
+                        <span class="block text-[11px] text-gray-500 dark:text-gray-400">Off karein to yeh product billing / sale screen par nahi aayega (catalog mein rahega).</span>
+                    </span>
+                </label>
             </div>
             {{-- ── SECTION: Inventory & Unit ── --}}
             <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/20 p-4">
@@ -409,6 +417,7 @@
                 'barcode' => $p->barcode,
                 'uom' => $p->uom ?? 'NOS',
                 'is_active' => (bool) $p->is_active,
+                'show_on_sale' => (bool) ($p->show_on_sale ?? true),
                 'stock_quantity' => $p->stock_quantity,
                 'low_stock_threshold' => $p->low_stock_threshold ?? 10,
                 'image' => $p->image,
@@ -540,6 +549,7 @@
                                         <div class="min-w-0">
                                             <span class="font-medium text-gray-900 dark:text-white" x-text="p.name"></span>
                                             <span x-show="p.is_tax_exempt" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 ml-1">EXEMPT</span>
+                                            <span x-show="!p.show_on_sale" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300 ml-1">HIDDEN</span>
                                             <div x-show="p.description" class="text-[10px] text-gray-400 truncate max-w-[180px]" x-text="p.description"></div>
                                         </div>
                                     </div>
@@ -573,6 +583,7 @@
                                 </td>
                                 <td class="px-4 py-3 text-center">
                                     <div class="flex items-center justify-center gap-1">
+                                        <button @click="toggleSale(p)" :title="p.show_on_sale ? 'Showing on sale screen — click to hide' : 'Hidden from sale screen — click to show'" class="text-xs px-2 py-1 font-semibold rounded" :class="p.show_on_sale ? 'text-emerald-600 hover:text-emerald-700' : 'text-gray-400 hover:text-gray-600'" x-text="p.show_on_sale ? 'On Sale' : 'Hidden'"></button>
                                         <button @click="openEdit(p)" class="text-xs text-purple-600 hover:text-purple-700 px-2 py-1 font-semibold">Edit</button>
                                         <button @click="deleteOne(p)" class="text-xs text-red-500 hover:text-red-600 px-2 py-1">Delete</button>
                                     </div>
@@ -611,7 +622,7 @@
                         </div>
                         <div class="flex items-center gap-1 mt-2">
                             <button @click="openEdit(p)" class="flex-1 text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 rounded-md py-1">Edit</button>
-                            <button @click="toggleStatus(p)" class="text-xs px-2 py-1 rounded-md" :class="p.is_active ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20' : 'text-gray-500 bg-gray-100 dark:bg-gray-800'" x-text="p.is_active ? 'On' : 'Off'"></button>
+                            <button @click="toggleSale(p)" :title="p.show_on_sale ? 'On sale screen — click to hide' : 'Hidden — click to show'" class="text-xs px-2 py-1 rounded-md" :class="p.show_on_sale ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20' : 'text-gray-400 bg-gray-100 dark:bg-gray-800'" x-text="p.show_on_sale ? 'Sale' : 'Hide'"></button>
                             <button @click="deleteOne(p)" class="text-xs px-2 py-1 rounded-md text-red-500 bg-red-50 dark:bg-red-900/20">✕</button>
                         </div>
                     </div>
@@ -652,6 +663,10 @@
                                     <span class="text-[10px] font-bold uppercase tracking-wider" :class="editing.is_tax_exempt ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500'">Tax Exempt</span>
                                 </label>
                             </div>
+                            <label class="rounded-lg border-2 p-2.5 flex items-center gap-2 cursor-pointer select-none transition-all" :class="editing.show_on_sale ? 'border-emerald-300 bg-emerald-50 dark:bg-emerald-900/20' : 'border-gray-300 bg-gray-50 dark:bg-gray-800'">
+                                <input type="checkbox" name="show_on_sale" value="1" x-model="editing.show_on_sale" class="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                <span class="text-[11px] font-bold uppercase tracking-wider" :class="editing.show_on_sale ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-500'" x-text="editing.show_on_sale ? 'On Sale Screen' : 'Hidden from Sale'"></span>
+                            </label>
                             <div>
                                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Stock <span class="text-gray-400">(blank=untracked)</span></label>
                                 <input type="number" name="stock_quantity" x-model="editing.stock_quantity" step="1" min="0" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-emerald-500">
@@ -744,11 +759,13 @@
                 csrf: '{{ csrf_token() }}',
                 updateBase: '{{ route('pos.products.update', ['id' => '__ID__']) }}',
                 toggleBase: '{{ route('pos.products.toggle', ['id' => '__ID__']) }}',
+                saleBase: '{{ route('pos.products.toggle-sale', ['id' => '__ID__']) }}',
                 bulkUrl: '{{ route('pos.products.bulk') }}',
                 labelsBase: '{{ route('pos.products.labels') }}',
 
                 updateUrl(id) { return this.updateBase.replace('__ID__', id); },
                 toggleUrl(id) { return this.toggleBase.replace('__ID__', id); },
+                saleUrl(id) { return this.saleBase.replace('__ID__', id); },
                 labelsUrl() { return this.selected.length > 0 ? this.labelsBase + '?ids=' + this.selected.join(',') : this.labelsBase; },
 
                 fmt(n) { return (Math.round((Number(n) || 0) * 100) / 100).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 }); },
@@ -824,6 +841,7 @@
                     document.body.appendChild(f); f.submit();
                 },
                 toggleStatus(p) { this.postForm(this.toggleUrl(p.id), {}); },
+                toggleSale(p) { this.postForm(this.saleUrl(p.id), {}); },
                 deleteOne(p) { if (confirm('Delete "' + p.name + '"?')) this.postForm(this.updateUrl(p.id), { _method: 'DELETE' }); },
                 doBulk(action) {
                     if (this.selected.length === 0) return;

@@ -492,6 +492,7 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
         Route::put('/products/{id}', [PosController::class, 'updateProduct'])->name('pos.products.update');
         Route::delete('/products/{id}', [PosController::class, 'deleteProduct'])->name('pos.products.delete');
         Route::post('/products/{id}/toggle', [PosController::class, 'toggleProduct'])->name('pos.products.toggle');
+        Route::post('/products/{id}/toggle-sale', [PosController::class, 'toggleProductSale'])->name('pos.products.toggle-sale');
         Route::put('/customers/{id}', [PosController::class, 'updateCustomer'])->name('pos.customers.update');
         Route::delete('/customers/{id}', [PosController::class, 'deleteCustomer'])->name('pos.customers.delete');
         Route::post('/customers/{id}/toggle', [PosController::class, 'toggleCustomer'])->name('pos.customers.toggle');

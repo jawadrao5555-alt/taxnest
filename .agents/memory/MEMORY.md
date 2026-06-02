@@ -1,0 +1,1 @@
+- [POS sale-screen product loaders](pos-sale-screen-product-loaders.md) — three controller methods feed the POS register; any product-visibility filter must hit all three.

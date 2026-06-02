@@ -274,7 +274,7 @@ class PosController extends Controller
         $company = Company::find($companyId);
         $features = PosFeatureService::forCompany($company);
 
-        $products = PosProduct::where('company_id', $companyId)->where('is_active', true)->get();
+        $products = PosProduct::where('company_id', $companyId)->where('is_active', true)->where('show_on_sale', true)->get();
         $services = PosService::where('company_id', $companyId)->where('is_active', true)->get();
         $categories = $products->pluck('category')->filter()->unique()->sort()->values();
         $productIds = $products->pluck('id')->toArray();
@@ -689,7 +689,7 @@ class PosController extends Controller
                 ->with('error', 'Cannot edit — this invoice has been submitted to PRA. PRA Fiscal #: ' . $transaction->pra_invoice_number);
         }
 
-        $products = PosProduct::where('company_id', $companyId)->where('is_active', true)->get();
+        $products = PosProduct::where('company_id', $companyId)->where('is_active', true)->where('show_on_sale', true)->get();
         $services = PosService::where('company_id', $companyId)->where('is_active', true)->get();
         $posCustomers = PosCustomer::where('company_id', $companyId)->where('is_active', true)->orderBy('name')->get();
         $taxRules = PosTaxRule::where('is_active', true)->get()->keyBy('payment_method');
@@ -2570,6 +2570,7 @@ class PosController extends Controller
             'barcode' => $request->barcode,
             'uom' => $request->uom ?? 'NOS',
             'is_tax_exempt' => $isExempt,
+            'show_on_sale' => $request->has('show_on_sale'),
             'image' => $imageName,
             'prescription_required' => $request->has('prescription_required'),
             'weight_based' => $request->has('weight_based'),
@@ -2887,6 +2888,7 @@ class PosController extends Controller
                 // Backend hardening: exempt MUST force tax_rate=0; otherwise honor submitted value (or keep current if absent)
                 'tax_rate' => $isExempt ? 0 : ($request->has('tax_rate') ? $request->tax_rate : $product->tax_rate),
                 'is_tax_exempt' => $isExempt,
+                'show_on_sale' => $request->has('show_on_sale'),
                 'prescription_required' => $request->has('prescription_required'),
                 'weight_based' => $request->has('weight_based'),
                 'custom_order' => $request->has('custom_order'),
@@ -2949,6 +2951,14 @@ class PosController extends Controller
         $product = PosProduct::where('company_id', $companyId)->findOrFail($id);
         $product->update(['is_active' => !$product->is_active]);
         return back()->with('success', $product->is_active ? 'Product activated.' : 'Product deactivated.');
+    }
+
+    public function toggleProductSale($id)
+    {
+        $companyId = app('currentCompanyId');
+        $product = PosProduct::where('company_id', $companyId)->findOrFail($id);
+        $product->update(['show_on_sale' => !$product->show_on_sale]);
+        return back()->with('success', $product->show_on_sale ? 'Product is now visible on the sale screen.' : 'Product hidden from the sale screen.');
     }
 
     /**

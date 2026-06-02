@@ -32,6 +32,7 @@ class RestaurantPosController extends Controller
 
         $products = PosProduct::where('company_id', $companyId)
             ->where('is_active', true)
+            ->where('show_on_sale', true)
             ->get();
 
         $services = PosService::where('company_id', $companyId)

@@ -348,6 +348,24 @@
                         </button>
                     </div>
 
+                    {{-- ═══ MASTER TOGGLE: show/hide saved products on the sale screen ═══ --}}
+                    <div class="flex items-center justify-between gap-3 mb-4 px-3.5 py-2.5 rounded-xl border transition-colors"
+                         :class="showProducts ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' : 'bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700'">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <svg class="w-4 h-4 flex-shrink-0" :class="showProducts ? 'text-emerald-600' : 'text-gray-400'" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                            <div class="min-w-0">
+                                <div class="text-xs font-bold" :class="showProducts ? 'text-emerald-800 dark:text-emerald-300' : 'text-gray-600 dark:text-gray-300'">Saved products dikhayein</div>
+                                <div class="text-[11px] text-gray-500 dark:text-gray-400 truncate" x-text="showProducts ? 'Billing par saved products suggest honge' : 'Hidden — sirf manual entry se bill karein'"></div>
+                            </div>
+                        </div>
+                        <button type="button" @click="toggleShowProducts()" role="switch" :aria-checked="showProducts ? 'true' : 'false'"
+                                class="relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                                :class="showProducts ? 'bg-emerald-600' : 'bg-gray-300 dark:bg-gray-600'">
+                            <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform"
+                                  :class="showProducts ? 'translate-x-5' : 'translate-x-1'"></span>
+                        </button>
+                    </div>
+
                     <div class="hidden sm:grid sm:grid-cols-12 gap-2 text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 px-1">
                         <div class="col-span-2">Type</div>
                         <div class="col-span-4">Item Name</div>
@@ -713,6 +731,15 @@
                 posCustomers: @json($posCustomers ?? []),
                 praEnabled: {{ $company->pra_reporting_enabled ? 'true' : 'false' }},
 
+                showProducts: true,
+                toggleShowProducts() {
+                    this.showProducts = !this.showProducts;
+                    try { localStorage.setItem('pos_show_products', this.showProducts ? '1' : '0'); } catch (e) {}
+                    if (!this.showProducts) {
+                        for (const k in this.ddOpen) { this.ddOpen[k] = false; }
+                    }
+                },
+
                 customerName: '',
                 customerPhone: '',
                 terminalId: '',
@@ -842,6 +869,7 @@
                 ddGetFiltered(idx) {
                     let s = (this.ddSearch[idx] || '').toLowerCase();
                     if (this.items[idx].type === 'product') {
+                        if (!this.showProducts) return [];
                         return this.products.filter(pr => !s || pr.name.toLowerCase().includes(s));
                     }
                     return this.services.filter(sv => !s || sv.name.toLowerCase().includes(s));
@@ -955,6 +983,8 @@
                 ],
 
                 init() {
+                    try { if (localStorage.getItem('pos_show_products') === '0') this.showProducts = false; } catch (e) {}
+
                     @if(isset($draftInvoice) && $draftInvoice)
                         this.loadServerDraft(@json($draftInvoice));
                     @else

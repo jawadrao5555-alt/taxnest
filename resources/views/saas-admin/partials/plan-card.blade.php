@@ -4,7 +4,7 @@
             <h3 class="text-lg font-bold text-white">{{ $plan->name }}</h3>
             @if($plan->is_trial)<span class="text-[10px] px-1.5 py-0.5 bg-blue-900/50 text-blue-300 rounded font-bold">TRIAL</span>@endif
             @php $badgeColors = ['di' => 'bg-emerald-900/50 text-emerald-300', 'pos' => 'bg-purple-900/50 text-purple-300', 'fbrpos' => 'bg-blue-900/50 text-blue-300']; @endphp
-            <span class="text-[10px] px-1.5 py-0.5 rounded font-bold {{ $badgeColors[$plan->product_type] ?? 'bg-gray-900/50 text-gray-300' }}">{{ strtoupper($plan->product_type) }}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded font-bold {{ $badgeColors[$plan->product_type ?? 'di'] ?? 'bg-gray-900/50 text-gray-300' }}">{{ strtoupper($plan->product_type ?? 'di') }}</span>
         </div>
         <button @click="editing = !editing" class="text-xs px-2 py-1 rounded transition" :class="editing ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30' : 'bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30'" x-text="editing ? 'Cancel' : 'Edit'"></button>
     </div>

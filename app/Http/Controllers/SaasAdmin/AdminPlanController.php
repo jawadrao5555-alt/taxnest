@@ -6,14 +6,26 @@ use App\Http\Controllers\Controller;
 use App\Models\PricingPlan;
 use App\Models\AdminAuditLog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\Eloquent\Collection;
 
 class AdminPlanController extends Controller
 {
     public function index()
     {
-        $diPlans = PricingPlan::where('product_type', 'di')->orderBy('price')->get();
-        $posPlans = PricingPlan::where('product_type', 'pos')->orderBy('price')->get();
-        $fbrposPlans = PricingPlan::where('product_type', 'fbrpos')->orderBy('price')->get();
+        // Defensive: if the product_type column has not been migrated on this
+        // database yet, fall back to bucketing every plan as Digital Invoice
+        // instead of crashing with a 500 (the safety migration adds the column).
+        if (Schema::hasColumn('pricing_plans', 'product_type')) {
+            $diPlans = PricingPlan::where('product_type', 'di')->orderBy('price')->get();
+            $posPlans = PricingPlan::where('product_type', 'pos')->orderBy('price')->get();
+            $fbrposPlans = PricingPlan::where('product_type', 'fbrpos')->orderBy('price')->get();
+        } else {
+            $diPlans = PricingPlan::orderBy('price')->get();
+            $posPlans = new Collection();
+            $fbrposPlans = new Collection();
+        }
+
         return view('saas-admin.plans', compact('diPlans', 'posPlans', 'fbrposPlans'));
     }
 

@@ -2,3 +2,4 @@
 - [PRA POS sale screen & product loaders](pos-sale-screen-product-loaders.md) — universal.blade.php is the only live sale screen; create-invoice.blade.php is DEAD; 3 product loaders must stay in sync.
 - [POS provisional & receipt-tax rules](pos-provisional-and-receipt-rules.md) — "local" bill = completed+invoice_mode=local+pra_status=local on every list/promote/delete; PRA fiscal receipts must always show tax.
 - [Alpine focused qty-input sync](alpine-focused-qty-input-sync.md) — qty input x-effect skips the focused element; keyboard qty changes must write e.target.value or the digit looks stale (model/bill stay correct).
+- [PROD schema drift & self-heal](prod-schema-drift-selfheal.md) — pages 500 only on owner's cPanel PROD = missing columns marked "Ran"; fix with a fresh idempotent ensure-columns migration + per-column hasColumn guards.

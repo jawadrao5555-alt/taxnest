@@ -1,1 +1,2 @@
-- [POS sale-screen product loaders](pos-sale-screen-product-loaders.md) — three controller methods feed the POS register; any product-visibility filter must hit all three.
+- [TaxNest dev env access](dev-env-access.md) — artisan needs `env -u` PG-strip prefix; tinker disabled (prod APP_ENV); dev MySQL via `mysql -u root taxnest_staging`.
+- [PRA POS sale screen](pos-sale-screen-product-loaders.md) — only universal.blade.php served (create-invoice dead); 3 product loaders must stay in sync; show-products toggle is inventory-OFF only.

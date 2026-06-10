@@ -503,14 +503,31 @@ window.addEventListener('popstate', function() {
 
         <div class="flex-1 flex flex-col overflow-hidden" :class="mobileView === 'menu' ? 'flex' : 'hidden md:flex'">
 
-            <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 overflow-x-auto hide-scrollbar flex-shrink-0">
-                <button @click="activeCategory = 'all'; filterProducts()" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === 'all' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">
-                    All <span class="ml-1 text-[10px] opacity-70" x-text="'(' + (allProducts.length + allServices.length) + ')'"></span>
+            <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+                <div class="flex items-center gap-2 overflow-x-auto hide-scrollbar flex-1 min-w-0">
+                    <button @click="activeCategory = 'all'; filterProducts()" x-show="showProducts" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === 'all' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">
+                        All <span class="ml-1 text-[10px] opacity-70" x-text="'(' + (allProducts.length + allServices.length) + ')'"></span>
+                    </button>
+                    @foreach($categories as $cat)
+                    <button @click="activeCategory = '{{ $cat }}'; filterProducts()" x-show="showProducts" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === '{{ $cat }}' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">{{ $cat }}</button>
+                    @endforeach
+                    <button @click="activeCategory = 'services'; filterProducts()" x-show="showProducts" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === 'services' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">Services</button>
+                    <span x-show="!showProducts" class="text-[11px] text-gray-400 dark:text-gray-500 italic px-1 whitespace-nowrap">Saved products hidden — manual entry only</span>
+                </div>
+                {{-- MASTER products toggle — inventory-OFF (Simple) mode ONLY. In inventory mode the
+                     catalog is mandatory (no on-the-fly manual create), so hiding it would brick billing. --}}
+                @if(!($inventoryEnabled ?? false))
+                <button type="button" @click="toggleShowProducts()" role="switch" :aria-checked="showProducts ? 'true' : 'false'"
+                        class="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold border transition"
+                        :class="showProducts ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400'"
+                        :title="showProducts ? 'Saved products billing par dikh rahe hain — chhupane ke liye click karein' : 'Saved products hidden — sirf manual entry. Dikhane ke liye click karein.'">
+                    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    <span x-text="showProducts ? 'Products' : 'Products OFF'" class="whitespace-nowrap"></span>
+                    <span class="relative inline-flex h-4 w-7 items-center rounded-full transition flex-shrink-0" :class="showProducts ? 'bg-emerald-600' : 'bg-gray-400 dark:bg-gray-600'">
+                        <span class="inline-block h-3 w-3 transform rounded-full bg-white transition" :class="showProducts ? 'translate-x-3.5' : 'translate-x-0.5'"></span>
+                    </span>
                 </button>
-                @foreach($categories as $cat)
-                <button @click="activeCategory = '{{ $cat }}'; filterProducts()" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === '{{ $cat }}' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">{{ $cat }}</button>
-                @endforeach
-                <button @click="activeCategory = 'services'; filterProducts()" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === 'services' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">Services</button>
+                @endif
             </div>
 
             <div x-ref="gridContainer" tabindex="0" @keydown.arrow-right.prevent="moveGridFocus(1)" @keydown.arrow-left.prevent="moveGridFocus(-1)" @keydown.arrow-down.prevent="moveGridFocus(gridCols)" @keydown.arrow-up.prevent="moveGridFocus(-gridCols)" @keydown.enter.prevent="addGridFocusedItem()" class="flex-1 overflow-y-auto p-3 outline-none">
@@ -1826,6 +1843,7 @@ function restaurantPos() {
         filteredItems: [],
         displayItems: [],
         displayCount: 60,
+        showProducts: true,
         loading: true,
         activeCategory: 'all',
         searchQuery: '',
@@ -1997,6 +2015,9 @@ function restaurantPos() {
         init() {
             if (this._inited) return;
             this._inited = true;
+            // Honor the saved "hide products" preference ONLY in inventory-OFF mode.
+            // Inventory mode must always show the catalog (no manual on-the-fly create).
+            try { if (!this.isInventoryEnabled() && localStorage.getItem('pos_show_products') === '0') this.showProducts = false; } catch (e) {}
             this.filterProducts();
             setTimeout(() => { this.loading = false; }, 300);
             this.$watch('activeCategory', () => { this.filterProducts(); this.gridFocusIndex = 0; });
@@ -2161,7 +2182,7 @@ function restaurantPos() {
             if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
             this._searchDebounceTimer = setTimeout(() => {
                 this.filterProducts();
-                if (q.length > 0) {
+                if (q.length > 0 && this.showProducts) {
                     const all = [...this.allProducts, ...this.allServices];
                     const out = [];
                     for (let i = 0; i < all.length && out.length < 12; i++) {
@@ -2186,7 +2207,11 @@ function restaurantPos() {
                 }
             });
         },
-        addHighlightedItem() { if (this.showSearchDropdown && this.searchSuggestions.length > 0) this.quickAddItem(this.searchSuggestions[this.highlightIndex]); },
+        addHighlightedItem() {
+            if (this.showSearchDropdown && this.searchSuggestions.length > 0) { this.quickAddItem(this.searchSuggestions[this.highlightIndex]); return; }
+            // No catalog match: in SIMPLE (inventory-OFF) mode, Enter creates the typed item on the fly.
+            if (!this.isInventoryEnabled() && this.searchQuery.trim().length > 0 && !this.quickCreating) this.quickCreateProduct();
+        },
         quickAddItem(item) {
             this.handleProductClick(item);
             this.searchQuery = ''; this.searchSuggestions = []; this.showSearchDropdown = false;
@@ -2194,6 +2219,9 @@ function restaurantPos() {
         },
 
         filterProducts() {
+            // MASTER "show saved products" toggle — when OFF, the catalog grid is emptied
+            // so cashiers bill via manual entry only (type a name → "Create X" quick-add).
+            if (!this.showProducts) { this.filteredItems = []; this.displayCount = 60; this.updateDisplayItems(); return; }
             let items = [...this.allProducts, ...this.allServices];
             items = items.filter(i => parseFloat(i.price) > 0 && i.name && i.name.trim().length > 0);
             if (this.activeCategory !== 'all' && this.activeCategory !== 'services') { items = this.allProducts.filter(p => p.category === this.activeCategory && parseFloat(p.price) > 0 && p.name && p.name.trim().length > 0); }
@@ -2206,6 +2234,17 @@ function restaurantPos() {
 
         updateDisplayItems() {
             this.displayItems = this.filteredItems.slice(0, this.displayCount);
+        },
+
+        // MASTER toggle — show/hide the saved products catalog on the sale screen.
+        // Persisted per-browser (localStorage). When OFF, cashiers bill via manual entry only.
+        toggleShowProducts() {
+            // Inventory mode requires the catalog — toggle is a no-op (force ON) there.
+            if (this.isInventoryEnabled()) { this.showProducts = true; return; }
+            this.showProducts = !this.showProducts;
+            try { localStorage.setItem('pos_show_products', this.showProducts ? '1' : '0'); } catch (e) {}
+            if (!this.showProducts) { this.searchSuggestions = []; this.showSearchDropdown = false; }
+            this.filterProducts();
         },
 
         loadMore() {

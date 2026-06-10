@@ -471,5 +471,7 @@
             </template>
         </div>
         <x-pwa-update color="emerald" />
+        <x-trial-lock-modal />
+        <x-whatsapp-support />
     </body>
 </html>

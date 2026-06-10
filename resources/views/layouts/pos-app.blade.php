@@ -701,5 +701,7 @@
         })();
         </script>
         <x-pwa-update color="purple" />
+        <x-trial-lock-modal />
+        <x-whatsapp-support />
     </body>
 </html>

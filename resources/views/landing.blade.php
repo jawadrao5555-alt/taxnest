@@ -154,7 +154,7 @@
 
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
                     <a href="#products" class="btn-glow group inline-flex items-center px-8 py-4 text-white rounded-xl text-[15px] font-bold w-full sm:w-auto justify-center shadow-xl" style="background:linear-gradient(135deg,#0F6171 0%,#0A4D5C 100%);box-shadow:0 12px 32px -8px rgba(10,77,92,0.5);" onmouseover="this.style.background='linear-gradient(135deg,#0A4D5C 0%,#063B47 100%)'" onmouseout="this.style.background='linear-gradient(135deg,#0F6171 0%,#0A4D5C 100%)'">
-                        Start 14-Day Free Trial
+                        Start 3-Day Free Trial
                         <svg class="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
                     </a>
                     <a href="#products" class="group inline-flex items-center px-8 py-4 bg-white text-gray-700 border border-gray-300 rounded-xl text-[15px] font-semibold hover:bg-gray-50 hover:text-gray-900 hover:border-gray-400 transition w-full sm:w-auto justify-center shadow-sm">
@@ -165,7 +165,7 @@
 
                 <div class="flex items-center justify-center gap-6 mt-8 text-[12px] text-gray-600">
                     <span class="flex items-center gap-1.5"><svg class="w-4 h-4" style="color:#0F6171;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> No credit card</span>
-                    <span class="flex items-center gap-1.5"><svg class="w-4 h-4" style="color:#0F6171;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> 14-day trial</span>
+                    <span class="flex items-center gap-1.5"><svg class="w-4 h-4" style="color:#0F6171;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> 3-day trial</span>
                     <span class="flex items-center gap-1.5"><svg class="w-4 h-4" style="color:#0F6171;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Cancel anytime</span>
                 </div>
             </div>
@@ -286,7 +286,7 @@
                         <span class="text-2xl font-black text-emerald-600">1</span>
                     </div>
                     <h3 class="text-[16px] font-bold text-gray-900 mb-2">Register & Choose Product</h3>
-                    <p class="text-[13px] text-gray-500 leading-relaxed">Sign up in 30 seconds. Pick Digital Invoice, PRA POS, or FBR POS. Get a 14-day free trial instantly.</p>
+                    <p class="text-[13px] text-gray-500 leading-relaxed">Sign up in 30 seconds. Pick Digital Invoice, PRA POS, or FBR POS. Get a 3-day free trial instantly.</p>
                 </div>
                 <div class="text-center step-connector">
                     <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-100 to-violet-50 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-purple-500/10">
@@ -552,7 +552,7 @@
             <div class="text-center mb-16 fade-up">
                 <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Pricing</p>
                 <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Simple, Transparent Pricing</h2>
-                <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">Each product has its own plans. Visit the product page for details and start your 14-day free trial.</p>
+                <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">Each product has its own plans. Visit the product page for details and start your 3-day free trial.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto fade-up">
                 <div class="relative card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 p-8 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
@@ -613,7 +613,7 @@
                     ['What is TaxNest?', 'TaxNest is Pakistan\'s most advanced tax compliance platform with three products: <strong>Digital Invoice</strong> for FBR compliance (Federal Board of Revenue), <strong>NestPOS</strong> for PRA compliance (Punjab Revenue Authority), and <strong>FBR POS</strong> for FBR-integrated point of sale billing. All three products are completely isolated with separate databases, logins, and dashboards.'],
                     ['What is the difference between Digital Invoice, NestPOS, and FBR POS?', '<strong>Digital Invoice</strong> is for businesses that need to submit invoices to FBR via PRAL API v1.12. It includes HS Intelligence, compliance scoring, risk detection, and enterprise analytics.<br><br><strong>NestPOS</strong> is a Point of Sale system for retail/service businesses that need PRA fiscal device integration via PRAL IMS API v1.2. It includes thermal receipt printing, multi-terminal support, and real-time tax calculations.<br><br><strong>FBR POS</strong> is a Point of Sale system with direct FBR API submission, designed for businesses that need FBR-compliant POS billing with automated tax calculation and retry system.'],
                     ['Are all three products data separate?', 'Yes, 100%. Digital Invoice, NestPOS, and FBR POS each have separate databases, separate login pages, separate dashboards, and separate user accounts. There is zero cross-contamination of data between any of the three systems.'],
-                    ['Is there a free trial?', 'Yes! All three products come with a 14-day free trial. No credit card required. You get full access to all features during the trial period with up to 20 invoices/transactions.'],
+                    ['Is there a free trial?', 'Yes! All three products come with a 3-day free trial. No credit card required. You get full access to all features during the trial period with up to 20 invoices/transactions.'],
                     ['How does FBR/PRA compliance work?', '<strong>FBR (Digital Invoice):</strong> Uses PRAL API v1.12 for real-time synchronous invoice submission. Invoices are validated, scored for compliance, and submitted with HS codes, tax rates, and QR codes.<br><br><strong>NestPOS:</strong> Uses PRAL IMS API v1.2 for fiscal device integration. Each transaction is fiscalized and assigned a PRA fiscal invoice number with QR code.<br><br><strong>FBR POS:</strong> Uses direct FBR API for real-time POS invoice submission with automated tax compliance, retry system, and comprehensive tax reports.'],
                     ['What security measures are in place?', 'TaxNest uses SHA-256 encrypted immutable audit logs, role-based access control, company isolation middleware, 6-phase idempotency shield for duplicate prevention, and HTTPS encryption. All critical operations are logged with tamper-proof hashing.'],
                 ];
@@ -790,5 +790,6 @@
         });
     </script>
 
+        <x-whatsapp-support />
 </body>
 </html>

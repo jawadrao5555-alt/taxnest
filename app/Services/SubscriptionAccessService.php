@@ -86,9 +86,51 @@ class SubscriptionAccessService
         }
 
         if ($subscription->isTrialExpired()) {
-            return ['allowed' => false, 'reason' => 'Your trial has expired. Please subscribe.', 'override' => null];
+            return ['allowed' => false, 'reason' => 'Your free trial has expired. Please subscribe to a plan.', 'override' => null];
+        }
+
+        // Free-trial invoice cap (3-day OR 20-invoice — whichever comes first).
+        // Applies to DI / PRA POS / FBR POS trial subscriptions uniformly.
+        $plan = $subscription->pricingPlan ?? $subscription->loadMissing('pricingPlan')->pricingPlan;
+        if ($plan && $plan->is_trial) {
+            $limit = (int) ($plan->invoice_limit ?? 0);
+            if ($limit > 0) {
+                $count = self::billableCount($company);
+                if ($count >= $limit) {
+                    return [
+                        'allowed' => false,
+                        'reason' => "Free trial invoice limit reached ({$count}/{$limit}). Please subscribe to a plan.",
+                        'override' => null,
+                    ];
+                }
+            }
         }
 
         return ['allowed' => true, 'reason' => 'Active subscription.', 'override' => null];
+    }
+
+    /**
+     * Count a company's billable documents by product type.
+     * DI uses the invoices table; PRA POS uses pos_transactions;
+     * FBR POS uses its own fbr_pos_transactions table.
+     */
+    protected static function billableCount(Company $company): int
+    {
+        // FBR POS bills live in their own table (fbr_pos_transactions).
+        if ($company->product_type === 'fbrpos') {
+            return \App\Models\FbrPosTransaction::where('company_id', $company->id)->count();
+        }
+
+        // PRA POS bills live in pos_transactions (archived rows hidden by a global scope).
+        if ($company->product_type === 'pos') {
+            return \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $company->id)
+                ->count();
+        }
+
+        // Digital Invoice uses the invoices table.
+        return Invoice::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
+            ->where('company_id', $company->id)
+            ->count();
     }
 }

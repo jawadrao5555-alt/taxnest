@@ -362,7 +362,7 @@
                     </span>
                     <span class="flex items-center gap-1.5">
                         <svg class="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        14-day free trial
+                        3-day free trial
                     </span>
                 </div>
             </div>
@@ -420,7 +420,7 @@
         <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.3),transparent_70%)]"></div>
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
             <h2 class="text-3xl font-bold text-white mb-4" style="text-shadow: 0 2px 15px rgba(0,0,0,0.3);">Ready to Get Started?</h2>
-            <p class="text-blue-200 mb-8">Start your 14-day free trial. No credit card required.</p>
+            <p class="text-blue-200 mb-8">Start your 3-day free trial. No credit card required.</p>
             <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <a href="/fbr-pos/register" class="w-full sm:w-auto px-8 py-3.5 bg-white text-blue-700 rounded-xl text-sm font-bold hover:bg-blue-50 transition shadow-2xl hover:shadow-blue-500/25 text-center">Create Free Account</a>
                 <button @click="showLoginModal = true" class="w-full sm:w-auto px-8 py-3.5 border-2 border-white/30 text-white rounded-xl text-sm font-bold hover:bg-white/15 backdrop-blur-sm transition text-center">Login to FBR POS</button>
@@ -435,5 +435,6 @@
         </div>
     </div>
 
+        <x-whatsapp-support />
 </body>
 </html>

@@ -579,6 +579,7 @@ use App\Http\Controllers\SaasAdmin\AdminSubscriptionController;
 use App\Http\Controllers\SaasAdmin\AdminFranchiseController;
 use App\Http\Controllers\SaasAdmin\AdminUsageController;
 use App\Http\Controllers\SaasAdmin\AdminSystemController;
+use App\Http\Controllers\SaasAdmin\AdminSettingsController;
 use App\Http\Controllers\SaasAdmin\AdminAuditController;
 use App\Http\Controllers\Franchise\FranchiseAuthController;
 use App\Http\Controllers\Franchise\FranchiseDashboardController;
@@ -715,6 +716,8 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/company-usage', [AdminUsageController::class, 'index'])->name('saas.admin.usage');
     Route::get('/system-control', [AdminSystemController::class, 'index'])->name('saas.admin.system');
     Route::post('/system-control/{key}/toggle', [AdminSystemController::class, 'toggle'])->name('saas.admin.system.toggle');
+    Route::get('/settings', [AdminSettingsController::class, 'index'])->name('saas.admin.settings');
+    Route::post('/settings', [AdminSettingsController::class, 'update'])->name('saas.admin.settings.update');
     Route::get('/audit-logs', [AdminAuditController::class, 'index'])->name('saas.admin.audit');
 });
 

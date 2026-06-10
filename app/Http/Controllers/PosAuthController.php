@@ -160,12 +160,41 @@ class PosAuthController extends Controller
             'is_active' => true,
         ]);
 
+        $this->startTrial($company->id, 'pos');
+
         Auth::guard('pos')->login($user);
 
         if ($posType === 'restaurant') {
             return redirect('/pos/restaurant/pos');
         }
         return redirect('/pos/invoice/create');
+    }
+
+    /**
+     * Give a freshly-registered company a 3-day / 20-invoice free trial by
+     * attaching the product's trial pricing plan. Mirrors the DI flow.
+     */
+    private function startTrial(int $companyId, string $productType): void
+    {
+        $trialPlan = \App\Models\PricingPlan::where('product_type', $productType)
+            ->where('is_trial', true)
+            ->first();
+
+        if (!$trialPlan) {
+            return;
+        }
+
+        \App\Models\Subscription::create([
+            'company_id' => $companyId,
+            'pricing_plan_id' => $trialPlan->id,
+            'billing_cycle' => 'monthly',
+            'discount_percent' => 0,
+            'final_price' => 0,
+            'start_date' => now(),
+            'end_date' => now()->addDays(3),
+            'trial_ends_at' => now()->addDays(3),
+            'active' => true,
+        ]);
     }
 
     public function logout(Request $request)

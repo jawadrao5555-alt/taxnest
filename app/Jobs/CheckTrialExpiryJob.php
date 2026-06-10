@@ -36,7 +36,7 @@ class CheckTrialExpiryJob implements ShouldQueue
                 'company_id' => $subscription->company_id,
                 'type' => 'trial_expired',
                 'title' => 'Free Trial Expired',
-                'message' => 'Your 14-day free trial has expired. Please subscribe to a plan to continue using TaxNest.',
+                'message' => 'Your free trial has expired. Please subscribe to a plan to continue using TaxNest.',
                 'read' => false,
             ]);
         }

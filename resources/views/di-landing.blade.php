@@ -192,7 +192,7 @@
                     Enterprise-grade FBR digital invoicing. Real-time synchronous submission via PRAL API v1.12, HS Intelligence, compliance scoring, risk detection, and immutable audit logs.
                 </p>
                 <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <a href="/register" class="w-full sm:w-auto px-8 py-3.5 bg-white dark:bg-gray-900 text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-50 transition shadow-2xl shadow-white/20 text-center">Start 14-Day Free Trial</a>
+                    <a href="/register" class="w-full sm:w-auto px-8 py-3.5 bg-white dark:bg-gray-900 text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-50 transition shadow-2xl shadow-white/20 text-center">Start 3-Day Free Trial</a>
                     <button @click="showLoginModal = true" class="w-full sm:w-auto px-8 py-3.5 border border-white/30 bg-white/5 backdrop-blur-sm text-white rounded-xl text-sm font-bold hover:bg-white/15 hover:border-white/50 transition">Login to Dashboard</button>
                 </div>
             </div>
@@ -380,7 +380,7 @@
                     </span>
                     <span class="flex items-center gap-1.5">
                         <svg class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        14-day free trial
+                        3-day free trial
                     </span>
                     <span class="flex items-center gap-1.5">
                         <svg class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
@@ -434,7 +434,7 @@
         </div>
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
             <h2 class="text-3xl font-bold text-white mb-4 di-hero-heading">Ready to Get FBR Compliant?</h2>
-            <p class="text-emerald-100/80 mb-8">Start your 14-day free trial. No credit card required.</p>
+            <p class="text-emerald-100/80 mb-8">Start your 3-day free trial. No credit card required.</p>
             <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <a href="/register" class="w-full sm:w-auto px-8 py-3.5 bg-white dark:bg-gray-900 text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-50 transition shadow-2xl shadow-white/15 text-center">Create Free Account</a>
                 <button @click="showLoginModal = true" class="w-full sm:w-auto px-8 py-3.5 border border-white/30 bg-white/5 backdrop-blur-sm text-white rounded-xl text-sm font-bold hover:bg-white/15 hover:border-white/50 transition">Login to Dashboard</button>
@@ -449,5 +449,6 @@
         </div>
     </div>
 
+        <x-whatsapp-support />
 </body>
 </html>

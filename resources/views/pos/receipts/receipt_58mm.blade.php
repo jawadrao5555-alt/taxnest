@@ -225,10 +225,12 @@
             <td class="tot-value">-{{ number_format($transaction->discount_amount, 2) }}</td>
         </tr>
         @endif
+        @if((optional($transaction->company)->pos_receipt_show_tax ?? true) || $transaction->invoice_mode === 'pra' || !empty($transaction->pra_invoice_number))
         <tr>
             <td class="tot-label">Tax ({{ number_format($transaction->tax_rate, 0) }}%):</td>
             <td class="tot-value">{{ number_format($transaction->tax_amount, 2) }}</td>
         </tr>
+        @endif
     </table>
     <div class="double-separator"></div>
     <table class="totals-table">

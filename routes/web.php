@@ -493,9 +493,15 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
         Route::delete('/products/{id}', [PosController::class, 'deleteProduct'])->name('pos.products.delete');
         Route::post('/products/{id}/toggle', [PosController::class, 'toggleProduct'])->name('pos.products.toggle');
         Route::post('/products/{id}/toggle-sale', [PosController::class, 'toggleProductSale'])->name('pos.products.toggle-sale');
+        Route::get('/customers/export', [PosController::class, 'exportCustomers'])->name('pos.customers.export');
+        Route::get('/customers/template', [PosController::class, 'downloadCustomerTemplate'])->name('pos.customers.template');
+        Route::post('/customers/import', [PosController::class, 'importCustomers'])->name('pos.customers.import');
         Route::put('/customers/{id}', [PosController::class, 'updateCustomer'])->name('pos.customers.update');
         Route::delete('/customers/{id}', [PosController::class, 'deleteCustomer'])->name('pos.customers.delete');
         Route::post('/customers/{id}/toggle', [PosController::class, 'toggleCustomer'])->name('pos.customers.toggle');
+        Route::get('/customers/{id}/history', [PosController::class, 'customerHistory'])->name('pos.customers.history');
+        Route::get('/customers/{id}/history/export', [PosController::class, 'exportCustomerHistory'])->name('pos.customers.history.export');
+        Route::get('/customers/{id}/history/pdf', [PosController::class, 'customerHistoryPdf'])->name('pos.customers.history.pdf');
         Route::get('/inventory', [PosInventoryController::class, 'dashboard'])->name('pos.inventory.dashboard');
         Route::get('/inventory/stock', [PosInventoryController::class, 'stock'])->name('pos.inventory.stock');
         Route::get('/inventory/movements', [PosInventoryController::class, 'movements'])->name('pos.inventory.movements');

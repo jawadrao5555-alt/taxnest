@@ -1,2 +1,3 @@
-- [TaxNest dev env access](dev-env-access.md) — artisan needs `env -u` PG-strip prefix; tinker disabled (prod APP_ENV); dev MySQL via `mysql -u root taxnest_staging`.
-- [PRA POS sale screen](pos-sale-screen-product-loaders.md) — only universal.blade.php served (create-invoice dead); 3 product loaders must stay in sync; show-products toggle is inventory-OFF only.
+- [TaxNest dev environment access](dev-env-access.md) — how to run artisan/MySQL in dev; tinker disabled (APP_ENV=production); strip PG env vars.
+- [PRA POS sale screen & product loaders](pos-sale-screen-product-loaders.md) — universal.blade.php is the only live sale screen; create-invoice.blade.php is DEAD; 3 product loaders must stay in sync.
+- [POS provisional & receipt-tax rules](pos-provisional-and-receipt-rules.md) — "local" bill = completed+invoice_mode=local+pra_status=local on every list/promote/delete; PRA fiscal receipts must always show tax.

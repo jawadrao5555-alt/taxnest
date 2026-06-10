@@ -183,10 +183,12 @@
                 <div class="val">-PKR {{ number_format($transaction->discount_amount, 2) }}</div>
             </div>
             @endif
+            @if((optional($transaction->company)->pos_receipt_show_tax ?? true) || $transaction->invoice_mode === 'pra' || !empty($transaction->pra_invoice_number))
             <div class="total-row">
                 <div class="lbl">Tax ({{ number_format($transaction->tax_rate, 0) }}%)</div>
                 <div class="val">PKR {{ number_format($transaction->tax_amount, 2) }}</div>
             </div>
+            @endif
         </div>
 
         <div class="grand-total-box">

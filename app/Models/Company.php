@@ -62,6 +62,8 @@ class Company extends Model
         'print_on_hold',
         'print_on_pay',
         'auto_print_kot',
+        'kot_reprint_enabled',
+        'pos_receipt_show_tax',
         'pra_environment',
         'pra_pos_id',
         'pra_access_code',
@@ -109,6 +111,9 @@ class Company extends Model
         'agent_last_seen' => 'datetime',
         'feature_flags' => 'array',
         'use_universal_pos' => 'boolean',
+        'auto_print_kot' => 'boolean',
+        'kot_reprint_enabled' => 'boolean',
+        'pos_receipt_show_tax' => 'boolean',
     ];
 
     protected $hidden = [

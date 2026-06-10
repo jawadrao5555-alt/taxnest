@@ -400,10 +400,14 @@ class PosController extends Controller
         }
 
         $company->update([
-            'business_category' => $data['business_category'] ?? $company->business_category,
-            'feature_flags'     => $flags,
-            'use_universal_pos' => (bool) ($data['use_universal_pos'] ?? false),
-            'pos_ui_density'    => $data['pos_ui_density'] ?? $company->pos_ui_density ?? 'standard',
+            'business_category'    => $data['business_category'] ?? $company->business_category,
+            'feature_flags'        => $flags,
+            'use_universal_pos'    => (bool) ($data['use_universal_pos'] ?? false),
+            'pos_ui_density'       => $data['pos_ui_density'] ?? $company->pos_ui_density ?? 'standard',
+            // Receipt & Kitchen preferences (checkboxes — absent value = off).
+            'pos_receipt_show_tax' => (bool) $request->input('pos_receipt_show_tax', false),
+            'auto_print_kot'       => (bool) $request->input('auto_print_kot', false),
+            'kot_reprint_enabled'  => (bool) $request->input('kot_reprint_enabled', false),
         ]);
 
         return redirect()->route('pos.features')->with('success', 'POS features updated.');
@@ -539,6 +543,9 @@ class PosController extends Controller
                     'total_amount' => $totalAmount,
                     'payment_method' => $request->payment_method,
                     'status' => 'completed',
+                    // Keep invoice_mode in sync with the resolved mode so a resumed
+                    // draft is never orphaned from the Local / Failed UI lists.
+                    'invoice_mode' => $invoiceMode,
                     'pra_status' => $initialPraStatus,
                     'submission_hash' => $submissionHash,
                     'locked_by_terminal_id' => null,
@@ -1011,7 +1018,13 @@ class PosController extends Controller
     public function apiProvisionalBills(Request $request)
     {
         $companyId = app('currentCompanyId');
+        // Provisional list MUST mirror the Transactions "Local" tab definition:
+        // a deliberately-saved provisional bill is a COMPLETED sale in local mode.
+        // Filtering on all three keeps drafts (status='draft', invoice_mode='pra')
+        // out of this list — those were polluting the F10 modal before.
         $bills = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->where('invoice_mode', 'local')
             ->where('pra_status', 'local')
             ->orderBy('id', 'desc')
             ->limit(100)
@@ -1049,7 +1062,7 @@ class PosController extends Controller
         if (!$tx) {
             return response()->json(['success' => false, 'message' => 'Bill not found'], 404);
         }
-        if ($tx->pra_status !== 'local') {
+        if ($tx->pra_status !== 'local' || $tx->status !== 'completed' || $tx->invoice_mode !== 'local') {
             return response()->json([
                 'success' => false,
                 'message' => 'Only provisional (local) bills can be deleted via this endpoint.',
@@ -1079,10 +1092,10 @@ class PosController extends Controller
         if (!$tx) {
             return response()->json(['success' => false, 'message' => 'Bill not found'], 404);
         }
-        if ($tx->pra_status !== 'local') {
+        if ($tx->pra_status !== 'local' || $tx->status !== 'completed' || $tx->invoice_mode !== 'local') {
             return response()->json([
                 'success' => false,
-                'message' => 'Only provisional bills can be promoted. Current status: ' . $tx->pra_status,
+                'message' => 'Only completed provisional (local) bills can be promoted. Current status: ' . $tx->status . '/' . $tx->pra_status,
             ], 422);
         }
         if (!$company || !$company->pra_reporting_enabled) {
@@ -3094,6 +3107,342 @@ class PosController extends Controller
         $customer = PosCustomer::where('company_id', $companyId)->findOrFail($id);
         $customer->update(['is_active' => !$customer->is_active]);
         return back()->with('success', $customer->is_active ? 'Customer activated.' : 'Customer deactivated.');
+    }
+
+    /**
+     * Neutralize CSV formula-injection: cells starting with = + - @ (or a
+     * leading tab/CR) are prefixed with a single quote so spreadsheets treat
+     * them as text instead of executing them as a formula.
+     */
+    private function csvSafe($value)
+    {
+        $s = (string) $value;
+        if ($s !== '' && in_array($s[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+            return "'" . $s;
+        }
+        return $s;
+    }
+
+    /**
+     * Export the company's POS customers to a CSV (streamed). Live order/spend
+     * totals match the history view (customer_id OR phone) without double-counting.
+     */
+    public function exportCustomers()
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $customers = PosCustomer::where('company_id', $companyId)->orderBy('name')->get();
+
+        // Aggregate by linked id, then by phone for rows WITHOUT a linked id
+        // (so a sale counted by id is never also counted by phone).
+        $aggById = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->whereNotNull('customer_id')
+            ->selectRaw('customer_id, COUNT(*) as cnt, SUM(total_amount) as spent')
+            ->groupBy('customer_id')
+            ->get()
+            ->keyBy('customer_id');
+
+        $aggByPhone = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->whereNull('customer_id')
+            ->whereNotNull('customer_phone')
+            ->selectRaw('customer_phone, COUNT(*) as cnt, SUM(total_amount) as spent')
+            ->groupBy('customer_phone')
+            ->get()
+            ->keyBy('customer_phone');
+
+        $filename = 'POS_Customers_' . now()->format('Ymd_His') . '.csv';
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+
+        $callback = function () use ($customers, $aggById, $aggByPhone, $company) {
+            $file = fopen('php://output', 'w');
+            // UTF-8 BOM so Excel renders Urdu / special chars correctly.
+            fwrite($file, "\xEF\xBB\xBF");
+            fputcsv($file, [$this->csvSafe('POS Customers — ' . ($company->name ?? ''))]);
+            fputcsv($file, ['Generated: ' . now()->format('d M Y H:i')]);
+            fputcsv($file, []);
+            fputcsv($file, ['Name', 'Phone', 'Email', 'CNIC', 'NTN', 'City', 'Address', 'Type', 'Status', 'Total Orders', 'Total Spent']);
+            foreach ($customers as $c) {
+                $byId = $aggById[$c->id] ?? null;
+                $byPhone = $c->phone ? ($aggByPhone[$c->phone] ?? null) : null;
+                $cnt = (int) ($byId->cnt ?? 0) + (int) ($byPhone->cnt ?? 0);
+                $spent = (float) ($byId->spent ?? 0) + (float) ($byPhone->spent ?? 0);
+                fputcsv($file, [
+                    $this->csvSafe($c->name),
+                    $this->csvSafe($c->phone),
+                    $this->csvSafe($c->email),
+                    $this->csvSafe($c->cnic),
+                    $this->csvSafe($c->ntn),
+                    $this->csvSafe($c->city),
+                    $this->csvSafe($c->address),
+                    ucfirst($c->type),
+                    $c->is_active ? 'Active' : 'Inactive',
+                    $cnt,
+                    number_format($spent, 2, '.', ''),
+                ]);
+            }
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Download a blank CSV template (with one example row) for customer import.
+     */
+    public function downloadCustomerTemplate()
+    {
+        $filename = 'POS_Customers_Import_Template.csv';
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+        $callback = function () {
+            $file = fopen('php://output', 'w');
+            fwrite($file, "\xEF\xBB\xBF");
+            fputcsv($file, ['Name', 'Phone', 'Email', 'CNIC', 'NTN', 'City', 'Address', 'Type']);
+            fputcsv($file, ['Ahmed Khan', '03001234567', 'ahmed@example.com', '35201-1234567-1', '1234567-8', 'Lahore', '123 Main Street', 'unregistered']);
+            fclose($file);
+        };
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Import POS customers from an uploaded CSV. Forces company_id, dedupes by
+     * phone then CNIC within the company (updates existing), skips invalid rows.
+     */
+    public function importCustomers(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:csv,txt|max:5120',
+        ]);
+
+        $companyId = app('currentCompanyId');
+        $handle = fopen($request->file('file')->getRealPath(), 'r');
+        if ($handle === false) {
+            return back()->with('error', 'Could not read the uploaded file.');
+        }
+
+        $header = fgetcsv($handle);
+        if (!$header) {
+            fclose($handle);
+            return back()->with('error', 'The CSV file appears to be empty.');
+        }
+        // Strip a UTF-8 BOM that Excel may prepend to the first header cell.
+        if (isset($header[0])) {
+            $header[0] = preg_replace('/^\xEF\xBB\xBF/', '', $header[0]);
+        }
+
+        $map = [];
+        foreach ($header as $i => $col) {
+            $key = strtolower(trim(str_replace([' ', '_', '-'], '', (string) $col)));
+            if ($key !== '') {
+                $map[$key] = $i;
+            }
+        }
+
+        $get = function ($row, $keys) use ($map) {
+            foreach ((array) $keys as $k) {
+                if (isset($map[$k]) && isset($row[$map[$k]])) {
+                    return trim((string) $row[$map[$k]]);
+                }
+            }
+            return null;
+        };
+
+        $imported = 0;
+        $updated = 0;
+        $skipped = 0;
+        $rowNum = 1;
+        $errors = [];
+
+        DB::beginTransaction();
+        try {
+            while (($row = fgetcsv($handle)) !== false) {
+                $rowNum++;
+                if (count(array_filter($row, fn($v) => trim((string) $v) !== '')) === 0) {
+                    continue; // wholly blank line
+                }
+
+                $name = $get($row, ['name', 'customername', 'fullname']);
+                if (empty($name)) {
+                    $skipped++;
+                    if (count($errors) < 10) $errors[] = "Row {$rowNum}: missing name — skipped.";
+                    continue;
+                }
+
+                // Truncate per column length so a long cell never throws a
+                // QueryException that rolls back the entire import.
+                $name = mb_substr($name, 0, 255);
+                $phone = ($v = $get($row, ['phone', 'mobile', 'contact', 'phonenumber'])) !== null && $v !== '' ? mb_substr($v, 0, 20) : null;
+                $cnic = ($v = $get($row, ['cnic'])) !== null && $v !== '' ? mb_substr($v, 0, 20) : null;
+                $email = ($v = $get($row, ['email'])) !== null && $v !== '' ? mb_substr($v, 0, 255) : null;
+                $ntn = ($v = $get($row, ['ntn'])) !== null && $v !== '' ? mb_substr($v, 0, 50) : null;
+                $city = ($v = $get($row, ['city'])) !== null && $v !== '' ? mb_substr($v, 0, 100) : null;
+                $address = ($v = $get($row, ['address'])) !== null && $v !== '' ? mb_substr($v, 0, 500) : null;
+
+                // Only treat type as authoritative when the cell actually has a value,
+                // so a partial CSV never silently flips registered → unregistered.
+                $typeRaw = $get($row, ['type']);
+                $hasType = $typeRaw !== null && trim($typeRaw) !== '';
+                $type = strtolower((string) $typeRaw) === 'registered' ? 'registered' : 'unregistered';
+
+                $existing = null;
+                if (!empty($phone)) {
+                    $existing = PosCustomer::where('company_id', $companyId)->where('phone', $phone)->first();
+                }
+                if (!$existing && !empty($cnic)) {
+                    $existing = PosCustomer::where('company_id', $companyId)->where('cnic', $cnic)->first();
+                }
+
+                $fields = [
+                    'name' => $name,
+                    'phone' => $phone,
+                    'email' => $email,
+                    'cnic' => $cnic,
+                    'ntn' => $ntn,
+                    'city' => $city,
+                    'address' => $address,
+                ];
+
+                if ($existing) {
+                    // Non-destructive: only overwrite fields the CSV actually carries,
+                    // so blank cells never null out existing data.
+                    $updateData = [];
+                    foreach ($fields as $k => $val) {
+                        if ($val !== null && $val !== '') {
+                            $updateData[$k] = $val;
+                        }
+                    }
+                    if ($hasType) {
+                        $updateData['type'] = $type;
+                    }
+                    if (!empty($updateData)) {
+                        $existing->update($updateData);
+                    }
+                    $updated++;
+                } else {
+                    PosCustomer::create(array_merge($fields, [
+                        'type' => $hasType ? $type : 'unregistered',
+                        'company_id' => $companyId,
+                        'is_active' => true,
+                    ]));
+                    $imported++;
+                }
+            }
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            fclose($handle);
+            \Log::error('POS customer import failed', ['company_id' => $companyId, 'error' => $e->getMessage()]);
+            return back()->with('error', 'Import failed due to an unexpected error. Please check the file format and try again.');
+        }
+        fclose($handle);
+
+        $msg = "Import complete: {$imported} added, {$updated} updated" . ($skipped ? ", {$skipped} skipped" : '') . '.';
+        return back()->with('success', $msg)->with('import_errors', $errors);
+    }
+
+    /**
+     * Resolve a customer's completed transactions, matching by id OR phone
+     * (POS records customer_phone on walk-in sales even without a linked id).
+     */
+    private function customerTransactions($companyId, PosCustomer $customer)
+    {
+        return PosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->where(function ($q) use ($customer) {
+                $q->where('customer_id', $customer->id);
+                if (!empty($customer->phone)) {
+                    $q->orWhere('customer_phone', $customer->phone);
+                }
+            })
+            ->orderByDesc('created_at');
+    }
+
+    /**
+     * Per-customer purchase history page.
+     */
+    public function customerHistory($id)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $customer = PosCustomer::where('company_id', $companyId)->findOrFail($id);
+
+        $transactions = $this->customerTransactions($companyId, $customer)->get();
+        $totalSpent = $transactions->sum('total_amount');
+        $totalOrders = $transactions->count();
+        $avgOrder = $totalOrders > 0 ? $totalSpent / $totalOrders : 0;
+        $lastOrder = $transactions->first();
+
+        return view('pos.customer-history', compact('company', 'customer', 'transactions', 'totalSpent', 'totalOrders', 'avgOrder', 'lastOrder'));
+    }
+
+    /**
+     * Download a single customer's purchase history as CSV.
+     */
+    public function exportCustomerHistory($id)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $customer = PosCustomer::where('company_id', $companyId)->findOrFail($id);
+        $transactions = $this->customerTransactions($companyId, $customer)->get();
+
+        $filename = 'Customer_History_' . preg_replace('/[^A-Za-z0-9]+/', '_', $customer->name) . '_' . now()->format('Ymd') . '.csv';
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+
+        $callback = function () use ($transactions, $customer, $company) {
+            $file = fopen('php://output', 'w');
+            fwrite($file, "\xEF\xBB\xBF");
+            fputcsv($file, [$this->csvSafe('Customer Purchase History — ' . ($company->name ?? ''))]);
+            fputcsv($file, [$this->csvSafe('Customer: ' . $customer->name), 'Phone: ' . ($customer->phone ?: '—')]);
+            fputcsv($file, ['Generated: ' . now()->format('d M Y H:i')]);
+            fputcsv($file, []);
+            fputcsv($file, ['Date', 'Invoice #', 'Mode', 'Payment', 'Subtotal', 'Discount', 'Tax', 'Total']);
+            foreach ($transactions as $t) {
+                fputcsv($file, [
+                    $t->created_at->format('d M Y H:i'),
+                    $this->csvSafe($t->invoice_number),
+                    $t->invoice_mode === 'local' ? 'Local' : 'PRA',
+                    ucwords(str_replace('_', ' ', (string) $t->payment_method)),
+                    number_format($t->subtotal, 2, '.', ''),
+                    number_format($t->discount_amount, 2, '.', ''),
+                    number_format($t->tax_amount, 2, '.', ''),
+                    number_format($t->total_amount, 2, '.', ''),
+                ]);
+            }
+            fputcsv($file, []);
+            fputcsv($file, ['', '', '', 'TOTAL', '', '', '', number_format($transactions->sum('total_amount'), 2, '.', '')]);
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Download a single customer's purchase history as a PDF.
+     */
+    public function customerHistoryPdf($id)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $customer = PosCustomer::where('company_id', $companyId)->findOrFail($id);
+        $transactions = $this->customerTransactions($companyId, $customer)->get();
+        $totalSpent = $transactions->sum('total_amount');
+        $totalOrders = $transactions->count();
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.customer-history-pdf', compact('company', 'customer', 'transactions', 'totalSpent', 'totalOrders'))
+            ->setPaper('a4', 'portrait');
+
+        $filename = 'Customer_History_' . preg_replace('/[^A-Za-z0-9]+/', '_', $customer->name) . '_' . now()->format('Ymd') . '.pdf';
+        return $pdf->download($filename);
     }
 
     public function getLastOrder(Request $request)

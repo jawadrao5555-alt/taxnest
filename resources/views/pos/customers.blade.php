@@ -2,14 +2,46 @@
 <div class="p-4 sm:p-6 max-w-7xl mx-auto">
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <h1 class="text-xl font-bold text-gray-900 dark:text-white">POS Customers</h1>
-        <button onclick="document.getElementById('addCustomerForm').classList.toggle('hidden')" class="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-md hover:shadow-lg transition">+ Add Customer</button>
+        <div class="flex flex-wrap items-center gap-2">
+            @if(!($isCashier ?? false))
+            <a href="{{ route('pos.customers.export') }}" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-semibold shadow-md transition">Export CSV</a>
+            <button onclick="document.getElementById('importCustomerForm').classList.toggle('hidden')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-semibold shadow-md transition">Import CSV</button>
+            @endif
+            <button onclick="document.getElementById('addCustomerForm').classList.toggle('hidden')" class="bg-gradient-to-r from-purple-500 to-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-md hover:shadow-lg transition">+ Add Customer</button>
+        </div>
     </div>
 
     @if(session('success'))
     <div class="mb-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 rounded-lg px-4 py-3 text-sm">{{ session('success') }}</div>
     @endif
+    @if(session('error'))
+    <div class="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-300 rounded-lg px-4 py-3 text-sm">{{ session('error') }}</div>
+    @endif
     @if($errors->any())
     <div class="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-300 rounded-lg px-4 py-3 text-sm">{{ $errors->first() }}</div>
+    @endif
+    @if(session('import_errors') && count(session('import_errors')))
+    <div class="mb-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-amber-800 dark:text-amber-300 rounded-lg px-4 py-3 text-xs">
+        <p class="font-semibold mb-1">Some rows were skipped:</p>
+        <ul class="list-disc list-inside space-y-0.5">
+            @foreach(session('import_errors') as $err)
+            <li>{{ $err }}</li>
+            @endforeach
+        </ul>
+    </div>
+    @endif
+
+    @if(!($isCashier ?? false))
+    <div id="importCustomerForm" class="hidden mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-md p-5">
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">Import Customers from CSV</h3>
+        <p class="text-xs text-gray-500 mb-4">Columns: Name, Phone, Email, CNIC, NTN, City, Address, Type. Existing customers (same phone or CNIC) are updated, not duplicated.</p>
+        <form method="POST" action="{{ route('pos.customers.import') }}" enctype="multipart/form-data" class="flex flex-col sm:flex-row sm:items-center gap-3">
+            @csrf
+            <input type="file" name="file" accept=".csv,text/csv" required class="text-sm text-gray-700 dark:text-gray-300 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-100 file:text-purple-700 hover:file:bg-purple-200">
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-semibold shadow-md transition">Upload &amp; Import</button>
+            <a href="{{ route('pos.customers.template') }}" class="text-xs text-purple-600 hover:text-purple-700 underline">Download template</a>
+        </form>
+    </div>
     @endif
 
     <div id="addCustomerForm" class="hidden mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-md p-5">
@@ -100,6 +132,7 @@
                         @if(!($isCashier ?? false))
                         <td class="px-4 py-3 text-center">
                             <div class="flex items-center justify-center gap-1">
+                                <a href="{{ route('pos.customers.history', $customer->id) }}" class="text-xs text-emerald-600 hover:text-emerald-700 px-2 py-1">History</a>
                                 <button @click="editing = !editing" class="text-xs text-purple-600 hover:text-purple-700 px-2 py-1">Edit</button>
                                 <form method="POST" action="{{ route('pos.customers.delete', $customer->id) }}" onsubmit="return confirm('Delete this customer?')" class="inline">
                                     @csrf @method('DELETE')

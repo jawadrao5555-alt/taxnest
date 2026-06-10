@@ -161,6 +161,57 @@
                 </div>
             </div>
 
+            {{-- ═══════════ STEP 4 — RECEIPT & KITCHEN ═══════════ --}}
+            <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 sm:p-6 shadow-sm">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="w-7 h-7 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-xs font-bold inline-flex items-center justify-center">4</span>
+                    <h2 class="text-lg font-extrabold text-gray-900 dark:text-white">Receipt &amp; Kitchen</h2>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 ml-9 mb-4">Control what prints on receipts and how kitchen tickets (KOT) behave.</p>
+
+                <div class="grid sm:grid-cols-2 gap-2.5">
+                    {{-- Receipt: show tax line --}}
+                    <label class="flex items-start gap-3 p-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:border-amber-300 dark:hover:border-amber-700 has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50/40 dark:has-[:checked]:bg-amber-900/10 cursor-pointer transition">
+                        <input type="checkbox" name="pos_receipt_show_tax" value="1" {{ ($company->pos_receipt_show_tax ?? true) ? 'checked' : '' }} class="mt-0.5 w-4 h-4 text-amber-600 rounded">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-1.5 mb-0.5">
+                                <span class="text-base leading-none">🧾</span>
+                                <span class="text-sm font-bold text-gray-900 dark:text-white">Show Tax on Receipt</span>
+                            </div>
+                            <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug">Print the tax (sales tax) line on customer receipts. Turn off for tax-inclusive pricing.</p>
+                            <div class="mt-1.5 inline-flex items-center gap-1 text-[9px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">
+                                <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+                                Tax is always submitted to PRA regardless of this setting
+                            </div>
+                        </div>
+                    </label>
+
+                    {{-- KOT: auto print --}}
+                    <label class="flex items-start gap-3 p-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:border-amber-300 dark:hover:border-amber-700 has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50/40 dark:has-[:checked]:bg-amber-900/10 cursor-pointer transition">
+                        <input type="checkbox" name="auto_print_kot" value="1" {{ ($company->auto_print_kot ?? false) ? 'checked' : '' }} class="mt-0.5 w-4 h-4 text-amber-600 rounded">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-1.5 mb-0.5">
+                                <span class="text-base leading-none">🖨️</span>
+                                <span class="text-sm font-bold text-gray-900 dark:text-white">Auto-Print KOT</span>
+                            </div>
+                            <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug">Automatically print the kitchen ticket when an order is sent to the kitchen.</p>
+                        </div>
+                    </label>
+
+                    {{-- KOT: reprint allowed --}}
+                    <label class="flex items-start gap-3 p-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:border-amber-300 dark:hover:border-amber-700 has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50/40 dark:has-[:checked]:bg-amber-900/10 cursor-pointer transition">
+                        <input type="checkbox" name="kot_reprint_enabled" value="1" {{ ($company->kot_reprint_enabled ?? true) ? 'checked' : '' }} class="mt-0.5 w-4 h-4 text-amber-600 rounded">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-1.5 mb-0.5">
+                                <span class="text-base leading-none">🔁</span>
+                                <span class="text-sm font-bold text-gray-900 dark:text-white">Allow KOT Reprint</span>
+                            </div>
+                            <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug">Let cashiers reprint a kitchen ticket from the held-orders screen.</p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
             {{-- ═══════════ ACTIONS ═══════════ --}}
             <div class="sticky bottom-4 z-10 bg-white/90 dark:bg-gray-900/90 backdrop-blur border border-gray-200 dark:border-gray-700 rounded-2xl p-4 shadow-2xl flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
                 <div class="text-xs text-gray-600 dark:text-gray-400">

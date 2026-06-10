@@ -178,6 +178,11 @@ class Company extends Model
         return $this->hasOne(Subscription::class)->where('active', true)->with('pricingPlan');
     }
 
+    public function paymentProofs()
+    {
+        return $this->hasMany(PaymentProof::class);
+    }
+
     public function complianceScores()
     {
         return $this->hasMany(ComplianceScore::class);

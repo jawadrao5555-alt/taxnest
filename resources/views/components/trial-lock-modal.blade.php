@@ -31,12 +31,32 @@
             }
         }
     }
+
+    // Guard-aware submit target + "under review" state for the proof upload form.
+    $submitAction = null;
+    $pendingProof = false;
+    $forceOpen = false;
+    if ($lockInfo) {
+        if (auth('pos')->check()) {
+            $submitAction = route('pos.payment-proof.store');
+        } elseif (auth('fbrpos')->check()) {
+            $submitAction = route('fbrpos.payment-proof.store');
+        } elseif (auth('web')->check()) {
+            $submitAction = route('payment-proof.store');
+        }
+        if ($companyId && \Illuminate\Support\Facades\Schema::hasTable('payment_proofs')) {
+            $pendingProof = \App\Models\PaymentProof::where('company_id', $companyId)
+                ->where('status', 'pending')->exists();
+        }
+        $forceOpen = session('payment_proof') || $errors->has('proof') || $errors->has('amount');
+    }
 @endphp
 
 @if($lockInfo)
 <div x-data="{
         open: false,
         init() {
+            @if($forceOpen) this.open = true; return; @endif
             try { if (sessionStorage.getItem('trial_lock_dismissed') !== '1') this.open = true; }
             catch (e) { this.open = true; }
         },
@@ -111,6 +131,36 @@
                 <div class="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 text-sm text-amber-700 dark:text-amber-300">
                     Please contact support to get the payment account details and subscribe.
                 </div>
+                @endif
+
+                {{-- Payment proof submission --}}
+                @if($pendingProof)
+                <div class="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4 text-sm text-blue-700 dark:text-blue-300 flex items-start gap-2">
+                    <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>Your payment proof is <strong>under review</strong>. We'll unlock your account as soon as our team verifies it.</span>
+                </div>
+                @elseif($submitAction)
+                <form method="POST" action="{{ $submitAction }}" enctype="multipart/form-data"
+                      class="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-4 space-y-3">
+                    @csrf
+                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Already paid? Submit your receipt</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <input type="number" step="0.01" min="0" name="amount" value="{{ old('amount') }}" placeholder="Amount paid (PKR)"
+                               class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">
+                        <input type="text" name="reference" value="{{ old('reference') }}" maxlength="120" placeholder="Bank ref / TID (optional)"
+                               class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">
+                    </div>
+                    <input type="file" name="proof" accept=".jpg,.jpeg,.png,.pdf" required
+                           class="w-full text-sm text-gray-600 dark:text-gray-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-amber-500 file:text-white hover:file:bg-amber-400">
+                    @error('proof')<p class="text-xs text-red-500">{{ $message }}</p>@enderror
+                    @error('amount')<p class="text-xs text-red-500">{{ $message }}</p>@enderror
+                    <p class="text-[11px] text-gray-400">Accepted: JPG, PNG, PDF — max 5 MB.</p>
+                    <button type="submit"
+                            class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-white text-sm font-semibold transition">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                        Upload Payment Proof
+                    </button>
+                </form>
                 @endif
 
                 <div class="flex flex-col sm:flex-row gap-3 pt-1">

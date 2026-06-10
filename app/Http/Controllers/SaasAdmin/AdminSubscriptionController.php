@@ -7,6 +7,7 @@ use App\Models\Subscription;
 use App\Models\Company;
 use App\Models\PricingPlan;
 use App\Models\AdminAuditLog;
+use App\Services\SubscriptionAssignmentService;
 use Illuminate\Http\Request;
 
 class AdminSubscriptionController extends Controller
@@ -36,19 +37,11 @@ class AdminSubscriptionController extends Controller
 
         $plan = PricingPlan::findOrFail($request->pricing_plan_id);
 
-        Subscription::where('company_id', $request->company_id)->where('active', true)->update(['active' => false]);
-
-        $endDate = $request->billing_cycle === 'yearly' ? now()->addYear() : now()->addMonth();
-
-        $sub = Subscription::create([
-            'company_id' => $request->company_id,
-            'pricing_plan_id' => $request->pricing_plan_id,
-            'start_date' => now()->toDateString(),
-            'end_date' => $endDate->toDateString(),
-            'active' => true,
-            'billing_cycle' => $request->billing_cycle,
-            'final_price' => $plan->price,
-        ]);
+        $sub = SubscriptionAssignmentService::assign(
+            (int) $request->company_id,
+            (int) $request->pricing_plan_id,
+            $request->billing_cycle
+        );
 
         AdminAuditLog::log(auth('admin')->id(), 'Subscription assigned', 'Subscription', $sub->id, [
             'company_id' => $request->company_id,

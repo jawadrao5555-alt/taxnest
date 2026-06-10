@@ -13,6 +13,7 @@ use App\Models\FbrPosTransaction;
 use App\Models\AdminAuditLog;
 use App\Models\SystemControl;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class AdminDashboardController extends Controller
 {
@@ -32,7 +33,7 @@ class AdminDashboardController extends Controller
             'binned_companies' => Company::onlyTrashed()->count(),
             'active_subscriptions' => Subscription::where('active', true)->count(),
             'total_users' => User::count(),
-            'total_franchises' => Franchise::count(),
+            'total_franchises' => Schema::hasTable('franchises') ? Franchise::count() : 0,
 
             'di_invoices' => Invoice::count(),
             'di_revenue' => Invoice::where('fbr_status', 'locked')->sum('total_amount'),
@@ -82,8 +83,10 @@ class AdminDashboardController extends Controller
                 ->where('fbr_status', 'locked')->sum('total_amount');
         }
 
-        $recentAuditLogs = AdminAuditLog::with('admin')->orderBy('created_at', 'desc')->take(10)->get();
-        $systemControls = SystemControl::all();
+        $recentAuditLogs = Schema::hasTable('admin_audit_logs')
+            ? AdminAuditLog::with('admin')->orderBy('created_at', 'desc')->take(10)->get()
+            : collect();
+        $systemControls = Schema::hasTable('system_controls') ? SystemControl::all() : collect();
 
         return view('saas-admin.dashboard', compact(
             'stats', 'diCompaniesList', 'posCompaniesList', 'fbrposCompaniesList',

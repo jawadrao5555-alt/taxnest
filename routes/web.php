@@ -411,6 +411,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/purchase-orders', [SupplierController::class, 'storePurchaseOrder'])->name('purchase-orders.store');
     Route::post('/purchase-orders/{id}/receive', [SupplierController::class, 'receivePurchaseOrder'])->name('purchase-orders.receive');
     Route::post('/purchase-orders/{id}/cancel', [SupplierController::class, 'cancelPurchaseOrder'])->name('purchase-orders.cancel');
+
+    // Payment proof submission (locked / trial-ended DI company) — intentionally NOT behind plan.limit.
+    Route::post('/payment-proof', [\App\Http\Controllers\PaymentProofController::class, 'store'])
+        ->name('payment-proof.store')->middleware('throttle:6,1');
 });
 
 Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
@@ -421,6 +425,8 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::get('/agent/download', [\App\Http\Controllers\AgentManagementController::class, 'downloadAgent'])->name('pos.agent.download');
 
     Route::get('/dashboard', [PosController::class, 'dashboard'])->name('pos.dashboard');
+    Route::post('/payment-proof', [\App\Http\Controllers\PaymentProofController::class, 'store'])
+        ->name('pos.payment-proof.store')->middleware('throttle:6,1');
     Route::post('/settings/theme', [PosController::class, 'updateTheme'])->name('pos.settings.theme');
     Route::post('/settings/dashboard-style', [PosController::class, 'updateDashboardStyle'])->name('pos.settings.dashboard-style');
     Route::get('/invoice/create', [PosController::class, 'createInvoice'])->name('pos.invoice.create');
@@ -581,6 +587,7 @@ use App\Http\Controllers\SaasAdmin\AdminUsageController;
 use App\Http\Controllers\SaasAdmin\AdminSystemController;
 use App\Http\Controllers\SaasAdmin\AdminSettingsController;
 use App\Http\Controllers\SaasAdmin\AdminAuditController;
+use App\Http\Controllers\SaasAdmin\AdminPaymentProofController;
 use App\Http\Controllers\Franchise\FranchiseAuthController;
 use App\Http\Controllers\Franchise\FranchiseDashboardController;
 
@@ -719,6 +726,12 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/settings', [AdminSettingsController::class, 'index'])->name('saas.admin.settings');
     Route::post('/settings', [AdminSettingsController::class, 'update'])->name('saas.admin.settings.update');
     Route::get('/audit-logs', [AdminAuditController::class, 'index'])->name('saas.admin.audit');
+
+    // Payment proof verification queue
+    Route::get('/payment-proofs', [AdminPaymentProofController::class, 'index'])->name('saas.admin.payment-proofs');
+    Route::get('/payment-proofs/{id}/download', [AdminPaymentProofController::class, 'download'])->name('saas.admin.payment-proofs.download');
+    Route::post('/payment-proofs/{id}/approve', [AdminPaymentProofController::class, 'approve'])->name('saas.admin.payment-proofs.approve');
+    Route::post('/payment-proofs/{id}/reject', [AdminPaymentProofController::class, 'reject'])->name('saas.admin.payment-proofs.reject');
 });
 
 Route::get('/franchise/login', [FranchiseAuthController::class, 'showLogin'])->name('franchise.login');
@@ -745,6 +758,8 @@ Route::post('/fbr-pos/logout', [FbrPosAuthController::class, 'logout'])->name('f
 
 Route::prefix('fbr-pos')->middleware(['fbrpos.auth'])->group(function () {
     Route::get('/dashboard', [FbrPosController::class, 'dashboard'])->name('fbrpos.dashboard');
+    Route::post('/payment-proof', [\App\Http\Controllers\PaymentProofController::class, 'store'])
+        ->name('fbrpos.payment-proof.store')->middleware('throttle:6,1');
     Route::get('/create', [FbrPosController::class, 'create'])->name('fbrpos.create');
     Route::post('/store', [FbrPosController::class, 'store'])->name('fbrpos.store')->middleware('plan.limit:invoices');
     Route::get('/transactions', [FbrPosController::class, 'transactions'])->name('fbrpos.transactions');

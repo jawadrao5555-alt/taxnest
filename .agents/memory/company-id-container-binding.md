@@ -19,3 +19,10 @@ binding anywhere in the app.
 
 **How to apply:** Admin routes do NOT run CompanyIsolation, so `'n'` is unbound there
 (intended — admins are cross-tenant). Guard against unbound `'n'` before calling `app('n')`.
+
+**Write-path fallback order:** when `'n'` is unbound and you must pick a company from the
+auth guards (shared controller serving DI/PRA POS/FBR POS), loop in order
+`pos → fbrpos → web`. All guards share one Laravel session, so a browser logged into
+two panels passes multiple `auth($guard)->check()`; keep server-side resolution and the
+form's per-guard submit action in the SAME order so a proof/upload is attached to the
+company of the panel it was actually submitted from.

@@ -110,6 +110,56 @@ class SubscriptionAccessService
     }
 
     /**
+     * Lightweight trial summary used by the in-app reminder banner and the
+     * email reminder command. Returns null when the company is NOT on an
+     * active, still-allowed trial (locked / paid companies are handled by the
+     * lock modal instead).
+     *
+     * @return array{on_trial: bool, days_left: ?int, invoices_left: ?int}|null
+     */
+    public static function trialStatus(Company $company): ?array
+    {
+        $subscription = Subscription::where('company_id', $company->id)
+            ->where('active', true)
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$subscription) {
+            return null;
+        }
+
+        $plan = $subscription->pricingPlan ?? $subscription->loadMissing('pricingPlan')->pricingPlan;
+        if (!$plan || !$plan->is_trial) {
+            return null;
+        }
+
+        // Already blocked? The lock modal owns the messaging — skip the reminder.
+        $access = self::hasAccess($company);
+        if (!($access['allowed'] ?? false)) {
+            return null;
+        }
+
+        $daysLeft = null;
+        if ($subscription->trial_ends_at) {
+            $daysLeft = $subscription->trial_ends_at->isFuture()
+                ? (int) ceil(abs(now()->diffInDays($subscription->trial_ends_at)))
+                : 0;
+        }
+
+        $invoicesLeft = null;
+        $limit = (int) ($plan->invoice_limit ?? 0);
+        if ($limit > 0) {
+            $invoicesLeft = max(0, $limit - self::billableCount($company));
+        }
+
+        return [
+            'on_trial' => true,
+            'days_left' => $daysLeft,
+            'invoices_left' => $invoicesLeft,
+        ];
+    }
+
+    /**
      * Count a company's billable documents by product type.
      * DI uses the invoices table; PRA POS uses pos_transactions;
      * FBR POS uses its own fbr_pos_transactions table.

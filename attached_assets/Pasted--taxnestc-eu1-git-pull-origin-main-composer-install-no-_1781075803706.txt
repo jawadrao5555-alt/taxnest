@@ -1,0 +1,66 @@
+[taxnestc@eu1 ~]$ git pull origin main
+composer install --no-dev --optimize-autoloader
+php artisan migrate --force
+php artisan config:clear && php artisan config:cache
+php artisan route:clear && php artisan route:cache
+php artisan view:clear && php artisan view:cache
+fatal: not a git repository (or any of the parent directories): .git
+Composer could not find a composer.json file in /home/taxnestc
+To initialize a project, please create a composer.json file. See https://getcomposer.org/basic-usage
+Could not open input file: artisan
+Could not open input file: artisan
+Could not open input file: artisan
+Could not open input file: artisan
+[taxnestc@eu1 ~]$ cd
+[taxnestc@eu1 ~]$ ^[[200~cd <PROJECT_FOLDER>
+jailshell: syntax error near unexpected token `newline'
+[taxnestc@eu1 ~]$ git pull origin main
+fatal: not a git repository (or any of the parent directories): .git
+[taxnestc@eu1 ~]$ composer install --no-dev --optimize-autoloader
+Composer could not find a composer.json file in /home/taxnestc
+To initialize a project, please create a composer.json file. See https://getcomposer.org/basic-usage
+[taxnestc@eu1 ~]$ php artisan migrate --force
+Could not open input file: artisan
+[taxnestc@eu1 ~]$ php artisan config:clear && php artisan config:cache
+Could not open input file: artisan
+[taxnestc@eu1 ~]$ php artisan route:clear && php artisan route:cache
+Could not open input file: artisan
+[taxnestc@eu1 ~]$ php artisan view:clear && php artisan view:cache~
+Could not open input file: artisan
+[taxnestc@eu1 ~]$ cd
+[taxnestc@eu1 ~]$ cd <PROJECT_FOLDER>
+git pull origin main
+composer install --no-dev --optimize-autoloader
+php artisan migrate --force
+php artisan config:clear && php artisan config:cache
+php artisan route:clear && php artisan route:cache
+php artisan view:clear &^C
+jailshell: syntax error near unexpected token `newline'
+fatal: not a git repository (or any of the parent directories): .git
+Composer could not find a composer.json file in /home/taxnestc
+To initialize a project, please create a composer.json file. See https://getcomposer.org/basic-usage
+Could not open input file: artisan
+Could not open input file: artisan
+Could not open input file: artisan
+[1] 383907
+jailshell: $'\003': command not found
+[taxnestc@eu1 ~]$ Could not open input file: artisan
+cd
+[1]+  Exit 1                  php artisan view:clear
+[taxnestc@eu1 ~]$ cd
+[taxnestc@eu1 ~]$ git pull origin main
+composer install --no-dev --optimize-autoloader
+php artisan migrate --force
+php artisan config:clear && php artisan config:cache
+php artisan route:clear && php artisan route:cache
+php artisan view:clear && php artisan view:cache
+fatal: not a git repository (or any of the parent directories): .git
+Composer could not find a composer.json file in /home/taxnestc
+To initialize a project, please create a composer.json file. See https://getcomposer.org/basic-usage
+Could not open input file: artisan
+Could not open input file: artisan
+Could not open input file: artisan
+Could not open input file: artisan
+[taxnestc@eu1 ~]$ git pull origin main
+fatal: not a git repository (or any of the parent directories): .git
+[taxnestc@eu1 ~]$

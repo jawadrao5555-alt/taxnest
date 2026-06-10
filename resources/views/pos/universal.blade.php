@@ -252,6 +252,18 @@ window.addEventListener('popstate', function() {
         @endif
     </div>
 
+    {{-- ═══════════ GUIDED FLOW STEP INDICATOR (opt-in, default OFF) ═══════════ --}}
+    {{-- Display-only coach strip. Highlights the current flowStep. Never blocks clicks. --}}
+    <div x-show="guidedFlow" x-cloak class="flex items-center justify-center flex-wrap gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-900/20 dark:to-blue-900/20 border-b border-emerald-200 dark:border-emerald-800 flex-shrink-0 text-[11px] font-bold select-none pointer-events-none">
+        <template x-for="(s, i) in [{k:'customer',l:'1 · Customer'},{k:'items',l:'2 · Items'},{k:'cart',l:'3 · Cart'},{k:'finish',l:'4 · Bill'}]" :key="s.k">
+            <div class="flex items-center gap-1.5">
+                <span :class="flowStep === s.k ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white/70 dark:bg-gray-800/70 text-gray-500 dark:text-gray-400'" class="px-2.5 py-0.5 rounded-full transition" x-text="s.l"></span>
+                <svg x-show="i < 3" class="w-3 h-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </div>
+        </template>
+        <span class="ml-2 text-[10px] font-medium text-gray-500 dark:text-gray-400 hidden md:inline">Enter = add / next · empty Enter = cart · P = provisional</span>
+    </div>
+
     <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0 shadow-sm">
 
         <div class="relative flex-shrink-0" style="min-width:180px;max-width:220px;">
@@ -1903,6 +1915,14 @@ function restaurantPos() {
         // Alpine crashes inside the modals which broke the whole page (incl. Pay).
         praEnabled: {{ ($company->pra_reporting_enabled ?? false) ? 'true' : 'false' }},
         praLoading: false,
+        // ── GUIDED KEYBOARD BILLING FLOW (opt-in, default OFF) ───────────────
+        // Mirrors $company->pos_guided_flow_enabled. When false EVERY keyboard
+        // behaviour below stays byte-identical to the original (no interception).
+        // flowStep is a DISPLAY-ONLY indicator; the actual transitions piggyback
+        // existing functions (addHighlightedItem, enterCartMode, showPayModal,
+        // clearCart). It NEVER rewrites handleKey or changes F-key bindings.
+        guidedFlow: {{ ($company->pos_guided_flow_enabled ?? false) ? 'true' : 'false' }},
+        flowStep: 'customer',
         // ── RESTAURANT MODE FLAG (gates hold/pay route selection) ────────────
         // Restaurant endpoints (pos.restaurant.orders.hold + /pay) are blocked
         // by RestaurantOnly middleware for retail POS companies (HTTP 403
@@ -2219,13 +2239,22 @@ function restaurantPos() {
         addHighlightedItem() {
             if (this.showSearchDropdown && this.searchSuggestions.length > 0) { this.quickAddItem(this.searchSuggestions[this.highlightIndex]); return; }
             // No catalog match: in SIMPLE (inventory-OFF) mode, Enter creates the typed item on the fly.
-            if (!this.isInventoryEnabled() && this.searchQuery.trim().length > 0 && !this.quickCreating) this.quickCreateProduct();
+            if (!this.isInventoryEnabled() && this.searchQuery.trim().length > 0 && !this.quickCreating) { this.quickCreateProduct(); return; }
+            // GUIDED FLOW (opt-in): Enter on an EMPTY search box advances to the cart step.
+            // This is the "double Enter" — the first Enter adds an item (clearing the box),
+            // the next Enter on the now-empty box jumps focus into the cart for qty/checkout.
+            if (this.guidedFlow && this.searchQuery.trim().length === 0 && this.cart.length > 0) {
+                this.flowStep = 'cart';
+                this.enterCartMode('last');
+            }
         },
         quickAddItem(item) {
             // Kill any in-flight debounced search so it can't repopulate the dropdown
             // under the now-cleared search box after we add the item.
             if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
             this.handleProductClick(item);
+            // GUIDED FLOW (opt-in): first added item moves the indicator off "customer".
+            if (this.guidedFlow && this.flowStep === 'customer') this.flowStep = 'items';
             this.searchQuery = ''; this.searchSuggestions = []; this.showSearchDropdown = false;
             this.filterProducts(); this.$nextTick(() => { this.$refs.searchInput?.focus(); });
         },
@@ -2962,6 +2991,9 @@ function restaurantPos() {
             if (this.showPayModal) {
                 if (e.key === '1') { e.preventDefault(); e.stopPropagation(); this.processPayment('cash'); return; }
                 if (e.key === '2') { e.preventDefault(); e.stopPropagation(); this.processPayment('card'); return; }
+                // GUIDED FLOW (opt-in): P = save as Provisional (local), Enter = finalise as Cash.
+                if (this.guidedFlow && (e.key === 'p' || e.key === 'P')) { e.preventDefault(); e.stopPropagation(); this.saveProvisionalDirect(); return; }
+                if (this.guidedFlow && e.key === 'Enter' && !e.repeat) { e.preventDefault(); e.stopPropagation(); this.processPayment('cash'); return; }
                 if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this.showPayModal = false; return; }
                 return;
             }
@@ -2984,10 +3016,17 @@ function restaurantPos() {
                 if (e.key === 'ArrowDown') { e.preventDefault(); this.moveCartSelection(1); return; }
                 if (e.key === 'ArrowUp')   { e.preventDefault(); this.moveCartSelection(-1); return; }
                 if (e.key === 'Tab')       { e.preventDefault(); this.moveCartSelection(e.shiftKey ? -1 : 1); return; }
-                if (e.key === 'Enter')     { e.preventDefault(); e.target.blur(); return; }
+                if (e.key === 'Enter')     {
+                    e.preventDefault();
+                    e.target.blur();
+                    // GUIDED FLOW (opt-in): Enter from the qty input advances Cart → Bill.
+                    // Without this, Enter only blurs and the guided chain stalls at the cart.
+                    if (this.guidedFlow && !e.repeat && this.cart.length) { this.flowStep = 'finish'; this.showPayModal = true; }
+                    return;
+                }
                 // Cart shortcuts still work while a qty input has focus.
-                if ((e.key === '+' || e.key === '=') && ci >= 0) { e.preventDefault(); this.updateQty(ci, 1); this.animateQty(ci); return; }
-                if (e.key === '-' && ci >= 0)                    { e.preventDefault(); this.updateQty(ci, -1); this.animateQty(ci); return; }
+                if ((e.key === '+' || e.key === '=') && ci >= 0) { e.preventDefault(); this.updateQty(ci, 1); if (this.cart[ci]) e.target.value = this.cart[ci].quantity; this.animateQty(ci); return; }
+                if (e.key === '-' && ci >= 0)                    { e.preventDefault(); this.updateQty(ci, -1); if (this.cart[ci]) e.target.value = this.cart[ci].quantity; this.animateQty(ci); return; }
                 if ((e.key === 't' || e.key === 'T') && ci >= 0) { e.preventDefault(); this.toggleItemTax(ci); return; }
                 if (e.key === 'Escape')                          { e.preventDefault(); this.exitCartMode(); return; }
                 return;
@@ -3084,7 +3123,7 @@ function restaurantPos() {
             if (e.key === '-' && ci >= 0) { this.updateQty(ci, -1); this.animateQty(ci); return; }
             if (e.key === 'Delete' && ci >= 0) { this.removeFromCart(ci); this.fixCartIndex(); return; }
             if ((e.key === 't' || e.key === 'T') && ci >= 0) { this.toggleItemTax(ci); return; }
-            if (e.key === 'Enter' && this.cart.length) { this.showPayModal = true; return; }
+            if (e.key === 'Enter' && this.cart.length) { if (this.guidedFlow) this.flowStep = 'finish'; this.showPayModal = true; return; }
             if (/^[a-zA-Z]$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
                 this.cartMode = false; this.activeCartIndex = -1;
                 this.searchQuery += e.key; this.$refs.searchInput?.focus();
@@ -3123,7 +3162,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.fixCartIndex(); this.clearCartStorage(); },
+        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm('Current order has ' + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast('New sale started', 'success');
@@ -3216,6 +3255,8 @@ function restaurantPos() {
             if (this.showNewCustomerInline) { this.saveNewCustomer(); return; }
             if (this.customerPhoneResults.length > 0) {
                 this.selectCustomerFromPhone(this.customerPhoneResults[0]);
+                // GUIDED FLOW (opt-in): customer chosen → advance to the items step.
+                if (this.guidedFlow) { this.flowStep = 'items'; this.$nextTick(() => this.$refs.searchInput?.focus()); }
             } else if (q.length >= 4 && /^\d+$/.test(q)) {
                 this.openInlineNewCustomer();
             } else {

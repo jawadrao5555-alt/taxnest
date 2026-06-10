@@ -1,3 +1,4 @@
 - [TaxNest dev environment access](dev-env-access.md) — how to run artisan/MySQL in dev; tinker disabled (APP_ENV=production); strip PG env vars.
 - [PRA POS sale screen & product loaders](pos-sale-screen-product-loaders.md) — universal.blade.php is the only live sale screen; create-invoice.blade.php is DEAD; 3 product loaders must stay in sync.
 - [POS provisional & receipt-tax rules](pos-provisional-and-receipt-rules.md) — "local" bill = completed+invoice_mode=local+pra_status=local on every list/promote/delete; PRA fiscal receipts must always show tax.
+- [Alpine focused qty-input sync](alpine-focused-qty-input-sync.md) — qty input x-effect skips the focused element; keyboard qty changes must write e.target.value or the digit looks stale (model/bill stay correct).

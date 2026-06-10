@@ -209,6 +209,18 @@
                             <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug">Let cashiers reprint a kitchen ticket from the held-orders screen.</p>
                         </div>
                     </label>
+
+                    {{-- Guided keyboard billing flow (opt-in, universal POS) --}}
+                    <label class="flex items-start gap-3 p-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:border-amber-300 dark:hover:border-amber-700 has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50/40 dark:has-[:checked]:bg-amber-900/10 cursor-pointer transition">
+                        <input type="checkbox" name="pos_guided_flow_enabled" value="1" {{ ($company->pos_guided_flow_enabled ?? false) ? 'checked' : '' }} class="mt-0.5 w-4 h-4 text-amber-600 rounded">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-1.5 mb-0.5">
+                                <span class="text-base leading-none">⌨️</span>
+                                <span class="text-sm font-bold text-gray-900 dark:text-white">Guided Keyboard Billing</span>
+                            </div>
+                            <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug">Step-by-step Enter-key flow on the sale screen: Customer → Items → Cart → Bill. All existing shortcuts (F-keys, +/−, arrows) keep working.</p>
+                        </div>
+                    </label>
                 </div>
             </div>
 

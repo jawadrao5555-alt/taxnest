@@ -64,6 +64,7 @@ class Company extends Model
         'auto_print_kot',
         'kot_reprint_enabled',
         'pos_receipt_show_tax',
+        'pos_guided_flow_enabled',
         'pra_environment',
         'pra_pos_id',
         'pra_access_code',
@@ -114,6 +115,7 @@ class Company extends Model
         'auto_print_kot' => 'boolean',
         'kot_reprint_enabled' => 'boolean',
         'pos_receipt_show_tax' => 'boolean',
+        'pos_guided_flow_enabled' => 'boolean',
     ];
 
     protected $hidden = [

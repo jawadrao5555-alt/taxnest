@@ -408,6 +408,7 @@ class PosController extends Controller
             'pos_receipt_show_tax' => (bool) $request->input('pos_receipt_show_tax', false),
             'auto_print_kot'       => (bool) $request->input('auto_print_kot', false),
             'kot_reprint_enabled'  => (bool) $request->input('kot_reprint_enabled', false),
+            'pos_guided_flow_enabled' => (bool) $request->input('pos_guided_flow_enabled', false),
         ]);
 
         return redirect()->route('pos.features')->with('success', 'POS features updated.');

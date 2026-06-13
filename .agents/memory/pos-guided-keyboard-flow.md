@@ -24,3 +24,22 @@ doesn't work / products don't show."
 make its Enter handler advance `flowStep` + focus the next field. Note the customer
 lookup is debounced (~300ms), so attaching a matched customer on a fast type-then-Enter
 is best-effort, not guaranteed.
+
+## There are TWO item-add paths — wire BOTH
+
+The items step has two distinct code paths and the guided chain breaks if you only
+wire one:
+1. Saved-product match → `quickAddItem` (advances flowStep customer→items, refocuses search).
+2. Inventory-OFF unmatched line → `quickCreateProduct` (creates the product, opens the
+   inline price editor) then `saveQuickPrice` on Enter.
+
+**Why:** Owner runs inventory-OFF (manual/quick entry), so they ONLY hit path 2. The
+flow felt "still not working" because `quickCreateProduct`/`saveQuickPrice` did not
+advance `flowStep` and did not return focus to search after the inline price was
+committed — the chain stalled after the first item even though path 1 worked.
+
+**How to apply:** `quickCreateProduct` must advance flowStep off 'customer'; the inline
+price input's Enter handler must call `saveQuickPrice(index, true)` and `saveQuickPrice`
+must, when `refocusSearch && guidedFlow`, `$nextTick`-focus the search box (the @blur
+handler passes false so clicking away never steals focus). Always test the inventory-OFF
+chain end to end, not just inventory-ON.

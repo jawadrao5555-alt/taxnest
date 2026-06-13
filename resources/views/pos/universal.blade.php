@@ -315,10 +315,12 @@ window.addEventListener('popstate', function() {
                     <span class="text-gray-400">Mobile:</span> <span class="text-gray-900 dark:text-white font-bold" x-text="newCustomerPhone"></span>
                 </div>
                 <input type="text" x-ref="newCustomerNameInput" x-model="newCustomerName"
+                    autocomplete="one-time-code" name="pos_newcust_name_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                     @keydown.enter.prevent="$refs.newCustomerAddressInput?.focus()"
                     placeholder="Customer name *"
                     class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400">
                 <input type="text" x-ref="newCustomerAddressInput" x-model="newCustomerAddress"
+                    autocomplete="one-time-code" name="pos_newcust_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                     @keydown.enter.prevent="saveNewCustomer()"
                     placeholder="Address (optional)"
                     class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400">
@@ -736,7 +738,7 @@ window.addEventListener('popstate', function() {
                                         <span class="text-[10px] text-gray-500">Rs.</span>
                                         <input type="number" min="0" step="any" x-ref="quickPriceInput"
                                             x-model.number="quickPriceValue"
-                                            @keydown.enter.prevent="saveQuickPrice(index)"
+                                            @keydown.enter.prevent="saveQuickPrice(index, true)"
                                             @keydown.escape.prevent="cancelQuickPrice()"
                                             @blur="saveQuickPrice(index)"
                                             placeholder="Enter price"
@@ -801,6 +803,7 @@ window.addEventListener('popstate', function() {
             <div class="border-t border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-sm">
                 <div class="px-3 py-1.5">
                     <textarea x-model="kitchenNotes" x-ref="orderNotesInput" rows="1"
+                        autocomplete="off" name="pos_order_notes_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                         @keydown.enter.prevent.stop="$event.target.blur()"
                         @keydown.escape.prevent.stop="$event.target.blur()"
                         placeholder="Order Notes... (press N to focus, ⏎/Esc to exit)"
@@ -1160,7 +1163,7 @@ window.addEventListener('popstate', function() {
                 <button @click="showCustomerPicker = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
             </div>
             <div class="p-3 border-b border-gray-100 dark:border-gray-800">
-                <input type="text" x-model="customerSearch" @input="onCustomerPhoneSearch()" placeholder="Search by name or phone..." class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white text-sm px-3 py-2 focus:ring-purple-500">
+                <input type="text" x-model="customerSearch" @input="onCustomerPhoneSearch()" placeholder="Search by name or phone..." autocomplete="one-time-code" name="pos_custsearch_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white text-sm px-3 py-2 focus:ring-purple-500">
                 <template x-if="customerLookupResult && customerLookupResult.found">
                     <div class="mt-2 p-2.5 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
                         <div class="flex items-center gap-2">
@@ -1204,10 +1207,10 @@ window.addEventListener('popstate', function() {
                     <button @click="showQuickAdd = true" class="w-full py-2.5 text-sm font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 rounded-xl hover:bg-purple-100 transition">+ Add New Customer</button>
                 </div>
                 <div x-show="showQuickAdd" class="space-y-2">
-                    <input type="text" x-model="quickCustomerName" placeholder="Customer name *" class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-purple-500">
-                    <input type="text" x-model="quickCustomerPhone" placeholder="Phone *" class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-purple-500">
+                    <input type="text" x-model="quickCustomerName" placeholder="Customer name *" autocomplete="one-time-code" name="pos_quickcust_name_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-purple-500">
+                    <input type="text" x-model="quickCustomerPhone" placeholder="Phone *" autocomplete="one-time-code" name="pos_quickcust_phone_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-purple-500">
                     @if($features->delivery)
-                    <input type="text" x-model="quickCustomerAddress" placeholder="Address (for delivery)" class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-purple-500">
+                    <input type="text" x-model="quickCustomerAddress" placeholder="Address (for delivery)" autocomplete="one-time-code" name="pos_quickcust_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-purple-500">
                     @endif
                     <div class="flex gap-2">
                         <button @click="showQuickAdd = false" class="flex-1 py-2 text-xs font-semibold text-gray-500 bg-gray-100 dark:bg-gray-800 rounded-xl">Cancel</button>
@@ -1362,7 +1365,7 @@ window.addEventListener('popstate', function() {
                         <span class="text-[10px] text-gray-400 dark:text-gray-500 font-mono" x-show="quickTypeText.length > 0" x-text="(quickTypeText.split(/[,;\n]+/).filter(s=>s.trim()).length) + ' line(s)'"></span>
                     </div>
                     <div class="relative">
-                        <textarea x-model="quickTypeText" @input="parseQuickTypeText()" @keydown.ctrl.enter.prevent="applyQuickType()" @keydown.meta.enter.prevent="applyQuickType()" x-init="$nextTick(() => $el.focus())" rows="5" placeholder="chai 2&#10;samosa 1&#10;paratha 3&#10;&#10;(or comma-separated: chai 2, samosa 1)" class="w-full text-sm rounded-2xl border-2 border-sky-200 dark:border-sky-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-4 py-3 focus:ring-4 focus:ring-sky-500/20 focus:border-sky-500 font-mono leading-relaxed transition-all shadow-sm hover:shadow-md"></textarea>
+                        <textarea x-model="quickTypeText" autocomplete="off" name="pos_quicktype_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore @input="parseQuickTypeText()" @keydown.ctrl.enter.prevent="applyQuickType()" @keydown.meta.enter.prevent="applyQuickType()" x-init="$nextTick(() => $el.focus())" rows="5" placeholder="chai 2&#10;samosa 1&#10;paratha 3&#10;&#10;(or comma-separated: chai 2, samosa 1)" class="w-full text-sm rounded-2xl border-2 border-sky-200 dark:border-sky-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-4 py-3 focus:ring-4 focus:ring-sky-500/20 focus:border-sky-500 font-mono leading-relaxed transition-all shadow-sm hover:shadow-md"></textarea>
                     </div>
                     <div class="flex items-center justify-between mt-2 px-1">
                         <p class="text-[10px] text-gray-500 dark:text-gray-400">
@@ -1512,7 +1515,7 @@ window.addEventListener('popstate', function() {
                         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                         Item Name
                     </label>
-                    <input id="manualItemNameInput" x-model="manualItemName" type="text" required maxlength="255" placeholder="e.g. Special Order, Custom Service" autocomplete="off"
+                    <input id="manualItemNameInput" x-model="manualItemName" type="text" required maxlength="255" placeholder="e.g. Special Order, Custom Service" autocomplete="off" name="pos_manualitem_name_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                         class="w-full text-sm rounded-2xl border-2 border-emerald-200 dark:border-emerald-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-4 py-2.5 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm hover:shadow-md">
                 </div>
 
@@ -1637,7 +1640,7 @@ window.addEventListener('popstate', function() {
                 <p class="text-xs text-gray-500 mt-1">Enter manager PIN to unlock full discount</p>
             </div>
             <div class="px-5 pb-5 space-y-3">
-                <input type="password" x-model="managerPin" @keydown.enter="submitManagerPin()" maxlength="6" placeholder="Enter PIN" class="w-full text-center text-2xl tracking-[0.5em] bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:ring-blue-500 focus:border-blue-500" autofocus>
+                <input type="password" x-model="managerPin" autocomplete="one-time-code" name="pos_managerpin_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore @keydown.enter="submitManagerPin()" maxlength="6" placeholder="Enter PIN" class="w-full text-center text-2xl tracking-[0.5em] bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:ring-blue-500 focus:border-blue-500" autofocus>
                 <p x-show="managerPinError" class="text-xs text-red-500 text-center" x-text="managerPinError"></p>
                 <div class="flex gap-2">
                     <button @click="showManagerPinModal = false" class="flex-1 py-2.5 text-sm font-semibold text-gray-600 bg-gray-100 dark:bg-gray-800 dark:text-gray-400 rounded-xl hover:bg-gray-200 transition">Cancel</button>
@@ -2661,6 +2664,8 @@ function restaurantPos() {
                     cartItem._productId = p.id;
                     this.openQuickPrice(cartItem);
                 }
+                // GUIDED FLOW (opt-in): first quick-created item moves the indicator off "customer".
+                if (this.guidedFlow && this.flowStep === 'customer') this.flowStep = 'items';
                 this.searchQuery = '';
                 this.searchSuggestions = [];
                 this.showSearchDropdown = false;
@@ -2680,7 +2685,7 @@ function restaurantPos() {
             this.quickPriceCartUid = null;
             this.quickPriceValue = '';
         },
-        async saveQuickPrice(cartIndex) {
+        async saveQuickPrice(cartIndex, refocusSearch = false) {
             // Guard: only save when this row is the one being edited, prevents double-fire on blur.
             const item = this.cart[cartIndex];
             if (!item || this.quickPriceCartUid !== item.cart_uid) return;
@@ -2695,6 +2700,13 @@ function restaurantPos() {
             const masterIdx = this.allProducts.findIndex(p => p.id === productId);
             if (masterIdx >= 0) this.allProducts[masterIdx].price = newPrice;
             this.cancelQuickPrice();
+            // GUIDED FLOW (opt-in): committing the price via Enter returns focus to the
+            // search box so the cashier can immediately type the next item (or press Enter
+            // on the empty box to drop into the cart). Without this the keyboard chain
+            // stalls after every quick-created item in inventory-OFF mode.
+            if (refocusSearch && this.guidedFlow) {
+                this.$nextTick(() => { this.$refs.searchInput?.focus(); });
+            }
             // Persist to backend (silent — already reflected in UI)
             try {
                 await fetch(`/pos/api/products/${productId}/quick-price`, {

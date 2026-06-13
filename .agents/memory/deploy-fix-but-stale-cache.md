@@ -1,17 +1,26 @@
 ---
-name: Fix is in the live commit but owner still sees old behavior
-description: When the deployed commit already contains a confirmed fix yet the bug persists on LIVE, suspect stale caches — client PWA service-worker cache and/or server Blade view cache — before touching code.
+name: Fix exists in code but not live — it's almost always a DEPLOY GAP, not cache
+description: When a confirmed fix doesn't show on LIVE, the real cause on this repo has been a deployment gap (old code on the cPanel server and/or unpushed local commits), NOT a stale cache. Verify live's ACTUAL commit before chasing caches.
 ---
 
-# How to confirm the fix is actually deployed
-- Find the live commit (see cpanel-deployment.md) and inspect the file AT that commit, plus ancestry:
-  - `git show <livecommit>:path/to/file | rg "<the fixed line>"`
-  - `git merge-base --is-ancestor <fixcommit> <livecommit> && echo IN || echo NOT-IN`
-- If the fixed line is present in the live commit, the code is fine — the bug the owner sees is a cache artifact, NOT a missing deploy.
+# Pipeline (three hops — the fix can be stuck at any hop)
+Replit working tree  --(push)-->  GitHub origin/main  --(git pull on cPanel)-->  LIVE (/home/taxnestc/public_html)
 
-# Likely causes, check in this order
-1. **Client-side PWA / service-worker cache.** TaxNest POS (PRA + FBR) and DI are PWAs with offline pre-caching. An installed device keeps serving the OLD cached page. Critical nuance: the sale-screen search/cart logic is **inline Alpine JS inside `universal.blade.php`** — so stale cached HTML == stale logic (there is no separate JS bundle to bust). Fix on that device: hard-refresh (Ctrl+Shift+R), use the in-app refresh/update control, or clear site data / uninstall+reinstall the PWA.
-2. **Server-side compiled Blade view cache** (`storage/framework/views`). If a deploy ran `view:cache` (or the pull preserved old mtimes), the old compiled view is served. Fix: `php artisan view:clear` (cpanel runbook step 5) using `/usr/local/bin/ea-php84`.
-3. **Live is not actually at the recorded commit.** The runbook records the last KNOWN deploy, not live's current state. Verify on the server: `git log -1 --oneline`; if behind, `git pull origin main`.
+- **Main agent CANNOT do git writes** (push, rm of .git/*.lock, etc.) — the sandbox blocks all of them. A background Project Task does NOT help: task work merges into the Replit main branch, it does NOT push to the external GitHub origin. **The only way local commits reach GitHub is the OWNER pushing via Replit's version-control UI.** That is how older commits (e.g. the GitHub HEAD) got there.
+- So a fix can be: (a) only in Replit, never pushed to GitHub; or (b) on GitHub but the cPanel server never ran `git pull`. Both look identical to the owner ("still broken on live").
 
-**Why:** because the sale-screen logic is inline JS embedded in the Blade template, BOTH a server Blade view cache and a client PWA service-worker cache can independently keep serving the old behavior long after the source is fixed and the commit is on live. Always prove the fix is in the live commit first, then chase caches — do not re-fix already-fixed code.
+# Diagnose in this order (get ground truth, stop guessing)
+1. **Is the fix on GitHub?** `git merge-base --is-ancestor <fixcommit> origin/main` (fetch first). If not, it must be pushed from Replit first.
+2. **What commit is LIVE actually on?** The decisive fact. Ask the owner to run on cPanel: `cd /home/taxnestc/public_html && git log -1 --oneline`. If it predates the fix commit, live is just running old code → `git pull origin main` + clear caches fixes it.
+3. Only AFTER confirming live runs code that contains the fix should you consider caches.
+
+# Why the service worker is a RED HERRING for sale-screen bugs
+- `public/sw.js` `skipPatterns` includes `/pos/invoice/create` (and `/login`, `/api/`, `/admin/`...). The SW returns early for these — **the POS sale screen is never cached; it's always network-first/fresh.** So search/cart/keyboard bugs on the sale screen are NEVER a client SW-cache problem.
+- `CACHE_VERSION` in sw.js is NOT a reliable deploy marker: `taxnest-v31` was set 2026-05-08 and was NOT bumped when later fixes landed. "Live serves vNN" only proves live is >= the commit that set vNN, not that any later fix is present.
+
+# The fix (covers all cases)
+1. Owner pushes latest Replit commits to GitHub via the Replit version-control UI (delivers anything not yet on origin, e.g. keyboard fixes).
+2. On cPanel: `git pull origin main` → `ea-php84 artisan migrate --force` → `view:clear` + `cache:clear` + `config:clear` + `route:clear` (paths/PHP in cpanel-deployment.md).
+3. Cashier just reloads the sale screen (not SW-cached, so the fix shows immediately). A one-time hard refresh covers any browser HTTP cache.
+
+**Why:** repeatedly the owner reported "still broken on live" for fixes that were already correct in code — every time the true cause was that the code had not actually been deployed to the live server (and/or not pushed to GitHub), not a caching artifact. Prove the fix is in the live commit FIRST; never re-fix already-fixed code, and don't prescribe cache-clearing as the primary remedy.

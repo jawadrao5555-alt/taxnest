@@ -294,8 +294,9 @@
                     @endif
                 @endif
 
+                <x-trial-reminder-banner />
+
                 <main class="flex-1 overflow-y-auto p-4 sm:p-6 main-scroll bg-gray-50 dark:bg-gray-950 page-fade">
-                    <div class="-mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-4"><x-trial-reminder-banner /></div>
                     @if(session('success'))
                         <div class="max-w-7xl mx-auto mb-4">
                             <div class="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg">

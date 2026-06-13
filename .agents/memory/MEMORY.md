@@ -6,3 +6,4 @@
 - [Vite arbitrary Tailwind classes](vite-arbitrary-classes.md) — new Blade components with arbitrary classes (bg-[#hex], z-[60]) render invisible until `npm run build`; view:cache is not enough.
 - [Company-id container binding](company-id-container-binding.md) — active company id is bound as `app('n')` (NOT 'ln'/'currentCompanyId'); unbound on admin routes; write-path guard order pos→fbrpos→web.
 - [PROD scheduled jobs need cron](prod-scheduled-jobs-cron.md) — Schedule:: entries (trial reminders/expiry, FBR token, POS sync) never run on owner's cPanel PROD unless a `schedule:run` cron exists.
+- [Top banners outside scrollable main](top-banner-clipping.md) — full-width top notification banners get clipped/inert inside main.overflow-y-auto with negative margins; place before <main> like the pending/suspended notices.

@@ -59,7 +59,7 @@
                         <select name="company_id" class="h-9 px-2 rounded border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white text-sm">
                             <option value="">All companies</option>
                             @foreach($companies as $c)
-                                <option value="{{ $c->id }}" @selected((int)request('company_id')===$c->id)>{{ $c->company_name }}</option>
+                                <option value="{{ $c->id }}" @selected((int)request('company_id')===$c->id)>{{ $c->name }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -88,7 +88,7 @@
                             @forelse($logs as $log)
                                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40">
                                     <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{{ $log->created_at->format('d M Y H:i:s') }}</td>
-                                    <td class="px-4 py-3 text-xs text-gray-700 dark:text-gray-300">{{ $log->company->company_name ?? '#'.$log->company_id }}</td>
+                                    <td class="px-4 py-3 text-xs text-gray-700 dark:text-gray-300">{{ $log->company->name ?? '#'.$log->company_id }}</td>
                                     <td class="px-4 py-3 text-xs">
                                         @if($log->transaction)
                                             <a href="/fbr-pos/transactions/{{ $log->transaction->id }}" class="font-bold text-blue-600 hover:underline">{{ $log->transaction->invoice_number }}</a>

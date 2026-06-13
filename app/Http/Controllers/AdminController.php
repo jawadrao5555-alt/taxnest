@@ -515,7 +515,7 @@ class AdminController extends Controller
             ? round(($stats->success / $stats->total) * 100, 1)
             : 0;
 
-        $companies = \App\Models\Company::orderBy('company_name')->get(['id', 'company_name']);
+        $companies = \App\Models\Company::orderBy('name')->get(['id', 'name']);
 
         return view('admin.fbr-pos-logs', compact('logs', 'stats', 'txStats', 'successRate', 'companies'));
     }

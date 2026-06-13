@@ -2260,13 +2260,27 @@ function restaurantPos() {
         },
 
         filterProducts() {
-            // MASTER "show saved products" toggle — when OFF, the catalog grid is emptied
-            // so cashiers bill via manual entry only (type a name → "Create X" quick-add).
-            if (!this.showProducts) { this.filteredItems = []; this.displayCount = 60; this.updateDisplayItems(); return; }
+            // MASTER "show saved products" toggle — when OFF, the catalog grid is hidden so
+            // cashiers bill via manual entry only (type a name → "Create X" quick-add).
+            // EXCEPTION: when the cashier is actively searching, still surface matching saved
+            // products IN THE GRID — the grid stays hidden by default, but a search query
+            // reveals matches so they can be tapped/added. Only stay empty when the grid is
+            // OFF *and* the search box is empty.
+            const hasSearch = !!(this.searchQuery && this.searchQuery.trim().length > 0);
+            if (!this.showProducts && !hasSearch) {
+                this.filteredItems = []; this.displayCount = 60; this.updateDisplayItems(); return;
+            }
             let items = [...this.allProducts, ...this.allServices];
             items = items.filter(i => parseFloat(i.price) > 0 && i.name && i.name.trim().length > 0);
-            if (this.activeCategory !== 'all' && this.activeCategory !== 'services') { items = this.allProducts.filter(p => p.category === this.activeCategory && parseFloat(p.price) > 0 && p.name && p.name.trim().length > 0); }
-            else if (this.activeCategory === 'services') { items = this.allServices.filter(s => parseFloat(s.price) > 0 && s.name && s.name.trim().length > 0); }
+            // When the grid is hidden, a search must look across the WHOLE catalog: the category
+            // pills are hidden in that mode, so any stale activeCategory (chosen earlier while the
+            // grid was visible) must be ignored — otherwise a matching product in a different
+            // category would stay invisible.
+            const ignoreCategory = !this.showProducts && hasSearch;
+            if (!ignoreCategory) {
+                if (this.activeCategory !== 'all' && this.activeCategory !== 'services') { items = this.allProducts.filter(p => p.category === this.activeCategory && parseFloat(p.price) > 0 && p.name && p.name.trim().length > 0); }
+                else if (this.activeCategory === 'services') { items = this.allServices.filter(s => parseFloat(s.price) > 0 && s.name && s.name.trim().length > 0); }
+            }
             if (this.searchQuery) { const q = this.searchQuery.toLowerCase(); items = items.filter(i => i.name.toLowerCase().includes(q)); }
             this.filteredItems = items;
             this.displayCount = 60;

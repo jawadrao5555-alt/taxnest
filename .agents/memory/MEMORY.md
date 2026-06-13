@@ -4,7 +4,8 @@
 - [Alpine focused qty-input sync](alpine-focused-qty-input-sync.md) — qty input x-effect skips the focused element; keyboard qty changes must write e.target.value or the digit looks stale (model/bill stay correct).
 - [PROD schema drift & self-heal](prod-schema-drift-selfheal.md) — pages 500 only on owner's cPanel PROD = missing columns marked "Ran"; fix with a fresh idempotent ensure-columns migration + per-column hasColumn guards.
 - [Vite arbitrary Tailwind classes](vite-arbitrary-classes.md) — new Blade components with arbitrary classes (bg-[#hex], z-[60]) render invisible until `npm run build`; view:cache is not enough.
-- [Company-id container binding](company-id-container-binding.md) — active company id is bound as `app('n')` (NOT 'ln'/'currentCompanyId'); unbound on admin routes; write-path guard order pos→fbrpos→web.
+- [Company-id container binding](company-id-container-binding.md) — company id bound under 'currentCompanyId', NOT 'n'/'ln'; 'n' is read in places but never bound (always falls back); unbound on admin routes.
 - [PROD scheduled jobs need cron](prod-scheduled-jobs-cron.md) — Schedule:: entries (trial reminders/expiry, FBR token, POS sync) never run on owner's cPanel PROD unless a `schedule:run` cron exists.
 - [Top banners outside scrollable main](top-banner-clipping.md) — full-width top notification banners get clipped/inert inside main.overflow-y-auto with negative margins; place before <main> like the pending/suspended notices.
 - [cPanel deployment runbook](cpanel-deployment.md) — LIVE site = /home/taxnestc/public_html (served from public/); PHP=/usr/local/bin/ea-php84; pull→migrate --force→cache; cron via UI; 3 decoy duplicate copies to ignore.
+- [POS guided keyboard flow](pos-guided-keyboard-flow.md) — opt-in Enter-driven chain; every step's Enter must advance, never pop a blocking modal; customer step is optional (walk-in).

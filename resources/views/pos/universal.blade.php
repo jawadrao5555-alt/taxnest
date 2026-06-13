@@ -3251,12 +3251,22 @@ function restaurantPos() {
 
         onCustomerPhoneEnter() {
             const q = this.customerPhoneQuery.trim();
-            if (!q) return;
             if (this.showNewCustomerInline) { this.saveNewCustomer(); return; }
+            // GUIDED FLOW (opt-in): the customer step is OPTIONAL. Enter must ALWAYS move
+            // the keyboard chain forward to the items step (focus product search). If the
+            // typed phone matches an existing customer, attach them first; otherwise proceed
+            // as a walk-in WITHOUT forcing the inline new-customer modal (which stalled the
+            // flow). Customers can still be created via the dropdown "+ New Customer" button.
+            if (this.guidedFlow) {
+                if (this.customerPhoneResults.length > 0) { this.selectCustomerFromPhone(this.customerPhoneResults[0]); }
+                this.customerPhoneDropdown = false;
+                this.flowStep = 'items';
+                this.$nextTick(() => { this.$refs.searchInput?.focus(); });
+                return;
+            }
+            if (!q) return;
             if (this.customerPhoneResults.length > 0) {
                 this.selectCustomerFromPhone(this.customerPhoneResults[0]);
-                // GUIDED FLOW (opt-in): customer chosen → advance to the items step.
-                if (this.guidedFlow) { this.flowStep = 'items'; this.$nextTick(() => this.$refs.searchInput?.focus()); }
             } else if (q.length >= 4 && /^\d+$/.test(q)) {
                 this.openInlineNewCustomer();
             } else {

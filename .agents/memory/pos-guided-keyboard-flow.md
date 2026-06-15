@@ -40,6 +40,10 @@ committed — the chain stalled after the first item even though path 1 worked.
 
 **How to apply:** `quickCreateProduct` must advance flowStep off 'customer'; the inline
 price input's Enter handler must call `saveQuickPrice(index, true)` and `saveQuickPrice`
-must, when `refocusSearch && guidedFlow`, `$nextTick`-focus the search box (the @blur
-handler passes false so clicking away never steals focus). Always test the inventory-OFF
-chain end to end, not just inventory-ON.
+must, when `refocusSearch && guidedFlow`, refocus the search box. CAUTION: `saveQuickPrice`
+runs in the cart x-for ROW scope, so `this.$refs.searchInput` is `undefined` there — a
+`$nextTick`/`$refs` refocus silently no-ops. Refocus via
+`document.querySelector('input[name="pos_product_search_nofill"]').focus()` (see
+alpine-xfor-refs-scope.md), scheduled on `$nextTick` + `setTimeout(0)`/`setTimeout(60)`
+to beat the x-if teardown blur. The @blur handler passes false so clicking away never
+steals focus. Always test the inventory-OFF chain end to end, not just inventory-ON.

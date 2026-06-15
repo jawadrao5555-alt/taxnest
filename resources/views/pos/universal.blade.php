@@ -2704,8 +2704,24 @@ function restaurantPos() {
             // search box so the cashier can immediately type the next item (or press Enter
             // on the empty box to drop into the cart). Without this the keyboard chain
             // stalls after every quick-created item in inventory-OFF mode.
+            //
+            // IMPORTANT — two traps handled here:
+            //  1. saveQuickPrice is invoked from the cart x-for ROW scope (the inline price
+            //     input's @keydown.enter). In Alpine, $refs read through a row-scope proxy
+            //     only sees that row's refs (quickPriceInput) — the component-root
+            //     searchInput is NOT reachable via this.$refs here. So we locate the live
+            //     search node directly in the DOM by its name attribute.
+            //  2. Clearing quickPriceCartUid removes the focused inline price <input> via
+            //     x-if, which natively blurs to <body>. A couple of timed attempts ensure
+            //     our focus wins that teardown race.
             if (refocusSearch && this.guidedFlow) {
-                this.$nextTick(() => { this.$refs.searchInput?.focus(); });
+                const refocusSearchBox = () => {
+                    const el = document.querySelector('input[name="pos_product_search_nofill"]');
+                    if (el) el.focus();
+                };
+                this.$nextTick(refocusSearchBox);
+                setTimeout(refocusSearchBox, 0);
+                setTimeout(refocusSearchBox, 60);
             }
             // Persist to backend (silent — already reflected in UI)
             try {

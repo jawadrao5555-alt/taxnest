@@ -286,9 +286,12 @@ class PosController extends Controller
         $company = Company::find($companyId);
         $features = PosFeatureService::forCompany($company);
 
-        $products = PosProduct::where('company_id', $companyId)->where('is_active', true)->where('show_on_sale', true)->get();
+        // Load ALL active products (including show_on_sale=false). "Hidden from sale screen"
+        // products are kept OUT of the browsable grid on the client, but MUST stay loaded so
+        // the cashier can still SEARCH them by name and add them to the cart at any time.
+        $products = PosProduct::where('company_id', $companyId)->where('is_active', true)->get();
         $services = PosService::where('company_id', $companyId)->where('is_active', true)->get();
-        $categories = $products->pluck('category')->filter()->unique()->sort()->values();
+        $categories = $products->where('show_on_sale', true)->pluck('category')->filter()->unique()->sort()->values();
         $productIds = $products->pluck('id')->toArray();
 
         $recipeLookup = [];

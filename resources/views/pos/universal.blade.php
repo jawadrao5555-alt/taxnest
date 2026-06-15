@@ -520,7 +520,7 @@ window.addEventListener('popstate', function() {
             <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
                 <div class="flex items-center gap-2 overflow-x-auto hide-scrollbar flex-1 min-w-0">
                     <button @click="activeCategory = 'all'; filterProducts()" x-show="showProducts" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === 'all' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">
-                        All <span class="ml-1 text-[10px] opacity-70" x-text="'(' + (allProducts.length + allServices.length) + ')'"></span>
+                        All <span class="ml-1 text-[10px] opacity-70" x-text="'(' + (allProducts.filter(p => p.show_on_sale !== false).length + allServices.length) + ')'"></span>
                     </button>
                     @foreach($categories as $cat)
                     <button @click="activeCategory = '{{ $cat }}'; filterProducts()" x-show="showProducts" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === '{{ $cat }}' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">{{ $cat }}</button>
@@ -1801,6 +1801,7 @@ $productsJson = $products->map(function($p) use ($recipeLookup, $stockStatus) {
     return [
         'id' => $p->id, 'type' => 'product', 'name' => $p->name,
         'price' => $p->price ?? 0, 'category' => $p->category,
+        'show_on_sale' => (bool)($p->show_on_sale ?? true),
         'cost_price' => (float) ($p->cost_price ?? 0),
         'is_tax_exempt' => $p->is_tax_exempt ?? false,
         'hasRecipe' => in_array($p->id, $recipeLookup ?? []),
@@ -2275,15 +2276,19 @@ function restaurantPos() {
             }
             let items = [...this.allProducts, ...this.allServices];
             items = items.filter(i => parseFloat(i.price) > 0 && i.name && i.name.trim().length > 0);
-            // When the grid is hidden, a search must look across the WHOLE catalog: the category
-            // pills are hidden in that mode, so any stale activeCategory (chosen earlier while the
-            // grid was visible) must be ignored — otherwise a matching product in a different
-            // category would stay invisible.
-            const ignoreCategory = !this.showProducts && hasSearch;
+            // A SEARCH query always spans the WHOLE catalog: it ignores the active category
+            // (the pills may be hidden, or a stale category chosen earlier would hide a match in
+            // another category) AND it includes products marked "Hidden from sale screen"
+            // (show_on_sale=false). The hidden flag ONLY declutters the browsable grid — it must
+            // never stop a cashier from finding a saved product by name and adding it to the cart.
+            const ignoreCategory = hasSearch;
             if (!ignoreCategory) {
                 if (this.activeCategory !== 'all' && this.activeCategory !== 'services') { items = this.allProducts.filter(p => p.category === this.activeCategory && parseFloat(p.price) > 0 && p.name && p.name.trim().length > 0); }
                 else if (this.activeCategory === 'services') { items = this.allServices.filter(s => parseFloat(s.price) > 0 && s.name && s.name.trim().length > 0); }
             }
+            // Hidden products stay OUT of the browsable grid (when NOT searching) but remain fully
+            // searchable above — so only drop show_on_sale=false items when there is no search.
+            if (!hasSearch) { items = items.filter(i => i.show_on_sale !== false); }
             if (this.searchQuery) { const q = this.searchQuery.toLowerCase(); items = items.filter(i => i.name.toLowerCase().includes(q)); }
             this.filteredItems = items;
             this.displayCount = 60;
@@ -2537,6 +2542,8 @@ function restaurantPos() {
             const pool = this.quickTypePool().filter(p => {
                 if (p.is_active === false) return false;
                 if (!(parseFloat(p.price) > 0)) return false;
+                // "Hidden from sale screen" products only surface on explicit search — never via the random picker.
+                if ((p._type || p.type) === 'product' && p.show_on_sale === false) return false;
                 if (inv && p.stockStatus === 'out' && this.blockOutOfStock) return false;
                 return true;
             });

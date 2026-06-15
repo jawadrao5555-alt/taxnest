@@ -107,3 +107,7 @@ deploymentTarget = "autoscale"
 run = ["bash", "-c", "php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan serve --host=0.0.0.0 --port=5000"]
 publicDir = "dist/public"
 build = ["bash", "-c", "composer install --no-dev --optimize-autoloader && npm install && npm run build"]
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 180000

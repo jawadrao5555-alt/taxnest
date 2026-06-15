@@ -55,6 +55,18 @@ class PosController extends Controller
         return response()->json(['success' => true, 'style' => $style]);
     }
 
+    public function updateGuidedFlow(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) {
+            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+        }
+        $enabled = $request->boolean('enabled');
+        $companyId = app('currentCompanyId');
+        Company::where('id', $companyId)->update(['pos_guided_flow_enabled' => $enabled]);
+        return response()->json(['success' => true, 'enabled' => $enabled]);
+    }
+
     public function dashboard(Request $request)
     {
         $companyId = app('currentCompanyId');

@@ -242,7 +242,7 @@
     </head>
     <body class="pos-layout-root h-screen overflow-hidden antialiased" data-theme="{{ $posTheme }}">
         <x-pwa-init />
-        <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false, themeOpen: false, currentTheme: '{{ $posTheme }}' }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false">
+        <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false, themeOpen: false, currentTheme: '{{ $posTheme }}', guidedOn: {{ ($companyLayout->pos_guided_flow_enabled ?? false) ? 'true' : 'false' }} }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false">
 
             <header class="topnav-bar flex-shrink-0 relative z-50">
                 <div class="flex items-center justify-between px-3 sm:px-5 h-12">
@@ -483,6 +483,15 @@
                                     <div class="px-3 pt-3 pb-1">
                                         <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">Settings</p>
                                     </div>
+                                    <button type="button"
+                                        @click="guidedOn = !guidedOn; fetch('/pos/settings/guided-flow', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({enabled: guidedOn})}).then(r=>r.json()).then(()=>{ if(window.location.pathname.includes('invoice/create')) window.location.reload(); }).catch(()=>{})"
+                                        class="menu-link w-full flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
+                                        <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 7h14a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2V9a2 2 0 012-2z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 11h.01M11 11h.01M15 11h.01M7 14h10"/></svg>
+                                        <span class="text-left leading-tight">Guided Keyboard Billing</span>
+                                        <span class="ml-auto relative inline-flex shrink-0 w-9 h-5 rounded-full transition-colors duration-200" :class="guidedOn ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'">
+                                            <span class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200" :class="guidedOn && 'translate-x-4'"></span>
+                                        </span>
+                                    </button>
                                     <a href="{{ route('pos.services') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                                         Services

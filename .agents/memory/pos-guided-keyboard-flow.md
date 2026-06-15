@@ -47,3 +47,22 @@ runs in the cart x-for ROW scope, so `this.$refs.searchInput` is `undefined` the
 alpine-xfor-refs-scope.md), scheduled on `$nextTick` + `setTimeout(0)`/`setTimeout(60)`
 to beat the x-if teardown blur. The @blur handler passes false so clicking away never
 steals focus. Always test the inventory-OFF chain end to end, not just inventory-ON.
+
+## The OPENING side has the same x-for-refs trap — fix BOTH ends
+
+`saveQuickPrice` (closing the price editor + refocusing search) was the first half fixed,
+but the OPENING half had the identical bug and was missed for a long time: `openQuickPrice`
+focused the inline price input via `this.$refs.quickPriceInput`. That input's `x-ref` lives
+inside the cart x-for ROW, and `openQuickPrice` is called from `quickCreateProduct` in
+COMPONENT-ROOT scope, where a row ref is unreachable → the focus silently no-op'd. The price
+box appeared but never took focus, so the cashier's typed price went into the search box and
+the chain died at the FIRST item — the exact "keyboard flow nahi ban raha" the owner kept
+reporting even after the saveQuickPrice fix.
+
+**Rule:** Both ends of an inline-editor focus handoff (open AND save) that touch an element
+inside an x-for must resolve the live node by attribute, never `this.$refs`. The price input
+carries `data-quick-price-input`; `openQuickPrice` focuses via
+`document.querySelector('[data-quick-price-input]')` on `$nextTick` + `setTimeout(0)`/`(60)`.
+**Why:** any x-for-row element targeted from root scope is invisible to `this.$refs`. When you
+fix one focus hop in this pattern, audit the sibling hop immediately — they almost always come
+in pairs (open/close, enter/exit).

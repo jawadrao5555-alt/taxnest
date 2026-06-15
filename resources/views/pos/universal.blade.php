@@ -736,7 +736,7 @@ window.addEventListener('popstate', function() {
                                 <template x-if="quickPriceCartUid === item.cart_uid">
                                     <div class="flex items-center gap-1.5 mt-1" @click.stop>
                                         <span class="text-[10px] text-gray-500">Rs.</span>
-                                        <input type="number" min="0" step="any" x-ref="quickPriceInput"
+                                        <input type="number" min="0" step="any" x-ref="quickPriceInput" data-quick-price-input
                                             x-model.number="quickPriceValue"
                                             @keydown.enter.prevent="saveQuickPrice(index, true)"
                                             @keydown.escape.prevent="cancelQuickPrice()"
@@ -2686,7 +2686,20 @@ function restaurantPos() {
         openQuickPrice(cartItem) {
             this.quickPriceCartUid = cartItem.cart_uid;
             this.quickPriceValue = cartItem.unit_price > 0 ? cartItem.unit_price : '';
-            this.$nextTick(() => { this.$refs.quickPriceInput?.focus(); this.$refs.quickPriceInput?.select(); });
+            // CRITICAL: the inline price <input> lives inside the cart x-for ROW, so its
+            // x-ref is NOT reachable from this component-root scope (quickCreateProduct
+            // calls this from root) — see alpine-xfor-refs-scope.md. A this.$refs focus
+            // here silently no-ops, leaving focus on the search box: the cashier types the
+            // price into search and the whole keyboard chain dies at the first item.
+            // Focus the live node by attribute instead, with timed retries to win the
+            // x-if render race (the input only mounts once quickPriceCartUid is set).
+            const focusPrice = () => {
+                const el = document.querySelector('[data-quick-price-input]');
+                if (el) { el.focus(); el.select && el.select(); }
+            };
+            this.$nextTick(focusPrice);
+            setTimeout(focusPrice, 0);
+            setTimeout(focusPrice, 60);
         },
         cancelQuickPrice() {
             this.quickPriceCartUid = null;

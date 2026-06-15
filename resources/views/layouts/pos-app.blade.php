@@ -489,7 +489,7 @@
                                         <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 7h14a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2V9a2 2 0 012-2z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 11h.01M11 11h.01M15 11h.01M7 14h10"/></svg>
                                         <span class="text-left leading-tight">Guided Keyboard Billing</span>
                                         <span class="ml-auto relative inline-flex shrink-0 w-9 h-5 rounded-full transition-colors duration-200" :class="guidedOn ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'">
-                                            <span class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200" :class="guidedOn && 'translate-x-4'"></span>
+                                            <span class="absolute w-4 h-4 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="guidedOn && 'translate-x-4'"></span>
                                         </span>
                                     </button>
                                     <a href="{{ route('pos.services') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">

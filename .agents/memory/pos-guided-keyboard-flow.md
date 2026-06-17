@@ -38,7 +38,36 @@ flow felt "still not working" because `quickCreateProduct`/`saveQuickPrice` did 
 advance `flowStep` and did not return focus to search after the inline price was
 committed — the chain stalled after the first item even though path 1 worked.
 
-**How to apply:** `quickCreateProduct` must advance flowStep off 'customer'; the inline
+## Restaurant register handleKey ordering must mirror universal (hotkeys → qty gate)
+
+When porting the guided flow into the RESTAURANT register (`pos/restaurant/pos.blade.php`),
+the keyboard "felt dead while a field is focused" for the SAME reason every POS register
+hits: `handleKey()` bailed out (`if (isInput) return`) before reaching any F-key. The fix
+is the universal ordering, and it took 3 review rounds to get right:
+
+1. **Global hotkeys (F1–F8 / Alt+P / Ctrl+S / Ctrl+E) must run BEFORE the `data-qty-input`
+   gate AND before the `if (isInput) return` gate.** If the qty gate runs first it swallows
+   F-keys while a qty box is focused — and F5 then reloads the *browser* instead of holding
+   the order.
+2. **Hoisting hotkeys above the input gate re-introduces a leak: F4/F8 fire behind any modal
+   whose input is focused.** Gate the hotkey block behind a `blockingModal` flag (new-customer
+   / table / customer-picker / shortcuts / quick-type / history / low-stock). When a blocking
+   modal is open, still `preventDefault()` the reserved keys (F1–F8, Ctrl/Cmd+S/E) so the
+   native browser action is suppressed, but run NO app action; let every other key fall
+   through so modal typing + Esc keep working.
+3. **A "capturing" modal must capture whenever it is OPEN, not only when it has rows.** The
+   held-orders handler gated on `heldOrders.length > 0`, so an *empty* held modal let F4/F8
+   act behind it. Capture on `showHeldOrders` alone; close on Esc first; nest the row actions
+   (Arrow/Enter/P/D) under the length check so they can't deref `undefined`.
+
+**Why:** these are not visible by reading the final code — they are the three distinct
+ordering traps that each looked fine in isolation. **How to apply:** keep restaurant's
+`handleKey` ordering = capturing-modals(return) → T-exceptions → `if(blockingModal){suppress
+reserved}else{hotkeys}` → qty gate → `if(isInput)return` → Escape → routing, identical to
+`universal.blade.php`. The whole guided layer is gated on `pos_guided_flow_enabled`; the
+hotkey hoist + pay-modal `Enter && !e.repeat` are the only UNGATED (always-on) changes.
+
+**How to apply (original inventory-OFF note):** `quickCreateProduct` must advance flowStep off 'customer'; the inline
 price input's Enter handler must call `saveQuickPrice(index, true)` and `saveQuickPrice`
 must, when `refocusSearch && guidedFlow`, refocus the search box. CAUTION: `saveQuickPrice`
 runs in the cart x-for ROW scope, so `this.$refs.searchInput` is `undefined` there — a

@@ -223,6 +223,18 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
+    {{-- ═══════════ GUIDED FLOW STEP INDICATOR (opt-in, default OFF) ═══════════ --}}
+    {{-- Display-only coach strip. Highlights the current flowStep. Never blocks clicks.
+         Sits OUTSIDE the scrollable main (flex-shrink-0) so it can't be clipped. --}}
+    <div x-show="guidedFlow" x-cloak class="flex items-center justify-center flex-wrap gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-900/20 dark:to-blue-900/20 border-b border-emerald-200 dark:border-emerald-800 flex-shrink-0 text-[11px] font-bold select-none pointer-events-none">
+        <template x-for="(s, i) in [{k:'customer',l:'1 · Customer'},{k:'items',l:'2 · Items'},{k:'cart',l:'3 · Cart'},{k:'finish',l:'4 · Bill'}]" :key="s.k">
+            <div class="flex items-center gap-1.5">
+                <span :class="flowStep === s.k ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white/70 dark:bg-gray-800/70 text-gray-500 dark:text-gray-400'" class="px-2.5 py-0.5 rounded-full transition" x-text="s.l"></span>
+                <svg x-show="i < 3" class="w-3 h-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </div>
+        </template>
+    </div>
+
     <div class="flex flex-1 overflow-hidden">
 
         <div class="flex-1 flex flex-col overflow-hidden" :class="mobileView === 'menu' ? 'flex' : 'hidden md:flex'">
@@ -1288,6 +1300,16 @@ function restaurantPos() {
         highlightIndex: 0,
         activeCartIndex: -1,
         cartMode: false,
+        // ── GUIDED KEYBOARD FLOW (opt-in, default OFF) ──────────────────────
+        // Mirrors $company->pos_guided_flow_enabled (same column the POS "Guided
+        // Keyboard Billing" toggle writes). When false EVERY guided branch below
+        // is skipped, so the guided behaviour is fully opt-in. (The ONLY ungated
+        // changes are the global-hotkey hoist above the input/qty gate and the
+        // pay-modal Enter !e.repeat guard — both deliberate universal-parity fixes.)
+        // flowStep is a DISPLAY-ONLY coach-strip indicator; transitions piggyback
+        // existing functions — they NEVER rewrite handleKey or change F-key bindings.
+        guidedFlow: {{ ($company->pos_guided_flow_enabled ?? false) ? 'true' : 'false' }},
+        flowStep: 'customer',
         get mode() { return this.cartMode ? 'cart' : 'search'; },
         activeHeldIndex: 0,
         gridFocusMode: false,
@@ -1507,6 +1529,15 @@ function restaurantPos() {
                 this.quickAddItem(this.searchSuggestions[this.highlightIndex]);
                 return;
             }
+            // GUIDED FLOW (opt-in): Enter on an EMPTY search box (no dropdown) when the cart
+            // already has items jumps focus INTO the cart for qty edits / checkout — the
+            // "double Enter" pattern. Only when guided; otherwise the manual-line fallback
+            // (incl. the blocking price prompt) runs exactly as before.
+            if (this.guidedFlow && (this.searchQuery || '').trim().length === 0 && this.cart.length > 0) {
+                this.flowStep = 'cart';
+                this.enterCartMode();
+                return;
+            }
             // Vendor T006 — no product matched but cashier pressed Enter → add manual line
             // "as-typed". Pattern: trailing number in query becomes the price (e.g. "Coke 150"
             // → name=Coke price=150). No trailing number → prompt for price. Same cart shape
@@ -1682,6 +1713,8 @@ function restaurantPos() {
         },
 
         addToCart(item) {
+            // GUIDED FLOW (opt-in): first added item advances the coach strip off "customer".
+            if (this.guidedFlow && this.flowStep === 'customer') this.flowStep = 'items';
             const existing = this.cart.find(c => c.item_id === item.id && c.item_type === item.type);
             if (existing) {
                 existing.quantity++;
@@ -1764,6 +1797,7 @@ function restaurantPos() {
 
         enterCartMode() {
             if (this.cart.length === 0) return;
+            if (this.guidedFlow) this.flowStep = 'cart';
             this.cartMode = true;
             this.gridFocusMode = false;
             this.activeCartIndex = this.cart.length - 1;
@@ -1787,15 +1821,6 @@ function restaurantPos() {
         },
 
         handleKey(e) {
-            // CART QTY INPUT: special-case so arrow keys ALWAYS navigate cart rows
-            // (single source of truth — eliminates double-firing skip bug 1→3→5).
-            const isQtyInput = e.target.matches && e.target.matches('[data-qty-input]');
-            if (isQtyInput) {
-                if (e.key === 'ArrowDown') { e.preventDefault(); this.moveCartSelection(1); return; }
-                if (e.key === 'ArrowUp')   { e.preventDefault(); this.moveCartSelection(-1); return; }
-                if (e.key === 'Enter')     { e.preventDefault(); e.target.blur(); return; }
-                return;
-            }
             const tag = document.activeElement?.tagName;
             const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 
@@ -1817,17 +1842,24 @@ function restaurantPos() {
             if (this.showPayModal) {
                 if (e.key === '1') { e.preventDefault(); this.processPayment('cash'); }
                 else if (e.key === '2') { e.preventDefault(); this.processPayment('card'); }
-                else if (e.key === 'Enter') { e.preventDefault(); if (!this.submitting) this.processPayment('cash'); }
+                else if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); if (!this.submitting) this.processPayment('cash'); }
                 else if (e.key === 'Escape') { e.preventDefault(); this.showPayModal = false; }
                 return;
             }
-            if (this.showHeldOrders && this.heldOrders.length > 0) {
-                if (e.key === 'ArrowDown') { e.preventDefault(); this.activeHeldIndex = Math.min(this.activeHeldIndex + 1, this.heldOrders.length - 1); }
-                else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeHeldIndex = Math.max(this.activeHeldIndex - 1, 0); }
-                else if (e.key === 'Enter') { e.preventDefault(); this.recallOrder(this.heldOrders[this.activeHeldIndex]); }
-                else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.payHeldOrder(this.heldOrders[this.activeHeldIndex].id); }
-                else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); this.deleteHeldOrder(this.heldOrders[this.activeHeldIndex].id); }
-                else if (e.key === 'Escape') { e.preventDefault(); this.showHeldOrders = false; }
+            if (this.showHeldOrders) {
+                // Capturing modal — owns the keyboard whenever open, INCLUDING when the list
+                // is empty (so F4/F8 can't clear the cart or open billing behind an empty
+                // modal). Esc always closes; row actions are guarded by length; reserved
+                // browser hotkeys (F1–F8, Ctrl/Cmd+S/E) are swallowed so nothing leaks.
+                if (e.key === 'Escape') { e.preventDefault(); this.showHeldOrders = false; return; }
+                if (this.heldOrders.length > 0) {
+                    if (e.key === 'ArrowDown') { e.preventDefault(); this.activeHeldIndex = Math.min(this.activeHeldIndex + 1, this.heldOrders.length - 1); }
+                    else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeHeldIndex = Math.max(this.activeHeldIndex - 1, 0); }
+                    else if (e.key === 'Enter') { e.preventDefault(); this.recallOrder(this.heldOrders[this.activeHeldIndex]); }
+                    else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.payHeldOrder(this.heldOrders[this.activeHeldIndex].id); }
+                    else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); this.deleteHeldOrder(this.heldOrders[this.activeHeldIndex].id); }
+                }
+                if (/^F[1-8]$/.test(e.key) || ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'e'))) { e.preventDefault(); }
                 return;
             }
             if (this.showManagerPinModal) {
@@ -1849,19 +1881,56 @@ function restaurantPos() {
                     e.preventDefault(); this.toggleItemTax(this.cart.length - 1); return;
                 }
             }
-            if (isInput) return;
+            // ── GLOBAL HOTKEYS — fire BEFORE the qty / input gate so F-keys / Alt+P / Ctrl+S /
+            // Ctrl+E work even while the cashier is typing in the customer-phone or product
+            // search box AND while a cart qty field is focused (mirrors the universal register).
+            // THIS is the core fix for "keyboard feels dead while a field is focused" and it
+            // stops F5 reloading the browser from a qty box. GATED OFF while a non-capturing
+            // modal (new-customer / table / customer-picker / shortcuts / quick-type / history /
+            // low-stock) is open, so F4/F8 can't clear the cart or open billing behind it — those
+            // modals own their own keys + Esc. (The capturing modals above already return early.)
+            const blockingModal = this.showNewCustomerModal || this.showTablePicker || this.showCustomerPicker || this.showShortcuts || this.showQuickType || this.showCustomerHistory || this.showLowStockPopup;
+            if (blockingModal) {
+                // A non-capturing modal owns the keyboard: swallow the reserved browser hotkeys
+                // (F1–F8, Alt+P, Ctrl/Cmd+S, Ctrl/Cmd+E) so native actions (F5 refresh, Ctrl+S
+                // save) can't fire behind it — but run NO app action. Every other key falls
+                // through so the modal's own inputs and Esc handling keep working.
+                if (/^F[1-8]$/.test(e.key) || (e.altKey && (e.key === 'p' || e.key === 'P')) || ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'e'))) {
+                    e.preventDefault(); return;
+                }
+            } else {
+                if (e.key === 'F1') { e.preventDefault(); this.showShortcuts = !this.showShortcuts; return; }
+                if (e.key === 'F2') { e.preventDefault(); this.cartMode = false; this.activeCartIndex = -1; this.enterSearchMode(); return; }
+                if (e.key === 'F3') { e.preventDefault(); this.activeHeldIndex = 0; this.showHeldOrders = true; return; }
+                if (e.key === 'F4') { e.preventDefault(); if (this.cart.length && confirm('Clear entire cart?')) { this.clearCart(); } return; }
+                if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
+                if (e.key === 'F6') { e.preventDefault(); if (this.cart.length > 0) { if (this.guidedFlow) this.flowStep = 'cart'; this.cartMode = true; this.activeCartIndex = this.cart.length - 1; this.mobileView = 'cart'; } return; }
+                if (e.key === 'F7') { e.preventDefault(); this.openQuickType(); return; }
+                if (e.altKey && (e.key === 'p' || e.key === 'P')) { e.preventDefault(); this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); return; }
+                if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) { if (this.guidedFlow) this.flowStep = 'finish'; this.showPayModal = true; } return; }
+                if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
+                if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode(); this.mobileView = 'cart'; } return; }
+            }
 
-            if (e.key === 'F1') { e.preventDefault(); this.showShortcuts = !this.showShortcuts; return; }
-            if (e.key === 'F2') { e.preventDefault(); this.cartMode = false; this.activeCartIndex = -1; this.enterSearchMode(); return; }
-            if (e.key === 'F3') { e.preventDefault(); this.activeHeldIndex = 0; this.showHeldOrders = true; return; }
-            if (e.key === 'F4') { e.preventDefault(); if (this.cart.length && confirm('Clear entire cart?')) { this.clearCart(); } return; }
-            if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
-            if (e.key === 'F6') { e.preventDefault(); if (this.cart.length > 0) { this.cartMode = true; this.activeCartIndex = this.cart.length - 1; this.mobileView = 'cart'; } return; }
-            if (e.key === 'F7') { e.preventDefault(); this.openQuickType(); return; }
-            if (e.altKey && (e.key === 'p' || e.key === 'P')) { e.preventDefault(); this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); return; }
-            if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) this.showPayModal = true; return; }
-            if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
-            if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode(); this.mobileView = 'cart'; } return; }
+            // ── CART QTY INPUT gate — runs AFTER the global hotkeys (so F-keys win while a qty
+            // box is focused) but BEFORE the generic input gate. Arrow keys navigate cart rows;
+            // Enter blurs and (guided) advances Cart → Bill. Single source of truth for qty-row
+            // arrow nav (eliminates the 1→3→5 double-fire skip bug).
+            const isQtyInput = e.target.matches && e.target.matches('[data-qty-input]');
+            if (isQtyInput) {
+                if (e.key === 'ArrowDown') { e.preventDefault(); this.moveCartSelection(1); return; }
+                if (e.key === 'ArrowUp')   { e.preventDefault(); this.moveCartSelection(-1); return; }
+                if (e.key === 'Enter')     {
+                    e.preventDefault(); e.target.blur();
+                    // GUIDED FLOW (opt-in): Enter from a qty box advances Cart → Bill. Plain mode
+                    // just blurs (unchanged). !e.repeat blocks a held key from auto-opening Pay.
+                    if (this.guidedFlow && !e.repeat && this.cart.length) { this.flowStep = 'finish'; this.showPayModal = true; }
+                    return;
+                }
+                return;
+            }
+
+            if (isInput) return;
 
             if (e.key === 'Escape') {
                 if (this.showQuickType) { this.showQuickType = false; return; }
@@ -1908,7 +1977,7 @@ function restaurantPos() {
             if ((e.key === '+' || e.key === '=') && ci >= 0) { this.updateQty(ci, 1); this.animateQty(ci); return; }
             if (e.key === '-' && ci >= 0) { this.updateQty(ci, -1); this.animateQty(ci); return; }
             if (e.key === 'Delete' && ci >= 0) { this.removeFromCart(ci); this.fixCartIndex(); return; }
-            if (e.key === 'Enter' && this.cart.length) { this.showPayModal = true; return; }
+            if (e.key === 'Enter' && this.cart.length) { if (this.guidedFlow) this.flowStep = 'finish'; this.showPayModal = true; return; }
             // T toggles tax on currently-selected cart row (MUST come before the generic letter-key search catch-all)
             if ((e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey && ci >= 0) { e.preventDefault(); this.toggleItemTax(ci); return; }
             if (/^[a-zA-Z]$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
@@ -1950,7 +2019,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.fixCartIndex(); this.clearCartStorage(); },
+        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm('Current order has ' + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             // Hide stale reprint widget — explicit "new sale" intent supersedes reprint access
@@ -2040,6 +2109,26 @@ function restaurantPos() {
 
         onCustomerPhoneEnter() {
             const q = this.customerPhoneQuery.trim();
+            // GUIDED FLOW (opt-in): the customer step is OPTIONAL — Enter must always move the
+            // keyboard chain forward. Dropdown match → attach customer + go to products. A typed
+            // phone (4+ digits) still opens the new-customer capture modal (restaurant has no
+            // inline "+ New" in its dropdown, so we must NOT drop that path). Empty / junk →
+            // walk-in: skip straight to the product search. Non-guided behaviour is unchanged.
+            if (this.guidedFlow) {
+                if (this.customerPhoneDropdown && this.customerPhoneResults.length > 0) {
+                    this.selectCustomerFromPhone(this.customerPhoneResults[0]); this.flowStep = 'items'; return;
+                }
+                if (q.length >= 4 && /^\d+$/.test(q)) {
+                    this.newCustomerPhone = q; this.newCustomerName = ''; this.newCustomerAddress = '';
+                    this.showNewCustomerModal = true;
+                    this.$nextTick(() => this.$refs.newCustomerNameInput?.focus());
+                    return;
+                }
+                this.customerPhoneDropdown = false;
+                this.flowStep = 'items';
+                this.$nextTick(() => { this.$refs.searchInput?.focus(); });
+                return;
+            }
             if (!q) return;
             if (this.customerPhoneDropdown && this.customerPhoneResults.length > 0) {
                 this.selectCustomerFromPhone(this.customerPhoneResults[0]);
@@ -2081,6 +2170,7 @@ function restaurantPos() {
                     this.customerPhoneDropdown = false;
                     if (this.allCustomers) this.allCustomers.push(data.customer);
                     this.showToast('Customer created: ' + data.customer.name, 'success');
+                    if (this.guidedFlow) this.flowStep = 'items';
                     this.$nextTick(() => { this.$refs.searchInput?.focus(); });
                 } else { this.showToast(data.message || 'Failed', 'error'); }
             } catch(e) { this.showToast('Network error', 'error'); }

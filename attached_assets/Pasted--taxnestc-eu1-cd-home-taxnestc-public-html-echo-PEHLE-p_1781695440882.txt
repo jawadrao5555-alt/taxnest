@@ -1,0 +1,43 @@
+[taxnestc@eu1 ~]$ cd /home/taxnestc/public_html
+echo "--- PEHLE ---"; pwd; git log -1 --oneline
+rm -f .git/*.lock .git/refs/remotes/origin/*.lock
+git fetch origin
+git reset --hard origin/main
+echo "--- BAAD MEIN ---"; git log -1 --oneline
+/usr/local/bin/ea-php84 artisan optimize:clear
+echo "--- HO GAYA ---"
+--- PEHLE ---
+/home/taxnestc/public_html
+286cb24 (HEAD -> main, origin/main, origin/HEAD) Improve keyboard navigation for adding items to the point-of-sale
+HEAD is now at 286cb24 Improve keyboard navigation for adding items to the point-of-sale
+--- BAAD MEIN ---
+286cb24 (HEAD -> main, origin/main, origin/HEAD) Improve keyboard navigation for adding items to the point-of-sale
+
+   INFO  Clearing cached bootstrap files.
+
+  config ......................................................... 1.36ms DONE
+  cache ......................................................... 12.75ms DONE
+  compiled ....................................................... 0.91ms DONE
+  events ......................................................... 0.43ms DONE  routes ......................................................... 0.27ms DONE
+  views .......................................................... 2.99ms DONE
+
+--- HO GAYA ---
+[taxnestc@eu1 public_html]$ cd /home/taxnestc/public_html
+cat > public/_diag.php <<'PHPEOF'ome/taxnestc/public_html
+<?php public/_diag.php <<'PHPEOF'
+header('Content-Type: text/plain');
+echo "SERVED_DIR: ".__DIR__."\n";);
+$h=@file_get_contents(dirname(__DIR__)."/.git/refs/heads/main");
+echo "GIT_HEAD: ".($h?substr(trim($h),0,12):"none")."\n";main");
+echo (function_exists("opcache_reset") && opcache_reset()) ? "OPCACHE: reset-OK\n" : "OPCACHE: off\n";
+echo "TIME: ".date("H:i:s")."\n";set") && opcache_reset()) ? "OPCACHE: reset-OK\n" : "OPCACHE: off\n";
+PHPEOFTIME: ".date("H:i:s")."\n";
+echo "BAN GAYA — ab browser mein apni website par kholें:  /_diag.php"
+BAN GAYA — ab browser mein acd /home/taxnestc/public_html.phpag.php"
+/usr/local/bin/ea-php84 artisan view:clearstc/public_html
+echo '<?php if(function_exists("opcache_reset")){opcache_reset();echo "OPCACHE CLEARED ";}else{echo "opcache disabled ";} echo "| DIR=".__DIR__." | "
+.date("H:i:s"); ?>' > public/r.phpcache_reset")){opcache_reset();echo "OPCACHE CLEARED ";}else{echo "opcache disabled ";} echo "| DIR=".__DIR__." | "echo "AB YE LINK BROWSER MEIN KHOLEN ->  /r.php"
+echo "AB YE LINK BROWSER MEIN KHOLEN ->  /r.php"
+   INFO  Compiled views cleared successfully.
+
+AB YE LINK BROWSER MEIN KHOLEN -> 

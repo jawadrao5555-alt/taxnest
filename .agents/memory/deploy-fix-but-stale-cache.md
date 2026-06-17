@@ -15,6 +15,13 @@ Replit working tree  --(push)-->  GitHub origin/main  --(git pull on cPanel)--> 
 2. **What commit is LIVE actually on?** The decisive fact. Ask the owner to run on cPanel: `cd /home/taxnestc/public_html && git log -1 --oneline`. If it predates the fix commit, live is just running old code → `git pull origin main` + clear caches fixes it.
 3. Only AFTER confirming live runs code that contains the fix should you consider caches.
 
+# CONFIRMED real-cache case: web OPcache holding stale compiled blade
+Once the deploy gap is CLOSED — live `git log -1` is on the correct commit, the served docroot IS the dir you pulled (verified `public_html/public`), AND `optimize:clear` ran — but the page STILL serves old code, the culprit is the **PHP-FPM (web SAPI) OPcache**, not git.
+- `optimize:clear` / `view:clear` run under **CLI PHP**: they delete compiled blade in `storage/framework/views`. Compiled-view filenames are deterministic by source path, so the file is recreated with the SAME name, and an OPcache with `opcache.validate_timestamps=0` keeps serving the OLD opcode for that filename → stale blade forever.
+- CLI clears do NOT reset the web OPcache (different process/SAPI). Reset it via a **web request**: `echo '<?php opcache_reset(); echo "OK ".__DIR__; ?>' > public/r.php`, open `https://<domain>/r.php` in a browser, then `rm public/r.php`. (Restarting PHP-FPM also works but cPanel rarely exposes it.)
+- The same `public/r.php` that prints `__DIR__` doubles as the docroot probe — the printed dir is the TRUE served docroot, so it also catches decoy-copy docroots.
+**Why:** spent many owner round-trips assuming a deploy/push gap when the code was already correct on the live server at the right commit; the live site stayed frozen purely because the web OPcache never got reset. After confirming the live commit is correct, reset the web OPcache before anything else.
+
 # Why the service worker is a RED HERRING for sale-screen bugs
 - `public/sw.js` `skipPatterns` includes `/pos/invoice/create` (and `/login`, `/api/`, `/admin/`...). The SW returns early for these — **the POS sale screen is never cached; it's always network-first/fresh.** So search/cart/keyboard bugs on the sale screen are NEVER a client SW-cache problem.
 - `CACHE_VERSION` in sw.js is NOT a reliable deploy marker: `taxnest-v31` was set 2026-05-08 and was NOT bumped when later fixes landed. "Live serves vNN" only proves live is >= the commit that set vNN, not that any later fix is present.

@@ -229,7 +229,7 @@ window.addEventListener('popstate', function() {
 
             <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 overflow-x-auto hide-scrollbar flex-shrink-0">
                 <button @click="activeCategory = 'all'; filterProducts()" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === 'all' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">
-                    All <span class="ml-1 text-[10px] opacity-70" x-text="'(' + (allProducts.length + allServices.length) + ')'"></span>
+                    All <span class="ml-1 text-[10px] opacity-70" x-text="'(' + (allProducts.filter(p => p.show_on_sale !== false).length + allServices.length) + ')'"></span>
                 </button>
                 @foreach($categories as $cat)
                 <button @click="activeCategory = '{{ $cat }}'; filterProducts()" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === '{{ $cat }}' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">{{ $cat }}</button>
@@ -1212,6 +1212,7 @@ $productsJson = $products->map(function($p) use ($recipeLookup, $stockStatus) {
         'hasRecipe' => in_array($p->id, $recipeLookup ?? []),
         'image' => $p->image ? asset('storage/products/' . $p->image) : null,
         'stockStatus' => $stockStatus[$p->id] ?? null,
+        'show_on_sale' => (bool)($p->show_on_sale ?? true),
     ];
 })->values();
 $servicesJson = $services->map(function($s) {
@@ -1546,10 +1547,19 @@ function restaurantPos() {
         },
 
         filterProducts() {
+            const hasSearch = !!(this.searchQuery && this.searchQuery.trim().length > 0);
             let items = [...this.allProducts, ...this.allServices];
             items = items.filter(i => parseFloat(i.price) > 0 && i.name && i.name.trim().length > 0);
-            if (this.activeCategory !== 'all' && this.activeCategory !== 'services') { items = this.allProducts.filter(p => p.category === this.activeCategory && parseFloat(p.price) > 0 && p.name && p.name.trim().length > 0); }
-            else if (this.activeCategory === 'services') { items = this.allServices.filter(s => parseFloat(s.price) > 0 && s.name && s.name.trim().length > 0); }
+            // A SEARCH query always spans the WHOLE catalog: it ignores the active category AND
+            // includes products marked "Hidden from sale screen" (show_on_sale=false). The hidden
+            // flag ONLY declutters the browsable grid — it must never stop a cashier from finding a
+            // saved product by name and adding it to the cart.
+            if (!hasSearch) {
+                if (this.activeCategory !== 'all' && this.activeCategory !== 'services') { items = this.allProducts.filter(p => p.category === this.activeCategory && parseFloat(p.price) > 0 && p.name && p.name.trim().length > 0); }
+                else if (this.activeCategory === 'services') { items = this.allServices.filter(s => parseFloat(s.price) > 0 && s.name && s.name.trim().length > 0); }
+                // Hidden products stay OUT of the browsable grid (only when NOT searching).
+                items = items.filter(i => i.show_on_sale !== false);
+            }
             if (this.searchQuery) { const q = this.searchQuery.toLowerCase(); items = items.filter(i => i.name.toLowerCase().includes(q)); }
             this.filteredItems = items;
             this.displayCount = 60;
@@ -1660,6 +1670,8 @@ function restaurantPos() {
             const pool = this.quickTypePool().filter(p => {
                 if (p.is_active === false) return false;
                 if (!(parseFloat(p.price) > 0)) return false;
+                // "Hidden from sale screen" products only surface on explicit search — never via the random picker.
+                if ((p._type || p.type) === 'product' && p.show_on_sale === false) return false;
                 if (inv && p.stockStatus === 'out' && this.blockOutOfStock) return false;
                 return true;
             });

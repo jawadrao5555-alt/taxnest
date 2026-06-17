@@ -30,16 +30,21 @@ class RestaurantPosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
+        // Load ALL active products (including show_on_sale=false). "Hidden from sale screen"
+        // products MUST stay loaded so the cashier can still SEARCH them by name and add to the
+        // cart — the hidden flag only declutters the browsable grid, it never blocks search.
         $products = PosProduct::where('company_id', $companyId)
             ->where('is_active', true)
-            ->where('show_on_sale', true)
             ->get();
 
         $services = PosService::where('company_id', $companyId)
             ->where('is_active', true)
             ->get();
 
-        $categories = $products->pluck('category')->filter()->unique()->sort()->values();
+        // Category pills are built from VISIBLE products only — a category that contains only
+        // hidden products should not surface an (apparently empty) browse pill.
+        $categories = $products->filter(fn($p) => (bool)($p->show_on_sale ?? true))
+            ->pluck('category')->filter()->unique()->sort()->values();
 
         $productIds = $products->pluck('id')->toArray();
         $recipeLookup = ProductRecipe::where('company_id', $companyId)

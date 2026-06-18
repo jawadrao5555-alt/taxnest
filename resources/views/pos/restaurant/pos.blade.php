@@ -1332,7 +1332,7 @@ function restaurantPos() {
         // pay-modal Enter !e.repeat guard — both deliberate universal-parity fixes.)
         // flowStep is a DISPLAY-ONLY coach-strip indicator; transitions piggyback
         // existing functions — they NEVER rewrite handleKey or change F-key bindings.
-        guidedFlow: {{ ($company->pos_guided_flow_enabled ?? false) ? 'true' : 'false' }},
+        guidedFlow: {{ ($company->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }},
         flowStep: 'customer',
         flowTypeIndex: 0,
         get mode() { return this.cartMode ? 'cart' : 'search'; },

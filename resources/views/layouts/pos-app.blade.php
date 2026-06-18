@@ -242,7 +242,7 @@
     </head>
     <body class="pos-layout-root h-screen overflow-hidden antialiased" data-theme="{{ $posTheme }}">
         <x-pwa-init />
-        <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false, themeOpen: false, currentTheme: '{{ $posTheme }}', guidedOn: {{ ($companyLayout->pos_guided_flow_enabled ?? false) ? 'true' : 'false' }} }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false">
+        <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false, themeOpen: false, currentTheme: '{{ $posTheme }}', guidedOn: {{ ($companyLayout->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }} }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false">
 
             <header class="topnav-bar flex-shrink-0 relative z-50">
                 <div class="flex items-center justify-between px-3 sm:px-5 h-12">

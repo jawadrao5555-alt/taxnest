@@ -1925,7 +1925,7 @@ function restaurantPos() {
         // flowStep is a DISPLAY-ONLY indicator; the actual transitions piggyback
         // existing functions (addHighlightedItem, enterCartMode, showPayModal,
         // clearCart). It NEVER rewrites handleKey or changes F-key bindings.
-        guidedFlow: {{ ($company->pos_guided_flow_enabled ?? false) ? 'true' : 'false' }},
+        guidedFlow: {{ ($company->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }},
         flowStep: 'customer',
         // ── RESTAURANT MODE FLAG (gates hold/pay route selection) ────────────
         // Restaurant endpoints (pos.restaurant.orders.hold + /pay) are blocked

@@ -77,6 +77,31 @@ alpine-xfor-refs-scope.md), scheduled on `$nextTick` + `setTimeout(0)`/`setTimeo
 to beat the x-if teardown blur. The @blur handler passes false so clicking away never
 steals focus. Always test the inventory-OFF chain end to end, not just inventory-ON.
 
+## RESTAURANT guided flow has an extra ORDER-TYPE step (universal does NOT)
+
+The restaurant register's guided chain is customer → items → **type** → cart → finish —
+one more step than universal's customer → items → cart → finish. The owner explicitly
+specified it: after adding items, pressing Enter on an EMPTY search box (cart non-empty)
+must open an order-TYPE picker (dine in / takeaway / delivery), arrow-navigable, and Enter
+on the chosen type drops into the cart. This is the "double Enter": empty-search Enter to
+leave items → type, then Enter on the type → cart.
+
+**Why:** the first port copied universal verbatim, so empty-search Enter went straight to
+cart mode and skipped the type step — the owner reported "flow tum bhol gaye, maine kuch aur
+bataya tha." Restaurants need the order type before billing; universal (retail) has no order
+type, so it legitimately has no such step. Do NOT "simplify" the restaurant flow back to the
+universal 4-step shape.
+
+**How to apply:** the type step is a capturing state, NOT a step-strip-only indicator. Its
+handler lives in `handleKey` placed right AFTER the `showManagerPinModal` capture block (so
+it owns Arrow/Enter/Esc and swallows F1–F8 / Ctrl+S+E while active) and `return`s for every
+key. `enterTypeStep()` seeds the highlight from the current `orderType` and blurs the search
+box; `confirmGuidedType()` commits `orderType` then calls `enterCartMode()`. Gate the
+empty-search→type transition on `cart.length > 0` (can't bill empty). Do NOT auto-open the
+table picker when "dine in" is chosen — owner's spec is type → cart directly; table stays an
+independent optional action. The overlay + all of this is gated on `guidedFlow`, so plain
+mode is byte-identical.
+
 ## The OPENING side has the same x-for-refs trap — fix BOTH ends
 
 `saveQuickPrice` (closing the price editor + refocusing search) was the first half fixed,

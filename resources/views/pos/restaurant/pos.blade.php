@@ -227,12 +227,36 @@ window.addEventListener('popstate', function() {
     {{-- Display-only coach strip. Highlights the current flowStep. Never blocks clicks.
          Sits OUTSIDE the scrollable main (flex-shrink-0) so it can't be clipped. --}}
     <div x-show="guidedFlow" x-cloak class="flex items-center justify-center flex-wrap gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-900/20 dark:to-blue-900/20 border-b border-emerald-200 dark:border-emerald-800 flex-shrink-0 text-[11px] font-bold select-none pointer-events-none">
-        <template x-for="(s, i) in [{k:'customer',l:'1 · Customer'},{k:'items',l:'2 · Items'},{k:'cart',l:'3 · Cart'},{k:'finish',l:'4 · Bill'}]" :key="s.k">
+        <template x-for="(s, i) in [{k:'customer',l:'1 · Customer'},{k:'items',l:'2 · Items'},{k:'type',l:'3 · Type'},{k:'cart',l:'4 · Cart'},{k:'finish',l:'5 · Bill'}]" :key="s.k">
             <div class="flex items-center gap-1.5">
                 <span :class="flowStep === s.k ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white/70 dark:bg-gray-800/70 text-gray-500 dark:text-gray-400'" class="px-2.5 py-0.5 rounded-full transition" x-text="s.l"></span>
-                <svg x-show="i < 3" class="w-3 h-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                <svg x-show="i < 4" class="w-3 h-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
             </div>
         </template>
+    </div>
+
+    {{-- ═══════════ GUIDED FLOW: ORDER-TYPE STEP (opt-in) ═══════════ --}}
+    {{-- Owner-specified keyboard step BETWEEN Items and Cart. Reached by pressing Enter on an
+         empty search box (cart already has items). Arrow keys move the highlight (handled in
+         handleKey), Enter confirms the type + drops into the cart, Esc returns to product search. --}}
+    <div x-cloak x-show="guidedFlow && flowStep === 'type'" x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md p-6 border border-gray-100 dark:border-gray-800">
+            <div class="text-center mb-5">
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Order Type</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">&uarr; &darr; select &middot; Enter confirm &middot; Esc back</p>
+            </div>
+            <div class="space-y-2">
+                <template x-for="(t, i) in [{k:'dine_in',l:'Dine In'},{k:'takeaway',l:'Takeaway'},{k:'delivery',l:'Delivery'}]" :key="t.k">
+                    <button type="button" @click="flowTypeIndex = i; confirmGuidedType()"
+                        :class="flowTypeIndex === i ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30 ring-2 ring-emerald-500 text-emerald-800 dark:text-emerald-200' : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'"
+                        class="w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left font-bold transition">
+                        <span :class="flowTypeIndex === i ? 'bg-emerald-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'" class="w-7 h-7 flex items-center justify-center rounded-full text-sm flex-shrink-0" x-text="i + 1"></span>
+                        <span x-text="t.l"></span>
+                        <span x-show="flowTypeIndex === i" class="ml-auto text-emerald-600 dark:text-emerald-400 text-xs">Enter</span>
+                    </button>
+                </template>
+            </div>
+        </div>
     </div>
 
     <div class="flex flex-1 overflow-hidden">
@@ -1310,6 +1334,7 @@ function restaurantPos() {
         // existing functions — they NEVER rewrite handleKey or change F-key bindings.
         guidedFlow: {{ ($company->pos_guided_flow_enabled ?? false) ? 'true' : 'false' }},
         flowStep: 'customer',
+        flowTypeIndex: 0,
         get mode() { return this.cartMode ? 'cart' : 'search'; },
         activeHeldIndex: 0,
         gridFocusMode: false,
@@ -1530,12 +1555,13 @@ function restaurantPos() {
                 return;
             }
             // GUIDED FLOW (opt-in): Enter on an EMPTY search box (no dropdown) when the cart
-            // already has items jumps focus INTO the cart for qty edits / checkout — the
-            // "double Enter" pattern. Only when guided; otherwise the manual-line fallback
-            // (incl. the blocking price prompt) runs exactly as before.
+            // already has items advances to the ORDER-TYPE step (dine in / takeaway / delivery)
+            // — the owner-specified step between Items and Cart. The cashier picks the type with
+            // arrows + Enter, which then drops focus into the cart ("double Enter" pattern: this
+            // empty-search Enter, then Enter on the chosen type). Only when guided; otherwise the
+            // manual-line fallback (incl. the blocking price prompt) runs exactly as before.
             if (this.guidedFlow && (this.searchQuery || '').trim().length === 0 && this.cart.length > 0) {
-                this.flowStep = 'cart';
-                this.enterCartMode();
+                this.enterTypeStep();
                 return;
             }
             // Vendor T006 — no product matched but cashier pressed Enter → add manual line
@@ -1805,6 +1831,25 @@ function restaurantPos() {
             this.scrollToCartItem(this.activeCartIndex);
         },
 
+        // GUIDED FLOW: Order-Type step (dine in / takeaway / delivery) — owner-specified step
+        // between Items and Cart. enterTypeStep() seeds the highlight from the current orderType
+        // and blurs the search box so handleKey owns arrows/Enter; the overlay (x-show
+        // guidedFlow && flowStep==='type') renders the choices. confirmGuidedType() commits the
+        // picked type and drops straight into cart mode. Gated on guidedFlow only.
+        guidedOrderTypes() { return ['dine_in', 'takeaway', 'delivery']; },
+        enterTypeStep() {
+            this.flowStep = 'type';
+            const i = this.guidedOrderTypes().indexOf(this.orderType);
+            this.flowTypeIndex = i >= 0 ? i : 0;
+            this.showSearchDropdown = false;
+            document.activeElement?.blur();
+        },
+        confirmGuidedType() {
+            this.orderType = this.guidedOrderTypes()[this.flowTypeIndex] || 'takeaway';
+            this.flowStep = 'cart';
+            this.enterCartMode();
+        },
+
         moveCartSelection(dir) {
             if (this.cart.length === 0) { this.activeCartIndex = -1; return; }
             let next = this.activeCartIndex + dir;
@@ -1864,6 +1909,22 @@ function restaurantPos() {
             }
             if (this.showManagerPinModal) {
                 if (e.key === 'Escape') { e.preventDefault(); this.showManagerPinModal = false; }
+                return;
+            }
+            // GUIDED FLOW: Order-Type step capture (dine in / takeaway / delivery). Arrow keys
+            // move the highlight, 1/2/3 jump to a choice, Enter confirms + drops into the cart,
+            // Esc returns to product search. Reserved browser hotkeys are swallowed so nothing
+            // leaks behind the overlay. Gated on guidedFlow so plain mode is byte-identical.
+            if (this.guidedFlow && this.flowStep === 'type') {
+                const tlen = 3;
+                if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); this.flowTypeIndex = (this.flowTypeIndex + 1) % tlen; return; }
+                if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); this.flowTypeIndex = (this.flowTypeIndex - 1 + tlen) % tlen; return; }
+                if (e.key === '1') { e.preventDefault(); this.flowTypeIndex = 0; return; }
+                if (e.key === '2') { e.preventDefault(); this.flowTypeIndex = 1; return; }
+                if (e.key === '3') { e.preventDefault(); this.flowTypeIndex = 2; return; }
+                if (e.key === 'Enter') { e.preventDefault(); this.confirmGuidedType(); return; }
+                if (e.key === 'Escape') { e.preventDefault(); this.flowStep = 'items'; this.enterSearchMode(); return; }
+                if (/^F[1-8]$/.test(e.key) || ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'e'))) { e.preventDefault(); }
                 return;
             }
 

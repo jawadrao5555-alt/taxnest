@@ -120,3 +120,40 @@ carries `data-quick-price-input`; `openQuickPrice` focuses via
 **Why:** any x-for-row element targeted from root scope is invisible to `this.$refs`. When you
 fix one focus hop in this pattern, audit the sibling hop immediately — they almost always come
 in pairs (open/close, enter/exit).
+
+## An input's `@keydown.enter.prevent` that mutates state then blurs DOUBLE-FIRES via the document handleKey
+
+`handleKey` is attached at the DOCUMENT level (`document.addEventListener('keydown', …)`). If an
+input's `@keydown.enter.prevent="x()"` mutates a state flag (e.g. `flowStep='type'`) and blurs the
+input, the SAME Enter keydown keeps bubbling to the document listener — which now reads the just-set
+flag and acts on it. In the restaurant flow this made the empty-search Enter open the order-TYPE
+overlay AND, in the same keypress, the document handler's `flowStep==='type'` block instantly ran
+`confirmGuidedType()` → cart. The overlay flashed and closed; owner saw "type screen skipped, went
+straight to cart."
+
+**Rule:** any input Enter handler that toggles a flag the document `handleKey` also routes on MUST
+use `.prevent.stop` (stopPropagation), not just `.prevent`. `.prevent` only blocks the native action;
+it does NOT stop the bubble to a document-level keydown listener.
+**Why:** `blur()` does not stop an in-flight event's propagation — the event already started bubbling.
+**How to apply:** subsequent Enters are fine because the handler blurred the input, so they target
+`<body>` and only `handleKey` fires (proper "double-Enter": 1st opens the step, 2nd confirms).
+
+## Restaurant "0-9 Set Qty" needs the FOCUSED-qty cart model (universal's), not the blurred model
+
+Both registers' cart hint says "0-9 Set Qty / +/− Qty / Del Remove", but neither `handleCartKeys`
+has a digit handler. It works in UNIVERSAL only because universal keeps the active row's
+`[data-qty-input]` FOCUSED+selected throughout cart mode (`enterCartMode`/`moveCartSelection` →
+`focusActiveQty()`), so digits/dot/backspace type straight into the native input and the
+`isQtyInput` gate in `handleKey` intercepts the cart shortcuts (arrows/Tab/Enter/+/-/T/Del/Esc).
+The restaurant originally used a BLURRED model (`enterCartMode` did `document.activeElement?.blur()`,
+gate handled only Arrow/Enter) so digits hit `handleCartKeys` → no handler → nothing typed.
+
+**Rule:** to support direct qty typing, mirror universal's focused-qty model wholesale — do NOT
+half-switch. Focus+select the qty box on enter/move, and EXPAND the qty gate to handle +/-/=, T,
+Delete, Escape, Tab, AND a letter→search escape hatch, letting digits/dot/backspace fall through.
+**Why:** with the box focused the qty gate becomes the primary cart router; any shortcut you forget
+to add there silently dies (e.g. +/- get sanitized away by `onQtyInput`). Two gotchas: (1) while a
+qty box is focused, `x-effect` skips model→input sync, so +/- must write `e.target.value` manually
+after `updateQty`; (2) `removeFromCart` splices after a 250ms exit animation, so refocus the next
+row via `setTimeout(…, 280)`, not an immediate `$nextTick`. Also point EVERY enter-cart path at
+`enterCartMode()` (the F6 keydown branch had its own inline blurred copy) so qty focus is consistent.

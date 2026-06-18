@@ -136,7 +136,7 @@ window.addEventListener('popstate', function() {
 
         <div class="flex-1 relative">
             <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input type="search" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent="addHighlightedItem()" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="Search products... (type to filter, Enter to add)" class="search-glow w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition shadow-sm" autocomplete="one-time-code" name="pos_product_search_nofill" data-lpignore="true" data-form-type="other" role="combobox">
+            <input type="search" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent.stop="addHighlightedItem()" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="Search products... (type to filter, Enter to add)" class="search-glow w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition shadow-sm" autocomplete="one-time-code" name="pos_product_search_nofill" data-lpignore="true" data-form-type="other" role="combobox">
             <kbd x-show="!searchQuery" class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 font-mono">Ctrl+S</kbd>
             <button x-show="searchQuery" @click="searchQuery = ''; showSearchDropdown = false; filterProducts(); $refs.searchInput.focus()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -1827,8 +1827,11 @@ function restaurantPos() {
             this.cartMode = true;
             this.gridFocusMode = false;
             this.activeCartIndex = this.cart.length - 1;
-            document.activeElement?.blur();
             this.scrollToCartItem(this.activeCartIndex);
+            // Focus (and select) the active row's qty box so the cashier can type the
+            // quantity directly ("0-9 Set Qty"). Mirrors universal's focused-qty model —
+            // the qty-input gate in handleKey then routes all cart shortcuts.
+            this.focusActiveQty();
         },
 
         // GUIDED FLOW: Order-Type step (dine in / takeaway / delivery) — owner-specified step
@@ -1857,6 +1860,18 @@ function restaurantPos() {
             if (next >= this.cart.length) next = this.cart.length - 1;
             this.activeCartIndex = next;
             this.scrollToCartItem(next);
+            this.focusActiveQty();
+        },
+
+        // Focus + select the active cart row's qty box (mirrors universal). Keeping this
+        // input focused while in cart mode is what makes "0-9 Set Qty" work — digits/dot/
+        // backspace type straight into the native input; the qty-input gate in handleKey
+        // intercepts the cart shortcuts (arrows, Tab, +/-, T, Delete, Enter, Esc, letters).
+        focusActiveQty() {
+            this.$nextTick(() => {
+                const el = this.$refs.cartList?.querySelector(`[data-cart-index="${this.activeCartIndex}"] [data-qty-input]`);
+                if (el) { el.focus(); el.select(); }
+            });
         },
 
         fixCartIndex() {
@@ -1965,7 +1980,7 @@ function restaurantPos() {
                 if (e.key === 'F3') { e.preventDefault(); this.activeHeldIndex = 0; this.showHeldOrders = true; return; }
                 if (e.key === 'F4') { e.preventDefault(); if (this.cart.length && confirm('Clear entire cart?')) { this.clearCart(); } return; }
                 if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
-                if (e.key === 'F6') { e.preventDefault(); if (this.cart.length > 0) { if (this.guidedFlow) this.flowStep = 'cart'; this.cartMode = true; this.activeCartIndex = this.cart.length - 1; this.mobileView = 'cart'; } return; }
+                if (e.key === 'F6') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode(); this.mobileView = 'cart'; } return; }
                 if (e.key === 'F7') { e.preventDefault(); this.openQuickType(); return; }
                 if (e.altKey && (e.key === 'p' || e.key === 'P')) { e.preventDefault(); this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); return; }
                 if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) { if (this.guidedFlow) this.flowStep = 'finish'; this.showPayModal = true; } return; }
@@ -1979,13 +1994,35 @@ function restaurantPos() {
             // arrow nav (eliminates the 1→3→5 double-fire skip bug).
             const isQtyInput = e.target.matches && e.target.matches('[data-qty-input]');
             if (isQtyInput) {
+                const ci = this.activeCartIndex;
                 if (e.key === 'ArrowDown') { e.preventDefault(); this.moveCartSelection(1); return; }
                 if (e.key === 'ArrowUp')   { e.preventDefault(); this.moveCartSelection(-1); return; }
+                if (e.key === 'Tab')       { e.preventDefault(); this.moveCartSelection(e.shiftKey ? -1 : 1); return; }
                 if (e.key === 'Enter')     {
                     e.preventDefault(); e.target.blur();
                     // GUIDED FLOW (opt-in): Enter from a qty box advances Cart → Bill. Plain mode
                     // just blurs (unchanged). !e.repeat blocks a held key from auto-opening Pay.
                     if (this.guidedFlow && !e.repeat && this.cart.length) { this.flowStep = 'finish'; this.showPayModal = true; }
+                    return;
+                }
+                // Cart shortcuts still work while the qty box is focused (mirrors universal).
+                if ((e.key === '+' || e.key === '=') && ci >= 0) { e.preventDefault(); this.updateQty(ci, 1); if (this.cart[ci]) e.target.value = this.cart[ci].quantity; this.animateQty(ci); return; }
+                if (e.key === '-' && ci >= 0)                    { e.preventDefault(); this.updateQty(ci, -1); if (this.cart[ci]) e.target.value = this.cart[ci].quantity; this.animateQty(ci); return; }
+                if ((e.key === 't' || e.key === 'T') && ci >= 0 && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); this.toggleItemTax(ci); return; }
+                // Del removes the row (preserves the "Del Remove" hint from the blurred model);
+                // Backspace stays native so the cashier can still edit digits in the qty field.
+                if (e.key === 'Delete' && ci >= 0) { e.preventDefault(); this.removeFromCart(ci); setTimeout(() => { if (this.cart.length) this.focusActiveQty(); }, 280); return; }
+                if (e.key === 'Escape') { e.preventDefault(); e.target.blur(); this.cartMode = false; this.activeCartIndex = -1; if (this.guidedFlow) this.flowStep = 'items'; this.enterSearchMode(); return; }
+                // RESTAURANT-specific: a letter while the qty box is focused jumps back to product
+                // search (the blurred-cart model supported this — preserve it). Digits/dot/backspace
+                // fall through to the native input so direct quantity typing works ("0-9 Set Qty").
+                if (/^[a-zA-Z]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                    e.preventDefault(); e.target.blur();
+                    this.cartMode = false; this.activeCartIndex = -1;
+                    if (this.guidedFlow) this.flowStep = 'items';
+                    this.searchQuery += e.key;
+                    this.$refs.searchInput?.focus();
+                    this.$nextTick(() => this.onSearchInput());
                     return;
                 }
                 return;
@@ -2014,8 +2051,10 @@ function restaurantPos() {
                 e.preventDefault();
             }
 
-            // Mode-specific routing
-            if (this.cartMode && this.cart.length > 0) { this.handleCartKeys(e); return; }
+            // Mode-specific routing — only stay in cart if focus is actually in the cart
+            // (mirrors universal: prevents sticky cartMode + body focus from hijacking arrows).
+            const focusInCart = !!(document.activeElement?.closest?.('[data-cart-index]'));
+            if (this.cartMode && this.cart.length > 0 && focusInCart) { this.handleCartKeys(e); return; }
             this.handleSearchKeys(e);
         },
 

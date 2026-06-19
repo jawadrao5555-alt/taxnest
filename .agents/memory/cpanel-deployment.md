@@ -30,3 +30,5 @@ See `prod-scheduled-jobs-cron.md` for why this is mandatory.
 # Notes
 - Migrations here are idempotent / self-healing (see `prod-schema-drift-selfheal.md`), so `migrate --force` is safe to re-run; already-applied migrations are skipped.
 - Owner is non-technical and deploys manually over SSH/cPanel — give exact copy-paste blocks, not abstract steps.
+- **Give ONE `&&`-chained one-liner that STARTS with `cd /home/taxnestc/public_html`, never a multi-line block.** A multi-line paste can run the `artisan` lines from the home dir (the `cd` line gets separated / pasted out of order) → every artisan call prints `Could not open input file: artisan` while git pull/migrate silently never happen. The single cd-prefixed one-liner guarantees cwd.
+- **OPcache reset from SSH needs NO browser:** `curl -s https://taxnest.com.pk/r.php` IS a real web (PHP-FPM) hit, so it resets the web OPcache just like opening it in a browser. Bake it into the one-liner: `... && echo '<?php opcache_reset(); ?>' > public/r.php && curl -s https://taxnest.com.pk/r.php ; rm -f public/r.php ; echo DONE` (use `;` before rm so r.php is always cleaned up even if curl fails).

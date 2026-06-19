@@ -563,7 +563,7 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
-    <div x-cloak x-show="showPayModal" x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false">
+    <div x-cloak x-show="showPayModal" x-transition.opacity x-effect="if (showPayModal) payMethodIndex = 0;" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
             <div class="p-5 text-center border-b border-gray-100 dark:border-gray-800">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">Payment</h3>
@@ -573,14 +573,14 @@ window.addEventListener('popstate', function() {
                 <p x-show="submitting" class="text-xs text-purple-500 mt-2">Processing payment...</p>
             </div>
             <div class="p-4 grid grid-cols-2 gap-3">
-                <button @click="processPayment('cash')" :disabled="submitting" class="py-4 rounded-xl text-center bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 hover:bg-green-100 hover:border-green-400 transition disabled:opacity-50 group">
+                <button @click="payMethodIndex = 0; processPayment('cash')" :disabled="submitting" :class="payMethodIndex === 0 ? 'ring-2 ring-green-500 ring-offset-2 dark:ring-offset-gray-900 scale-105 shadow-lg shadow-green-600/20 border-green-400' : ''" class="py-4 rounded-xl text-center bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 hover:bg-green-100 hover:border-green-400 transition disabled:opacity-50 group">
                     <svg x-show="submitting" class="w-8 h-8 mx-auto text-green-600 mb-1 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                     <svg x-show="!submitting" class="w-8 h-8 mx-auto text-green-600 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                     <span class="text-sm font-bold text-green-700 dark:text-green-400" x-text="submitting ? 'Processing...' : 'Cash'"></span>
                     <span class="block text-[10px] font-semibold text-green-600/60 mt-0.5" x-text="'Tax: ' + (taxRules['cash'] || 16) + '%'"></span>
                     <kbd x-show="!submitting" class="block mt-0.5 text-[9px] text-green-500/60 font-mono">Press 1</kbd>
                 </button>
-                <button @click="processPayment('card')" :disabled="submitting" class="py-4 rounded-xl text-center bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 hover:bg-blue-100 hover:border-blue-400 transition disabled:opacity-50 group">
+                <button @click="payMethodIndex = 1; processPayment('card')" :disabled="submitting" :class="payMethodIndex === 1 ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900 scale-105 shadow-lg shadow-blue-600/20 border-blue-400' : ''" class="py-4 rounded-xl text-center bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 hover:bg-blue-100 hover:border-blue-400 transition disabled:opacity-50 group">
                     <svg x-show="submitting" class="w-8 h-8 mx-auto text-blue-600 mb-1 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                     <svg x-show="!submitting" class="w-8 h-8 mx-auto text-blue-600 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                     <span class="text-sm font-bold text-blue-700 dark:text-blue-400" x-text="submitting ? 'Processing...' : 'Card'"></span>
@@ -588,7 +588,10 @@ window.addEventListener('popstate', function() {
                     <kbd x-show="!submitting" class="block mt-0.5 text-[9px] text-blue-500/60 font-mono">Press 2</kbd>
                 </button>
             </div>
-            <div class="p-4 pt-0">
+            <div class="px-4 pb-0.5">
+                <p class="text-center text-[10px] text-gray-400 dark:text-gray-500 font-medium">Use <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&larr;</kbd> <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&rarr;</kbd> to choose &middot; <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">Enter</kbd> to confirm</p>
+            </div>
+            <div class="p-4 pt-2">
                 <button @click="showPayModal = false" :disabled="submitting" class="w-full py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:text-gray-700 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition disabled:opacity-50">Cancel <span class="text-[9px] text-gray-400 font-mono ml-1">ESC</span></button>
             </div>
         </div>
@@ -931,20 +934,40 @@ window.addEventListener('popstate', function() {
             </button>
 
             {{-- Header / success info --}}
-            <div class="relative px-5 pt-6 pb-5 text-center bg-gradient-to-b from-green-50 to-white dark:from-green-900/20 dark:to-gray-900" id="confettiContainer">
-                <div class="w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center mb-3 shadow-lg shadow-green-600/30 success-icon-animate" style="animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)">
-                    <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-dasharray="24" stroke-dashoffset="0" style="animation: checkDraw 0.5s ease 0.3s both;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+            <div class="relative px-6 pt-7 pb-6 text-center overflow-hidden bg-gradient-to-b from-emerald-50 via-green-50 to-white dark:from-emerald-900/30 dark:via-green-900/10 dark:to-gray-900" id="confettiContainer">
+                {{-- soft glow behind the success icon --}}
+                <div class="pointer-events-none absolute inset-x-0 -top-10 h-40 bg-gradient-to-b from-emerald-400/25 to-transparent blur-2xl"></div>
+                {{-- Animated success ring with a pulsing halo --}}
+                <div class="relative w-20 h-20 mx-auto mb-3">
+                    <span class="absolute inset-0 rounded-full bg-emerald-400/30 animate-ping"></span>
+                    <div class="relative w-20 h-20 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center shadow-xl shadow-emerald-600/40 success-icon-animate" style="animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)">
+                        <svg class="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-dasharray="24" stroke-dashoffset="0" style="animation: checkDraw 0.5s ease 0.3s both;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                    </div>
                 </div>
-                <h3 class="text-lg font-extrabold text-gray-900 dark:text-white tracking-tight">Payment Complete</h3>
-                <div class="flex items-center justify-center gap-2 mt-1.5">
-                    <span class="text-[11px] font-mono text-gray-400 dark:text-gray-500" x-text="lastInvoiceNumber"></span>
-                    <span class="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full" :class="lastPaymentMethod === 'cash' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'">
-                        <span class="w-1 h-1 rounded-full" :class="lastPaymentMethod === 'cash' ? 'bg-green-500' : 'bg-blue-500'"></span>
-                        <span x-text="lastPaymentMethod"></span>
+                <h3 class="relative text-2xl font-black text-gray-900 dark:text-white tracking-tight">Payment Complete!</h3>
+                {{-- PRA fiscal status — the "production" proof the cashier needs to see at a glance --}}
+                <div class="relative mt-2.5 flex items-center justify-center">
+                    <span class="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider px-3 py-1 rounded-full shadow-sm"
+                          :class="lastPraStatus === 'submitted' ? 'bg-emerald-600 text-white shadow-emerald-600/30' : (lastPraStatus === 'pending' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : ((lastPraStatus === 'offline' || lastPraStatus === 'failed') ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'))">
+                        <svg x-show="lastPraStatus === 'submitted'" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.42 0l-3.5-3.5a1 1 0 111.42-1.42l2.79 2.8 6.79-6.8a1 1 0 011.42 0z" clip-rule="evenodd"/></svg>
+                        <svg x-show="lastPraStatus === 'pending'" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        <span x-text="lastPraStatus === 'submitted' ? 'PRA Verified' : (lastPraStatus === 'pending' ? 'Reporting to PRA' : ((lastPraStatus === 'offline' || lastPraStatus === 'failed') ? 'Saved · will sync to PRA' : 'Local Bill'))"></span>
                     </span>
                 </div>
-                <div class="mt-3 py-2 px-5 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800/50 inline-block">
-                    <p class="text-2xl font-extrabold text-green-600 dark:text-green-400" x-text="'Rs. ' + Number(lastTotal).toLocaleString()" style="font-variant-numeric: tabular-nums;"></p>
+                {{-- Big total --}}
+                <p class="relative mt-3 text-4xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight" x-text="'Rs. ' + Number(lastTotal).toLocaleString()" style="font-variant-numeric: tabular-nums;"></p>
+                {{-- PRA fiscal invoice number — shown only once PRA returns it (real "production" number) --}}
+                <div x-show="lastPraNumber" class="relative mt-3 mx-auto max-w-xs py-2 px-3 rounded-xl bg-emerald-600/10 border border-emerald-500/30">
+                    <p class="text-[9px] font-bold uppercase tracking-widest text-emerald-700/70 dark:text-emerald-400/70">PRA Invoice Number</p>
+                    <p class="text-sm font-extrabold font-mono text-emerald-800 dark:text-emerald-300 break-all" x-text="lastPraNumber"></p>
+                </div>
+                {{-- Internal invoice # + payment method (secondary) --}}
+                <div class="relative flex items-center justify-center gap-3 mt-3">
+                    <span class="text-[11px] font-mono text-gray-400 dark:text-gray-500" x-text="lastInvoiceNumber"></span>
+                    <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" :class="lastPaymentMethod === 'cash' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'">
+                        <span class="w-1.5 h-1.5 rounded-full" :class="lastPaymentMethod === 'cash' ? 'bg-green-500' : 'bg-blue-500'"></span>
+                        <span x-text="lastPaymentMethod"></span>
+                    </span>
                 </div>
             </div>
 
@@ -1347,6 +1370,9 @@ function restaurantPos() {
         heldOrders: @json($heldOrders),
         showTablePicker: false,
         showPayModal: false,
+        // payMethodIndex — highlighted Pay-modal method (0 = Cash, 1 = Card). Arrows
+        // move it, Enter confirms, number keys 1/2 jump + fire. Reset to 0 on open.
+        payMethodIndex: 0,
         showHeldOrders: false,
         showReceipt: false,
         // Live print-status state per channel ('idle' | 'printing' | 'done').
@@ -1376,6 +1402,9 @@ function restaurantPos() {
         showLastSaleWidget: false,
         lastTotal: 0,
         lastPaymentMethod: '',
+        // PRA fiscal result for the success popup (status badge + fiscal number).
+        lastPraNumber: '',
+        lastPraStatus: '',
         submitting: false,
         cartAnimating: false,
         // Quick Type modal state — mirrors universal POS
@@ -1900,9 +1929,14 @@ function restaurantPos() {
                 e.preventDefault(); this.dismissLastSaleWidget(); return;
             }
             if (this.showPayModal) {
-                if (e.key === '1') { e.preventDefault(); this.processPayment('cash'); }
-                else if (e.key === '2') { e.preventDefault(); this.processPayment('card'); }
-                else if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); if (!this.submitting) this.processPayment('cash'); }
+                // Arrow keys move the payment-method highlight (Cash <-> Card); Enter confirms it.
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowUp')   { e.preventDefault(); this.payMethodIndex = 0; }
+                else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); this.payMethodIndex = 1; }
+                // Number keys jump straight to that method AND fire it (fast path).
+                else if (e.key === '1') { e.preventDefault(); this.payMethodIndex = 0; this.processPayment('cash'); }
+                else if (e.key === '2') { e.preventDefault(); this.payMethodIndex = 1; this.processPayment('card'); }
+                // Enter confirms the CURRENTLY-HIGHLIGHTED method (Cash by default).
+                else if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); if (!this.submitting) this.processPayment(this.payMethodIndex === 1 ? 'card' : 'cash'); }
                 else if (e.key === 'Escape') { e.preventDefault(); this.showPayModal = false; }
                 return;
             }
@@ -2542,6 +2576,7 @@ function restaurantPos() {
                     this.lastInvoiceNumber = data.invoice_number || ''; this.lastTransactionId = data.transaction_id || null;
                     this.lastOrderId = orderId;
                     this.lastTotal = savedTotal || data.total_amount || 0; this.lastPaymentMethod = method;
+                    this.lastPraNumber = data.pra_invoice_number || ''; this.lastPraStatus = data.pra_status || '';
                     // Reset print pills to 'idle' BEFORE opening popup so any prior sale's
                     // ✓ marks don't briefly flash through. Auto-print chain (if enabled) will
                     // flip them to 'printing' → 'done' as it runs.

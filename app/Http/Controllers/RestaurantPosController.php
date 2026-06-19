@@ -654,6 +654,8 @@ class RestaurantPosController extends Controller
                 'transaction_id' => $transaction->id,
                 'invoice_number' => $invoiceNumber,
                 'total_amount' => $totalAmount,
+                'pra_invoice_number' => $transaction->pra_invoice_number ?? null,
+                'pra_status' => $transaction->pra_status ?? null,
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();

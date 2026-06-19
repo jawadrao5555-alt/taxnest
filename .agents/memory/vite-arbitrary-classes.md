@@ -10,10 +10,18 @@ through `@vite([...])` — NOT a Tailwind CDN. Tailwind JIT only emits classes i
 in the content globs at build time (`tailwind.config.js` scans `resources/views/**` and
 `storage/framework/views/*.php`).
 
-**Rule:** Any NEW Blade view/component that introduces Tailwind utility classes not
-already used elsewhere — especially arbitrary-value classes like `bg-[#25D366]`,
-`z-[60]`, `max-h-[90vh]` — will render with NO styling (invisible / unstyled) until you
-run `npm run build`. The element is in the served HTML but has no CSS rules.
+**Rule:** Any NEW Tailwind utility class not already present elsewhere in the scanned
+content — this includes plain standard utilities (`font-black`, `tracking-widest`,
+`shadow-emerald-600/40`, `ring-offset-2`) the JIT hasn't emitted yet, AND arbitrary-value
+classes like `bg-[#25D366]`, `z-[60]`, `max-h-[90vh]` — renders with NO styling
+(invisible / unstyled) until you run `npm run build`. The element is in the served HTML
+but has no CSS rules. It is NOT only about arbitrary values.
+
+**cPanel deploy implication:** `public/build/` is git-tracked. The standard deploy
+one-liner does `git pull` + artisan caches — it does NOT run `npm run build` on the
+server. So after editing Blade with new classes you MUST `npm run build` locally and
+get the regenerated `public/build/assets/*.css` + `manifest.json` committed and pushed
+to `origin/main`, or production serves stale CSS and the new classes are invisible live.
 
 **Why:** I added a floating WhatsApp button; the anchor was present in HTML (grep found
 `wa.me`) but it never appeared on screen. The arbitrary classes simply weren't in the

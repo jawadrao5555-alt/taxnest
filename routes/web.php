@@ -435,6 +435,7 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::get('/features', [PosController::class, 'featureSettings'])->name('pos.features');
     Route::post('/features', [PosController::class, 'updateFeatureSettings'])->name('pos.features.update');
     Route::post('/features/reset', [PosController::class, 'resetFeaturesToCategory'])->name('pos.features.reset');
+    Route::get('/customize', [PosController::class, 'customize'])->name('pos.customize');
     Route::post('/invoice/store', [PosController::class, 'storeInvoice'])->name('pos.invoice.store')->middleware('plan.limit:invoices');
     Route::get('/transactions', [PosController::class, 'transactions'])->name('pos.transactions');
     Route::get('/transaction/{id}', [PosController::class, 'transactionShow'])->name('pos.transaction.show');

@@ -67,6 +67,23 @@ class PosController extends Controller
         return response()->json(['success' => true, 'enabled' => $enabled]);
     }
 
+    /**
+     * Customize POS — single consolidated settings hub (admin-only).
+     * Surfaces every POS customization feature from one place; complex
+     * sub-features link out to their existing pages.
+     */
+    public function customize(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) {
+            abort(403, 'Only POS administrators can customize POS.');
+        }
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        if (!$company) { abort(404); }
+        return view('pos.customize', compact('company'));
+    }
+
     public function dashboard(Request $request)
     {
         $companyId = app('currentCompanyId');

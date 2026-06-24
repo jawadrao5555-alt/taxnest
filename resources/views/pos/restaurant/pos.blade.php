@@ -959,7 +959,15 @@ window.addEventListener('popstate', function() {
                 {{-- PRA fiscal invoice number — shown only once PRA returns it (real "production" number) --}}
                 <div x-show="lastPraNumber" class="relative mt-3 mx-auto max-w-xs py-2 px-3 rounded-xl bg-emerald-600/10 border border-emerald-500/30">
                     <p class="text-[9px] font-bold uppercase tracking-widest text-emerald-700/70 dark:text-emerald-400/70">PRA Invoice Number</p>
-                    <p class="text-sm font-extrabold font-mono text-emerald-800 dark:text-emerald-300 break-all" x-text="lastPraNumber"></p>
+                    <div class="flex items-center justify-center gap-2 mt-0.5">
+                        <p class="text-sm font-extrabold font-mono text-emerald-800 dark:text-emerald-300 break-all" x-text="lastPraNumber"></p>
+                        <button type="button"
+                            @click="if(navigator.clipboard){navigator.clipboard.writeText(lastPraNumber).then(()=>{ praCopied=true; showToast('PRA number copied','success'); setTimeout(()=>praCopied=false,1500); }).catch(()=>showToast('Copy failed','error'));}else{showToast('Copy not supported on this device','error');}"
+                            class="shrink-0 w-7 h-7 rounded-lg bg-emerald-600/15 hover:bg-emerald-600/30 text-emerald-700 dark:text-emerald-300 flex items-center justify-center transition" :title="praCopied ? 'Copied!' : 'Copy PRA number'">
+                            <svg x-show="!praCopied" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            <svg x-show="praCopied" x-cloak class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                        </button>
+                    </div>
                 </div>
                 {{-- Internal invoice # + payment method (secondary) --}}
                 <div class="relative flex items-center justify-center gap-3 mt-3">
@@ -967,6 +975,18 @@ window.addEventListener('popstate', function() {
                     <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" :class="lastPaymentMethod === 'cash' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'">
                         <span class="w-1.5 h-1.5 rounded-full" :class="lastPaymentMethod === 'cash' ? 'bg-green-500' : 'bg-blue-500'"></span>
                         <span x-text="lastPaymentMethod"></span>
+                    </span>
+                </div>
+                {{-- Sale meta: time + item count (item count auto-hides when unknown) --}}
+                <div class="relative flex items-center justify-center gap-2.5 mt-2 text-[10px] font-semibold text-gray-400 dark:text-gray-500">
+                    <span class="inline-flex items-center gap-1" x-show="lastSaleAt">
+                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span x-text="lastSaleAt ? new Date(lastSaleAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''"></span>
+                    </span>
+                    <span x-show="lastSaleAt && lastItemsCount > 0" class="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600"></span>
+                    <span class="inline-flex items-center gap-1" x-show="lastItemsCount > 0">
+                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                        <span x-text="lastItemsCount + (lastItemsCount === 1 ? ' item' : ' items')"></span>
                     </span>
                 </div>
             </div>
@@ -1402,6 +1422,10 @@ function restaurantPos() {
         showLastSaleWidget: false,
         lastTotal: 0,
         lastPaymentMethod: '',
+        // Success-popup extras: item count + sale timestamp + PRA copy state.
+        lastItemsCount: 0,
+        lastSaleAt: null,
+        praCopied: false,
         // PRA fiscal result for the success popup (status badge + fiscal number).
         lastPraNumber: '',
         lastPraStatus: '',
@@ -2577,6 +2601,8 @@ function restaurantPos() {
                     this.lastOrderId = orderId;
                     this.lastTotal = savedTotal || data.total_amount || 0; this.lastPaymentMethod = method;
                     this.lastPraNumber = data.pra_invoice_number || ''; this.lastPraStatus = data.pra_status || '';
+                    this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
+                    this.lastSaleAt = Date.now();
                     // Reset print pills to 'idle' BEFORE opening popup so any prior sale's
                     // ✓ marks don't briefly flash through. Auto-print chain (if enabled) will
                     // flip them to 'printing' → 'done' as it runs.

@@ -1,0 +1,63 @@
+[taxnestc@eu1 ~]$ cd /home/taxnestc/public_html && cd /home/taxnestc/public_html && git pull origin main && /usr/local/bin/ea-php84 artisan migrate --force && /usr/local/bin/ea-php84 artisan config:clear && /usr/local/bin/ea-php84 artisan cache:clear && /usr/local/bin/ea-php84 artisan route:clear&& /usr/local/bin/ea-php84 artisan view:clear && /usr/local/bin/ea-php84 artisan view:cache && echo '<?php opcache_reset(); ?>' > public/r.php && curl -s https://taxnest.com.pk/r.php ; rm -f public/r.php ; echo "=== DEPLOY DONE ==="
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+
+   INFO  Nothing to migrate.
+
+
+   INFO  Configuration cache cleared successfully.
+
+
+   INFO  Application cache cleared successfully.
+
+
+   INFO  Route cache cleared successfully.   INFO  Compiled views cleared successfully.
+
+
+
+   INFO  Blade templates cached successfully.                cd /home/taxnestc/public_html && git pull origin main && /usr/local/bin/ea-php84 artisan
+ migrate --force && /usr/local/bin/ea-php84 artisan config:clear && /usr/local/bin/ea-php84 artisan cache:clear && /usr/local/bin/ea-php84 artisan ro
+ute:clear && /usr/local/bin/ea-php84 artisan view:clear && /usr/local/bin/ea-php84 artisan view:cache && echo '<?php opcache_reset(); ?>' > public/r.
+php && curl -s https://taxnest.com.pk/r.php ; rm -f public/r.php ; echo "=== DEPLOY DONE ==="al/bin/ea-php84 artisan migrate --force && /usr/local/biremote: Enumerating objects: 47, done.remote: Counting objects: 100% (47/47), done.remote: Compressing objects: 100% (8/8), done.
+remote: Total 27 (delta 19), reused 27 (delta 19), pack-reused 0 (from 0)
+Unpacking objects: 100% (27/27), 39.55 KiB | 586.00 KiB/s, done.
+From https://github.com/jawadrao5555-alt/taxnest
+ * branch            main       -> FETCH_HEAD
+   83c441f..76ca43c  main       -> origin/main
+Updating 83c441f..76ca43c
+Fast-forward
+ .agents/memory/cpanel-deployment.md                |  2 +
+ .agents/memory/vite-arbitrary-classes.md           | 16 +++--
+ app/Http/Controllers/RestaurantPosController.php   |  2 +
+ ...n-ea-php84-artisan-migrate-fo_1781847143185.txt | 51 +++++++++++++++
+ public/build/assets/app-BtP0JSjq.css               |  1 +
+ public/build/assets/app-_BzGMHRH.css               |  1 -
+ public/build/manifest.json                         |  2 +-
+ resources/views/pos/restaurant/pos.blade.php       | 69 +++++++++++++++-----
+ resources/views/pos/universal.blade.php            | 74 +++++++++++++++++-----
+ 9 files changed, 178 insertions(+), 40 deletions(-)
+ create mode 100644 attached_assets/Pasted--taxnestc-eu1-usr-local-bin-ea-php84-artisan-migrate-fo_1781847143185.txt
+ create mode 100644 public/build/assets/app-BtP0JSjq.css
+ delete mode 100644 public/build/assets/app-_BzGMHRH.css
+
+   INFO  Nothing to migrate.
+
+
+   INFO  Configuration cache cleared successfully.
+
+
+   INFO  Application cache cleared successfully.
+
+
+   INFO  Route cache cleared successfully.
+
+
+   INFO  Compiled views cleared successfully.
+
+
+
+   INFO  Blade templates cached successfully.
+
+=== DEPLOY DONE ===
+[taxnestc@eu1 public_html]$

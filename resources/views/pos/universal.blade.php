@@ -1888,10 +1888,10 @@ function restaurantPos() {
         // item_id, so we gate those actions while a manual line is in cart.
         hasManualItems() { return (this.cart || []).some(i => i && i.item_type === 'manual'); },
         blockOutOfStock: {{ $blockOutOfStock ? 'true' : 'false' }},
-        taxRate: {{ $taxRate }},
+        taxRate: {{ (float) ($taxRate ?? 0) }},
         taxRules: @json($taxRules->mapWithKeys(fn($r) => [$r->payment_method => (float) $r->tax_rate])),
         posRole: '{{ $posRole }}',
-        discountLimit: {{ $discountLimit }},
+        discountLimit: {{ (float) ($discountLimit ?? 0) }},
         hasManagerPin: {{ $hasManagerPin ? 'true' : 'false' }},
         managerOverrideActive: false,
         showManagerPinModal: false,
@@ -4086,7 +4086,7 @@ function restaurantPos() {
 
         get effectiveDiscountLimit() {
             if (this.posRole === 'pos_admin') return 100;
-            return this.managerOverrideActive ? {{ $hasManagerPin ? ($company->manager_discount_limit ?? 50) : 100 }} : this.discountLimit;
+            return this.managerOverrideActive ? {{ (float) ($hasManagerPin ? ($company->manager_discount_limit ?? 50) : 100) }} : this.discountLimit;
         },
         checkDiscountLimit(val, type) {
             // Percentage discounts respect the role-based cap (cashier vs manager-override).

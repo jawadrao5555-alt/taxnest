@@ -65,6 +65,8 @@ class Company extends Model
         'kot_reprint_enabled',
         'pos_receipt_show_tax',
         'pos_guided_flow_enabled',
+        'pos_setup_completed',
+        'pos_use_legacy_restaurant',
         'pra_environment',
         'pra_pos_id',
         'pra_access_code',
@@ -116,6 +118,8 @@ class Company extends Model
         'kot_reprint_enabled' => 'boolean',
         'pos_receipt_show_tax' => 'boolean',
         'pos_guided_flow_enabled' => 'boolean',
+        'pos_setup_completed' => 'boolean',
+        'pos_use_legacy_restaurant' => 'boolean',
     ];
 
     protected $hidden = [

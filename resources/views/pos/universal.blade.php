@@ -796,6 +796,17 @@ window.addEventListener('popstate', function() {
                                 min="0" step="any" placeholder="0" class="dense-input w-14 text-[10px] bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 text-gray-900 dark:text-white focus:ring-purple-500">
                             <button @click.stop="item.item_discount_value = 0; item.showItemDiscount = false" class="text-[9px] text-red-400 hover:text-red-600 px-1">X</button>
                         </div>
+                        @if($features->kitchen_notes)
+                        {{-- Per-item kitchen note (e.g. "no onions") — parity with restaurant screen, gated by kitchen_notes feature --}}
+                        <div class="mt-1" @click.stop>
+                            <input type="text" x-model="item.special_notes"
+                                autocomplete="off" name="pos_item_note_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                                @keydown.enter.prevent.stop="$event.target.blur()"
+                                @keydown.escape.prevent.stop="$event.target.blur()"
+                                placeholder="Item note (e.g. no onions, extra spicy)..."
+                                class="dense-input w-full text-[10px] bg-amber-50/60 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-md px-2 py-1 text-gray-600 dark:text-gray-300 focus:ring-amber-400 placeholder-gray-300">
+                        </div>
+                        @endif
                     </div>
                 </template>
             </div>
@@ -3627,6 +3638,7 @@ function restaurantPos() {
                         type: c.item_type === 'service' ? 'service' : 'product',
                         item_id: c.item_id || null,
                         is_tax_exempt: !!c.is_tax_exempt,
+                        special_notes: c.special_notes || null,
                         // Flag manual cart lines so the backend doesn't auto-
                         // create a permanent product for them.
                         _manual: (c.item_type === 'manual' || !c.item_id) ? true : false,

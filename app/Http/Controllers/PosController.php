@@ -88,6 +88,12 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
+
+        // First-time POS admins are guided through the setup wizard before anything else.
+        if ($this->needsPosSetup($company)) {
+            return redirect()->route('pos.features', ['welcome' => 1]);
+        }
+
         $today = now()->startOfDay();
 
         $todayStats = PosTransaction::where('company_id', $companyId)
@@ -301,6 +307,12 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
+
+        // First-time POS admins are guided through the setup wizard before billing.
+        if ($this->needsPosSetup($company)) {
+            return redirect()->route('pos.features', ['welcome' => 1]);
+        }
+
         $features = PosFeatureService::forCompany($company);
 
         // Load ALL active products (including show_on_sale=false). "Hidden from sale screen"
@@ -394,6 +406,24 @@ class PosController extends Controller
         ->header('Expires', '0');
     }
 
+    /**
+     * Does this company still need to run the POS setup wizard?
+     * Cashiers are NEVER trapped — only POS admins configure the POS.
+     * Existing companies were backfilled pos_setup_completed=true by migration,
+     * so only brand-new companies auto-launch into the wizard.
+     */
+    private function needsPosSetup(?Company $company): bool
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) {
+            return false;
+        }
+        if (!$company) {
+            return false;
+        }
+        return !($company->pos_setup_completed ?? false);
+    }
+
     public function featureSettings(Request $request)
     {
         $user = auth('pos')->user();
@@ -405,7 +435,9 @@ class PosController extends Controller
         $features = PosFeatureService::forCompany($company);
         $categories = PosFeatureService::categories();
         $allFlags = PosFeatureService::ALL_FLAGS;
-        return view('pos.feature-settings', compact('company', 'features', 'categories', 'allFlags'));
+        // First-time setup → wizard shows welcome banner + opens on Step 1.
+        $isFirstTime = $request->boolean('welcome') || !($company->pos_setup_completed ?? false);
+        return view('pos.feature-settings', compact('company', 'features', 'categories', 'allFlags', 'isFirstTime'));
     }
 
     public function updateFeatureSettings(Request $request)
@@ -430,6 +462,9 @@ class PosController extends Controller
         foreach (PosFeatureService::ALL_FLAGS as $flag) {
             $flags[$flag] = (bool) $request->input("feature_flags.$flag", false);
         }
+        // Canonicalize server-side: a child feature can't persist ON while its
+        // required parent is OFF (mirrors the wizard's client-side resolveDeps).
+        $flags = PosFeatureService::normalize($flags);
 
         $company->update([
             'business_category'    => $data['business_category'] ?? $company->business_category,
@@ -441,9 +476,12 @@ class PosController extends Controller
             'auto_print_kot'       => (bool) $request->input('auto_print_kot', false),
             'kot_reprint_enabled'  => (bool) $request->input('kot_reprint_enabled', false),
             'pos_guided_flow_enabled' => (bool) $request->input('pos_guided_flow_enabled', false),
+            // Finishing the wizard marks setup complete so it never auto-launches again.
+            'pos_setup_completed'  => true,
         ]);
 
-        return redirect()->route('pos.features')->with('success', 'POS features updated.');
+        // Step 3 "Start Using POS" → drop the cashier straight onto the sale screen.
+        return redirect()->route('pos.invoice.create')->with('success', 'Your POS is ready — start billing!');
     }
 
     public function resetFeaturesToCategory(Request $request)

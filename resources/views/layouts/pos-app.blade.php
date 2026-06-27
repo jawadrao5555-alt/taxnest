@@ -8,6 +8,10 @@
     // Single source of truth = companies.restaurant_mode (toggle in Business Profile).
     // Disable that toggle → restaurant nav items disappear immediately, regardless of business_category or pos_type.
     $isRestaurantLayout = $companyLayout && (bool) $companyLayout->restaurant_mode;
+    // POS UNIFICATION: every company now bills on the unified universal sale screen.
+    // pos_use_legacy_restaurant is a per-company emergency opt-OUT that keeps a
+    // restaurant company on the OLD restaurant sale screen (instant per-company rollback).
+    $useLegacyRestaurant = $isRestaurantLayout && (bool) ($companyLayout->pos_use_legacy_restaurant ?? false);
     $praEnabledLayout = $companyLayout && $companyLayout->pra_reporting_enabled;
     $inventoryEnabledLayout = $companyLayout && $companyLayout->inventory_enabled;
     $companyName = $companyLayout->name ?? 'My Business';
@@ -261,7 +265,7 @@
                         <div class="h-5 w-px bg-white/10 hidden md:block"></div>
 
                         <nav class="hidden md:flex items-center gap-1">
-                            @if($isRestaurantLayout)
+                            @if($useLegacyRestaurant)
                             <a href="{{ route('pos.restaurant.pos') }}"
                                class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.restaurant.pos') ? 'active text-white' : 'text-white' }}">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
@@ -520,7 +524,7 @@
                      x-transition:leave-start="opacity-100"
                      x-transition:leave-end="opacity-0 -translate-y-2"
                      class="md:hidden border-t border-white/10 px-3 py-2 flex flex-wrap gap-1.5" style="background: hsla(var(--accent-h), var(--accent-s), 10%, 0.9)">
-                    @if($isRestaurantLayout)
+                    @if($useLegacyRestaurant)
                     <a href="{{ route('pos.restaurant.pos') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">New Sale</a>
                     @else
                     <a href="{{ route('pos.invoice.create') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">New Sale</a>
@@ -564,7 +568,7 @@
                 q: '',
                 idx: 0,
                 items: @js([
-                    ['label' => 'New Sale', 'url' => $isRestaurantLayout ? route('pos.restaurant.pos') : route('pos.invoice.create'), 'icon' => '+', 'kbd' => ''],
+                    ['label' => 'New Sale', 'url' => $useLegacyRestaurant ? route('pos.restaurant.pos') : route('pos.invoice.create'), 'icon' => '+', 'kbd' => ''],
                     ['label' => 'Dashboard', 'url' => $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard'), 'icon' => '◧', 'kbd' => ''],
                     ['label' => 'Orders / Transactions', 'url' => route('pos.transactions'), 'icon' => '☰', 'kbd' => ''],
                     ['label' => 'Products', 'url' => route('pos.products'), 'icon' => '◫', 'kbd' => ''],

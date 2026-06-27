@@ -338,6 +338,17 @@ class PosFeatureService
         return self::DEPENDENCIES;
     }
 
+    /**
+     * Public dependency normalizer. Applies DEPENDENCIES so a child flag can
+     * never persist ON while a required parent is OFF. Mirrors the wizard's
+     * client-side resolveDeps() so a malformed / JS-disabled POST still stores
+     * canonical, self-consistent flags.
+     */
+    public static function normalize(array $flags): array
+    {
+        return self::resolve($flags);
+    }
+
     protected static function baseDefaults(): array
     {
         return array_fill_keys(self::ALL_FLAGS, false);

@@ -4,6 +4,7 @@
 - [Alpine focused qty-input sync](alpine-focused-qty-input-sync.md) — qty input x-effect skips the focused element; keyboard qty changes must write e.target.value or the digit looks stale (model/bill stay correct).
 - [PROD schema drift & self-heal](prod-schema-drift-selfheal.md) — pages 500 only on owner's cPanel PROD = missing columns marked "Ran"; fix with a fresh idempotent ensure-columns migration + per-column hasColumn guards.
 - [Vite arbitrary Tailwind classes](vite-arbitrary-classes.md) — new Blade components with arbitrary classes (bg-[#hex], z-[60]) render invisible until `npm run build`; view:cache is not enough.
+- [Blade @php use ParseError](blade-php-use-parse-error.md) — `use X;` inside @php 500s at RUNTIME; view:cache reports OK (only writes, never parses); fully-qualify the class or @use; php -l the COMPILED view to prove it.
 - [Company-id container binding](company-id-container-binding.md) — company id bound under 'currentCompanyId', NOT 'n'/'ln'; 'n' is read in places but never bound (always falls back); unbound on admin routes.
 - [PROD scheduled jobs need cron](prod-scheduled-jobs-cron.md) — Schedule:: entries (trial reminders/expiry, FBR token, POS sync) never run on owner's cPanel PROD unless a `schedule:run` cron exists.
 - [Top banners outside scrollable main](top-banner-clipping.md) — full-width top notification banners get clipped/inert inside main.overflow-y-auto with negative margins; place before <main> like the pending/suspended notices.

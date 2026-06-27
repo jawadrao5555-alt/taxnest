@@ -14,9 +14,8 @@
 
         {{-- ═══════════ WELCOME (first-time only) ═══════════ --}}
         @if($isFirstTime)
-        <div class="mb-5 rounded-2xl bg-gradient-to-br from-purple-600 via-fuchsia-600 to-pink-600 p-5 sm:p-6 text-white shadow-xl relative overflow-hidden">
-            <div class="absolute top-0 right-0 w-60 h-60 bg-white/10 rounded-full blur-3xl -mr-24 -mt-24"></div>
-            <div class="relative flex items-start gap-3">
+        <div class="mb-5 rounded-2xl bg-gradient-to-r from-purple-600 to-fuchsia-600 p-5 sm:p-6 text-white shadow-xl">
+            <div class="flex items-start gap-3">
                 <div class="text-3xl">👋</div>
                 <div>
                     <h1 class="text-xl sm:text-2xl font-extrabold mb-1">Welcome — let's set up your POS</h1>

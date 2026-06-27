@@ -18,6 +18,7 @@ TaxNest is a multi-company SaaS platform designed for comprehensive tax and invo
 - Pending companies can VIEW all features but CANNOT perform any actions until admin approves
 - Login supports: Email, Phone, Username, CNIC, NTN
 - CNIC/NTN login maps to company_admin user of matching company
+- Cards/banners must be CLEAN & SOLID — owner dislikes decorative faint colored corner-glow/gradient overlays on cards. Do NOT add absolute corner blobs (`from-{color}/10 to-transparent rounded-bl-full`), white corner glows (`bg-white/10 rounded-full blur-xl/3xl`), or top washes (`from-emerald-400/25 to-transparent blur-2xl`) to KPI cards, dashboard cards, sale-screen tops, or gradient banners. EXEMPT (keep): modal backdrops (`bg-black/40 backdrop-blur`), login/landing/guest page backgrounds, hover accent underline bars, icon-box gradients.
 
 ## System Architecture
 TaxNest is built on Laravel 12 with PHP 8.4, utilizing Breeze for authentication and a frontend stack of Tailwind CSS, Alpine.js, and Chart.js.

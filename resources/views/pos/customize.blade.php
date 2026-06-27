@@ -59,7 +59,6 @@
 
         {{-- ═══════════ HERO ═══════════ --}}
         <div class="rounded-2xl bg-gradient-to-br from-purple-600 via-fuchsia-600 to-pink-600 p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
-            <div class="absolute top-0 right-0 w-72 h-72 bg-white/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
             <div class="relative">
                 <div class="flex items-center gap-2 mb-2">
                     <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur text-[10px] font-bold uppercase tracking-wider">

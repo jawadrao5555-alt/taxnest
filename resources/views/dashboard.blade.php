@@ -205,7 +205,6 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
                 <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 p-5 shadow-lg shadow-blue-600/25 hover:shadow-xl hover:shadow-blue-600/30 hover:-translate-y-0.5 transition-all duration-200">
-                    <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
                     <div class="relative">
                         <div class="flex items-center justify-between mb-3">
                             <div class="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
@@ -223,7 +222,6 @@
                 </div>
 
                 <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 p-5 shadow-lg shadow-emerald-600/25 hover:shadow-xl hover:shadow-emerald-600/30 hover:-translate-y-0.5 transition-all duration-200">
-                    <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
                     <div class="relative">
                         <div class="flex items-center justify-between mb-3">
                             <div class="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
@@ -236,7 +234,6 @@
                 </div>
 
                 <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-500 via-purple-600 to-purple-700 p-5 shadow-lg shadow-purple-600/25 hover:shadow-xl hover:shadow-purple-600/30 hover:-translate-y-0.5 transition-all duration-200">
-                    <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
                     <div class="relative">
                         <div class="flex items-center justify-between mb-3">
                             <div class="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
@@ -249,7 +246,6 @@
                 </div>
 
                 <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-indigo-700 p-5 shadow-lg shadow-indigo-600/25 hover:shadow-xl hover:shadow-indigo-600/30 hover:-translate-y-0.5 transition-all duration-200">
-                    <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
                     <div class="relative">
                         <div class="flex items-center justify-between mb-3">
                             <div class="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
@@ -262,7 +258,6 @@
                 </div>
 
                 <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 via-orange-600 to-orange-700 p-5 shadow-lg shadow-orange-600/25 hover:shadow-xl hover:shadow-orange-600/30 hover:-translate-y-0.5 transition-all duration-200">
-                    <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
                     <div class="relative">
                         <div class="flex items-center justify-between mb-3">
                             <div class="p-2 bg-white/20 rounded-lg backdrop-blur-sm">

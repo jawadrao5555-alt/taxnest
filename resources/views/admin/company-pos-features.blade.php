@@ -23,7 +23,6 @@
 
             {{-- Hero --}}
             <div class="mb-6 rounded-2xl bg-gradient-to-br from-indigo-700 via-purple-700 to-fuchsia-700 p-6 text-white shadow-xl relative overflow-hidden">
-                <div class="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-24 -mt-24"></div>
                 <div class="relative">
                     <div class="flex items-center gap-2 mb-2">
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-white/20 backdrop-blur text-[10px] font-bold uppercase tracking-wider">🛡️ Admin Panel</span>

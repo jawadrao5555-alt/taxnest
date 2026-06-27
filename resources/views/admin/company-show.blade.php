@@ -345,7 +345,6 @@
 
                 {{-- ━━━ PRA POS Universal v2 — Admin Override CTA ━━━ --}}
                 <div class="rounded-2xl bg-gradient-to-br from-purple-600 via-fuchsia-600 to-pink-600 p-5 sm:p-6 text-white shadow-xl relative overflow-hidden">
-                    <div class="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16"></div>
                     <div class="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div>
                             <div class="flex items-center gap-2 mb-1.5">

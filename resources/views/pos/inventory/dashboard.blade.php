@@ -31,7 +31,6 @@
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div class="group bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg p-5 relative overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
-            <div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-purple-500/10 to-transparent rounded-bl-full group-hover:from-purple-500/20 transition-colors"></div>
             <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-violet-500 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-500"></div>
             <div class="flex items-center gap-3 mb-3">
                 <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-100 to-purple-50 dark:from-purple-900/30 dark:to-purple-800/20 flex items-center justify-center shadow-sm shadow-purple-500/10">
@@ -42,7 +41,6 @@
             <p class="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-1">Total Products</p>
         </div>
         <div class="group bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg p-5 relative overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
-            <div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-emerald-500/10 to-transparent rounded-bl-full group-hover:from-emerald-500/20 transition-colors"></div>
             <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-teal-500 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-500"></div>
             <div class="flex items-center gap-3 mb-3">
                 <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-900/30 dark:to-emerald-800/20 flex items-center justify-center shadow-sm shadow-emerald-500/10">
@@ -53,7 +51,6 @@
             <p class="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-1">Stock Value</p>
         </div>
         <div class="group bg-white dark:bg-gray-900 rounded-2xl border {{ $lowStockItems->count() > 0 ? 'border-amber-200 dark:border-amber-800/50' : 'border-gray-100 dark:border-gray-700' }} shadow-lg p-5 relative overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
-            <div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-amber-500/10 to-transparent rounded-bl-full group-hover:from-amber-500/20 transition-colors"></div>
             <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-orange-500 {{ $lowStockItems->count() > 0 ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100' }} transform transition-transform origin-left duration-500"></div>
             <div class="flex items-center gap-3 mb-3">
                 <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-100 to-amber-50 dark:from-amber-900/30 dark:to-amber-800/20 flex items-center justify-center shadow-sm shadow-amber-500/10">
@@ -64,7 +61,6 @@
             <p class="text-[11px] font-semibold {{ $lowStockItems->count() > 0 ? 'text-amber-500' : 'text-gray-400 dark:text-gray-500' }} uppercase tracking-wider mt-1">Low Stock</p>
         </div>
         <div class="group bg-white dark:bg-gray-900 rounded-2xl border {{ $outOfStockCount > 0 ? 'border-red-200 dark:border-red-800/50' : 'border-gray-100 dark:border-gray-700' }} shadow-lg p-5 relative overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
-            <div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-red-500/10 to-transparent rounded-bl-full group-hover:from-red-500/20 transition-colors"></div>
             <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 to-rose-500 {{ $outOfStockCount > 0 ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100' }} transform transition-transform origin-left duration-500"></div>
             <div class="flex items-center gap-3 mb-3">
                 <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-red-100 to-red-50 dark:from-red-900/30 dark:to-red-800/20 flex items-center justify-center shadow-sm shadow-red-500/10">

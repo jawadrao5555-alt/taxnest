@@ -15,8 +15,6 @@ Usage: <x-pwa-banner color="emerald" appName="Tax DI" />
 @endphp
 <div id="tnPwaBanner" style="display:none; position:relative; margin-bottom:16px; padding:2px; border-radius:18px; background:linear-gradient(135deg, {{ $c['from'] }}, {{ $c['via'] }}, {{ $c['to'] }}); box-shadow: 0 18px 44px {{ $c['glow'] }};">
     <div style="position:relative; padding:14px 16px; border-radius:16px; background:linear-gradient(135deg, {{ $c['from'] }}, {{ $c['via'] }}, {{ $c['to'] }}); overflow:hidden;">
-        <div style="position:absolute; top:-30px; right:-30px; width:140px; height:140px; border-radius:50%; background:rgba(255,255,255,0.10); filter:blur(30px); pointer-events:none;"></div>
-        <div style="position:absolute; bottom:-40px; left:30%; width:120px; height:120px; border-radius:50%; background:rgba(255,255,255,0.08); filter:blur(25px); pointer-events:none;"></div>
 
         <div style="position:relative; display:flex; align-items:center; gap:14px;">
             <div id="tnPwaBannerIcon" style="flex-shrink:0; width:54px; height:54px; border-radius:14px; background:rgba(255,255,255,0.20); display:flex; align-items:center; justify-content:center; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.25), 0 6px 16px rgba(0,0,0,0.18); position:relative;">

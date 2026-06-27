@@ -1591,7 +1591,6 @@ window.addEventListener('popstate', function() {
 
             <div class="relative px-6 pt-7 pb-6 text-center overflow-hidden bg-gradient-to-b from-emerald-50 via-green-50 to-white dark:from-emerald-900/30 dark:via-green-900/10 dark:to-gray-900 flex-shrink-0" id="confettiContainer">
                 {{-- soft glow behind the success icon --}}
-                <div class="pointer-events-none absolute inset-x-0 -top-10 h-40 bg-gradient-to-b from-emerald-400/25 to-transparent blur-2xl"></div>
                 {{-- Animated success ring with a pulsing halo --}}
                 <div class="relative w-20 h-20 mx-auto mb-3">
                     <span class="absolute inset-0 rounded-full bg-emerald-400/30 animate-ping"></span>

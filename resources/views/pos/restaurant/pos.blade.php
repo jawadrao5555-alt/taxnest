@@ -1309,17 +1309,27 @@ $kitchenSettings = [
     'print_on_hold' => (bool)($company->print_on_hold ?? false),
     'print_on_pay' => (bool)($company->print_on_pay ?? true),
 ];
+// UTF-8-SAFE JSON for x-data: a single product/customer/order with a broken byte
+// sequence makes json_encode() return false → @json emits NOTHING → "allProducts: ,"
+// is invalid JS → the WHOLE Alpine component fails to init (dead order-type buttons,
+// dead cart, dead keyboard flow). JSON_INVALID_UTF8_SUBSTITUTE swaps bad bytes for
+// U+FFFD; the ?: fallback guarantees valid JS even if encoding still fails for any
+// other reason. NEVER use bare @json for DB free-text fields in this x-data block.
+$jsEnc = function ($value, $fallback = '[]') {
+    $json = json_encode($value, JSON_INVALID_UTF8_SUBSTITUTE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    return $json === false ? $fallback : $json;
+};
 @endphp
 <script>
 function restaurantPos() {
     return {
-        allProducts: @json($productsJson),
-        allServices: @json($servicesJson),
-        allCustomers: @json($customersJson),
+        allProducts: {!! $jsEnc($productsJson) !!},
+        allServices: {!! $jsEnc($servicesJson) !!},
+        allCustomers: {!! $jsEnc($customersJson) !!},
         kitchenSettings: @json($kitchenSettings),
         blockOutOfStock: {{ $blockOutOfStock ? 'true' : 'false' }},
         taxRate: {{ (float) ($taxRate ?? 0) }},
-        taxRules: @json($taxRules->mapWithKeys(fn($r) => [$r->payment_method => (float) $r->tax_rate])),
+        taxRules: {!! $jsEnc($taxRules->mapWithKeys(fn($r) => [$r->payment_method => (float) $r->tax_rate]), '{}') !!},
         posRole: '{{ $posRole }}',
         discountLimit: {{ (float) ($discountLimit ?? 0) }},
         hasManagerPin: {{ $hasManagerPin ? 'true' : 'false' }},
@@ -1327,12 +1337,12 @@ function restaurantPos() {
         showManagerPinModal: false,
         managerPin: '',
         managerPinError: '',
-        ingredientCosts: @json($ingredientCosts ?? []),
+        ingredientCosts: {!! $jsEnc($ingredientCosts ?? [], '{}') !!},
         // Inventory master switch — when company.inventory_enabled = false, ALL stock UI
         // (popup, product-card dots/OUT pills) is suppressed via isInventoryEnabled() helper.
         inventoryEnabled: {{ ($inventoryEnabled ?? false) ? 'true' : 'false' }},
         isInventoryEnabled() { return this.inventoryEnabled === true; },
-        lowStockAlerts: @json($lowStockAlerts ?? []),
+        lowStockAlerts: {!! $jsEnc($lowStockAlerts ?? []) !!},
         showLowStockPopup: {{ (($inventoryEnabled ?? false) && ($lowStockAlerts ?? collect())->count() > 0) ? 'true' : 'false' }},
         customerHistory: null,
         showCustomerHistory: false,
@@ -1385,8 +1395,8 @@ function restaurantPos() {
         orderType: '{{ $selectedTable ? "dine_in" : "takeaway" }}',
         cart: [],
         kitchenNotes: '',
-        selectedTable: @json($selectedTableJson),
-        heldOrders: @json($heldOrders),
+        selectedTable: {!! $jsEnc($selectedTableJson, 'null') !!},
+        heldOrders: {!! $jsEnc($heldOrders) !!},
         showTablePicker: false,
         showPayModal: false,
         // payMethodIndex — highlighted Pay-modal method (0 = Cash, 1 = Card). Arrows

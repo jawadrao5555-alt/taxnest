@@ -21,10 +21,8 @@ class PosAuthController extends Controller
             if (($user->pos_role ?? null) === 'archive_viewer') {
                 return redirect('/pos/archive');
             }
-            $loginCompany = Company::find($user->company_id);
-            if ($loginCompany && $loginCompany->restaurant_mode) {
-                return redirect('/pos/restaurant/pos');
-            }
+            // POS UNIFICATION: every POS user (restaurant or retail) bills on the
+            // single universal sale screen; restaurant behavior is driven by features.
             return redirect('/pos/invoice/create');
         }
         return view('pos.auth.login');
@@ -98,9 +96,6 @@ class PosAuthController extends Controller
                     return redirect('/pos/archive');
                 }
 
-                if ($company->restaurant_mode) {
-                    return redirect('/pos/restaurant/pos');
-                }
                 return redirect('/pos/invoice/create');
             }
             // Wrong panel → fall through to generic failure (no info leak)
@@ -164,9 +159,6 @@ class PosAuthController extends Controller
 
         Auth::guard('pos')->login($user);
 
-        if ($posType === 'restaurant') {
-            return redirect('/pos/restaurant/pos');
-        }
         return redirect('/pos/invoice/create');
     }
 

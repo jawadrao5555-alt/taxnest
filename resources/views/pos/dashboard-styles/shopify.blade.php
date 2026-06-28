@@ -53,7 +53,7 @@
 
     <div class="flex items-center gap-3 overflow-x-auto pb-1 sh-anim sh-d2">
         @if($isRestaurant)
-        <a href="{{ route('pos.restaurant.pos') }}" class="flex-shrink-0 px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-[11px] font-bold hover:bg-indigo-700 transition shadow-sm">POS Screen</a>
+        <a href="{{ route('pos.invoice.create') }}" class="flex-shrink-0 px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-[11px] font-bold hover:bg-indigo-700 transition shadow-sm">POS Screen</a>
         <a href="{{ route('pos.transactions') }}" class="flex-shrink-0 px-5 py-2.5 rounded-xl text-[11px] font-bold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition">Orders</a>
         <a href="{{ route('pos.restaurant.tables') }}" class="flex-shrink-0 px-5 py-2.5 rounded-xl text-[11px] font-bold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition">Tables</a>
         <a href="{{ route('pos.restaurant.kds') }}" class="flex-shrink-0 px-5 py-2.5 rounded-xl text-[11px] font-bold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition">Kitchen</a>

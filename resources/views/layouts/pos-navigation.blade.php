@@ -81,7 +81,7 @@
         <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Restaurant</p>
     </div>
 
-    <a href="{{ route('pos.restaurant.pos') }}" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->routeIs('pos.restaurant.pos') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
+    <a href="{{ route('pos.invoice.create') }}" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->routeIs('pos.invoice.create') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
         <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 3h18v18H3V3zm3 6h12m-12 6h12"/></svg>
         Restaurant POS
     </a>

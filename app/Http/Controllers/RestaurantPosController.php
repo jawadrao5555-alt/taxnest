@@ -27,6 +27,12 @@ class RestaurantPosController extends Controller
 {
     public function pos(Request $request)
     {
+        // POS UNIFICATION: the dedicated restaurant sale screen is retired. Every cashier
+        // now bills on the single universal screen (pos.universal), which adapts to
+        // restaurant mode via company feature settings. Carry table_id through so a table
+        // tap still opens the order on the universal screen with that table selected.
+        return redirect()->route('pos.invoice.create', $request->only('table_id'));
+
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
@@ -1116,7 +1122,7 @@ class RestaurantPosController extends Controller
 
         $user = auth('pos')->user();
         if ($user && $user->pos_role !== 'pos_admin' && $user->role !== 'company_admin') {
-            return redirect('/pos/restaurant/pos');
+            return redirect('/pos/invoice/create');
         }
 
         $today = now()->startOfDay();

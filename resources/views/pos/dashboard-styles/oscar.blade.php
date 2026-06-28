@@ -77,7 +77,7 @@
     <div class="flex flex-wrap gap-2 os-anim os-d2">
         @if($isRestaurant)
         @php $navItems = [
-            ['route' => 'pos.restaurant.pos', 'label' => '📱 POS Screen', 'primary' => true],
+            ['route' => 'pos.invoice.create', 'label' => '📱 POS Screen', 'primary' => true],
             ['route' => 'pos.transactions', 'label' => '📋 Orders'],
             ['route' => 'pos.restaurant.tables', 'label' => '🪑 Tables'],
             ['route' => 'pos.restaurant.kds', 'label' => '👨‍🍳 Kitchen'],

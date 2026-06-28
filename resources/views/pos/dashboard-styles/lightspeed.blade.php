@@ -46,7 +46,7 @@
 
     @if($isRestaurant)
     <div class="grid grid-cols-3 lg:grid-cols-6 gap-3 ls-anim ls-d2">
-        <a href="{{ route('pos.restaurant.pos') }}" class="ls-tile bg-gradient-to-br from-violet-500 to-purple-700 shadow-xl shadow-purple-500/20">
+        <a href="{{ route('pos.invoice.create') }}" class="ls-tile bg-gradient-to-br from-violet-500 to-purple-700 shadow-xl shadow-purple-500/20">
             <div class="relative z-10">
                 <div class="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center mb-3"><svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg></div>
                 <p class="text-sm font-black text-white">POS</p>

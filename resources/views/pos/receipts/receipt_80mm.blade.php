@@ -287,17 +287,19 @@
             'total' => number_format($transaction->total_amount, 2),
             'business' => $transaction->company->name ?? 'NestPOS',
         ]);
-        $qrUrl = 'https://chart.googleapis.com/chart?cht=qr&chs=150x150&chl=' . urlencode($qrData);
+        $qrUrl = \App\Support\QrImage::dataUri($qrData);
     @endphp
     <div class="local-badge" style="border: 2px dashed #000; color: #000; padding: 8px; font-weight: 700;">
         <strong style="font-size: 12px; color: #000;">PROVISIONAL BILL</strong><br>
         <span style="font-weight: bold;">{{ $transaction->invoice_number }}</span><br>
         <span style="font-size: 10px; color: #000; font-weight: 600;">This is a provisional bill for your reference</span>
     </div>
+    @if($qrUrl)
     <div class="qr-code">
         <img src="{{ $qrUrl }}" alt="Invoice QR" style="width: 100px; height: 100px; margin: 4px auto;">
         <p style="font-size: 10px; color: #000; font-weight: 600;">Scan for invoice details</p>
     </div>
+    @endif
     @endif
 
     <div class="footer text-center">

@@ -55,8 +55,24 @@ return Application::configure(basePath: dirname(__DIR__))
                 };
             }
 
+            $message = "{$modelName} not found or has been deleted.";
+            $path = $request->path();
+
+            // Keep each panel isolated — a POS / FBR-POS / admin not-found must never
+            // dump the user onto the Digital Invoice dashboard (cross-panel leak when
+            // multiple guards share one session). Redirect within the active panel.
+            if (str_starts_with($path, 'pos/') || $path === 'pos') {
+                return redirect(auth('pos')->check() ? '/pos/dashboard' : '/pos/login')->with('error', $message);
+            }
+            if (str_starts_with($path, 'fbr-pos/') || $path === 'fbr-pos') {
+                return redirect(auth('fbrpos')->check() ? '/fbr-pos/dashboard' : '/fbr-pos/login')->with('error', $message);
+            }
+            if (str_starts_with($path, 'admin/') || $path === 'admin') {
+                return redirect(auth('admin')->check() ? '/admin/dashboard' : '/admin/login')->with('error', $message);
+            }
+
             $redirectTo = auth()->check() ? '/dashboard' : '/';
-            return redirect($redirectTo)->with('error', "{$modelName} not found or has been deleted.");
+            return redirect($redirectTo)->with('error', $message);
         });
 
         $exceptions->renderable(function (MethodNotAllowedHttpException $e, $request) {

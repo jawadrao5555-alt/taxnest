@@ -157,3 +157,12 @@ qty box is focused, `x-effect` skips model→input sync, so +/- must write `e.ta
 after `updateQty`; (2) `removeFromCart` splices after a 250ms exit animation, so refocus the next
 row via `setTimeout(…, 280)`, not an immediate `$nextTick`. Also point EVERY enter-cart path at
 `enterCartMode()` (the F6 keydown branch had its own inline blurred copy) so qty focus is consistent.
+
+## E2E-VERIFIED working in dev — recurring "still not right" = DEPLOY GAP, not a code bug
+Playwright drove the full inventory-OFF chain on company 11 and confirmed every focus hop:
+load→customer box focused; Enter→product search; type name+Enter→inline price box focused, 1 cart row;
+type price+Enter→focus RETURNS to product search (does NOT jump to cart); 2nd item→2 rows; empty-search
+Enter→cart qty input; Enter→Pay modal (Cash/Card, TOTAL shown). So the chain is correct in current code.
+**Rule:** if the owner again reports the guided flow "jumps direct to cart" / "still not right," first suspect
+a DEPLOY GAP (live behind origin/main) per deploy-fix-but-stale-cache.md — re-confirm with the e2e drive
+before touching code. Do NOT re-investigate by reading; reading already looked correct every prior round.

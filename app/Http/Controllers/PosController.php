@@ -1474,11 +1474,16 @@ class PosController extends Controller
             $itemLines += max(1, (int) ceil($len / max(1, $charsPerLine)));
         }
 
-        $height  = 470.0;                                          // header + info + totals + footer chrome
+        $height  = 490.0;                                          // header + info + totals + footer chrome (+ header-field wrap headroom)
         $height += ($company && $company->logo_path) ? 70.0 : 0.0; // logo block
         $height += $itemLines * $perLine;                          // item rows
         $height += ($transaction->discount_amount > 0) ? 26.0 : 0.0;
-        $height += !empty($transaction->notes) ? 60.0 : 0.0;
+        // Notes wrap to several lines on a narrow thermal roll — scale by length, never assume one line.
+        if (!empty($transaction->notes)) {
+            $noteCharsPerLine = $printerSize === '58mm' ? 28 : 40;
+            $noteLines = max(1, (int) ceil(mb_strlen((string) $transaction->notes) / $noteCharsPerLine));
+            $height += 20.0 + ($noteLines * 14.0);
+        }
         $height += 250.0;                                          // PRA/provisional badge + 100px QR + caption
         $height += 80.0;                                           // safety tail so nothing clips
 

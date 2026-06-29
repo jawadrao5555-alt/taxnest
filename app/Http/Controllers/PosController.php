@@ -1454,6 +1454,37 @@ class PosController extends Controller
         return view($receiptView, compact('transaction', 'company'));
     }
 
+    /**
+     * Estimate the page height (in points) for a thermal receipt PDF.
+     *
+     * DomPDF ignores the receipt CSS `@page { size: 80mm auto }`, so we MUST pass an
+     * explicit height to setPaper(). The old hard-coded 1200pt truncated any receipt
+     * taller than that — the cashier reported the downloaded slip "poori nahi hoti"
+     * (cut off). We size the page to its content and over-estimate slightly: trailing
+     * whitespace on a thermal roll is harmless, a clipped receipt is not.
+     */
+    private function estimateReceiptHeightPt($transaction, $company, string $printerSize): float
+    {
+        $charsPerLine = $printerSize === '58mm' ? 12 : 18; // monospace chars fitting the Item column
+        $perLine = 22.0;                                    // pt consumed per (wrapped) item line
+
+        $itemLines = 0;
+        foreach ($transaction->items as $it) {
+            $len = mb_strlen((string) ($it->item_name ?? ''));
+            $itemLines += max(1, (int) ceil($len / max(1, $charsPerLine)));
+        }
+
+        $height  = 470.0;                                          // header + info + totals + footer chrome
+        $height += ($company && $company->logo_path) ? 70.0 : 0.0; // logo block
+        $height += $itemLines * $perLine;                          // item rows
+        $height += ($transaction->discount_amount > 0) ? 26.0 : 0.0;
+        $height += !empty($transaction->notes) ? 60.0 : 0.0;
+        $height += 250.0;                                          // PRA/provisional badge + 100px QR + caption
+        $height += 80.0;                                           // safety tail so nothing clips
+
+        return max(640.0, $height);
+    }
+
     public function downloadInvoicePdf($id)
     {
         $companyId = app('currentCompanyId');
@@ -1473,7 +1504,7 @@ class PosController extends Controller
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($receiptView, compact('transaction', 'company'))
             ->setOption('isRemoteEnabled', true)
             ->setOption('isHtml5ParserEnabled', true);
-        $pdf->setPaper([0, 0, $paperWidthPt, 1200], 'portrait');
+        $pdf->setPaper([0, 0, $paperWidthPt, $this->estimateReceiptHeightPt($transaction, $company, $printerSize)], 'portrait');
 
         return $pdf->download("Invoice-{$transaction->invoice_number}.pdf");
     }
@@ -1524,7 +1555,7 @@ class PosController extends Controller
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($receiptView, compact('transaction', 'company'))
             ->setOption('isRemoteEnabled', true)
             ->setOption('isHtml5ParserEnabled', true);
-        $pdf->setPaper([0, 0, $paperWidthPt, 1200], 'portrait');
+        $pdf->setPaper([0, 0, $paperWidthPt, $this->estimateReceiptHeightPt($transaction, $company, $printerSize)], 'portrait');
 
         return $pdf->stream("Invoice-{$transaction->invoice_number}.pdf");
     }

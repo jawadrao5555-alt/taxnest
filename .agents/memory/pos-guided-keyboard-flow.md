@@ -77,20 +77,26 @@ alpine-xfor-refs-scope.md), scheduled on `$nextTick` + `setTimeout(0)`/`setTimeo
 to beat the x-if teardown blur. The @blur handler passes false so clicking away never
 steals focus. Always test the inventory-OFF chain end to end, not just inventory-ON.
 
-## RESTAURANT guided flow has an extra ORDER-TYPE step (universal does NOT)
+## Guided flow ORDER-TYPE step — restaurant UNCONDITIONAL, universal FEATURE-GATED
 
-The restaurant register's guided chain is customer → items → **type** → cart → finish —
-one more step than universal's customer → items → cart → finish. The owner explicitly
-specified it: after adding items, pressing Enter on an EMPTY search box (cart non-empty)
-must open an order-TYPE picker (dine in / takeaway / delivery), arrow-navigable, and Enter
-on the chosen type drops into the cart. This is the "double Enter": empty-search Enter to
-leave items → type, then Enter on the type → cart.
+BOTH registers now have the order-type step (customer → items → **type** → cart → finish).
+Empty-search Enter (cart non-empty) opens an arrow-navigable order-TYPE picker; Enter on the
+chosen type drops into the cart ("double Enter": empty-search Enter leaves items → type, then
+Enter on the type → cart).
 
-**Why:** the first port copied universal verbatim, so empty-search Enter went straight to
-cart mode and skipped the type step — the owner reported "flow tum bhol gaye, maine kuch aur
-bataya tha." Restaurants need the order type before billing; universal (retail) has no order
-type, so it legitimately has no such step. Do NOT "simplify" the restaurant flow back to the
-universal 4-step shape.
+- **Restaurant** (`pos/restaurant/pos.blade.php`): UNCONDITIONAL 3 types (dine in / takeaway /
+  delivery). Owner explicitly required it; do NOT "simplify" it back to a 4-step shape.
+- **Universal** (`pos/universal.blade.php`): FEATURE-GATED. A @php block builds `$guidedTypes`
+  from PosFeatureService flags — dine_in only if `$features->tables`, takeaway always, delivery
+  only if `$features->delivery` — and `$hasTypeStep = count > 1`. The whole step (overlay,
+  coach-strip "Type", handleKey block) exists only when 2+ types; single-type retail takes the
+  original straight-to-cart path and is byte-identical. JS mirror: `guidedOrderTypes().length > 1`.
+  E.g. company 11 (pharmacy, delivery ON, tables OFF) = Takeaway + Delivery (no Dine In until
+  Tables enabled). Feature resolution uses `business_category`/`restaurant_mode` + `feature_flags`
+  JSON override, NOT `pos_type`.
+
+**Why:** universal used to have NO type step; it was added feature-gated so retail with one type
+is unaffected while delivery/restaurant-style companies get the picker.
 
 **How to apply:** the type step is a capturing state, NOT a step-strip-only indicator. Its
 handler lives in `handleKey` placed right AFTER the `showManagerPinModal` capture block (so
@@ -101,6 +107,14 @@ empty-search→type transition on `cart.length > 0` (can't bill empty). Do NOT a
 table picker when "dine in" is chosen — owner's spec is type → cart directly; table stays an
 independent optional action. The overlay + all of this is gated on `guidedFlow`, so plain
 mode is byte-identical.
+
+**Universal placement specifics:** the type block sits at the VERY TOP of `handleKey` (before the
+global F-key hotkeys) so it fully owns the keyboard while active. Its Enter-confirm MUST carry
+`!e.repeat` (`if (e.key === 'Enter' && !e.repeat)`) — otherwise a HELD Enter on the empty search
+box opens the step (first keydown, `.prevent.stop`), `enterTypeStep()` blurs the input, and the
+auto-repeat keydowns land on the document handler and instantly `confirmGuidedType()`, silently
+SKIPPING the owner's step. The search input's Enter is `.prevent.stop` (see the double-fire section
+below).
 
 ## The OPENING side has the same x-for-refs trap — fix BOTH ends
 

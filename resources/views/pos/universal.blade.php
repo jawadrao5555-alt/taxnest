@@ -276,7 +276,7 @@ window.addEventListener('popstate', function() {
                 <svg x-show="i < {{ $hasTypeStep ? 4 : 3 }}" class="w-3 h-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
             </div>
         </template>
-        <span class="ml-2 text-[10px] font-medium text-gray-500 dark:text-gray-400 hidden md:inline">Enter = add / next · empty Enter = @if($hasTypeStep)type → @endifcart · P = provisional</span>
+        <span class="ml-2 text-[10px] font-medium text-gray-500 dark:text-gray-400 hidden md:inline">Enter = add / next · empty Enter = @if($hasTypeStep)type → @endif cart · P = provisional</span>
     </div>
 
     {{-- ═══════════ GUIDED FLOW: ORDER-TYPE STEP (opt-in) ═══════════ --}}
@@ -3049,7 +3049,7 @@ function restaurantPos() {
                 if (e.key === '1' && tlen >= 1) { e.preventDefault(); this.flowTypeIndex = 0; return; }
                 if (e.key === '2' && tlen >= 2) { e.preventDefault(); this.flowTypeIndex = 1; return; }
                 if (e.key === '3' && tlen >= 3) { e.preventDefault(); this.flowTypeIndex = 2; return; }
-                if (e.key === 'Enter') { e.preventDefault(); this.confirmGuidedType(); return; }
+                if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); this.confirmGuidedType(); return; }
                 if (e.key === 'Escape') { e.preventDefault(); this.flowStep = 'items'; this.enterSearchMode(); return; }
                 if (/^F\d+$/.test(e.key) || ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'e'))) { e.preventDefault(); }
                 return;

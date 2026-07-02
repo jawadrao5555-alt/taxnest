@@ -31,3 +31,11 @@ pre-compiled CSS.
 `npm run build` (node/npm + node_modules are available in dev). `view:clear && view:cache`
 alone is NOT enough — that only recompiles Blade→PHP, not the CSS. Verify with a fresh
 app-preview screenshot, not just an HTML grep.
+
+**Related trap — undefined custom colors:** classes like `text-saffron` / `bg-saffron/20`
+silently emit NO CSS even after a rebuild if the color isn't in `tailwind.config.js`
+theme colors (a `--saffron` CSS variable in `:root` does NOT make Tailwind utilities
+work). No build error, no warning — elements just render unstyled (e.g. black star
+icons, invisible blobs). After any design-subagent rewrite, grep the BUILT css
+(`grep -c <token> public/build/assets/app-*.css`) for novel color names; replace with
+standard palette utilities (amber-400 etc.) or extend the config, then rebuild.

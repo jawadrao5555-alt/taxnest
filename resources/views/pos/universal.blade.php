@@ -376,7 +376,7 @@ window.addEventListener('popstate', function() {
 
         <div class="flex-1 relative">
             <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input type="search" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent.stop="addHighlightedItem()" @keydown.tab="if(!searchQuery && cart.length > 0){ $event.preventDefault(); enterCartMode('last'); }" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="Search products... (type to filter, Enter to add, Tab → cart)" class="search-glow w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition shadow-sm" autocomplete="one-time-code" name="pos_product_search_nofill" data-lpignore="true" data-form-type="other" role="combobox">
+            <input type="search" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent.stop="addHighlightedItem($event)" @keydown.tab="if(flowStep === 'type'){ $event.preventDefault(); } else if(!searchQuery && cart.length > 0){ $event.preventDefault(); enterCartMode('last'); }" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="Search products... (type to filter, Enter to add, Tab → cart)" class="search-glow w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition shadow-sm" autocomplete="one-time-code" name="pos_product_search_nofill" data-lpignore="true" data-form-type="other" role="combobox">
             <kbd x-show="!searchQuery" class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 font-mono">Ctrl+S</kbd>
             <button x-show="searchQuery" @click="searchQuery = ''; showSearchDropdown = false; filterProducts(); $refs.searchInput.focus()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -2381,7 +2381,15 @@ function restaurantPos() {
                 }
             });
         },
-        addHighlightedItem() {
+        addHighlightedItem(e) {
+            // GUIDED FLOW: if the Order-Type overlay is ALREADY open but focus somehow
+            // returned to the search box (e.g. quick-price's delayed refocus fires after
+            // enterTypeStep's blur), the input's Enter (.prevent.stop) must CONFIRM the
+            // highlighted type — never re-enter/re-seed the step. Without this the cashier
+            // is stuck: arrows bubble to handleKey and move the highlight, but every Enter
+            // re-seeds the highlight back to the current orderType and never confirms.
+            // !e?.repeat mirrors the document-path held-Enter guard in handleKey.
+            if (this.guidedFlow && this.flowStep === 'type') { if (!e?.repeat) this.confirmGuidedType(); return; }
             if (this.showSearchDropdown && this.searchSuggestions.length > 0) { this.quickAddItem(this.searchSuggestions[this.highlightIndex]); return; }
             // No catalog match: in SIMPLE (inventory-OFF) mode, Enter creates the typed item on the fly.
             if (!this.isInventoryEnabled() && this.searchQuery.trim().length > 0 && !this.quickCreating) { this.quickCreateProduct(); return; }
@@ -2879,6 +2887,9 @@ function restaurantPos() {
             //     our focus wins that teardown race.
             if (refocusSearch && this.guidedFlow) {
                 const refocusSearchBox = () => {
+                    // Never steal focus while the Order-Type overlay is open — a delayed
+                    // refocus landing under the overlay traps Enter inside the search box.
+                    if (this.flowStep === 'type') return;
                     const el = document.querySelector('input[name="pos_product_search_nofill"]');
                     if (el) el.focus();
                 };

@@ -217,6 +217,39 @@
                     </div>
                 </div>
 
+                {{-- SALES TAX RATES (PRA) --}}
+                <div class="mt-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-lg">🧾</span>
+                        <h3 class="text-sm font-extrabold text-gray-900 dark:text-white">Sales Tax Rates (PRA)</h3>
+                    </div>
+                    <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug mb-3">
+                        Set your company's tax rates for POS billing. Leave a field blank to use the system default.
+                        Current defaults: <strong>{{ rtrim(rtrim(number_format($globalTaxRates['cash'], 2, '.', ''), '0'), '.') }}%</strong> cash,
+                        <strong>{{ rtrim(rtrim(number_format($globalTaxRates['card'], 2, '.', ''), '0'), '.') }}%</strong> card / digital payments.
+                    </p>
+                    <div class="grid sm:grid-cols-2 gap-2.5">
+                        <label class="block p-3 rounded-xl border-2 border-gray-200 dark:border-gray-700">
+                            <div class="text-sm font-bold text-gray-900 dark:text-white mb-0.5">💵 Cash Rate (%)</div>
+                            <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug mb-2">Applied when the customer pays by cash.</p>
+                            <input type="number" name="pos_tax_rate_cash" step="0.01" min="0" max="100" inputmode="decimal"
+                                value="{{ $company->pos_tax_rate_cash !== null ? rtrim(rtrim(number_format((float) $company->pos_tax_rate_cash, 2, '.', ''), '0'), '.') : '' }}"
+                                placeholder="Default: {{ rtrim(rtrim(number_format($globalTaxRates['cash'], 2, '.', ''), '0'), '.') }}"
+                                autocomplete="off" data-lpignore="true"
+                                class="w-full px-3 py-2 text-sm font-bold rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                        </label>
+                        <label class="block p-3 rounded-xl border-2 border-gray-200 dark:border-gray-700">
+                            <div class="text-sm font-bold text-gray-900 dark:text-white mb-0.5">💳 Card / Digital Rate (%)</div>
+                            <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug mb-2">Applied to debit/credit card, QR and other digital-channel payments.</p>
+                            <input type="number" name="pos_tax_rate_card" step="0.01" min="0" max="100" inputmode="decimal"
+                                value="{{ $company->pos_tax_rate_card !== null ? rtrim(rtrim(number_format((float) $company->pos_tax_rate_card, 2, '.', ''), '0'), '.') : '' }}"
+                                placeholder="Default: {{ rtrim(rtrim(number_format($globalTaxRates['card'], 2, '.', ''), '0'), '.') }}"
+                                autocomplete="off" data-lpignore="true"
+                                class="w-full px-3 py-2 text-sm font-bold rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                        </label>
+                    </div>
+                </div>
+
                 <div class="mt-4 flex items-center justify-between">
                     <button type="button" @click="back()" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>

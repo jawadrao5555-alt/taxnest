@@ -584,7 +584,7 @@ window.addEventListener('popstate', function() {
                     <svg x-show="submitting" class="w-8 h-8 mx-auto text-blue-600 mb-1 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                     <svg x-show="!submitting" class="w-8 h-8 mx-auto text-blue-600 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                     <span class="text-sm font-bold text-blue-700 dark:text-blue-400" x-text="submitting ? 'Processing...' : 'Card'"></span>
-                    <span class="block text-[10px] font-semibold text-blue-600/60 mt-0.5" x-text="'Tax: ' + (taxRules['debit_card'] || taxRules['card'] || 5) + '%'"></span>
+                    <span class="block text-[10px] font-semibold text-blue-600/60 mt-0.5" x-text="'Tax: ' + (taxRules['debit_card'] || taxRules['card'] || 8) + '%'"></span>
                     <kbd x-show="!submitting" class="block mt-0.5 text-[9px] text-blue-500/60 font-mono">Press 2</kbd>
                 </button>
             </div>

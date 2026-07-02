@@ -267,7 +267,7 @@ class PosController extends Controller
         $products = PosProduct::where('company_id', $companyId)->where('is_active', true)->get();
         $services = PosService::where('company_id', $companyId)->where('is_active', true)->get();
         $posCustomers = PosCustomer::where('company_id', $companyId)->where('is_active', true)->orderBy('name')->get();
-        $taxRules = PosTaxRule::where('is_active', true)->get()->keyBy('payment_method');
+        $taxRules = PosTaxRule::effectiveRules($company);
         $terminals = PosTerminal::where('company_id', $companyId)->where('is_active', true)->get();
 
         $draftInvoice = null;
@@ -378,8 +378,8 @@ class PosController extends Controller
         }
 
         $customers = PosCustomer::where('company_id', $companyId)->orderBy('name')->get();
-        $taxRate = PosTaxRule::getRateForMethod('cash');
-        $taxRules = PosTaxRule::where('is_active', true)->get()->keyBy('payment_method');
+        $taxRate = PosTaxRule::getRateForMethod('cash', $company);
+        $taxRules = PosTaxRule::effectiveRules($company);
         // Inventory master switch governs ALL stock behavior. When OFF:
         //   - block_out_of_stock is FORCED false (cannot block adds based on stock)
         //   - lowStockAlerts is empty (popup cannot open)
@@ -437,7 +437,12 @@ class PosController extends Controller
         $allFlags = PosFeatureService::ALL_FLAGS;
         // First-time setup → wizard shows welcome banner + opens on Step 1.
         $isFirstTime = $request->boolean('welcome') || !($company->pos_setup_completed ?? false);
-        return view('pos.feature-settings', compact('company', 'features', 'categories', 'allFlags', 'isFirstTime'));
+        // Global defaults shown as placeholders in the Sales Tax Rates card.
+        $globalTaxRates = [
+            'cash' => PosTaxRule::getRateForMethod('cash'),
+            'card' => PosTaxRule::getRateForMethod('debit_card'),
+        ];
+        return view('pos.feature-settings', compact('company', 'features', 'categories', 'allFlags', 'isFirstTime', 'globalTaxRates'));
     }
 
     public function updateFeatureSettings(Request $request)
@@ -456,6 +461,8 @@ class PosController extends Controller
             'use_universal_pos' => 'nullable|boolean',
             'pos_ui_density'    => 'nullable|in:simple,standard,premium',
             'feature_flags'     => 'nullable|array',
+            'pos_tax_rate_cash' => 'nullable|numeric|min:0|max:100',
+            'pos_tax_rate_card' => 'nullable|numeric|min:0|max:100',
         ]);
 
         $flags = [];
@@ -476,6 +483,9 @@ class PosController extends Controller
             'auto_print_kot'       => (bool) $request->input('auto_print_kot', false),
             'kot_reprint_enabled'  => (bool) $request->input('kot_reprint_enabled', false),
             'pos_guided_flow_enabled' => (bool) $request->input('pos_guided_flow_enabled', false),
+            // Manual PRA tax-rate overrides — blank clears back to the global default.
+            'pos_tax_rate_cash' => $request->filled('pos_tax_rate_cash') ? round((float) $request->input('pos_tax_rate_cash'), 2) : null,
+            'pos_tax_rate_card' => $request->filled('pos_tax_rate_card') ? round((float) $request->input('pos_tax_rate_card'), 2) : null,
             // Finishing the wizard marks setup complete so it never auto-launches again.
             'pos_setup_completed'  => true,
         ]);
@@ -561,7 +571,7 @@ class PosController extends Controller
         $taxableAfterDiscount = $subtotal > 0 ? round($taxableSubtotal / $subtotal * $afterDiscount, 2) : 0;
         $exemptAfterDiscount = round($afterDiscount - $taxableAfterDiscount, 2);
 
-        $taxRate = PosTaxRule::getRateForMethod($request->payment_method);
+        $taxRate = PosTaxRule::getRateForMethod($request->payment_method, $company);
         // Round tax to nearest whole rupee — matches frontend Math.round(taxAmount).
         // Pakistan POS convention: tax + bill always whole rupees, no paisa.
         $taxAmount = (float) round($taxableAfterDiscount * $taxRate / 100);
@@ -770,7 +780,7 @@ class PosController extends Controller
         $products = PosProduct::where('company_id', $companyId)->where('is_active', true)->where('show_on_sale', true)->get();
         $services = PosService::where('company_id', $companyId)->where('is_active', true)->get();
         $posCustomers = PosCustomer::where('company_id', $companyId)->where('is_active', true)->orderBy('name')->get();
-        $taxRules = PosTaxRule::where('is_active', true)->get()->keyBy('payment_method');
+        $taxRules = PosTaxRule::effectiveRules($company);
         $terminals = PosTerminal::where('company_id', $companyId)->where('is_active', true)->get();
 
         $transactionItems = $transaction->items->map(fn($item) => [
@@ -838,7 +848,7 @@ class PosController extends Controller
         $taxableAfterDiscount = $subtotal > 0 ? round($taxableSubtotal / $subtotal * $afterDiscount, 2) : 0;
         $exemptAfterDiscount = round($afterDiscount - $taxableAfterDiscount, 2);
 
-        $taxRate = PosTaxRule::getRateForMethod($request->payment_method);
+        $taxRate = PosTaxRule::getRateForMethod($request->payment_method, $company);
         // Round tax to nearest whole rupee — matches frontend Math.round(taxAmount).
         // Pakistan POS convention: tax + bill always whole rupees, no paisa.
         $taxAmount = (float) round($taxableAfterDiscount * $taxRate / 100);
@@ -2172,7 +2182,8 @@ class PosController extends Controller
     public function getTaxRate(Request $request)
     {
         $method = $request->payment_method ?? 'cash';
-        $rate = PosTaxRule::getRateForMethod($method);
+        $company = Company::find(app('currentCompanyId'));
+        $rate = PosTaxRule::getRateForMethod($method, $company);
         return response()->json(['tax_rate' => $rate]);
     }
 

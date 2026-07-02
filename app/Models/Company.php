@@ -65,6 +65,8 @@ class Company extends Model
         'kot_reprint_enabled',
         'pos_receipt_show_tax',
         'pos_guided_flow_enabled',
+        'pos_tax_rate_cash',
+        'pos_tax_rate_card',
         'pos_setup_completed',
         'pos_use_legacy_restaurant',
         'pra_environment',

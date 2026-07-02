@@ -76,8 +76,8 @@ class RestaurantPosController extends Controller
 
         $customers = PosCustomer::where('company_id', $companyId)->orderBy('name')->get();
 
-        $taxRate = PosTaxRule::getRateForMethod('cash');
-        $taxRules = PosTaxRule::where('is_active', true)->get()->keyBy('payment_method');
+        $taxRate = PosTaxRule::getRateForMethod('cash', $company);
+        $taxRules = PosTaxRule::effectiveRules($company);
 
         // Inventory master switch — when company has inventory_enabled = false, suppress
         // ALL stock indicators (OUT/LOW dots, low-stock popup, block_out_of_stock).
@@ -321,7 +321,7 @@ class RestaurantPosController extends Controller
         $discountRatio = $subtotal > 0 ? ($subtotal - $discountAmount) / $subtotal : 1;
         $adjustedTaxable = round($taxableSubtotal * $discountRatio, 2);
 
-        $taxRate = PosTaxRule::getRateForMethod('cash');
+        $taxRate = PosTaxRule::getRateForMethod('cash', $company);
         $taxAmount = round($adjustedTaxable * $taxRate / 100, 2);
         $totalAmount = round($subtotal - $discountAmount + $taxAmount, 2);
 
@@ -510,7 +510,7 @@ class RestaurantPosController extends Controller
         }
 
         $paymentMethod = $request->input('payment_method', 'cash');
-        $taxRate = PosTaxRule::getRateForMethod($paymentMethod);
+        $taxRate = PosTaxRule::getRateForMethod($paymentMethod, $company);
 
         $subtotal = $order->items->sum('subtotal');
         $discountAmount = (float)($order->discount_amount ?? 0);

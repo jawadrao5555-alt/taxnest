@@ -26,6 +26,16 @@ Always confirm the binding key before reading from the container.
 **How to apply:** Admin routes do NOT run CompanyIsolation, so `currentCompanyId` is
 unbound there (intended — admins are cross-tenant); guard with `bound()` first.
 
+**isset-null container trap:** `app()->instance('key', null)` SILENTLY does nothing —
+Container instances/bound() use `isset()`, so a null instance is invisible and
+`app('key')` still throws `Target class [key] does not exist`. To bind a null value,
+use `app()->bind('key', fn() => null)` (bindings array entry is non-null, so isset works).
+CompanyIsolation now binds `currentCompanyId => null` this way for web-guard super_admins
+without a company_id, so `CheckCompanyApproval` and friends no longer 500 on
+/dashboard, /tax-overrides etc. Same latent pattern exists in BranchContextService
+(`instance('currentBranchId', ...)`) — harmless today because all consumers guard with
+`bound()`, but use closure bind if touching it.
+
 **Write-path fallback order:** when the key is unbound and you must pick a company from
 auth guards (shared controller serving DI/PRA POS/FBR POS), loop in order
 `pos → fbrpos → web`. All guards share one Laravel session, so keep server-side

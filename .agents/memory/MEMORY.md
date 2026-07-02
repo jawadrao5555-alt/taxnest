@@ -8,7 +8,7 @@
 - [Vite arbitrary Tailwind classes](vite-arbitrary-classes.md) — new Blade components with arbitrary classes (bg-[#hex], z-[60]) render invisible until `npm run build`; view:cache is not enough.
 - [Blade @php use ParseError](blade-php-use-parse-error.md) — `use X;` inside @php 500s at RUNTIME; view:cache reports OK (only writes, never parses); fully-qualify the class or @use; php -l the COMPILED view to prove it.
 - [Blade directive glue](blade-directive-glue.md) — `@endif` glued to a letter (`@endifcart`) is NOT recognized → unclosed @if → compiled view fails php -l "EOF expecting endif"; add a space; grep -oE @if vs @endif to spot.
-- [Company-id container binding](company-id-container-binding.md) — company id bound under 'currentCompanyId', NOT 'n'/'ln'; 'n' is read in places but never bound (always falls back); unbound on admin routes.
+- [Company-id container binding](company-id-container-binding.md) — bound under 'currentCompanyId', NOT 'n'/'ln'; instance('key', null) silently no-ops (isset) — bind a closure for null; unbound on admin routes.
 - [PROD scheduled jobs need cron](prod-scheduled-jobs-cron.md) — Schedule:: entries (trial reminders/expiry, FBR token, POS sync) never run on owner's cPanel PROD unless a `schedule:run` cron exists.
 - [Top banners outside scrollable main](top-banner-clipping.md) — full-width top notification banners get clipped/inert inside main.overflow-y-auto with negative margins; place before <main> like the pending/suspended notices.
 - [cPanel deployment runbook](cpanel-deployment.md) — LIVE site = /home/taxnestc/public_html (served from public/); PHP=/usr/local/bin/ea-php84; pull→migrate --force→cache; cron via UI; 3 decoy duplicate copies to ignore.

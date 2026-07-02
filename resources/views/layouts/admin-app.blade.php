@@ -175,8 +175,8 @@
             <div class="admin-sidebar-border border-t px-4 py-3">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-sm font-medium text-gray-300">{{ auth('admin')->user()->name }}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ auth('admin')->user()->email }}</p>
+                        <p class="text-sm font-medium text-gray-300">{{ auth('admin')->user()->name ?? auth()->user()->name ?? 'Admin' }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ auth('admin')->user()->email ?? auth()->user()->email ?? '' }}</p>
                     </div>
                     <form method="POST" action="{{ route('admin.logout') }}">
                         @csrf

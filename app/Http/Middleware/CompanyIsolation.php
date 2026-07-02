@@ -25,6 +25,8 @@ class CompanyIsolation
                     app()->bind('currentBranchId', fn() => $branchId);
                     view()->share('currentBranchId', $branchId);
                     view()->share('currentBranch', $branchId ? \App\Models\Branch::find($branchId) : null);
+                } else {
+                    app()->bind('currentCompanyId', fn() => null);
                 }
                 return $next($request);
             }

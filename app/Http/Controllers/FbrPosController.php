@@ -1462,6 +1462,7 @@ class FbrPosController extends Controller
         $lastInvoice = FbrPosTransaction::where('company_id', $companyId)
             ->where('invoice_number', 'like', "{$prefix}%")
             ->orderByDesc('id')
+            ->lockForUpdate()
             ->value('invoice_number');
 
         if ($lastInvoice) {
@@ -1482,6 +1483,7 @@ class FbrPosController extends Controller
         $lastInvoice = FbrPosTransaction::where('company_id', $companyId)
             ->where('invoice_number', 'like', "{$prefix}%")
             ->orderByDesc('id')
+            ->lockForUpdate()
             ->value('invoice_number');
 
         if ($lastInvoice) {

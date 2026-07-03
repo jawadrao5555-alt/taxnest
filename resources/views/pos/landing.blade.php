@@ -134,20 +134,20 @@
                     </a>
                 </div>
 
-                <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-                    <a href="#features" class="text-sm font-medium text-gray-500 hover:text-purple-600 transition">Features</a>
-                    <a href="#pricing" class="text-sm font-medium text-gray-500 hover:text-purple-600 transition">Pricing</a>
-                    <a href="#how-it-works" class="text-sm font-medium text-gray-500 hover:text-purple-600 transition">How It Works</a>
-                    <a href="/digital-invoice" class="group flex items-center space-x-1.5 text-sm font-semibold text-emerald-600 hover:text-emerald-700 transition">
+                <div class="flex flex-wrap items-center gap-x-1 sm:gap-x-3 gap-y-1">
+                    <a href="#features" class="px-2 py-1.5 rounded-lg whitespace-nowrap text-[11px] sm:text-sm font-medium text-gray-500 hover:text-purple-600 transition">Features</a>
+                    <a href="#pricing" class="px-2 py-1.5 rounded-lg whitespace-nowrap text-[11px] sm:text-sm font-medium text-gray-500 hover:text-purple-600 transition">Pricing</a>
+                    <a href="#how-it-works" class="px-2 py-1.5 rounded-lg whitespace-nowrap text-[11px] sm:text-sm font-medium text-gray-500 hover:text-purple-600 transition">How It Works</a>
+                    <a href="/digital-invoice" class="group flex items-center space-x-1.5 px-2 py-1.5 rounded-lg whitespace-nowrap text-[11px] sm:text-sm font-semibold text-emerald-600 hover:text-emerald-700 transition">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                         <span>Digital Invoice</span>
                     </a>
-                    <a href="/fbr-pos-landing" class="group flex items-center space-x-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700 transition">
+                    <a href="/fbr-pos-landing" class="group flex items-center space-x-1.5 px-2 py-1.5 rounded-lg whitespace-nowrap text-[11px] sm:text-sm font-semibold text-blue-600 hover:text-blue-700 transition">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                         <span>FBR POS</span>
                     </a>
-                    <button @click="showLoginModal = true" class="text-sm font-semibold text-gray-700 hover:text-gray-900 transition">Log in</button>
-                    <a href="/pos/register" class="inline-flex items-center px-5 py-2 bg-gradient-to-r from-purple-500 to-purple-700 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition shadow-md">POS Sign Up</a>
+                    <button @click="showLoginModal = true" class="px-3 py-1.5 rounded-lg whitespace-nowrap text-[11px] sm:text-sm font-semibold text-gray-700 hover:text-gray-900 transition">Log in</button>
+                    <a href="/pos/register" class="inline-flex items-center px-4 sm:px-5 py-2 bg-gradient-to-r from-purple-500 to-purple-700 text-white rounded-xl whitespace-nowrap text-xs sm:text-sm font-semibold hover:shadow-lg transition shadow-md">POS Sign Up</a>
                 </div>
             </div>
         </div>

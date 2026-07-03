@@ -1571,7 +1571,7 @@ class PosController extends Controller
         $receiptView = $printerSize === '58mm' ? 'pos.receipts.receipt_58mm' : 'pos.receipts.receipt_80mm';
         $paperWidthPt = $printerSize === '58mm' ? 164.41 : 226.77;
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($receiptView, compact('transaction', 'company'))
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($receiptView, ['transaction' => $transaction, 'company' => $company, 'pdfMode' => true])
             ->setOption('isRemoteEnabled', true)
             ->setOption('isHtml5ParserEnabled', true);
         $pdf->setPaper([0, 0, $paperWidthPt, $this->estimateReceiptHeightPt($transaction, $company, $printerSize)], 'portrait');
@@ -1622,7 +1622,7 @@ class PosController extends Controller
         $receiptView = $printerSize === '58mm' ? 'pos.receipts.receipt_58mm' : 'pos.receipts.receipt_80mm';
         $paperWidthPt = $printerSize === '58mm' ? 164.41 : 226.77;
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($receiptView, compact('transaction', 'company'))
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($receiptView, ['transaction' => $transaction, 'company' => $company, 'pdfMode' => true])
             ->setOption('isRemoteEnabled', true)
             ->setOption('isHtml5ParserEnabled', true);
         $pdf->setPaper([0, 0, $paperWidthPt, $this->estimateReceiptHeightPt($transaction, $company, $printerSize)], 'portrait');

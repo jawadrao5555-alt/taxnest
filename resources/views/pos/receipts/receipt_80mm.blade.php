@@ -82,6 +82,16 @@
             .no-print { margin-bottom: 15px; text-align: center; font-family: Arial, sans-serif; }
         }
     </style>
+    @if(!empty($pdfMode))
+    <style>
+        /* DomPDF-only overrides: DomPDF's default media type is "screen", so the
+           @media print rules above never apply and the fixed 80mm body width
+           (plus padding) overflows the 226.77pt page — clipping the right edge.
+           Let the body fill the PDF page instead, and hide screen-only chrome. */
+        body { width: auto !important; max-width: none !important; margin: 0 !important; padding: 3mm !important; }
+        .no-print { display: none !important; }
+    </style>
+    @endif
 </head>
 <body>
     <div class="no-print" id="receiptActions">

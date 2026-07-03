@@ -82,6 +82,14 @@
             .no-print { margin-bottom: 12px; text-align: center; font-family: Arial, sans-serif; }
         }
     </style>
+    @if(!empty($pdfMode))
+    <style>
+        /* DomPDF-only overrides (see receipt_80mm): body must fill the PDF page,
+           never a fixed mm width that overflows and clips the right edge. */
+        body { width: auto !important; max-width: none !important; margin: 0 !important; padding: 2mm !important; }
+        .no-print { display: none !important; }
+    </style>
+    @endif
 </head>
 <body>
     <div class="no-print" id="receiptActions">

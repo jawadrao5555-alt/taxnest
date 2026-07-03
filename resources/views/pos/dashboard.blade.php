@@ -42,7 +42,7 @@
                 ? round(($costCoverage['with_cost'] / $costCoverage['total']) * 100)
                 : 0;
         @endphp
-        <div class="mb-4 rounded-2xl border border-emerald-200/60 dark:border-emerald-700/30 bg-gradient-to-br from-emerald-50 via-white to-purple-50 dark:from-emerald-900/20 dark:via-gray-900 dark:to-purple-900/20 p-4 sm:p-5 shadow-sm">
+        <div class="mb-4 rounded-2xl border border-emerald-200/60 dark:border-emerald-700/30 bg-white dark:bg-gray-900 p-4 sm:p-5 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div class="flex items-center gap-2">
                     <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-md">

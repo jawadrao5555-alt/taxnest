@@ -128,9 +128,9 @@
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: {{ min(100, ($monthSales ?? $monthStats->revenue ?? 1) > 0 ? (($todaySales ?? $todayStats->revenue ?? 0) / ($monthSales ?? $monthStats->revenue ?? 1) * 100) : 0) }}%"></div></div>
             </div>
         </div>
-        <div class="stat-card card-reveal bg-gradient-to-br from-blue-500 to-blue-700 p-4 shadow-lg shadow-blue-500/15">
+        <div class="stat-card card-reveal bg-gradient-to-br from-teal-600 to-teal-800 p-4 shadow-lg shadow-teal-600/15">
             <div class="relative z-10">
-                <span class="text-[9px] font-bold uppercase tracking-wider text-blue-100/70">Orders</span>
+                <span class="text-[9px] font-bold uppercase tracking-wider text-teal-100/70">Orders</span>
                 <p class="text-xl font-extrabold text-white mt-1"><span data-count-target="{{ $todayOrders ?? $todayStats->count ?? 0 }}">0</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: {{ min(100, ($todayOrders ?? $todayStats->count ?? 0) * 5) }}%"></div></div>
             </div>

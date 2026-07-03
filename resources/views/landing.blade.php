@@ -123,6 +123,11 @@
                     <a href="/digital-invoice" class="px-4 py-2 text-sm font-bold text-emerald-700 bg-emerald-100 rounded-xl hover:bg-emerald-200 hover:-translate-y-1 transition">Digital Invoice</a>
                     <a href="/pos" class="px-4 py-2 text-sm font-bold text-purple-700 bg-purple-100 rounded-xl hover:bg-purple-200 hover:-translate-y-1 transition">PRA POS</a>
                     <a href="/fbr-pos-landing" class="px-4 py-2 text-sm font-bold text-blue-700 bg-blue-100 rounded-xl hover:bg-blue-200 hover:-translate-y-1 transition">FBR POS</a>
+                    <span class="hidden xl:inline-block w-px h-6 bg-gray-200"></span>
+                    <a href="#features" class="hidden xl:inline-block px-2 py-2 text-sm font-bold text-gray-600 hover:text-gray-900 transition">Features</a>
+                    <a href="#pricing" class="hidden xl:inline-block px-2 py-2 text-sm font-bold text-gray-600 hover:text-gray-900 transition">Pricing</a>
+                    <a href="#faq" class="hidden xl:inline-block px-2 py-2 text-sm font-bold text-gray-600 hover:text-gray-900 transition">FAQ</a>
+                    <a href="#contact" class="hidden xl:inline-block px-2 py-2 text-sm font-bold text-gray-600 hover:text-gray-900 transition">Contact</a>
                 </div>
 
                 <div class="flex items-center gap-3">
@@ -345,6 +350,12 @@
                             <div class="w-5 h-5 bg-emerald-100 text-emerald-600 rounded flex items-center justify-center mr-3">✓</div> Compliant QR Code generation
                         </li>
                         <li class="flex items-center text-sm font-bold text-gray-700">
+                            <div class="w-5 h-5 bg-emerald-100 text-emerald-600 rounded flex items-center justify-center mr-3">✓</div> Risk detection & compliance scoring
+                        </li>
+                        <li class="flex items-center text-sm font-bold text-gray-700">
+                            <div class="w-5 h-5 bg-emerald-100 text-emerald-600 rounded flex items-center justify-center mr-3">✓</div> MIS analytics & multi-branch invoicing
+                        </li>
+                        <li class="flex items-center text-sm font-bold text-gray-700">
                             <div class="w-5 h-5 bg-emerald-100 text-emerald-600 rounded flex items-center justify-center mr-3">✓</div> Separate account & strict privacy
                         </li>
                     </ul>
@@ -390,6 +401,12 @@
                             <div class="w-5 h-5 bg-purple-100 text-purple-600 rounded flex items-center justify-center mr-3">✓</div> Split payments (Card/Cash)
                         </li>
                         <li class="flex items-center text-sm font-bold text-gray-700">
+                            <div class="w-5 h-5 bg-purple-100 text-purple-600 rounded flex items-center justify-center mr-3">✓</div> Offline billing with auto-sync
+                        </li>
+                        <li class="flex items-center text-sm font-bold text-gray-700">
+                            <div class="w-5 h-5 bg-purple-100 text-purple-600 rounded flex items-center justify-center mr-3">✓</div> 80mm thermal receipts & multi-terminal
+                        </li>
+                        <li class="flex items-center text-sm font-bold text-gray-700">
                             <div class="w-5 h-5 bg-purple-100 text-purple-600 rounded flex items-center justify-center mr-3">✓</div> Dedicated restaurant environment
                         </li>
                     </ul>
@@ -426,6 +443,12 @@
                         </li>
                         <li class="flex items-center text-sm font-bold text-gray-700">
                             <div class="w-5 h-5 bg-blue-100 text-blue-600 rounded flex items-center justify-center mr-3">✓</div> Barcode scanner & drawer support
+                        </li>
+                        <li class="flex items-center text-sm font-bold text-gray-700">
+                            <div class="w-5 h-5 bg-blue-100 text-blue-600 rounded flex items-center justify-center mr-3">✓</div> Failed-bill edit & retry system
+                        </li>
+                        <li class="flex items-center text-sm font-bold text-gray-700">
+                            <div class="w-5 h-5 bg-blue-100 text-blue-600 rounded flex items-center justify-center mr-3">✓</div> Tax reports & multi-user roles
                         </li>
                         <li class="flex items-center text-sm font-bold text-gray-700">
                             <div class="w-5 h-5 bg-blue-100 text-blue-600 rounded flex items-center justify-center mr-3">✓</div> Fully partitioned retail data
@@ -498,7 +521,7 @@
     </section>
 
     <!-- Hard Truths / Features -->
-    <section class="py-24 bg-[#1F2937] text-white overflow-hidden border-t-8 border-gray-900">
+    <section id="features" class="py-24 bg-[#1F2937] text-white overflow-hidden border-t-8 border-gray-900">
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
             <h2 class="text-3xl sm:text-5xl font-bricolage font-black mb-16 text-center">Built Different. Built for Pakistan.</h2>
             
@@ -550,6 +573,30 @@
                     <h4 class="text-xl font-bold font-bricolage mb-3 text-gray-100">Token Health Monitoring</h4>
                     <p class="text-gray-400 font-medium leading-relaxed">FBR tokens expire. We monitor them 24/7. When a token is about to lapse, we automatically alert you and queue invoices safely until you refresh it. Zero dropped receipts.</p>
                 </div>
+
+                <div class="bg-gray-800 p-8 rounded-2xl border-2 border-gray-700 reveal shadow-[0_6px_0_0_#374151]">
+                    <div class="w-12 h-12 bg-emerald-500/20 text-emerald-400 flex items-center justify-center rounded-xl mb-6 border border-emerald-500/30">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                    </div>
+                    <h4 class="text-xl font-bold font-bricolage mb-3 text-gray-100">HS Intelligence Engine</h4>
+                    <p class="text-gray-400 font-medium leading-relaxed">Stop hunting for HS codes in PDF booklets. Our engine learns from every submission and auto-suggests the right HS code, SRO number, and tax rate while you type the product name.</p>
+                </div>
+
+                <div class="bg-gray-800 p-8 rounded-2xl border-2 border-gray-700 reveal shadow-[0_6px_0_0_#374151]" style="transition-delay: 100ms;">
+                    <div class="w-12 h-12 bg-purple-500/20 text-purple-400 flex items-center justify-center rounded-xl mb-6 border border-purple-500/30">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    </div>
+                    <h4 class="text-xl font-bold font-bricolage mb-3 text-gray-100">Risk & Duplicate Shield</h4>
+                    <p class="text-gray-400 font-medium leading-relaxed">Every digital invoice is risk-scored before submission, and a multi-phase idempotency shield guarantees the same bill can never be submitted to FBR or PRA twice — even on double-click.</p>
+                </div>
+
+                <div class="bg-gray-800 p-8 rounded-2xl border-2 border-gray-700 reveal shadow-[0_6px_0_0_#374151]" style="transition-delay: 200ms;">
+                    <div class="w-12 h-12 bg-blue-500/20 text-blue-400 flex items-center justify-center rounded-xl mb-6 border border-blue-500/30">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                    </div>
+                    <h4 class="text-xl font-bold font-bricolage mb-3 text-gray-100">5 Login Methods + PWA</h4>
+                    <p class="text-gray-400 font-medium leading-relaxed">Log in with Email, Phone, Username, CNIC, or NTN — whatever you remember. Install TaxNest like an app on any phone or PC, with keyboard shortcuts built for fast cashiers.</p>
+                </div>
             </div>
         </div>
     </section>
@@ -581,6 +628,12 @@
                         <li class="flex items-start text-gray-600 font-medium">
                             <span class="text-red-500 font-bold mr-3">✗</span> Slow, unresponsive support
                         </li>
+                        <li class="flex items-start text-gray-600 font-medium">
+                            <span class="text-red-500 font-bold mr-3">✗</span> No duplicate protection — double receipts
+                        </li>
+                        <li class="flex items-start text-gray-600 font-medium">
+                            <span class="text-red-500 font-bold mr-3">✗</span> Editable records — audit nightmares
+                        </li>
                     </ul>
                 </div>
                 <div class="card-tactile p-8 border-emerald-200 shadow-[0_6px_0_0_#D1FAE5]">
@@ -600,6 +653,12 @@
                         </li>
                         <li class="flex items-start text-gray-800 font-bold">
                             <span class="text-emerald-500 font-bold mr-3">✓</span> Dedicated WhatsApp engineer line
+                        </li>
+                        <li class="flex items-start text-gray-800 font-bold">
+                            <span class="text-emerald-500 font-bold mr-3">✓</span> Multi-phase duplicate submission shield
+                        </li>
+                        <li class="flex items-start text-gray-800 font-bold">
+                            <span class="text-emerald-500 font-bold mr-3">✓</span> SHA-256 immutable audit logs
                         </li>
                     </ul>
                 </div>
@@ -659,7 +718,7 @@
     </section>
 
     <!-- Pricing Overview -->
-    <section class="py-24 bg-white border-b-2 border-gray-100">
+    <section id="pricing" class="py-24 bg-white border-b-2 border-gray-100">
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-16 reveal">
                 <h2 class="text-3xl sm:text-5xl font-bricolage font-black text-gray-900 mb-4">Simple, Isolated Pricing</h2>
@@ -695,7 +754,7 @@
     </section>
 
     <!-- FAQ Section (Alpine) -->
-    <section class="py-24 bg-pattern-dots border-b-2 border-gray-100">
+    <section id="faq" class="py-24 bg-pattern-dots border-b-2 border-gray-100">
         <div class="max-w-[800px] mx-auto px-4 sm:px-6 lg:px-8" x-data="{ active: null }">
             <div class="text-center mb-16 reveal">
                 <h2 class="text-3xl sm:text-5xl font-bricolage font-black text-gray-900 mb-4">Questions Shopkeepers Ask</h2>
@@ -739,6 +798,39 @@
                     </button>
                     <div x-show="active === 4" x-collapse x-cloak class="px-6 pb-6 text-gray-600 font-medium">
                         Absolutely not. Product isolation is sacred here. Each product (Digital Invoice, PRA, FBR) is entirely separate with its own registration, its own login, and fully partitioned data. Zero cross-mixing, ensuring your operational privacy.
+                    </div>
+                </div>
+
+                <!-- FAQ 5 -->
+                <div class="card-tactile overflow-hidden reveal">
+                    <button @click="active = active === 5 ? null : 5" class="w-full px-6 py-5 text-left flex justify-between items-center font-bricolage font-bold text-lg text-gray-900 focus:outline-none">
+                        How does FBR / PRA compliance actually work?
+                        <span x-text="active === 5 ? '-' : '+'" class="text-gray-400 font-mono text-xl"></span>
+                    </button>
+                    <div x-show="active === 5" x-collapse x-cloak class="px-6 pb-6 text-gray-600 font-medium">
+                        Digital Invoice submits through the FBR PRAL API v1.12 in real time — every invoice is validated, gets an official FBR invoice number, and prints with a QR code. PRA POS fiscalizes each sale via the PRAL IMS API v1.2 and receives a PRA fiscal invoice number. FBR POS submits directly to the FBR API with an automatic retry system for rejected bills. You never visit a government portal manually.
+                    </div>
+                </div>
+
+                <!-- FAQ 6 -->
+                <div class="card-tactile overflow-hidden reveal">
+                    <button @click="active = active === 6 ? null : 6" class="w-full px-6 py-5 text-left flex justify-between items-center font-bricolage font-bold text-lg text-gray-900 focus:outline-none">
+                        Is there a free trial? How do I log in?
+                        <span x-text="active === 6 ? '-' : '+'" class="text-gray-400 font-mono text-xl"></span>
+                    </button>
+                    <div x-show="active === 6" x-collapse x-cloak class="px-6 pb-6 text-gray-600 font-medium">
+                        Yes — every product comes with a 3-day free trial, no card required. Register on the product you need, and log in with whatever you remember: Email, Phone, Username, CNIC, or NTN. Each product has its own separate login page.
+                    </div>
+                </div>
+
+                <!-- FAQ 7 -->
+                <div class="card-tactile overflow-hidden reveal">
+                    <button @click="active = active === 7 ? null : 7" class="w-full px-6 py-5 text-left flex justify-between items-center font-bricolage font-bold text-lg text-gray-900 focus:outline-none">
+                        What security protects my records?
+                        <span x-text="active === 7 ? '-' : '+'" class="text-gray-400 font-mono text-xl"></span>
+                    </button>
+                    <div x-show="active === 7" x-collapse x-cloak class="px-6 pb-6 text-gray-600 font-medium">
+                        Everything runs over HTTPS with company-level isolation enforced on every single query. Critical events are written to SHA-256 signed immutable audit logs that cannot be edited — ever. A multi-phase idempotency shield blocks duplicate submissions, and role-based access keeps cashiers, managers, and owners in their own lanes.
                     </div>
                 </div>
             </div>

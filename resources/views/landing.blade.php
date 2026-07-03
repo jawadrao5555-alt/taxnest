@@ -97,29 +97,29 @@
 </head>
 <body class="antialiased text-gray-700 scroll-smooth bg-white dark:bg-gray-900 overflow-x-hidden">
 
-    <nav class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-2xl border-b border-gray-100/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+    <nav class="fixed top-0 w-full z-50 bg-[#052730]/85 backdrop-blur-2xl border-b border-white/10 shadow-[0_1px_3px_rgba(0,0,0,0.2)]">
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="flex items-center justify-between py-2.5 sm:py-0 sm:h-[60px]">
                 <a href="/" class="flex items-center gap-2 flex-shrink-0">
                     {{-- Custom folded-receipt mark with gold total stripe --}}
                     <svg class="w-7 h-7 sm:w-8 sm:h-8" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="TaxNest">
-                        <path d="M10 4 L31 4 L31 33 L27.5 29.5 L24 33 L20.5 29.5 L17 33 L13.5 29.5 L10 33 Z" fill="#0A4D5C"/>
-                        <path d="M26 4 L31 4 L31 9 Z" fill="#1B7C8C"/>
+                        <path d="M10 4 L31 4 L31 33 L27.5 29.5 L24 33 L20.5 29.5 L17 33 L13.5 29.5 L10 33 Z" fill="#1B7C8C"/>
+                        <path d="M26 4 L31 4 L31 9 Z" fill="#2EA0B3"/>
                         <rect x="13.5" y="11"   width="9"  height="1.5" rx="0.4" fill="#F6F2E9" opacity="0.95"/>
                         <rect x="13.5" y="14.5" width="13" height="1.5" rx="0.4" fill="#F6F2E9" opacity="0.70"/>
                         <rect x="13.5" y="18"   width="11" height="1.5" rx="0.4" fill="#F6F2E9" opacity="0.85"/>
                         <rect x="13.5" y="21.5" width="13" height="2.5" rx="0.4" fill="#E7BF3B"/>
                     </svg>
-                    <span class="text-sm sm:text-[17px] font-bold text-gray-900 tracking-tight">TaxNest</span>
+                    <span class="text-sm sm:text-[17px] font-bold text-white tracking-tight">TaxNest</span>
                 </a>
 
                 <div class="flex items-center flex-wrap justify-end gap-1 sm:gap-2">
-                    <a href="/digital-invoice" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-[#0A4D5C] rounded-full hover:bg-[#063B47] transition shadow-sm">Digital Invoice</a>
+                    <a href="/digital-invoice" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-white/10 border border-white/20 backdrop-blur rounded-full hover:bg-white/20 hover:border-white/30 transition shadow-sm">Digital Invoice</a>
                     <a href="/pos" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-purple-700 rounded-full hover:bg-purple-800 transition shadow-sm">PRA POS</a>
                     <a href="/fbr-pos-landing" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-blue-700 rounded-full hover:bg-blue-800 transition shadow-sm">FBR POS</a>
-                    <a href="#pricing" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition">Pricing</a>
-                    <a href="#features" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition">Docs</a>
-                    <a href="#contact" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition">Contact</a>
+                    <a href="#pricing" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-300 hover:text-white rounded-lg hover:bg-white/10 transition">Pricing</a>
+                    <a href="#features" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-300 hover:text-white rounded-lg hover:bg-white/10 transition">Docs</a>
+                    <a href="#contact" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-300 hover:text-white rounded-lg hover:bg-white/10 transition">Contact</a>
                 </div>
             </div>
         </div>
@@ -209,33 +209,34 @@
         </div>
     </section>
 
-    <div class="relative bg-gradient-to-r from-gray-50 via-white to-gray-50 border-b border-gray-100 py-6">
-        <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0F6171]/30 to-transparent"></div>
+    <div class="relative py-6" style="background:#063B47;">
+        <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+        <div class="absolute inset-x-0 bottom-0 h-px" style="background:linear-gradient(90deg,transparent,rgba(231,191,59,0.3),transparent);"></div>
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="flex flex-wrap items-center justify-center gap-3 sm:gap-5">
-                <div class="flex items-center gap-2 px-3 py-1.5 bg-[#0F6171]/5 rounded-full border border-[#0F6171]/20">
-                    <svg class="w-3.5 h-3.5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                    <span class="text-[12px] font-semibold text-[#0A4D5C]">FBR API v1.12</span>
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-white/10 backdrop-blur rounded-full border border-white/15">
+                    <svg class="w-3.5 h-3.5 text-[#2EA0B3]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    <span class="text-[12px] font-semibold text-white">FBR API v1.12</span>
                 </div>
-                <div class="flex items-center gap-2 px-3 py-1.5 bg-[#0F6171]/5 rounded-full border border-[#0F6171]/20">
-                    <svg class="w-3.5 h-3.5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span class="text-[12px] font-semibold text-[#0A4D5C]">PRA IMS v1.2</span>
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-white/10 backdrop-blur rounded-full border border-white/15">
+                    <svg class="w-3.5 h-3.5 text-[#2EA0B3]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span class="text-[12px] font-semibold text-white">PRA IMS v1.2</span>
                 </div>
-                <div class="flex items-center gap-2 px-3 py-1.5 bg-[#0F6171]/5 rounded-full border border-[#0F6171]/20">
-                    <svg class="w-3.5 h-3.5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                    <span class="text-[12px] font-semibold text-[#0A4D5C]">SHA-256 Encrypted</span>
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-white/10 backdrop-blur rounded-full border border-white/15">
+                    <svg class="w-3.5 h-3.5 text-[#2EA0B3]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    <span class="text-[12px] font-semibold text-white">SHA-256 Encrypted</span>
                 </div>
-                <div class="flex items-center gap-2 px-3 py-1.5 bg-[#0F6171]/5 rounded-full border border-[#0F6171]/20">
-                    <svg class="w-3.5 h-3.5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                    <span class="text-[12px] font-semibold text-[#0A4D5C]">Real-time Sync</span>
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-white/10 backdrop-blur rounded-full border border-white/15">
+                    <svg class="w-3.5 h-3.5 text-[#2EA0B3]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    <span class="text-[12px] font-semibold text-white">Real-time Sync</span>
                 </div>
-                <div class="flex items-center gap-2 px-3 py-1.5 bg-[#0F6171]/5 rounded-full border border-[#0F6171]/20">
-                    <svg class="w-3.5 h-3.5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                    <span class="text-[12px] font-semibold text-[#0A4D5C]">PWA + Offline</span>
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-white/10 backdrop-blur rounded-full border border-white/15">
+                    <svg class="w-3.5 h-3.5 text-[#2EA0B3]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                    <span class="text-[12px] font-semibold text-white">PWA + Offline</span>
                 </div>
-                <div class="flex items-center gap-2 px-3 py-1.5 bg-[#0F6171]/5 rounded-full border border-[#0F6171]/20">
-                    <svg class="w-3.5 h-3.5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-                    <span class="text-[12px] font-semibold text-[#0A4D5C]">99.9% Uptime</span>
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-white/10 backdrop-blur rounded-full border border-white/15">
+                    <svg class="w-3.5 h-3.5 text-[#2EA0B3]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                    <span class="text-[12px] font-semibold text-white">99.9% Uptime</span>
                 </div>
             </div>
         </div>

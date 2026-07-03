@@ -38,3 +38,8 @@ remain visible via PRA Sahulat app QR scan; tax is ALWAYS submitted to PRA in fu
 Do NOT re-add `|| invoice_mode==='pra' || pra_invoice_number` overrides. transaction-show (internal admin
 view) keeps full details. restaurant/receipt.blade.php is DEAD (RestaurantPosController::receipt renders
 the shared receipt_80mm/58mm templates).
+
+**Toggle location (owner-mandated):** the checkbox lives on the Receipt Settings page
+(`/pos/receipt-settings`, field `rp_show_tax`, saved in `receiptSettings()`), NOT on the Features page.
+`updateFeatureSettings()` must NEVER write `pos_receipt_show_tax` — a checkbox absent from that form
+would silently force it off on every Features save.

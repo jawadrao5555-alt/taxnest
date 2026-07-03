@@ -186,13 +186,6 @@
                     </div>
 
                     <div class="grid sm:grid-cols-2 gap-2.5">
-                        <label class="flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition" :class="receiptShowTax ? 'border-amber-500 bg-amber-50/40 dark:bg-amber-900/10' : 'border-gray-200 dark:border-gray-700'">
-                            <input type="checkbox" name="pos_receipt_show_tax" value="1" x-model="receiptShowTax" class="mt-0.5 w-4 h-4 text-amber-600 rounded">
-                            <div class="flex-1 min-w-0">
-                                <div class="text-sm font-bold text-gray-900 dark:text-white">🧾 Show Tax on Receipt</div>
-                                <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug">Print subtotal + sales-tax lines on receipts. OFF = customer copy shows grand total only. Tax is always submitted to FBR/PRA in full; details stay visible on QR scan (Sahulat app).</p>
-                            </div>
-                        </label>
                         <label class="flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition" :class="guidedFlow ? 'border-amber-500 bg-amber-50/40 dark:bg-amber-900/10' : 'border-gray-200 dark:border-gray-700'">
                             <input type="checkbox" name="pos_guided_flow_enabled" value="1" x-model="guidedFlow" class="mt-0.5 w-4 h-4 text-amber-600 rounded">
                             <div class="flex-1 min-w-0">
@@ -291,7 +284,6 @@
                     <div class="flex flex-wrap gap-2">
                         <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-200">Screen: <span class="capitalize" x-text="density"></span></span>
                         <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-200" x-text="guidedFlow ? '⌨️ Guided billing ON' : 'Guided billing off'"></span>
-                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-200" x-text="receiptShowTax ? '🧾 Tax on receipt' : 'No tax line on receipt'"></span>
                     </div>
                 </div>
 
@@ -321,7 +313,6 @@
                 selectedPreset: @json($currentCategory),
                 flags: @json($flagState),
                 density: @json($company->pos_ui_density ?? 'standard'),
-                receiptShowTax: @json((bool)($company->pos_receipt_show_tax ?? true)),
                 autoPrintKot: @json((bool)($company->auto_print_kot ?? false)),
                 kotReprint: @json((bool)($company->kot_reprint_enabled ?? true)),
                 guidedFlow: @json((bool)($company->pos_guided_flow_enabled ?? true)),

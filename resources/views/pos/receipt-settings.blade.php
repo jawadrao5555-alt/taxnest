@@ -49,6 +49,16 @@
                     <span class="text-sm text-gray-800 dark:text-gray-200">Show Phone / Mobile</span>
                 </label>
             </div>
+            <div class="mt-4 p-3 rounded-lg border-2 {{ ($company->pos_receipt_show_tax ?? true) ? 'border-amber-400 bg-amber-50/40 dark:bg-amber-900/10' : 'border-gray-200 dark:border-gray-700' }}">
+                <label class="flex items-start gap-2.5 cursor-pointer">
+                    <input type="checkbox" name="rp_show_tax" value="1" {{ ($company->pos_receipt_show_tax ?? true) ? 'checked' : '' }} class="mt-0.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500 w-4 h-4">
+                    <span class="flex-1 min-w-0">
+                        <span class="block text-sm font-bold text-gray-900 dark:text-white">🧾 Show Tax on Receipt</span>
+                        <span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">Print Subtotal + Sales-Tax lines. OFF = customer copy shows grand TOTAL only. Tax is always submitted to FBR/PRA in full; details stay visible on QR scan (Sahulat app).</span>
+                    </span>
+                </label>
+            </div>
+
             <div class="mt-4">
                 <label class="flex items-center gap-2.5 cursor-pointer mb-2">
                     <input type="checkbox" name="rp_show_footer" value="1" {{ $rp['show_footer'] ? 'checked' : '' }} class="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4">

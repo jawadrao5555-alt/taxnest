@@ -104,7 +104,13 @@ class PosController extends Controller
                 'show_footer' => $request->has('rp_show_footer'),
                 'footer_text' => trim((string) $request->input('rp_footer_text', '')) ?: null,
             ];
-            $company->update(['invoice_display_prefs' => $prefs]);
+            $company->update([
+                'invoice_display_prefs' => $prefs,
+                // Owner decision (Jul 2026): tax display toggle lives HERE (receipt
+                // customization), not on the Features page. OFF = customer copy
+                // shows grand TOTAL only; tax is always submitted to PRA in full.
+                'pos_receipt_show_tax' => $request->has('rp_show_tax'),
+            ]);
             return redirect()->route('pos.receipt-settings')->with('success', 'Receipt display settings saved.');
         }
 
@@ -538,8 +544,10 @@ class PosController extends Controller
             'feature_flags'        => $flags,
             'use_universal_pos'    => (bool) ($data['use_universal_pos'] ?? false),
             'pos_ui_density'       => $data['pos_ui_density'] ?? $company->pos_ui_density ?? 'standard',
-            // Receipt & Kitchen preferences (checkboxes — absent value = off).
-            'pos_receipt_show_tax' => (bool) $request->input('pos_receipt_show_tax', false),
+            // Kitchen preferences (checkboxes — absent value = off).
+            // NOTE: pos_receipt_show_tax moved to the Receipt Settings page
+            // (receiptSettings) — do NOT save it here or every Features save
+            // would force it off.
             'auto_print_kot'       => (bool) $request->input('auto_print_kot', false),
             'kot_reprint_enabled'  => (bool) $request->input('kot_reprint_enabled', false),
             'pos_guided_flow_enabled' => (bool) $request->input('pos_guided_flow_enabled', false),

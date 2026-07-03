@@ -631,14 +631,10 @@ kbd {
 
     <form method="POST" action="{{ route('fbrpos.store') }}" x-ref="saleForm" novalidate
           @submit.prevent="finalizeAndSubmit($event)"
-          @keydown.enter="
-              /* Block stray Enter from submitting the bill — Enter is for adding products only.
-                 Use F9 (or the Complete button) to finalize. Per-input handlers (barcode,
-                 search, item rows) still run because they fire first during bubble. */
-              if ($event.target.tagName !== 'TEXTAREA' && $event.target.type !== 'submit' && $event.target.type !== 'button') {
-                  $event.preventDefault();
-              }
-          ">
+          {{-- Block stray Enter from submitting the bill — Enter is for adding products only.
+               Use F9 (or the Complete button) to finalize. Per-input handlers (barcode,
+               search, item rows) still run because they fire first during bubble. --}}
+          @keydown.enter="if ($event.target.tagName !== 'TEXTAREA' && $event.target.type !== 'submit' && $event.target.type !== 'button') { $event.preventDefault(); }">
         @csrf
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 items-start">
@@ -719,7 +715,7 @@ kbd {
                               title="Quantity multiplier active — Esc to cancel"></span>
                         <span class="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-600 text-white rounded shadow-sm tracking-wider">●</span>
                     </div>
-                    <div x-show="scanStatus" :class="scanStatus.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'" class="text-[10px] font-bold mt-1 px-1" x-text="scanStatus && scanStatus.msg"></div>
+                    <div x-show="scanStatus" :class="(scanStatus && scanStatus.ok) ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'" class="text-[10px] font-bold mt-1 px-1" x-text="scanStatus && scanStatus.msg"></div>
 
                     {{-- Autocomplete dropdown — appears under input as cashier types --}}
                     <div x-show="searchOpen && searchResults.length > 0" x-cloak
@@ -930,7 +926,7 @@ kbd {
                             </span>
                             <input type="text" inputmode="decimal" autocomplete="off" maxlength="10"
                                 x-ref="globalAmountInput"
-                                x-model="(target ? target._amountInput : '')"
+                                :value="target ? target._amountInput : ''"
                                 @focus="if (target) target._amountInput = ''"
                                 @input="if (target) { target._amountInput = sanitizeQty($event.target.value); reverseCalcFromAmount(target, target._amountInput); }"
                                 @blur="if (target) target._amountInput = ''"

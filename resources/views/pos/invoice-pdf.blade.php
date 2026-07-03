@@ -143,41 +143,52 @@
             @endif
         </div>
 
+        @php
+            // Owner decision (Jul 2026): toggle OFF hides subtotal + tax on ALL receipts
+            // (incl. PRA fiscal) — customer copy shows grand total only, the Tax% column
+            // is dropped, and item Price/Total are shown TAX-INCLUSIVE so line items add
+            // up to the grand total. Tax is always submitted to PRA; details visible via
+            // Sahulat app QR scan.
+            $showTaxLines = (bool) (optional($transaction->company)->pos_receipt_show_tax ?? true);
+            $inclAmts = $showTaxLines ? [] : $transaction->inclusiveLineAmounts();
+        @endphp
         <div class="section-label">Order Items</div>
         <table class="items">
             <thead>
                 <tr>
-                    <th style="width:40%;">Item</th>
+                    <th style="width:{{ $showTaxLines ? '40%' : '50%' }};">Item</th>
                     <th class="c" style="width:10%;">Qty</th>
+                    @if($showTaxLines)
                     <th class="r" style="width:10%;">Tax%</th>
+                    @endif
                     <th class="r" style="width:20%;">Price</th>
                     <th class="r" style="width:20%;">Total</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($transaction->items as $item)
+                @php
+                    $lineAmt = $showTaxLines ? (float) $item->subtotal : (float) ($inclAmts[$item->id] ?? ((float) $item->subtotal + (float) ($item->tax_amount ?? 0)));
+                    $lineRate = $showTaxLines ? (float) $item->unit_price : ((float) $item->quantity > 0 ? $lineAmt / (float) $item->quantity : (float) $item->unit_price);
+                @endphp
                 <tr>
                     <td>
                         {{ $item->item_name }}
-                        @if($item->is_tax_exempt)
+                        @if($showTaxLines && $item->is_tax_exempt)
                         <span class="exempt-tag">EXEMPT</span>
                         @endif
                     </td>
                     <td class="c">{{ $item->quantity }}</td>
+                    @if($showTaxLines)
                     <td class="r">{{ $item->is_tax_exempt ? 'Exempt' : number_format($item->tax_rate ?? $transaction->tax_rate, 0) . '%' }}</td>
-                    <td class="r">{{ number_format($item->unit_price, 2) }}</td>
-                    <td class="r">{{ number_format($item->subtotal, 2) }}</td>
+                    @endif
+                    <td class="r">{{ number_format($lineRate, 2) }}</td>
+                    <td class="r">{{ number_format($lineAmt, 2) }}</td>
                 </tr>
                 @endforeach
             </tbody>
         </table>
 
-        @php
-            // Owner decision (Jul 2026): toggle OFF hides subtotal + tax on ALL receipts
-            // (incl. PRA fiscal) — customer copy shows grand total only. Tax is always
-            // submitted to PRA; details visible via Sahulat app QR scan.
-            $showTaxLines = (bool) (optional($transaction->company)->pos_receipt_show_tax ?? true);
-        @endphp
         <div class="totals-box">
             @if($showTaxLines)
             <div class="total-row">
@@ -188,7 +199,7 @@
             @if($transaction->discount_amount > 0)
             <div class="total-row discount">
                 <div class="lbl">Discount{{ $transaction->discount_type === 'percentage' ? ' ('.$transaction->discount_value.'%)' : '' }}</div>
-                <div class="val">-PKR {{ number_format($transaction->discount_amount, 2) }}</div>
+                <div class="val">-PKR {{ number_format($showTaxLines ? $transaction->discount_amount : round((float) $transaction->discount_amount), 2) }}</div>
             </div>
             @endif
             @if($showTaxLines)
@@ -201,7 +212,7 @@
 
         <div class="grand-total-box">
             <div class="lbl">TOTAL</div>
-            <div class="val">PKR {{ number_format($transaction->total_amount, 2) }}</div>
+            <div class="val">PKR {{ number_format($showTaxLines ? $transaction->total_amount : round((float) $transaction->total_amount), 2) }}</div>
         </div>
 
         @if($transaction->pra_status === 'submitted' && $transaction->pra_invoice_number)

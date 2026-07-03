@@ -66,6 +66,60 @@ class PosTransaction extends Model
         return $this->hasMany(PosTransactionItem::class, 'transaction_id');
     }
 
+    /**
+     * Tax-inclusive per-item display amounts (whole rupees) for receipts when the
+     * "Show Tax on Receipt" toggle is OFF. Uses largest-remainder allocation so the
+     * item amounts ALWAYS sum exactly to round(total + discount) — i.e. line items
+     * minus the printed discount reconcile to the printed grand total, avoiding
+     * customer disputes over a 1-rupee rounding drift.
+     *
+     * @return array<int, int> item_id => inclusive display amount (int rupees)
+     */
+    public function inclusiveLineAmounts(): array
+    {
+        $raw = [];
+        foreach ($this->items as $item) {
+            $raw[$item->id] = (float) $item->subtotal + (float) ($item->tax_amount ?? 0);
+        }
+        if (empty($raw)) {
+            return [];
+        }
+
+        // Target = printed TOTAL + printed discount (both rounded independently,
+        // exactly as the receipt displays them in tax-hidden mode) so that
+        // itemsSum - printedDiscount == printedTotal always holds.
+        $target = (int) round((float) $this->total_amount) + (int) round((float) $this->discount_amount);
+
+        $out = [];
+        $fracs = [];
+        foreach ($raw as $id => $v) {
+            $out[$id] = (int) floor($v);
+            $fracs[$id] = $v - floor($v);
+        }
+
+        $remainder = $target - array_sum($out);
+        if ($remainder > 0) {
+            arsort($fracs);
+            $ids = array_keys($fracs);
+            $n = count($ids);
+            for ($i = 0; $i < $remainder; $i++) {
+                $out[$ids[$i % $n]] += 1;
+            }
+        } elseif ($remainder < 0) {
+            asort($fracs);
+            $ids = array_keys($fracs);
+            $n = count($ids);
+            for ($i = 0; $i < -$remainder; $i++) {
+                $id = $ids[$i % $n];
+                if ($out[$id] > 0) {
+                    $out[$id] -= 1;
+                }
+            }
+        }
+
+        return $out;
+    }
+
     public function payments()
     {
         return $this->hasMany(PosPayment::class, 'transaction_id');

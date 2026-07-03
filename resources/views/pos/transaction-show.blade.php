@@ -228,7 +228,9 @@
             <div class="bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700 p-5">
                 <h3 class="text-sm font-semibold text-purple-700 dark:text-purple-300 mb-2">Provisional Bill</h3>
                 <p class="text-xs text-purple-600 dark:text-purple-400 mb-3">This is a provisional bill for your reference. It has NOT been reported to PRA — you can still edit, delete, or submit it as a final invoice.</p>
-                @php($company = \App\Models\Company::find(app('currentCompanyId')))
+                @php
+                    $company = \App\Models\Company::find(app('currentCompanyId'));
+                @endphp
                 @if($company && $company->pra_reporting_enabled)
                 <form method="POST" action="{{ route('pos.transaction.retry-pra', $transaction->id) }}" onsubmit="return confirm('Submit this bill to PRA as a FINAL invoice?\n\nOnce reported, the bill will be locked — no more edit or delete. Continue?');">
                     @csrf

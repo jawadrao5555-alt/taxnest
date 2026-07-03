@@ -20,6 +20,14 @@
                         </select>
                     </div>
                     <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Connection Mode</label>
+                        <select name="pra_connection_mode" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <option value="cloud" {{ ($company->pra_connection_mode ?? 'cloud') === 'cloud' ? 'selected' : '' }}>Cloud API — older POS IDs (Live/PostData)</option>
+                            <option value="fiscal_device" {{ ($company->pra_connection_mode ?? 'cloud') === 'fiscal_device' ? 'selected' : '' }}>PRA Fiscal Device — new POS IDs (via Desktop Agent)</option>
+                        </select>
+                        <p class="text-xs text-gray-400 mt-1">New PRA registrations get <strong>"Code 112 — Bulk data upload no more available"</strong> on the old Cloud API. Select <strong>PRA Fiscal Device</strong>, then install PRAL's IMS Fiscal Device software AND the TaxNest Desktop Agent on the shop PC. Bills will sync automatically.</p>
+                    </div>
+                    <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">POS Registration ID (from PRA portal)</label>
                         <input type="text" name="pra_pos_id" value="{{ $company->pra_pos_id }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500" placeholder="e.g. 100000">
                     </div>
@@ -44,8 +52,13 @@
                     <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
                         <p class="text-xs text-blue-700 dark:text-blue-400">
                             <strong>API Endpoints:</strong><br>
+                            @if(($company->pra_connection_mode ?? 'cloud') === 'fiscal_device')
+                            Fiscal Device (on shop PC): http://localhost:8524/api/IMSFiscal/GetInvoiceNumberByModel<br>
+                            Health check: http://localhost:8524/api/IMSFiscal/get → "Service is responding"
+                            @else
                             Sandbox: https://ims.pral.com.pk/ims/sandbox/api/Live/PostData<br>
                             Production: https://ims.pral.com.pk/ims/production/api/Live/PostData
+                            @endif
                         </p>
                     </div>
                     <button type="submit" class="px-6 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition">Save Settings</button>
@@ -103,7 +116,11 @@
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-500">Connection</span>
+                        @if(($company->pra_connection_mode ?? 'cloud') === 'fiscal_device')
+                        <span class="text-blue-600 font-semibold">Fiscal Device (Shop PC)</span>
+                        @else
                         <span class="text-emerald-600 font-semibold">Direct (Pakistani Server)</span>
+                        @endif
                     </div>
                 </div>
             </div>

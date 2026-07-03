@@ -74,6 +74,7 @@ class Company extends Model
         'pra_access_code',
         'pra_production_token',
         'pra_proxy_url',
+        'pra_connection_mode',
         'agent_api_key',
         'agent_last_seen',
         'agent_version',

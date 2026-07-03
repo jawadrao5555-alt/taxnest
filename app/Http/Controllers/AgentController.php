@@ -107,12 +107,20 @@ class AgentController extends Controller
             }
         }
 
+        // PRA Fiscal Device mode (new POS IDs): PRAL retired the cloud Live/PostData API (Code 112).
+        // The agent must POST each invoice to PRAL's local IMS Fiscal Device service running
+        // on the SAME shop PC as the agent (installed via PRA registration).
+        $fiscalDevice = ($company->pra_connection_mode ?? 'cloud') === 'fiscal_device';
+
         return response()->json([
             'count' => count($invoices),
             'invoices' => $invoices,
-            'pra_endpoint' => $company->pra_environment === 'production'
-                ? 'https://ims.pral.com.pk/ims/production/api/Live/PostData'
-                : 'https://ims.pral.com.pk/ims/sandbox/api/Live/PostData',
+            'pra_endpoint' => $fiscalDevice
+                ? 'http://localhost:8524/api/IMSFiscal/GetInvoiceNumberByModel'
+                : ($company->pra_environment === 'production'
+                    ? 'https://ims.pral.com.pk/ims/production/api/Live/PostData'
+                    : 'https://ims.pral.com.pk/ims/sandbox/api/Live/PostData'),
+            'pra_mode' => $fiscalDevice ? 'fiscal_device' : 'cloud',
             'pra_token' => $company->pra_production_token,
             'pra_pos_id' => $company->pra_pos_id,
         ]);

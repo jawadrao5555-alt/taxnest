@@ -168,6 +168,19 @@ class PraIntegrationService
             }
         }
 
+        // PRA Fiscal Device mode: the cloud PostData API is retired for this company's POS ID.
+        // Submission can ONLY happen from the shop PC (PRAL local service on localhost:8524),
+        // so the server never attempts a direct call — the desktop agent picks the row up.
+        if (($this->company->pra_connection_mode ?? 'cloud') === 'fiscal_device') {
+            $transaction->update(['pra_status' => 'pending']);
+            return [
+                'success' => false,
+                'response_code' => 'QUEUED',
+                'message' => 'Queued for desktop agent — PRA Fiscal Device mode submits from your shop PC.',
+                'queued_for_agent' => true,
+            ];
+        }
+
         $payload = $this->generatePayload($transaction);
 
         $praLog = PraLog::create([
@@ -312,12 +325,18 @@ class PraIntegrationService
 
             $this->storePraResponse($praLog, $transaction, $responseData, $responseCode, $success, $praInvoiceNumber);
 
+            $message = $responseData['Response'] ?? ($responseData['Errors'] ?? 'No response message');
+            if (!$success && (string) $responseCode === '112') {
+                // PRAL retired the cloud bulk PostData API for newer POS registrations.
+                $message = 'PRA has retired the old cloud API for this POS ID (Code 112). Open PRA Settings and switch Connection Mode to "PRA Fiscal Device", then install PRAL\'s IMS Fiscal Device software + TaxNest Desktop Agent on the shop PC.';
+            }
+
             return [
                 'success' => $success,
                 'response_code' => $responseCode,
                 'data' => $responseData,
                 'pra_invoice_number' => $praInvoiceNumber,
-                'message' => $responseData['Response'] ?? ($responseData['Errors'] ?? 'No response message'),
+                'message' => $message,
             ];
         } catch (\Exception $e) {
             $errorMsg = $e->getMessage();

@@ -145,7 +145,7 @@ async function syncOnce() {
       timeout: 15000,
     });
 
-    const { invoices, pra_endpoint, pra_token, count } = res.data;
+    const { invoices, pra_endpoint, pra_token, pra_mode, count } = res.data;
     status.pendingCount = count;
     status.connected = true;
     notify();
@@ -160,7 +160,7 @@ async function syncOnce() {
     log(`Found ${count} pending invoices`);
 
     for (const inv of invoices) {
-      await submitToPra(inv, pra_endpoint, pra_token);
+      await submitToPra(inv, pra_endpoint, pra_token, pra_mode);
     }
 
     status.lastSync = new Date().toISOString();
@@ -173,8 +173,9 @@ async function syncOnce() {
   }
 }
 
-async function submitToPra(invoice, praEndpoint, praToken) {
-  log(`Submitting txn ${invoice.transaction_id} to PRA`);
+async function submitToPra(invoice, praEndpoint, praToken, praMode) {
+  const isFiscalDevice = praMode === 'fiscal_device';
+  log(`Submitting txn ${invoice.transaction_id} to PRA${isFiscalDevice ? ' (Fiscal Device — localhost:8524)' : ''}`);
 
   try {
     const praRes = await axios.post(praEndpoint, invoice.payload, {
@@ -186,7 +187,9 @@ async function submitToPra(invoice, praEndpoint, praToken) {
     });
 
     const data = praRes.data;
-    const success = data && (data.Code === '100' || data.code === '100');
+    // Tolerant comparison — the local IMS Fiscal Device service may return Code as a NUMBER (100),
+    // while the cloud API returns a string ('100'). A strict === would misreport success as failure.
+    const success = data != null && String(data.Code ?? data.code ?? '') === '100';
     const praInvoiceNumber = data?.InvoiceNumber || data?.invoiceNumber || data?.Response;
 
     if (success && praInvoiceNumber) {
@@ -203,12 +206,18 @@ async function submitToPra(invoice, praEndpoint, praToken) {
     } else {
       const err = data?.Response || data?.message || JSON.stringify(data);
       log(`❌ PRA rejected txn ${invoice.transaction_id}: ${err}`);
-      await reportResult(invoice.transaction_id, false, null, data, err);
+      // Pass any invoice number we DID receive — the server has a regex rescue
+      // (fiscal-number pattern) that flips the row to 'submitted' if PRA actually issued one,
+      // preventing a duplicate re-submission of an already-fiscalized bill.
+      await reportResult(invoice.transaction_id, false, praInvoiceNumber || null, data, err);
       failedTxnIds.add(invoice.transaction_id);
       status.failedCount = failedTxnIds.size;
     }
   } catch (e) {
-    const errMsg = e.response?.data ? JSON.stringify(e.response.data) : e.message;
+    let errMsg = e.response?.data ? JSON.stringify(e.response.data) : e.message;
+    if (isFiscalDevice && /ECONNREFUSED|ENOTFOUND|ETIMEDOUT/i.test(e.message || '')) {
+      errMsg = `IMS Fiscal Device service is NOT running on this PC (localhost:8524 unreachable). Install/start PRAL's IMS Fiscal Device software, then bills will sync automatically. (${e.message})`;
+    }
     log(`❌ PRA error txn ${invoice.transaction_id}: ${errMsg}`);
     await reportResult(invoice.transaction_id, false, null, e.response?.data, errMsg);
     failedTxnIds.add(invoice.transaction_id);

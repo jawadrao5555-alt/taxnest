@@ -2320,6 +2320,7 @@ class PosController extends Controller
 
             $request->validate([
                 'pra_environment' => 'required|in:sandbox,production',
+                'pra_connection_mode' => 'nullable|in:cloud,fiscal_device',
                 'pra_pos_id' => 'nullable|string',
                 'pra_production_token' => 'nullable|string',
                 'pra_proxy_url' => 'nullable|url',
@@ -2330,6 +2331,18 @@ class PosController extends Controller
                 'pra_environment' => $request->pra_environment,
                 'receipt_printer_size' => $request->receipt_printer_size ?? '80mm',
             ];
+
+            if ($request->filled('pra_connection_mode')) {
+                $updateData['pra_connection_mode'] = $request->pra_connection_mode;
+
+                // Fiscal Device submissions only happen from the shop PC — the desktop agent is mandatory.
+                if ($request->pra_connection_mode === 'fiscal_device') {
+                    $updateData['agent_enabled'] = true;
+                    if (empty($company->agent_api_key)) {
+                        $updateData['agent_api_key'] = 'tnk_' . \Illuminate\Support\Str::random(48);
+                    }
+                }
+            }
 
             if ($request->filled('pra_pos_id')) {
                 $updateData['pra_pos_id'] = $request->pra_pos_id;

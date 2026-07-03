@@ -18,7 +18,9 @@ use Illuminate\Support\Facades\Schema;
  */
 class VerifyDiSerials extends Command
 {
-    protected $signature = 'di:serials {--check : Report only, change nothing}';
+    protected $signature = 'di:serials
+        {--check : Report only, change nothing}
+        {--renumber-drafts : Renumber DRAFT DI invoices (never FBR-submitted) to the new per-company serial format}';
 
     protected $description = 'Verify and heal per-company serial counters for DI, PRA POS and FBR POS (never modifies invoices/bills)';
 
@@ -90,6 +92,10 @@ class VerifyDiSerials extends Command
             $this->info('All counters already correct. Nothing changed. Invoices data untouched.');
         }
 
+        if ($this->option('renumber-drafts')) {
+            $this->renumberDrafts($companies, $checkOnly);
+        }
+
         $this->reportPosSerials(
             'PRA POS',
             'pos_transactions',
@@ -110,6 +116,94 @@ class VerifyDiSerials extends Command
         $this->info('POS serials are self-deriving (next = company\'s own last bill + 1, always company-scoped) — nothing to fix, table above is verification only.');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Renumber DRAFT invoices that were created with the old universal/legacy
+     * formats onto the new per-company serial format.
+     *
+     * SAFETY GATES — an invoice is renumbered ONLY if ALL of these hold:
+     *   - status = 'draft'                       (never locked/finalized)
+     *   - fbr_invoice_number IS NULL             (FBR never accepted it)
+     *   - submitted_at IS NULL                   (never marked submitted)
+     *   - is_fbr_processing = 0                  (not in the FBR queue)
+     *   - number is not already new-format (ends in DI + exactly 5 digits;
+     *     legacy timestamp format ends in DI + 13 digits, so no overlap)
+     *
+     * FBR-submitted / locked invoices are NEVER touched: their numbers are on
+     * FBR's official record and must stay identical forever.
+     *
+     * With --check the section only PREVIEWS what would change.
+     */
+    private function renumberDrafts($companies, bool $checkOnly): void
+    {
+        $this->line('');
+        $this->info('=== DI DRAFT RENUMBERING (old universal serials → new per-company serials) ===');
+
+        $totalChanged = 0;
+
+        foreach ($companies as $company) {
+            $drafts = DB::table('invoices')
+                ->where('company_id', $company->id)
+                ->where('status', 'draft')
+                ->whereNull('fbr_invoice_number')
+                ->whereNull('submitted_at')
+                ->whereNull('integrity_hash')
+                ->where(function ($q) {
+                    $q->whereNull('is_fbr_processing')->orWhere('is_fbr_processing', 0);
+                })
+                ->orderBy('id')
+                ->get(['id', 'invoice_number']);
+
+            foreach ($drafts as $draft) {
+                if (preg_match('/DI\d{5}$/', (string) $draft->invoice_number)) {
+                    continue; // already in the new per-company format
+                }
+
+                if ($checkOnly) {
+                    $this->line("  [preview] C{$company->id} #{$draft->id}: {$draft->invoice_number} → (next per-company serial)");
+                    $totalChanged++;
+                    continue;
+                }
+
+                $newNumber = InvoiceNumberingService::generateNextNumber($company->id);
+
+                // Re-assert every safety gate in the UPDATE itself: if the
+                // invoice was locked / queued for FBR between our SELECT and
+                // now, affected rows = 0 and we skip it (the unused serial is
+                // harmlessly absorbed by the service's uniqueness loop).
+                $updated = DB::table('invoices')
+                    ->where('id', $draft->id)
+                    ->where('status', 'draft')
+                    ->whereNull('fbr_invoice_number')
+                    ->whereNull('submitted_at')
+                    ->whereNull('integrity_hash')
+                    ->where(function ($q) {
+                        $q->whereNull('is_fbr_processing')->orWhere('is_fbr_processing', 0);
+                    })
+                    ->update([
+                        'invoice_number' => $newNumber,
+                        'internal_invoice_number' => $newNumber,
+                        'updated_at' => now(),
+                    ]);
+
+                if ($updated === 0) {
+                    $this->warn("  SKIPPED C{$company->id} #{$draft->id}: state changed while running (locked/submitted) — left untouched.");
+                    continue;
+                }
+
+                $this->line("  C{$company->id} #{$draft->id}: {$draft->invoice_number} → {$newNumber}");
+                $totalChanged++;
+            }
+        }
+
+        if ($totalChanged === 0) {
+            $this->info('No old-format drafts found — nothing to renumber.');
+        } elseif ($checkOnly) {
+            $this->info("{$totalChanged} draft(s) WOULD be renumbered. Run without --check (keep --renumber-drafts) to apply.");
+        } else {
+            $this->info("Renumbered {$totalChanged} draft(s). Locked/FBR-submitted invoices untouched.");
+        }
     }
 
     /**

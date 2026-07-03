@@ -322,8 +322,11 @@ class RestaurantPosController extends Controller
         $adjustedTaxable = round($taxableSubtotal * $discountRatio, 2);
 
         $taxRate = PosTaxRule::getRateForMethod('cash', $company);
-        $taxAmount = round($adjustedTaxable * $taxRate / 100, 2);
-        $totalAmount = round($subtotal - $discountAmount + $taxAmount, 2);
+        // Whole-rupee rounding — matches PosController::storeInvoice and the universal
+        // cart's roundedTotal getter (Math.round). Pakistan POS convention: tax + bill
+        // always whole rupees, no paisa. Was round(...,2) → 533.60 vs frontend 534.
+        $taxAmount = (float) round($adjustedTaxable * $taxRate / 100);
+        $totalAmount = (float) round($subtotal - $discountAmount + $taxAmount);
 
         DB::beginTransaction();
         try {
@@ -517,8 +520,11 @@ class RestaurantPosController extends Controller
         $discountRatio = $subtotal > 0 ? ($subtotal - $discountAmount) / $subtotal : 1;
         $taxableSubtotal = $order->items->where('is_tax_exempt', false)->sum('subtotal');
         $adjustedTaxable = round($taxableSubtotal * max(0, $discountRatio), 2);
-        $taxAmount = round($adjustedTaxable * $taxRate / 100, 2);
-        $totalAmount = round($subtotal - $discountAmount + $taxAmount, 2);
+        // Whole-rupee rounding — matches PosController::storeInvoice and the universal
+        // cart's roundedTotal getter (Math.round). Was round(...,2) → decimal totals on
+        // held/table-order bills while direct cart bills were whole-rupee.
+        $taxAmount = (float) round($adjustedTaxable * $taxRate / 100);
+        $totalAmount = (float) round($subtotal - $discountAmount + $taxAmount);
         $totalItemDiscounts = $order->items->sum('item_discount_amount');
 
         // PROVISIONAL BILL FLOW — when cashier saves as provisional, the bill is created

@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#052730">
     <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.5') }}">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <title>TaxNest — Pakistan's Most Advanced Tax Compliance Platform</title>
@@ -40,45 +41,14 @@
             50% { transform: translateY(5px) translateX(8px); }
             75% { transform: translateY(20px) translateX(-5px); }
         }
-        @keyframes shimmer {
-            0% { background-position: -200% center; }
-            100% { background-position: 200% center; }
-        }
-        @keyframes pulse-glow {
-            0%, 100% { opacity: 0.4; transform: scale(1); }
-            50% { opacity: 0.7; transform: scale(1.05); }
-        }
-        @keyframes countUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes slideInLeft { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
-        @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
-        @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-        .marquee-track { animation: marquee 25s linear infinite; }
-        .marquee-track:hover { animation-play-state: paused; }
         .testimonial-card { background: #ffffff; box-shadow: 0 2px 4px rgba(10,77,92,0.06), 0 8px 20px -6px rgba(10,77,92,0.10); }
-        @keyframes typewriter { from { width: 0; } to { width: 100%; } }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-        .typing-cursor { animation: blink 1s step-end infinite; }
         @keyframes gradientMove { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
         .gradient-animate { background-size: 200% auto; animation: gradientMove 4s ease infinite; }
-        @keyframes badgePulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(10,77,92,0.3); } 50% { box-shadow: 0 0 0 8px rgba(10,77,92,0); } }
-        .badge-pulse { animation: badgePulse 2s ease infinite; }
-        .trust-logo { opacity: 0.5; transition: opacity 0.3s; filter: grayscale(100%); }
-        .trust-logo:hover { opacity: 1; filter: grayscale(0%); }
         .orb-1 { animation: float 8s ease-in-out infinite; }
         .orb-2 { animation: float-reverse 10s ease-in-out infinite; }
         .orb-3 { animation: float 12s ease-in-out infinite 2s; }
-        .shimmer-text {
-            background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0) 100%);
-            background-size: 200% 100%;
-            animation: shimmer 4s ease-in-out infinite;
-        }
         .gradient-border-top { border-top: 4px solid #0A4D5C; }
         .gradient-border-top-purple { border-top: 4px solid #6d28d9; }
-        .pricing-glow { box-shadow: 0 0 80px -20px rgba(10,77,92,0.20); }
-        .grid-overlay {
-            background-image: linear-gradient(rgba(10,77,92,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(10,77,92,0.04) 1px, transparent 1px);
-            background-size: 60px 60px;
-        }
         .grid-overlay-dark {
             background-image: linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px);
             background-size: 60px 60px;
@@ -92,7 +62,6 @@
         .step-connector { position: relative; }
         .step-connector::after { content: ''; position: absolute; top: 50%; right: -24px; width: 48px; height: 2px; background: #0A4D5C; opacity: 0.25; }
         @media (max-width: 768px) { .step-connector::after { display: none; } }
-        .feature-icon-glow { box-shadow: 0 0 20px -4px currentColor; }
     </style>
 </head>
 <body class="antialiased text-gray-700 scroll-smooth bg-white dark:bg-gray-900 overflow-x-hidden">
@@ -114,12 +83,12 @@
                 </a>
 
                 <div class="flex items-center flex-wrap justify-end gap-1 sm:gap-2">
-                    <a href="/digital-invoice" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-white/10 border border-white/20 backdrop-blur rounded-full hover:bg-white/20 hover:border-white/30 transition shadow-sm">Digital Invoice</a>
-                    <a href="/pos" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-purple-700 rounded-full hover:bg-purple-800 transition shadow-sm">PRA POS</a>
-                    <a href="/fbr-pos-landing" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-blue-700 rounded-full hover:bg-blue-800 transition shadow-sm">FBR POS</a>
-                    <a href="#pricing" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-300 hover:text-white rounded-lg hover:bg-white/10 transition">Pricing</a>
-                    <a href="#features" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-300 hover:text-white rounded-lg hover:bg-white/10 transition">Docs</a>
-                    <a href="#contact" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-300 hover:text-white rounded-lg hover:bg-white/10 transition">Contact</a>
+                    <a href="/digital-invoice" class="px-2.5 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-[13px] font-semibold text-white bg-white/10 border border-white/20 backdrop-blur rounded-full hover:bg-white/20 hover:border-white/30 transition shadow-sm whitespace-nowrap">Digital Invoice</a>
+                    <a href="/pos" class="px-2.5 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-[13px] font-semibold text-white bg-purple-700 rounded-full hover:bg-purple-800 transition shadow-sm whitespace-nowrap">PRA POS</a>
+                    <a href="/fbr-pos-landing" class="px-2.5 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-[13px] font-semibold text-white bg-blue-700 rounded-full hover:bg-blue-800 transition shadow-sm whitespace-nowrap">FBR POS</a>
+                    <a href="#pricing" class="px-2 py-1.5 sm:px-3 sm:py-1.5 text-[11px] sm:text-[13px] font-medium text-gray-300 hover:text-white rounded-lg hover:bg-white/10 transition whitespace-nowrap">Pricing</a>
+                    <a href="#features" class="px-2 py-1.5 sm:px-3 sm:py-1.5 text-[11px] sm:text-[13px] font-medium text-gray-300 hover:text-white rounded-lg hover:bg-white/10 transition whitespace-nowrap">Docs</a>
+                    <a href="#contact" class="px-2 py-1.5 sm:px-3 sm:py-1.5 text-[11px] sm:text-[13px] font-medium text-gray-300 hover:text-white rounded-lg hover:bg-white/10 transition whitespace-nowrap">Contact</a>
                 </div>
             </div>
         </div>
@@ -167,7 +136,7 @@
                     </a>
                 </div>
 
-                <div class="flex items-center justify-center gap-6 mt-8 text-[12px] text-gray-300">
+                <div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-8 text-[12px] text-gray-300">
                     <span class="flex items-center gap-1.5"><svg class="w-4 h-4" style="color:#2EA0B3;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> No credit card</span>
                     <span class="flex items-center gap-1.5"><svg class="w-4 h-4" style="color:#2EA0B3;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> 3-day trial</span>
                     <span class="flex items-center gap-1.5"><svg class="w-4 h-4" style="color:#2EA0B3;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Cancel anytime</span>
@@ -501,9 +470,9 @@
                     <table class="w-full">
                         <thead>
                             <tr class="bg-[#07333E]">
-                                <th class="text-left py-4 px-6 text-[13px] font-medium text-gray-300">Capability</th>
-                                <th class="text-center py-4 px-6 text-[13px] font-bold text-[#E7BF3B]">TaxNest</th>
-                                <th class="text-center py-4 px-6 text-[13px] font-bold text-gray-400">Others</th>
+                                <th class="text-left py-4 px-4 sm:px-6 text-[13px] font-medium text-gray-300">Capability</th>
+                                <th class="text-center py-4 px-3 sm:px-6 text-[13px] font-bold text-[#E7BF3B]">TaxNest</th>
+                                <th class="text-center py-4 px-3 sm:px-6 text-[13px] font-bold text-gray-400">Others</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-50">
@@ -528,13 +497,13 @@
                             @endphp
                             @foreach($comparisons as $comp)
                             <tr class="hover:bg-gray-50/50 transition">
-                                <td class="py-3.5 px-6 text-[13px] font-medium text-gray-700">{{ $comp[0] }}</td>
-                                <td class="py-3.5 px-6 text-center">
+                                <td class="py-3.5 px-4 sm:px-6 text-[13px] font-medium text-gray-700">{{ $comp[0] }}</td>
+                                <td class="py-3.5 px-3 sm:px-6 text-center">
                                     @if($comp[1] === true)
                                     <svg class="w-5 h-5 text-[#0F6171] mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                     @endif
                                 </td>
-                                <td class="py-3.5 px-6 text-center">
+                                <td class="py-3.5 px-3 sm:px-6 text-center">
                                     @if($comp[2] === true)
                                     <svg class="w-5 h-5 text-[#0F6171] mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                     @elseif($comp[2] === 'partial')
@@ -736,7 +705,7 @@
             </div>
             <div class="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <p class="text-[12px] text-gray-400">&copy; {{ date('Y') }} TaxNest. All rights reserved.</p>
-                <div class="flex items-center space-x-5">
+                <div class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
                     <span class="flex items-center text-[11px] text-gray-400"><svg class="w-3 h-3 mr-1 text-[#2EA0B3]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>FBR API v1.12</span>
                     <span class="flex items-center text-[11px] text-gray-400"><svg class="w-3 h-3 mr-1 text-[#2EA0B3]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>PRA IMS v1.2</span>
                     <span class="flex items-center text-[11px] text-gray-400"><svg class="w-3 h-3 mr-1 text-[#2EA0B3]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>SHA-256</span>

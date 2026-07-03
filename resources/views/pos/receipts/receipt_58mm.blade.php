@@ -223,18 +223,26 @@
 
     <div class="separator"></div>
 
+    @php
+        // Owner decision (Jul 2026): toggle OFF hides subtotal + tax on ALL receipts
+        // (incl. PRA fiscal) — customer copy shows grand total only. Tax is always
+        // submitted to PRA; details visible via Sahulat app QR scan.
+        $showTaxLines = (bool) (optional($transaction->company)->pos_receipt_show_tax ?? true);
+    @endphp
     <table class="totals-table">
+        @if($showTaxLines)
         <tr>
             <td class="tot-label">Subtotal:</td>
             <td class="tot-value">{{ number_format($transaction->subtotal, 2) }}</td>
         </tr>
+        @endif
         @if($transaction->discount_amount > 0)
         <tr>
             <td class="tot-label">Disc:</td>
             <td class="tot-value">-{{ number_format($transaction->discount_amount, 2) }}</td>
         </tr>
         @endif
-        @if((optional($transaction->company)->pos_receipt_show_tax ?? true) || $transaction->invoice_mode === 'pra' || !empty($transaction->pra_invoice_number))
+        @if($showTaxLines)
         <tr>
             <td class="tot-label">Tax ({{ number_format($transaction->tax_rate, 0) }}%):</td>
             <td class="tot-value">{{ number_format($transaction->tax_amount, 2) }}</td>

@@ -18,6 +18,7 @@ TaxNest is a multi-company SaaS platform designed for comprehensive tax and invo
 - Pending companies can VIEW all features but CANNOT perform any actions until admin approves
 - Login supports: Email, Phone, Username, CNIC, NTN
 - CNIC/NTN login maps to company_admin user of matching company
+- "Show Tax on Receipt" toggle OFF hides Subtotal + Tax lines on ALL POS receipts (including PRA fiscal) — customer copy shows grand TOTAL only (owner decision, Jul 2026; customers dislike separate tax). Tax is ALWAYS submitted to PRA in full; details visible via Sahulat app QR scan. Do NOT re-add a fiscal-always-show override.
 - Cards/banners must be CLEAN & SOLID — owner dislikes decorative faint colored corner-glow/gradient overlays on cards. Do NOT add absolute corner blobs (`from-{color}/10 to-transparent rounded-bl-full`), white corner glows (`bg-white/10 rounded-full blur-xl/3xl`), or top washes (`from-emerald-400/25 to-transparent blur-2xl`) to KPI cards, dashboard cards, sale-screen tops, or gradient banners. EXEMPT (keep): modal backdrops (`bg-black/40 backdrop-blur`), login/landing/guest page backgrounds, hover accent underline bars, icon-box gradients.
 
 ## System Architecture

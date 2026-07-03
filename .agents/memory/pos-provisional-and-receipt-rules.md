@@ -22,14 +22,19 @@ F10 provisional modal and mismatches the Transactions "Local" tab — this cause
 - Both save paths already land provisional correctly: retail `storeInvoice` and restaurant
   `RestaurantPosController::payHeldOrder` set completed + local + local when `save_as_provisional`.
 
-# PRA fiscal receipt tax rule
+# Receipt tax display rule (OWNER OVERRIDE, Jul 2026)
 
-The `companies.pos_receipt_show_tax` toggle hides the tax line ONLY on local / non-fiscal receipts.
+The `companies.pos_receipt_show_tax` toggle applies to ALL receipts — including PRA fiscal ones.
+Toggle OFF = customer copy hides BOTH the Subtotal and Tax lines and shows only the grand TOTAL
+(discount line stays if present). PRA number + QR remain on the receipt.
 
-**Why:** Pakistan PRA fiscal receipts that carry a PRA invoice number/QR must display the tax amount;
-hiding it risks non-compliance and makes receipt arithmetic (Subtotal − Discount = Total) inconsistent.
+**Why:** Owner's explicit business decision — Pakistani customers dislike seeing separate tax, shopkeepers
+want tax-inclusive-looking receipts. Earlier fiscal-always-show guard was rejected by the owner. Hiding
+subtotal along with tax is deliberate: subtotal alone (750 vs TOTAL 870) reveals the tax gap. Full details
+remain visible via PRA Sahulat app QR scan; tax is ALWAYS submitted to PRA in full regardless of display.
 
-**How to apply:** Guard the tax line in all receipt templates (receipt_80mm, receipt_58mm, invoice-pdf) with:
-`@if((optional($transaction->company)->pos_receipt_show_tax ?? true) || $transaction->invoice_mode === 'pra' || !empty($transaction->pra_invoice_number))`
-i.e. fiscal bills always show tax; the toggle only affects local bills. Tax is always SUBMITTED to PRA
-regardless of this display toggle.
+**How to apply:** In receipt_80mm, receipt_58mm, invoice-pdf: a single `$showTaxLines` boolean
+(`optional($transaction->company)->pos_receipt_show_tax ?? true`) guards BOTH subtotal and tax rows.
+Do NOT re-add `|| invoice_mode==='pra' || pra_invoice_number` overrides. transaction-show (internal admin
+view) keeps full details. restaurant/receipt.blade.php is DEAD (RestaurantPosController::receipt renders
+the shared receipt_80mm/58mm templates).

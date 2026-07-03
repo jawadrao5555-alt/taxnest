@@ -243,18 +243,28 @@
 
     <div class="separator"></div>
 
+    @php
+        // Owner decision (Jul 2026): the "Show Tax on Receipt" toggle applies to ALL
+        // receipts, including PRA fiscal ones. When OFF the customer copy shows only
+        // the grand total (subtotal + tax lines hidden — showing subtotal alone would
+        // reveal the tax gap). Tax is ALWAYS submitted to PRA in full regardless;
+        // full details remain visible via PRA Sahulat app QR scan.
+        $showTaxLines = (bool) (optional($transaction->company)->pos_receipt_show_tax ?? true);
+    @endphp
     <table class="totals-table">
+        @if($showTaxLines)
         <tr>
             <td class="tot-label">Subtotal:</td>
             <td class="tot-value">PKR {{ number_format($transaction->subtotal, 2) }}</td>
         </tr>
+        @endif
         @if($transaction->discount_amount > 0)
         <tr>
             <td class="tot-label">Discount{{ $transaction->discount_type === 'percentage' ? ' ('.$transaction->discount_value.'%)' : '' }}:</td>
             <td class="tot-value">-PKR {{ number_format($transaction->discount_amount, 2) }}</td>
         </tr>
         @endif
-        @if((optional($transaction->company)->pos_receipt_show_tax ?? true) || $transaction->invoice_mode === 'pra' || !empty($transaction->pra_invoice_number))
+        @if($showTaxLines)
         <tr>
             <td class="tot-label">Tax ({{ number_format($transaction->tax_rate, 0) }}%):</td>
             <td class="tot-value">PKR {{ number_format($transaction->tax_amount, 2) }}</td>

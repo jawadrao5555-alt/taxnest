@@ -190,7 +190,7 @@
                             <input type="checkbox" name="pos_receipt_show_tax" value="1" x-model="receiptShowTax" class="mt-0.5 w-4 h-4 text-amber-600 rounded">
                             <div class="flex-1 min-w-0">
                                 <div class="text-sm font-bold text-gray-900 dark:text-white">🧾 Show Tax on Receipt</div>
-                                <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug">Print the sales-tax line on <b>local (non-fiscal)</b> receipts. PRA fiscal receipts always show tax — required by PRA. (Tax is always submitted to FBR/PRA regardless.)</p>
+                                <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug">Print subtotal + sales-tax lines on receipts. OFF = customer copy shows grand total only. Tax is always submitted to FBR/PRA in full; details stay visible on QR scan (Sahulat app).</p>
                             </div>
                         </label>
                         <label class="flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition" :class="guidedFlow ? 'border-amber-500 bg-amber-50/40 dark:bg-amber-900/10' : 'border-gray-200 dark:border-gray-700'">

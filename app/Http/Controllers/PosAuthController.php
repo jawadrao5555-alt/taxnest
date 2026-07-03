@@ -21,6 +21,9 @@ class PosAuthController extends Controller
             if (($user->pos_role ?? null) === 'archive_viewer') {
                 return redirect('/pos/archive');
             }
+            if (($user->pos_role ?? null) === 'local_viewer') {
+                return redirect('/pos/local-bills');
+            }
             // POS UNIFICATION: every POS user (restaurant or retail) bills on the
             // single universal sale screen; restaurant behavior is driven by features.
             return redirect('/pos/invoice/create');
@@ -94,6 +97,11 @@ class PosAuthController extends Controller
                 // auto-detected by pos_role. POS admin/cashier never sees this account.
                 if (($user->pos_role ?? null) === 'archive_viewer') {
                     return redirect('/pos/archive');
+                }
+
+                // Local Bills Viewer → isolated Local Bills Portal only.
+                if (($user->pos_role ?? null) === 'local_viewer') {
+                    return redirect('/pos/local-bills');
                 }
 
                 return redirect('/pos/invoice/create');

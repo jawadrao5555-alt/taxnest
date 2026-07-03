@@ -53,6 +53,11 @@ class User extends Authenticatable
         return $this->pos_role === 'pos_cashier';
     }
 
+    public function isLocalViewer()
+    {
+        return $this->pos_role === 'local_viewer';
+    }
+
     public function company()
     {
         return $this->belongsTo(Company::class);

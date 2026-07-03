@@ -17,7 +17,9 @@ class PosInventoryController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         if (!$company || !$company->inventory_enabled) {
-            abort(403, 'Inventory module is not enabled for this company.');
+            // Company admin has full visibility of the links — guide them to
+            // enable the module instead of a hard 403.
+            abort(redirect()->route('pos.features')->with('error', 'Inventory module is OFF. Enable it from POS Features to use these pages.'));
         }
         return [$companyId, $company];
     }

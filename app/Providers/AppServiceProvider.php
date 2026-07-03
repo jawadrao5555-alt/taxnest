@@ -22,6 +22,12 @@ class AppServiceProvider extends ServiceProvider
     {
         InvoiceItem::observe(InvoiceItemObserver::class);
 
+        // Allow any view to be used as an anonymous component (e.g.
+        // <x-dynamic-component :component="'pos.archive.layout'"> resolves to
+        // resources/views/pos/archive/layout.blade.php). Required by the
+        // Archive Portal and Local Bills Portal layouts.
+        \Illuminate\Support\Facades\Blade::anonymousComponentPath(resource_path('views'));
+
         $dbDefault = config('database.default');
         Log::info('DB_DRIVER', [
             'default' => $dbDefault,

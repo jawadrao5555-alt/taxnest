@@ -232,7 +232,7 @@ window.addEventListener('popstate', function() {
             <span x-show="autoPrintLoading" class="text-[10px] text-emerald-500 animate-pulse">…</span>
         </div>
 
-        @if($company->restaurant_mode ?? false)
+        @if($features->kot ?? false)
         <div class="w-px h-4 bg-purple-200 dark:bg-purple-800/40"></div>
 
         {{-- Auto-KOT (Phase 5+) — when ON, the kitchen ticket print dialog also pops
@@ -540,8 +540,8 @@ window.addEventListener('popstate', function() {
                 <span x-show="!submitting" class="text-[10px] bg-amber-400/30 px-1 rounded">F5</span> <span x-text="submitting ? 'Holding...' : 'Hold'"></span>
             </button>
 
-            {{-- Phase 5 — Send to Kitchen (visible only when restaurant_mode OR feature.kot is on) --}}
-            @if(($company->restaurant_mode ?? false) || ($features->kot ?? false))
+            {{-- Phase 5 — Send to Kitchen (visible only when feature.kot is on) --}}
+            @if($features->kot ?? false)
             <button @click="sendToKitchen()" :disabled="cart.length === 0 || submitting || hasManualItems()" :title="hasManualItems() ? 'Manual items billing-only — pay first or remove from cart' : 'Saves the order and prints the kitchen ticket without taking payment.'" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
                 <span class="text-base leading-none">🍳</span>
                 <span x-text="submitting ? 'Sending...' : 'Send to Kitchen'"></span>
@@ -1121,9 +1121,8 @@ window.addEventListener('popstate', function() {
                     </div>
                 </template>
             </div>
-            <div x-show="localBills.length > 0" class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-[11px] text-gray-500 flex items-center justify-between">
+            <div x-show="localBills.length > 0" class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-[11px] text-gray-500">
                 <span>💡 Provisional bills NOT reported to PRA — edit/delete anytime, or "Make Final" to lock & submit.</span>
-                <a href="{{ route('pos.transactions') }}?tab=local" class="text-purple-600 hover:underline font-semibold">Open full page →</a>
             </div>
         </div>
     </div>
@@ -2044,7 +2043,7 @@ function restaurantPos() {
         // "Restaurant module not enabled"). For retail companies we route
         // EVERY processPayment call through processPaymentManual which uses
         // pos.invoice.store — a universal endpoint with no restaurant guard.
-        isRestaurantMode: {{ (($company->pos_type ?? '') === 'restaurant' || ($company->restaurant_mode ?? false)) ? 'true' : 'false' }},
+        isRestaurantMode: {{ (($features->tables ?? false) || ($features->kot ?? false) || ($features->kitchen ?? false)) ? 'true' : 'false' }},
         // ── PROVISIONAL BILLS (header shortcut, F10) ──────────────────────────
         // Lazy-loaded list of all bills with pra_status='local' for current company.
         // Refreshed on page mount, after every bill save, and after each modal action.

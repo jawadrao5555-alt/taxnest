@@ -1,10 +1,9 @@
 <x-pos-layout>
     @php
-        $cat     = $company->business_category ? ucfirst(str_replace('_', ' ', $company->business_category)) : 'Retail';
         $density = $company->pos_ui_density ? ucfirst($company->pos_ui_density) : 'Standard';
-        $mode    = ($company->restaurant_mode ?? false) ? 'Restaurant' : 'Retail';
         $praOn   = (bool) ($company->pra_reporting_enabled ?? false);
         $agentOn = (bool) ($company->agent_enabled ?? false);
+        $invOn   = (bool) ($company->inventory_enabled ?? false);
 
         // Card sections — every POS feature reachable from this one hub.
         $sections = [
@@ -12,8 +11,9 @@
                 'title' => 'Setup & Features',
                 'desc'  => 'Modules, presets, business info and compliance',
                 'items' => [
-                    ['label' => 'Modules & Features', 'desc' => 'Industry preset, layout density, receipt tax, KOT printing & stock rules', 'url' => route('pos.features'), 'tone' => 'purple', 'badge' => $density . ' · ' . $cat, 'icon' => 'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4'],
-                    ['label' => 'Business Profile', 'desc' => 'Store name, NTN, logo, address, inventory & restaurant mode', 'url' => route('pos.business-profile'), 'tone' => 'purple', 'badge' => $mode, 'icon' => 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'],
+                    ['label' => 'Modules & Features', 'desc' => 'Har feature ka apna toggle — tables, kitchen, barcode, recipes & more', 'url' => route('pos.features'), 'tone' => 'purple', 'badge' => $density, 'icon' => 'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4'],
+                    ['label' => 'Business Profile', 'desc' => 'Store name, NTN, logo, address & contact details', 'url' => route('pos.business-profile'), 'tone' => 'purple', 'badge' => 'Identity', 'icon' => 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'],
+                    ['label' => 'Receipt Display', 'desc' => 'Receipt par address, NTN, phone & footer message ka control', 'url' => route('pos.receipt-settings'), 'tone' => 'purple', 'badge' => 'Receipt', 'icon' => 'M9 17v-2a2 2 0 012-2h2a2 2 0 012 2v2m-6 4h6a2 2 0 002-2V7a2 2 0 00-2-2H9a2 2 0 00-2 2v12a2 2 0 002 2z'],
                     ['label' => 'PRA Compliance', 'desc' => 'PRA fiscal reporting & device credentials', 'url' => route('pos.pra-settings'), 'tone' => $praOn ? 'emerald' : 'amber', 'badge' => $praOn ? 'PRA ON' : 'PRA OFF', 'icon' => 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'],
                 ],
             ],
@@ -54,7 +54,7 @@
         ];
     @endphp
 
-    <div x-data="{ currentTheme: '{{ $company->pos_theme ?? 'purple' }}', guidedOn: {{ ($company->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }}, savingGuided: false }"
+    <div x-data="{ currentTheme: '{{ $company->pos_theme ?? 'purple' }}', guidedOn: {{ ($company->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }}, savingGuided: false, invOn: {{ $invOn ? 'true' : 'false' }}, savingInv: false }"
          class="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
 
         {{-- ═══════════ HERO ═══════════ --}}
@@ -117,6 +117,22 @@
                         <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="guidedOn && 'translate-x-6'"></span>
                     </button>
                 </div>
+
+                {{-- Inventory tracking (moved here from Business Profile) --}}
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">Inventory Tracking</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">Har sale par stock khud minus ho — low-stock alerts ke saath</p>
+                    </div>
+                    <button type="button"
+                        @click="invOn=!invOn; savingInv=true; fetch('/pos/settings/inventory-toggle', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({enabled:invOn})}).then(r=>r.json()).catch(()=>{}).finally(()=>{ savingInv=false; })"
+                        class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200" :class="invOn ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'">
+                        <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="invOn && 'translate-x-6'"></span>
+                    </button>
+                </div>
             </div>
         </section>
 
@@ -151,7 +167,7 @@
         @endforeach
 
         <div class="pt-2 text-center">
-            <a href="{{ $company->restaurant_mode ?? false ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}" class="inline-flex items-center gap-1.5 text-[12px] font-semibold text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition">
+            <a href="{{ route('pos.dashboard') }}" class="inline-flex items-center gap-1.5 text-[12px] font-semibold text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                 Back to Dashboard
             </a>

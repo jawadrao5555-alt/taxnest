@@ -216,7 +216,13 @@ class AdminCompanyController extends Controller
             ->orderBy('id', 'desc')
             ->get();
 
-        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers'));
+        // Local Bills Viewer accounts (only meaningful for POS companies).
+        $localViewers = User::where('company_id', $id)
+            ->where('pos_role', 'local_viewer')
+            ->orderBy('id', 'desc')
+            ->get();
+
+        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers'));
     }
 
     /**
@@ -324,6 +330,104 @@ class AdminCompanyController extends Controller
 
         $user->delete();
         return back()->with('success', 'Archive Viewer account removed.');
+    }
+
+    /**
+     * Local Bills Viewer Account — Super-admin creates a dedicated read-only login for the
+     * company's "Local Bills Portal" (the ONLY surface where local/non-PRA bills are visible).
+     * Same /pos/login URL (auto-detected by pos_role); invisible to POS admin/cashier.
+     */
+    public function storeLocalViewer(Request $request, $id)
+    {
+        $this->assertSuperAdmin();
+        $company = Company::findOrFail($id);
+        if ($company->product_type !== 'pos') {
+            return back()->with('error', 'Local Bills Viewer only available for POS companies.');
+        }
+
+        $request->validate([
+            'name' => 'required|string|max:100',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:8',
+        ]);
+
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => bcrypt($request->password),
+            'company_id' => $company->id,
+            'role' => 'employee',
+            'pos_role' => 'local_viewer',
+            'is_active' => true,
+        ]);
+
+        AdminAuditLog::log(auth('admin')->id(), 'Local Bills Viewer created', 'User', $user->id, [
+            'company_id' => $company->id,
+            'company_name' => $company->name,
+            'email' => $user->email,
+        ]);
+
+        return back()->with('success', "Local Bills Viewer account created for {$company->name}. They can now log in at /pos/login.");
+    }
+
+    public function updateLocalViewer(Request $request, $id, $userId)
+    {
+        $this->assertSuperAdmin();
+        $company = Company::findOrFail($id);
+        $user = User::where('company_id', $company->id)
+            ->where('pos_role', 'local_viewer')
+            ->findOrFail($userId);
+
+        $request->validate([
+            'name' => 'required|string|max:100',
+            'email' => 'required|email|unique:users,email,' . $user->id,
+            'password' => 'nullable|string|min:8',
+        ]);
+
+        $update = [
+            'name' => $request->name,
+            'email' => $request->email,
+        ];
+        if ($request->filled('password')) {
+            $update['password'] = bcrypt($request->password);
+        }
+        $user->update($update);
+
+        AdminAuditLog::log(auth('admin')->id(), 'Local Bills Viewer updated', 'User', $user->id, [
+            'company_id' => $company->id,
+            'password_changed' => $request->filled('password'),
+        ]);
+
+        return back()->with('success', 'Local Bills Viewer credentials updated.');
+    }
+
+    public function toggleLocalViewer($id, $userId)
+    {
+        $this->assertSuperAdmin();
+        $user = User::where('company_id', $id)
+            ->where('pos_role', 'local_viewer')
+            ->findOrFail($userId);
+        $user->update(['is_active' => !$user->is_active]);
+
+        AdminAuditLog::log(auth('admin')->id(), $user->is_active ? 'Local Bills Viewer activated' : 'Local Bills Viewer deactivated', 'User', $user->id, ['company_id' => $id]);
+
+        return back()->with('success', $user->is_active ? 'Local Bills Viewer activated.' : 'Local Bills Viewer deactivated.');
+    }
+
+    public function deleteLocalViewer($id, $userId)
+    {
+        $this->assertSuperAdmin();
+        $user = User::where('company_id', $id)
+            ->where('pos_role', 'local_viewer')
+            ->findOrFail($userId);
+
+        AdminAuditLog::log(auth('admin')->id(), 'Local Bills Viewer deleted', 'User', $user->id, [
+            'company_id' => $id,
+            'email' => $user->email,
+        ]);
+
+        $user->delete();
+        return back()->with('success', 'Local Bills Viewer account removed.');
     }
 
     public function approve($id)

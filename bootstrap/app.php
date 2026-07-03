@@ -33,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'plan.limit' => \App\Http\Middleware\CheckPlanLimit::class,
             'company.approval' => \App\Http\Middleware\CheckCompanyApproval::class,
             'restaurant.only' => \App\Http\Middleware\RestaurantOnly::class,
+            'feature' => \App\Http\Middleware\FeatureEnabled::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

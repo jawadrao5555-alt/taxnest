@@ -341,6 +341,73 @@
     </div>
     @endif
 
+    @if($company->product_type === 'pos' && auth('admin')->user()?->isSuperAdmin())
+    <div class="bg-gradient-to-br from-violet-950/40 to-slate-900 border border-violet-800/40 rounded-xl p-5 mt-6" x-data="{ showCreateLv: false }">
+        <div class="flex items-center justify-between mb-3">
+            <div>
+                <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                    <span class="text-violet-400">🧾</span> Local Bills Portal — Viewer Accounts
+                </h3>
+                <p class="text-xs text-gray-400 mt-0.5">Dedicated read-only logins for LIVE + archived local (non-PRA) bills — the ONLY jagah jahan local bills nazar aate hain. Login at <code class="text-violet-300">/pos/login</code> (auto-detected). POS admin/cashier ko ye accounts nazar nahi aate.</p>
+            </div>
+            <button type="button" @click="showCreateLv = !showCreateLv" class="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium rounded-lg transition">+ New Viewer</button>
+        </div>
+
+        <div x-show="showCreateLv" x-cloak class="bg-gray-900/60 border border-violet-800/30 rounded-lg p-4 mb-3">
+            <form method="POST" action="{{ route('saas.admin.companies.local-viewer.store', $company->id) }}" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                @csrf
+                <input type="text" name="name" placeholder="Full Name" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 placeholder-gray-500">
+                <input type="email" name="email" placeholder="Email (login)" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 placeholder-gray-500">
+                <input type="text" name="password" placeholder="Password (min 8)" required minlength="8" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 placeholder-gray-500">
+                <div class="sm:col-span-3 flex justify-end">
+                    <button type="submit" class="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium rounded-lg">Create Local Bills Viewer</button>
+                </div>
+            </form>
+        </div>
+
+        @if($localViewers->isEmpty())
+            <p class="text-xs text-gray-500">No Local Bills Viewer accounts yet.</p>
+        @else
+            <div class="space-y-2">
+                @foreach($localViewers as $lv)
+                <div class="bg-gray-900/60 border border-gray-800 rounded-lg p-3" x-data="{ edit: false }">
+                    <div x-show="!edit" class="flex items-center justify-between gap-3 flex-wrap">
+                        <div class="flex-1 min-w-[180px]">
+                            <div class="text-sm font-medium text-white">{{ $lv->name }} <span class="text-xs text-gray-500">#{{ $lv->id }}</span></div>
+                            <div class="text-xs text-gray-400">{{ $lv->email }}</div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded {{ $lv->is_active ? 'bg-emerald-900/40 text-emerald-300' : 'bg-gray-800 text-gray-500' }}">{{ $lv->is_active ? 'Active' : 'Inactive' }}</span>
+                            <button type="button" @click="edit = true" class="text-xs px-2.5 py-1 rounded bg-gray-800 text-gray-300 hover:bg-gray-700">Edit</button>
+                            <form method="POST" action="{{ route('saas.admin.companies.local-viewer.toggle', [$company->id, $lv->id]) }}" class="inline">
+                                @csrf
+                                <button type="submit" class="text-xs px-2.5 py-1 rounded {{ $lv->is_active ? 'bg-amber-900/40 text-amber-300' : 'bg-emerald-900/40 text-emerald-300' }} hover:opacity-80">{{ $lv->is_active ? 'Disable' : 'Enable' }}</button>
+                            </form>
+                            <form method="POST" action="{{ route('saas.admin.companies.local-viewer.delete', [$company->id, $lv->id]) }}" class="inline" onsubmit="return confirm('Delete this Local Bills Viewer account? They will lose access immediately.');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="text-xs px-2.5 py-1 rounded bg-red-900/40 text-red-300 hover:bg-red-900/60">Delete</button>
+                            </form>
+                        </div>
+                    </div>
+                    <form x-show="edit" x-cloak method="POST" action="{{ route('saas.admin.companies.local-viewer.update', [$company->id, $lv->id]) }}" class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1">
+                        @csrf
+                        @method('PUT')
+                        <input type="text" name="name" value="{{ $lv->name }}" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
+                        <input type="email" name="email" value="{{ $lv->email }}" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
+                        <input type="text" name="password" placeholder="New password (leave blank to keep)" minlength="8" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 placeholder-gray-500">
+                        <div class="sm:col-span-3 flex justify-end gap-2">
+                            <button type="button" @click="edit = false" class="px-3 py-1.5 bg-gray-800 text-gray-300 text-xs rounded-lg hover:bg-gray-700">Cancel</button>
+                            <button type="submit" class="px-4 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium rounded-lg">Save</button>
+                        </div>
+                    </form>
+                </div>
+                @endforeach
+            </div>
+        @endif
+    </div>
+    @endif
+
     <div x-show="showDeleteModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @click.self="showDeleteModal = false">
         <div class="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md mx-4" @click.stop>
             <h3 class="text-lg font-bold text-white mb-2">Move to Bin</h3>

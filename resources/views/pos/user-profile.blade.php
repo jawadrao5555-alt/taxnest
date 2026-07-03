@@ -1,5 +1,9 @@
 <x-pos-layout>
 <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <a href="{{ route('pos.customize') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition mb-3">
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        Back to Customize
+    </a>
     <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">My Profile</h1>
     <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Update your personal details and change your password.</p>
 

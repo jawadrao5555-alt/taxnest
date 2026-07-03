@@ -62,6 +62,24 @@ class PosAuth
             }
         }
 
+        // ═══ Local Bills Viewer isolation ═══
+        // Users with pos_role='local_viewer' are confined to /pos/local-bills/* and
+        // /pos/logout — the ONLY surface where local (non-PRA) bills are visible.
+        // Every other pos_role gets a 404 on these routes.
+        if (($user->pos_role ?? null) === 'local_viewer') {
+            $path = ltrim($request->path(), '/');
+            $allowed = str_starts_with($path, 'pos/local-bills')
+                || $path === 'pos/logout'
+                || $path === 'pos/login';
+            if (!$allowed) {
+                return redirect('/pos/local-bills');
+            }
+        } else {
+            if (str_starts_with(ltrim($request->path(), '/'), 'pos/local-bills')) {
+                abort(404);
+            }
+        }
+
         // Resolve & bind active branch (returns null if no branches exist yet).
         // NOTE: use bind() not instance() — instance(name, null) is treated as "not bound" by Laravel.
         $branchId = app(\App\Services\BranchContextService::class)->getActiveBranchId();

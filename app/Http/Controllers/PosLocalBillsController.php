@@ -3,28 +3,31 @@
 namespace App\Http\Controllers;
 
 use App\Models\PosTransaction;
-use App\Models\PosDayCloseReport;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-class PosArchiveController extends Controller
+class PosLocalBillsController extends Controller
 {
     /**
-     * Archive Portal — only accessible by users with pos_role = 'archive_viewer'.
-     * Shows archived local/provisional bills that were moved here at day-close.
-     * Completely isolated from normal POS UI; cashiers/admins cannot see this data.
+     * Local Bills Portal — only accessible by users with pos_role = 'local_viewer'.
+     * The ONLY surface where local (non-PRA) bills are visible: live local bills
+     * plus those already archived at day-close. Completely isolated from normal
+     * POS UI; cashiers/admins cannot see this data (PosAuth confines both ways).
      */
+    private function baseQuery(int $companyId)
+    {
+        return PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->where('invoice_mode', 'local')
+            ->where('status', 'completed');
+    }
+
     public function index(Request $request)
     {
         $companyId = app('currentCompanyId');
 
-        $query = PosTransaction::withoutGlobalScope('hide_archived')
-            ->where('company_id', $companyId)
-            ->where('is_archived', true)
-            ->where(function ($m) { $m->where('invoice_mode', 'pra')->orWhereNull('invoice_mode'); });
+        $query = $this->baseQuery($companyId);
 
         if ($q = trim((string) $request->input('q', ''))) {
             $query->where(function ($w) use ($q) {
@@ -42,17 +45,16 @@ class PosArchiveController extends Controller
         if ($cashier = $request->input('cashier')) {
             $query->where('created_by', $cashier);
         }
-        if ($reportId = $request->input('report')) {
-            $query->where('archived_by_report_id', $reportId);
-        }
 
         $stats = [
             'total' => (clone $query)->count(),
             'sum' => (clone $query)->sum('total_amount'),
+            'today' => $this->baseQuery($companyId)->whereDate('created_at', today())->count(),
+            'today_sum' => $this->baseQuery($companyId)->whereDate('created_at', today())->sum('total_amount'),
         ];
 
         $bills = $query->with(['creator', 'items'])
-            ->orderBy('archived_at', 'desc')
+            ->orderBy('created_at', 'desc')
             ->orderBy('id', 'desc')
             ->paginate(50)
             ->withQueryString();
@@ -62,34 +64,23 @@ class PosArchiveController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        $reports = PosDayCloseReport::where('company_id', $companyId)
-            ->orderBy('report_date', 'desc')
-            ->take(60)
-            ->get(['id', 'report_number', 'report_date']);
-
-        return view('pos.archive.index', compact('bills', 'stats', 'cashiers', 'reports'));
+        return view('pos.local.index', compact('bills', 'stats', 'cashiers'));
     }
 
     public function show($id)
     {
         $companyId = app('currentCompanyId');
-        $bill = PosTransaction::withoutGlobalScope('hide_archived')
-            ->where('company_id', $companyId)
-            ->where('is_archived', true)
-            ->where(function ($m) { $m->where('invoice_mode', 'pra')->orWhereNull('invoice_mode'); })
+        $bill = $this->baseQuery($companyId)
             ->with(['items', 'creator', 'company'])
             ->findOrFail($id);
 
-        return view('pos.archive.show', compact('bill'));
+        return view('pos.local.show', compact('bill'));
     }
 
     public function exportCsv(Request $request): StreamedResponse
     {
         $companyId = app('currentCompanyId');
-        $query = PosTransaction::withoutGlobalScope('hide_archived')
-            ->where('company_id', $companyId)
-            ->where('is_archived', true)
-            ->where(function ($m) { $m->where('invoice_mode', 'pra')->orWhereNull('invoice_mode'); });
+        $query = $this->baseQuery($companyId);
 
         if ($from = $request->input('from')) {
             $query->whereDate('created_at', '>=', $from);
@@ -98,15 +89,15 @@ class PosArchiveController extends Controller
             $query->whereDate('created_at', '<=', $to);
         }
 
-        $bills = $query->with('creator')->orderBy('archived_at', 'desc')->get();
-        $filename = 'archived-local-bills-' . now()->format('Ymd-His') . '.csv';
+        $bills = $query->with('creator')->orderBy('created_at', 'desc')->get();
+        $filename = 'local-bills-' . now()->format('Ymd-His') . '.csv';
 
         return response()->streamDownload(function () use ($bills) {
             $out = fopen('php://output', 'w');
             fputcsv($out, [
                 'Invoice #', 'Created At', 'Cashier', 'Customer', 'Phone',
                 'Subtotal', 'Discount', 'Tax', 'Total',
-                'Payment Method', 'PRA Status', 'Archived At', 'Day-Close Report ID',
+                'Payment Method', 'Status', 'Archived',
             ]);
             foreach ($bills as $b) {
                 fputcsv($out, [
@@ -121,8 +112,7 @@ class PosArchiveController extends Controller
                     $b->total_amount,
                     $b->payment_method,
                     $b->pra_status,
-                    $b->archived_at?->format('Y-m-d H:i:s'),
-                    $b->archived_by_report_id,
+                    $b->is_archived ? 'Yes' : 'No',
                 ]);
             }
             fclose($out);

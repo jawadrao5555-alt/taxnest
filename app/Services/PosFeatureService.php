@@ -254,10 +254,12 @@ class PosFeatureService
             return self::flagsToObject(self::baseDefaults());
         }
 
-        $category = $company->business_category ?: ($company->restaurant_mode ? 'restaurant' : 'retail');
-        $defaults = self::CATEGORY_DEFAULTS[$category] ?? [];
+        // Business-category modes are retired: every feature is an individual
+        // per-company toggle. Existing companies were snapshot-migrated so
+        // feature_flags holds their full resolved set (see
+        // 2026_07_03_180000_snapshot_pos_feature_flags migration).
         $overrides = is_array($company->feature_flags) ? $company->feature_flags : [];
-        $resolved = self::resolve(array_merge(self::baseDefaults(), $defaults, $overrides));
+        $resolved = self::resolve(array_merge(self::baseDefaults(), $overrides));
 
         return self::flagsToObject($resolved);
     }

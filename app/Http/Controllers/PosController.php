@@ -67,6 +67,50 @@ class PosController extends Controller
         return response()->json(['success' => true, 'enabled' => $enabled]);
     }
 
+    public function updateInventoryToggle(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) {
+            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+        }
+        $enabled = $request->boolean('enabled');
+        $companyId = app('currentCompanyId');
+        Company::where('id', $companyId)->update(['inventory_enabled' => $enabled]);
+        return response()->json(['success' => true, 'enabled' => $enabled]);
+    }
+
+    /**
+     * Receipt Display Options — moved out of Business Profile into its own
+     * Customize POS sub-page.
+     */
+    public function receiptSettings(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) {
+            abort(403, 'Only POS administrators can change receipt settings.');
+        }
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        if (!$company) { abort(404); }
+
+        if ($request->isMethod('post')) {
+            $request->validate(['rp_footer_text' => 'nullable|string|max:150']);
+            $prefs = $company->invoice_display_prefs ?? [];
+            $prefs['pos'] = [
+                'show_address' => $request->has('rp_show_address'),
+                'show_ntn' => $request->has('rp_show_ntn'),
+                'show_email' => $request->has('rp_show_email'),
+                'show_mobile' => $request->has('rp_show_mobile'),
+                'show_footer' => $request->has('rp_show_footer'),
+                'footer_text' => trim((string) $request->input('rp_footer_text', '')) ?: null,
+            ];
+            $company->update(['invoice_display_prefs' => $prefs]);
+            return redirect()->route('pos.receipt-settings')->with('success', 'Receipt display settings saved.');
+        }
+
+        return view('pos.receipt-settings', compact('company'));
+    }
+
     /**
      * Customize POS — single consolidated settings hub (admin-only).
      * Surfaces every POS customization feature from one place; complex
@@ -96,15 +140,26 @@ class PosController extends Controller
 
         $today = now()->startOfDay();
 
+        // Local (non-PRA) bills are excluded from ALL dashboard KPIs — they are
+        // visible only in the isolated Local Bills Portal (pos_role='local_viewer').
+        $excludeLocal = function ($q) {
+            $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+        };
+        $excludeLocalRaw = function ($q) {
+            $q->where('t.invoice_mode', 'pra')->orWhereNull('t.invoice_mode');
+        };
+
         $todayStats = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->where('created_at', '>=', $today)
+            ->where($excludeLocal)
             ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue, COALESCE(AVG(total_amount),0) as avg_ticket')
             ->first();
 
         $monthStats = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->where('created_at', '>=', now()->startOfMonth())
+            ->where($excludeLocal)
             ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue')
             ->first();
 
@@ -130,6 +185,7 @@ class PosController extends Controller
             ->where('t.status', 'completed')
             ->where('t.created_at', '>=', $periodStart)
             ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
+            ->where($excludeLocalRaw)
             ->selectRaw('
                 COALESCE(SUM(i.subtotal), 0) as gross_revenue,
                 COALESCE(SUM(COALESCE(p.cost_price, 0) * i.quantity), 0) as total_cost
@@ -138,6 +194,7 @@ class PosController extends Controller
         $periodOrders = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->where('created_at', '>=', $periodStart)
+            ->where($excludeLocal)
             ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue')
             ->first();
 
@@ -162,6 +219,7 @@ class PosController extends Controller
             ->where('t.status', 'completed')
             ->where('t.created_at', '>=', $periodStart)
             ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
+            ->where($excludeLocalRaw)
             ->where('i.item_type', 'product')
             ->selectRaw('i.item_id, MAX(i.item_name) as name, SUM(i.quantity) as qty, SUM(i.subtotal) as revenue')
             ->groupBy('i.item_id')
@@ -177,6 +235,7 @@ class PosController extends Controller
             ->where('t.status', 'completed')
             ->where('t.created_at', '>=', $periodStart)
             ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
+            ->where($excludeLocalRaw)
             ->where('i.item_type', 'product')
             ->selectRaw('
                 i.item_id, MAX(i.item_name) as name,
@@ -219,6 +278,7 @@ class PosController extends Controller
         $paymentBreakdown = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->where('created_at', '>=', $today)
+            ->where($excludeLocal)
             ->selectRaw("payment_method, COUNT(*) as count, COALESCE(SUM(total_amount),0) as total")
             ->groupBy('payment_method')
             ->get();
@@ -1396,20 +1456,15 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        $tab = $request->get('tab', 'pra');
-
-        $pinRedirect = $this->requirePinForLocalTab($tab, $company);
-        if ($pinRedirect) return $pinRedirect;
+        // Local bills are ONLY visible in the isolated Local Bills Portal
+        // (pos_role='local_viewer'). Normal surfaces always show PRA-mode bills.
+        $tab = 'pra';
 
         $query = PosTransaction::where('company_id', $companyId)->where('status', 'completed')->with('creator');
 
-        if ($tab === 'local') {
-            $query->where('invoice_mode', 'local');
-        } else {
-            $query->where(function ($q) {
-                $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
-            });
-        }
+        $query->where(function ($q) {
+            $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+        });
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -1434,7 +1489,7 @@ class PosController extends Controller
         $transactions = $query->orderBy('created_at', 'desc')->paginate(20);
 
         $hasPinSet = !empty($company->confidential_pin);
-        $localCount = PosTransaction::where('company_id', $companyId)->where('status', 'completed')->where('invoice_mode', 'local')->count();
+        $localCount = 0;
         $user = auth('pos')->user();
 
         return view('pos.transactions', compact('transactions', 'tab', 'hasPinSet', 'localCount', 'user'));
@@ -1577,13 +1632,11 @@ class PosController extends Controller
 
     private function applyReportFilters($query, $tab, $cashierFilter = null)
     {
-        if ($tab === 'local') {
-            $query->where('invoice_mode', 'local');
-        } else {
-            $query->where(function ($sub) {
-                $sub->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
-            });
-        }
+        // Local bills are NEVER shown in the normal POS panel — they live only in
+        // the isolated Local Bills Portal (pos_role='local_viewer').
+        $query->where(function ($sub) {
+            $sub->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+        });
 
         if ($cashierFilter && $cashierFilter !== 'all') {
             $query->where('created_by', $cashierFilter);
@@ -1596,10 +1649,8 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        $tab = $request->get('tab', 'pra');
-
-        $pinRedirect = $this->requirePinForLocalTab($tab, $company);
-        if ($pinRedirect) return $pinRedirect;
+        // Local bills excluded from all normal reporting (Local Bills Portal only).
+        $tab = 'pra';
 
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
@@ -1656,7 +1707,7 @@ class PosController extends Controller
             ->get();
 
         $hasPinSet = !empty($company->confidential_pin);
-        $localCount = PosTransaction::where('company_id', $companyId)->where('status', 'completed')->where('invoice_mode', 'local')->count();
+        $localCount = 0;
         $selectedCashier = $cashierFilter;
 
         return view('pos.reports', compact('dailySales', 'paymentSummary', 'topItems', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user', 'teamMembers', 'isCashier', 'selectedCashier'));
@@ -1666,10 +1717,8 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        $tab = $request->get('tab', 'pra');
-
-        $pinRedirect = $this->requirePinForLocalTab($tab, $company);
-        if ($pinRedirect) return $pinRedirect;
+        // Local bills excluded from exports (Local Bills Portal only).
+        $tab = 'pra';
 
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
@@ -1682,8 +1731,7 @@ class PosController extends Controller
         $transactions = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->where('created_at', '>=', now()->subDays(30))
-            ->when($tab === 'local', fn($q) => $q->where('invoice_mode', 'local'))
-            ->when($tab !== 'local', fn($q) => $q->where(function ($s) { $s->where('invoice_mode', 'pra')->orWhereNull('invoice_mode'); }))
+            ->where(function ($s) { $s->where('invoice_mode', 'pra')->orWhereNull('invoice_mode'); })
             ->when($cashierFilter && $cashierFilter !== 'all', fn($q) => $q->where('created_by', $cashierFilter))
             ->with('creator')
             ->orderBy('created_at', 'desc')
@@ -1735,11 +1783,8 @@ class PosController extends Controller
             ->where('status', 'completed')
             ->with('terminal');
 
-        if ($tab === 'local') {
-            $query->where('invoice_mode', 'local');
-        } else {
-            $query->where(function ($q) { $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode'); });
-        }
+        // Local bills excluded everywhere in the normal POS panel (Local Bills Portal only).
+        $query->where(function ($q) { $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode'); });
 
         if (!$skipTaxRateFilter && $request->filled('tax_rate')) {
             if ($request->tax_rate === 'exempt') {
@@ -1888,10 +1933,8 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        $tab = $request->get('tab', 'pra');
-
-        $pinRedirect = $this->requirePinForLocalTab($tab, $company);
-        if ($pinRedirect) return $pinRedirect;
+        // Local bills excluded from tax reports (Local Bills Portal only).
+        $tab = 'pra';
 
         $taxRateFilter = $request->filled('tax_rate') ? $request->tax_rate : null;
 
@@ -1927,7 +1970,7 @@ class PosController extends Controller
         }
 
         $hasPinSet = !empty($company->confidential_pin);
-        $localCount = PosTransaction::where('company_id', $companyId)->where('status', 'completed')->where('invoice_mode', 'local')->count();
+        $localCount = 0;
         $user = auth('pos')->user();
 
         return view('pos.tax-reports', compact('company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel', 'tab', 'hasPinSet', 'localCount', 'user', 'itemValues', 'taxRateFilter'));
@@ -1937,10 +1980,8 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        $tab = $request->get('tab', 'pra');
-
-        $pinRedirect = $this->requirePinForLocalTab($tab, $company);
-        if ($pinRedirect) return $pinRedirect;
+        // Local bills excluded from tax report exports (Local Bills Portal only).
+        $tab = 'pra';
 
         $taxRateFilter = $request->filled('tax_rate') ? $request->tax_rate : null;
 
@@ -2076,10 +2117,8 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        $tab = $request->get('tab', 'pra');
-
-        $pinRedirect = $this->requirePinForLocalTab($tab, $company);
-        if ($pinRedirect) return $pinRedirect;
+        // Local bills excluded from tax report exports (Local Bills Portal only).
+        $tab = 'pra';
 
         $taxRateFilter = $request->filled('tax_rate') ? $request->tax_rate : null;
 
@@ -2229,10 +2268,11 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
-        if (!($company->restaurant_mode ?? false)) {
+        $features = \App\Services\PosFeatureService::forCompany($company);
+        if (!$features->kot) {
             return response()->json([
                 'success' => false,
-                'message' => 'Auto-KOT is only available in restaurant mode.',
+                'message' => 'Auto-KOT requires the KOT feature to be enabled (Customize POS → Modules).',
             ], 422);
         }
 
@@ -3938,8 +3978,6 @@ class PosController extends Controller
             $request->validate($rules);
 
             $data = $request->only(['name', 'owner_name', 'ntn', 'email', 'phone', 'mobile', 'address', 'city', 'business_activity', 'website']);
-            $data['inventory_enabled'] = $request->has('inventory_enabled');
-            $data['restaurant_mode'] = $request->has('restaurant_mode');
 
             // Receipt display preferences (per-company, POS product scope)
             if ($request->has('receipt_prefs_submitted')) {
@@ -4026,8 +4064,13 @@ class PosController extends Controller
             ->where('report_date', $date)
             ->first();
 
+        // Local (non-PRA) bills are excluded from the day-close view & figures —
+        // visible only in the isolated Local Bills Portal (pos_role='local_viewer').
         $transactions = PosTransaction::where('company_id', $companyId)
             ->whereDate('created_at', $date)
+            ->where(function ($q) {
+                $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+            })
             ->with('creator')
             ->orderBy('created_at')
             ->get();
@@ -4088,13 +4131,24 @@ class PosController extends Controller
             return back()->with('error', 'Day Close Report for this date already exists.');
         }
 
+        // Local (non-PRA) bills stay OUT of the stored day-close figures — they are
+        // visible only in the isolated Local Bills Portal. The purge/archive query
+        // below still targets them so day-close archiving keeps working.
         $transactions = PosTransaction::where('company_id', $companyId)
             ->whereDate('created_at', $date)
+            ->where(function ($q) {
+                $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+            })
             ->with('creator')
             ->orderBy('created_at')
             ->get();
 
-        if ($transactions->isEmpty()) {
+        $hasLocalBills = PosTransaction::where('company_id', $companyId)
+            ->whereDate('created_at', $date)
+            ->where('invoice_mode', 'local')
+            ->exists();
+
+        if ($transactions->isEmpty() && !$hasLocalBills) {
             return back()->with('error', 'No transactions found for this date.');
         }
 
@@ -4173,9 +4227,13 @@ class PosController extends Controller
 
         // Day-Close PDF shows HISTORICAL truth — include archived bills so the
         // closed-day report stays consistent even after rows were archived.
+        // Local (non-PRA) bills excluded — visible only in the Local Bills Portal.
         $transactions = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->whereDate('created_at', $report->report_date)
+            ->where(function ($q) {
+                $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+            })
             ->with('creator')
             ->orderBy('created_at')
             ->get();

@@ -157,6 +157,17 @@ Route::middleware(['pos.auth'])->prefix('pos/archive')->group(function () {
     Route::get('/{id}', [\App\Http\Controllers\PosArchiveController::class, 'show'])->whereNumber('id')->name('pos.archive.show');
 });
 
+// ═══ Local Bills Portal ═══
+// Isolated read-only portal for users with pos_role='local_viewer'. Same /pos/login URL
+// (auto-detected). PosAuth middleware confines local_viewer to /pos/local-bills/* and
+// blocks every other pos_role from these routes (404). This is the ONLY surface where
+// local (non-PRA) bills are visible. Account created/managed only by SaaS super-admin.
+Route::middleware(['pos.auth'])->prefix('pos/local-bills')->group(function () {
+    Route::get('/', [\App\Http\Controllers\PosLocalBillsController::class, 'index'])->name('pos.local.index');
+    Route::get('/export', [\App\Http\Controllers\PosLocalBillsController::class, 'exportCsv'])->name('pos.local.export');
+    Route::get('/{id}', [\App\Http\Controllers\PosLocalBillsController::class, 'show'])->whereNumber('id')->name('pos.local.show');
+});
+
 // Branch switcher — accessible by ANY authenticated guard (web/pos/fbrpos)
 Route::middleware('web')->post('/branch/switch', [BranchSwitchController::class, 'switch'])->name('branch.switch');
 
@@ -430,6 +441,7 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
     Route::post('/settings/theme', [PosController::class, 'updateTheme'])->name('pos.settings.theme');
     Route::post('/settings/dashboard-style', [PosController::class, 'updateDashboardStyle'])->name('pos.settings.dashboard-style');
     Route::post('/settings/guided-flow', [PosController::class, 'updateGuidedFlow'])->name('pos.settings.guided-flow');
+    Route::post('/settings/inventory-toggle', [PosController::class, 'updateInventoryToggle'])->name('pos.settings.inventory-toggle');
     Route::get('/invoice/create', [PosController::class, 'createInvoice'])->name('pos.invoice.create');
     Route::get('/v2/invoice/create', [PosController::class, 'universalCreateInvoice'])->name('pos.v2.invoice.create');
     Route::get('/features', [PosController::class, 'featureSettings'])->name('pos.features');
@@ -493,6 +505,7 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
         Route::match(['get', 'post'], '/pra-settings', [PosController::class, 'praSettings'])->name('pos.pra-settings');
         Route::get('/billing', [PosController::class, 'billing'])->name('pos.billing');
         Route::match(['get', 'post'], '/business-profile', [PosController::class, 'businessProfile'])->name('pos.business-profile');
+        Route::match(['get', 'post'], '/receipt-settings', [PosController::class, 'receiptSettings'])->name('pos.receipt-settings');
         Route::post('/products', [PosController::class, 'storeProduct'])->name('pos.products.store')->middleware('plan.limit:products');
         Route::get('/products/template', [PosController::class, 'downloadProductTemplate'])->name('pos.products.template');
         Route::post('/products/import', [PosController::class, 'importProducts'])->name('pos.products.import');
@@ -522,9 +535,11 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
         Route::put('/team/cashier/{id}', [PosController::class, 'updateCashier'])->name('pos.team.update-cashier');
         Route::post('/team/cashier/{id}/toggle', [PosController::class, 'toggleCashier'])->name('pos.team.toggle-cashier');
 
-        Route::prefix('restaurant')->middleware('restaurant.only')->group(function () {
+        Route::prefix('restaurant')->middleware('feature:kitchen')->group(function () {
             Route::get('/kitchen-settings', [RestaurantPosController::class, 'kitchenSettings'])->name('pos.restaurant.kitchen-settings');
             Route::post('/kitchen-settings', [RestaurantPosController::class, 'updateKitchenSettings'])->name('pos.restaurant.kitchen-settings.update');
+        });
+        Route::prefix('restaurant')->middleware('feature:tables')->group(function () {
             Route::get('/table-management', [RestaurantTableController::class, 'manage'])->name('pos.restaurant.table-management');
             Route::post('/floors', [RestaurantTableController::class, 'storeFloor'])->name('pos.restaurant.floors.store');
             Route::put('/floors/{id}', [RestaurantTableController::class, 'updateFloor'])->name('pos.restaurant.floors.update');
@@ -532,6 +547,8 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
             Route::post('/tables', [RestaurantTableController::class, 'storeTable'])->name('pos.restaurant.tables.store');
             Route::put('/tables/{id}', [RestaurantTableController::class, 'updateTable'])->name('pos.restaurant.tables.update');
             Route::delete('/tables/{id}', [RestaurantTableController::class, 'deleteTable'])->name('pos.restaurant.tables.delete');
+        });
+        Route::prefix('restaurant')->middleware('feature:recipes')->group(function () {
             Route::get('/ingredients', [IngredientController::class, 'index'])->name('pos.restaurant.ingredients');
             Route::post('/ingredients', [IngredientController::class, 'store'])->name('pos.restaurant.ingredients.store');
             Route::put('/ingredients/{id}', [IngredientController::class, 'update'])->name('pos.restaurant.ingredients.update');
@@ -704,6 +721,10 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::put('/companies/{id}/archive-viewer/{userId}', [AdminCompanyController::class, 'updateArchiveViewer'])->name('saas.admin.companies.archive-viewer.update');
     Route::post('/companies/{id}/archive-viewer/{userId}/toggle', [AdminCompanyController::class, 'toggleArchiveViewer'])->name('saas.admin.companies.archive-viewer.toggle');
     Route::delete('/companies/{id}/archive-viewer/{userId}', [AdminCompanyController::class, 'deleteArchiveViewer'])->name('saas.admin.companies.archive-viewer.delete');
+    Route::post('/companies/{id}/local-viewer', [AdminCompanyController::class, 'storeLocalViewer'])->name('saas.admin.companies.local-viewer.store');
+    Route::put('/companies/{id}/local-viewer/{userId}', [AdminCompanyController::class, 'updateLocalViewer'])->name('saas.admin.companies.local-viewer.update');
+    Route::post('/companies/{id}/local-viewer/{userId}/toggle', [AdminCompanyController::class, 'toggleLocalViewer'])->name('saas.admin.companies.local-viewer.toggle');
+    Route::delete('/companies/{id}/local-viewer/{userId}', [AdminCompanyController::class, 'deleteLocalViewer'])->name('saas.admin.companies.local-viewer.delete');
     Route::post('/companies/{id}/override/lifetime', [AdminCompanyController::class, 'grantLifetime'])->name('saas.admin.companies.override.lifetime');
     Route::post('/companies/{id}/override/temporary', [AdminCompanyController::class, 'grantTemporary'])->name('saas.admin.companies.override.temporary');
     Route::post('/companies/{id}/override/grace', [AdminCompanyController::class, 'grantGrace'])->name('saas.admin.companies.override.grace');

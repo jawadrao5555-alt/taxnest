@@ -43,9 +43,13 @@
         $posUserNav = auth('pos')->user();
         $isCashierNav = $posUserNav && $posUserNav->isPosCashier();
     @endphp
-    @if($inventoryEnabled && !$isCashierNav)
+    {{-- Company admin ALWAYS sees Inventory links (full visibility) — pages
+         redirect to POS Features with a prompt if the module is disabled. --}}
+    @if(!$isCashierNav)
     <div class="pt-4 pb-1 px-4">
-        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Inventory</p>
+        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Inventory
+            @if(!$inventoryEnabled)<span class="ml-1 normal-case font-medium text-[9px] px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400">OFF</span>@endif
+        </p>
     </div>
 
     <a href="{{ route('pos.inventory.dashboard') }}" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->routeIs('pos.inventory.dashboard') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
@@ -73,7 +77,8 @@
         $posUser = auth('pos')->user();
         $isCashier = $posUser && $posUser->isPosCashier();
         $companyNav = \App\Models\Company::find(app('currentCompanyId'));
-        $isRestaurantNav = $companyNav && ($companyNav->pos_type === 'restaurant' || $companyNav->restaurant_mode);
+        $featNav = \App\Services\PosFeatureService::forCompany($companyNav);
+        $isRestaurantNav = $featNav->tables || $featNav->kitchen || $featNav->kot;
     @endphp
 
     @if(!$isCashierNav && $isRestaurantNav)

@@ -18,6 +18,11 @@ class PosAdminOnly
             return redirect()->route('pos.dashboard')->with('error', 'Access denied. Admin privileges required.');
         }
 
+        // Special isolated accounts can never reach POS admin pages.
+        if (in_array($user->pos_role ?? null, ['archive_viewer', 'local_viewer'], true)) {
+            return redirect($user->pos_role === 'local_viewer' ? '/pos/local-bills' : '/pos/archive');
+        }
+
         return $next($request);
     }
 }

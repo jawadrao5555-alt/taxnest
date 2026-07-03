@@ -438,9 +438,13 @@
                                         Day Close
                                     </a>
 
-                                    @if($inventoryEnabledLayout && !$isCashierLayout)
+                                    {{-- Company admin ALWAYS sees Inventory links (full visibility);
+                                         pages redirect to POS Features with a prompt when the module is OFF. --}}
+                                    @if(!$isCashierLayout)
                                     <div class="px-3 pt-3 pb-1">
-                                        <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">Inventory</p>
+                                        <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">Inventory
+                                            @if(!$inventoryEnabledLayout)<span class="ml-1 normal-case font-medium text-[8px] px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400">OFF</span>@endif
+                                        </p>
                                     </div>
                                     <a href="{{ route('pos.inventory.dashboard') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>

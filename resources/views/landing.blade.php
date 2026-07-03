@@ -60,7 +60,7 @@
         .typing-cursor { animation: blink 1s step-end infinite; }
         @keyframes gradientMove { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
         .gradient-animate { background-size: 200% auto; animation: gradientMove 4s ease infinite; }
-        @keyframes badgePulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.3); } 50% { box-shadow: 0 0 0 8px rgba(16,185,129,0); } }
+        @keyframes badgePulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(10,77,92,0.3); } 50% { box-shadow: 0 0 0 8px rgba(10,77,92,0); } }
         .badge-pulse { animation: badgePulse 2s ease infinite; }
         .trust-logo { opacity: 0.5; transition: opacity 0.3s; filter: grayscale(100%); }
         .trust-logo:hover { opacity: 1; filter: grayscale(0%); }
@@ -72,21 +72,21 @@
             background-size: 200% 100%;
             animation: shimmer 4s ease-in-out infinite;
         }
-        .gradient-border-top { border-top: 4px solid; border-image: linear-gradient(to right, #10b981, #14b8a6) 1; }
-        .gradient-border-top-purple { border-top: 4px solid; border-image: linear-gradient(to right, #8b5cf6, #a78bfa) 1; }
-        .pricing-glow { box-shadow: 0 0 80px -20px rgba(16,185,129,0.25), 0 0 40px -10px rgba(139,92,246,0.15); }
+        .gradient-border-top { border-top: 4px solid #0A4D5C; }
+        .gradient-border-top-purple { border-top: 4px solid #6d28d9; }
+        .pricing-glow { box-shadow: 0 0 80px -20px rgba(10,77,92,0.20); }
         .grid-overlay {
             background-image: linear-gradient(rgba(10,77,92,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(10,77,92,0.04) 1px, transparent 1px);
             background-size: 60px 60px;
         }
-        .product-card-glow-emerald { box-shadow: 0 0 0 1px rgba(16,185,129,0.1); }
-        .product-card-glow-emerald:hover { box-shadow: 0 0 40px -8px rgba(16,185,129,0.15), 0 20px 40px -12px rgba(0,0,0,0.1); }
+        .product-card-glow-emerald { box-shadow: 0 0 0 1px rgba(10,77,92,0.12); }
+        .product-card-glow-emerald:hover { box-shadow: 0 0 40px -8px rgba(10,77,92,0.15), 0 20px 40px -12px rgba(0,0,0,0.1); }
         .product-card-glow-purple { box-shadow: 0 0 0 1px rgba(139,92,246,0.1); }
         .product-card-glow-purple:hover { box-shadow: 0 0 40px -8px rgba(139,92,246,0.15), 0 20px 40px -12px rgba(0,0,0,0.1); }
         .product-card-glow-blue { box-shadow: 0 0 0 1px rgba(37,99,235,0.1); }
         .product-card-glow-blue:hover { box-shadow: 0 0 40px -8px rgba(37,99,235,0.15), 0 20px 40px -12px rgba(0,0,0,0.1); }
         .step-connector { position: relative; }
-        .step-connector::after { content: ''; position: absolute; top: 50%; right: -24px; width: 48px; height: 2px; background: linear-gradient(90deg, #10b981, #8b5cf6); opacity: 0.3; }
+        .step-connector::after { content: ''; position: absolute; top: 50%; right: -24px; width: 48px; height: 2px; background: #0A4D5C; opacity: 0.25; }
         @media (max-width: 768px) { .step-connector::after { display: none; } }
         .feature-icon-glow { box-shadow: 0 0 20px -4px currentColor; }
     </style>
@@ -110,9 +110,9 @@
                 </a>
 
                 <div class="flex items-center flex-wrap justify-end gap-1 sm:gap-2">
-                    <a href="/digital-invoice" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-emerald-600 rounded-full hover:bg-emerald-700 transition shadow-sm">Digital Invoice</a>
-                    <a href="/pos" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-purple-600 rounded-full hover:bg-purple-700 transition shadow-sm">PRA POS</a>
-                    <a href="/fbr-pos-landing" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-blue-600 rounded-full hover:bg-blue-700 transition shadow-sm">FBR POS</a>
+                    <a href="/digital-invoice" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-[#0A4D5C] rounded-full hover:bg-[#063B47] transition shadow-sm">Digital Invoice</a>
+                    <a href="/pos" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-purple-700 rounded-full hover:bg-purple-800 transition shadow-sm">PRA POS</a>
+                    <a href="/fbr-pos-landing" class="px-2 py-1 sm:px-4 sm:py-2 text-[10px] sm:text-[13px] font-semibold text-white bg-blue-700 rounded-full hover:bg-blue-800 transition shadow-sm">FBR POS</a>
                     <a href="#pricing" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition">Pricing</a>
                     <a href="#features" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition">Docs</a>
                     <a href="#contact" class="px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[13px] font-medium text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition">Contact</a>
@@ -127,7 +127,7 @@
 
         <div class="orb-1 absolute top-20 left-[10%] w-72 h-72 bg-teal-300/25 rounded-full blur-3xl pointer-events-none"></div>
         <div class="orb-2 absolute bottom-10 right-[15%] w-96 h-96 bg-amber-200/30 rounded-full blur-3xl pointer-events-none"></div>
-        <div class="orb-3 absolute top-1/2 left-[60%] w-64 h-64 bg-emerald-200/25 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="orb-3 absolute top-1/2 left-[60%] w-64 h-64 bg-teal-200/25 rounded-full blur-3xl pointer-events-none"></div>
 
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8 relative">
             <div class="text-center max-w-3xl mx-auto">
@@ -172,31 +172,31 @@
 
             <div id="heroStats" class="mt-20 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto">
                 <div class="stat-glass rounded-2xl p-5 text-center transition-all duration-300">
-                    <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mx-auto mb-3">
-                        <svg class="w-5 h-5 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                    <div class="w-10 h-10 rounded-xl bg-[#0F6171]/10 flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
                     </div>
                     <p class="text-2xl sm:text-3xl font-bold text-gray-900"><span class="counter-val" data-target="99.9" data-decimal="1" data-step="2" data-suffix="%">0%</span></p>
                     <p class="text-xs text-gray-600 mt-1">Uptime SLA</p>
                 </div>
                 <div class="stat-glass rounded-2xl p-5 text-center transition-all duration-300">
-                    <div class="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center mx-auto mb-3">
-                        <svg class="w-5 h-5 text-teal-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                    <div class="w-10 h-10 rounded-xl bg-[#0F6171]/10 flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                     </div>
                     @php $invoiceTarget = isset($stats['total_invoices']) && $stats['total_invoices'] > 0 ? $stats['total_invoices'] : 50000; @endphp
                     <p class="text-2xl sm:text-3xl font-bold text-gray-900"><span class="counter-val" data-target="{{ $invoiceTarget }}" data-format="k" data-suffix="+">0</span></p>
                     <p class="text-xs text-gray-600 mt-1">Invoices Processed</p>
                 </div>
                 <div class="stat-glass rounded-2xl p-5 text-center transition-all duration-300">
-                    <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center mx-auto mb-3">
-                        <svg class="w-5 h-5 text-purple-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    <div class="w-10 h-10 rounded-xl bg-[#0F6171]/10 flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                     </div>
                     @php $compTarget = isset($stats['total_companies']) && $stats['total_companies'] > 0 ? $stats['total_companies'] : 500; @endphp
                     <p class="text-2xl sm:text-3xl font-bold text-gray-900"><span class="counter-val" data-target="{{ $compTarget }}" data-suffix="+">0</span></p>
                     <p class="text-xs text-gray-600 mt-1">Companies Trust Us</p>
                 </div>
                 <div class="stat-glass rounded-2xl p-5 text-center transition-all duration-300">
-                    <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mx-auto mb-3">
-                        <svg class="w-5 h-5 text-blue-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                    <div class="w-10 h-10 rounded-xl bg-[#0F6171]/10 flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                     </div>
                     <p class="text-2xl sm:text-3xl font-bold text-gray-900"><span class="counter-val" data-target="3" data-step="1" data-interval="300">0</span></p>
                     <p class="text-xs text-gray-600 mt-1">Integrated Products</p>
@@ -206,32 +206,32 @@
     </section>
 
     <div class="relative bg-gradient-to-r from-gray-50 via-white to-gray-50 border-b border-gray-100 py-6">
-        <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/40 to-transparent"></div>
+        <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#0F6171]/30 to-transparent"></div>
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="flex flex-wrap items-center justify-center gap-3 sm:gap-5">
-                <div class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50/80 rounded-full border border-emerald-200/50">
-                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                    <span class="text-[12px] font-semibold text-emerald-800">FBR API v1.12</span>
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-[#0F6171]/5 rounded-full border border-[#0F6171]/20">
+                    <svg class="w-3.5 h-3.5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    <span class="text-[12px] font-semibold text-[#0A4D5C]">FBR API v1.12</span>
                 </div>
-                <div class="flex items-center gap-2 px-3 py-1.5 bg-purple-50/80 rounded-full border border-purple-200/50">
-                    <svg class="w-3.5 h-3.5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span class="text-[12px] font-semibold text-purple-800">PRA IMS v1.2</span>
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-[#0F6171]/5 rounded-full border border-[#0F6171]/20">
+                    <svg class="w-3.5 h-3.5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span class="text-[12px] font-semibold text-[#0A4D5C]">PRA IMS v1.2</span>
                 </div>
-                <div class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50/80 rounded-full border border-emerald-200/50">
-                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                    <span class="text-[12px] font-semibold text-emerald-800">SHA-256 Encrypted</span>
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-[#0F6171]/5 rounded-full border border-[#0F6171]/20">
+                    <svg class="w-3.5 h-3.5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    <span class="text-[12px] font-semibold text-[#0A4D5C]">SHA-256 Encrypted</span>
                 </div>
-                <div class="flex items-center gap-2 px-3 py-1.5 bg-blue-50/80 rounded-full border border-blue-200/50">
-                    <svg class="w-3.5 h-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                    <span class="text-[12px] font-semibold text-blue-800">Real-time Sync</span>
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-[#0F6171]/5 rounded-full border border-[#0F6171]/20">
+                    <svg class="w-3.5 h-3.5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    <span class="text-[12px] font-semibold text-[#0A4D5C]">Real-time Sync</span>
                 </div>
-                <div class="flex items-center gap-2 px-3 py-1.5 bg-teal-50/80 rounded-full border border-teal-200/50">
-                    <svg class="w-3.5 h-3.5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                    <span class="text-[12px] font-semibold text-teal-800">PWA + Offline</span>
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-[#0F6171]/5 rounded-full border border-[#0F6171]/20">
+                    <svg class="w-3.5 h-3.5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                    <span class="text-[12px] font-semibold text-[#0A4D5C]">PWA + Offline</span>
                 </div>
-                <div class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50/80 rounded-full border border-emerald-200/50">
-                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-                    <span class="text-[12px] font-semibold text-emerald-800">99.9% Uptime</span>
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-[#0F6171]/5 rounded-full border border-[#0F6171]/20">
+                    <svg class="w-3.5 h-3.5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                    <span class="text-[12px] font-semibold text-[#0A4D5C]">99.9% Uptime</span>
                 </div>
             </div>
         </div>
@@ -261,7 +261,7 @@
                     </div>
                     <p class="text-[14px] text-gray-700 leading-relaxed mb-5">"{{ $t[0] }}"</p>
                     <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold" style="background: linear-gradient(135deg, {{ $t[3] === 'emerald' ? '#059669,#10b981' : ($t[3] === 'purple' ? '#7c3aed,#8b5cf6' : '#2563eb,#3b82f6') }});">{{ substr($t[1],0,1) }}</div>
+                        <div class="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold" style="background: {{ $t[3] === 'emerald' ? '#0A4D5C' : ($t[3] === 'purple' ? '#6d28d9' : '#1d4ed8') }};">{{ substr($t[1],0,1) }}</div>
                         <div>
                             <p class="text-sm font-semibold text-gray-900">{{ $t[1] }}</p>
                             <p class="text-xs text-gray-600">{{ $t[2] }}</p>
@@ -276,28 +276,28 @@
     <section class="py-20 lg:py-24 bg-white dark:bg-gray-900">
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="text-center mb-14 fade-up">
-                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Get Started in Minutes</p>
+                <p class="text-[13px] font-semibold text-[#0A4D5C] uppercase tracking-widest mb-3">Get Started in Minutes</p>
                 <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">How It Works</h2>
                 <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">Three simple steps to complete tax compliance</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto fade-up">
                 <div class="text-center step-connector">
-                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-100 to-teal-50 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-emerald-500/10">
-                        <span class="text-2xl font-black text-emerald-600">1</span>
+                    <div class="w-16 h-16 rounded-2xl bg-[#0F6171]/10 flex items-center justify-center mx-auto mb-5 shadow-sm">
+                        <span class="text-2xl font-black text-[#0A4D5C]">1</span>
                     </div>
                     <h3 class="text-[16px] font-bold text-gray-900 mb-2">Register & Choose Product</h3>
                     <p class="text-[13px] text-gray-500 leading-relaxed">Sign up in 30 seconds. Pick Digital Invoice, PRA POS, or FBR POS. Get a 3-day free trial instantly.</p>
                 </div>
                 <div class="text-center step-connector">
-                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-100 to-violet-50 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-purple-500/10">
-                        <span class="text-2xl font-black text-purple-600">2</span>
+                    <div class="w-16 h-16 rounded-2xl bg-[#0F6171]/10 flex items-center justify-center mx-auto mb-5 shadow-sm">
+                        <span class="text-2xl font-black text-[#0A4D5C]">2</span>
                     </div>
                     <h3 class="text-[16px] font-bold text-gray-900 mb-2">Configure & Connect FBR/PRA</h3>
                     <p class="text-[13px] text-gray-500 leading-relaxed">Enter your NTN, connect to FBR or PRA API, set up your business profile. Takes under 5 minutes.</p>
                 </div>
                 <div class="text-center">
-                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-100 to-sky-50 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-blue-500/10">
-                        <span class="text-2xl font-black text-blue-600">3</span>
+                    <div class="w-16 h-16 rounded-2xl bg-[#0F6171]/10 flex items-center justify-center mx-auto mb-5 shadow-sm">
+                        <span class="text-2xl font-black text-[#0A4D5C]">3</span>
                     </div>
                     <h3 class="text-[16px] font-bold text-gray-900 mb-2">Create & Submit Invoices</h3>
                     <p class="text-[13px] text-gray-500 leading-relaxed">Start creating compliant invoices immediately. Real-time submission to FBR/PRA with instant confirmation.</p>
@@ -309,7 +309,7 @@
     <section id="products" class="py-24 lg:py-28 bg-gray-50 dark:bg-gray-800">
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="text-center mb-16 fade-up">
-                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Three Products, One Platform</p>
+                <p class="text-[13px] font-semibold text-[#0A4D5C] uppercase tracking-widest mb-3">Three Products, One Platform</p>
                 <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Choose Your Solution</h2>
                 <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">All three products are 100% isolated — separate data, separate logins, separate dashboards.</p>
             </div>
@@ -317,28 +317,28 @@
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
                 <div class="relative card-hover bg-white dark:bg-gray-900 rounded-2xl product-card-glow-emerald overflow-hidden hover:-translate-y-2 hover:shadow-xl transition-all duration-300 gradient-border-top">
                     <div class="absolute top-3 right-3">
-                        <span class="inline-flex items-center px-2.5 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full uppercase tracking-wide">Enterprise</span>
+                        <span class="inline-flex items-center px-2.5 py-1 bg-[#0F6171]/10 text-[#0A4D5C] text-[10px] font-bold rounded-full uppercase tracking-wide">Enterprise</span>
                     </div>
                     <div class="p-7">
                         <div class="flex items-center space-x-3 mb-5">
-                            <div class="w-14 h-14 rounded-[14px] bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                            <div class="w-14 h-14 rounded-[14px] bg-[#0A4D5C] flex items-center justify-center shadow-lg shadow-[#0A4D5C]/20">
                                 <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                             </div>
                             <div>
                                 <h3 class="text-lg font-bold text-gray-900">Digital Invoice</h3>
-                                <p class="text-[12px] text-emerald-600 font-semibold">FBR Compliance System</p>
+                                <p class="text-[12px] text-[#0F6171] font-semibold">FBR Compliance System</p>
                             </div>
                         </div>
                         <p class="text-[14px] text-gray-600 leading-relaxed mb-5">Enterprise-grade FBR digital invoicing with PRAL API v1.12 integration, real-time submission, and compliance scoring.</p>
                         <div class="grid grid-cols-2 gap-2.5 mb-6">
                             @foreach(['FBR API v1.12', 'HS Intelligence AI', 'Risk Detection', 'PDF + QR Codes', 'MIS Analytics', 'Multi-Branch'] as $feature)
                             <div class="flex items-center text-[12px] text-gray-700">
-                                <svg class="w-3.5 h-3.5 text-emerald-500 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                <svg class="w-3.5 h-3.5 text-[#0F6171] mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                 {{ $feature }}
                             </div>
                             @endforeach
                         </div>
-                        <a href="/digital-invoice" class="btn-glow block w-full py-3 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white rounded-xl text-[13px] font-semibold hover:from-emerald-600 hover:to-emerald-800 shadow-md hover:shadow-lg text-center">
+                        <a href="/digital-invoice" class="btn-glow block w-full py-3 bg-[#0A4D5C] text-white rounded-xl text-[13px] font-semibold hover:bg-[#063B47] shadow-md hover:shadow-lg text-center transition">
                             Explore Digital Invoice
                         </a>
                     </div>
@@ -346,40 +346,40 @@
 
                 <div class="relative card-hover bg-white dark:bg-gray-900 rounded-2xl product-card-glow-purple overflow-hidden hover:-translate-y-2 hover:shadow-xl transition-all duration-300 gradient-border-top-purple ring-2 ring-purple-200/50">
                     <div class="absolute top-3 right-3">
-                        <span class="inline-flex items-center px-2.5 py-1 bg-gradient-to-r from-purple-500 to-violet-600 text-white text-[10px] font-bold rounded-full uppercase tracking-wide shadow-lg shadow-purple-500/20">Most Popular</span>
+                        <span class="inline-flex items-center px-2.5 py-1 bg-purple-700 text-white text-[10px] font-bold rounded-full uppercase tracking-wide shadow-sm">Most Popular</span>
                     </div>
                     <div class="p-7">
                         <div class="flex items-center space-x-3 mb-5">
-                            <div class="w-14 h-14 rounded-[14px] bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
+                            <div class="w-14 h-14 rounded-[14px] bg-purple-700 flex items-center justify-center shadow-lg shadow-purple-700/20">
                                 <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                             </div>
                             <div>
                                 <h3 class="text-lg font-bold text-gray-900">PRA POS</h3>
-                                <p class="text-[12px] text-purple-600 font-semibold">PRA Point of Sale</p>
+                                <p class="text-[12px] text-purple-700 font-semibold">PRA Point of Sale</p>
                             </div>
                         </div>
                         <p class="text-[14px] text-gray-600 leading-relaxed mb-5">Complete POS billing with PRA fiscal device integration via PRAL IMS API v1.2, thermal receipts, and real-time tax calculations.</p>
                         <div class="grid grid-cols-2 gap-2.5 mb-6">
                             @foreach(['PRA IMS v1.2', 'Thermal Receipts', 'Multi-Terminal', 'Smart Billing', 'Cash/Card/QR Tax', 'Offline Billing'] as $feature)
                             <div class="flex items-center text-[12px] text-gray-700">
-                                <svg class="w-3.5 h-3.5 text-purple-500 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                <svg class="w-3.5 h-3.5 text-purple-700 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                 {{ $feature }}
                             </div>
                             @endforeach
                         </div>
-                        <a href="/pos" class="btn-glow-purple block w-full py-3 bg-gradient-to-r from-purple-500 to-purple-700 text-white rounded-xl text-[13px] font-semibold hover:from-purple-600 hover:to-purple-800 shadow-lg shadow-purple-500/20 hover:shadow-xl text-center">
+                        <a href="/pos" class="btn-glow-purple block w-full py-3 bg-purple-700 text-white rounded-xl text-[13px] font-semibold hover:bg-purple-800 shadow-md hover:shadow-lg text-center transition">
                             Explore PRA POS
                         </a>
                     </div>
                 </div>
 
-                <div class="relative card-hover bg-white dark:bg-gray-900 rounded-2xl product-card-glow-blue overflow-hidden hover:-translate-y-2 hover:shadow-xl transition-all duration-300" style="border-top: 4px solid; border-image: linear-gradient(to right, #2563eb, #3b82f6) 1;">
+                <div class="relative card-hover bg-white dark:bg-gray-900 rounded-2xl product-card-glow-blue overflow-hidden hover:-translate-y-2 hover:shadow-xl transition-all duration-300" style="border-top: 4px solid #1d4ed8;">
                     <div class="absolute top-3 right-3">
                         <span class="inline-flex items-center px-2.5 py-1 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full uppercase tracking-wide">New</span>
                     </div>
                     <div class="p-7">
                         <div class="flex items-center space-x-3 mb-5">
-                            <div class="w-14 h-14 rounded-[14px] flex items-center justify-center shadow-lg shadow-blue-600/30" style="background: linear-gradient(135deg, #1e40af, #2563eb);">
+                            <div class="w-14 h-14 rounded-[14px] flex items-center justify-center shadow-lg shadow-blue-700/20" style="background: #1d4ed8;">
                                 <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                             </div>
                             <div>
@@ -391,12 +391,12 @@
                         <div class="grid grid-cols-2 gap-2.5 mb-6">
                             @foreach(['FBR Direct API', 'Smart Billing', 'Tax Compliance', 'Retry System', 'Tax Reports', 'Multi-User'] as $feature)
                             <div class="flex items-center text-[12px] text-gray-700">
-                                <svg class="w-3.5 h-3.5 text-blue-500 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                <svg class="w-3.5 h-3.5 text-blue-700 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                 {{ $feature }}
                             </div>
                             @endforeach
                         </div>
-                        <a href="/fbr-pos-landing" class="block w-full py-3 bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-xl text-[13px] font-semibold hover:from-blue-600 hover:to-blue-800 shadow-md hover:shadow-lg text-center transition">
+                        <a href="/fbr-pos-landing" class="block w-full py-3 bg-blue-700 text-white rounded-xl text-[13px] font-semibold hover:bg-blue-800 shadow-md hover:shadow-lg text-center transition">
                             Explore FBR POS
                         </a>
                     </div>
@@ -416,7 +416,7 @@
     <section id="features" class="py-24 lg:py-28 bg-gray-50">
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="text-center mb-16 fade-up">
-                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Enterprise Architecture</p>
+                <p class="text-[13px] font-semibold text-[#0A4D5C] uppercase tracking-widest mb-3">Enterprise Architecture</p>
                 <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Built Different From Day One</h2>
                 <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">Purpose-built for Pakistan's tax ecosystem with enterprise-grade infrastructure.</p>
             </div>
@@ -437,8 +437,8 @@
                 @endphp
                 @foreach($features as $f)
                 <div class="group card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 ring-1 ring-gray-100 hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-                    <div class="w-12 h-12 rounded-xl flex items-center justify-center mb-4 shadow-sm transition-all duration-300" style="background-color: {{ $f[3] }};">
-                        <svg class="w-6 h-6" style="color: {{ $f[4] }};" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $f[2] }}"/></svg>
+                    <div class="w-12 h-12 rounded-xl flex items-center justify-center mb-4 shadow-sm transition-all duration-300" style="background-color: rgba(10,77,92,0.08);">
+                        <svg class="w-6 h-6" style="color: #0A4D5C;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $f[2] }}"/></svg>
                     </div>
                     <h3 class="text-[15px] font-bold text-gray-900 mb-2">{{ $f[0] }}</h3>
                     <p class="text-[13px] text-gray-600 leading-relaxed">{{ $f[1] }}</p>
@@ -447,18 +447,18 @@
             </div>
 
             <div class="mt-14 fade-up">
-                <div class="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl shadow-xl overflow-hidden max-w-4xl mx-auto">
+                <div class="relative bg-[#07333E] rounded-2xl shadow-xl overflow-hidden max-w-4xl mx-auto">
                     <div class="absolute inset-0 opacity-[0.04]" style="background-image: url('data:image/svg+xml,%3Csvg width=&quot;40&quot; height=&quot;40&quot; viewBox=&quot;0 0 40 40&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;%3E%3Cg fill=&quot;%23ffffff&quot; fill-opacity=&quot;1&quot; fill-rule=&quot;evenodd&quot;%3E%3Cpath d=&quot;M0 40L40 0H20L0 20M40 40V20L20 40&quot;/%3E%3C/g%3E%3C/svg%3E');"></div>
-                    <div class="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-emerald-500 via-teal-400 to-purple-500"></div>
+                    <div class="absolute top-0 left-0 right-0 h-[2px] bg-[#E7BF3B]/70"></div>
                     <div class="relative px-6 py-6 sm:px-8 sm:py-7">
                         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
                             <div class="flex items-center gap-3">
-                                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 flex-shrink-0">
+                                <div class="w-9 h-9 rounded-lg bg-[#0F6171] flex items-center justify-center shadow-lg shadow-black/20 flex-shrink-0">
                                     <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
                                 </div>
                                 <h3 class="text-[15px] font-bold text-white tracking-tight">Platform Capabilities</h3>
                             </div>
-                            <span class="inline-flex items-center px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-[11px] font-semibold text-emerald-400 tracking-wide">BUILT FOR ENTERPRISE</span>
+                            <span class="inline-flex items-center px-2.5 py-1 bg-[#E7BF3B]/10 border border-[#E7BF3B]/30 rounded-full text-[11px] font-semibold text-[#E7BF3B] tracking-wide">BUILT FOR ENTERPRISE</span>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-2.5">
                             @foreach([
@@ -472,7 +472,7 @@
                                 'Thermal receipt printing'
                             ] as $cap)
                             <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                <svg class="w-4 h-4 text-[#2EA0B3] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                                 <span class="text-[13px] text-gray-300 font-medium">{{ $cap }}</span>
                             </div>
                             @endforeach
@@ -486,7 +486,7 @@
     <section class="py-24 lg:py-28 bg-white dark:bg-gray-900">
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="text-center mb-16 fade-up">
-                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Comparison</p>
+                <p class="text-[13px] font-semibold text-[#0A4D5C] uppercase tracking-widest mb-3">Comparison</p>
                 <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">TaxNest vs Traditional Software</h2>
                 <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto">See how TaxNest compares to generic accounting tools</p>
             </div>
@@ -495,9 +495,9 @@
                 <div class="overflow-x-auto">
                     <table class="w-full">
                         <thead>
-                            <tr class="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900">
+                            <tr class="bg-[#07333E]">
                                 <th class="text-left py-4 px-6 text-[13px] font-medium text-gray-300">Capability</th>
-                                <th class="text-center py-4 px-6 text-[13px] font-bold text-emerald-400">TaxNest</th>
+                                <th class="text-center py-4 px-6 text-[13px] font-bold text-[#E7BF3B]">TaxNest</th>
                                 <th class="text-center py-4 px-6 text-[13px] font-bold text-gray-400">Others</th>
                             </tr>
                         </thead>
@@ -526,12 +526,12 @@
                                 <td class="py-3.5 px-6 text-[13px] font-medium text-gray-700">{{ $comp[0] }}</td>
                                 <td class="py-3.5 px-6 text-center">
                                     @if($comp[1] === true)
-                                    <svg class="w-5 h-5 text-emerald-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    <svg class="w-5 h-5 text-[#0F6171] mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                     @endif
                                 </td>
                                 <td class="py-3.5 px-6 text-center">
                                     @if($comp[2] === true)
-                                    <svg class="w-5 h-5 text-emerald-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    <svg class="w-5 h-5 text-[#0F6171] mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                     @elseif($comp[2] === 'partial')
                                     <span class="text-[11px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Limited</span>
                                     @else
@@ -550,48 +550,45 @@
     <section id="pricing" class="py-24 lg:py-28 bg-gray-50">
         <div class="max-w-[1200px] mx-auto px-3 sm:px-5 md:px-8">
             <div class="text-center mb-16 fade-up">
-                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Pricing</p>
+                <p class="text-[13px] font-semibold text-[#0A4D5C] uppercase tracking-widest mb-3">Pricing</p>
                 <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Simple, Transparent Pricing</h2>
                 <p class="mt-4 text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed">Each product has its own plans. Visit the product page for details and start your 3-day free trial.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto fade-up">
                 <div class="relative card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 p-8 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-                    <div class="absolute inset-0 rounded-xl bg-gradient-to-br from-emerald-500/5 to-teal-500/5 pointer-events-none"></div>
                     <div class="relative">
-                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center mx-auto mb-5 shadow-sm">
-                            <svg class="w-7 h-7 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                        <div class="w-14 h-14 rounded-2xl bg-[#0F6171]/10 flex items-center justify-center mx-auto mb-5">
+                            <svg class="w-7 h-7 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                         </div>
                         <h3 class="text-lg font-bold text-gray-900 mb-2">Digital Invoice</h3>
                         <p class="text-[14px] text-gray-500 mb-6 leading-relaxed">FBR-compliant invoicing with multiple billing cycles and volume discounts</p>
-                        <a href="/digital-invoice#pricing" class="btn-glow inline-flex items-center px-6 py-3 bg-emerald-600 text-white rounded-[10px] text-[14px] font-semibold hover:bg-emerald-700 transition">
+                        <a href="/digital-invoice#pricing" class="btn-glow inline-flex items-center px-6 py-3 bg-[#0A4D5C] text-white rounded-[10px] text-[14px] font-semibold hover:bg-[#063B47] transition">
                             View DI Plans
                             <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                         </a>
                     </div>
                 </div>
                 <div class="relative card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 p-8 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-                    <div class="absolute inset-0 rounded-xl bg-gradient-to-br from-purple-500/5 to-violet-500/5 pointer-events-none"></div>
                     <div class="relative">
-                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-50 to-violet-50 flex items-center justify-center mx-auto mb-5 shadow-sm">
-                            <svg class="w-7 h-7 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                        <div class="w-14 h-14 rounded-2xl bg-purple-50 flex items-center justify-center mx-auto mb-5">
+                            <svg class="w-7 h-7 text-purple-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                         </div>
                         <h3 class="text-lg font-bold text-gray-900 mb-2">NestPOS</h3>
                         <p class="text-[14px] text-gray-500 mb-6 leading-relaxed">PRA point of sale with annual billing and built-in 6% discount</p>
-                        <a href="/pos#pricing" class="btn-glow-purple inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-[10px] text-[14px] font-semibold hover:bg-purple-700">
+                        <a href="/pos#pricing" class="btn-glow-purple inline-flex items-center px-6 py-3 bg-purple-700 text-white rounded-[10px] text-[14px] font-semibold hover:bg-purple-800 transition">
                             View POS Plans
                             <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                         </a>
                     </div>
                 </div>
                 <div class="relative card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 p-8 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-                    <div class="absolute inset-0 rounded-xl bg-gradient-to-br from-blue-500/5 to-sky-500/5 pointer-events-none"></div>
                     <div class="relative">
-                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-50 to-sky-50 flex items-center justify-center mx-auto mb-5 shadow-sm">
-                            <svg class="w-7 h-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                        <div class="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-5">
+                            <svg class="w-7 h-7 text-blue-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                         </div>
                         <h3 class="text-lg font-bold text-gray-900 mb-2">FBR POS</h3>
                         <p class="text-[14px] text-gray-500 mb-6 leading-relaxed">FBR-integrated POS with direct API submission and low-budget billing cycles</p>
-                        <a href="/fbr-pos-landing#pricing" class="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-[10px] text-[14px] font-semibold hover:bg-blue-700 transition">
+                        <a href="/fbr-pos-landing#pricing" class="inline-flex items-center px-6 py-3 bg-blue-700 text-white rounded-[10px] text-[14px] font-semibold hover:bg-blue-800 transition">
                             View FBR POS Plans
                             <svg class="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                         </a>
@@ -604,7 +601,7 @@
     <section id="faq" class="py-24 lg:py-28 bg-white dark:bg-gray-900">
         <div class="max-w-3xl mx-auto px-5 sm:px-8">
             <div class="text-center mb-12 fade-up">
-                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">FAQ</p>
+                <p class="text-[13px] font-semibold text-[#0A4D5C] uppercase tracking-widest mb-3">FAQ</p>
                 <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Frequently Asked Questions</h2>
             </div>
             <div class="space-y-3 fade-up" x-data="{ open: null }">
@@ -619,7 +616,7 @@
                 ];
                 @endphp
                 @foreach($faqs as $i => $faq)
-                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200/80 overflow-hidden transition-shadow duration-300" :class="open === {{ $i+1 }} ? 'shadow-lg ring-1 ring-emerald-100' : 'shadow-sm'">
+                <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200/80 overflow-hidden transition-shadow duration-300" :class="open === {{ $i+1 }} ? 'shadow-lg ring-1 ring-[#0F6171]/20' : 'shadow-sm'">
                     <button @click="open = open === {{ $i+1 }} ? null : {{ $i+1 }}" class="w-full flex items-center justify-between p-5 text-left">
                         <span class="text-[14px] font-semibold text-gray-900 pr-4">{{ $faq[0] }}</span>
                         <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0" :class="open === {{ $i+1 }} ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -636,28 +633,28 @@
     <section id="contact" class="py-24 lg:py-28 bg-gray-50">
         <div class="max-w-3xl mx-auto px-5 sm:px-8">
             <div class="text-center mb-12 fade-up">
-                <p class="text-[13px] font-semibold text-emerald-600 uppercase tracking-widest mb-3">Get in Touch</p>
+                <p class="text-[13px] font-semibold text-[#0A4D5C] uppercase tracking-widest mb-3">Get in Touch</p>
                 <h2 class="text-[28px] sm:text-[32px] font-bold text-gray-900 tracking-tight">Contact Us</h2>
                 <p class="mt-4 text-[17px] text-gray-500">Have questions? We're here to help you choose the right solution.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-5 fade-up">
                 <div class="card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 p-6 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-                    <div class="w-11 h-11 bg-gradient-to-br from-emerald-400/20 to-teal-400/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    <div class="w-11 h-11 bg-[#0F6171]/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     </div>
                     <h3 class="text-[14px] font-semibold text-gray-900 mb-1">Email</h3>
                     <p class="text-[13px] text-gray-500">support@taxnest.com</p>
                 </div>
                 <div class="card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 p-6 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-                    <div class="w-11 h-11 bg-gradient-to-br from-blue-400/20 to-indigo-400/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                    <div class="w-11 h-11 bg-[#0F6171]/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
                     </div>
                     <h3 class="text-[14px] font-semibold text-gray-900 mb-1">Phone</h3>
                     <p class="text-[13px] text-gray-500">+92-XXX-XXXXXXX</p>
                 </div>
                 <div class="card-hover bg-white dark:bg-gray-900 rounded-xl shadow-md ring-1 ring-gray-200/50 p-6 text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-                    <div class="w-11 h-11 bg-gradient-to-br from-purple-400/20 to-violet-400/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    <div class="w-11 h-11 bg-[#0F6171]/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     </div>
                     <h3 class="text-[14px] font-semibold text-gray-900 mb-1">Location</h3>
                     <p class="text-[13px] text-gray-500">Pakistan</p>
@@ -678,11 +675,11 @@
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                     Digital Invoice
                 </a>
-                <a href="/pos" class="btn-glow-purple px-6 py-3 bg-gradient-to-r from-purple-500 to-violet-600 text-white border border-purple-400/20 rounded-[10px] text-[14px] font-semibold hover:from-purple-600 hover:to-violet-700 transition w-full sm:w-auto flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20">
+                <a href="/pos" class="btn-glow-purple px-6 py-3 bg-purple-700 text-white rounded-[10px] text-[14px] font-semibold hover:bg-purple-800 transition w-full sm:w-auto flex items-center justify-center gap-2 shadow-lg">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     PRA POS
                 </a>
-                <a href="/fbr-pos-landing" class="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white border border-blue-400/20 rounded-[10px] text-[14px] font-semibold hover:from-blue-600 hover:to-blue-700 transition w-full sm:w-auto flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20">
+                <a href="/fbr-pos-landing" class="px-6 py-3 bg-blue-700 text-white rounded-[10px] text-[14px] font-semibold hover:bg-blue-800 transition w-full sm:w-auto flex items-center justify-center gap-2 shadow-lg">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                     FBR POS
                 </a>
@@ -711,7 +708,7 @@
                 <div>
                     <h4 class="text-[11px] font-semibold text-gray-700 uppercase tracking-widest mb-4">Products</h4>
                     <div class="space-y-2.5">
-                        <a href="/digital-invoice" class="block text-[13px] text-gray-600 hover:text-emerald-700 transition">Digital Invoice</a>
+                        <a href="/digital-invoice" class="block text-[13px] text-gray-600 hover:text-[#0A4D5C] transition">Digital Invoice</a>
                         <a href="/pos" class="block text-[13px] text-gray-600 hover:text-purple-700 transition">PRA POS</a>
                         <a href="/fbr-pos-landing" class="block text-[13px] text-gray-600 hover:text-blue-700 transition">FBR POS</a>
                     </div>
@@ -734,9 +731,9 @@
             <div class="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <p class="text-[12px] text-gray-600">&copy; {{ date('Y') }} TaxNest. All rights reserved.</p>
                 <div class="flex items-center space-x-5">
-                    <span class="flex items-center text-[11px] text-gray-600"><svg class="w-3 h-3 mr-1 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>FBR API v1.12</span>
-                    <span class="flex items-center text-[11px] text-gray-600"><svg class="w-3 h-3 mr-1 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>PRA IMS v1.2</span>
-                    <span class="flex items-center text-[11px] text-gray-600"><svg class="w-3 h-3 mr-1 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>SHA-256</span>
+                    <span class="flex items-center text-[11px] text-gray-600"><svg class="w-3 h-3 mr-1 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>FBR API v1.12</span>
+                    <span class="flex items-center text-[11px] text-gray-600"><svg class="w-3 h-3 mr-1 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>PRA IMS v1.2</span>
+                    <span class="flex items-center text-[11px] text-gray-600"><svg class="w-3 h-3 mr-1 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>SHA-256</span>
                 </div>
             </div>
         </div>

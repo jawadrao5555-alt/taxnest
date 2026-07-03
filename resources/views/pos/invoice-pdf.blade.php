@@ -202,10 +202,15 @@
             <div>POS: {{ $transaction->invoice_number }}</div>
             <div class="num">PRA: {{ $transaction->pra_invoice_number }}</div>
         </div>
-        @if($transaction->pra_qr_code)
+        @php
+            $praQr = $transaction->pra_invoice_number
+                ? \App\Support\QrImage::dataUri($transaction->pra_invoice_number)
+                : ($transaction->pra_qr_code ?: '');
+        @endphp
+        @if($praQr)
         <div class="qr-section">
-            <img src="{{ $transaction->pra_qr_code }}" alt="PRA QR">
-            <p>Scan to verify on PRA portal</p>
+            <img src="{{ $praQr }}" alt="PRA QR">
+            <p>Scan with PRA Sahulat App to verify</p>
         </div>
         @endif
         @elseif($transaction->pra_status === 'offline')

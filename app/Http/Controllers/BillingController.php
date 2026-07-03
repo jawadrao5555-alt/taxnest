@@ -15,7 +15,8 @@ class BillingController extends Controller
 {
     public function plans()
     {
-        $plans = PricingPlan::where('is_trial', false)->orderBy('price')->get();
+        // Digital Invoice panel shows ONLY DI plans (POS/FBR POS have their own billing pages).
+        $plans = PricingPlan::where('is_trial', false)->where('product_type', 'di')->orderBy('price')->get();
         $currentSubscription = null;
         $usageData = null;
 
@@ -99,6 +100,10 @@ class BillingController extends Controller
 
         if ($plan->is_trial) {
             return back()->with('error', 'Trial plan cannot be subscribed to directly.');
+        }
+
+        if ($plan->product_type !== 'di') {
+            return back()->with('error', 'This plan is not available for Digital Invoice accounts.');
         }
 
         $pricing = Subscription::calculateFinalPrice($plan->price, $cycle);

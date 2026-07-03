@@ -267,10 +267,16 @@
         <div>POS: {{ $transaction->invoice_number }}</div>
         <div class="pra-number">PRA: {{ $transaction->pra_invoice_number }}</div>
     </div>
-    @if($transaction->pra_qr_code)
+    @php
+        // QR carries the RAW PRA invoice number (PRA Sahulat app format).
+        $praQr = $transaction->pra_invoice_number
+            ? \App\Support\QrImage::dataUri($transaction->pra_invoice_number)
+            : ($transaction->pra_qr_code ?: '');
+    @endphp
+    @if($praQr)
     <div class="qr-code">
-        <img src="{{ $transaction->pra_qr_code }}" alt="PRA Verification QR">
-        <p>Scan to verify on PRA portal</p>
+        <img src="{{ $praQr }}" alt="PRA Verification QR">
+        <p>Scan with PRA Sahulat App to verify</p>
     </div>
     @endif
     @elseif($transaction->pra_status === 'offline')

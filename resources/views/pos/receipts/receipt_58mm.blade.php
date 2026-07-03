@@ -248,10 +248,15 @@
         <div class="pra-title">PRA FISCAL</div>
         <div class="pra-number">{{ $transaction->pra_invoice_number }}</div>
     </div>
-    @if($transaction->pra_qr_code)
+    @php
+        $praQr = $transaction->pra_invoice_number
+            ? \App\Support\QrImage::dataUri($transaction->pra_invoice_number)
+            : ($transaction->pra_qr_code ?: '');
+    @endphp
+    @if($praQr)
     <div class="qr-code">
-        <img src="{{ $transaction->pra_qr_code }}" alt="PRA QR">
-        <p>Scan to verify</p>
+        <img src="{{ $praQr }}" alt="PRA QR">
+        <p>Scan with PRA Sahulat App</p>
     </div>
     @endif
     @elseif($transaction->pra_status === 'offline')

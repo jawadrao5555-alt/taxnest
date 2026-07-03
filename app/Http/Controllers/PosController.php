@@ -3945,7 +3945,7 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        $plans = \App\Models\PricingPlan::where('is_trial', false)->orderBy('price')->get();
+        $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'pos')->orderBy('price')->get();
         $currentSubscription = \App\Models\Subscription::where('company_id', $companyId)
             ->where('active', true)
             ->with('pricingPlan')

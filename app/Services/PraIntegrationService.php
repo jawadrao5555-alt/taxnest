@@ -395,16 +395,18 @@ class PraIntegrationService
 
     public function generateQrCode(string $praInvoiceNumber): string
     {
-        $verificationUrl = 'https://reg.pra.punjab.gov.pk/IMSFiscalReport/SearchPOSInvoice_Report.aspx?PRAInvNo=' . urlencode($praInvoiceNumber);
-
+        // PRA Sahulat app expects the QR to contain the RAW PRA invoice number
+        // (scanning yields the number → app fetches details). Generic scanners
+        // give the customer the number to paste on the PRA verification portal.
+        // Do NOT encode a URL here.
         try {
-            $qrCode = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')
-                ->size(150)
-                ->margin(1)
-                ->generate($verificationUrl);
-
-            return 'data:image/svg+xml;base64,' . base64_encode($qrCode);
-        } catch (\Exception $e) {
+            $qr = \App\Support\QrImage::dataUri($praInvoiceNumber);
+            if ($qr !== '') {
+                return $qr;
+            }
+            Log::error('QR Code Generation Error', ['error' => 'QrImage returned empty string']);
+            return '';
+        } catch (\Throwable $e) {
             Log::error('QR Code Generation Error', ['error' => $e->getMessage()]);
             return '';
         }

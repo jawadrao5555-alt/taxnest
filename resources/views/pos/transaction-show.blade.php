@@ -274,9 +274,15 @@
                     <h3 class="text-sm font-semibold text-emerald-800 dark:text-emerald-300">PRA Verified</h3>
                 </div>
                 <p class="text-xs text-emerald-700 dark:text-emerald-400 mb-3">This invoice has been successfully reported to PRA and cannot be resubmitted.</p>
-                @if($transaction->pra_qr_code)
+                @php
+                    $praQr = $transaction->pra_invoice_number
+                        ? \App\Support\QrImage::dataUri($transaction->pra_invoice_number)
+                        : ($transaction->pra_qr_code ?: '');
+                @endphp
+                @if($praQr)
                 <div class="flex flex-col items-center pt-3 border-t border-emerald-200 dark:border-emerald-700">
-                    <img src="{{ $transaction->pra_qr_code }}" alt="PRA Verification QR" class="w-32 h-32 mb-2">
+                    <img src="{{ $praQr }}" alt="PRA Verification QR" class="w-32 h-32 mb-2">
+                    <p class="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium mb-1">Scan with PRA Sahulat App</p>
                     <a href="https://reg.pra.punjab.gov.pk/IMSFiscalReport/SearchPOSInvoice_Report.aspx?PRAInvNo={{ urlencode($transaction->pra_invoice_number) }}" target="_blank" class="text-xs text-emerald-600 hover:underline">Verify on PRA Portal</a>
                 </div>
                 @endif

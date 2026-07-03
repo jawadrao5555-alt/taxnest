@@ -1,6 +1,6 @@
 // TaxNest Suite Service Worker — Tax DI / Nest Pra Pos / Nest FBR Pos
 // Strategy: Stale-while-revalidate for static assets, network-first for HTML, offline fallback.
-const CACHE_VERSION = 'taxnest-v32';
+const CACHE_VERSION = 'taxnest-v33';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const OFFLINE_PAGE = '/offline-splash';
@@ -42,9 +42,18 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
     const req = e.request;
-    if (req.method !== 'GET') return;
     const url = new URL(req.url);
     if (url.origin !== location.origin) return;
+
+    // Session hygiene: ANY logout (DI /logout, /pos/logout, /fbr-pos/logout, admin, franchise —
+    // GET or POST) purges all cached authenticated pages so the next user on a shared
+    // terminal can never see the previous session's pages, even offline.
+    if (url.pathname.includes('/logout')) {
+        e.waitUntil(caches.delete(RUNTIME_CACHE));
+        return;
+    }
+
+    if (req.method !== 'GET') return;
 
     // Never cache: auth, API, admin, agent, FBR submit, payment posting, livewire, debugbar
     const skipPatterns = ['/api/', '/login', '/logout', '/register', '/admin/', '/agent/', '/livewire/', '/_debugbar/', '/setup-', '/sanctum/', '/broadcasting/', '/pos/invoice/create', '/pos/v2/invoice/create', '/pos/create-invoice', '/fbr-pos/create', '/edit-failed'];

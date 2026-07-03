@@ -271,6 +271,27 @@
         </div>
     </section>
 
+    <!-- Trusted By Strip -->
+    <div class="py-6 border-b-2 border-gray-100 bg-white overflow-hidden">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-wrap justify-center items-center gap-6 sm:gap-12">
+                <span class="text-sm font-bold text-gray-500 uppercase tracking-widest text-center w-full sm:w-auto mb-2 sm:mb-0">Trusted by businesses across Pakistan</span>
+                <div class="flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-xl border border-emerald-100">
+                    <div class="w-3 h-3 rounded-full bg-emerald-500"></div>
+                    <span class="font-bold text-emerald-800 text-sm">FBR API v1.12</span>
+                </div>
+                <div class="flex items-center gap-2 px-4 py-2 bg-purple-50 rounded-xl border border-purple-100">
+                    <div class="w-3 h-3 rounded-full bg-purple-500"></div>
+                    <span class="font-bold text-purple-800 text-sm">PRA IMS v1.2</span>
+                </div>
+                <div class="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-xl border border-blue-100">
+                    <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+                    <span class="font-bold text-blue-800 text-sm">Real-time Sync</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Stats Section -->
     <section class="py-16 bg-emerald-900 border-b-8 border-emerald-950">
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
@@ -285,7 +306,7 @@
                 </div>
                 <div class="p-6 reveal" style="transition-delay: 200ms;">
                     <div class="text-4xl sm:text-5xl font-bricolage font-black text-white mb-2">99.9%</div>
-                    <div class="text-emerald-300 font-bold text-sm tracking-wide uppercase">Uptime SLA</div>
+                    <div class="text-emerald-300 font-bold text-sm tracking-wide uppercase">Platform Uptime</div>
                 </div>
                 <div class="p-6 reveal" style="transition-delay: 300ms;">
                     <div class="text-4xl sm:text-5xl font-bricolage font-black text-white mb-2">0</div>
@@ -295,8 +316,17 @@
         </div>
     </section>
 
+    <!-- Product Isolation Notice -->
+    <section class="py-16 bg-gray-50 border-b-2 border-gray-200">
+        <div class="max-w-[800px] mx-auto px-4 text-center reveal">
+            <span class="inline-block px-4 py-1.5 bg-gray-200 text-gray-800 text-xs font-bold rounded-lg uppercase tracking-wide mb-4 border-2 border-gray-300">Enterprise Architecture</span>
+            <h3 class="text-3xl font-bricolage font-extrabold text-gray-900 mb-4">Total Data Isolation. Zero Cross-Mixing.</h3>
+            <p class="text-lg text-gray-600 font-medium">TaxNest operates as three completely isolated platforms to protect your shop's privacy. Digital Invoice, PRA POS, and FBR POS each have their own separate registration, separate login, fully partitioned data, and completely independent reporting. Your data is strictly locked to the product you choose.</p>
+        </div>
+    </section>
+
     <!-- Products Section - Asymmetric Layout -->
-    <section id="products" class="py-24 sm:py-32 overflow-hidden">
+    <section id="products" class="py-24 sm:py-32 overflow-hidden bg-white">
         <div class="max-w-[1000px] mx-auto px-4 sm:px-6 lg:px-8 space-y-24">
             
             <!-- Enterprise Digital Invoice -->
@@ -305,7 +335,7 @@
                     <span class="inline-block px-3 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-lg tracking-wide uppercase mb-4">Enterprise APIs</span>
                     <h3 class="text-3xl sm:text-4xl font-bricolage font-bold text-gray-900 mb-4">Digital Invoice</h3>
                     <p class="text-emerald-600 font-bold text-sm mb-4">FBR API v1.12 Integration</p>
-                    <p class="text-gray-600 font-medium mb-8">For traders and distributors doing high-volume B2B sales. Automate HS code mapping via our internal engine and sync thousands of digital invoices instantly to the FBR backend.</p>
+                    <p class="text-gray-600 font-medium mb-8">For traders and distributors doing high-volume B2B sales. Automate HS code mapping via our internal engine and sync thousands of digital invoices instantly to the FBR backend. Runs completely isolated.</p>
                     
                     <ul class="space-y-3 mb-8">
                         <li class="flex items-center text-sm font-bold text-gray-700">
@@ -315,7 +345,7 @@
                             <div class="w-5 h-5 bg-emerald-100 text-emerald-600 rounded flex items-center justify-center mr-3">✓</div> Compliant QR Code generation
                         </li>
                         <li class="flex items-center text-sm font-bold text-gray-700">
-                            <div class="w-5 h-5 bg-emerald-100 text-emerald-600 rounded flex items-center justify-center mr-3">✓</div> Bulk API submissions
+                            <div class="w-5 h-5 bg-emerald-100 text-emerald-600 rounded flex items-center justify-center mr-3">✓</div> Separate account & strict privacy
                         </li>
                     </ul>
                     <a href="/digital-invoice" class="btn-chunky px-6 py-3 bg-emerald-50 text-emerald-700 border-2 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300">
@@ -350,21 +380,21 @@
                     <span class="inline-block px-3 py-1 bg-purple-100 text-purple-800 text-xs font-bold rounded-lg tracking-wide uppercase mb-4">Restaurants & Salons</span>
                     <h3 class="text-3xl sm:text-4xl font-bricolage font-bold text-gray-900 mb-4">PRA POS</h3>
                     <p class="text-purple-600 font-bold text-sm mb-4">Punjab Revenue Authority PRAL IMS</p>
-                    <p class="text-gray-600 font-medium mb-8">Handles the 8% card / 16% cash tax splits automatically. Push orders directly to kitchen displays. Works on cheap Android tablets and connects to any 80mm thermal printer via Bluetooth or LAN.</p>
+                    <p class="text-gray-600 font-medium mb-8">Handles the 8% card / 16% cash tax splits automatically. Push orders directly to kitchen displays. Works on cheap Android tablets and connects to any 80mm thermal printer via Bluetooth or LAN. Fully isolated setup.</p>
                     
                     <ul class="space-y-3 mb-8">
                         <li class="flex items-center text-sm font-bold text-gray-700">
-                            <div class="w-5 h-5 bg-purple-100 text-purple-600 rounded flex items-center justify-center mr-3">✓</div> IMS API v1.2 Certified
+                            <div class="w-5 h-5 bg-purple-100 text-purple-600 rounded flex items-center justify-center mr-3">✓</div> PRAL IMS API v1.2 integration
                         </li>
                         <li class="flex items-center text-sm font-bold text-gray-700">
                             <div class="w-5 h-5 bg-purple-100 text-purple-600 rounded flex items-center justify-center mr-3">✓</div> Split payments (Card/Cash)
                         </li>
                         <li class="flex items-center text-sm font-bold text-gray-700">
-                            <div class="w-5 h-5 bg-purple-100 text-purple-600 rounded flex items-center justify-center mr-3">✓</div> Urdu speaking phone support
+                            <div class="w-5 h-5 bg-purple-100 text-purple-600 rounded flex items-center justify-center mr-3">✓</div> Dedicated restaurant environment
                         </li>
                     </ul>
                     <a href="/pos" class="btn-chunky px-6 py-3 bg-purple-50 text-purple-700 border-2 border-purple-200 hover:bg-purple-100 hover:border-purple-300">
-                        Explore POS Features
+                        Explore PRA POS
                     </a>
                 </div>
                 <div class="w-full md:w-1/2 flex justify-center">
@@ -388,7 +418,7 @@
                     <span class="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-lg tracking-wide uppercase mb-4">Tier-1 Retailers</span>
                     <h3 class="text-3xl sm:text-4xl font-bricolage font-bold text-gray-900 mb-4">FBR POS</h3>
                     <p class="text-blue-600 font-bold text-sm mb-4">Multi-Branch Retail Operations</p>
-                    <p class="text-gray-600 font-medium mb-8">Full inventory control, barcode scanning, and multi-location syncing. Don't worry about fiscal device integrations — we handle the complexity so your cashiers just scan and bill.</p>
+                    <p class="text-gray-600 font-medium mb-8">Full inventory control, barcode scanning, and multi-location syncing. Don't worry about fiscal device integrations — we handle the complexity so your cashiers just scan and bill in their isolated workspace.</p>
                     
                     <ul class="space-y-3 mb-8">
                         <li class="flex items-center text-sm font-bold text-gray-700">
@@ -398,7 +428,7 @@
                             <div class="w-5 h-5 bg-blue-100 text-blue-600 rounded flex items-center justify-center mr-3">✓</div> Barcode scanner & drawer support
                         </li>
                         <li class="flex items-center text-sm font-bold text-gray-700">
-                            <div class="w-5 h-5 bg-blue-100 text-blue-600 rounded flex items-center justify-center mr-3">✓</div> Centralized admin reporting
+                            <div class="w-5 h-5 bg-blue-100 text-blue-600 rounded flex items-center justify-center mr-3">✓</div> Fully partitioned retail data
                         </li>
                     </ul>
                     <a href="/fbr-pos-landing" class="btn-chunky px-6 py-3 bg-blue-50 text-blue-700 border-2 border-blue-200 hover:bg-blue-100 hover:border-blue-300">
@@ -436,41 +466,149 @@
         </div>
     </section>
 
-    <!-- Hard Truths / Features -->
-    <section class="py-20 bg-[#1F2937] text-white overflow-hidden">
+    <!-- How It Works Section -->
+    <section class="py-24 bg-pattern-dots border-t-2 border-gray-100">
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 class="text-3xl sm:text-5xl font-bricolage font-black mb-12 text-center">Built for the reality of Pakistani businesses.</h2>
+            <div class="text-center mb-16 reveal">
+                <h2 class="text-3xl sm:text-5xl font-bricolage font-black text-gray-900 mb-4">How It Works</h2>
+                <p class="text-lg text-gray-600 font-medium max-w-2xl mx-auto">Three steps to compliant, worry-free billing.</p>
+            </div>
             
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div class="bg-gray-800 p-8 rounded-2xl border border-gray-700 reveal">
-                    <div class="w-12 h-12 bg-emerald-500/20 text-emerald-400 flex items-center justify-center rounded-xl mb-6">
+                <!-- Step 1 -->
+                <div class="card-tactile p-8 text-center reveal relative">
+                    <div class="absolute -top-6 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-gray-900 text-white font-bricolage font-bold text-xl flex items-center justify-center border-4 border-white shadow-sm">1</div>
+                    <h4 class="font-bricolage font-bold text-2xl text-gray-900 mt-4 mb-3">Choose Your Product</h4>
+                    <p class="text-gray-600 font-medium">Select Digital Invoice, PRA POS, or FBR POS. Each operates in its own strict, isolated environment to ensure data purity.</p>
+                </div>
+                <!-- Step 2 -->
+                <div class="card-tactile p-8 text-center reveal relative" style="transition-delay: 100ms;">
+                    <div class="absolute -top-6 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-gray-900 text-white font-bricolage font-bold text-xl flex items-center justify-center border-4 border-white shadow-sm">2</div>
+                    <h4 class="font-bricolage font-bold text-2xl text-gray-900 mt-4 mb-3">Connect Credentials</h4>
+                    <p class="text-gray-600 font-medium">Enter your FBR or PRA tokens securely. TaxNest handles the handshake, cryptography, and network tunnels instantly.</p>
+                </div>
+                <!-- Step 3 -->
+                <div class="card-tactile p-8 text-center reveal relative" style="transition-delay: 200ms;">
+                    <div class="absolute -top-6 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-gray-900 text-white font-bricolage font-bold text-xl flex items-center justify-center border-4 border-white shadow-sm">3</div>
+                    <h4 class="font-bricolage font-bold text-2xl text-gray-900 mt-4 mb-3">Start Billing</h4>
+                    <p class="text-gray-600 font-medium">Generate invoices or ring up customers on the POS. Receipts print with official QR codes in under a second.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Hard Truths / Features -->
+    <section class="py-24 bg-[#1F2937] text-white overflow-hidden border-t-8 border-gray-900">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl sm:text-5xl font-bricolage font-black mb-16 text-center">Built Different. Built for Pakistan.</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="bg-gray-800 p-8 rounded-2xl border-2 border-gray-700 reveal shadow-[0_6px_0_0_#374151]">
+                    <div class="w-12 h-12 bg-emerald-500/20 text-emerald-400 flex items-center justify-center rounded-xl mb-6 border border-emerald-500/30">
                         <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     </div>
-                    <h4 class="text-xl font-bold font-bricolage mb-3">Offline Auto-Sync Queue</h4>
+                    <h4 class="text-xl font-bold font-bricolage mb-3 text-gray-100">Offline Auto-Sync Queue</h4>
                     <p class="text-gray-400 font-medium leading-relaxed">Internet drops during a rush? Keep printing receipts. TaxNest securely holds invoices locally and blasts them to the FBR/PRA servers the second your connection returns.</p>
                 </div>
                 
-                <div class="bg-gray-800 p-8 rounded-2xl border border-gray-700 reveal" style="transition-delay: 100ms;">
-                    <div class="w-12 h-12 bg-purple-500/20 text-purple-400 flex items-center justify-center rounded-xl mb-6">
+                <div class="bg-gray-800 p-8 rounded-2xl border-2 border-gray-700 reveal shadow-[0_6px_0_0_#374151]" style="transition-delay: 100ms;">
+                    <div class="w-12 h-12 bg-purple-500/20 text-purple-400 flex items-center justify-center rounded-xl mb-6 border border-purple-500/30">
                         <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                     </div>
-                    <h4 class="text-xl font-bold font-bricolage mb-3">Runs on Cheap Hardware</h4>
+                    <h4 class="text-xl font-bold font-bricolage mb-3 text-gray-100">Runs on Cheap Hardware</h4>
                     <p class="text-gray-400 font-medium leading-relaxed">You don't need $1,000 iPads. Our POS runs blazing fast on affordable Android tablets, standard Windows PCs, and works with basic generic Chinese 80mm thermal printers.</p>
                 </div>
                 
-                <div class="bg-gray-800 p-8 rounded-2xl border border-gray-700 reveal" style="transition-delay: 200ms;">
-                    <div class="w-12 h-12 bg-blue-500/20 text-blue-400 flex items-center justify-center rounded-xl mb-6">
+                <div class="bg-gray-800 p-8 rounded-2xl border-2 border-gray-700 reveal shadow-[0_6px_0_0_#374151]" style="transition-delay: 200ms;">
+                    <div class="w-12 h-12 bg-blue-500/20 text-blue-400 flex items-center justify-center rounded-xl mb-6 border border-blue-500/30">
                         <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
                     </div>
-                    <h4 class="text-xl font-bold font-bricolage mb-3">Urdu-Speaking Support</h4>
+                    <h4 class="text-xl font-bold font-bricolage mb-3 text-gray-100">Urdu-Speaking Support</h4>
                     <p class="text-gray-400 font-medium leading-relaxed">When a tax inspector is standing at your counter, you need answers fast. Call our local support team on WhatsApp and get help in Urdu from engineers who actually understand PRAL.</p>
+                </div>
+
+                <div class="bg-gray-800 p-8 rounded-2xl border-2 border-gray-700 reveal shadow-[0_6px_0_0_#374151]">
+                    <div class="w-12 h-12 bg-amber-500/20 text-amber-400 flex items-center justify-center rounded-xl mb-6 border border-amber-500/30">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    </div>
+                    <h4 class="text-xl font-bold font-bricolage mb-3 text-gray-100">Immutable Audit Logs</h4>
+                    <p class="text-gray-400 font-medium leading-relaxed">Every transaction, void, and modification is permanently recorded. When the tax department audits you, hand them a clean, unalterable ledger that proves your compliance.</p>
+                </div>
+
+                <div class="bg-gray-800 p-8 rounded-2xl border-2 border-gray-700 reveal shadow-[0_6px_0_0_#374151]" style="transition-delay: 100ms;">
+                    <div class="w-12 h-12 bg-rose-500/20 text-rose-400 flex items-center justify-center rounded-xl mb-6 border border-rose-500/30">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                    </div>
+                    <h4 class="text-xl font-bold font-bricolage mb-3 text-gray-100">Multi-Branch Control</h4>
+                    <p class="text-gray-400 font-medium leading-relaxed">Manage inventory, monitor cashiers, and view real-time sales across dozens of locations from a single admin dashboard. No more calling branch managers for EOD reports.</p>
+                </div>
+
+                <div class="bg-gray-800 p-8 rounded-2xl border-2 border-gray-700 reveal shadow-[0_6px_0_0_#374151]" style="transition-delay: 200ms;">
+                    <div class="w-12 h-12 bg-teal-500/20 text-teal-400 flex items-center justify-center rounded-xl mb-6 border border-teal-500/30">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <h4 class="text-xl font-bold font-bricolage mb-3 text-gray-100">Token Health Monitoring</h4>
+                    <p class="text-gray-400 font-medium leading-relaxed">FBR tokens expire. We monitor them 24/7. When a token is about to lapse, we automatically alert you and queue invoices safely until you refresh it. Zero dropped receipts.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Traditional vs TaxNest -->
+    <section class="py-24 bg-white border-b-2 border-gray-100">
+        <div class="max-w-[1000px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16 reveal">
+                <h2 class="text-3xl sm:text-5xl font-bricolage font-black text-gray-900 mb-4">TaxNest vs. The Old Way</h2>
+                <p class="text-lg text-gray-600 font-medium max-w-2xl mx-auto">Why switch from legacy desktop software?</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 reveal">
+                <div class="card-tactile p-8 bg-gray-50 border-gray-200 shadow-none">
+                    <h3 class="font-bricolage font-bold text-2xl text-gray-600 mb-6 pb-4 border-b-2 border-gray-200">Traditional Desktop POS</h3>
+                    <ul class="space-y-4">
+                        <li class="flex items-start text-gray-600 font-medium">
+                            <span class="text-red-500 font-bold mr-3">✗</span> Manual nightly FBR uploads
+                        </li>
+                        <li class="flex items-start text-gray-600 font-medium">
+                            <span class="text-red-500 font-bold mr-3">✗</span> Stuck on one computer in the shop
+                        </li>
+                        <li class="flex items-start text-gray-600 font-medium">
+                            <span class="text-red-500 font-bold mr-3">✗</span> Data lost if hard drive crashes
+                        </li>
+                        <li class="flex items-start text-gray-600 font-medium">
+                            <span class="text-red-500 font-bold mr-3">✗</span> Painful paid upgrades for tax changes
+                        </li>
+                        <li class="flex items-start text-gray-600 font-medium">
+                            <span class="text-red-500 font-bold mr-3">✗</span> Slow, unresponsive support
+                        </li>
+                    </ul>
+                </div>
+                <div class="card-tactile p-8 border-emerald-200 shadow-[0_6px_0_0_#D1FAE5]">
+                    <h3 class="font-bricolage font-bold text-2xl text-emerald-900 mb-6 pb-4 border-b-2 border-emerald-100">TaxNest Cloud POS</h3>
+                    <ul class="space-y-4">
+                        <li class="flex items-start text-gray-800 font-bold">
+                            <span class="text-emerald-500 font-bold mr-3">✓</span> Real-time automated syncing
+                        </li>
+                        <li class="flex items-start text-gray-800 font-bold">
+                            <span class="text-emerald-500 font-bold mr-3">✓</span> Access from anywhere, any device
+                        </li>
+                        <li class="flex items-start text-gray-800 font-bold">
+                            <span class="text-emerald-500 font-bold mr-3">✓</span> Automatic cloud data protection
+                        </li>
+                        <li class="flex items-start text-gray-800 font-bold">
+                            <span class="text-emerald-500 font-bold mr-3">✓</span> Free automatic tax-rate updates
+                        </li>
+                        <li class="flex items-start text-gray-800 font-bold">
+                            <span class="text-emerald-500 font-bold mr-3">✓</span> Dedicated WhatsApp engineer line
+                        </li>
+                    </ul>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- Realistic Mini Case Studies -->
-    <section class="py-24 bg-white border-b-2 border-gray-100">
+    <section class="py-24 bg-pattern-dots border-b-2 border-gray-100">
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-16 reveal">
                 <h2 class="text-3xl sm:text-4xl font-bricolage font-black text-gray-900">Operations Running on TaxNest</h2>
@@ -517,6 +655,111 @@
                 </div>
             </div>
 
+        </div>
+    </section>
+
+    <!-- Pricing Overview -->
+    <section class="py-24 bg-white border-b-2 border-gray-100">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16 reveal">
+                <h2 class="text-3xl sm:text-5xl font-bricolage font-black text-gray-900 mb-4">Simple, Isolated Pricing</h2>
+                <p class="text-lg text-gray-600 font-medium max-w-2xl mx-auto">Choose your dedicated product. 3-day free trial on all plans.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Pricing Card 1 -->
+                <div class="card-tactile border-2 border-emerald-200 p-8 flex flex-col reveal text-center">
+                    <span class="inline-block px-3 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-lg uppercase mx-auto mb-4">Enterprise</span>
+                    <h3 class="text-2xl font-bricolage font-bold text-gray-900 mb-2">Digital Invoice</h3>
+                    <p class="text-gray-600 font-medium text-sm mb-6 pb-6 border-b border-gray-100">High-volume B2B API integrations</p>
+                    <a href="/digital-invoice" class="btn-chunky w-full py-3 bg-emerald-50 text-emerald-700 border-2 border-emerald-200 mt-auto hover:bg-emerald-100">See Pricing</a>
+                </div>
+
+                <!-- Pricing Card 2 -->
+                <div class="card-tactile border-2 border-purple-200 p-8 flex flex-col reveal text-center" style="transition-delay: 100ms;">
+                    <span class="inline-block px-3 py-1 bg-purple-100 text-purple-800 text-xs font-bold rounded-lg uppercase mx-auto mb-4">Restaurants</span>
+                    <h3 class="text-2xl font-bricolage font-bold text-gray-900 mb-2">PRA POS</h3>
+                    <p class="text-gray-600 font-medium text-sm mb-6 pb-6 border-b border-gray-100">Punjab Revenue Authority certified</p>
+                    <a href="/pos" class="btn-chunky w-full py-3 bg-purple-50 text-purple-700 border-2 border-purple-200 mt-auto hover:bg-purple-100">See Pricing</a>
+                </div>
+
+                <!-- Pricing Card 3 -->
+                <div class="card-tactile border-2 border-blue-200 p-8 flex flex-col reveal text-center" style="transition-delay: 200ms;">
+                    <span class="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-lg uppercase mx-auto mb-4">Retailers</span>
+                    <h3 class="text-2xl font-bricolage font-bold text-gray-900 mb-2">FBR POS</h3>
+                    <p class="text-gray-600 font-medium text-sm mb-6 pb-6 border-b border-gray-100">Multi-branch inventory & scanning</p>
+                    <a href="/fbr-pos-landing" class="btn-chunky w-full py-3 bg-blue-50 text-blue-700 border-2 border-blue-200 mt-auto hover:bg-blue-100">See Pricing</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ Section (Alpine) -->
+    <section class="py-24 bg-pattern-dots border-b-2 border-gray-100">
+        <div class="max-w-[800px] mx-auto px-4 sm:px-6 lg:px-8" x-data="{ active: null }">
+            <div class="text-center mb-16 reveal">
+                <h2 class="text-3xl sm:text-5xl font-bricolage font-black text-gray-900 mb-4">Questions Shopkeepers Ask</h2>
+            </div>
+
+            <div class="space-y-4 reveal">
+                <div class="card-tactile border-2 border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-none">
+                    <button @click="active = active === 1 ? null : 1" class="w-full px-6 py-5 text-left flex justify-between items-center font-bricolage font-bold text-lg text-gray-900 focus:outline-none">
+                        Do I need internet all the time?
+                        <span x-text="active === 1 ? '-' : '+'" class="text-gray-400 font-mono text-xl"></span>
+                    </button>
+                    <div x-show="active === 1" x-collapse x-cloak class="px-6 pb-6 text-gray-600 font-medium">
+                        No. Our offline auto-sync queue ensures your cashiers can keep billing even when the internet drops. The system holds invoices securely and blasts them to the tax portal the moment you're back online.
+                    </div>
+                </div>
+
+                <div class="card-tactile border-2 border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-none">
+                    <button @click="active = active === 2 ? null : 2" class="w-full px-6 py-5 text-left flex justify-between items-center font-bricolage font-bold text-lg text-gray-900 focus:outline-none">
+                        What happens if the FBR/PRA portal is down?
+                        <span x-text="active === 2 ? '-' : '+'" class="text-gray-400 font-mono text-xl"></span>
+                    </button>
+                    <div x-show="active === 2" x-collapse x-cloak class="px-6 pb-6 text-gray-600 font-medium">
+                        You won't even notice. TaxNest monitors portal health. If the government servers fail, we queue your receipts and print them with an offline status. Once the servers recover, we sync everything transparently.
+                    </div>
+                </div>
+
+                <div class="card-tactile border-2 border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-none">
+                    <button @click="active = active === 3 ? null : 3" class="w-full px-6 py-5 text-left flex justify-between items-center font-bricolage font-bold text-lg text-gray-900 focus:outline-none">
+                        Can I use my existing thermal printer?
+                        <span x-text="active === 3 ? '-' : '+'" class="text-gray-400 font-mono text-xl"></span>
+                    </button>
+                    <div x-show="active === 3" x-collapse x-cloak class="px-6 pb-6 text-gray-600 font-medium">
+                        Yes! TaxNest runs on cheap, standard hardware. If it's a standard 80mm generic thermal printer connecting via USB, Bluetooth, or LAN, our cloud POS can print compliant receipts to it instantly.
+                    </div>
+                </div>
+
+                <div class="card-tactile border-2 border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-none">
+                    <button @click="active = active === 4 ? null : 4" class="w-full px-6 py-5 text-left flex justify-between items-center font-bricolage font-bold text-lg text-gray-900 focus:outline-none">
+                        Is my data mixed with other companies?
+                        <span x-text="active === 4 ? '-' : '+'" class="text-gray-400 font-mono text-xl"></span>
+                    </button>
+                    <div x-show="active === 4" x-collapse x-cloak class="px-6 pb-6 text-gray-600 font-medium">
+                        Absolutely not. Product isolation is sacred here. Each product (Digital Invoice, PRA, FBR) is entirely separate with its own registration, its own login, and fully partitioned data. Zero cross-mixing, ensuring your operational privacy.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="py-24 bg-white">
+        <div class="max-w-[800px] mx-auto px-4 text-center reveal">
+            <h2 class="text-3xl sm:text-5xl font-bricolage font-black text-gray-900 mb-6">We're in Lahore. Let's talk.</h2>
+            <p class="text-lg text-gray-600 font-medium mb-8">Need custom API integrations or high-volume enterprise pricing? Our engineering team is ready.</p>
+            <div class="flex flex-col sm:flex-row justify-center gap-6">
+                <div class="flex items-center justify-center gap-3 px-6 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl">
+                    <svg class="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    <span class="font-bold text-gray-900">support@taxnest.com</span>
+                </div>
+                <div class="flex items-center justify-center gap-3 px-6 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl">
+                    <svg class="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    <span class="font-bold text-gray-900">Lahore, Pakistan</span>
+                </div>
+            </div>
         </div>
     </section>
 

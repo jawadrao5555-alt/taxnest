@@ -188,7 +188,7 @@ window.addEventListener('popstate', function() {
 });
 </script>
 
-<div x-data="restaurantPos()" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
+<div x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
     <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-bold tracking-wider uppercase px-3 py-1 text-center shadow-sm">
         ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v18-PROFIT-BI
     </div>
@@ -309,7 +309,7 @@ window.addEventListener('popstate', function() {
 
         <div class="relative flex-shrink-0" style="min-width:180px;max-width:220px;">
             <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-            <input type="search" x-ref="customerPhoneInput" x-model="customerPhoneQuery" @input="onCustomerPhoneInput()" @keydown.enter.prevent="onCustomerPhoneEnter()" @keydown.escape.prevent="customerPhoneDropdown = false" @keydown.tab.prevent="$refs.searchInput?.focus()" @click.away="customerPhoneDropdown = false" placeholder="Customer name or mobile..." class="w-full pl-9 pr-7 py-2.5 rounded-xl text-sm border-2 transition shadow-sm font-medium" :class="selectedCustomer ? 'border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200' : 'border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400'" autocomplete="one-time-code" name="pos_customer_phone_nofill" data-lpignore="true" data-form-type="other">
+            <input type="search" x-ref="customerPhoneInput" x-model="customerPhoneQuery" @input="onCustomerPhoneInput()" @keydown.enter.prevent="onCustomerPhoneEnter()" @keydown.escape.prevent="customerPhoneDropdown = false" @keydown.tab.prevent="$refs.searchInput?.focus()" @click.away="customerPhoneDropdown = false" placeholder="Customer name or mobile..." class="w-full pl-9 pr-7 py-2.5 rounded-xl text-sm border-2 transition shadow-sm" :class="selectedCustomer ? 'font-bold border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200' : 'font-medium border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400'" autocomplete="one-time-code" name="pos_customer_phone_nofill" data-lpignore="true" data-form-type="other">
             <kbd x-show="!customerPhoneQuery && !selectedCustomer && !customerSearching" class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded font-mono">Alt+P</kbd>
             {{-- Inline search spinner --}}
             <svg x-show="customerSearching && !selectedCustomer" x-cloak class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -1000,6 +1000,15 @@ window.addEventListener('popstate', function() {
             <div class="p-4 max-h-[50vh] overflow-y-auto grid grid-cols-3 gap-2">
                 @foreach($tables as $t)
                 <button @click="selectTable({ id: {{ $t->id }}, table_number: '{{ $t->table_number }}', seats: {{ $t->seats }} })" class="py-3 px-2 rounded-xl text-center border-2 transition hover:scale-105 {{ $t->status === 'occupied' ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-purple-400' }}">
+                    {{-- Top-view table + chairs diagram (color = status) --}}
+                    <svg viewBox="0 0 48 48" class="w-8 h-8 mx-auto mb-1 {{ $t->status === 'occupied' ? 'text-red-500' : 'text-green-500 dark:text-green-400' }}" fill="currentColor" aria-hidden="true">
+                        <rect x="17" y="1.5" width="14" height="7" rx="3"/>
+                        <rect x="17" y="39.5" width="14" height="7" rx="3"/>
+                        <rect x="1.5" y="17" width="7" height="14" rx="3"/>
+                        <rect x="39.5" y="17" width="7" height="14" rx="3"/>
+                        <circle cx="24" cy="24" r="13"/>
+                        <circle cx="24" cy="24" r="8.5" fill="#fff" fill-opacity="0.35"/>
+                    </svg>
                     <p class="text-sm font-bold {{ $t->status === 'occupied' ? 'text-red-600' : 'text-gray-900 dark:text-white' }}">T-{{ $t->table_number }}</p>
                     <p class="text-[10px] text-gray-400">{{ $t->seats }} seats</p>
                     @if($t->status === 'occupied')<span class="text-[9px] text-red-500 font-medium">Occupied</span>@endif
@@ -3414,6 +3423,32 @@ function restaurantPos() {
         },
         selectTable(table) { this.selectedTable = table; this.orderType = 'dine_in'; this.showTablePicker = false; },
 
+        // ── Global mouse-wheel forwarding ──────────────────────────────────────
+        // The sale screen is a fixed-height app shell (body never scrolls), so a
+        // wheel spin over "dead" areas (header, customer bar, empty gaps) used to
+        // do NOTHING. Forward those wheel events to the product grid. Native
+        // scrolling still wins wherever the cursor is over an element that can
+        // actually scroll (grid, cart list, dropdowns, modal bodies).
+        handleGlobalWheel(e) {
+            if (!e.deltaY) return;
+            // Never hijack the wheel inside fixed overlays (modals, drawers).
+            if (e.target && e.target.closest && e.target.closest('.fixed')) return;
+            let el = e.target;
+            while (el && el !== document.body) {
+                if (el.scrollHeight > el.clientHeight + 1) {
+                    const oy = window.getComputedStyle(el).overflowY;
+                    if (oy === 'auto' || oy === 'scroll') {
+                        const down = e.deltaY > 0;
+                        const canScroll = down ? (el.scrollTop + el.clientHeight < el.scrollHeight - 1) : (el.scrollTop > 0);
+                        if (canScroll) return; // native scroll handles it
+                    }
+                }
+                el = el.parentElement;
+            }
+            const grid = this.$refs.gridContainer;
+            if (grid) grid.scrollTop += e.deltaY;
+        },
+
         onCustomerPhoneSearch() {
             if (this.customerLookupTimer) clearTimeout(this.customerLookupTimer);
             const phone = this.customerSearch.trim();
@@ -3436,7 +3471,7 @@ function restaurantPos() {
             const c = this.customerLookupResult.customer;
             this.selectedCustomer = c;
             this.customerStats = this.customerLookupResult.stats;
-            this.customerPhoneQuery = c.phone || c.name;
+            this.customerPhoneQuery = c.name + (c.phone ? " · " + c.phone : "");
             this.showCustomerPicker = false;
             this.customerLookupResult = null;
             this.showToast('Customer: ' + c.name + (this.customerStats.is_frequent ? ' (VIP)' : ''), 'success');
@@ -3445,7 +3480,7 @@ function restaurantPos() {
         async selectCustomerWithStats(c) {
             this.selectedCustomer = c;
             this.customerStats = null;
-            this.customerPhoneQuery = c.phone || c.name;
+            this.customerPhoneQuery = c.name + (c.phone ? " · " + c.phone : "");
             this.showCustomerPicker = false;
             this.showToast('Customer: ' + c.name, 'success');
             if (c.phone) {
@@ -3489,16 +3524,33 @@ function restaurantPos() {
             finally { this.customerSearching = false; }
         },
 
-        onCustomerPhoneEnter() {
+        async onCustomerPhoneEnter() {
             const q = this.customerPhoneQuery.trim();
             if (this.showNewCustomerInline) { this.saveNewCustomer(); return; }
-            // GUIDED FLOW (opt-in): the customer step is OPTIONAL. Enter must ALWAYS move
-            // the keyboard chain forward to the items step (focus product search). If the
-            // typed phone matches an existing customer, attach them first; otherwise proceed
-            // as a walk-in WITHOUT forcing the inline new-customer modal (which stalled the
-            // flow). Customers can still be created via the dropdown "+ New Customer" button.
+            // GUIDED FLOW: the customer step stays OPTIONAL (empty Enter = walk-in, moves on).
+            // But when the cashier HAS typed a valid mobile number:
+            //   - match found → attach customer, move to items
+            //   - no match   → open the inline new-customer form (full keyboard: name → Enter
+            //     → address → Enter saves & moves to items). No mouse needed. Esc = skip.
             if (this.guidedFlow) {
-                if (this.customerPhoneResults.length > 0) { this.selectCustomerFromPhone(this.customerPhoneResults[0]); }
+                // Re-entrancy guard: a second Enter while the search is in flight would
+                // start a duplicate fetch and re-open (and wipe) the new-customer form.
+                if (this.customerSearching) return;
+                const validPhone = q.length >= 4 && /^\d+$/.test(q);
+                if (validPhone && this.customerPhoneResults.length === 0) {
+                    // Debounced search may still be in flight — resolve it NOW so we don't
+                    // open the new-customer form for a customer who actually exists.
+                    if (this.customerPhoneTimer) { clearTimeout(this.customerPhoneTimer); this.customerPhoneTimer = null; }
+                    await this.searchCustomerByPhone(q);
+                }
+                if (this.customerPhoneResults.length > 0) {
+                    this.selectCustomerFromPhone(this.customerPhoneResults[0]);
+                    this.customerPhoneDropdown = false;
+                    this.flowStep = 'items';
+                    this.$nextTick(() => { this.$refs.searchInput?.focus(); });
+                    return;
+                }
+                if (validPhone) { this.openInlineNewCustomer(); return; }
                 this.customerPhoneDropdown = false;
                 this.flowStep = 'items';
                 this.$nextTick(() => { this.$refs.searchInput?.focus(); });
@@ -3535,7 +3587,7 @@ function restaurantPos() {
         selectCustomerFromPhone(cr) {
             this.selectedCustomer = { id: cr.id, name: cr.name, phone: cr.phone, address: cr.address };
             this.customerStats = cr.stats || null;
-            this.customerPhoneQuery = cr.phone || cr.name;
+            this.customerPhoneQuery = cr.name + (cr.phone ? ' · ' + cr.phone : '');
             this.customerPhoneDropdown = false;
             this.customerPhoneResults = [];
             this.showToast('Customer: ' + cr.name + (cr.stats && cr.stats.is_frequent ? ' (VIP)' : ''), 'success');
@@ -3556,7 +3608,8 @@ function restaurantPos() {
                 if (data.success) {
                     this.selectedCustomer = { id: data.customer.id, name: data.customer.name, phone: data.customer.phone, address: data.customer.address };
                     this.customerStats = { total_orders: 0, total_spent: 0, is_frequent: false, last_order_date: null };
-                    this.customerPhoneQuery = data.customer.phone || data.customer.name;
+                    this.customerPhoneQuery = data.customer.name + (data.customer.phone ? ' · ' + data.customer.phone : '');
+                    if (this.guidedFlow) this.flowStep = 'items';
                     this.showNewCustomerInline = false;
                     this.showNewCustomerModal = false;
                     this.customerPhoneDropdown = false;

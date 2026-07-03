@@ -75,7 +75,17 @@ class PosController extends Controller
         }
         $enabled = $request->boolean('enabled');
         $companyId = app('currentCompanyId');
-        Company::where('id', $companyId)->update(['inventory_enabled' => $enabled]);
+        $company = Company::find($companyId);
+        if ($company) {
+            // Keep the Features-wizard "Inventory Tracking" flag in lockstep
+            // with the master module switch so both surfaces always agree.
+            $flags = is_array($company->feature_flags) ? $company->feature_flags : [];
+            $flags['inventory'] = $enabled;
+            // Canonicalize so dependent children (e.g. recipes) cascade off in
+            // STORED flags too — keeps the Features wizard display truthful.
+            $flags = \App\Services\PosFeatureService::normalize($flags);
+            $company->update(['inventory_enabled' => $enabled, 'feature_flags' => $flags]);
+        }
         return response()->json(['success' => true, 'enabled' => $enabled]);
     }
 
@@ -542,6 +552,9 @@ class PosController extends Controller
         $company->update([
             'business_category'    => $data['business_category'] ?? $company->business_category,
             'feature_flags'        => $flags,
+            // Master inventory module switch follows the wizard's
+            // "Inventory Tracking" flag so both surfaces always agree.
+            'inventory_enabled'    => (bool) ($flags['inventory'] ?? false),
             'use_universal_pos'    => (bool) ($data['use_universal_pos'] ?? false),
             'pos_ui_density'       => $data['pos_ui_density'] ?? $company->pos_ui_density ?? 'standard',
             // Kitchen preferences (checkboxes — absent value = off).
@@ -580,6 +593,7 @@ class PosController extends Controller
         $company->update([
             'business_category' => $category,
             'feature_flags' => $defaults,
+            'inventory_enabled' => (bool) ($defaults['inventory'] ?? false),
         ]);
         return redirect()->route('pos.features')->with('success', 'Features reset to ' . $category . ' defaults.');
     }

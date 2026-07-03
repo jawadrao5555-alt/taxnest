@@ -14,8 +14,19 @@
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             @foreach($floor->tables as $table)
             <a href="{{ route('pos.invoice.create', ['table_id' => $table->id]) }}" class="block bg-white dark:bg-gray-800 rounded-xl border-2 p-4 text-center transition-all hover:shadow-lg {{ $table->status === 'available' ? 'border-green-300 dark:border-green-700 hover:border-green-500' : ($table->status === 'occupied' ? 'border-red-300 dark:border-red-700 hover:border-red-500' : 'border-amber-300 dark:border-amber-700 hover:border-amber-500') }}">
-                <div class="text-2xl mb-1">
-                    @if($table->status === 'available') 🟢 @elseif($table->status === 'occupied') 🔴 @else 🟡 @endif
+                @php
+                    $tblColor = $table->status === 'available' ? 'text-green-500 dark:text-green-400' : ($table->status === 'occupied' ? 'text-red-500 dark:text-red-400' : 'text-amber-500 dark:text-amber-400');
+                @endphp
+                <div class="mb-1.5">
+                    {{-- Top-view table + chairs diagram (color = status) --}}
+                    <svg viewBox="0 0 48 48" class="w-11 h-11 mx-auto {{ $tblColor }}" fill="currentColor" aria-hidden="true">
+                        <rect x="17" y="1.5" width="14" height="7" rx="3"/>
+                        <rect x="17" y="39.5" width="14" height="7" rx="3"/>
+                        <rect x="1.5" y="17" width="7" height="14" rx="3"/>
+                        <rect x="39.5" y="17" width="7" height="14" rx="3"/>
+                        <circle cx="24" cy="24" r="13"/>
+                        <circle cx="24" cy="24" r="8.5" fill="#fff" fill-opacity="0.35"/>
+                    </svg>
                 </div>
                 <div class="text-lg font-bold text-gray-900 dark:text-white">{{ $table->table_number }}</div>
                 <div class="text-xs text-gray-500 dark:text-gray-400">{{ $table->seats }} seats</div>

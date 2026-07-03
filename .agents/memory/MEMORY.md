@@ -5,6 +5,7 @@
 - [bash output corrupts pos.restaurant.pos→n](bash-output-route-name-artifact.md) — bash/rg STDOUT renders route 'pos.restaurant.pos' as 'n'; rg MATCH is on real bytes; trust read/edit, not bash display.
 - [Bad UTF-8 in @json kills POS x-data](blade-json-xdata-utf8.md) — malformed product name → json_encode false → empty @json → x-data syntax error → whole sale screen dead; use UTF-8-safe encode+fallback, not bare @json.
 - [POS provisional & receipt-tax rules](pos-provisional-and-receipt-rules.md) — "local" bill = completed+invoice_mode=local+pra_status=local on every list/promote/delete; PRA fiscal receipts must always show tax.
+- [POS inventory dual-switch trap](pos-inventory-dual-switch.md) — inventory has TWO switches (feature flag + inventory_enabled column); gates read only the column — every write path must sync both + normalize.
 - [Alpine focused qty-input sync](alpine-focused-qty-input-sync.md) — qty input x-effect skips the focused element; keyboard qty changes must write e.target.value or the digit looks stale (model/bill stay correct).
 - [PROD schema drift & self-heal](prod-schema-drift-selfheal.md) — pages 500 only on owner's cPanel PROD = missing columns marked "Ran"; fix with a fresh idempotent ensure-columns migration + per-column hasColumn guards.
 - [Vite arbitrary Tailwind classes](vite-arbitrary-classes.md) — new Blade components with arbitrary classes (bg-[#hex], z-[60]) render invisible until `npm run build`; view:cache is not enough.

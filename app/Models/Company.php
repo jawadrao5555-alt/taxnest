@@ -85,6 +85,7 @@ class Company extends Model
         'logo_path',
         'print_paper_size',
         'receipt_footer_note',
+        'invoice_display_prefs',
         'status',
         'product_type',
         'franchise_id',
@@ -116,6 +117,7 @@ class Company extends Model
         'agent_enabled' => 'boolean',
         'agent_last_seen' => 'datetime',
         'feature_flags' => 'array',
+        'invoice_display_prefs' => 'array',
         'use_universal_pos' => 'boolean',
         'auto_print_kot' => 'boolean',
         'kot_reprint_enabled' => 'boolean',
@@ -131,6 +133,39 @@ class Company extends Model
         'confidential_pin',
         'manager_override_pin',
     ];
+
+    /**
+     * Receipt / invoice display preferences for a product ('pos' or 'di').
+     * NULL / missing keys = show everything with default footer text,
+     * so companies that never touched the setting see zero change.
+     */
+    public static function defaultDisplayPrefs(): array
+    {
+        return [
+            'show_address' => true,
+            'show_ntn' => true,
+            'show_email' => true,
+            'show_mobile' => true,
+            'show_footer' => true,
+            'footer_text' => null,
+        ];
+    }
+
+    public function displayPrefs(string $product): array
+    {
+        $defaults = self::defaultDisplayPrefs();
+
+        $all = $this->invoice_display_prefs;
+        $prefs = is_array($all) ? ($all[$product] ?? []) : [];
+
+        $merged = array_merge($defaults, is_array($prefs) ? $prefs : []);
+
+        foreach (['show_address', 'show_ntn', 'show_email', 'show_mobile', 'show_footer'] as $k) {
+            $merged[$k] = filter_var($merged[$k], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        return $merged;
+    }
 
     public function isSuspended()
     {

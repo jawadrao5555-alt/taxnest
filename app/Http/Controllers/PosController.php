@@ -3932,6 +3932,7 @@ class PosController extends Controller
                 'business_activity' => 'nullable|string|max:255',
                 'website' => 'nullable|url|max:255',
                 'logo' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:2048',
+                'rp_footer_text' => 'nullable|string|max:150',
             ];
 
             $request->validate($rules);
@@ -3939,6 +3940,20 @@ class PosController extends Controller
             $data = $request->only(['name', 'owner_name', 'ntn', 'email', 'phone', 'mobile', 'address', 'city', 'business_activity', 'website']);
             $data['inventory_enabled'] = $request->has('inventory_enabled');
             $data['restaurant_mode'] = $request->has('restaurant_mode');
+
+            // Receipt display preferences (per-company, POS product scope)
+            if ($request->has('receipt_prefs_submitted')) {
+                $prefs = $company->invoice_display_prefs ?? [];
+                $prefs['pos'] = [
+                    'show_address' => $request->has('rp_show_address'),
+                    'show_ntn' => $request->has('rp_show_ntn'),
+                    'show_email' => $request->has('rp_show_email'),
+                    'show_mobile' => $request->has('rp_show_mobile'),
+                    'show_footer' => $request->has('rp_show_footer'),
+                    'footer_text' => trim((string) $request->input('rp_footer_text', '')) ?: null,
+                ];
+                $data['invoice_display_prefs'] = $prefs;
+            }
 
             if ($request->hasFile('logo')) {
                 if ($company->logo_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($company->logo_path)) {
@@ -3956,7 +3971,7 @@ class PosController extends Controller
             }
 
             $company->update($data);
-            return back()->with('success', 'Business profile updated successfully.');
+            return redirect()->route('pos.customize')->with('success', 'Business profile updated successfully.');
         }
 
         return view('pos.business-profile', compact('company'));

@@ -75,5 +75,6 @@
             </main>
         </div>
     </div>
+<script src="{{ asset('js/wheel-scroll.js') }}?v=1" defer></script>
 </body>
 </html>

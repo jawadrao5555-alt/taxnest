@@ -673,5 +673,6 @@
         <x-pwa-update color="purple" />
         <x-trial-lock-modal />
         <x-whatsapp-support />
+        <script src="{{ asset('js/wheel-scroll.js') }}?v=1" defer></script>
     </body>
 </html>

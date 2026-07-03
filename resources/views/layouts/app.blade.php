@@ -99,17 +99,6 @@
                 position: relative;
                 overflow: hidden;
             }
-            .stat-card::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                right: 0;
-                width: 60px;
-                height: 60px;
-                border-radius: 0 0 0 100%;
-                opacity: 0.08;
-                background: currentColor;
-            }
             .stat-card:hover { transform: translateY(-2px); box-shadow: var(--card-shadow-hover); }
 
             .premium-hover { transition: all 0.2s ease; }
@@ -475,5 +464,6 @@
         <x-pwa-update color="emerald" />
         <x-trial-lock-modal />
         <x-whatsapp-support />
+        <script src="{{ asset('js/wheel-scroll.js') }}?v=1" defer></script>
     </body>
 </html>

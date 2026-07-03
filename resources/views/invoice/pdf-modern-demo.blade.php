@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Invoice {{ $invoice->invoice_number ?? $invoice->id }}</title>
+    <title>Invoice {{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</title>
     <style>
         @page {
             margin: 12mm 14mm 10mm 14mm;
@@ -286,12 +286,12 @@
                     </tr>
                     <tr>
                         <td class="dl" style="color: #000000; font-weight: 800;">Internal Ref #</td>
-                        <td class="dv" style="color: #000000; font-size: 8.5px; font-weight: 800;">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</td>
+                        <td class="dv" style="color: #000000; font-size: 8.5px; font-weight: 800;">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</td>
                     </tr>
                     @else
                     <tr>
                         <td class="dl" style="color: #000000; font-weight: 800;">Invoice No.</td>
-                        <td class="dv" style="color: #000000; font-weight: 800;">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</td>
+                        <td class="dv" style="color: #000000; font-weight: 800;">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</td>
                     </tr>
                     @endif
                     <tr>

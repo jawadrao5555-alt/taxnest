@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Invoice {{ $invoice->invoice_number ?? $invoice->id }}</title>
+    <title>Invoice {{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 40px; color: #333; font-size: 13px; }
         .doc-title { text-align: center; font-size: 22px; font-weight: bold; color: #10b981; letter-spacing: 3px; border-bottom: 2px solid #10b981; padding-bottom: 12px; margin-bottom: 20px; }
@@ -33,22 +33,27 @@
         <table>
             <tr>
                 <td style="width: 60%; vertical-align: top;">
+                    @php $dp = $invoice->company?->displayPrefs('di') ?? \App\Models\Company::defaultDisplayPrefs(); @endphp
                     <div class="company-name">{{ $invoice->company->name ?? 'TaxNest' }}</div>
+                    @if($dp['show_ntn'])
                     <p style="margin: 3px 0; font-size: 12px; color: #6b7280;">NTN: {{ $invoice->company->ntn ?? 'N/A' }}</p>
+                    @endif
                     @if($invoice->company->cnic && $invoice->company->cnic !== $invoice->company->ntn && $invoice->company->cnic !== $invoice->company->registration_no)
                     <p style="margin: 3px 0; font-size: 12px; color: #6b7280;">CNIC: {{ $invoice->company->cnic }}</p>
                     @endif
                     @if($invoice->company->registration_no)
                     <p style="margin: 3px 0; font-size: 12px; color: #6b7280;">Reg #: {{ $invoice->company->registration_no }}</p>
                     @endif
+                    @if($dp['show_address'])
                     <p style="margin: 3px 0; font-size: 12px; color: #6b7280;">{{ $invoice->company->address ?? '' }}@if($invoice->company->city), {{ $invoice->company->city }}@endif</p>
-                    @if($invoice->company->phone)
+                    @endif
+                    @if($invoice->company->phone && $dp['show_mobile'])
                     <p style="margin: 3px 0; font-size: 12px; color: #6b7280;">Phone: {{ $invoice->company->phone }}</p>
                     @endif
-                    @if($invoice->company->mobile && $invoice->company->mobile !== $invoice->company->phone)
+                    @if($invoice->company->mobile && $invoice->company->mobile !== $invoice->company->phone && $dp['show_mobile'])
                     <p style="margin: 3px 0; font-size: 12px; color: #6b7280;">Mobile: {{ $invoice->company->mobile }}</p>
                     @endif
-                    @if($invoice->company->email)
+                    @if($invoice->company->email && $dp['show_email'])
                     <p style="margin: 3px 0; font-size: 12px; color: #6b7280;">Email: {{ $invoice->company->email }}</p>
                     @endif
                 </td>
@@ -145,6 +150,10 @@
             </tr>
         </tfoot>
     </table>
+
+    @if($dp['show_footer'] && !empty($dp['footer_text']))
+    <p style="margin-top: 14px; text-align: center; font-size: 11px; color: #374151;">{{ $dp['footer_text'] }}</p>
+    @endif
 
     @if(!empty($showWatermark) && $showWatermark)
     <div style="position: fixed; top: 40%; left: 15%; font-size: 48px; color: rgba(239, 68, 68, 0.10); font-weight: bold; text-transform: uppercase; transform: rotate(-35deg); pointer-events: none; z-index: 9999; white-space: nowrap; letter-spacing: 6px;">

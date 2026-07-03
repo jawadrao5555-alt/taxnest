@@ -63,15 +63,32 @@ class ProfileController extends Controller
                 'address' => 'nullable|string|max:500',
                 'city' => 'nullable|string|max:100',
                 'website' => 'nullable|string|max:255',
+                'dp_footer_text' => 'nullable|string|max:150',
             ]);
 
-            $company->update($request->only(['name', 'owner_name', 'ntn', 'cnic', 'registration_no', 'email', 'phone', 'mobile', 'business_activity', 'address', 'city', 'website']));
+            $data = $request->only(['name', 'owner_name', 'ntn', 'cnic', 'registration_no', 'email', 'phone', 'mobile', 'business_activity', 'address', 'city', 'website']);
+
+            // Invoice display preferences (per-company, DI product scope)
+            if ($request->has('invoice_prefs_submitted')) {
+                $prefs = $company->invoice_display_prefs ?? [];
+                $prefs['di'] = [
+                    'show_address' => $request->has('dp_show_address'),
+                    'show_ntn' => $request->has('dp_show_ntn'),
+                    'show_email' => $request->has('dp_show_email'),
+                    'show_mobile' => $request->has('dp_show_mobile'),
+                    'show_footer' => $request->has('dp_show_footer'),
+                    'footer_text' => trim((string) $request->input('dp_footer_text', '')) ?: null,
+                ];
+                $data['invoice_display_prefs'] = $prefs;
+            }
+
+            $company->update($data);
 
             SecurityLogService::log('company_profile_updated', auth()->id(), [
                 'company_id' => $company->id,
             ]);
 
-            return Redirect::route('profile.edit')->with('status', 'company-updated');
+            return Redirect::route('dashboard')->with('success', 'Business profile updated successfully.');
         } catch (\Illuminate\Validation\ValidationException $e) {
             throw $e;
         } catch (\Exception $e) {

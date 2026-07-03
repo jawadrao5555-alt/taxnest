@@ -178,12 +178,13 @@
                     @endif
                 </td>
                 <td style="width: 55%; text-align: right;">
+                    @php $dp = $invoice->company?->displayPrefs('di') ?? \App\Models\Company::defaultDisplayPrefs(); @endphp
                     <div class="company-name">{{ $invoice->company->name ?? 'TaxNest' }}</div>
                     <div class="company-info">
-                        @if($invoice->company->address)
+                        @if($invoice->company->address && $dp['show_address'])
                         {{ $invoice->company->address }}@if($invoice->company->city), {{ $invoice->company->city }}@endif<br>
                         @endif
-                        @if($invoice->company->ntn)
+                        @if($invoice->company->ntn && $dp['show_ntn'])
                         <strong>NTN: {{ $invoice->company->ntn }}</strong><br>
                         @endif
                         @if($invoice->company->cnic && $invoice->company->cnic !== $invoice->company->ntn && $invoice->company->cnic !== $invoice->company->registration_no)
@@ -192,13 +193,13 @@
                         @if($invoice->company->registration_no)
                         Reg #: {{ $invoice->company->registration_no }}<br>
                         @endif
-                        @if($invoice->company->phone)
+                        @if($invoice->company->phone && $dp['show_mobile'])
                         Phone: {{ $invoice->company->phone }}
                         @endif
-                        @if($invoice->company->mobile && $invoice->company->mobile !== $invoice->company->phone)
+                        @if($invoice->company->mobile && $invoice->company->mobile !== $invoice->company->phone && $dp['show_mobile'])
                         &nbsp;| Mobile: {{ $invoice->company->mobile }}
                         @endif
-                        @if($invoice->company->email)
+                        @if($invoice->company->email && $dp['show_email'])
                         <br>{{ $invoice->company->email }}
                         @endif
                     </div>
@@ -397,6 +398,9 @@
 
     {{-- ===== FOOTER ===== --}}
     <div class="footer">
+        @if($dp['show_footer'] && !empty($dp['footer_text']))
+        <div class="footer-text" style="font-weight: 700;">{{ $dp['footer_text'] }}</div>
+        @endif
         <div class="footer-text">This is a computer-generated invoice. | {{ now()->format('d M Y, h:i A') }}</div>
         <div class="footer-brand">TaxNest — Tax &amp; Invoice Management System</div>
     </div>

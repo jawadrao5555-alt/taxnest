@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Invoice {{ $invoice->invoice_number ?? $invoice->id }}</title>
+    <title>Invoice {{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</title>
     <style>
         @page {
             margin: 12mm 14mm 10mm 14mm;
@@ -167,16 +167,17 @@
         <table>
             <tr>
                 <td style="width: 58%;">
+                    @php $dp = $invoice->company?->displayPrefs('di') ?? \App\Models\Company::defaultDisplayPrefs(); @endphp
                     <div class="b-name">{{ $invoice->company->name ?? 'TaxNest' }}</div>
                     <div class="b-sub">
-                        @if($invoice->company->address)
+                        @if($invoice->company->address && $dp['show_address'])
                         {{ $invoice->company->address }}
                         @if($invoice->company->city)
                         , {{ $invoice->company->city }}
                         @endif
                         <br>
                         @endif
-                        @if($invoice->company->ntn)
+                        @if($invoice->company->ntn && $dp['show_ntn'])
                         <strong>NTN: {{ $invoice->company->ntn }}</strong>
                         @endif
                         @if($invoice->company->registration_no && $invoice->company->registration_no !== $invoice->company->ntn)
@@ -185,20 +186,20 @@
                         @if($invoice->company->cnic && $invoice->company->cnic !== $invoice->company->ntn && $invoice->company->cnic !== ($invoice->company->registration_no ?? ''))
                         <br>CNIC: {{ $invoice->company->cnic }}
                         @endif
-                        @if($invoice->company->phone)
+                        @if($invoice->company->phone && $dp['show_mobile'])
                         <br>Phone: {{ $invoice->company->phone }}
                         @endif
-                        @if($invoice->company->mobile && $invoice->company->mobile !== ($invoice->company->phone ?? ''))
+                        @if($invoice->company->mobile && $invoice->company->mobile !== ($invoice->company->phone ?? '') && $dp['show_mobile'])
                         &nbsp;| Mobile: {{ $invoice->company->mobile }}
                         @endif
-                        @if($invoice->company->email)
+                        @if($invoice->company->email && $dp['show_email'])
                         <br>{{ $invoice->company->email }}
                         @endif
                     </div>
                 </td>
                 <td style="width: 42%;">
                     <div class="inv-label">INVOICE</div>
-                    <div class="inv-num"># {{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</div>
+                    <div class="inv-num"># {{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</div>
                     @if($invoice->fbr_invoice_number)
                     <div style="text-align: right; margin-top: 4px;">
                         <span class="tag tag-verified">FBR VERIFIED</span>
@@ -282,7 +283,7 @@
                     <table class="dtable">
                         <tr>
                             <td class="dl">Invoice No.</td>
-                            <td class="dv">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id }}</td>
+                            <td class="dv">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</td>
                         </tr>
                         <tr>
                             <td class="dl">Date</td>
@@ -446,6 +447,9 @@
 
     {{-- ===== FOOTER ===== --}}
     <div class="foot">
+        @if($dp['show_footer'] && !empty($dp['footer_text']))
+        <div class="foot-line" style="font-weight: 700; color: #111827;">{{ $dp['footer_text'] }}</div>
+        @endif
         <div class="foot-line">This is a computer-generated invoice. | {{ $invoice->created_at->format('d M Y, h:i A') }}</div>
         <div class="foot-brand">TaxNest &mdash; Tax &amp; Invoice Management System</div>
     </div>

@@ -149,6 +149,7 @@
         }
         $addressLine = trim(($company->address ?? '') . (($company->city) ? ', ' . $company->city : ''));
         $phoneLine = trim(implode(' / ', array_filter([$company->phone ?? null, $company->mobile ?? null])));
+        $rp = $company->displayPrefs('pos');
     @endphp
     <div class="header text-center">
         @if($logoDataUri)
@@ -158,11 +159,11 @@
         @endif
         <h1>{{ $company->name }}</h1>
         @if($company->business_activity)<p style="font-style:italic;">{{ $company->business_activity }}</p>@endif
-        @if(!empty($addressLine))<p>{{ $addressLine }}</p>@endif
-        @if($phoneLine)<p>Tel: {{ $phoneLine }}</p>@endif
-        @if($company->email)<p>{{ $company->email }}</p>@endif
+        @if(!empty($addressLine) && $rp['show_address'])<p>{{ $addressLine }}</p>@endif
+        @if($phoneLine && $rp['show_mobile'])<p>Tel: {{ $phoneLine }}</p>@endif
+        @if($company->email && $rp['show_email'])<p>{{ $company->email }}</p>@endif
         @if($company->website)<p>{{ $company->website }}</p>@endif
-        @if($company->ntn)<p><strong>NTN:</strong> {{ $company->ntn }}</p>@endif
+        @if($company->ntn && $rp['show_ntn'])<p><strong>NTN:</strong> {{ $company->ntn }}</p>@endif
         @if(!empty($company->fbr_registration_no))<p><strong>STRN:</strong> {{ $company->fbr_registration_no }}</p>@endif
     </div>
 
@@ -303,7 +304,7 @@
     @endif
 
     <div class="footer text-center">
-        <p>Thank you for your purchase!</p>
+        @if($rp['show_footer'])<p>{{ $rp['footer_text'] ?? 'Thank you for your purchase!' }}</p>@endif
         <p>Powered by NestPOS</p>
         <p>{{ now()->format('d/m/Y h:i:s A') }}</p>
     </div>

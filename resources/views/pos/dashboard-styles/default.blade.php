@@ -5,7 +5,6 @@
 .slide-up-1 { animation-delay: 0ms; } .slide-up-2 { animation-delay: 60ms; } .slide-up-3 { animation-delay: 120ms; } .slide-up-4 { animation-delay: 180ms; } .slide-up-5 { animation-delay: 240ms; }
 .count-up { animation: countUp 0.5s ease-out forwards; }
 .stat-card { position: relative; overflow: hidden; border-radius: 16px; }
-.stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; opacity: 0.03; background: repeating-linear-gradient(45deg, transparent, transparent 8px, currentColor 8px, currentColor 9px); }
 .stat-card:hover { transform: translateY(-2px); transition: transform 0.2s ease; }
 .glass-card { background: rgba(255,255,255,0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.4); }
 .dark .glass-card { background: rgba(17,24,39,0.7); border: 1px solid rgba(255,255,255,0.05); }
@@ -19,7 +18,6 @@
 .tile-icon { transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .tile-card:hover .tile-icon { transform: scale(1.15) rotate(3deg); }
 .r-stat { position: relative; overflow: hidden; border-radius: 14px; }
-.r-stat::before { content: ''; position: absolute; top: -40%; right: -40%; width: 80%; height: 80%; background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%); pointer-events: none; }
 .stat-val { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 .r-progress { transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
 .r-glass { background: rgba(255,255,255,0.8); backdrop-filter: blur(12px); border: 1px solid rgba(0,0,0,0.05); border-radius: 14px; }

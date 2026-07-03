@@ -102,13 +102,14 @@
     </div>
     @endif
 
+    @php $rp = $company->displayPrefs('pos'); @endphp
     <div class="receipt-header">
         <p class="company-name">{{ $company->name ?? 'Restaurant' }}</p>
         <div class="company-meta">
-            @if($company->address)<p>{{ $company->address }}</p>@endif
-            @if($company->phone)<p>Tel: {{ $company->phone }}</p>@endif
+            @if($company->address && $rp['show_address'])<p>{{ $company->address }}</p>@endif
+            @if($company->phone && $rp['show_mobile'])<p>Tel: {{ $company->phone }}</p>@endif
         </div>
-        @if($company->ntn)<p class="company-ntn">NTN: {{ $company->ntn }}</p>@endif
+        @if($company->ntn && $rp['show_ntn'])<p class="company-ntn">NTN: {{ $company->ntn }}</p>@endif
     </div>
 
     <hr class="sep-double">
@@ -214,7 +215,7 @@
     <hr class="sep-dashed">
 
     <div class="footer">
-        <p class="thanks">Thank you for dining with us!</p>
+        @if($rp['show_footer'])<p class="thanks">{{ $rp['footer_text'] ?? 'Thank you for dining with us!' }}</p>@endif
         <p class="powered">Powered by TaxNest</p>
     </div>
 

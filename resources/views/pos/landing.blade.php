@@ -63,10 +63,6 @@
 
     <div x-show="showLoginModal" x-cloak x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4" @click.self="showLoginModal = false" @keydown.escape.window="showLoginModal = false">
         <div x-show="showLoginModal" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95 translate-y-4" x-transition:enter-end="opacity-100 scale-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="w-full max-w-md relative overflow-hidden rounded-2xl" style="background: linear-gradient(135deg, #1e1b4b 0%, #4c1d95 50%, #581c87 100%); box-shadow: 0 25px 60px -12px rgba(0,0,0,0.5);">
-            <div class="absolute inset-0 overflow-hidden">
-                <div class="absolute -top-20 -right-20 w-40 h-40 bg-purple-400/10 rounded-full blur-2xl"></div>
-                <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-violet-400/10 rounded-full blur-2xl"></div>
-            </div>
             <div class="relative px-6 py-5">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-3">

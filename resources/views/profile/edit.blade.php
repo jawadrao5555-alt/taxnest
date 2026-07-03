@@ -116,6 +116,41 @@
                     </div>
                 </div>
 
+                @php $dp = $company->displayPrefs('di'); @endphp
+                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+                    <input type="hidden" name="invoice_prefs_submitted" value="1">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">Invoice Display Options</h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Choose which business details appear on your invoice PDFs, and add an optional footer message.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <label class="flex items-center gap-2.5 cursor-pointer p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700 transition">
+                            <input type="checkbox" name="dp_show_address" value="1" {{ $dp['show_address'] ? 'checked' : '' }} class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4">
+                            <span class="text-sm text-gray-800 dark:text-gray-200">Show Address</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 cursor-pointer p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700 transition">
+                            <input type="checkbox" name="dp_show_ntn" value="1" {{ $dp['show_ntn'] ? 'checked' : '' }} class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4">
+                            <span class="text-sm text-gray-800 dark:text-gray-200">Show NTN</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 cursor-pointer p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700 transition">
+                            <input type="checkbox" name="dp_show_email" value="1" {{ $dp['show_email'] ? 'checked' : '' }} class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4">
+                            <span class="text-sm text-gray-800 dark:text-gray-200">Show Email</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 cursor-pointer p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700 transition">
+                            <input type="checkbox" name="dp_show_mobile" value="1" {{ $dp['show_mobile'] ? 'checked' : '' }} class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4">
+                            <span class="text-sm text-gray-800 dark:text-gray-200">Show Phone / Mobile</span>
+                        </label>
+                    </div>
+                    <div class="mt-4">
+                        <label class="flex items-center gap-2.5 cursor-pointer mb-2">
+                            <input type="checkbox" name="dp_show_footer" value="1" {{ $dp['show_footer'] ? 'checked' : '' }} class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4">
+                            <span class="text-sm font-medium text-gray-800 dark:text-gray-200">Show footer message on invoice</span>
+                        </label>
+                        <input type="text" name="dp_footer_text" value="{{ $dp['footer_text'] }}" maxlength="150" placeholder="e.g. Thank you for your business!"
+                            class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+                            autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Leave blank for no custom footer message.</p>
+                    </div>
+                </div>
+
                 <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">Invoice Preview - These details appear on your invoices</h3>
                     <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
@@ -131,7 +166,11 @@
                     </div>
                 </div>
 
-                <div class="flex justify-end">
+                <div class="flex items-center justify-between gap-3">
+                    <a href="{{ route('dashboard') }}" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                        Back to Dashboard
+                    </a>
                     <button type="submit" class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition shadow-sm">Save Business Profile</button>
                 </div>
             </form>

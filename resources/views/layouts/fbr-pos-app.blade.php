@@ -135,18 +135,12 @@
             .menu-link { transition: all 0.12s ease; border-left: 2px solid transparent; }
             .menu-link:hover { background: linear-gradient(90deg, rgba(37,99,235,0.10), transparent 70%); border-left-color: #2563eb; padding-left: calc(1rem + 2px); }
             .dark .menu-link:hover { background: linear-gradient(90deg, rgba(59,130,246,0.18), transparent 70%); border-left-color: #60a5fa; }
-            /* Premium page background — subtle navy/blue wash with corner gradients */
+            /* Premium page background — clean flat navy/blue wash (no corner gradients) */
             .fbr-page-bg {
-                background:
-                    radial-gradient(circle 800px at 100% 0%, rgba(96,165,250,0.10), transparent 60%),
-                    radial-gradient(circle 600px at 0% 100%, rgba(251,191,36,0.06), transparent 55%),
-                    linear-gradient(180deg, #f5f8ff 0%, #f1f5fb 100%);
+                background: linear-gradient(180deg, #f5f8ff 0%, #f1f5fb 100%);
             }
             .dark .fbr-page-bg {
-                background:
-                    radial-gradient(circle 800px at 100% 0%, rgba(59,130,246,0.10), transparent 60%),
-                    radial-gradient(circle 600px at 0% 100%, rgba(251,191,36,0.04), transparent 55%),
-                    linear-gradient(180deg, #030712 0%, #0a1124 100%);
+                background: linear-gradient(180deg, #030712 0%, #0a1124 100%);
             }
             /* Premium session toast banners */
             .fbr-banner-success {
@@ -925,5 +919,6 @@
         </script>
         <x-trial-lock-modal />
         <x-whatsapp-support />
+        <script src="{{ asset('js/wheel-scroll.js') }}?v=1" defer></script>
     </body>
 </html>

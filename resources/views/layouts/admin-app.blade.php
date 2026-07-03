@@ -213,5 +213,6 @@
         </div>
     </div>
     <x-whatsapp-support message="Hello, I am a TaxNest admin and need assistance." />
+<script src="{{ asset('js/wheel-scroll.js') }}?v=1" defer></script>
 </body>
 </html>

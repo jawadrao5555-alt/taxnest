@@ -1,4 +1,5 @@
 - [TaxNest dev environment access](dev-env-access.md) — how to run artisan/MySQL in dev; tinker disabled (APP_ENV=production); strip PG env vars.
+- [DI per-company invoice numbering](di-invoice-numbering.md) — {identifier}DI{NNNNN} per-company seq; NEVER renumber FBR-submitted rows; shared-NTN concurrent collision = accepted risk.
 - [PRA POS sale screen & product loaders](pos-sale-screen-product-loaders.md) — universal.blade.php is the ONLY live POS sale screen; create-invoice.blade.php AND restaurant/pos.blade.php are DEAD (legacy restaurant screen retired: RestaurantPosController::pos early-redirects to pos.invoice.create; restaurant features driven by PosFeatureService); 3 product loaders must stay in sync.
 - [bash output corrupts pos.restaurant.pos→n](bash-output-route-name-artifact.md) — bash/rg STDOUT renders route 'pos.restaurant.pos' as 'n'; rg MATCH is on real bytes; trust read/edit, not bash display.
 - [Bad UTF-8 in @json kills POS x-data](blade-json-xdata-utf8.md) — malformed product name → json_encode false → empty @json → x-data syntax error → whole sale screen dead; use UTF-8-safe encode+fallback, not bare @json.

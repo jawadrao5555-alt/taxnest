@@ -116,7 +116,7 @@
                 <div class="flex items-center space-x-3">
                     <a href="/" class="flex items-center space-x-1.5 text-gray-500 hover:text-purple-600 transition group" title="Back to TaxNest Home">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                        <span class="text-xs font-medium hidden sm:inline">Home</span>
+                        <span class="text-xs font-semibold">Home</span>
                     </a>
                     <div class="w-px h-6 bg-gray-200"></div>
                     <a href="/pos" class="flex items-center space-x-2">

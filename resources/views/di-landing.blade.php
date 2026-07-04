@@ -136,7 +136,7 @@
                 <div class="flex items-center space-x-3">
                     <a href="/" class="flex items-center space-x-1.5 text-gray-400 hover:text-emerald-600 transition group" title="Back to TaxNest Home">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                        <span class="text-xs font-medium hidden sm:inline">Home</span>
+                        <span class="text-xs font-semibold">Home</span>
                     </a>
                     <div class="w-px h-6 bg-gray-200"></div>
                     <a href="/digital-invoice" class="flex items-center space-x-2">
@@ -280,51 +280,31 @@
                 <p class="mt-4 text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">Flexible billing cycles with savings on longer commitments</p>
             </div>
 
-            <div class="flex justify-center mb-8 overflow-x-auto" x-data="{ cycle: 'monthly' }">
-                <div class="inline-flex bg-white dark:bg-gray-900 rounded-xl p-1 border border-gray-200 dark:border-gray-700 shadow-sm flex-shrink-0">
-                    <button @click="cycle = 'monthly'" :class="cycle === 'monthly' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Monthly</button>
-                    <button @click="cycle = 'quarterly'" :class="cycle === 'quarterly' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Quarterly <span class="text-[10px] opacity-75">-1%</span></button>
-                    <button @click="cycle = 'semi_annual'" :class="cycle === 'semi_annual' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Semi-Annual <span class="text-[10px] opacity-75">-3%</span></button>
-                    <button @click="cycle = 'annual'" :class="cycle === 'annual' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Annual <span class="text-[10px] opacity-75">-6%</span></button>
+            <div x-data="{
+                    cycle: 'monthly',
+                    discounts: { monthly: 0, quarterly: 1, semi_annual: 3, annual: 6 },
+                    months: { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 },
+                    calcPrice(base) {
+                        let m = this.months[this.cycle];
+                        let d = this.discounts[this.cycle];
+                        let total = base * m;
+                        return Math.round(total - (total * d / 100));
+                    },
+                    calcMonthly(base) {
+                        return Math.round(this.calcPrice(base) / this.months[this.cycle]);
+                    }
+                }">
+                <div class="flex justify-center mb-8 overflow-x-auto">
+                    <div class="inline-flex bg-white dark:bg-gray-900 rounded-xl p-1 border border-gray-200 dark:border-gray-700 shadow-sm flex-shrink-0">
+                        <button @click="cycle = 'monthly'" :class="cycle === 'monthly' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Monthly</button>
+                        <button @click="cycle = 'quarterly'" :class="cycle === 'quarterly' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Quarterly <span class="text-[10px] opacity-75">-1%</span></button>
+                        <button @click="cycle = 'semi_annual'" :class="cycle === 'semi_annual' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Semi-Annual <span class="text-[10px] opacity-75">-3%</span></button>
+                        <button @click="cycle = 'annual'" :class="cycle === 'annual' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Annual <span class="text-[10px] opacity-75">-6%</span></button>
+                    </div>
                 </div>
 
                 @if(isset($plans) && $plans->count())
-                <div class="hidden">
-                    @foreach($plans as $plan)
-                    <span id="plan-price-{{ $plan->id }}" data-price="{{ $plan->price }}"></span>
-                    @endforeach
-                </div>
-
-                <script>
-                    document.addEventListener('alpine:init', () => {
-                        Alpine.store('diPricing', {
-                            plans: {!! $plans->map(fn($p) => ['id' => $p->id, 'price' => floatval($p->price)])->values()->toJson() !!},
-                            discounts: { monthly: 0, quarterly: 1, semi_annual: 3, annual: 6 },
-                            getPrice(planId, cycle) {
-                                const plan = this.plans.find(p => p.id === planId);
-                                if (!plan) return 0;
-                                const discount = this.discounts[cycle] || 0;
-                                return Math.round(plan.price * (1 - discount / 100));
-                            },
-                            getTotal(planId, cycle) {
-                                const months = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 };
-                                return this.getPrice(planId, cycle) * (months[cycle] || 1);
-                            },
-                            getSavings(planId, cycle) {
-                                const months = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 };
-                                const plan = this.plans.find(p => p.id === planId);
-                                if (!plan) return 0;
-                                const full = plan.price * (months[cycle] || 1);
-                                return Math.round(full - this.getTotal(planId, cycle));
-                            }
-                        });
-                    });
-                </script>
-                @endif
-            </div>
-
-            @if(isset($plans) && $plans->count())
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto" x-data="{ cycle: 'monthly' }" x-init="$watch('cycle', () => {})" @click.window="cycle = $event.target.closest('[x-data]')?.querySelector ? cycle : cycle" x-effect="cycle = document.querySelector('[x-data] button.bg-emerald-600')?.textContent?.includes('Annual') ? 'annual' : document.querySelector('[x-data] button.bg-emerald-600')?.textContent?.includes('Semi') ? 'semi_annual' : document.querySelector('[x-data] button.bg-emerald-600')?.textContent?.includes('Quarterly') ? 'quarterly' : 'monthly'">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
                 @foreach($plans as $plan)
                 @php
                     $isPopular = $plan->name === 'Business';
@@ -342,11 +322,19 @@
                         <span class="inline-block mt-2 px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full text-[11px] font-bold">{{ $plan->sale_badge }}</span>
                         @endif
                         <div class="mt-3 mb-1">
-                            @if($hasOffer)<span class="text-lg text-gray-400 line-through mr-1">PKR {{ number_format($plan->price, 0) }}</span>@endif
-                            <span class="text-3xl font-black text-gray-900">PKR {{ number_format($plan->sale_price, 0) }}</span>
-                            <span class="text-gray-400 text-sm">/mo</span>
+                            <div x-show="cycle === 'monthly'">
+                                @if($hasOffer)<span class="text-lg text-gray-400 line-through mr-1">PKR {{ number_format($plan->price, 0) }}</span>@endif
+                                <span class="text-3xl font-black text-gray-900">PKR {{ number_format($plan->sale_price, 0) }}</span>
+                                <span class="text-gray-400 text-sm">/mo</span>
+                            </div>
+                            <div x-show="cycle !== 'monthly'" style="display:none;">
+                                @if($hasOffer)<span class="text-lg text-gray-400 line-through mr-1">PKR <span x-text="calcMonthly({{ $plan->price }}).toLocaleString()"></span></span>@endif
+                                <span class="text-3xl font-black text-gray-900">PKR <span x-text="calcMonthly({{ $plan->sale_price }}).toLocaleString()"></span></span>
+                                <span class="text-gray-400 text-sm">/mo</span>
+                                <p class="text-xs text-gray-500 mt-1">@if($hasOffer)<span class="line-through mr-1">PKR <span x-text="calcPrice({{ $plan->price }}).toLocaleString()"></span></span> @endif PKR <span x-text="calcPrice({{ $plan->sale_price }}).toLocaleString()"></span> total</p>
+                            </div>
                         </div>
-                        <p class="text-xs text-emerald-600 font-medium">Save up to 6% on annual billing</p>
+                        <p class="text-xs text-emerald-600 font-medium" x-show="cycle === 'monthly'">Save up to 6% on annual billing</p>
 
                         @php
                             $diFeatures = is_array($plan->features) ? $plan->features : (is_string($plan->features) ? json_decode($plan->features, true) : []);
@@ -396,6 +384,7 @@
                 </div>
             </div>
             @endif
+            </div>
         </div>
     </section>
 

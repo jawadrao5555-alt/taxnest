@@ -13,6 +13,7 @@ use App\Models\SecurityLog;
 use App\Models\ComplianceScore;
 use App\Models\AnomalyLog;
 use App\Services\SecurityLogService;
+use App\Services\CredentialLedgerService;
 use App\Services\AuditLogService;
 use App\Services\IntegrityHashService;
 use App\Services\HsIntelligenceService;
@@ -226,6 +227,18 @@ class AdminController extends Controller
                 'role' => 'company_admin',
                 'company_id' => $company->id,
             ]);
+        }
+
+        // Record credentials to the persistent ledger (admin path records but never blocks)
+        // so an admin-created account cannot later self-register a fresh free trial.
+        CredentialLedgerService::record([
+            'email' => $request->admin_email,
+            'phone' => $request->phone,
+            'ntn' => $request->ntn,
+            'cnic' => $request->cnic,
+        ], $company->id, $company->product_type ?? null);
+        if ($request->filled('email') && $request->email !== $request->admin_email) {
+            CredentialLedgerService::record(['email' => $request->email], $company->id, $company->product_type ?? null);
         }
 
         SecurityLogService::log('company_created', auth()->id(), ['company_id' => $company->id, 'name' => $company->name]);

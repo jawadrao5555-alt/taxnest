@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
+use Illuminate\Validation\ValidationException;
+use App\Services\CredentialLedgerService;
 
 class PosAuthController extends Controller
 {
@@ -137,6 +139,16 @@ class PosAuthController extends Controller
             'pos_type' => 'required|in:restaurant,retail,general,pharmacy,grocery,clothing,electronics,hardware,salon,autoparts,bakery',
         ]);
 
+        // Anti free-trial-abuse: block re-use of any previously-registered credential.
+        if ($usedType = CredentialLedgerService::firstUsed([
+            'email' => $request->email,
+            'phone' => $request->phone,
+            'ntn' => $request->company_ntn,
+        ])) {
+            [$field, $message] = CredentialLedgerService::rejectionFor($usedType);
+            throw ValidationException::withMessages([$field => $message]);
+        }
+
         $posType = $request->pos_type ?? 'general';
 
         $company = Company::create([
@@ -163,6 +175,12 @@ class PosAuthController extends Controller
             'is_active' => true,
         ]);
 
+        CredentialLedgerService::record([
+            'email' => $request->email,
+            'phone' => $request->phone,
+            'ntn' => $request->company_ntn,
+        ], $company->id, 'pos');
+
         $this->startTrial($company->id, 'pos');
 
         Auth::guard('pos')->login($user);
@@ -171,7 +189,7 @@ class PosAuthController extends Controller
     }
 
     /**
-     * Give a freshly-registered company a 3-day / 20-invoice free trial by
+     * Give a freshly-registered company a 3-day / 10-invoice free trial by
      * attaching the product's trial pricing plan. Mirrors the DI flow.
      */
     private function startTrial(int $companyId, string $productType): void

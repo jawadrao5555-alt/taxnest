@@ -250,6 +250,8 @@
                 @php
                     $isPopular = $plan->name === 'Business';
                     $perMonth = round($plan->price / 12);
+                    $hasOffer = !empty($plan->compare_at_price) && $plan->compare_at_price > $plan->price;
+                    $comparePerMonth = $hasOffer ? round($plan->compare_at_price / 12) : 0;
                     $features = is_array($plan->features) ? $plan->features : (is_string($plan->features) ? json_decode($plan->features, true) : []);
                 @endphp
                 <div class="relative rounded-xl overflow-hidden transition duration-300 hover:-translate-y-1 shadow-md hover:shadow-xl {{ $isPopular ? 'ring-2 ring-purple-500' : '' }}">
@@ -262,11 +264,15 @@
                     @endif
                     <div class="bg-white border {{ $isPopular ? 'border-purple-500 border-t-0 rounded-b-xl backdrop-blur-xl' : 'border-gray-200 rounded-xl' }} p-6 relative">
                         <h3 class="text-xl font-bold text-gray-900">{{ $plan->name }}</h3>
+                        @if($hasOffer)
+                        <span class="inline-block mt-2 px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full text-[11px] font-bold">50% OFF · Launch Offer</span>
+                        @endif
                         <div class="mt-4 mb-1">
+                            @if($hasOffer)<span class="text-lg text-gray-400 line-through mr-1">PKR {{ number_format($plan->compare_at_price) }}</span>@endif
                             <span class="text-3xl font-black text-gray-900">PKR {{ number_format($plan->price) }}</span>
                             <span class="text-gray-600 text-sm font-medium">/year</span>
                         </div>
-                        <p class="text-sm text-gray-600">PKR {{ number_format($perMonth) }}/mo effective</p>
+                        <p class="text-sm text-gray-600">@if($hasOffer)<span class="line-through mr-1">PKR {{ number_format($comparePerMonth) }}</span> @endif PKR {{ number_format($perMonth) }}/mo effective</p>
 
                         <div class="mt-5 pt-5 border-t border-gray-100 space-y-3">
                             @if(!empty($features))

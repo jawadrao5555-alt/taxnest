@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules;
 use Illuminate\View\View;
 use App\Services\SecurityLogService;
+use App\Services\CredentialLedgerService;
+use Illuminate\Validation\ValidationException;
 
 class RegisteredUserController extends Controller
 {
@@ -35,6 +37,18 @@ class RegisteredUserController extends Controller
             'company_name' => ['required', 'string', 'max:255'],
             'company_ntn' => ['required', 'string', 'max:50', 'unique:companies,ntn'],
         ]);
+
+        // Anti free-trial-abuse: block if any credential was ever used before
+        // (survives account deletion) — force login / subscription instead.
+        if ($usedType = CredentialLedgerService::firstUsed([
+            'email' => $request->email,
+            'phone' => $request->phone,
+            'ntn' => $request->company_ntn,
+            'username' => $request->username ?? null,
+        ])) {
+            [$field, $message] = CredentialLedgerService::rejectionFor($usedType);
+            throw ValidationException::withMessages([$field => $message]);
+        }
 
         $user = DB::transaction(function () use ($request) {
             $company = Company::create([
@@ -78,11 +92,18 @@ class RegisteredUserController extends Controller
                 'company_name' => $company->name,
             ]);
 
+            CredentialLedgerService::record([
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'ntn' => $request->company_ntn,
+                'username' => $request->username ?? null,
+            ], $company->id, 'di');
+
             return $user;
         });
 
         event(new Registered($user));
 
-        return redirect('/login')->with('success', 'Registration submitted! Your company is pending approval. You have a 3-day free trial with up to 20 invoices.');
+        return redirect('/login')->with('success', 'Registration submitted! Your company is pending approval. You have a 3-day free trial with up to 10 invoices.');
     }
 }

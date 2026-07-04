@@ -14,6 +14,7 @@ use App\Models\Franchise;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\Request;
+use App\Services\CredentialLedgerService;
 
 class AdminCompanyController extends Controller
 {
@@ -85,6 +86,14 @@ class AdminCompanyController extends Controller
             'is_active' => true,
             'pos_role' => in_array($request->product_type, ['pos', 'fbrpos']) ? 'pos_admin' : null,
         ]);
+
+        // Record credentials in the anti-reuse ledger (admin creation is never blocked).
+        CredentialLedgerService::record([
+            'email' => $request->admin_email,
+            'phone' => $request->phone ?: $request->mobile,
+            'ntn' => $request->ntn,
+            'cnic' => $request->cnic,
+        ], $company->id, $request->product_type);
 
         AdminAuditLog::log(auth('admin')->id(), 'Company created', 'Company', $company->id, [
             'name' => $company->name,

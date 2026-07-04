@@ -326,7 +326,10 @@
             @if(isset($plans) && $plans->count())
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto" x-data="{ cycle: 'monthly' }" x-init="$watch('cycle', () => {})" @click.window="cycle = $event.target.closest('[x-data]')?.querySelector ? cycle : cycle" x-effect="cycle = document.querySelector('[x-data] button.bg-emerald-600')?.textContent?.includes('Annual') ? 'annual' : document.querySelector('[x-data] button.bg-emerald-600')?.textContent?.includes('Semi') ? 'semi_annual' : document.querySelector('[x-data] button.bg-emerald-600')?.textContent?.includes('Quarterly') ? 'quarterly' : 'monthly'">
                 @foreach($plans as $plan)
-                @php $isPopular = $plan->name === 'Business'; @endphp
+                @php
+                    $isPopular = $plan->name === 'Business';
+                    $hasOffer = !empty($plan->compare_at_price) && $plan->compare_at_price > $plan->price;
+                @endphp
                 <div class="relative rounded-xl shadow-md overflow-hidden transition duration-300 hover:-translate-y-1 hover:shadow-xl {{ $isPopular ? 'ring-2 ring-emerald-400/80 shadow-lg shadow-emerald-500/10' : '' }}">
                     @if($isPopular)
                     <div class="bg-gradient-to-r from-emerald-500 to-teal-500 text-center py-1.5">
@@ -335,7 +338,11 @@
                     @endif
                     <div class="{{ $isPopular ? 'bg-gradient-to-b from-emerald-50/50 to-white border-emerald-400/30 border-t-0 rounded-b-xl' : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-xl' }} border p-5">
                         <h3 class="text-lg font-bold text-gray-900">{{ $plan->name }}</h3>
+                        @if($hasOffer)
+                        <span class="inline-block mt-2 px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full text-[11px] font-bold">50% OFF · Launch Offer</span>
+                        @endif
                         <div class="mt-3 mb-1">
+                            @if($hasOffer)<span class="text-lg text-gray-400 line-through mr-1">PKR {{ number_format($plan->compare_at_price, 0) }}</span>@endif
                             <span class="text-3xl font-black text-gray-900">PKR {{ number_format($plan->price, 0) }}</span>
                             <span class="text-gray-400 text-sm">/mo</span>
                         </div>

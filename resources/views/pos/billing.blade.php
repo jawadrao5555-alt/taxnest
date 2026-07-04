@@ -33,6 +33,8 @@
                     $yearlyTotal = round($plan->price * 12 * (1 - $annualDiscount / 100));
                     $perMonth = round($yearlyTotal / 12);
                     $saved = round($plan->price * 12 * $annualDiscount / 100);
+                    $hasOffer = !empty($plan->compare_at_price) && $plan->compare_at_price > $plan->price;
+                    $compareYearly = $hasOffer ? round($plan->compare_at_price * 12 * (1 - $annualDiscount / 100)) : 0;
                     $isCurrent = $currentSubscription && $currentSubscription->pricing_plan_id === $plan->id;
                     $isPopular = $plan->name === 'Business';
                 @endphp
@@ -49,6 +51,10 @@
                         <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ $plan->name }}</h3>
 
                         <div class="mt-4 mb-1">
+                            @if($hasOffer)
+                            <div class="mb-1.5"><span class="inline-block px-2 py-0.5 bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 rounded-full text-[11px] font-bold">50% OFF · Launch Offer</span></div>
+                            <span class="text-base text-gray-400 line-through mr-1">PKR {{ number_format($compareYearly) }}</span>
+                            @endif
                             <span class="text-3xl font-black text-gray-900 dark:text-gray-100">PKR {{ number_format($yearlyTotal) }}</span>
                             <span class="text-gray-400 text-sm">/year</span>
                         </div>

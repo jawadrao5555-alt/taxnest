@@ -302,10 +302,13 @@
                 <div class="relative rounded-xl shadow-md overflow-hidden transition duration-300 hover:-translate-y-1 hover:shadow-xl {{ $isPopular ? 'ring-2 ring-blue-400/80 shadow-lg shadow-blue-500/10' : '' }}"
                      x-data="{
                          basePrice: {{ $plan->price }},
+                         compareBase: {{ $plan->compare_at_price ?? 0 }},
                          discounts: { monthly: 0, quarterly: 1, semi_annual: 3, annual: 6 },
                          get discount() { return this.discounts[cycle] || 0; },
                          get months() { return { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }[cycle] || 1; },
                          get totalPrice() { return Math.round(this.basePrice * this.months * (1 - this.discount / 100)); },
+                         get compareTotal() { return Math.round(this.compareBase * this.months * (1 - this.discount / 100)); },
+                         get hasOffer() { return this.compareBase > this.basePrice; },
                          get perMonth() { return Math.round(this.totalPrice / this.months); },
                          get saved() { return Math.round(this.basePrice * this.months * this.discount / 100); },
                          get periodLabel() { return { monthly: '/mo', quarterly: '/quarter', semi_annual: '/6 months', annual: '/year' }[cycle] || '/mo'; }
@@ -318,6 +321,12 @@
                     <div class="{{ $isPopular ? 'bg-gradient-to-b from-blue-50/50 to-white border-blue-400/30 border-t-0 rounded-b-xl' : 'bg-white border-gray-200 rounded-xl' }} border p-5">
                         <h3 class="text-lg font-bold text-gray-900">{{ $plan->name }}</h3>
                         <div class="mt-3 mb-1">
+                            <template x-if="hasOffer">
+                                <div class="mb-1.5"><span class="inline-block px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full text-[11px] font-bold">50% OFF · Launch Offer</span></div>
+                            </template>
+                            <template x-if="hasOffer">
+                                <span class="text-base text-gray-400 line-through mr-1">PKR <span x-text="compareTotal.toLocaleString()"></span></span>
+                            </template>
                             <span class="text-3xl font-black text-gray-900">PKR <span x-text="totalPrice.toLocaleString()"></span></span>
                             <span class="text-gray-400 text-sm" x-text="periodLabel"></span>
                         </div>

@@ -14,6 +14,7 @@ class PricingPlan extends Model
         'is_trial',
         'price',
         'price_monthly',
+        'compare_at_price',
         'features',
         'product_type',
         'max_terminals',
@@ -27,6 +28,7 @@ class PricingPlan extends Model
         'features' => 'array',
         'is_trial' => 'boolean',
         'price' => 'decimal:2',
+        'compare_at_price' => 'decimal:2',
         'inventory_enabled' => 'boolean',
         'reports_enabled' => 'boolean',
     ];

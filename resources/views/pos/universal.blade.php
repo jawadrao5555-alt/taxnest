@@ -309,7 +309,7 @@ window.addEventListener('popstate', function() {
 
         <div class="relative flex-shrink-0" style="min-width:180px;max-width:220px;">
             <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-            <input type="search" x-ref="customerPhoneInput" x-model="customerPhoneQuery" @input="onCustomerPhoneInput()" @keydown.enter.prevent="onCustomerPhoneEnter()" @keydown.escape.prevent="customerPhoneDropdown = false" @keydown.tab.prevent="$refs.searchInput?.focus()" @click.away="customerPhoneDropdown = false" placeholder="Customer name or mobile..." class="w-full pl-9 pr-7 py-2.5 rounded-xl text-sm border-2 transition shadow-sm" :class="selectedCustomer ? 'font-bold border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200' : 'font-medium border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400'" autocomplete="one-time-code" name="pos_customer_phone_nofill" data-lpignore="true" data-form-type="other">
+            <input type="search" x-ref="customerPhoneInput" x-model="customerPhoneQuery" @input="onCustomerPhoneInput()" @keydown.enter.prevent="if(!$event.repeat) onCustomerPhoneEnter()" @keydown.escape.prevent="customerPhoneDropdown = false" @keydown.tab.prevent="$refs.searchInput?.focus()" @click.away="customerPhoneDropdown = false" placeholder="Customer name or mobile..." class="w-full pl-9 pr-7 py-2.5 rounded-xl text-sm border-2 transition shadow-sm" :class="selectedCustomer ? 'font-bold border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200' : 'font-medium border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400'" autocomplete="one-time-code" name="pos_customer_phone_nofill" data-lpignore="true" data-form-type="other">
             <kbd x-show="!customerPhoneQuery && !selectedCustomer && !customerSearching" class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded font-mono">Alt+P</kbd>
             {{-- Inline search spinner --}}
             <svg x-show="customerSearching && !selectedCustomer" x-cloak class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -3510,16 +3510,22 @@ function restaurantPos() {
             }
         },
 
-        async searchCustomerByPhone(q) {
-            this.customerSearching = true;
-            try {
-                const res = await fetch('/pos/restaurant/api/customer-search?q=' + encodeURIComponent(q));
-                const data = await res.json();
-                this.customerPhoneResults = data.customers || [];
-                // Always show dropdown so the inline "add new" hint can appear when results === 0
-                this.customerPhoneDropdown = true;
-            } catch(e) { this.customerPhoneResults = []; this.customerPhoneDropdown = false; }
-            finally { this.customerSearching = false; }
+        searchCustomerByPhone(q) {
+            // Expose the in-flight fetch as a promise so onCustomerPhoneEnter() can AWAIT the
+            // SAME search instead of dead-ending when the cashier presses Enter mid-search.
+            // This is what makes the keyboard "add new customer" path reliable (no mouse).
+            this._custSearchPromise = (async () => {
+                this.customerSearching = true;
+                try {
+                    const res = await fetch('/pos/restaurant/api/customer-search?q=' + encodeURIComponent(q));
+                    const data = await res.json();
+                    this.customerPhoneResults = data.customers || [];
+                    // Always show dropdown so the inline "add new" hint can appear when results === 0
+                    this.customerPhoneDropdown = true;
+                } catch(e) { this.customerPhoneResults = []; this.customerPhoneDropdown = false; }
+                finally { this.customerSearching = false; }
+            })();
+            return this._custSearchPromise;
         },
 
         async onCustomerPhoneEnter() {
@@ -3531,15 +3537,19 @@ function restaurantPos() {
             //   - no match   → open the inline new-customer form (full keyboard: name → Enter
             //     → address → Enter saves & moves to items). No mouse needed. Esc = skip.
             if (this.guidedFlow) {
-                // Re-entrancy guard: a second Enter while the search is in flight would
-                // start a duplicate fetch and re-open (and wipe) the new-customer form.
-                if (this.customerSearching) return;
                 const validPhone = q.length >= 4 && /^\d+$/.test(q);
-                if (validPhone && this.customerPhoneResults.length === 0) {
-                    // Debounced search may still be in flight — resolve it NOW so we don't
-                    // open the new-customer form for a customer who actually exists.
+                // Enter must ALWAYS resolve to a decision (attach existing OR open the new-
+                // customer form) — never a silent no-op. Previously an in-flight search made
+                // Enter `return` and do nothing, forcing the cashier to grab the mouse.
+                // Instead: SETTLE the search first. If one is already running, AWAIT that same
+                // fetch (no duplicate); otherwise kick off a fresh one for the current number.
+                if (validPhone) {
                     if (this.customerPhoneTimer) { clearTimeout(this.customerPhoneTimer); this.customerPhoneTimer = null; }
-                    await this.searchCustomerByPhone(q);
+                    if (this.customerSearching && this._custSearchPromise) {
+                        try { await this._custSearchPromise; } catch (e) {}
+                    } else if (this.customerPhoneResults.length === 0) {
+                        await this.searchCustomerByPhone(q);
+                    }
                 }
                 if (this.customerPhoneResults.length > 0) {
                     this.selectCustomerFromPhone(this.customerPhoneResults[0]);
@@ -3572,7 +3582,11 @@ function restaurantPos() {
             this.newCustomerAddress = '';
             this.showNewCustomerInline = true;
             this.customerPhoneDropdown = true;
+            // Land the cursor in the name field so the cashier types immediately — no mouse.
+            // $nextTick handles Alpine's DOM flush; the short timeout is a fallback for the
+            // x-show/x-transition paint race that can otherwise swallow the first focus.
             this.$nextTick(() => this.$refs.newCustomerNameInput?.focus());
+            setTimeout(() => { if (this.showNewCustomerInline) this.$refs.newCustomerNameInput?.focus(); }, 80);
         },
 
         cancelInlineNewCustomer() {

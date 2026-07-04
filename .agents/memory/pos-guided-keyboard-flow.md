@@ -9,11 +9,14 @@ The universal PRA POS sale screen has an opt-in "Guided Keyboard Billing" flow
 (per-company toggle) that chains steps customer → items → cart → finish, driven
 entirely by Enter.
 
-**Rule:** In guided mode, every step's Enter must move the chain FORWARD. No guided
-step may pop a modal or forced sub-form on Enter. The customer step is OPTIONAL: Enter
-advances to item search whether or not the typed phone matches a customer (unmatched =
-walk-in). Explicit actions like creating a new customer stay available via click, not as
-a blocking Enter side-effect.
+**Rule:** In guided mode, every step's Enter must move the chain FORWARD. The customer
+step is OPTIONAL: with an EMPTY or non-numeric box, Enter advances to item search
+(unmatched = walk-in). But when the cashier HAS typed a valid mobile number, Enter is a
+first-class KEYBOARD add-customer path (owner requirement, Jul 2026): matched → attach +
+advance; unmatched → open the INLINE new-customer form (name → Enter → address → Enter
+saves & advances). This inline form is additive and non-blocking (Esc skips), so it does
+NOT violate "never pop a blocking modal." Do NOT downgrade this back to "add via mouse
+click only" — the owner explicitly asked for full keyboard add-customer.
 
 **Why:** The customer-phone Enter handler opened the inline "+ New Customer" modal for
 any unmatched number, which stalled the entire keyboard chain at step 1 — the cashier
@@ -180,3 +183,24 @@ Enter→cart qty input; Enter→Pay modal (Cash/Card, TOTAL shown). So the chain
 **Rule:** if the owner again reports the guided flow "jumps direct to cart" / "still not right," first suspect
 a DEPLOY GAP (live behind origin/main) per deploy-fix-but-stale-cache.md — re-confirm with the e2e drive
 before touching code. Do NOT re-investigate by reading; reading already looked correct every prior round.
+
+## Enter on an async-search field must SETTLE the search, never dead-end on the in-flight guard
+The customer-phone lookup is DEBOUNCED (~300ms). `onCustomerPhoneEnter()`'s guided branch began
+with `if (this.customerSearching) return;` — so pressing Enter WHILE the debounced fetch was still
+in flight was a silent no-op. A fast cashier who typed a number and immediately hit Enter fell into
+that window every time, so keyboard add-customer "didn't work" and they reached for the mouse.
+
+**Rule:** an Enter handler on a debounced-search field must not bail while a fetch is pending — it must
+SETTLE the search first, then act deterministically. Pattern used here: `searchCustomerByPhone()` stores
+its in-flight fetch in `this._custSearchPromise` (own `.catch` swallows errors so it never rejects) and
+returns it; the Enter handler clears the debounce timer, `await`s that same promise if one is running (no
+duplicate fetch) else runs a fresh search when results are empty, THEN attaches `results[0]` or opens the
+inline new-customer form. Enter is now never a no-op — even a failed/offline search resolves and falls
+through to opening the form.
+**Why:** `blur()`/return-early feels harmless but the pending-fetch window is exactly when an eager
+keyboard user presses Enter. **How to apply:** any "type-then-Enter" field backed by a debounced async
+lookup (customer, product, HS) needs this settle-then-act shape, not a `if(searching)return` guard.
+Focus handoff into the opened inline form needs `$nextTick` + a `setTimeout(~80ms)` fallback (guarded by
+the still-open flag) to beat the x-show/x-transition paint race. Pre-existing non-blocking gap: if the
+cashier pauses mid-number (stale prefix results present) then finishes typing and Enters, the non-empty
+stale results short-circuit the fresh search and can attach the wrong customer — fix only if reported.

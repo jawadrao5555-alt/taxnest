@@ -653,7 +653,7 @@ window.addEventListener('popstate', function() {
 
                 <template x-if="!loading && displayItems.length === 0">
                     <div class="tn-empty flex flex-col items-center justify-center py-24 px-6 text-gray-400 text-center">
-                        <div class="tn-empty-icon w-28 h-28 rounded-full bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 flex items-center justify-center mb-5 ring-1 ring-purple-100 dark:ring-purple-900/30">
+                        <div class="tn-empty-icon w-28 h-28 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center mb-5">
                             <svg class="w-14 h-14 text-purple-400 dark:text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
                         </div>
                         <p class="text-lg font-bold text-gray-700 dark:text-gray-200">No products match</p>
@@ -747,7 +747,7 @@ window.addEventListener('popstate', function() {
             <div class="flex-1 min-h-0 overflow-y-auto" x-ref="cartList">
                 <template x-if="cart.length === 0">
                     <div class="tn-empty flex flex-col items-center justify-center h-full text-gray-400 py-16 px-6 text-center">
-                        <div class="tn-empty-icon w-24 h-24 rounded-full bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 flex items-center justify-center mb-5 ring-1 ring-purple-100 dark:ring-purple-900/30">
+                        <div class="tn-empty-icon w-24 h-24 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center mb-5">
                             <svg class="w-12 h-12 text-purple-400 dark:text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
                         </div>
                         <p class="text-base font-bold text-gray-700 dark:text-gray-200">Your cart is empty</p>
@@ -1403,7 +1403,6 @@ window.addEventListener('popstate', function() {
         <div x-show="showQuickType" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-90 translate-y-4" x-transition:enter-end="opacity-100 scale-100 translate-y-0" @click.stop class="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden ring-1 ring-sky-200/50 dark:ring-sky-800/50" style="box-shadow: 0 25px 80px -20px rgba(2, 132, 199, 0.55);">
             {{-- Header — sky/blue gradient with subtle glow --}}
             <div class="relative px-6 py-5 flex items-center justify-between" style="background:linear-gradient(135deg,#0284c7 0%,#0369a1 50%,#1e40af 100%);">
-                <div class="absolute inset-0 opacity-30 pointer-events-none" style="background:radial-gradient(circle at 20% 0%, rgba(255,255,255,0.4) 0%, transparent 40%);"></div>
                 <div class="relative flex items-center gap-3">
                     <div class="w-11 h-11 bg-white/25 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg ring-1 ring-white/30">
                         <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
@@ -1556,7 +1555,6 @@ window.addEventListener('popstate', function() {
         <div x-show="showManualItem" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-90 translate-y-4" x-transition:enter-end="opacity-100 scale-100 translate-y-0" @click.stop class="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden ring-1 ring-emerald-200/50 dark:ring-emerald-800/50" style="box-shadow: 0 25px 80px -20px rgba(5, 150, 105, 0.55);">
             {{-- Header --}}
             <div class="relative px-6 py-5 flex items-center justify-between" style="background:linear-gradient(135deg,#059669 0%,#0d9488 50%,#0f766e 100%);">
-                <div class="absolute inset-0 opacity-30 pointer-events-none" style="background:radial-gradient(circle at 20% 0%, rgba(255,255,255,0.4) 0%, transparent 40%);"></div>
                 <div class="relative flex items-center gap-3">
                     <div class="w-11 h-11 bg-white/25 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg ring-1 ring-white/30">
                         <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>

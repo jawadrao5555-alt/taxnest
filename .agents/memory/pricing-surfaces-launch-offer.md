@@ -23,6 +23,15 @@ the live price (e.g. `compareTotal` mirrors `totalPrice`) so the 2× ratio holds
 `text-[11px]` + `bg-rose-*` are arbitrary/rare classes — run `npm run build` or they render
 invisible (see vite-arbitrary-classes memory).
 
+## Admin management surface
+The SaaS-admin Plan Builder (`AdminPlanController` store/update + `saas-admin/plans.blade.php`
+create form + `saas-admin/partials/plan-card.blade.php` edit form & card) is the 7th surface
+and the ONLY place to set/clear `compare_at_price`. Rules: store/update use an EXPLICIT field
+list (NOT `$request->except(...)`) so fillable-but-unposted columns like `is_trial` can't be
+injected; a BLANK compare-at input → null → offer cleared (relies on ConvertEmptyStringsToNull).
+The card view-mode shows a rose strikethrough + `round(100 - price/compare*100)`% OFF, guarded by
+the same `compare > price` `$hasOffer` check as the customer views.
+
 ## GOTCHA: pos landing vs billing price semantics (pre-existing, NOT introduced by offer work)
 `pos/landing` renders `$plan->price` labelled **"/year"** (e.g. 4,999/year) while `pos/billing`
 treats the same `price` as MONTHLY and shows `price×12×0.94` (≈ 56,389/year). That is a ~12×

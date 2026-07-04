@@ -34,6 +34,7 @@
                     </select>
                 </div>
                 <input type="number" name="price" placeholder="Price (PKR)" step="1" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+                <input type="number" name="compare_at_price" placeholder="Compare-at Price (optional, for OFF badge)" step="1" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                 <input type="number" name="invoice_limit" placeholder="Invoice Limit (-1=unlimited)" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                 <input type="number" name="max_terminals" placeholder="Max Terminals (-1=unlimited)" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                 <input type="number" name="max_users" placeholder="Max Users (-1=unlimited)" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">

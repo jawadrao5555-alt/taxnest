@@ -150,6 +150,11 @@ class AdminCompanyController extends Controller
                     $companyAdmin->password = Hash::make($request->admin_password);
                 }
                 if ($request->filled('admin_email')) {
+                    $emailTaken = User::where('email', $request->admin_email)
+                        ->where('id', '!=', $companyAdmin->id)->exists();
+                    if ($emailTaken) {
+                        return back()->withErrors(['admin_email' => 'This email is already used by another user.'])->withInput();
+                    }
                     $companyAdmin->email = $request->admin_email;
                 }
                 $companyAdmin->save();

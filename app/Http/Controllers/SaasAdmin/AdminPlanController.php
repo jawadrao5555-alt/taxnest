@@ -31,9 +31,10 @@ class AdminPlanController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate([
+        $data = $request->validate([
             'name' => 'required|string|max:100',
             'price' => 'required|numeric|min:0',
+            'compare_at_price' => 'nullable|numeric|min:0',
             'invoice_limit' => 'required|integer|min:-1',
             'product_type' => 'required|in:di,pos,fbrpos',
             'max_terminals' => 'nullable|integer|min:-1',
@@ -46,12 +47,22 @@ class AdminPlanController extends Controller
 
         $features = array_filter(array_map('trim', explode("\n", $request->input('features_text', ''))));
 
-        $plan = PricingPlan::create(array_merge($request->except('features_text'), [
-            'price_monthly' => in_array($request->product_type, ['di', 'fbrpos']) ? $request->price : null,
-            'features' => $features,
+        // Explicit field list (never mass-assign the whole request) so sensitive
+        // columns like is_trial can't be injected via crafted POST data.
+        $plan = PricingPlan::create([
+            'name' => $data['name'],
+            'product_type' => $data['product_type'],
+            'price' => $data['price'],
+            'price_monthly' => in_array($data['product_type'], ['di', 'fbrpos']) ? $data['price'] : null,
+            'compare_at_price' => $request->filled('compare_at_price') ? $request->compare_at_price : null,
+            'invoice_limit' => $data['invoice_limit'],
+            'max_terminals' => $request->input('max_terminals'),
+            'max_users' => $request->input('max_users'),
+            'max_products' => $request->input('max_products'),
             'inventory_enabled' => $request->boolean('inventory_enabled'),
             'reports_enabled' => $request->boolean('reports_enabled'),
-        ]));
+            'features' => $features,
+        ]);
 
         AdminAuditLog::log(auth('admin')->id(), 'Plan created', 'PricingPlan', $plan->id, ['name' => $plan->name, 'product_type' => $plan->product_type]);
         return back()->with('success', "Plan '{$plan->name}' created.");
@@ -61,9 +72,10 @@ class AdminPlanController extends Controller
     {
         $plan = PricingPlan::findOrFail($id);
 
-        $request->validate([
+        $data = $request->validate([
             'name' => 'required|string|max:100',
             'price' => 'required|numeric|min:0',
+            'compare_at_price' => 'nullable|numeric|min:0',
             'invoice_limit' => 'required|integer|min:-1',
             'product_type' => 'required|in:di,pos,fbrpos',
             'max_terminals' => 'nullable|integer|min:-1',
@@ -74,12 +86,23 @@ class AdminPlanController extends Controller
 
         $features = array_filter(array_map('trim', explode("\n", $request->input('features_text', ''))));
 
-        $plan->update(array_merge($request->except('features_text'), [
-            'price_monthly' => in_array($request->product_type, ['di', 'fbrpos']) ? $request->price : null,
-            'features' => $features,
+        // Explicit field list (never mass-assign the whole request) so sensitive
+        // columns like is_trial can't be injected, and compare_at_price stays in
+        // sync — leaving it blank clears the launch-offer badge.
+        $plan->update([
+            'name' => $data['name'],
+            'product_type' => $data['product_type'],
+            'price' => $data['price'],
+            'price_monthly' => in_array($data['product_type'], ['di', 'fbrpos']) ? $data['price'] : null,
+            'compare_at_price' => $request->filled('compare_at_price') ? $request->compare_at_price : null,
+            'invoice_limit' => $data['invoice_limit'],
+            'max_terminals' => $request->input('max_terminals'),
+            'max_users' => $request->input('max_users'),
+            'max_products' => $request->input('max_products'),
             'inventory_enabled' => $request->boolean('inventory_enabled'),
             'reports_enabled' => $request->boolean('reports_enabled'),
-        ]));
+            'features' => $features,
+        ]);
 
         AdminAuditLog::log(auth('admin')->id(), 'Plan updated', 'PricingPlan', $plan->id, ['name' => $plan->name, 'product_type' => $plan->product_type]);
         return back()->with('success', "Plan '{$plan->name}' updated.");

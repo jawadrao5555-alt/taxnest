@@ -26,6 +26,7 @@
 - [Approved landing color formula](landing-color-formula.md) — teal #0A4D5C primary, gold #E7BF3B micro-highlights only, flat confined product colors, no card gradients; use on all marketing pages.
 - [POS whole-rupee rounding convention](pos-rounding-convention.md) — PRA POS header tax+total = whole rupee on ALL write paths (incl. restaurant hold/pay); lines stay 2dp; FBR POS & DI keep decimals; dev held-order test needs restaurant_mode+kot+kitchen flip on company 11.
 - [DomPDF thermal receipt height](dompdf-thermal-receipt-height.md) — DomPDF ignores `@page size:auto`; a fixed setPaper height clips long receipts; compute a content-sized (over-estimated) height, wire into EVERY pdf path.
+- [POS buttons no colored glow](pos-button-glow.md) — owner reads button `shadow-<color>/NN` + CSS box-shadow rgba glow as "white blur on sides"; use neutral shadow, keep focus/selected rings.
 - [PRA Code 112 & Fiscal Device mode](pra-code-112-fiscal-device.md) — new POS IDs can't use cloud PostData; local IMS service localhost:8524 GetInvoiceNumberByModel, single OBJECT payload, agent on same PC.
 - [Alpine expression pitfalls](alpine-expression-pitfalls.md) — leading /* */ comment kills Alpine's if-detection (handler silently dead); x-model needs a plain path, never a ternary; :class evals even when x-show false.
 - [SW skip-list for sale screens](sw-skiplist-sale-screens.md) — every new authenticated sale/edit screen must go into sw.js skipPatterns + CACHE_VERSION bump; runtime cache survives logout (offline-only exposure).

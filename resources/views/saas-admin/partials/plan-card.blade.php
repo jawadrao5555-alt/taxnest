@@ -10,15 +10,15 @@
     </div>
 
     <div x-show="!editing">
-        @php $hasOffer = !empty($plan->compare_at_price) && $plan->compare_at_price > $plan->price; @endphp
+        @php $hasOffer = $plan->sale_percent > 0; @endphp
         <div class="mb-3">
             @if($hasOffer)
             <div class="flex items-center gap-2 mb-1">
-                <span class="text-sm text-gray-500 line-through">PKR {{ number_format($plan->compare_at_price, 0) }}</span>
-                <span class="text-[10px] px-1.5 py-0.5 bg-rose-900/40 text-rose-300 rounded font-bold">{{ round(100 - ($plan->price / $plan->compare_at_price * 100)) }}% OFF</span>
+                <span class="text-sm text-gray-500 line-through">PKR {{ number_format($plan->price, 0) }}</span>
+                <span class="text-[10px] px-1.5 py-0.5 bg-rose-900/40 text-rose-300 rounded font-bold">{{ $plan->sale_badge }}</span>
             </div>
             @endif
-            <div class="text-2xl font-bold text-{{ $color }}-400">PKR {{ number_format($plan->price, 0) }}<span class="text-sm text-gray-500 dark:text-gray-400 font-normal">{{ $plan->product_type === 'pos' ? '/yr' : '/mo' }}</span></div>
+            <div class="text-2xl font-bold text-{{ $color }}-400">PKR {{ number_format($hasOffer ? $plan->sale_price : $plan->price, 0) }}<span class="text-sm text-gray-500 dark:text-gray-400 font-normal">{{ $plan->product_type === 'pos' ? '/yr' : '/mo' }}</span></div>
         </div>
 
         <div class="space-y-1.5 text-sm">
@@ -63,10 +63,6 @@
             <div>
                 <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Price (PKR{{ $plan->product_type === 'pos' ? '/yr' : '/mo' }})</label>
                 <input type="number" name="price" value="{{ intval($plan->price) }}" step="1" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
-            </div>
-            <div>
-                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Compare-at Price (blank = no offer)</label>
-                <input type="number" name="compare_at_price" value="{{ $plan->compare_at_price ? intval($plan->compare_at_price) : '' }}" step="1" placeholder="old price for OFF badge" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
             </div>
             <div>
                 <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Invoice Limit</label>

@@ -34,7 +34,7 @@ class SubscriptionAssignmentService
             'end_date' => $endDate->toDateString(),
             'active' => true,
             'billing_cycle' => $billingCycle,
-            'final_price' => $plan->price,
+            'final_price' => $plan->sale_price,
         ]);
     }
 }

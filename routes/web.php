@@ -600,6 +600,7 @@ use App\Http\Controllers\SaasAdmin\AdminAuthController;
 use App\Http\Controllers\SaasAdmin\AdminDashboardController;
 use App\Http\Controllers\SaasAdmin\AdminCompanyController;
 use App\Http\Controllers\SaasAdmin\AdminPlanController;
+use App\Http\Controllers\SaasAdmin\AdminSaleController;
 use App\Http\Controllers\SaasAdmin\AdminSubscriptionController;
 use App\Http\Controllers\SaasAdmin\AdminFranchiseController;
 use App\Http\Controllers\SaasAdmin\AdminUsageController;
@@ -736,6 +737,10 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/plans', [AdminPlanController::class, 'index'])->name('saas.admin.plans');
     Route::post('/plans', [AdminPlanController::class, 'store'])->name('saas.admin.plans.store');
     Route::put('/plans/{id}', [AdminPlanController::class, 'update'])->name('saas.admin.plans.update');
+    Route::get('/sales', [AdminSaleController::class, 'index'])->name('saas.admin.sales');
+    Route::post('/sales', [AdminSaleController::class, 'store'])->name('saas.admin.sales.store');
+    Route::post('/sales/{id}/toggle', [AdminSaleController::class, 'toggle'])->name('saas.admin.sales.toggle');
+    Route::delete('/sales/{id}', [AdminSaleController::class, 'destroy'])->name('saas.admin.sales.destroy');
     Route::get('/subscriptions', [AdminSubscriptionController::class, 'index'])->name('saas.admin.subscriptions');
     Route::post('/subscriptions/assign', [AdminSubscriptionController::class, 'assign'])->name('saas.admin.subscriptions.assign');
     Route::post('/subscriptions/{id}/toggle', [AdminSubscriptionController::class, 'toggle'])->name('saas.admin.subscriptions.toggle');

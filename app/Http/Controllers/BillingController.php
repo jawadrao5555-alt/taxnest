@@ -106,7 +106,7 @@ class BillingController extends Controller
             return back()->with('error', 'This plan is not available for Digital Invoice accounts.');
         }
 
-        $pricing = Subscription::calculateFinalPrice($plan->price, $cycle);
+        $pricing = Subscription::calculateFinalPrice($plan->sale_price, $cycle);
         $months = Subscription::getMonthsForCycle($cycle);
 
         Subscription::where('company_id', $companyId)->update(['active' => false]);
@@ -142,7 +142,7 @@ class BillingController extends Controller
         }
 
         $cycle = $request->billing_cycle ?? 'monthly';
-        $pricing = Subscription::calculateFinalPrice($plan->price, $cycle);
+        $pricing = Subscription::calculateFinalPrice($plan->sale_price, $cycle);
 
         return response()->json($pricing);
     }

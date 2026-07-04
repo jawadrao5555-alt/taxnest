@@ -328,7 +328,7 @@
                 @foreach($plans as $plan)
                 @php
                     $isPopular = $plan->name === 'Business';
-                    $hasOffer = !empty($plan->compare_at_price) && $plan->compare_at_price > $plan->price;
+                    $hasOffer = $plan->sale_percent > 0;
                 @endphp
                 <div class="relative rounded-xl shadow-md overflow-hidden transition duration-300 hover:-translate-y-1 hover:shadow-xl {{ $isPopular ? 'ring-2 ring-emerald-400/80 shadow-lg shadow-emerald-500/10' : '' }}">
                     @if($isPopular)
@@ -339,11 +339,11 @@
                     <div class="{{ $isPopular ? 'bg-gradient-to-b from-emerald-50/50 to-white border-emerald-400/30 border-t-0 rounded-b-xl' : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-xl' }} border p-5">
                         <h3 class="text-lg font-bold text-gray-900">{{ $plan->name }}</h3>
                         @if($hasOffer)
-                        <span class="inline-block mt-2 px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full text-[11px] font-bold">50% OFF · Launch Offer</span>
+                        <span class="inline-block mt-2 px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full text-[11px] font-bold">{{ $plan->sale_badge }}</span>
                         @endif
                         <div class="mt-3 mb-1">
-                            @if($hasOffer)<span class="text-lg text-gray-400 line-through mr-1">PKR {{ number_format($plan->compare_at_price, 0) }}</span>@endif
-                            <span class="text-3xl font-black text-gray-900">PKR {{ number_format($plan->price, 0) }}</span>
+                            @if($hasOffer)<span class="text-lg text-gray-400 line-through mr-1">PKR {{ number_format($plan->price, 0) }}</span>@endif
+                            <span class="text-3xl font-black text-gray-900">PKR {{ number_format($plan->sale_price, 0) }}</span>
                             <span class="text-gray-400 text-sm">/mo</span>
                         </div>
                         <p class="text-xs text-emerald-600 font-medium">Save up to 6% on annual billing</p>

@@ -34,7 +34,6 @@ class AdminPlanController extends Controller
         $data = $request->validate([
             'name' => 'required|string|max:100',
             'price' => 'required|numeric|min:0',
-            'compare_at_price' => 'nullable|numeric|min:0',
             'invoice_limit' => 'required|integer|min:-1',
             'product_type' => 'required|in:di,pos,fbrpos',
             'max_terminals' => 'nullable|integer|min:-1',
@@ -54,7 +53,6 @@ class AdminPlanController extends Controller
             'product_type' => $data['product_type'],
             'price' => $data['price'],
             'price_monthly' => in_array($data['product_type'], ['di', 'fbrpos']) ? $data['price'] : null,
-            'compare_at_price' => $request->filled('compare_at_price') ? $request->compare_at_price : null,
             'invoice_limit' => $data['invoice_limit'],
             'max_terminals' => $request->input('max_terminals'),
             'max_users' => $request->input('max_users'),
@@ -75,7 +73,6 @@ class AdminPlanController extends Controller
         $data = $request->validate([
             'name' => 'required|string|max:100',
             'price' => 'required|numeric|min:0',
-            'compare_at_price' => 'nullable|numeric|min:0',
             'invoice_limit' => 'required|integer|min:-1',
             'product_type' => 'required|in:di,pos,fbrpos',
             'max_terminals' => 'nullable|integer|min:-1',
@@ -87,14 +84,12 @@ class AdminPlanController extends Controller
         $features = array_filter(array_map('trim', explode("\n", $request->input('features_text', ''))));
 
         // Explicit field list (never mass-assign the whole request) so sensitive
-        // columns like is_trial can't be injected, and compare_at_price stays in
-        // sync — leaving it blank clears the launch-offer badge.
+        // columns like is_trial can't be injected via crafted POST data.
         $plan->update([
             'name' => $data['name'],
             'product_type' => $data['product_type'],
             'price' => $data['price'],
             'price_monthly' => in_array($data['product_type'], ['di', 'fbrpos']) ? $data['price'] : null,
-            'compare_at_price' => $request->filled('compare_at_price') ? $request->compare_at_price : null,
             'invoice_limit' => $data['invoice_limit'],
             'max_terminals' => $request->input('max_terminals'),
             'max_users' => $request->input('max_users'),

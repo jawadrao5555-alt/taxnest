@@ -301,8 +301,8 @@
                 @endphp
                 <div class="relative rounded-xl shadow-md overflow-hidden transition duration-300 hover:-translate-y-1 hover:shadow-xl {{ $isPopular ? 'ring-2 ring-blue-400/80 shadow-lg shadow-blue-500/10' : '' }}"
                      x-data="{
-                         basePrice: {{ $plan->price }},
-                         compareBase: {{ $plan->compare_at_price ?? 0 }},
+                         basePrice: {{ $plan->sale_price }},
+                         compareBase: {{ $plan->price }},
                          discounts: { monthly: 0, quarterly: 1, semi_annual: 3, annual: 6 },
                          get discount() { return this.discounts[cycle] || 0; },
                          get months() { return { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }[cycle] || 1; },
@@ -322,7 +322,7 @@
                         <h3 class="text-lg font-bold text-gray-900">{{ $plan->name }}</h3>
                         <div class="mt-3 mb-1">
                             <template x-if="hasOffer">
-                                <div class="mb-1.5"><span class="inline-block px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full text-[11px] font-bold">50% OFF · Launch Offer</span></div>
+                                <div class="mb-1.5"><span class="inline-block px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full text-[11px] font-bold">{{ $plan->sale_badge }}</span></div>
                             </template>
                             <template x-if="hasOffer">
                                 <span class="text-base text-gray-400 line-through mr-1">PKR <span x-text="compareTotal.toLocaleString()"></span></span>

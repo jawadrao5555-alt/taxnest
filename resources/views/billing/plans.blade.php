@@ -118,7 +118,7 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     @foreach($plans as $index => $plan)
-                    @php $hasOffer = !empty($plan->compare_at_price) && $plan->compare_at_price > $plan->price; @endphp
+                    @php $hasOffer = $plan->sale_percent > 0; @endphp
                     <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border-2 transition relative
                         {{ $plan->name === 'Business' ? 'border-emerald-500 ring-2 ring-emerald-500' : 'border-gray-200 dark:border-gray-800' }}
                         {{ $currentSubscription && $currentSubscription->pricing_plan_id === $plan->id ? 'border-emerald-500' : '' }}">
@@ -135,19 +135,19 @@
                             @endif
                             <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">{{ $plan->name }}</h3>
                             @if($hasOffer)
-                            <span class="inline-block mt-2 px-2 py-0.5 bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 rounded-full text-[11px] font-bold">50% OFF · Launch Offer</span>
+                            <span class="inline-block mt-2 px-2 py-0.5 bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 rounded-full text-[11px] font-bold">{{ $plan->sale_badge }}</span>
                             @endif
                             <div class="mt-4">
                                 <div x-show="cycle === 'monthly'">
-                                    @if($hasOffer)<span class="text-base text-gray-400 line-through mr-1">PKR {{ number_format($plan->compare_at_price) }}</span>@endif
-                                    <span class="text-3xl font-bold text-gray-900 dark:text-gray-100">PKR {{ number_format($plan->price) }}</span>
+                                    @if($hasOffer)<span class="text-base text-gray-400 line-through mr-1">PKR {{ number_format($plan->price) }}</span>@endif
+                                    <span class="text-3xl font-bold text-gray-900 dark:text-gray-100">PKR {{ number_format($plan->sale_price) }}</span>
                                     <span class="text-gray-500 dark:text-gray-400 text-sm">/mo</span>
                                 </div>
                                 <div x-show="cycle !== 'monthly'">
-                                    @if($hasOffer)<span class="text-base text-gray-400 line-through mr-1">PKR <span x-text="calcMonthly({{ $plan->compare_at_price }}).toLocaleString()"></span></span>@endif
-                                    <span class="text-3xl font-bold text-gray-900 dark:text-gray-100">PKR <span x-text="calcMonthly({{ $plan->price }}).toLocaleString()"></span></span>
+                                    @if($hasOffer)<span class="text-base text-gray-400 line-through mr-1">PKR <span x-text="calcMonthly({{ $plan->price }}).toLocaleString()"></span></span>@endif
+                                    <span class="text-3xl font-bold text-gray-900 dark:text-gray-100">PKR <span x-text="calcMonthly({{ $plan->sale_price }}).toLocaleString()"></span></span>
                                     <span class="text-gray-500 dark:text-gray-400 text-sm">/mo</span>
-                                    <p class="text-xs text-gray-400 mt-1">@if($hasOffer)<span class="line-through mr-1">PKR <span x-text="calcPrice({{ $plan->compare_at_price }}).toLocaleString()"></span></span> @endif PKR <span x-text="calcPrice({{ $plan->price }}).toLocaleString()"></span> total</p>
+                                    <p class="text-xs text-gray-400 mt-1">@if($hasOffer)<span class="line-through mr-1">PKR <span x-text="calcPrice({{ $plan->price }}).toLocaleString()"></span></span> @endif PKR <span x-text="calcPrice({{ $plan->sale_price }}).toLocaleString()"></span> total</p>
                                 </div>
                             </div>
                             <ul class="mt-5 space-y-2.5">
@@ -229,7 +229,7 @@
                                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-800 transition">
                                     <td class="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">Monthly Price</td>
                                     @foreach($plans as $plan)
-                                    <td class="py-3 px-4 text-center text-sm font-semibold">@if(!empty($plan->compare_at_price) && $plan->compare_at_price > $plan->price)<span class="text-gray-400 line-through font-normal mr-1">PKR {{ number_format($plan->compare_at_price) }}</span> @endif PKR {{ number_format($plan->price) }}</td>
+                                    <td class="py-3 px-4 text-center text-sm font-semibold">@if($plan->sale_percent > 0)<span class="text-gray-400 line-through font-normal mr-1">PKR {{ number_format($plan->price) }}</span> @endif PKR {{ number_format($plan->sale_price) }}</td>
                                     @endforeach
                                 </tr>
                                 <tr class="bg-gray-50 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 dark:hover:bg-gray-800 transition">

@@ -30,3 +30,4 @@
 - [PRA Code 112 & Fiscal Device mode](pra-code-112-fiscal-device.md) — new POS IDs can't use cloud PostData; local IMS service localhost:8524 GetInvoiceNumberByModel, single OBJECT payload, agent on same PC.
 - [Alpine expression pitfalls](alpine-expression-pitfalls.md) — leading /* */ comment kills Alpine's if-detection (handler silently dead); x-model needs a plain path, never a ternary; :class evals even when x-show false.
 - [SW skip-list for sale screens](sw-skiplist-sale-screens.md) — every new authenticated sale/edit screen must go into sw.js skipPatterns + CACHE_VERSION bump; runtime cache survives logout (offline-only exposure).
+- [Dynamic sale campaigns](dynamic-sale-campaigns.md) — admin sales via sale_campaigns + PricingPlan sale_* accessors; base price never hiked, auto-expires by date (no cron); ALL surfaces + charge paths read sale_price; compare_at column dead.

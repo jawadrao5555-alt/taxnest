@@ -672,8 +672,22 @@ class PosController extends Controller
         // via retryPra (the "Submit to PRA — Make Final" button on transaction-show).
         $saveAsProvisional = (bool) $request->input('save_as_provisional', false);
         $praEnabled = (bool) $company->pra_reporting_enabled && !$saveAsProvisional;
-        $invoiceMode = $praEnabled ? 'pra' : 'local';
-        $initialPraStatus = $praEnabled ? 'pending' : 'local';
+        if ($saveAsProvisional) {
+            // Deliberate provisional — editable/deletable via F10 Local modal until promoted.
+            $invoiceMode = 'local';
+            $initialPraStatus = 'local';
+        } elseif ($praEnabled) {
+            $invoiceMode = 'pra';
+            $initialPraStatus = 'pending';
+        } else {
+            // PRA-reporting-OFF company, FINAL sale. Must NOT be 'local' — local mode
+            // hides the bill from the normal panel (transactions/KPIs/reports filter to
+            // pra/NULL) and pollutes the F10 provisional modal where cashiers could
+            // edit/delete a final bill. 'pra' mode + NULL pra_status = normal bill with
+            // no PRA involvement (agent/failed/retry lists all key off pra_status).
+            $invoiceMode = 'pra';
+            $initialPraStatus = null;
+        }
 
         DB::beginTransaction();
         try {
@@ -951,7 +965,13 @@ class PosController extends Controller
                 'exempt_amount' => $exemptAfterDiscount,
                 'total_amount' => $totalAmount,
                 'payment_method' => $request->payment_method,
-                'pra_status' => $company->pra_reporting_enabled ? 'pending' : ($transaction->pra_status ?? 'local'),
+                // Mirror storeInvoice's three-branch invariant:
+                // provisional stays provisional; PRA-on final re-queues as 'pending';
+                // PRA-off final keeps NULL (never regress to 'local' — that would hide
+                // it from transactions/KPIs and expose it in the F10 modal).
+                'pra_status' => ($transaction->invoice_mode === 'local' && $transaction->pra_status === 'local')
+                    ? 'local'
+                    : ($company->pra_reporting_enabled ? 'pending' : null),
                 'notes' => $request->input('kitchen_notes'),
             ]);
 
@@ -1071,6 +1091,16 @@ class PosController extends Controller
         }
 
         if (!$company->pra_reporting_enabled) {
+            // PRA-reporting-OFF company promoting a provisional → finalize WITHOUT any
+            // PRA submission: 'pra' mode + NULL pra_status = normal final bill.
+            if ($transaction->pra_status === 'local') {
+                $transaction->update([
+                    'pra_status' => null,
+                    'invoice_mode' => 'pra',
+                    'pra_response_code' => null,
+                ]);
+                return back()->with('success', 'Bill ' . $transaction->invoice_number . ' is now FINAL. PRA reporting is OFF — no PRA submission needed.');
+            }
             return back()->with('error', 'PRA reporting is currently disabled. Enable it from PRA Settings first.');
         }
 
@@ -1261,11 +1291,24 @@ class PosController extends Controller
                 'message' => 'Only completed provisional (local) bills can be promoted. Current status: ' . $tx->status . '/' . $tx->pra_status,
             ], 422);
         }
-        if (!$company || !$company->pra_reporting_enabled) {
+        if (!$company) {
+            return response()->json(['success' => false, 'message' => 'Company not found'], 404);
+        }
+        if (!$company->pra_reporting_enabled) {
+            // PRA-reporting-OFF company — finalize WITHOUT any PRA submission:
+            // 'pra' mode + NULL pra_status = normal final bill (visible in
+            // transactions/KPIs, out of the F10 provisional modal).
+            $tx->update([
+                'pra_status'        => null,
+                'invoice_mode'      => 'pra',
+                'pra_response_code' => null,
+            ]);
             return response()->json([
-                'success' => false,
-                'message' => 'PRA reporting is currently disabled. Enable it from PRA Settings first.',
-            ], 422);
+                'success'   => true,
+                'submitted' => false,
+                'message'   => '✓ Bill ' . $tx->invoice_number . ' is now FINAL — PRA reporting is OFF, no submission needed.',
+                'id'        => $id,
+            ]);
         }
 
         // Flip provisional → pending + lock to PRA mode (same as retryPra L897-902).

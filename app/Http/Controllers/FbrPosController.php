@@ -478,10 +478,25 @@ class FbrPosController extends Controller
         // for a local bill (no FBR submission now). Same semantics as a local-mode
         // sale: invoice_mode='local' + fbr_status='local'. Promote later via F10.
         $saveAsProvisional = $request->boolean('save_as_provisional');
-        $invoiceMode = ($fbrEnabled && !$saveAsProvisional) ? 'fbr' : 'local';
+        if ($saveAsProvisional) {
+            // Deliberate provisional — editable/deletable via F10 Local modal until promoted.
+            $invoiceMode = 'local';
+            $initialFbrStatus = 'local';
+        } elseif ($fbrEnabled) {
+            $invoiceMode = 'fbr';
+            $initialFbrStatus = 'pending';
+        } else {
+            // FBR-reporting-OFF company, FINAL sale. Must NOT be local-mode — local
+            // hides the bill from transactions/KPIs (which filter to fbr/NULL) and
+            // pollutes the F10 provisional modal where cashiers could edit/delete a
+            // final bill. 'fbr' mode + NULL fbr_status = normal bill, no FBR
+            // involvement (fail-queue/retry/promote all key off fbr_status).
+            $invoiceMode = 'fbr';
+            $initialFbrStatus = null;
+        }
 
         try {
-            $transaction = DB::transaction(function () use ($request, $companyId, $company, $invoiceMode) {
+            $transaction = DB::transaction(function () use ($request, $companyId, $company, $invoiceMode, $initialFbrStatus) {
                 $subtotal = 0;
                 $totalTax = 0;
                 $itemsData = [];
@@ -596,7 +611,10 @@ class FbrPosController extends Controller
                     $discountAmount = min($discountValue, $subtotal);
                 }
 
-                $fbrServiceCharge = $invoiceMode === 'fbr' ? 1.00 : 0.00;
+                // Rs 1 POS service fee applies ONLY to bills actually reported to FBR.
+                // FBR-reporting-OFF finals are 'fbr' mode with NULL status (never
+                // submitted) — no fee. Provisionals (local) — no fee until promoted.
+                $fbrServiceCharge = ($invoiceMode === 'fbr' && $initialFbrStatus !== null) ? 1.00 : 0.00;
 
                 // Phase 2: Promotion discount (cart-level, separate from manual discount)
                 $promotionDiscount = 0;
@@ -696,7 +714,7 @@ class FbrPosController extends Controller
                     'cash_received' => $cashReceived,
                     'change_due' => $changeDue,
                     'status' => 'completed',
-                    'fbr_status' => $invoiceMode === 'local' ? 'local' : 'pending',
+                    'fbr_status' => $initialFbrStatus,
                     'created_by' => Auth::guard('fbrpos')->id(),
                 ]);
 
@@ -777,6 +795,26 @@ class FbrPosController extends Controller
                 }
                 return redirect()->route('fbrpos.show', $transaction->id)
                     ->with('success', "Local sale #{$transaction->invoice_number} created (PKR " . number_format($transaction->total_amount, 2) . "). FBR Reporting is OFF — invoice saved locally.");
+            }
+
+            // FBR-reporting-OFF company, FINAL sale — bill is saved as a normal
+            // transaction (fbr_status NULL) and FBR submission is skipped entirely.
+            if (!$fbrEnabled) {
+                if ($request->wantsJson()) {
+                    return response()->json([
+                        'success' => true,
+                        'transaction_id' => $transaction->id,
+                        'invoice_number' => $transaction->invoice_number,
+                        'total_amount' => (float) $transaction->total_amount,
+                        'change_due' => (float) $transaction->change_due,
+                        'invoice_mode' => 'fbr',
+                        'fbr_status' => null,
+                        'fbr_invoice_number' => null,
+                        'message' => "✓ Bill #{$transaction->invoice_number} created — PKR " . number_format($transaction->total_amount, 2) . " (FBR Reporting is OFF).",
+                    ]);
+                }
+                return redirect()->route('fbrpos.show', $transaction->id)
+                    ->with('success', "Bill #{$transaction->invoice_number} created (PKR " . number_format($transaction->total_amount, 2) . "). FBR Reporting is OFF.");
             }
 
             $transaction->load(['items', 'company']);

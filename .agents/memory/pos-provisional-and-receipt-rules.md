@@ -22,6 +22,27 @@ F10 provisional modal and mismatches the Transactions "Local" tab — this cause
 - Both save paths already land provisional correctly: retail `storeInvoice` and restaurant
   `RestaurantPosController::payHeldOrder` set completed + local + local when `save_as_provisional`.
 
+# Reporting-OFF finals invariant (PRA & FBR POS — Jul 2026)
+
+A FINAL sale for a company whose regulator reporting is OFF (`pra_reporting_enabled=0` /
+`fbr_reporting_enabled=0`) is stored as **regulator mode + NULL status**:
+PRA → `invoice_mode='pra'` + `pra_status=NULL`; FBR → `invoice_mode='fbr'` + `fbr_status=NULL`.
+Never `'local'` — local is RESERVED for deliberate provisionals.
+
+**Why:** 'local' finals vanish from transactions/KPIs/reports (which filter to regulator-mode/NULL)
+and pollute the F10 provisional modal where cashiers can edit/delete/promote a final bill.
+Found via fresh-account simulation — every pre-existing company had reporting ON, so only brand-new
+registrations hit it. NULL status is safe: fail-queue/retry/agent/day-close all key off explicit
+status values (`whereIn` excludes NULL). `fbr_pos_transactions.fbr_status` was made nullable for this.
+
+**How to apply — EVERY write path must use the three-branch:**
+provisional → local/'local'; reporting-ON final → regulator-mode/'pending'; reporting-OFF final →
+regulator-mode/NULL. Paths already converted: `storeInvoice`, `updateTransaction` (edit must NOT
+regress NULL→'local'), `retryPra` + `apiPromoteProvisional` (PRA-off promote = finalize to NULL
+WITHOUT submission, not a "enable PRA first" block), `FbrPosController::store` (also skips
+FbrService submission entirely and charges NO Rs-1 fee when `$initialFbrStatus === null`).
+Any NEW save/edit/promote path must follow the same three-branch or the invariant breaks.
+
 # Receipt tax display rule (OWNER OVERRIDE, Jul 2026)
 
 The `companies.pos_receipt_show_tax` toggle applies to ALL receipts — including PRA fiscal ones.

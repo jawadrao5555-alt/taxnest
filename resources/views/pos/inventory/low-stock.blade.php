@@ -120,7 +120,7 @@
                             <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">-{{ number_format($shortage, 0) }}</span>
                         </td>
                         <td class="px-5 py-4 text-center">
-                            <a href="{{ route('pos.inventory.adjust') }}?product_id={{ $item->product_id }}" class="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-purple-600 to-violet-600 text-white text-xs font-bold rounded-lg hover:from-purple-700 hover:to-violet-700 transition shadow-sm">
+                            <a href="{{ route('pos.inventory.adjust') }}?product_id={{ $item->product_id }}" class="inline-flex items-center px-3 py-1.5 bg-purple-600 text-white text-xs font-bold rounded-lg hover:bg-purple-700 transition shadow-sm">
                                 <svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                 Restock
                             </a>

@@ -38,7 +38,7 @@
     @if($isRestaurant)
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 slide-up slide-up-2">
         <a href="{{ route('pos.invoice.create') }}" class="tile-card glass-card p-4 text-center group cursor-pointer">
-            <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center mb-2.5 shadow-lg shadow-purple-500/20">
+            <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center mb-2.5 shadow-lg">
                 <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
             </div>
             <p class="text-[11px] font-bold text-gray-900 dark:text-white">POS Screen</p>
@@ -83,7 +83,7 @@
     @else
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 slide-up slide-up-2">
         <a href="{{ route('pos.invoice.create') }}" class="tile-card glass-card p-4 text-center group cursor-pointer">
-            <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center mb-2.5 shadow-lg shadow-purple-500/20">
+            <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center mb-2.5 shadow-lg">
                 <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
             </div>
             <p class="text-[11px] font-bold text-gray-900 dark:text-white">New Sale</p>
@@ -135,9 +135,9 @@
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: {{ min(100, ($todayOrders ?? $todayStats->count ?? 0) * 5) }}%"></div></div>
             </div>
         </div>
-        <div class="stat-card card-reveal bg-gradient-to-br from-purple-500 to-violet-700 p-4 shadow-lg shadow-purple-500/15">
+        <div class="stat-card card-reveal bg-gradient-to-br from-purple-500 to-purple-700 p-4 shadow-lg">
             <div class="relative z-10">
-                <span class="text-[9px] font-bold uppercase tracking-wider text-purple-100/70">Avg Order</span>
+                <span class="text-[9px] font-bold uppercase tracking-wider text-white/70">Avg Order</span>
                 <p class="text-xl font-extrabold text-white mt-1">Rs. <span data-count-target="{{ round($todayStats->avg_ticket ?? (($todayOrders ?? 0) > 0 ? ($todaySales ?? 0) / ($todayOrders ?? 1) : 0)) }}">0</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: 60%"></div></div>
             </div>

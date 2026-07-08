@@ -5,7 +5,7 @@
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Recipes (Bill of Materials)</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400">Define ingredient requirements for each product</p>
         </div>
-        <button @click="showAddModal = true" class="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-violet-600 text-white text-sm font-semibold hover:from-purple-700 hover:to-violet-700">+ Add Recipe</button>
+        <button @click="showAddModal = true" class="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700">+ Add Recipe</button>
     </div>
 
     @if(session('success'))

@@ -74,7 +74,7 @@
             <p class="text-xs text-gray-400 mt-2">Inventory deducts ONLY on payment. KOT prints on hold (if enabled).</p>
         </div>
 
-        <button type="submit" class="w-full py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white shadow-md transition-all">
+        <button type="submit" class="w-full py-2.5 rounded-xl text-sm font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-sm transition-all">
             Save Kitchen Settings
         </button>
     </form>

@@ -14,7 +14,7 @@
 
         {{-- ═══════════ WELCOME (first-time only) ═══════════ --}}
         @if($isFirstTime)
-        <div class="mb-5 rounded-2xl bg-gradient-to-r from-purple-600 to-fuchsia-600 p-5 sm:p-6 text-white shadow-xl">
+        <div class="mb-5 rounded-2xl bg-purple-600 p-5 sm:p-6 text-white shadow-xl">
             <div class="flex items-start gap-3">
                 <div class="text-3xl">👋</div>
                 <div>
@@ -91,7 +91,7 @@
 
                 <div class="mt-4 flex items-center justify-between">
                     <a href="{{ route('pos.customize') }}" class="inline-flex items-center px-4 py-2.5 text-sm font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">Cancel</a>
-                    <button type="button" @click="next()" class="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded-lg bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 text-white shadow-lg shadow-purple-500/30">
+                    <button type="button" @click="next()" class="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded-lg bg-purple-600 hover:bg-purple-700 text-white shadow-sm">
                         Next — Choose Features
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                     </button>
@@ -248,7 +248,7 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                         Back
                     </button>
-                    <button type="button" @click="next()" class="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded-lg bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 text-white shadow-lg shadow-purple-500/30">
+                    <button type="button" @click="next()" class="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded-lg bg-purple-600 hover:bg-purple-700 text-white shadow-sm">
                         Next — Review
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                     </button>

@@ -5,7 +5,7 @@
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Table Setup</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400">Configure floors and tables for your restaurant</p>
         </div>
-        <button @click="showFloorModal = true; editFloor = null" class="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-violet-600 text-white text-sm font-semibold hover:from-purple-700 hover:to-violet-700">+ Add Floor</button>
+        <button @click="showFloorModal = true; editFloor = null" class="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700">+ Add Floor</button>
     </div>
 
     @if(session('success'))

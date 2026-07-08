@@ -95,7 +95,7 @@
         <div class="p-2.5 space-y-0.5">
             @forelse(($topProducts ?? collect())->take(5) as $idx => $p)
             <div class="flex items-center gap-2 py-1.5 px-2 rounded-lg r-row transition">
-                <span class="w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-extrabold flex-shrink-0 {{ $idx < 3 ? 'bg-gradient-to-br from-purple-500 to-violet-600 text-white' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' }}">{{ $idx + 1 }}</span>
+                <span class="w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-extrabold flex-shrink-0 {{ $idx < 3 ? 'bg-gradient-to-br from-purple-500 to-purple-700 text-white' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' }}">{{ $idx + 1 }}</span>
                 <p class="flex-1 text-[11px] font-semibold text-gray-900 dark:text-white truncate">{{ $p->item_name }}</p>
                 <span class="text-[9px] text-gray-400 bg-gray-50 dark:bg-gray-800 px-1.5 py-0.5 rounded font-mono">{{ $p->total_qty }}x</span>
                 <span class="text-[11px] font-bold text-gray-900 dark:text-white">Rs. {{ number_format($p->total_revenue) }}</span>

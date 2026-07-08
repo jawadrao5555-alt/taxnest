@@ -189,14 +189,14 @@ window.addEventListener('popstate', function() {
 </script>
 
 <div x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
-    <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-bold tracking-wider uppercase px-3 py-1 text-center shadow-sm">
+    <div class="bg-purple-600 text-white text-[10px] font-bold tracking-wider uppercase px-3 py-1 text-center shadow-sm">
         ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v18-PROFIT-BI
     </div>
 
     {{-- PRA Reporting + Auto-Print toggles strip (visible to admin + cashier).
          autoPrintEnabled lives on the parent restaurantPos() scope (mirrors kitchenSettings.print_on_pay)
          so toggling immediately updates the receipt-iframe URL on the very next sale, no refresh needed. --}}
-    <div class="flex items-center justify-end gap-4 px-3 py-1.5 bg-gradient-to-r from-purple-50 to-white dark:from-purple-900/10 dark:to-gray-900 border-b border-purple-100 dark:border-purple-900/30 flex-shrink-0"
+    <div class="flex items-center justify-end gap-4 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/10 border-b border-purple-100 dark:border-purple-900/30 flex-shrink-0"
          x-data="{
             autoPrintLoading: false,
             autoKotLoading: false
@@ -389,7 +389,7 @@ window.addEventListener('popstate', function() {
                 <template x-if="!isInventoryEnabled()">
                     <button type="button" @click="quickCreateProduct()"
                         class="w-full flex items-center gap-3 px-3 py-3 text-left hover:bg-purple-50 dark:hover:bg-purple-900/20 transition group">
-                        <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex-shrink-0 shadow">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-purple-500 to-purple-700 text-white flex-shrink-0 shadow">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
                         </div>
                         <div class="flex-1 min-w-0">
@@ -1070,7 +1070,7 @@ window.addEventListener('popstate', function() {
     {{-- ─────────────────────────────────────────────────────────────────────── --}}
     <div x-show="showLocalBills" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showLocalBills = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden" x-transition.scale.90>
-            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20">
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-purple-50 dark:bg-purple-900/20">
                 <div>
                     <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                         <svg class="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
@@ -1122,7 +1122,7 @@ window.addEventListener('popstate', function() {
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V3a1 1 0 011-1h4a1 1 0 011 1v4"/></svg>
                                 Delete
                             </button>
-                            <button @click="promoteProvisional(bill)" :disabled="!praEnabled" :title="praEnabled ? 'Submit this bill to PRA as final invoice' : 'PRA reporting is disabled — enable from settings'" class="flex-1 py-2 text-xs font-bold text-white bg-gradient-to-br from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 rounded-xl transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
+                            <button @click="promoteProvisional(bill)" :disabled="!praEnabled" :title="praEnabled ? 'Submit this bill to PRA as final invoice' : 'PRA reporting is disabled — enable from settings'" class="flex-1 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                                 Make Final
                             </button>
@@ -1699,7 +1699,7 @@ window.addEventListener('popstate', function() {
             <div class="p-3 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
                 <div class="grid grid-cols-4 gap-2">
                     {{-- 1. Print Receipt (P) --}}
-                    <button @click="printReceipt()" :disabled="!lastTransactionId" class="py-3 text-center rounded-xl bg-gradient-to-br from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-sm flex items-center justify-center gap-1.5" title="Print customer receipt">
+                    <button @click="printReceipt()" :disabled="!lastTransactionId" class="py-3 text-center rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-sm flex items-center justify-center gap-1.5" title="Print customer receipt">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                         Print <kbd class="text-[8px] bg-purple-500/40 px-1 rounded font-mono">P</kbd>
                     </button>
@@ -1824,7 +1824,7 @@ window.addEventListener('popstate', function() {
          x-transition:leave-end="opacity-0 translate-y-4"
          class="fixed bottom-4 right-4 z-40 w-[300px]" style="display:none">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-purple-200 dark:border-purple-800 overflow-hidden ring-2 ring-purple-500/20">
-            <div class="px-3 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex items-center gap-2">
+            <div class="px-3 py-2 bg-purple-600 text-white flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                 <span class="text-[11px] font-bold uppercase tracking-wider">Suggested Add-on</span>
                 <button @click="dismissUpsell(true)" class="ml-auto text-white/80 hover:text-white" aria-label="Skip">
@@ -1846,7 +1846,7 @@ window.addEventListener('popstate', function() {
                         <button @click="dismissUpsell(true)" class="px-3 py-1.5 text-[11px] font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition">
                             Skip <span class="text-[9px] opacity-60 ml-0.5">Esc</span>
                         </button>
-                        <button @click="acceptUpsell()" class="px-3 py-1.5 text-[11px] font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-lg transition shadow-sm">
+                        <button @click="acceptUpsell()" class="px-3 py-1.5 text-[11px] font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition shadow-sm">
                             + Add <span class="text-[9px] opacity-80 ml-0.5">⏎</span>
                         </button>
                     </div>

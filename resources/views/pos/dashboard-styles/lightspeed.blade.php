@@ -44,7 +44,7 @@
 
     @if($isRestaurant)
     <div class="grid grid-cols-3 lg:grid-cols-6 gap-3 ls-anim ls-d2">
-        <a href="{{ route('pos.invoice.create') }}" class="ls-tile bg-gradient-to-br from-violet-500 to-purple-700 shadow-xl shadow-purple-500/20">
+        <a href="{{ route('pos.invoice.create') }}" class="ls-tile bg-gradient-to-br from-purple-500 to-purple-700 shadow-xl">
             <div class="relative z-10">
                 <div class="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center mb-3"><svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg></div>
                 <p class="text-sm font-black text-white">POS</p>
@@ -89,7 +89,7 @@
     </div>
     @else
     <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 ls-anim ls-d2">
-        <a href="{{ route('pos.invoice.create') }}" class="ls-tile bg-gradient-to-br from-violet-500 to-purple-700 shadow-xl shadow-purple-500/20"><div class="relative z-10"><div class="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center mb-3"><svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg></div><p class="text-sm font-black text-white">New Sale</p></div></a>
+        <a href="{{ route('pos.invoice.create') }}" class="ls-tile bg-gradient-to-br from-purple-500 to-purple-700 shadow-xl"><div class="relative z-10"><div class="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center mb-3"><svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg></div><p class="text-sm font-black text-white">New Sale</p></div></a>
         <a href="{{ route('pos.transactions') }}" class="ls-tile bg-gradient-to-br from-teal-600 to-teal-800 shadow-xl shadow-teal-600/20"><div class="relative z-10"><div class="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center mb-3"><svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg></div><p class="text-sm font-black text-white">Orders</p></div></a>
         <a href="{{ route('pos.products') }}" class="ls-tile bg-gradient-to-br from-emerald-500 to-teal-700 shadow-xl shadow-emerald-500/20"><div class="relative z-10"><div class="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center mb-3"><svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg></div><p class="text-sm font-black text-white">Products</p></div></a>
         <a href="{{ route('pos.customers') }}" class="ls-tile bg-gradient-to-br from-pink-500 to-rose-700 shadow-xl shadow-pink-500/20"><div class="relative z-10"><div class="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center mb-3"><svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div><p class="text-sm font-black text-white">Customers</p></div></a>
@@ -166,7 +166,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2">
                 @forelse(($topProducts ?? collect())->take(6) as $idx => $p)
                 <div class="flex items-center gap-3 p-4 border-b border-r border-gray-50 dark:border-gray-800/50 hover:bg-violet-50/20 dark:hover:bg-violet-900/5 transition">
-                    <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-black flex-shrink-0 {{ $idx < 3 ? 'bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-lg shadow-violet-500/20' : 'bg-gray-100 dark:bg-gray-800 text-gray-400' }}">{{ $idx + 1 }}</div>
+                    <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-black flex-shrink-0 {{ $idx < 3 ? 'bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg' : 'bg-gray-100 dark:bg-gray-800 text-gray-400' }}">{{ $idx + 1 }}</div>
                     <div class="flex-1 min-w-0"><p class="text-xs font-bold text-gray-900 dark:text-white truncate">{{ $p->item_name }}</p><p class="text-[9px] text-gray-400">{{ $p->total_qty }} sold</p></div>
                     <p class="text-xs font-black text-gray-900 dark:text-white">Rs.{{ number_format($p->total_revenue) }}</p>
                 </div>

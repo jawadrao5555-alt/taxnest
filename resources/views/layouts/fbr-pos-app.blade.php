@@ -573,6 +573,10 @@
                     {{-- Setup Section --}}
                     <div>
                         <p class="px-3 mb-1.5 text-[9px] font-black uppercase tracking-[0.15em] text-white/40">Setup</p>
+                        <a href="{{ route('fbrpos.customize') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.customize') ? $sidebarActive : $sidebarInactive }}">
+                            <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+                            Customize POS
+                        </a>
                         <a href="{{ route('fbrpos.business-profile') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.business-profile') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                             Business Profile

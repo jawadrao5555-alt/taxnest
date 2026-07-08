@@ -29,9 +29,16 @@ class FbrPosController extends Controller
     public function apiProvisionalBills(Request $request)
     {
         $companyId = Auth::guard('fbrpos')->user()->company_id ?? app('currentCompanyId');
+        // 🔒 CONFIDENTIAL PIN GATE — local (provisional) bills are PIN-protected,
+        // same rule as transactions?tab=local. 30-min verified-session window.
+        $pinCompany = Company::find($companyId);
+        if (!empty($pinCompany?->confidential_pin) && !$this->isPinSessionValid()) {
+            return response()->json(['success' => false, 'pin_required' => true, 'message' => 'PIN verification required.'], 403);
+        }
         $bills = \App\Models\FbrPosTransaction::where('company_id', $companyId)
             ->where('invoice_mode', 'local')
             ->where('fbr_status', 'local')
+            ->withCount('items')
             ->orderByDesc('id')
             ->limit(50)
             ->get(['id', 'invoice_number', 'total_amount', 'created_at', 'customer_name'])
@@ -41,6 +48,8 @@ class FbrPosController extends Controller
                     'invoice_number' => $b->invoice_number,
                     'total_amount' => (float) $b->total_amount,
                     'customer_name' => $b->customer_name ?? 'Walk-in',
+                    'items_count' => (int) ($b->items_count ?? 0),
+                    'created_human' => $b->created_at?->diffForHumans(),
                     'created_at' => optional($b->created_at)->format('d M, h:i A'),
                 ];
             });
@@ -50,6 +59,11 @@ class FbrPosController extends Controller
     public function apiDeleteProvisional(Request $request, $id)
     {
         $companyId = Auth::guard('fbrpos')->user()->company_id ?? app('currentCompanyId');
+        // 🔒 CONFIDENTIAL PIN GATE — mirrors apiProvisionalBills.
+        $pinCompany = Company::find($companyId);
+        if (!empty($pinCompany?->confidential_pin) && !$this->isPinSessionValid()) {
+            return response()->json(['success' => false, 'pin_required' => true, 'message' => 'PIN verification required.'], 403);
+        }
         $bill = \App\Models\FbrPosTransaction::where('company_id', $companyId)
             ->where('id', $id)
             ->where('invoice_mode', 'local')
@@ -68,6 +82,11 @@ class FbrPosController extends Controller
     public function apiPromoteProvisional(Request $request, $id)
     {
         $companyId = Auth::guard('fbrpos')->user()->company_id ?? app('currentCompanyId');
+        // 🔒 CONFIDENTIAL PIN GATE — mirrors apiProvisionalBills.
+        $pinCompany = Company::find($companyId);
+        if (!empty($pinCompany?->confidential_pin) && !$this->isPinSessionValid()) {
+            return response()->json(['success' => false, 'pin_required' => true, 'message' => 'PIN verification required.'], 403);
+        }
         // 🔒 Race-safe atomic claim: only flips if still local — prevents double-promote
         $affected = \App\Models\FbrPosTransaction::where('id', $id)
             ->where('company_id', $companyId)
@@ -1492,6 +1511,40 @@ class FbrPosController extends Controller
                 ? 'Universal sale screen enabled'
                 : 'Universal sale screen disabled — classic screen active',
         ]);
+    }
+
+    /**
+     * 🎛️ Customize FBR POS — single consolidated settings hub (admin-only).
+     * Mirrors the PRA POS Customize page but stays in the blue-X theme family
+     * so the FBR layout's accent-remap engine themes it correctly.
+     */
+    public function customize(Request $request)
+    {
+        $user = Auth::guard('fbrpos')->user();
+        if (!$user || $user->role !== 'company_admin') {
+            abort(403, 'Only company admin can customize FBR POS.');
+        }
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        if (!$company) {
+            abort(404);
+        }
+        return view('fbr-pos.customize', compact('company'));
+    }
+
+    /**
+     * 🎯 Toggle guided keyboard billing flow (admin-only) — Enter-driven fast
+     * billing that the Universal sale screen reads via pos_guided_flow_enabled.
+     */
+    public function updateGuidedFlow(Request $request)
+    {
+        if (Auth::guard('fbrpos')->user()->role !== 'company_admin') {
+            return response()->json(['success' => false, 'message' => 'Only company admin can change this setting.'], 403);
+        }
+        $enabled = $request->boolean('enabled');
+        $companyId = app('currentCompanyId');
+        Company::where('id', $companyId)->update(['pos_guided_flow_enabled' => $enabled]);
+        return response()->json(['success' => true, 'enabled' => $enabled]);
     }
 
     public function verifyPin(Request $request)

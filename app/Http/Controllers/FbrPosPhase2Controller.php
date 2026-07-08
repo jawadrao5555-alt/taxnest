@@ -98,7 +98,15 @@ class FbrPosPhase2Controller extends Controller
     {
         $held = FbrPosHeldSale::where('company_id', $this->companyId())->findOrFail($id);
         $data = $held->cart_data;
-        $held->delete();
+        // Atomic claim — the conditional DELETE decides the winner when two
+        // terminals recall the same parked cart concurrently. Only the request
+        // whose delete actually removed the row gets the cart back; the loser
+        // gets 409 and must refresh its held list.
+        $claimed = FbrPosHeldSale::where('company_id', $this->companyId())
+            ->where('id', $id)->delete();
+        if (!$claimed) {
+            return response()->json(['success' => false, 'message' => 'Already recalled on another terminal'], 409);
+        }
         return response()->json(['success' => true, 'cart' => $data]);
     }
 

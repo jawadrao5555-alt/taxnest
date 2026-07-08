@@ -804,6 +804,8 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth'])->group(function () {
     Route::post('/api/toggle-universal', [FbrPosController::class, 'toggleUniversal'])->name('fbrpos.api.toggle-universal');
     Route::post('/settings/dashboard-style', [FbrPosController::class, 'updateDashboardStyle'])->name('fbrpos.settings.dashboard-style');
     Route::post('/settings/theme', [FbrPosController::class, 'updateTheme'])->name('fbrpos.settings.theme');
+    Route::post('/settings/guided-flow', [FbrPosController::class, 'updateGuidedFlow'])->name('fbrpos.settings.guided-flow');
+    Route::get('/customize', [FbrPosController::class, 'customize'])->name('fbrpos.customize');
 
     // 🎯 Universal Header API — Local / Provisional bills (F10) + Failed bills (F11)
     Route::get('/api/provisional-bills', [FbrPosController::class, 'apiProvisionalBills'])->name('fbrpos.api.provisional-bills');

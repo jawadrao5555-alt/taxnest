@@ -32,3 +32,4 @@
 - [Alpine expression pitfalls](alpine-expression-pitfalls.md) — leading /* */ comment kills Alpine's if-detection (handler silently dead); x-model needs a plain path, never a ternary; :class evals even when x-show false.
 - [SW skip-list for sale screens](sw-skiplist-sale-screens.md) — every new authenticated sale/edit screen must go into sw.js skipPatterns + CACHE_VERSION bump; runtime cache survives logout (offline-only exposure).
 - [Dynamic sale campaigns](dynamic-sale-campaigns.md) — admin sales via sale_campaigns + PricingPlan sale_* accessors; base price never hiked, auto-expires by date (no cron); ALL surfaces + charge paths read sale_price; compare_at column dead.
+- [FBR universal sale screen port](fbr-universal-sale-screen.md) — port of PRA universal with shim pins (never delete); held sales = Phase2 JSON carts, recall needs conditional-delete claim; live paths must be /fbr-pos/.

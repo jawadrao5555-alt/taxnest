@@ -9,6 +9,7 @@
     $features = (object) [
         'tables' => false, 'delivery' => false, 'kot' => false,
         'kitchen' => false, 'recipes' => false, 'inventory' => false,
+        'kitchen_notes' => false,
     ];
     $services = collect();
     $categories = collect();
@@ -862,6 +863,7 @@ window.addEventListener('popstate', function() {
                         <div class="flex items-center gap-1.5 mt-1.5 justify-end">
                             <button @click.stop="item.is_tax_exempt = !item.is_tax_exempt" class="text-[11px] font-extrabold px-2 py-1 rounded-md transition whitespace-nowrap ring-1" :class="item.is_tax_exempt ? 'bg-green-500 text-white ring-green-600 shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 ring-gray-300 dark:ring-gray-600 hover:ring-green-500 hover:text-green-600'" :title="item.is_tax_exempt ? 'Tax exempt — click or press T to apply tax' : 'Press T (when search empty) or Alt+T (anywhere) to toggle tax'" x-text="item.is_tax_exempt ? 'NO TAX (T)' : 'TAX (T)'"></button>
                             <button @click.stop="item.showItemDiscount = !item.showItemDiscount" class="text-[9px] font-bold px-1.5 py-1 rounded-md transition whitespace-nowrap" :class="(item.item_discount_value || 0) > 0 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-orange-500'" x-text="(item.item_discount_value || 0) > 0 ? ((item.item_discount_type || 'percentage') === 'percentage' ? '-' + item.item_discount_value + '%' : '-Rs.' + item.item_discount_value) : 'Disc'"></button>
+                            <button @click.stop="item.showFbrPanel = !item.showFbrPanel" title="FBR compliance — HS code, UoM, tax rate" class="text-[9px] font-bold px-1.5 py-1 rounded-md transition whitespace-nowrap" :class="item.showFbrPanel ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : ((item.hs_code || (item.uom && item.uom !== 'U')) ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/20 dark:text-blue-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-blue-500')">FBR</button>
                         </div>
                         <div x-show="item.showItemDiscount" x-transition class="mt-1 flex items-center gap-1">
                             <button @click.stop="item.item_discount_type = 'percentage'" class="text-[9px] font-bold px-1.5 py-0.5 rounded transition" :class="(item.item_discount_type || 'percentage') === 'percentage' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'">%</button>
@@ -872,6 +874,24 @@ window.addEventListener('popstate', function() {
                                 @keydown.escape.prevent.stop="$event.target.blur()"
                                 min="0" step="any" placeholder="0" class="dense-input w-14 text-[10px] bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 text-gray-900 dark:text-white focus:ring-blue-500">
                             <button @click.stop="item.item_discount_value = 0; item.showItemDiscount = false" class="text-[9px] text-red-400 hover:text-red-600 px-1">X</button>
+                        </div>
+                        {{-- 🧾 FBR compliance drawer — HS code / UoM / tax % per line (store() field names) --}}
+                        <div x-show="item.showFbrPanel" x-transition class="mt-1 p-1.5 rounded-lg bg-blue-50/60 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 flex flex-wrap items-center gap-1" @click.stop>
+                            <input type="text" x-model="item.hs_code" placeholder="HS code" maxlength="20"
+                                autocomplete="off" name="pos_hs_code_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                                @keydown.enter.prevent.stop="$event.target.blur()" @keydown.escape.prevent.stop="$event.target.blur()"
+                                class="dense-input w-20 text-[10px] font-mono bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded px-1.5 py-0.5 text-gray-900 dark:text-white focus:ring-blue-500">
+                            <select x-model="item.uom" @click.stop title="Unit of measure" class="dense-input text-[10px] bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded px-1 py-0.5 text-gray-900 dark:text-white focus:ring-blue-500">
+                                <template x-for="u in uomOptions" :key="u"><option :value="u" x-text="u"></option></template>
+                            </select>
+                            <div class="flex items-center gap-0.5" title="Tax rate %">
+                                <input type="number" x-model.number="item.tax_rate" min="0" max="100" step="any" placeholder="18"
+                                    :disabled="item.is_tax_exempt"
+                                    @keydown.enter.prevent.stop="$event.target.blur()" @keydown.escape.prevent.stop="$event.target.blur()"
+                                    class="dense-input w-12 text-[10px] bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded px-1.5 py-0.5 text-gray-900 dark:text-white focus:ring-blue-500 disabled:opacity-40">
+                                <span class="text-[9px] text-blue-400 font-bold">%</span>
+                            </div>
+                            <span x-show="item.is_tax_exempt" class="text-[8px] text-green-600 font-bold uppercase">Exempt</span>
                         </div>
                         @if($features->kitchen_notes)
                         {{-- Per-item kitchen note (e.g. "no onions") — parity with restaurant screen, gated by kitchen_notes feature --}}
@@ -1000,20 +1020,29 @@ window.addEventListener('popstate', function() {
                 <p x-show="Math.abs(roundOff) > 0.001" class="text-[10px] text-gray-400 mt-0.5" x-text="(roundOff >= 0 ? 'rounded up by ' : 'rounded down by ') + 'Rs. ' + Math.abs(roundOff).toFixed(2)"></p>
                 <p x-show="stockError" class="text-xs text-red-500 mt-2 bg-red-50 dark:bg-red-900/20 p-2 rounded-lg" x-text="stockError"></p>
                 <p x-show="submitting" class="text-xs text-blue-500 mt-2">Processing payment...</p>
+                {{-- 🧾 Buyer NTN (optional — FBR B2B compliance). @keydown.stop keeps digits
+                     from triggering the modal's 1/2 payment hotkeys while typing. --}}
+                <div class="mt-3 text-left" @click.stop>
+                    <label class="block text-[9px] font-black uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-0.5">Buyer NTN <span class="font-medium normal-case text-gray-300 dark:text-gray-600">(optional — B2B)</span></label>
+                    <input type="text" x-model="customerNtn" maxlength="30" placeholder="e.g. 1234567-8"
+                        autocomplete="one-time-code" name="pos_buyer_ntn_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                        @keydown.stop @keydown.enter.prevent.stop="$event.target.blur()" @keydown.escape.prevent.stop="$event.target.blur()"
+                        class="w-full text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-2.5 py-1.5 text-gray-800 dark:text-gray-200 focus:ring-blue-500 focus:border-blue-400 font-mono">
+                </div>
             </div>
             <div class="p-4 grid grid-cols-2 gap-3">
                 <button @click="payMethodIndex = 0; processPayment('cash')" :disabled="submitting" :class="payMethodIndex === 0 ? 'ring-2 ring-green-500 ring-offset-2 dark:ring-offset-gray-900 scale-105 shadow-sm border-green-400' : ''" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:bg-green-100 hover:border-green-400">
                     <svg x-show="submitting" class="w-8 h-8 mx-auto mb-1 animate-spin text-green-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                     <svg x-show="!submitting" class="w-8 h-8 mx-auto mb-1 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                     <span class="text-sm font-bold text-green-700 dark:text-green-400" x-text="submitting ? 'Processing...' : 'Cash'"></span>
-                    <span class="block text-[10px] font-semibold mt-0.5 text-green-600/60" x-text="'Tax: ' + (taxRules['cash'] || 16) + '%'"></span>
+                    <span class="block text-[10px] font-semibold mt-0.5 text-green-600/60" x-text="'Tax: Rs ' + taxAmount.toFixed(2) + ' (per-item)'"></span>
                     <kbd x-show="!submitting" class="block mt-0.5 text-[9px] font-mono text-green-500/60">Press 1</kbd>
                 </button>
                 <button @click="payMethodIndex = 1; processPayment('card')" :disabled="submitting" :class="payMethodIndex === 1 ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900 scale-105 shadow-sm border-blue-400' : ''" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 hover:border-blue-400">
                     <svg x-show="submitting" class="w-8 h-8 mx-auto mb-1 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                     <svg x-show="!submitting" class="w-8 h-8 mx-auto mb-1 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                     <span class="text-sm font-bold text-blue-700 dark:text-blue-400" x-text="submitting ? 'Processing...' : 'Card'"></span>
-                    <span class="block text-[10px] font-semibold mt-0.5 text-blue-600/60" x-text="'Tax: ' + (taxRules['debit_card'] || taxRules['card'] || 8) + '%'"></span>
+                    <span class="block text-[10px] font-semibold mt-0.5 text-blue-600/60" x-text="'Tax: Rs ' + taxAmount.toFixed(2) + ' (per-item)'"></span>
                     <kbd x-show="!submitting" class="block mt-0.5 text-[9px] font-mono text-blue-500/60">Press 2</kbd>
                 </button>
             </div>
@@ -1121,7 +1150,23 @@ window.addEventListener('popstate', function() {
                     <button @click="showLocalBills = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                 </div>
             </div>
-            <div class="max-h-[65vh] overflow-y-auto">
+            {{-- 🔒 PIN GATE — company has a confidential PIN & this session isn't verified yet.
+                 Server (apiProvisionalBills) returned 403 pin_required; unlock via verify-pin. --}}
+            <div x-show="localPinRequired" x-cloak class="p-8 text-center">
+                <svg class="w-10 h-10 mx-auto mb-3 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                <p class="text-sm font-bold text-gray-800 dark:text-gray-100">PIN required</p>
+                <p class="text-[11px] text-gray-400 mt-1">Provisional (local) bills are protected by the confidential PIN.</p>
+                <form @submit.prevent="verifyLocalPin()" class="mt-4 flex items-center justify-center gap-2">
+                    <input type="password" inputmode="numeric" x-model="localPinInput" maxlength="6" placeholder="••••"
+                        autocomplete="one-time-code" name="pos_local_pin_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                        @keydown.stop @keydown.escape.prevent.stop="showLocalBills = false"
+                        class="w-28 text-center text-lg font-mono tracking-widest rounded-xl border-2 border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-800 px-3 py-2 text-gray-900 dark:text-white focus:ring-blue-500 focus:border-blue-400">
+                    <button type="submit" :disabled="localPinVerifying || localPinInput.length < 4" class="px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 transition" x-text="localPinVerifying ? 'Checking...' : 'Unlock'"></button>
+                </form>
+                <p x-show="localPinError" x-cloak class="text-xs text-red-500 mt-2 font-semibold" x-text="localPinError"></p>
+                <p class="text-[10px] text-gray-400 mt-3">Locked after 5 wrong attempts (15 min). Session stays unlocked for 30 min.</p>
+            </div>
+            <div x-show="!localPinRequired" class="max-h-[65vh] overflow-y-auto">
                 <template x-if="localBillsLoading && localBills.length === 0">
                     <div class="p-12 text-center text-gray-400">
                         <svg class="w-8 h-8 mx-auto mb-2 animate-spin text-blue-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
@@ -1624,7 +1669,7 @@ window.addEventListener('popstate', function() {
                     <input id="manualItemPriceInput" x-model="manualItemPrice" type="number" required min="0" step="0.01" placeholder="0.00"
                         class="w-full text-sm rounded-2xl border-2 border-emerald-200 dark:border-emerald-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-4 py-2.5 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono font-bold transition-all shadow-sm hover:shadow-md">
                     <p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1.5 px-1 italic">
-                        Quantity aur tax cart se adjust kar sakte ho. Tax payment-method per auto (5% Card / 16% Cash / Exempt).
+                        Quantity aur tax cart se adjust kar sakte ho. FBR tax har item ka apna rate hai (default 18% / Exempt).
                     </p>
                 </div>
 
@@ -2094,6 +2139,15 @@ function restaurantPos() {
         showLocalBills: false,
         activeLocalIndex: 0,
         localBillsLoading: false,
+        // 🔒 PIN gate (confidential PIN) — F10 provisional list is PIN-protected
+        // when company has a confidential_pin set; server returns 403 pin_required.
+        localPinRequired: false,
+        localPinInput: '',
+        localPinError: '',
+        localPinVerifying: false,
+        // 🧾 FBR compliance — buyer NTN (optional, B2B) + UoM list (mirrors store() validation)
+        customerNtn: '',
+        uomOptions: ['U','KG','GM','LTR','ML','MTR','SQM','PCS','PKT','DOZ','BOX','SET','BAG','BTL','CTN','ROL','FT','IN','YDS','TIN','CAN','BUN'],
         // ── FAILED BILLS (header shortcut, F11) ───────────────────────────────
         // Lazy-loaded list of all bills with fbr_status IN (failed,offline,pending)
         // that have NOT received a fbr_invoice_number yet. Auto-refresh on mount.
@@ -2236,6 +2290,7 @@ function restaurantPos() {
             // Failures are silent — badge just won't show until next refresh.
             setTimeout(() => this.loadLocalBills(), 1200);
             setTimeout(() => this.loadFailedBills(), 1500);
+            setTimeout(() => this.loadHeldOrders(), 1000);
             // 🔄 Auto-Sync — kicks in after 4 sec, then every 30 sec.
             // Live-updates online/offline pill + silently retries pending bills.
             setTimeout(() => this._startAutoSync(), 4000);
@@ -2532,7 +2587,7 @@ function restaurantPos() {
                 const src = (item.type === 'product' && item.id) ? this.allProducts.find(p => p.id === item.id) : null;
                 const rate = (item.tax_rate === 0 || item.tax_rate) ? parseFloat(item.tax_rate)
                     : ((src && (src.tax_rate === 0 || src.tax_rate)) ? parseFloat(src.tax_rate) : 18);
-                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.id, item_type: item.type, item_name: item.name, quantity: 1, unit_price: parseFloat(item.price), special_notes: '', is_tax_exempt: item.is_tax_exempt || false, hs_code: item.hs_code ?? (src ? src.hs_code : null) ?? null, uom: item.uom ?? (src ? src.uom : null) ?? 'U', tax_rate: rate, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false });
+                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.id, item_type: item.type, item_name: item.name, quantity: 1, unit_price: parseFloat(item.price), special_notes: '', is_tax_exempt: item.is_tax_exempt || false, hs_code: item.hs_code ?? (src ? src.hs_code : null) ?? null, uom: item.uom ?? (src ? src.uom : null) ?? 'U', tax_rate: rate, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false, showFbrPanel: false });
                 this.activeCartIndex = this.cart.length - 1;
             }
             this.cartAnimating = true; setTimeout(() => this.cartAnimating = false, 300);
@@ -3460,7 +3515,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); },
+        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.customerNtn = ''; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm('Current order has ' + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast('New sale started', 'success');
@@ -3715,25 +3770,56 @@ function restaurantPos() {
             this.submitting = true;
             let result = null;
             try {
-                const res = await fetch('{{ route("pos.restaurant.orders.hold") }}', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount }),
+                // FBR POS held sales — parked carts stored as opaque JSON via
+                // FbrPosPhase2Controller::holdSale (NOT restaurant orders — FBR
+                // has no restaurant module). Recall restores the full cart incl.
+                // hs_code / uom / tax_rate / buyer NTN.
+                const holdName = ((this.selectedCustomer?.name || 'Hold') + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })).slice(0, 100);
+                const cartData = {
+                    items: this.cart.map(i => ({ ...i })),
+                    discount_type: this.discountAmount > 0 ? this.discountType : null,
+                    discount_value: this.discountAmount > 0 ? this.discountValue : 0,
+                    customer_id: this.selectedCustomer?.id || null,
+                    customer_phone: this.selectedCustomer?.phone || null,
+                    customer_ntn: this.customerNtn || null,
+                    // Snapshot of the FINAL payable total (discounts + per-item tax
+                    // + Rs1 FBR charge) so the F3 held list shows the real figure.
+                    total_amount: this.totalAmount,
+                };
+                const res = await fetch('{{ route("fbrpos.phase2.hold") }}', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ hold_name: holdName, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, cart_data: cartData }),
                 });
                 const data = await res.json();
-                if (data.success) {
-                    const successMsg = opts.successMessage || data.message;
-                    this.showToast(successMsg, 'success'); this.heldOrders.unshift(data.order); this.clearCart();
+                if (res.ok && data.success) {
+                    this.showToast(opts.successMessage || 'Order held — recall anytime (F3)', 'success');
+                    this.heldOrders.unshift({ id: data.id, order_number: holdName, customer_name: this.selectedCustomer?.name || null, status: 'held', total_amount: this.totalAmount, items: cartData.items, cart_data: cartData });
+                    this.clearCart();
                     this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
-                    // Auto-print KOT when print_on_hold is enabled, OR when the caller explicitly asked
-                    // (e.g. "Send to Kitchen" button always prints a ticket).
-                    if (this.kitchenSettings.print_on_hold || opts.forcePrintKot) {
-                        window.open('/pos/restaurant/orders/' + data.order.id + '/kitchen-ticket?auto_print=1', '_blank', 'width=380,height=620');
-                    }
                     result = data;
-                } else { this.showToast(data.message || 'Failed', 'error'); }
+                } else { this.showToast(data.message || 'Hold failed', 'error'); }
             } catch (e) { this.showToast('Network error', 'error'); }
             this.submitting = false;
             return result;
+        },
+
+        // Load parked carts from FbrPosHeldSale on mount (header badge + F3 modal).
+        async loadHeldOrders() {
+            try {
+                const res = await fetch('{{ route("fbrpos.phase2.held.list") }}', { headers: { 'Accept': 'application/json' } });
+                if (!res.ok) return;
+                const rows = await res.json();
+                if (!Array.isArray(rows)) return;
+                this.heldOrders = rows.map(r => {
+                    const cd = r.cart_data || {};
+                    const items = Array.isArray(cd.items) ? cd.items : (Array.isArray(cd) ? cd : []);
+                    // Prefer the exact total snapshot saved at hold time; the
+                    // subtotal fallback (pre-discount/tax) only covers legacy rows.
+                    const total = (cd.total_amount || cd.total_amount === 0) ? parseFloat(cd.total_amount)
+                        : items.reduce((s, i) => s + ((parseFloat(i.quantity) || 0) * (parseFloat(i.unit_price) || 0)), 0);
+                    return { id: r.id, order_number: r.hold_name || ('#' + r.id), customer_name: r.customer_name || null, status: 'held', total_amount: total, items, cart_data: cd };
+                });
+            } catch (e) { /* silent — badge just won't show */ }
         },
 
         // Phase 5 — explicit "Send to Kitchen" action.
@@ -3873,6 +3959,8 @@ function restaurantPos() {
                     customer_id: this.selectedCustomer?.id || null,
                     customer_name: this.selectedCustomer?.name || null,
                     customer_phone: this.selectedCustomer?.phone || null,
+                    // 🧾 Buyer NTN (optional B2B) — typed in the Pay modal, max 30 chars server-side.
+                    customer_ntn: (this.customerNtn || '').trim() || null,
                     // No tendered-cash input in this flow — send the exact total so the
                     // server-side cash guard passes (change_due = 0). Client total mirrors
                     // store() math 1:1 (per-item tax, order disc after tax, +Rs1 FBR charge).
@@ -3943,10 +4031,16 @@ function restaurantPos() {
         payingHeldOrderId: null,
 
         async payHeldOrder(orderId) {
+            // FBR flow: recall the parked cart back into the live cart, then open
+            // the normal Pay modal — payment goes through processPaymentManual →
+            // fbrpos.store (no restaurant pay-order endpoint in FBR POS).
             if (this.submitting) return;
-            this.payingHeldOrderId = orderId;
-            this.showHeldOrders = false;
+            const order = this.heldOrders.find(o => o.id === orderId);
+            if (!order) return;
+            const ok = await this.recallOrder(order);
+            if (!ok) return;
             this.stockError = '';
+            this.payMethodIndex = 0;
             this.showPayModal = true;
         },
 
@@ -4092,9 +4186,22 @@ function restaurantPos() {
                 const res = await fetch('{{ route('fbrpos.api.provisional-bills') }}', {
                     headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                 });
+                // 🔒 403 pin_required → show PIN gate inside the F10 modal.
+                if (res.status === 403) {
+                    const d = await res.json().catch(() => null);
+                    if (d && d.pin_required) {
+                        this.localPinRequired = true;
+                        this.localBills = [];
+                        if (this.showLocalBills) {
+                            setTimeout(() => document.querySelector('input[name="pos_local_pin_nofill"]')?.focus(), 150);
+                        }
+                    }
+                    this.localBillsLoading = false; return;
+                }
                 if (!res.ok) { this.localBillsLoading = false; return; }
                 const data = await res.json();
                 if (data && data.success) {
+                    this.localPinRequired = false;
                     this.localBills = data.bills || [];
                     if (this.activeLocalIndex >= this.localBills.length) {
                         this.activeLocalIndex = Math.max(0, this.localBills.length - 1);
@@ -4102,6 +4209,28 @@ function restaurantPos() {
                 }
             } catch (e) { console.warn('loadLocalBills error', e); }
             this.localBillsLoading = false;
+        },
+        // 🔒 Verify confidential PIN (30-min session window server-side).
+        async verifyLocalPin() {
+            if (this.localPinVerifying) return;
+            this.localPinVerifying = true; this.localPinError = '';
+            try {
+                const res = await fetch('{{ route('fbrpos.api.verify-pin') }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ pin: this.localPinInput }),
+                });
+                const data = await res.json().catch(() => null);
+                if (data && data.success) {
+                    this.localPinRequired = false; this.localPinInput = ''; this.localPinError = '';
+                    this.showToast('PIN verified — unlocked for 30 minutes', 'success');
+                    this.loadLocalBills();
+                } else {
+                    this.localPinError = (data && data.message) || 'Incorrect PIN.';
+                    this.localPinInput = '';
+                }
+            } catch (e) { this.localPinError = 'Network error — try again.'; }
+            this.localPinVerifying = false;
         },
         openLocalBills() {
             this.activeLocalIndex = 0;
@@ -4117,6 +4246,12 @@ function restaurantPos() {
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                 });
                 const data = await res.json();
+                if (res.status === 403 && data && data.pin_required) {
+                    // 🔒 PIN session expired mid-modal — show the gate again.
+                    this.localPinRequired = true;
+                    setTimeout(() => document.querySelector('input[name="pos_local_pin_nofill"]')?.focus(), 150);
+                    return;
+                }
                 if (data && data.success) {
                     this.localBills = this.localBills.filter(b => b.id !== bill.id);
                     if (this.activeLocalIndex >= this.localBills.length) this.activeLocalIndex = Math.max(0, this.localBills.length - 1);
@@ -4137,6 +4272,12 @@ function restaurantPos() {
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                 });
                 const data = await res.json();
+                if (res.status === 403 && data && data.pin_required) {
+                    // 🔒 PIN session expired mid-modal — show the gate again.
+                    this.localPinRequired = true;
+                    setTimeout(() => document.querySelector('input[name="pos_local_pin_nofill"]')?.focus(), 150);
+                    return;
+                }
                 if (data && data.success) {
                     // Remove from list (no longer provisional) regardless of submitted vs queued.
                     this.localBills = this.localBills.filter(b => b.id !== bill.id);
@@ -4212,7 +4353,7 @@ function restaurantPos() {
             // the neighbouring order — looked exactly like "delete pe order aa gaya".
             if (!confirm('Delete held order ' + label + '?\nThis cannot be undone.')) return;
             try {
-                const res = await fetch(`/pos/restaurant/orders/${orderId}/delete`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' } });
+                const res = await fetch('{{ url("/fbr-pos/api/held") }}/' + orderId, { method: 'DELETE', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' } });
                 if (!res.ok) { this.showToast('Failed to delete order (Error ' + res.status + ')', 'error'); return; }
                 const data = await res.json();
                 if (data.success) {
@@ -4276,17 +4417,27 @@ function restaurantPos() {
             if (this.receiptAutoCloseTimer) { clearTimeout(this.receiptAutoCloseTimer); this.receiptAutoCloseTimer = null; }
         },
 
-        recallOrder(order) {
-            if (this.cart.length > 0 && !confirm('Current cart has items. Replace with recalled order?')) return;
-            this.cart = order.items.map(i => ({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: i.item_id, item_type: i.item_type, item_name: i.item_name, quantity: parseFloat(i.quantity), unit_price: parseFloat(i.unit_price), special_notes: i.special_notes || '', is_tax_exempt: i.is_tax_exempt || false, item_discount_type: i.item_discount_type || 'percentage', item_discount_value: parseFloat(i.item_discount_value) || 0, showItemDiscount: parseFloat(i.item_discount_value) > 0 }));
-            this.kitchenNotes = order.kitchen_notes || '';
-            this.recalledOrderId = order.id;
-            this.priorityOrder = order.priority || false;
-            if (order.discount_type && parseFloat(order.discount_value) > 0) { this.discountType = order.discount_type; this.discountValue = parseFloat(order.discount_value) || 0; this.showDiscount = true; } else { this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; }
-            if (order.table) { this.selectedTable = { id: order.table.id, table_number: order.table.table_number }; this.orderType = 'dine_in'; }
-            this.selectedCustomer = order.customer_id ? { id: order.customer_id, name: order.customer_name || 'Customer', phone: order.customer_phone || '' } : null;
-            this.customerPhoneQuery = this.selectedCustomer ? (this.selectedCustomer.phone || this.selectedCustomer.name) : '';
-            this.heldOrders = this.heldOrders.filter(o => o.id !== order.id); this.showHeldOrders = false; this.showToast('Order recalled for editing', 'success');
+        async recallOrder(order) {
+            if (!order || !order.id) return false;
+            if (this.cart.length > 0 && !confirm('Current cart has items. Replace with recalled order?')) return false;
+            try {
+                // Server-side recall DELETES the held row via conditional-delete
+                // claim — if another terminal already recalled it we get 409 and
+                // refresh the list instead of duplicating the cart.
+                const res = await fetch('{{ url("/fbr-pos/api/held") }}/' + order.id + '/recall', { headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' } });
+                const data = await res.json();
+                if (!res.ok || !data.success) { this.showToast((data && data.message) || 'Recall failed', 'error'); this.loadHeldOrders(); return false; }
+                const cd = data.cart || {};
+                const items = Array.isArray(cd.items) ? cd.items : (Array.isArray(cd) ? cd : []);
+                this.cart = items.map(i => ({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: i.item_id ?? null, item_type: i.item_type || 'product', item_name: i.item_name, quantity: parseFloat(i.quantity) || 1, unit_price: parseFloat(i.unit_price) || 0, special_notes: i.special_notes || '', is_tax_exempt: !!i.is_tax_exempt, hs_code: i.hs_code ?? null, uom: i.uom || 'U', tax_rate: (i.tax_rate === 0 || i.tax_rate) ? parseFloat(i.tax_rate) : 18, item_discount_type: i.item_discount_type || 'percentage', item_discount_value: parseFloat(i.item_discount_value) || 0, showItemDiscount: (parseFloat(i.item_discount_value) || 0) > 0, showFbrPanel: false }));
+                if (cd.discount_type && parseFloat(cd.discount_value) > 0) { this.discountType = cd.discount_type; this.discountValue = parseFloat(cd.discount_value) || 0; this.showDiscount = true; } else { this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; }
+                this.customerNtn = cd.customer_ntn || '';
+                this.recalledOrderId = null;
+                this.selectedCustomer = cd.customer_id ? { id: cd.customer_id, name: order.customer_name || 'Customer', phone: cd.customer_phone || '' } : null;
+                this.customerPhoneQuery = this.selectedCustomer ? (this.selectedCustomer.phone || this.selectedCustomer.name) : '';
+                this.heldOrders = this.heldOrders.filter(o => o.id !== order.id); this.showHeldOrders = false; this.showToast('Order recalled for editing', 'success');
+                return true;
+            } catch (e) { console.error('recallOrder', e); this.showToast('Network error', 'error'); return false; }
         },
 
         async addQuickCustomer() {
@@ -4353,7 +4504,7 @@ function restaurantPos() {
             for (const item of order.items) {
                 const existing = this.cart.find(c => c.item_id === item.item_id && c.item_type === item.item_type);
                 if (existing) { existing.quantity += item.qty; } else {
-                    this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.item_id, item_type: item.item_type, item_name: item.name, quantity: item.qty, unit_price: item.price, special_notes: '', is_tax_exempt: false, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false });
+                    this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.item_id, item_type: item.item_type, item_name: item.name, quantity: item.qty, unit_price: item.price, special_notes: '', is_tax_exempt: false, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false, showFbrPanel: false });
                 }
             }
             this.showCustomerHistory = false; this.showToast('Items added to cart', 'success');

@@ -801,6 +801,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth'])->group(function () {
     Route::match(['get', 'post'], '/settings', [FbrPosController::class, 'fbrSettings'])->name('fbrpos.settings');
     Route::post('/test-connection', [FbrPosController::class, 'testConnection'])->name('fbrpos.testConnection');
     Route::post('/api/toggle-fbr-reporting', [FbrPosController::class, 'toggleFbrReporting'])->name('fbrpos.api.toggle-fbr-reporting');
+    Route::post('/api/toggle-universal', [FbrPosController::class, 'toggleUniversal'])->name('fbrpos.api.toggle-universal');
     Route::post('/settings/dashboard-style', [FbrPosController::class, 'updateDashboardStyle'])->name('fbrpos.settings.dashboard-style');
     Route::post('/settings/theme', [FbrPosController::class, 'updateTheme'])->name('fbrpos.settings.theme');
 
@@ -836,6 +837,14 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth'])->group(function () {
     // 🔄 Auto-Sync engine — silent 30-sec frontend poller + manual Failed modal
     Route::get('/api/failed-bills', [FbrPosController::class, 'apiFailedBills'])->name('fbrpos.api.failed-bills');
     Route::post('/api/failed-bills/{id}/retry', [FbrPosController::class, 'apiRetryFailed'])->name('fbrpos.api.failed.retry');
+
+    // 🌐 Universal sale screen APIs — customer + quick product (PRA-shape mirrors)
+    Route::get('/api/customer-search', [FbrPosController::class, 'apiCustomerSearch'])->name('fbrpos.api.customer-search');
+    Route::get('/api/customer-lookup', [FbrPosController::class, 'apiCustomerLookup'])->name('fbrpos.api.customer-lookup');
+    Route::post('/api/customer-store', [FbrPosController::class, 'apiCustomerStore'])->name('fbrpos.api.customer-store');
+    Route::get('/api/customer-history/{id}', [FbrPosController::class, 'apiCustomerHistory'])->name('fbrpos.api.customer-history');
+    Route::post('/api/products/quick-create', [FbrPosController::class, 'apiQuickCreateProduct'])->name('fbrpos.api.products.quick-create');
+    Route::post('/api/products/{id}/quick-price', [FbrPosController::class, 'apiQuickUpdatePrice'])->name('fbrpos.api.products.quick-price');
 
     // ============ Phase 2: Mall-Grade Universal Features ============
     // Terminals (multi-counter)

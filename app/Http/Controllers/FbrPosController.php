@@ -378,10 +378,23 @@ class FbrPosController extends Controller
         $activePromos = \App\Models\FbrPosPromotion::where('company_id', $companyId)
             ->where('is_active', true)->orderByDesc('id')->limit(20)->get();
 
-        return view('fbr-pos.create', compact(
+        // 🌐 FBR Universal sale screen (per-company opt-in, Phase 1 toggle).
+        // Falls back to the classic create screen until the universal view ships
+        // AND the company has explicitly enabled it — zero risk to existing flow.
+        $viewName = ((bool) ($company->fbr_universal_enabled ?? false) && view()->exists('fbr-pos.universal'))
+            ? 'fbr-pos.universal'
+            : 'fbr-pos.create';
+
+        // Universal screen needs the customer list for its phone-lookup bar.
+        $customers = $viewName === 'fbr-pos.universal'
+            ? \App\Models\PosCustomer::where('company_id', $companyId)
+                ->where('is_active', true)->orderBy('name')->get(['id', 'name', 'phone'])
+            : collect();
+
+        return view($viewName, compact(
             'company', 'products', 'fbrReportingEnabled', 'frequentProducts',
             'terminals', 'currentShift', 'loyaltySettings', 'heldCount', 'activePromos',
-            'pendingDayCloses'
+            'pendingDayCloses', 'customers'
         ));
     }
 
@@ -442,7 +455,11 @@ class FbrPosController extends Controller
         }
 
         $fbrEnabled = (bool) $company->fbr_reporting_enabled;
-        $invoiceMode = $fbrEnabled ? 'fbr' : 'local';
+        // 💾 SAVE AS PROVISIONAL (universal sale screen) — cashier explicitly asked
+        // for a local bill (no FBR submission now). Same semantics as a local-mode
+        // sale: invoice_mode='local' + fbr_status='local'. Promote later via F10.
+        $saveAsProvisional = $request->boolean('save_as_provisional');
+        $invoiceMode = ($fbrEnabled && !$saveAsProvisional) ? 'fbr' : 'local';
 
         try {
             $transaction = DB::transaction(function () use ($request, $companyId, $company, $invoiceMode) {
@@ -723,6 +740,19 @@ class FbrPosController extends Controller
             });
 
             if ($invoiceMode === 'local') {
+                if ($request->wantsJson()) {
+                    return response()->json([
+                        'success' => true,
+                        'transaction_id' => $transaction->id,
+                        'invoice_number' => $transaction->invoice_number,
+                        'total_amount' => (float) $transaction->total_amount,
+                        'change_due' => (float) $transaction->change_due,
+                        'invoice_mode' => 'local',
+                        'fbr_status' => 'local',
+                        'fbr_invoice_number' => null,
+                        'message' => "Local sale #{$transaction->invoice_number} created — FBR Reporting is OFF.",
+                    ]);
+                }
                 return redirect()->route('fbrpos.show', $transaction->id)
                     ->with('success', "Local sale #{$transaction->invoice_number} created (PKR " . number_format($transaction->total_amount, 2) . "). FBR Reporting is OFF — invoice saved locally.");
             }
@@ -732,6 +762,19 @@ class FbrPosController extends Controller
             $fbrResult = $fbrService->submitFbrPosTransaction($transaction);
 
             if ($fbrResult['status'] === 'success') {
+                if ($request->wantsJson()) {
+                    return response()->json([
+                        'success' => true,
+                        'transaction_id' => $transaction->id,
+                        'invoice_number' => $transaction->invoice_number,
+                        'total_amount' => (float) $transaction->total_amount,
+                        'change_due' => (float) $transaction->change_due,
+                        'invoice_mode' => 'fbr',
+                        'fbr_status' => 'success',
+                        'fbr_invoice_number' => $fbrResult['fbr_invoice_number'] ?? null,
+                        'message' => "Sale #{$transaction->invoice_number} submitted to FBR — Invoice: " . ($fbrResult['fbr_invoice_number'] ?? ''),
+                    ]);
+                }
                 return redirect()->route('fbrpos.show', $transaction->id)
                     ->with('success', "Sale #{$transaction->invoice_number} created and submitted to FBR successfully! FBR Invoice: {$fbrResult['fbr_invoice_number']}");
             }
@@ -751,6 +794,20 @@ class FbrPosController extends Controller
 
             if ($isTransient) {
                 \App\Jobs\RetryFbrPosSubmissionJob::dispatch($transaction->id)->delay(now()->addSeconds(10));
+                if ($request->wantsJson()) {
+                    return response()->json([
+                        'success' => true,
+                        'transaction_id' => $transaction->id,
+                        'invoice_number' => $transaction->invoice_number,
+                        'total_amount' => (float) $transaction->total_amount,
+                        'change_due' => (float) $transaction->change_due,
+                        'invoice_mode' => 'fbr',
+                        'fbr_status' => 'pending',
+                        'fbr_invoice_number' => null,
+                        'message' => "Sale #{$transaction->invoice_number} saved.",
+                        'warning' => "FBR submission temporarily failed — auto-retry scheduled (3 attempts).",
+                    ]);
+                }
                 return redirect()->route('fbrpos.show', $transaction->id)
                     ->with('success', "Sale #{$transaction->invoice_number} saved (PKR " . number_format($transaction->total_amount, 2) . ").")
                     ->with('warning', "FBR submission temporarily failed: {$fbrErrors}. Auto-retry scheduled (3 attempts, 10s apart).");
@@ -762,6 +819,21 @@ class FbrPosController extends Controller
                 ? "✓ Bill saved successfully. FBR submission pending — your FBR token is not configured yet. Go to Settings → FBR Settings to set it up, then retry from Fail Queue."
                 : "✓ Bill saved successfully. FBR submission pending: {$fbrErrors}. Retry from this page or the Fail Queue.";
 
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'transaction_id' => $transaction->id,
+                    'invoice_number' => $transaction->invoice_number,
+                    'total_amount' => (float) $transaction->total_amount,
+                    'change_due' => (float) $transaction->change_due,
+                    'invoice_mode' => 'fbr',
+                    'fbr_status' => 'failed',
+                    'fbr_invoice_number' => null,
+                    'message' => "✓ Bill #{$transaction->invoice_number} created — PKR " . number_format($transaction->total_amount, 2),
+                    'warning' => $warningMsg,
+                ]);
+            }
+
             return redirect()->route('fbrpos.show', $transaction->id)
                 ->with('success', "✓ Bill #{$transaction->invoice_number} created — PKR " . number_format($transaction->total_amount, 2))
                 ->with('warning', $warningMsg);
@@ -769,10 +841,14 @@ class FbrPosController extends Controller
         } catch (\Illuminate\Validation\ValidationException $ve) {
             // 💵 Field-level validation errors (e.g. cash_received < total) MUST propagate
             // through Laravel's normal error bag so the error appears next to the cash input.
-            // Re-throw before the generic Exception catch swallows it.
+            // Re-throw before the generic Exception catch swallows it. (wantsJson requests
+            // automatically get a 422 JSON error bag from the framework.)
             throw $ve;
         } catch (\Exception $e) {
             Log::error('FBR POS Store Error', ['error' => $e->getMessage()]);
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => 'Failed to create sale: ' . $e->getMessage()], 500);
+            }
             return back()->withInput()->with('error', 'Failed to create sale: ' . $e->getMessage());
         }
     }
@@ -1391,6 +1467,30 @@ class FbrPosController extends Controller
             'success' => true,
             'enabled' => $company->fbr_reporting_enabled,
             'message' => $company->fbr_reporting_enabled ? 'FBR Reporting enabled' : 'FBR Reporting disabled',
+        ]);
+    }
+
+    /**
+     * 🌐 Toggle the FBR Universal sale screen (admin-only).
+     * Classic create screen remains the fallback whenever this is OFF.
+     */
+    public function toggleUniversal()
+    {
+        if (Auth::guard('fbrpos')->user()->role !== 'company_admin') {
+            return response()->json(['success' => false, 'message' => 'Only company admin can toggle the Universal sale screen.'], 403);
+        }
+
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $company->fbr_universal_enabled = !$company->fbr_universal_enabled;
+        $company->save();
+
+        return response()->json([
+            'success' => true,
+            'enabled' => (bool) $company->fbr_universal_enabled,
+            'message' => $company->fbr_universal_enabled
+                ? 'Universal sale screen enabled'
+                : 'Universal sale screen disabled — classic screen active',
         ]);
     }
 
@@ -2057,5 +2157,252 @@ class FbrPosController extends Controller
             return response()->json(['found' => false]);
         }
         return response()->json(['found' => true, 'product' => $product]);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 🌐 UNIVERSAL SALE SCREEN APIs (customer + quick product)
+    // Mirrors the PRA universal endpoints' JSON shapes so the ported
+    // fbr-pos/universal view works without frontend shape changes.
+    // All scoped by company_id; customers live in the shared pos_customers table.
+    // ═══════════════════════════════════════════════════════════════════
+
+    public function apiCustomerSearch(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $q = $request->get('q', '');
+
+        if (strlen($q) < 2) {
+            return response()->json(['customers' => []]);
+        }
+
+        $customers = \App\Models\PosCustomer::where('company_id', $companyId)
+            ->where('is_active', true)
+            ->where(function ($query) use ($q) {
+                $query->whereRaw('LOWER(name) LIKE ?', ['%' . strtolower($q) . '%'])
+                    ->orWhereRaw('LOWER(phone) LIKE ?', ['%' . strtolower($q) . '%']);
+            })
+            ->limit(8)
+            ->get(['id', 'name', 'phone', 'email', 'address']);
+
+        $result = [];
+        foreach ($customers as $c) {
+            $agg = FbrPosTransaction::where('company_id', $companyId)
+                ->where('customer_id', $c->id)
+                ->where('status', 'completed')
+                ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as total')
+                ->first();
+            $totalOrders = (int) ($agg->cnt ?? 0);
+            $result[] = [
+                'id' => $c->id,
+                'name' => $c->name,
+                'phone' => $c->phone,
+                'address' => $c->address,
+                'stats' => [
+                    'total_orders' => $totalOrders,
+                    'total_spent' => round((float) ($agg->total ?? 0), 2),
+                    'is_frequent' => $totalOrders >= 5,
+                ],
+            ];
+        }
+
+        return response()->json(['customers' => $result]);
+    }
+
+    public function apiCustomerLookup(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $phone = $request->get('phone', '');
+
+        if (strlen($phone) < 4) {
+            return response()->json(['found' => false]);
+        }
+
+        $customer = \App\Models\PosCustomer::where('company_id', $companyId)
+            ->where('phone', $phone)
+            ->first();
+
+        if (!$customer) {
+            $partials = \App\Models\PosCustomer::where('company_id', $companyId)
+                ->whereRaw('LOWER(phone) LIKE ?', ['%' . strtolower($phone) . '%'])
+                ->limit(5)
+                ->get(['id', 'name', 'phone', 'address']);
+
+            return response()->json(['found' => false, 'suggestions' => $partials]);
+        }
+
+        $agg = FbrPosTransaction::where('company_id', $companyId)
+            ->where('customer_id', $customer->id)
+            ->where('status', 'completed')
+            ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as total, MAX(created_at) as last_at')
+            ->first();
+
+        return response()->json([
+            'found' => true,
+            'customer' => [
+                'id' => $customer->id,
+                'name' => $customer->name,
+                'phone' => $customer->phone,
+                'address' => $customer->address,
+            ],
+            'stats' => [
+                'total_orders' => (int) ($agg->cnt ?? 0),
+                'total_spent' => round((float) ($agg->total ?? 0), 2),
+                'last_order_at' => $agg->last_at,
+                'is_frequent' => (int) ($agg->cnt ?? 0) >= 5,
+            ],
+        ]);
+    }
+
+    public function apiCustomerStore(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'phone' => 'required|string|max:30',
+            'address' => 'nullable|string|max:500',
+        ]);
+
+        $existing = \App\Models\PosCustomer::where('company_id', $companyId)
+            ->where('phone', $request->phone)
+            ->first();
+
+        if ($existing) {
+            if ($request->address && !$existing->address) {
+                $existing->update(['address' => $request->address]);
+            }
+            return response()->json(['success' => true, 'customer' => $existing, 'existing' => true]);
+        }
+
+        $customer = \App\Models\PosCustomer::create([
+            'company_id' => $companyId,
+            'name' => $request->name,
+            'phone' => $request->phone,
+            'address' => $request->address,
+            'type' => 'unregistered',
+        ]);
+
+        return response()->json(['success' => true, 'customer' => $customer]);
+    }
+
+    public function apiCustomerHistory($id)
+    {
+        $companyId = app('currentCompanyId');
+        $customer = \App\Models\PosCustomer::where('company_id', $companyId)->find($id);
+        if (!$customer) {
+            return response()->json(['error' => 'Not found'], 404);
+        }
+
+        $recentOrders = FbrPosTransaction::where('company_id', $companyId)
+            ->where('customer_id', $customer->id)
+            ->where('status', 'completed')
+            ->with('items')
+            ->orderBy('created_at', 'desc')
+            ->limit(5)
+            ->get()
+            ->map(function ($t) {
+                return [
+                    'id' => $t->id,
+                    'order_number' => $t->invoice_number,
+                    'total' => (float) $t->total_amount,
+                    'date' => $t->created_at->format('M d, g:i A'),
+                    'items' => $t->items->map(fn($i) => [
+                        'item_id' => $i->product_id,
+                        'item_type' => $i->product_id ? 'product' : 'manual',
+                        'name' => $i->item_name,
+                        'qty' => (float) $i->quantity,
+                        'price' => (float) $i->unit_price,
+                    ]),
+                ];
+            });
+
+        $favorites = FbrPosTransactionItem::whereHas('transaction', function ($q) use ($companyId, $customer) {
+            $q->where('company_id', $companyId)
+              ->where('customer_id', $customer->id)
+              ->where('status', 'completed');
+        })
+        ->select('item_name', DB::raw('SUM(quantity) as total_qty'))
+        ->groupBy('item_name')
+        ->orderByDesc('total_qty')
+        ->limit(5)
+        ->get();
+
+        $agg = FbrPosTransaction::where('company_id', $companyId)
+            ->where('customer_id', $customer->id)
+            ->where('status', 'completed')
+            ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as total')
+            ->first();
+
+        return response()->json([
+            'customer_name' => $customer->name,
+            'customer_phone' => $customer->phone,
+            'total_orders' => (int) ($agg->cnt ?? 0),
+            'total_spent' => round((float) ($agg->total ?? 0), 2),
+            'recent_orders' => $recentOrders,
+            'favorites' => $favorites->map(fn($f) => ['name' => $f->item_name, 'count' => (int) $f->total_qty]),
+        ]);
+    }
+
+    /**
+     * ⚡ Quick-create a product from the universal sale screen search box.
+     * FBR defaults: standard 18% tax, UOM 'U', price editable. Cashier sets
+     * price inline right after (apiQuickUpdatePrice). HS code left empty —
+     * admin can fill it later from Products; store() falls back to default rate.
+     */
+    public function apiQuickCreateProduct(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $data = $request->validate([
+            'name'  => 'required|string|max:255',
+            'price' => 'nullable|numeric|min:0',
+        ]);
+        $name = trim($data['name']);
+        if ($name === '') {
+            return response()->json(['ok' => false, 'error' => 'Name required'], 422);
+        }
+        $product = Product::create([
+            'company_id'       => $companyId,
+            'name'             => $name,
+            'default_price'    => $data['price'] ?? 0,
+            'default_tax_rate' => 18,
+            'tax_type'         => 'standard',
+            'uom'              => 'U',
+            'sku'              => 'QC-' . substr((string) time(), -6) . '-' . strtoupper(substr(uniqid(), -3)),
+            'is_price_editable'=> true,
+            'is_active'        => true,
+        ]);
+        return response()->json([
+            'ok' => true,
+            'product' => [
+                'id'            => $product->id,
+                'name'          => $product->name,
+                'price'         => (float) $product->default_price,
+                'category'      => 'Quick',
+                'type'          => 'product',
+                'image'         => null,
+                'is_tax_exempt' => false,
+                'tax_rate'      => 18.0,
+                'hs_code'       => null,
+                'uom'           => 'U',
+                'hasRecipe'     => false,
+                'stockStatus'   => null,
+                'isQuickCreated'=> true,
+            ],
+        ]);
+    }
+
+    public function apiQuickUpdatePrice(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $data = $request->validate([
+            'price' => 'required|numeric|min:0',
+        ]);
+        $product = Product::where('company_id', $companyId)->where('id', $id)->first();
+        if (!$product) {
+            return response()->json(['ok' => false, 'error' => 'Not found'], 404);
+        }
+        $product->default_price = $data['price'];
+        $product->save();
+        return response()->json(['ok' => true, 'price' => (float) $product->default_price]);
     }
 }

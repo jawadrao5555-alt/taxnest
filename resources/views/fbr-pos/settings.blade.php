@@ -91,6 +91,41 @@
                 </form>
             </div>
 
+            {{-- 🌐 Universal Sale Screen toggle (Phase 1) — classic create screen stays the fallback --}}
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5"
+                 x-data="{ on: {{ ($company->fbr_universal_enabled ?? false) ? 'true' : 'false' }}, busy: false, msg: '',
+                    flip() {
+                        if (this.busy) return; this.busy = true; this.msg = '';
+                        fetch('{{ route('fbrpos.api.toggle-universal') }}', {
+                            method: 'POST',
+                            headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' }
+                        })
+                        .then(r => r.json())
+                        .then(d => { if (d.success) { this.on = d.enabled; this.msg = d.message; } else { this.msg = d.message || 'Failed to update.'; } })
+                        .catch(() => { this.msg = 'Network error — please try again.'; })
+                        .finally(() => { this.busy = false; });
+                    } }">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                            Universal Sale Screen
+                            <span class="text-[9px] px-1.5 py-0.5 bg-blue-600 text-white rounded font-bold uppercase tracking-wider">New</span>
+                        </h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Modern billing screen with product grid, cart and full keyboard flow — same experience as Universal POS.
+                            Turn OFF anytime to return to the classic screen. FBR submission stays exactly the same.
+                        </p>
+                        <p class="text-xs mt-2 font-medium" :class="on ? 'text-blue-600' : 'text-gray-400'" x-show="msg" x-text="msg" x-cloak></p>
+                    </div>
+                    <button type="button" @click="flip()" :disabled="busy"
+                            :class="on ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-700'"
+                            class="relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition disabled:opacity-50"
+                            role="switch" :aria-checked="on.toString()" aria-label="Toggle Universal Sale Screen">
+                        <span :class="on ? 'translate-x-6' : 'translate-x-1'" class="inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition"></span>
+                    </button>
+                </div>
+            </div>
+
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">FBR Registration Details</h3>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">These values are used in FBR invoice payloads. Update them from your main DI company profile if needed.</p>

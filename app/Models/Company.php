@@ -69,6 +69,7 @@ class Company extends Model
         'pos_tax_rate_card',
         'pos_setup_completed',
         'pos_use_legacy_restaurant',
+        'fbr_universal_enabled',
         'pra_environment',
         'pra_pos_id',
         'pra_access_code',
@@ -125,6 +126,7 @@ class Company extends Model
         'pos_guided_flow_enabled' => 'boolean',
         'pos_setup_completed' => 'boolean',
         'pos_use_legacy_restaurant' => 'boolean',
+        'fbr_universal_enabled' => 'boolean',
     ];
 
     protected $hidden = [

@@ -798,6 +798,9 @@
                         document.addEventListener('visibilitychange', () => {
                             if (document.visibilityState === 'visible') this.refreshCounts();
                         });
+                        // 🌐 Universal sale screen dispatches this after every save/promote/delete
+                        // so the header Local/Failed badges stay live without waiting for the 2-min poll.
+                        window.addEventListener('fbr-bills-refresh', () => this.refreshCounts());
                         // 🎹 F10 = Local, Shift+F11 = Failed, Ctrl+M = Sidebar Menu
                         window.addEventListener('keydown', (e) => {
                             if (e.key === 'F10' && !e.shiftKey && !e.ctrlKey && !e.altKey) {

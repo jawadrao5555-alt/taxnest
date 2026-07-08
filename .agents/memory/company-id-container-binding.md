@@ -26,6 +26,12 @@ Always confirm the binding key before reading from the container.
 **How to apply:** Admin routes do NOT run CompanyIsolation, so `currentCompanyId` is
 unbound there (intended — admins are cross-tenant); guard with `bound()` first.
 
+**app() second-arg trap:** `app('currentCompanyId', null)` is a fatal TypeError — the
+2nd parameter of `app()` must be an ARRAY (it's constructor $parameters, not a default
+value). Any code path that reaches it 500s (this silently broke admin company-approve:
+status saved, then audit-log write crashed the response). There is no "default value"
+form of app(); always use `app()->bound('key') ? app('key') : $fallback`.
+
 **isset-null container trap:** `app()->instance('key', null)` SILENTLY does nothing —
 Container instances/bound() use `isset()`, so a null instance is invisible and
 `app('key')` still throws `Target class [key] does not exist`. To bind a null value,

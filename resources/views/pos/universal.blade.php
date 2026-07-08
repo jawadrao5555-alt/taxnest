@@ -202,7 +202,10 @@ window.addEventListener('popstate', function() {
             autoKotLoading: false
          }">
 
-        {{-- PRA Reporting --}}
+        {{-- PRA Reporting — hidden entirely for Standalone-edition companies (no
+             government integration): flipping it ON would queue every sale for PRA
+             submission that can only fail. togglePra also rejects server-side. --}}
+        @if(($company->pos_integration_mode ?? 'pra') !== 'standalone')
         <div class="flex items-center gap-2">
             <span class="text-[10px] uppercase tracking-wider font-extrabold text-purple-700 dark:text-purple-300">PRA Reporting</span>
             <button type="button"
@@ -217,6 +220,7 @@ window.addEventListener('popstate', function() {
         </div>
 
         <div class="w-px h-4 bg-purple-200 dark:bg-purple-800/40"></div>
+        @endif
 
         {{-- Auto-Print on Sale (Phase 4) — bound to parent restaurantPos() scope --}}
         <div class="flex items-center gap-2" title="When ON, the receipt print dialog opens automatically right after a successful payment.">

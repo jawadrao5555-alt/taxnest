@@ -2313,6 +2313,18 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
+
+        // Standalone edition has ZERO government integration — PRA reporting can
+        // never be flipped on (sales would queue for a submission that must fail).
+        // The sale-screen toggle is hidden for standalone; this guards direct POSTs.
+        if (($company->pos_integration_mode ?? 'pra') === 'standalone') {
+            return response()->json([
+                'success' => false,
+                'enabled' => false,
+                'message' => 'PRA Reporting is not available on the Standalone edition. Enable PRA Integration from PRA Settings first.',
+            ], 422);
+        }
+
         $company->pra_reporting_enabled = !$company->pra_reporting_enabled;
         $company->save();
 

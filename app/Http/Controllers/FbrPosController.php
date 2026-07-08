@@ -503,7 +503,10 @@ class FbrPosController extends Controller
                             ->where('company_id', $companyId)
                             ->first();
                         if ($product && $product->is_price_editable === false) {
-                            $price = (float) $product->price;
+                            // NOTE: column is default_price — reading the non-existent
+                            // ->price attribute silently returned null → every fixed-price
+                            // product line became Rs 0 (total = just the Rs1 FBR charge).
+                            $price = (float) $product->default_price;
                             $valueInput = 0; // hard-reject value-mode for fixed-price products
                         }
                     }

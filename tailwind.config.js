@@ -10,6 +10,10 @@ export default {
         './resources/views/**/*.blade.php',
     ],
 
+    // plan-card partial builds classes dynamically (text-{{ $color }}-400/500),
+    // so JIT can't see them — safelist the teal set used by Standalone plans.
+    safelist: ['text-teal-400', 'text-teal-500', 'bg-teal-500', 'bg-teal-600'],
+
     theme: {
         extend: {
             fontFamily: {

@@ -503,6 +503,8 @@ Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
         Route::put('/terminals/{id}', [PosController::class, 'updateTerminal'])->name('pos.terminals.update');
         Route::delete('/terminals/{id}', [PosController::class, 'deleteTerminal'])->name('pos.terminals.delete');
         Route::match(['get', 'post'], '/pra-settings', [PosController::class, 'praSettings'])->name('pos.pra-settings');
+        // Irreversible standalone→PRA edition flip: admins only.
+        Route::post('/api/enable-pra-integration', [PosController::class, 'enablePraIntegration'])->name('pos.api.enable-pra-integration');
         Route::get('/billing', [PosController::class, 'billing'])->name('pos.billing');
         Route::match(['get', 'post'], '/business-profile', [PosController::class, 'businessProfile'])->name('pos.business-profile');
         Route::match(['get', 'post'], '/receipt-settings', [PosController::class, 'receiptSettings'])->name('pos.receipt-settings');

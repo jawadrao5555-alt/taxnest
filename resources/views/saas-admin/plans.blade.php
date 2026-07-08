@@ -15,6 +15,7 @@
         <button @click="activeTab = 'di'" :class="activeTab === 'di' ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Digital Invoice Plans</button>
         <button @click="activeTab = 'pos'" :class="activeTab === 'pos' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">PRA POS Plans</button>
         <button @click="activeTab = 'fbrpos'" :class="activeTab === 'fbrpos' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">FBR POS Plans</button>
+        <button @click="activeTab = 'standalone'" :class="activeTab === 'standalone' ? 'bg-teal-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Standalone POS Plans</button>
     </div>
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6" x-data="{ showForm: false }">
@@ -31,6 +32,7 @@
                         <option value="di">Digital Invoice</option>
                         <option value="pos">PRA POS</option>
                         <option value="fbrpos">FBR POS</option>
+                        <option value="standalone">Standalone POS (No Integration)</option>
                     </select>
                 </div>
                 <input type="number" name="price" placeholder="Price (PKR)" step="1" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
@@ -86,6 +88,19 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             @foreach($fbrposPlans as $plan)
             @include('saas-admin.partials.plan-card', ['plan' => $plan, 'color' => 'blue'])
+            @endforeach
+        </div>
+    </div>
+
+    <div x-show="activeTab === 'standalone'" x-cloak>
+        <div class="flex items-center gap-2 mb-4">
+            <div class="w-2 h-2 rounded-full bg-teal-500"></div>
+            <h2 class="text-lg font-bold text-white">Standalone POS Plans</h2>
+            <span class="text-xs text-gray-500 dark:text-gray-400">({{ ($standalonePlans ?? collect())->count() }} plans — prices are annual, no government integration)</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            @foreach(($standalonePlans ?? collect()) as $plan)
+            @include('saas-admin.partials.plan-card', ['plan' => $plan, 'color' => 'teal'])
             @endforeach
         </div>
     </div>

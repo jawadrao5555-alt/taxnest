@@ -49,6 +49,7 @@ class Company extends Model
         'website',
         'inventory_enabled',
         'pra_reporting_enabled',
+        'pos_integration_mode',
         'kds_enabled',
         'restaurant_mode',
         'pos_type',

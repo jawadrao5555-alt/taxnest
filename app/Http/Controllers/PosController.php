@@ -2291,6 +2291,24 @@ class PosController extends Controller
         return response()->json(['tax_rate' => $rate]);
     }
 
+    /**
+     * Standalone → PRA upgrade: flips the company onto the PRA-integrated
+     * edition (plans + PRA settings become relevant). One-way from the UI —
+     * the reverse (PRA → standalone) is an admin decision, not self-serve.
+     */
+    public function enablePraIntegration(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        if (($company->pos_integration_mode ?? 'pra') === 'standalone') {
+            $company->pos_integration_mode = 'pra';
+            $company->save();
+        }
+
+        return redirect()->route('pos.pra-settings')->with('success', 'PRA integration enabled — configure your PRA credentials below, then turn on PRA Reporting when ready.');
+    }
+
     public function togglePra(Request $request)
     {
         $companyId = app('currentCompanyId');
@@ -4010,7 +4028,14 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'pos')->orderBy('price')->get();
+        // Standalone (no-integration) companies see the cheaper Standalone plan
+        // set; everyone else keeps the PRA POS plans — zero change for them.
+        $planType = ($company->pos_integration_mode ?? 'pra') === 'standalone' ? 'standalone' : 'pos';
+        $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', $planType)->orderBy('price')->get();
+        if ($planType === 'standalone' && $plans->isEmpty()) {
+            // Migration not yet run on this DB — fall back to PRA POS plans.
+            $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'pos')->orderBy('price')->get();
+        }
         $currentSubscription = \App\Models\Subscription::where('company_id', $companyId)
             ->where('active', true)
             ->with('pricingPlan')

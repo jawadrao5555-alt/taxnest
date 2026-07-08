@@ -55,8 +55,29 @@
                         <p class="text-sm text-purple-200/50 mt-1">Register your business for NestPOS</p>
                     </div>
 
-                    <form method="POST" action="/pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'retail') }}' }">
+                    <form method="POST" action="/pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'retail') }}', integrationMode: '{{ old('integration_mode', 'pra') }}' }">
                         @csrf
+
+                        <div class="pt-1 pb-2">
+                            <p class="text-xs font-semibold text-purple-300/50 uppercase tracking-wider">Choose Your POS Edition</p>
+                        </div>
+
+                        <input type="hidden" name="integration_mode" :value="integrationMode">
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="relative cursor-pointer" @click="integrationMode = 'pra'">
+                                <div class="flex flex-col gap-1 py-3 px-3 rounded-xl transition-all cat-card" :class="integrationMode === 'pra' ? 'cat-active' : ''">
+                                    <span class="text-sm font-bold text-white">PRA Integrated</span>
+                                    <span class="text-[10px] text-purple-200/60 leading-snug">Fiscal receipts with PRA invoice number &amp; QR — for Punjab registered businesses</span>
+                                </div>
+                            </label>
+                            <label class="relative cursor-pointer" @click="integrationMode = 'standalone'">
+                                <div class="flex flex-col gap-1 py-3 px-3 rounded-xl transition-all cat-card" :class="integrationMode === 'standalone' ? 'cat-active' : ''">
+                                    <span class="text-sm font-bold text-white">Standalone</span>
+                                    <span class="text-[10px] text-purple-200/60 leading-snug">Full POS without any government integration — simple billing at a lower price</span>
+                                </div>
+                            </label>
+                        </div>
 
                         <div class="pt-1 pb-2">
                             <p class="text-xs font-semibold text-purple-300/50 uppercase tracking-wider">Select Your Business Type</p>

@@ -12,6 +12,22 @@
     <div class="mb-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-sm">{{ session('success') }}</div>
     @endif
 
+    @if(($company->pos_integration_mode ?? 'pra') === 'standalone')
+    {{-- Standalone edition: PRA settings are irrelevant until the company opts in. --}}
+    <div class="mb-6 p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-md">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <p class="text-sm font-bold text-gray-900 dark:text-white">You're on the Standalone edition</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Your POS runs fully without any government integration — these PRA settings don't apply to your account. If your business gets PRA-registered later, you can switch to the PRA-integrated edition anytime.</p>
+            </div>
+            <form method="POST" action="{{ route('pos.api.enable-pra-integration') }}" onsubmit="return confirm('Switch to the PRA-integrated edition? Your plan set will change to PRA POS plans and PRA settings will become active.');">
+                @csrf
+                <button type="submit" class="px-4 py-2.5 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition whitespace-nowrap">Enable PRA Integration</button>
+            </form>
+        </div>
+    </div>
+    @endif
+
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="lg:col-span-2 space-y-6">
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">

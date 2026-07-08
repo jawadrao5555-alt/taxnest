@@ -18,7 +18,7 @@
                 <span class="text-[10px] px-1.5 py-0.5 bg-rose-900/40 text-rose-300 rounded font-bold">{{ $plan->sale_badge }}</span>
             </div>
             @endif
-            <div class="text-2xl font-bold text-{{ $color }}-400">PKR {{ number_format($hasOffer ? $plan->sale_price : $plan->price, 0) }}<span class="text-sm text-gray-500 dark:text-gray-400 font-normal">{{ $plan->product_type === 'pos' ? '/yr' : '/mo' }}</span></div>
+            <div class="text-2xl font-bold text-{{ $color }}-400">PKR {{ number_format($hasOffer ? $plan->sale_price : $plan->price, 0) }}<span class="text-sm text-gray-500 dark:text-gray-400 font-normal">{{ in_array($plan->product_type, ['pos', 'standalone']) ? '/yr' : '/mo' }}</span></div>
         </div>
 
         <div class="space-y-1.5 text-sm">
@@ -61,7 +61,7 @@
                 </select>
             </div>
             <div>
-                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Price (PKR{{ $plan->product_type === 'pos' ? '/yr' : '/mo' }})</label>
+                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Price (PKR{{ in_array($plan->product_type, ['pos', 'standalone']) ? '/yr' : '/mo' }})</label>
                 <input type="number" name="price" value="{{ intval($plan->price) }}" step="1" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
             </div>
             <div>

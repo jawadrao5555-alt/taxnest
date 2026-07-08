@@ -453,6 +453,12 @@ window.addEventListener('popstate', function() {
         </button>
         @endif
 
+        {{-- Order-type switcher (Dine In / Takeaway / Delivery): RESTAURANT-category
+             companies only (owner rule, Jul 2026). A plain retail/general store has no
+             order types — a lone always-on "Takeaway" pill just confuses cashiers, so
+             the whole widget is hidden unless a restaurant feature (tables/KOT/kitchen)
+             or Delivery is enabled. orderType silently stays 'takeaway' underneath. --}}
+        @if(($features->tables ?? false) || ($features->kot ?? false) || ($features->kitchen ?? false) || ($features->delivery ?? false))
         <div class="flex items-center rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex-shrink-0" title="Press F2 to cycle">
             @if($features->tables)
             <button @click="orderType = 'dine_in'" class="px-2 py-1.5 text-[10px] font-bold transition-all" :class="orderType === 'dine_in' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">Dine In</button>
@@ -463,6 +469,7 @@ window.addEventListener('popstate', function() {
             @endif
             <span class="px-1.5 py-1.5 text-[8px] font-mono text-gray-400 bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">F2</span>
         </div>
+        @endif
 
         <div class="w-px h-6 bg-gray-200 dark:bg-gray-700 hidden sm:block flex-shrink-0"></div>
 
@@ -709,7 +716,10 @@ window.addEventListener('popstate', function() {
                     <span x-text="cartMode ? 'Editing' : 'Edit'"></span>
                 </button>
                 <template x-if="priorityOrder"><span class="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold">RUSH</span></template>
+                {{-- Order-type badge: restaurant-category companies only (matches the header widget gate). --}}
+                @if(($features->tables ?? false) || ($features->kot ?? false) || ($features->kitchen ?? false) || ($features->delivery ?? false))
                 <span class="text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full font-semibold" x-text="orderType.replace('_', ' ').toUpperCase()"></span>
+                @endif
                 <template x-if="selectedTable">
                     <span class="text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-semibold" x-text="'T-' + selectedTable.table_number"></span>
                 </template>
@@ -1901,6 +1911,7 @@ $productsJson = $products->map(function($p) use ($recipeLookup, $stockStatus) {
     return [
         'id' => $p->id, 'type' => 'product', 'name' => $p->name,
         'price' => $p->price ?? 0, 'category' => $p->category,
+        'barcode' => $p->barcode ?: null, 'sku' => $p->sku ?: null,
         'show_on_sale' => (bool)($p->show_on_sale ?? true),
         'cost_price' => (float) ($p->cost_price ?? 0),
         'is_tax_exempt' => $p->is_tax_exempt ?? false,
@@ -2350,6 +2361,17 @@ function restaurantPos() {
         },
 
         _searchDebounceTimer: null,
+        // BARCODE SCAN support: true when the typed query EXACTLY equals a product's
+        // barcode or SKU (case-insensitive). Scanners "type" the code then send Enter.
+        isExactCodeMatch(it, q) {
+            return (it.barcode && String(it.barcode).toLowerCase() === q)
+                || (it.sku && String(it.sku).toLowerCase() === q);
+        },
+        findExactCodeItem(q) {
+            if (!q) return null;
+            const all = [...this.allProducts, ...this.allServices];
+            return all.find(it => it.name && parseFloat(it.price) > 0 && this.isExactCodeMatch(it, q)) || null;
+        },
         onSearchInput() {
             // Toggle dropdown synchronously so empty-state hides instantly (no flicker).
             const q = this.searchQuery.trim().toLowerCase();
@@ -2368,8 +2390,15 @@ function restaurantPos() {
                     for (let i = 0; i < all.length && out.length < 12; i++) {
                         const it = all[i];
                         if (!it.name || !(parseFloat(it.price) > 0)) continue;
-                        if (it.name.toLowerCase().includes(q)) out.push(it);
+                        // Match by NAME, BARCODE or SKU — scanners type the barcode digits,
+                        // which never match a product name; without this, every scan "fails".
+                        if (it.name.toLowerCase().includes(q)
+                            || (it.barcode && String(it.barcode).toLowerCase().includes(q))
+                            || (it.sku && String(it.sku).toLowerCase().includes(q))) out.push(it);
                     }
+                    // Exact barcode/SKU match jumps to the top so the scanner's trailing
+                    // Enter always adds the right product (not an accidental name match).
+                    out.sort((a, b) => (this.isExactCodeMatch(b, q) ? 1 : 0) - (this.isExactCodeMatch(a, q) ? 1 : 0));
                     this.searchSuggestions = out;
                     this.highlightIndex = 0;
                     this.showSearchDropdown = true;
@@ -2396,6 +2425,21 @@ function restaurantPos() {
             // re-seeds the highlight back to the current orderType and never confirms.
             // !e?.repeat mirrors the document-path held-Enter guard in handleKey.
             if (this.guidedFlow && this.flowStep === 'type') { if (!e?.repeat) this.confirmGuidedType(); return; }
+            // BARCODE SCAN fast path: scanner's Enter can arrive BEFORE the 60ms search
+            // debounce fills the dropdown — an exact barcode/SKU match must add instantly
+            // here, or (inventory-OFF) the scan would fall through to quick-CREATE a bogus
+            // product named after the barcode digits. Skipped when the cashier has
+            // ARROWED to a suggestion (highlightIndex > 0): their explicit pick wins
+            // over an accidental short-SKU collision.
+            const scanQ = this.searchQuery.trim().toLowerCase();
+            if (scanQ.length > 0 && this.highlightIndex === 0) {
+                const exact = this.findExactCodeItem(scanQ);
+                if (exact) {
+                    if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
+                    this.quickAddItem(exact);
+                    return;
+                }
+            }
             if (this.showSearchDropdown && this.searchSuggestions.length > 0) { this.quickAddItem(this.searchSuggestions[this.highlightIndex]); return; }
             // No catalog match: in SIMPLE (inventory-OFF) mode, Enter creates the typed item on the fly.
             if (!this.isInventoryEnabled() && this.searchQuery.trim().length > 0 && !this.quickCreating) { this.quickCreateProduct(); return; }
@@ -2446,7 +2490,13 @@ function restaurantPos() {
             // Hidden products stay OUT of the browsable grid (when NOT searching) but remain fully
             // searchable above — so only drop show_on_sale=false items when there is no search.
             if (!hasSearch) { items = items.filter(i => i.show_on_sale !== false); }
-            if (this.searchQuery) { const q = this.searchQuery.toLowerCase(); items = items.filter(i => i.name.toLowerCase().includes(q)); }
+            if (this.searchQuery) {
+                const q = this.searchQuery.toLowerCase();
+                // Grid search matches NAME, BARCODE or SKU (mirrors the dropdown matcher).
+                items = items.filter(i => i.name.toLowerCase().includes(q)
+                    || (i.barcode && String(i.barcode).toLowerCase().includes(q))
+                    || (i.sku && String(i.sku).toLowerCase().includes(q)));
+            }
             this.filteredItems = items;
             this.displayCount = 60;
             this.updateDisplayItems();
@@ -2921,6 +2971,14 @@ function restaurantPos() {
                 : Math.max(1, Math.round((current + delta) * 100) / 100);
             if (!Number.isFinite(next) || next < 1) next = 1;
             this.cart[index].quantity = next;
+            // Force-sync the visible qty box even while it holds focus: some browsers
+            // (Safari, touch devices) do NOT move focus onto the +/- button on tap, so
+            // the input's x-effect activeElement guard skips the write and the digit
+            // on screen looks stale (model/bill were correct, display wasn't).
+            this.$nextTick(() => {
+                const el = document.querySelector('input[data-qty-row="' + index + '"]');
+                if (el) el.value = next;
+            });
         },
         setQty(index, val) {
             if (!this.cart[index]) return;
@@ -3502,11 +3560,27 @@ function restaurantPos() {
                 this.selectedCustomer = null;
                 this.customerStats = null;
             }
-            if (q.length >= 3) {
-                this.customerPhoneTimer = setTimeout(() => this.searchCustomerByPhone(q), 300);
-            } else {
+            if (q.length === 0) {
                 this.customerPhoneResults = [];
                 this.customerPhoneDropdown = false;
+                return;
+            }
+            // FILTER-AS-YOU-TYPE: instant local matches from the preloaded customer list
+            // from the VERY FIRST character (no server round-trip). The server search
+            // below then replaces these with stats-enriched results (orders/spend/VIP).
+            const lq = q.toLowerCase();
+            const local = (this.allCustomers || [])
+                .filter(c => (c.name && c.name.toLowerCase().includes(lq)) || (c.phone && String(c.phone).includes(q)))
+                .slice(0, 8);
+            if (local.length > 0) {
+                this.customerPhoneResults = local;
+                this.customerPhoneDropdown = true;
+            } else if (q.length < 2) {
+                this.customerPhoneResults = [];
+                this.customerPhoneDropdown = false;
+            }
+            if (q.length >= 2) {
+                this.customerPhoneTimer = setTimeout(() => this.searchCustomerByPhone(q), 150);
             }
         },
 
@@ -3519,6 +3593,9 @@ function restaurantPos() {
                 try {
                     const res = await fetch('/pos/restaurant/api/customer-search?q=' + encodeURIComponent(q));
                     const data = await res.json();
+                    // Stale-response guard: with the 150ms debounce a slow earlier fetch can
+                    // land AFTER a newer one — never let it clobber fresher results.
+                    if (q !== this.customerPhoneQuery.trim()) return;
                     this.customerPhoneResults = data.customers || [];
                     // Always show dropdown so the inline "add new" hint can appear when results === 0
                     this.customerPhoneDropdown = true;

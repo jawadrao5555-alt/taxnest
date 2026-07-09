@@ -117,25 +117,37 @@
         }
     </style>
 </head>
-<body x-data="{ scrolled: false }" @scroll.window="scrolled = (window.pageYOffset > 20)">
+<body x-data="{ scrolled: false, mobileOpen: false }" @scroll.window="scrolled = (window.pageYOffset > 20)">
 
     <!-- Navigation -->
-    <nav :class="scrolled ? 'nav-scrolled' : 'nav-transparent'" class="fixed top-0 w-full z-50 transition-all duration-300">
+    <nav :class="(scrolled || mobileOpen) ? 'nav-scrolled' : 'nav-transparent'" class="fixed top-0 w-full z-50 transition-all duration-300">
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-20">
                 <a href="/" class="flex-shrink-0">
-                    <img src="{{ asset('images/brand/taxnest-logo.svg') }}" x-show="scrolled" alt="TaxNest" class="h-8 w-auto">
-                    <img src="{{ asset('images/brand/taxnest-logo-white.svg') }}" x-show="!scrolled" alt="TaxNest" class="h-8 w-auto">
+                    <img src="{{ asset('images/brand/taxnest-logo.svg') }}" x-show="scrolled || mobileOpen" alt="TaxNest" class="h-8 w-auto">
+                    <img src="{{ asset('images/brand/taxnest-logo-white.svg') }}" x-show="!scrolled && !mobileOpen" alt="TaxNest" class="h-8 w-auto">
                 </a>
                 <div class="hidden md:flex items-center space-x-8">
                     <a href="/digital-invoice" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Digital Invoice</a>
                     <a href="/pos" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">NestPOS</a>
                     <a href="/fbr-pos-landing" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">FBR POS</a>
+                    <a href="#compare" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Compare</a>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <a href="/login" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Log In</a>
+                    <a href="/login" class="hidden sm:inline text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Log In</a>
                     <a href="/register" class="btn-solid" :class="scrolled ? 'btn-primary' : 'bg-white text-[#052730] hover:bg-gray-100'">Get Started</a>
+                    <button @click="mobileOpen = !mobileOpen" class="md:hidden p-2 -mr-2" aria-label="Menu">
+                        <svg x-show="!mobileOpen" class="w-6 h-6" :class="scrolled ? 'text-gray-800' : 'text-white'" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                        <svg x-show="mobileOpen" x-cloak class="w-6 h-6 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
                 </div>
+            </div>
+            <div x-show="mobileOpen" x-cloak @click.away="mobileOpen = false" class="md:hidden border-t border-gray-200 py-4 space-y-1 bg-[#FDFBF7]">
+                <a href="/digital-invoice" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Digital Invoice</a>
+                <a href="/pos" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">NestPOS</a>
+                <a href="/fbr-pos-landing" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">FBR POS</a>
+                <a href="#compare" @click="mobileOpen = false" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Compare Products</a>
+                <a href="/login" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Log In</a>
             </div>
         </div>
     </nav>
@@ -363,6 +375,123 @@
                     <p class="text-sm text-gray-600 leading-relaxed">
                         Internet drops shouldn't stop your business. Generate bills offline; the system automatically syncs with authorities the moment connectivity returns.
                     </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Product Comparison -->
+    <section id="compare" class="py-24 bg-grid-pattern border-t border-gray-200">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center max-w-2xl mx-auto mb-16 fade-in-up">
+                <h2 class="text-sm font-bold tracking-widest uppercase text-gray-500 mb-4">Compare</h2>
+                <h3 class="text-3xl font-serif text-[#052730]">Which product fits your business?</h3>
+            </div>
+            <div class="overflow-x-auto fade-in-up">
+                <table class="w-full min-w-[640px] bg-white border border-gray-200 rounded-lg text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-200">
+                            <th class="text-left p-5 font-semibold text-gray-500 uppercase tracking-wider text-xs w-1/4"></th>
+                            <th class="text-left p-5">
+                                <span class="block font-serif text-lg text-[#052730]">Digital Invoice</span>
+                                <span class="text-xs font-medium accent-emerald uppercase tracking-wider">FBR e-Invoicing</span>
+                            </th>
+                            <th class="text-left p-5">
+                                <span class="block font-serif text-lg text-[#052730]">NestPOS</span>
+                                <span class="text-xs font-medium accent-purple uppercase tracking-wider">PRA Point of Sale</span>
+                            </th>
+                            <th class="text-left p-5">
+                                <span class="block font-serif text-lg text-[#052730]">FBR POS</span>
+                                <span class="text-xs font-medium accent-blue uppercase tracking-wider">FBR Point of Sale</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-700">
+                        <tr class="border-b border-gray-100">
+                            <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Regulator</td>
+                            <td class="p-5">FBR — via PRAL API</td>
+                            <td class="p-5">Punjab Revenue Authority</td>
+                            <td class="p-5">FBR — direct submission</td>
+                        </tr>
+                        <tr class="border-b border-gray-100">
+                            <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Built for</td>
+                            <td class="p-5">Businesses issuing sales tax invoices</td>
+                            <td class="p-5">Retail &amp; restaurants in Punjab</td>
+                            <td class="p-5">FBR-registered retail counters</td>
+                        </tr>
+                        <tr class="border-b border-gray-100">
+                            <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Billing</td>
+                            <td class="p-5">Monthly, Quarterly, Semi-Annual or Annual</td>
+                            <td class="p-5">Simple annual billing</td>
+                            <td class="p-5">Simple annual billing</td>
+                        </tr>
+                        <tr class="border-b border-gray-100">
+                            <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Starting at</td>
+                            <td class="p-5 font-bold text-[#052730]">PKR 499 / month</td>
+                            <td class="p-5 font-bold text-[#052730]">PKR 4,999 / year</td>
+                            <td class="p-5 font-bold text-[#052730]">PKR 5,629 / year</td>
+                        </tr>
+                        <tr class="border-b border-gray-100">
+                            <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Standout features</td>
+                            <td class="p-5">HS code intelligence, sandbox validation, customer ledgers</td>
+                            <td class="p-5">Restaurant module, offline auto-sync, fiscal-device mode</td>
+                            <td class="p-5">Keyboard-first billing, installable PWA, retry queue</td>
+                        </tr>
+                        <tr>
+                            <td class="p-5"></td>
+                            <td class="p-5"><a href="/digital-invoice" class="btn-solid btn-primary w-full">Explore DI</a></td>
+                            <td class="p-5"><a href="/pos" class="btn-solid btn-primary w-full">Explore NestPOS</a></td>
+                            <td class="p-5"><a href="/fbr-pos-landing" class="btn-solid btn-primary w-full">Explore FBR POS</a></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-center text-sm text-gray-500 mt-6 fade-in-up">Every product includes a 3-day free trial. No credit card required.</p>
+        </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="py-24 bg-white border-t border-gray-200">
+        <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12 fade-in-up">
+                <h2 class="text-sm font-bold tracking-widest uppercase text-gray-500 mb-4">Questions</h2>
+                <h3 class="text-3xl font-serif text-[#052730]">Frequently asked questions</h3>
+            </div>
+            <div class="space-y-3 fade-in-up" x-data="{ open: null }">
+                <div class="card-solid rounded-lg">
+                    <button @click="open = (open === 1 ? null : 1)" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="font-semibold text-[#052730]">Is there a free trial?</span>
+                        <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 1 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 1" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed">Yes. Every product starts with a 3-day free trial — no credit card required. Register, get approved, and explore the full system before paying.</div>
+                </div>
+                <div class="card-solid rounded-lg">
+                    <button @click="open = (open === 2 ? null : 2)" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="font-semibold text-[#052730]">Are the three products connected to each other?</span>
+                        <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 2 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 2" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed">No — by design. Digital Invoice, NestPOS and FBR POS each have their own login, their own data and their own panel. Nothing leaks between products, which keeps every regulator's records clean.</div>
+                </div>
+                <div class="card-solid rounded-lg">
+                    <button @click="open = (open === 3 ? null : 3)" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="font-semibold text-[#052730]">What happens after I register?</span>
+                        <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 3 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 3" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed">Your company goes to our team for a quick review. While pending you can look around the whole panel; once approved, everything unlocks and your trial begins.</div>
+                </div>
+                <div class="card-solid rounded-lg">
+                    <button @click="open = (open === 4 ? null : 4)" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="font-semibold text-[#052730]">Does the POS keep working if the internet drops?</span>
+                        <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 4 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 4" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed">Yes. Bills keep printing offline and the system submits them to the authority automatically the moment connectivity returns — no manual re-entry.</div>
+                </div>
+                <div class="card-solid rounded-lg">
+                    <button @click="open = (open === 5 ? null : 5)" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="font-semibold text-[#052730]">Can I run branches and multiple staff accounts?</span>
+                        <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 5 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 5" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed">Yes. Plans include multiple users and branches with role-based access — cashiers, managers and admins each see exactly what they should, and every action lands in an immutable audit log.</div>
                 </div>
             </div>
         </div>

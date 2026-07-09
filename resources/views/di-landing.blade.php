@@ -439,6 +439,53 @@
         </div>
     </section>
 
+    <!-- FAQ -->
+    <section class="py-20 bg-white border-t border-slate-200">
+        <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <p class="text-xs font-bold tracking-widest uppercase text-emerald-700 mb-3">Questions</p>
+                <h2 class="text-3xl font-bold text-slate-900">Frequently asked questions</h2>
+            </div>
+            <div class="space-y-3" x-data="{ open: null }">
+                <div class="bg-white border border-slate-200 rounded-lg">
+                    <button @click="open = (open === 1 ? null : 1)" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="font-semibold text-slate-900 text-sm">Can I test invoices before sending them to FBR?</span>
+                        <svg class="w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ml-4" :class="open === 1 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 1" x-collapse class="px-5 pb-5 text-sm text-slate-600 leading-relaxed">Yes. Every invoice is validated against FBR's rules before submission, and a sandbox environment lets you verify the full payload safely before anything touches production.</div>
+                </div>
+                <div class="bg-white border border-slate-200 rounded-lg">
+                    <button @click="open = (open === 2 ? null : 2)" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="font-semibold text-slate-900 text-sm">Which billing cycles are available?</span>
+                        <svg class="w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ml-4" :class="open === 2 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 2" x-collapse class="px-5 pb-5 text-sm text-slate-600 leading-relaxed">Digital Invoice is fully flexible: pay Monthly, Quarterly (1% off), Semi-Annual (3% off) or Annual (6% off). You pick the cycle at checkout — no lock-in beyond the period you choose.</div>
+                </div>
+                <div class="bg-white border border-slate-200 rounded-lg">
+                    <button @click="open = (open === 3 ? null : 3)" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="font-semibold text-slate-900 text-sm">I don't know my HS codes. Does the system help?</span>
+                        <svg class="w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ml-4" :class="open === 3 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 3" x-collapse class="px-5 pb-5 text-sm text-slate-600 leading-relaxed">Yes. As you type an item, the HS intelligence engine suggests matching codes and checks them against the correct tax schedule — so the right rate is applied before the invoice ever leaves your screen.</div>
+                </div>
+                <div class="bg-white border border-slate-200 rounded-lg">
+                    <button @click="open = (open === 4 ? null : 4)" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="font-semibold text-slate-900 text-sm">What happens if a submission fails?</span>
+                        <svg class="w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ml-4" :class="open === 4 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 4" x-collapse class="px-5 pb-5 text-sm text-slate-600 leading-relaxed">Nothing is lost. The invoice stays in your panel with the exact FBR response, you fix the flagged field and resubmit. Duplicate protection makes sure a retry never creates a second invoice.</div>
+                </div>
+                <div class="bg-white border border-slate-200 rounded-lg">
+                    <button @click="open = (open === 5 ? null : 5)" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="font-semibold text-slate-900 text-sm">Do I get printable invoices and customer statements?</span>
+                        <svg class="w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ml-4" :class="open === 5 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 5" x-collapse class="px-5 pb-5 text-sm text-slate-600 leading-relaxed">Yes. Every invoice generates a formal print-ready PDF, and each customer has a running ledger of invoices and payments you can review or adjust at any time.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Footer CTA & Footer -->
     <footer class="mt-auto border-t border-slate-200 bg-slate-900">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">

@@ -407,6 +407,53 @@
         </div>
     </section>
 
+    <!-- FAQ -->
+    <section class="py-20 bg-white border-t border-slate-200">
+        <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <p class="text-xs font-bold tracking-widest uppercase text-fbr-blue mb-3">FAQ</p>
+                <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">Frequently asked questions</h2>
+            </div>
+            <div class="space-y-3" x-data="{ open: null }">
+                <div class="bg-white border border-slate-200 rounded-lg">
+                    <button @click="open = (open === 1 ? null : 1)" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="font-semibold text-slate-900 text-sm">Are bills really submitted to FBR in real time?</span>
+                        <svg class="w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ml-4" :class="open === 1 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 1" x-collapse class="px-5 pb-5 text-sm text-slate-600 leading-relaxed">Yes. Each completed sale goes straight to FBR's POS service and the fiscal invoice number prints on the receipt. If FBR rejects a bill, it lands in a fail queue where you can fix the data and retry — nothing silently disappears.</div>
+                </div>
+                <div class="bg-white border border-slate-200 rounded-lg">
+                    <button @click="open = (open === 2 ? null : 2)" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="font-semibold text-slate-900 text-sm">Can I run the whole sale from the keyboard?</span>
+                        <svg class="w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ml-4" :class="open === 2 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 2" x-collapse class="px-5 pb-5 text-sm text-slate-600 leading-relaxed">Yes — scan or type in one smart input, adjust quantities, take payment and print, all without touching the mouse. Barcode scanners work out of the box.</div>
+                </div>
+                <div class="bg-white border border-slate-200 rounded-lg">
+                    <button @click="open = (open === 3 ? null : 3)" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="font-semibold text-slate-900 text-sm">Do I need to install anything?</span>
+                        <svg class="w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ml-4" :class="open === 3 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 3" x-collapse class="px-5 pb-5 text-sm text-slate-600 leading-relaxed">No. It runs in the browser and installs as a PWA for a full-screen, desktop-like terminal on any PC or tablet — updates arrive automatically.</div>
+                </div>
+                <div class="bg-white border border-slate-200 rounded-lg">
+                    <button @click="open = (open === 4 ? null : 4)" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="font-semibold text-slate-900 text-sm">How is billing structured?</span>
+                        <svg class="w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ml-4" :class="open === 4 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 4" x-collapse class="px-5 pb-5 text-sm text-slate-600 leading-relaxed">Simple annual billing — one payment a year with the annual discount already applied, starting at PKR 5,629/year. Every account begins with a 3-day free trial.</div>
+                </div>
+                <div class="bg-white border border-slate-200 rounded-lg">
+                    <button @click="open = (open === 5 ? null : 5)" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="font-semibold text-slate-900 text-sm">Who can approve sensitive actions like provisional bills?</span>
+                        <svg class="w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ml-4" :class="open === 5 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 5" x-collapse class="px-5 pb-5 text-sm text-slate-600 leading-relaxed">A confidential owner PIN gates sensitive areas. Cashiers ring up sales; only someone with the PIN can open the provisional-bill list — so control stays with the owner.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- CTA -->
     <section class="bg-fbr-blue py-20 terminal-grid">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">

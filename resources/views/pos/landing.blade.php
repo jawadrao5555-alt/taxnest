@@ -394,6 +394,53 @@
         </div>
     </section>
 
+    <!-- FAQ -->
+    <section class="py-20 bg-purple-50 border-t-2 border-slate-900">
+        <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <p class="text-xs font-black tracking-widest uppercase text-purple-700 font-mono mb-3">// FAQ</p>
+                <h2 class="text-3xl font-black text-slate-900">Straight answers</h2>
+            </div>
+            <div class="space-y-4" x-data="{ open: null }">
+                <div class="bg-white border-2 border-slate-900 rounded">
+                    <button @click="open = (open === 1 ? null : 1)" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="font-bold text-slate-900 text-sm">How does the PRA connection actually work?</span>
+                        <svg class="w-4 h-4 text-purple-700 transition-transform flex-shrink-0 ml-4" :class="open === 1 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 1" x-collapse class="px-5 pb-5 text-sm text-slate-700 leading-relaxed">Two modes. Cloud mode submits bills straight from our servers to PRA. Fiscal-device mode runs a small desktop agent on your counter PC for shops whose PRA registration requires the local fiscal service — the system queues bills and the agent fiscalizes them automatically.</div>
+                </div>
+                <div class="bg-white border-2 border-slate-900 rounded">
+                    <button @click="open = (open === 2 ? null : 2)" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="font-bold text-slate-900 text-sm">Does it work for restaurants?</span>
+                        <svg class="w-4 h-4 text-purple-700 transition-transform flex-shrink-0 ml-4" :class="open === 2 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 2" x-collapse class="px-5 pb-5 text-sm text-slate-700 leading-relaxed">Yes — a full restaurant module: dine-in / takeaway / delivery order types, table management, kitchen order tickets and held orders, all on the same keyboard-fast sale screen.</div>
+                </div>
+                <div class="bg-white border-2 border-slate-900 rounded">
+                    <button @click="open = (open === 3 ? null : 3)" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="font-bold text-slate-900 text-sm">What if my internet goes down mid-day?</span>
+                        <svg class="w-4 h-4 text-purple-700 transition-transform flex-shrink-0 ml-4" :class="open === 3 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 3" x-collapse class="px-5 pb-5 text-sm text-slate-700 leading-relaxed">Keep selling. Bills print offline and sync to PRA automatically when the connection returns — no manual re-entry, no lost sales.</div>
+                </div>
+                <div class="bg-white border-2 border-slate-900 rounded">
+                    <button @click="open = (open === 4 ? null : 4)" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="font-bold text-slate-900 text-sm">Can cashiers work without touching the mouse?</span>
+                        <svg class="w-4 h-4 text-purple-700 transition-transform flex-shrink-0 ml-4" :class="open === 4 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 4" x-collapse class="px-5 pb-5 text-sm text-slate-700 leading-relaxed">That's the whole point. Guided keyboard billing walks the cashier from customer to items to payment on Enter alone, with barcode scanning, quick manual entry and shortcut keys for tax and discounts.</div>
+                </div>
+                <div class="bg-white border-2 border-slate-900 rounded">
+                    <button @click="open = (open === 5 ? null : 5)" class="w-full flex items-center justify-between p-5 text-left">
+                        <span class="font-bold text-slate-900 text-sm">Is there a version without PRA integration?</span>
+                        <svg class="w-4 h-4 text-purple-700 transition-transform flex-shrink-0 ml-4" :class="open === 5 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 5" x-collapse class="px-5 pb-5 text-sm text-slate-700 leading-relaxed">Yes — the Standalone edition. Same POS, same speed, zero government integration, at a lower annual price. You can upgrade a standalone shop to full PRA mode later; the switch is one-way.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Footer -->
     <footer class="bg-white border-t-2 border-slate-900 py-12">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center">

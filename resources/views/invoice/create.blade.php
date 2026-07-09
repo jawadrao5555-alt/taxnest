@@ -17,7 +17,7 @@
             </div>
         </div>
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <form method="POST" action="/invoice/store" x-data="invoiceForm()" @submit="if (submitting) { $event.preventDefault(); return; } submitting = true;" @keydown.enter.prevent="focusNext($event)" @keydown.ctrl.s.prevent="saveDraft()" @keydown.meta.s.prevent="saveDraft()" @keydown.ctrl.enter.prevent="submitInvoice()" @keydown.meta.enter.prevent="submitInvoice()" @keydown.escape="closeModals()" class="space-y-6">
+            <form method="POST" action="/invoice/store" x-data="invoiceForm()" @submit="if (submitting) { $event.preventDefault(); return; } submitting = true;" @keydown.enter.prevent="focusNext($event)" @keydown.ctrl.s.prevent="saveDraft()" @keydown.meta.s.prevent="saveDraft()" @keydown.ctrl.enter.prevent="submitInvoice()" @keydown.meta.enter.prevent="submitInvoice()" @keydown.escape="closeModals()" class="space-y-6 pb-28">
                 @csrf
 
                 @if(session('error'))
@@ -254,7 +254,7 @@
                                                         </div>
                                                     </div>
                                                     <div class="grid grid-cols-2 md:grid-cols-4 gap-1.5 text-xs">
-                                                        <div><span class="text-gray-400">Sale Type:</span> <span class="font-medium text-gray-700 dark:text-gray-300" x-text="mp.sale_type.replace('_',' ')"></span></div>
+                                                        <div><span class="text-gray-400">Sale Type:</span> <span class="font-medium text-gray-700 dark:text-gray-300" x-text="(mp.sale_type || '').replace('_',' ')"></span></div>
                                                         <div><span class="text-gray-400">Tax:</span> <span class="font-medium text-gray-700 dark:text-gray-300" x-text="mp.tax_rate + '%'"></span></div>
                                                         <div x-show="mp.sro_applicable"><span class="text-gray-400">SRO:</span> <span class="font-medium text-gray-700 dark:text-gray-300" x-text="mp.sro_number || 'Yes'"></span></div>
                                                         <div x-show="mp.serial_number_applicable"><span class="text-gray-400">Serial:</span> <span class="font-medium text-gray-700 dark:text-gray-300" x-text="mp.serial_number_value || 'Yes'"></span></div>
@@ -517,35 +517,6 @@
                     </button>
                 </div>
 
-                <div class="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 z-30 shadow-sm">
-                    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-6 text-sm">
-                                <div>
-                                    <span class="text-gray-500 dark:text-gray-400">Subtotal</span>
-                                    <p class="font-bold text-gray-900 dark:text-white" x-text="'PKR ' + Number(subtotal || 0).toLocaleString()"></p>
-                                </div>
-                                <div>
-                                    <span class="text-gray-500 dark:text-gray-400">Tax</span>
-                                    <p class="font-bold text-emerald-600 dark:text-emerald-400" x-text="'PKR ' + Number(totalTax || 0).toLocaleString()"></p>
-                                </div>
-                                <div>
-                                    <span class="text-gray-500 dark:text-gray-400">WHT</span>
-                                    <p class="font-bold text-amber-600 dark:text-amber-400" x-text="'PKR ' + Number(whtAmount || 0).toLocaleString()"></p>
-                                </div>
-                                <div class="pl-4 border-l border-gray-200 dark:border-gray-600">
-                                    <span class="text-gray-500 dark:text-gray-400">Grand Total</span>
-                                    <p class="text-lg font-extrabold text-gray-900 dark:text-white" x-text="'PKR ' + Number(grandTotal || 0).toLocaleString()"></p>
-                                </div>
-                            </div>
-                            <button type="submit" :disabled="submitting" class="inline-flex items-center px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed shadow-sm transition">
-                                <svg x-show="!submitting" class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                <svg x-show="submitting" class="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                                <span x-text="submitting ? 'Saving...' : 'Save Invoice'"></span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
             </form>
         </div>
     </div>
@@ -581,11 +552,16 @@
                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ $fbrEnv === 'production' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' }}">
                         {{ ucfirst($fbrEnv) }}
                     </span>
-                    <div class="text-xs text-gray-400">
+                    <div class="text-xs text-gray-400 hidden sm:block">
                         <kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-xs font-mono">Ctrl+S</kbd> Save
                         <kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-xs font-mono ml-1">Ctrl+Enter</kbd> Save
                         <kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-xs font-mono ml-1">Esc</kbd> Close
                     </div>
+                    <button type="button" @click="document.querySelector('form[x-data]').requestSubmit()" :disabled="form.submitting" class="inline-flex items-center px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed shadow-sm transition">
+                        <svg x-show="!form.submitting" class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <svg x-show="form.submitting" class="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        <span x-text="form.submitting ? 'Saving...' : 'Save Invoice'"></span>
+                    </button>
                 </div>
             </div>
         </div>

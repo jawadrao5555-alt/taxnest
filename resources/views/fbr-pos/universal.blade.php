@@ -226,10 +226,6 @@ window.addEventListener('popstate', function() {
 </script>
 
 <div x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
-    <div class="bg-blue-600 text-white text-[10px] font-bold tracking-wider uppercase px-3 py-1 text-center shadow-sm">
-        ⚡ FBR UNIVERSAL POS · {{ $company->name ?? '' }} · BUILD {{ now()->format('H:i:s') }} · v1-FBR-PORT
-    </div>
-
     {{-- FBR Reporting + Auto-Print toggles strip (visible to admin + cashier).
          autoPrintEnabled lives on the parent restaurantPos() scope (mirrors kitchenSettings.print_on_pay)
          so toggling immediately updates the receipt-iframe URL on the very next sale, no refresh needed. --}}
@@ -2251,7 +2247,7 @@ function restaurantPos() {
         },
         // Rs 1 FBR POS service charge — added by store() whenever the bill goes to FBR
         // (fbr mode). Provisional saves + FBR-OFF companies bill in local mode (Rs 0).
-        get fbrServiceCharge() { return (this.fbrEnabled && !this.saveAsProvisional) ? 1 : 0; },
+        get fbrServiceCharge() { return (this.fbrEnabled && !this.saveAsProvisional && this.cart.length > 0) ? 1 : 0; },
         get totalAmount() { return Math.max(0, this.r2(this.effectiveSubtotal - this.discountAmount + this.taxAmount + this.fbrServiceCharge)); },
         // FBR keeps DECIMALS (no PRA whole-rupee rounding) — store() rounds to 2dp only.
         get roundedTotal() { return this.totalAmount; },

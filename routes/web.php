@@ -136,7 +136,8 @@ Route::get('/di', function () {
 
 Route::get('/pos', function () {
     $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'pos')->orderBy('price')->get();
-    return view('pos.landing', ['plans' => $plans]);
+    $standalonePlans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'standalone')->orderBy('price')->get();
+    return view('pos.landing', ['plans' => $plans, 'standalonePlans' => $standalonePlans]);
 })->name('pos.landing');
 Route::get('/pos/login', [PosAuthController::class, 'showLogin'])->name('pos.login');
 Route::post('/pos/login', [PosAuthController::class, 'login']);
@@ -940,3 +941,4 @@ Route::get('/api/fbr/item-sr-search', [\App\Http\Controllers\FbrReferenceControl
 Route::get('/api/fbr/hs-detail', [\App\Http\Controllers\FbrReferenceController::class, 'hsDetail'])->name('fbr.api.hs-detail');
 
 require __DIR__.'/auth.php';
+

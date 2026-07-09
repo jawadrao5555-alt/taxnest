@@ -10,5 +10,6 @@ description: How to run PHP/artisan, query the dev MySQL, and the production-env
 - **Lint a compiled view:** compiled filename = `storage/framework/views/` + `hash('xxh128', 'v2'.<absolute blade path>)` + `.php`; run `php -l` on it to prove the view really parses (view:cache alone doesn't).
 - **Tinker workaround:** write a standalone script that `require`s `vendor/autoload.php` + `bootstrap/app.php`, then `$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();` — full Eloquent access under the same env-strip prefix.
 - **Pushing to GitHub origin:** `git push origin HEAD:main` works (tokened remote), but pushes only COMMITTED work — the platform checkpoint-commits at end of turn, so the current session's changes can only be pushed on a LATER turn.
+- **curl login for authenticated pages:** the login POST field is `login` (NOT `email` — supports email/phone/username/CNIC/NTN). Recipe: GET /login with `-c jar` to grab `_token` + cookies, POST `_token`+`login`+`password` with `-b jar -c jar`, always add `-H "X-Forwarded-Proto: https"`. Then GET any panel page to verify rendered HTML without Playwright.
 
 **Why:** these are environment quirks (production `APP_ENV` inside a dev container + dual PostgreSQL/MySQL setup) that cause repeated, confusing failures if forgotten.

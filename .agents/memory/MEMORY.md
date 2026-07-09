@@ -35,3 +35,4 @@
 - [Dynamic sale campaigns](dynamic-sale-campaigns.md) — admin sales via sale_campaigns + PricingPlan sale_* accessors; base price never hiked, auto-expires by date (no cron); ALL surfaces + charge paths read sale_price; compare_at column dead.
 - [FBR universal sale screen port](fbr-universal-sale-screen.md) — port of PRA universal with shim pins (never delete); held sales = Phase2 JSON carts, recall needs conditional-delete claim; live paths must be /fbr-pos/.
 - [Eloquent missing attribute = silent null](eloquent-missing-attribute-null.md) — $product->price (real col: default_price) silently zeroed fixed-price POS bills to Rs 1; fresh-shop e2e journeys catch what seasoned test companies can't.
+- [Plan price storage per product_type](plan-price-storage.md) — pos/standalone store ANNUAL, di/fbrpos store MONTHLY; any price surface must copy the matching billing.blade.php formula, never assume.

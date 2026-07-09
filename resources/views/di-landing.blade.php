@@ -1,283 +1,345 @@
 <!DOCTYPE html>
-<html lang="en" class="overflow-x-hidden">
+<html lang="en" class="scroll-smooth">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.5') }}">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <title>Digital Invoice — FBR Compliant Invoicing by TaxNest</title>
+    <title>Digital Invoice — Calm, Guided FBR Invoicing by TaxNest</title>
+    
     <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700,800&display=swap" rel="stylesheet">
+    <link href="https://fonts.bunny.net/css?family=plus-jakarta-sans:400,500,600,700|ibm-plex-mono:400,500,600&display=swap" rel="stylesheet">
+    
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    
     <style>
-        body { font-family: 'Figtree', sans-serif; }
-        .di-gradient {
-            background: linear-gradient(135deg, #022c22 0%, #065f46 40%, #059669 80%, #065f46 100%);
-            position: relative;
+        :root {
+            --font-sans: 'Plus Jakarta Sans', sans-serif;
+            --font-mono: 'IBM Plex Mono', monospace;
+            --emerald-50: #ecfdf5;
+            --emerald-100: #d1fae5;
+            --emerald-600: #059669;
+            --emerald-700: #047857;
+            --emerald-800: #065f46;
+            --emerald-900: #064e3b;
+            --desk-surface: #F8FBF9;
         }
-        .di-gradient::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
-            opacity: 0.4;
-            pointer-events: none;
+        
+        body { 
+            font-family: var(--font-sans); 
+            background-color: var(--desk-surface);
+            color: #0F172A;
+            -webkit-font-smoothing: antialiased;
         }
+
+        .font-mono {
+            font-family: var(--font-mono);
+        }
+
+        .desk-grid {
+            background-image: linear-gradient(to right, rgba(5, 150, 105, 0.05) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(5, 150, 105, 0.05) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        .solid-button {
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            box-shadow: 0 2px 0 0 rgba(0,0,0,0.8);
+        }
+        .solid-button:hover {
+            transform: translateY(1px);
+            box-shadow: 0 1px 0 0 rgba(0,0,0,0.8);
+        }
+        .solid-button:active {
+            transform: translateY(2px);
+            box-shadow: none;
+        }
+
+        .solid-card {
+            background: #ffffff;
+            border: 1px solid #E2E8F0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            transition: box-shadow 0.3s ease, border-color 0.3s ease;
+        }
+
+        .solid-card:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
+            border-color: #cbd5e1;
+        }
+
         [x-cloak] { display: none !important; }
-        @keyframes di-float {
-            0%, 100% { transform: translateY(0px) scale(1); }
-            50% { transform: translateY(-30px) scale(1.05); }
+
+        .reveal-on-scroll {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        @keyframes di-float-reverse {
-            0%, 100% { transform: translateY(0px) scale(1.05); }
-            50% { transform: translateY(20px) scale(1); }
-        }
-        @keyframes di-pulse-glow {
-            0%, 100% { opacity: 0.4; }
-            50% { opacity: 0.7; }
-        }
-        .di-orb-1 { animation: di-float 8s ease-in-out infinite; }
-        .di-orb-2 { animation: di-float-reverse 10s ease-in-out infinite; }
-        .di-orb-3 { animation: di-float 12s ease-in-out infinite 2s; }
-        .di-hero-heading { text-shadow: 0 2px 20px rgba(0,0,0,0.15), 0 4px 40px rgba(5,150,105,0.2); }
-        .di-card-accent { position: relative; overflow: hidden; }
-        .di-card-accent::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, #10b981, #14b8a6, #059669);
-            border-radius: 12px 12px 0 0;
-        }
-        .di-step-connector {
-            position: relative;
-        }
-        .di-step-connector::after {
-            content: '';
-            position: absolute;
-            top: 28px;
-            left: calc(50% + 35px);
-            width: calc(100% - 70px);
-            height: 2px;
-            background: linear-gradient(90deg, #10b981, #d1fae5);
-        }
-        .di-step-connector:last-child::after {
-            display: none;
-        }
-        @media (max-width: 639px) {
-            .di-step-connector::after { display: none; }
+        .reveal-on-scroll.is-visible {
+            opacity: 1;
+            transform: translateY(0);
         }
     </style>
 </head>
-<body class="antialiased text-gray-800 dark:text-gray-100 overflow-x-hidden" style="scroll-behavior: smooth;" x-data="{ showLoginModal: {{ isset($showLogin) && $showLogin ? 'true' : 'false' }} }">
+<body class="relative min-h-[100dvh] flex flex-col" x-data="{ showLoginModal: {{ isset($showLogin) && $showLogin ? 'true' : 'false' }} }">
 
-    <div x-show="showLoginModal" x-cloak x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4" @click.self="showLoginModal = false" @keydown.escape.window="showLoginModal = false">
-        <div x-show="showLoginModal" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95 translate-y-4" x-transition:enter-end="opacity-100 scale-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="w-full max-w-md relative overflow-hidden rounded-2xl" style="background: linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%); box-shadow: 0 25px 60px -12px rgba(0,0,0,0.5);">
-            <div class="absolute inset-0 overflow-hidden">
-                <div class="absolute -top-20 -right-20 w-40 h-40 bg-emerald-400/10 rounded-full blur-2xl"></div>
-                <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-teal-400/10 rounded-full blur-2xl"></div>
-            </div>
-            <div class="relative px-6 py-5">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-3">
-                        <img src="/icons/tax-di/icon-192.png" alt="Tax DI" class="w-12 h-12 rounded-xl ring-1 ring-white/10 shadow-lg shadow-emerald-500/20">
-                        <div>
-                            <h3 class="text-lg font-bold text-white">Tax DI</h3>
-                            <p class="text-emerald-200/60 text-xs">Mall-Grade FBR Invoicing</p>
-                        </div>
+    <!-- Login Modal -->
+    <div x-show="showLoginModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" @click="showLoginModal = false" x-transition.opacity></div>
+        <div class="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden" 
+             x-transition:enter="transition ease-out duration-300" 
+             x-transition:enter-start="opacity-0 scale-95 translate-y-4" 
+             x-transition:enter-end="opacity-100 scale-100 translate-y-0" 
+             x-transition:leave="transition ease-in duration-200" 
+             x-transition:leave-start="opacity-100 scale-100" 
+             x-transition:leave-end="opacity-0 scale-95">
+            <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-emerald-700 text-white flex items-center justify-center rounded-lg shadow-sm">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <x-pwa-install color="emerald" label="Install" />
-                        <button @click="showLoginModal = false" class="text-white/40 hover:text-white transition p-1">
-                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                        </button>
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900">Digital Invoice</h3>
+                        <p class="text-xs text-slate-500 font-mono">FBR Portal Access</p>
                     </div>
                 </div>
+                <button @click="showLoginModal = false" class="text-slate-400 hover:text-slate-600 transition p-1">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
             </div>
-            <form method="POST" action="/login" class="relative px-6 pb-6 space-y-4">
+            <form method="POST" action="/login" class="px-6 py-6 space-y-5">
                 @csrf
                 <div>
-                    <label class="block text-sm font-medium text-emerald-100/70 mb-1.5">Email, Phone, Username, CNIC or NTN</label>
-                    <input type="text" name="login" required autofocus class="w-full px-4 py-2.5 rounded-xl text-sm text-white placeholder-emerald-300/30 transition" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); outline: none;" placeholder="Enter your credential" onfocus="this.style.borderColor='rgba(52,211,153,0.5)'; this.style.boxShadow='0 0 0 3px rgba(52,211,153,0.12)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
+                    <label class="block text-xs font-bold tracking-wide text-slate-700 uppercase mb-2">Identifier</label>
+                    <input type="text" name="login" required autofocus class="w-full px-4 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors" placeholder="Email, Phone, Username, CNIC or NTN">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-emerald-100/70 mb-1.5">Password</label>
-                    <input type="password" name="password" required autocomplete="current-password" class="w-full px-4 py-2.5 rounded-xl text-sm text-white placeholder-emerald-300/30 transition" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); outline: none;" placeholder="Enter your password" onfocus="this.style.borderColor='rgba(52,211,153,0.5)'; this.style.boxShadow='0 0 0 3px rgba(52,211,153,0.12)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
+                    <label class="block text-xs font-bold tracking-wide text-slate-700 uppercase mb-2">Password</label>
+                    <input type="password" name="password" required autocomplete="current-password" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors" placeholder="••••••••">
                 </div>
                 <div class="flex items-center justify-between">
-                    <label class="flex items-center">
-                        <input type="checkbox" name="remember" class="rounded bg-white/5 border-white/10 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0 mr-2 w-4 h-4">
-                        <span class="text-sm text-emerald-200/40">Remember me</span>
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" name="remember" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 mr-2 w-4 h-4">
+                        <span class="text-sm text-slate-600">Remember me</span>
                     </label>
-                    <a href="{{ route('password.request') }}" class="text-sm text-emerald-300/70 hover:text-emerald-200 transition">Forgot Password?</a>
+                    <a href="{{ route('password.request') ?? '#' }}" class="text-sm text-emerald-700 hover:text-emerald-800 font-medium transition">Forgot Password?</a>
                 </div>
                 @if($errors->any())
-                <div class="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                <div class="bg-red-50 text-red-700 border border-red-200 rounded-lg p-3 text-sm">
                     @foreach($errors->all() as $error)
-                    <p class="text-sm text-red-400">{{ $error }}</p>
+                    <p>{{ $error }}</p>
                     @endforeach
                 </div>
                 @endif
-                <button type="submit" class="w-full py-3 rounded-xl text-sm font-bold text-white transition-all duration-200" style="background: linear-gradient(135deg, #059669, #14b8a6); box-shadow: 0 4px 20px rgba(5, 150, 105, 0.35);" onmouseover="this.style.boxShadow='0 6px 28px rgba(5, 150, 105, 0.5)'; this.style.transform='translateY(-1px)';" onmouseout="this.style.boxShadow='0 4px 20px rgba(5, 150, 105, 0.35)'; this.style.transform='translateY(0)';">
-                    Sign In
+                <button type="submit" class="w-full py-3 bg-slate-900 text-white rounded-lg text-sm font-bold solid-button">
+                    Sign In to Dashboard
                 </button>
-                <p class="text-center text-sm text-emerald-200/40">
-                    Don't have an account? <a href="/register" class="font-semibold text-emerald-300 hover:text-white transition">Sign Up Free</a>
-                </p>
+                <div class="text-center pt-2">
+                    <p class="text-sm text-slate-500">
+                        No account? <a href="/register" class="font-semibold text-emerald-700 hover:text-emerald-800 transition">Start 3-Day Trial</a>
+                    </p>
+                </div>
             </form>
         </div>
     </div>
 
-    <nav class="fixed top-0 w-full z-50 bg-white/95 backdrop-blur-2xl border-b border-gray-200 dark:border-gray-700/60 shadow-sm">
+    <!-- Navigation -->
+    <nav class="sticky top-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-slate-200">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex flex-wrap items-center justify-between gap-y-2 py-3">
-                <div class="flex items-center space-x-3">
-                    <a href="/" class="flex items-center space-x-1.5 text-gray-400 hover:text-emerald-600 transition group" title="Back to TaxNest Home">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                        <span class="text-xs font-semibold">Home</span>
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-4 sm:gap-8">
+                    <a href="/" class="flex-shrink-0">
+                        <img src="{{ asset('images/brand/taxnest-logo.svg') }}" alt="TaxNest" class="h-8">
                     </a>
-                    <div class="w-px h-6 bg-gray-200"></div>
-                    <a href="/digital-invoice" class="flex items-center space-x-2">
-                        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
-                            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                        </div>
-                        <div>
-                            <span class="text-lg font-extrabold text-gray-900 tracking-tight block leading-tight">Digital Invoice</span>
-                            <span class="text-[10px] text-gray-400 font-medium leading-none">by TaxNest</span>
-                        </div>
-                    </a>
+                    <div class="hidden md:flex items-center gap-6">
+                        <a href="/pos" class="text-sm font-medium text-slate-600 hover:text-slate-900">PRA POS</a>
+                        <a href="/fbr-pos-landing" class="text-sm font-medium text-slate-600 hover:text-slate-900">FBR POS</a>
+                        <a href="#features" class="text-sm font-medium text-slate-600 hover:text-slate-900">Features</a>
+                        <a href="#pricing" class="text-sm font-medium text-slate-600 hover:text-slate-900">Pricing</a>
+                    </div>
                 </div>
-
-                <div class="flex flex-wrap items-center gap-x-1 sm:gap-x-3 gap-y-1">
-                    <a href="#features" class="px-2 py-1.5 rounded-lg whitespace-nowrap text-[11px] sm:text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-emerald-600 transition">Features</a>
-                    <a href="#pricing" class="px-2 py-1.5 rounded-lg whitespace-nowrap text-[11px] sm:text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-emerald-600 transition">Pricing</a>
-                    <a href="#how-it-works" class="px-2 py-1.5 rounded-lg whitespace-nowrap text-[11px] sm:text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-emerald-600 transition">How It Works</a>
-                    <a href="/pos" class="group flex items-center space-x-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg whitespace-nowrap hover:bg-purple-50 transition">
-                        <div class="w-6 h-6 rounded-md bg-purple-100 group-hover:bg-purple-200 flex items-center justify-center transition">
-                            <svg class="w-3.5 h-3.5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                        </div>
-                        <span class="text-[11px] sm:text-sm font-semibold text-gray-900">PRA POS</span>
-                    </a>
-                    <a href="/fbr-pos-landing" class="group flex items-center space-x-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg whitespace-nowrap hover:bg-blue-50 transition">
-                        <div class="w-6 h-6 rounded-md bg-blue-100 group-hover:bg-blue-200 flex items-center justify-center transition">
-                            <svg class="w-3.5 h-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                        </div>
-                        <span class="text-[11px] sm:text-sm font-semibold text-gray-900">FBR POS</span>
-                    </a>
-                    <button @click="showLoginModal = true" class="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg whitespace-nowrap text-[11px] sm:text-sm font-semibold text-gray-700 dark:text-gray-300 hover:text-gray-900 transition">Log in</button>
-                    <a href="/register" class="inline-flex items-center px-4 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white rounded-xl whitespace-nowrap text-xs sm:text-sm font-semibold hover:shadow-lg transition shadow-md shadow-emerald-600/20">Sign Up Free</a>
+                <div class="flex items-center gap-3">
+                    <button @click="showLoginModal = true" class="text-sm font-medium text-slate-700 hover:text-slate-900 px-3 py-2">Log In</button>
+                    <a href="/register" class="bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold solid-button hidden sm:inline-flex">Start Free Trial</a>
                 </div>
             </div>
         </div>
     </nav>
 
-    <section class="di-gradient pt-32 pb-24 lg:pb-28 relative overflow-hidden">
-        <div class="absolute inset-0">
-            <div class="di-orb-1 absolute top-10 left-[10%] w-72 h-72 bg-emerald-400/15 rounded-full blur-3xl"></div>
-            <div class="di-orb-2 absolute bottom-10 right-[15%] w-96 h-96 bg-teal-300/10 rounded-full blur-3xl"></div>
-            <div class="di-orb-3 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-emerald-500/8 rounded-full blur-3xl" style="animation: di-pulse-glow 6s ease-in-out infinite;"></div>
-        </div>
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <div class="text-center max-w-3xl mx-auto">
-                <div class="inline-flex items-center px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 mb-6">
-                    <span class="text-sm font-semibold text-emerald-200">FBR PRAL API v1.12 Integrated</span>
+    <!-- Hero Section -->
+    <header class="relative pt-20 pb-24 lg:pt-32 lg:pb-40 overflow-hidden desk-grid border-b border-slate-200">
+        <div class="absolute inset-0 bg-gradient-to-b from-transparent to-white/90 pointer-events-none"></div>
+        <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10">
+            <div class="grid lg:grid-cols-2 gap-16 items-center">
+                <div class="max-w-2xl reveal-on-scroll">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-md text-emerald-800 text-xs font-mono font-medium mb-8">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        PRAL API v1.12 Integration Active
+                    </div>
+                    <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 leading-[1.1] tracking-tight mb-6">
+                        A perfectly organized desk for <span class="text-emerald-700">FBR invoicing.</span>
+                    </h1>
+                    <p class="text-lg text-slate-600 mb-8 leading-relaxed">
+                        TaxNest Digital Invoice turns stressful government reporting into a calm, guided workflow. Catch errors before submission, suggest HS codes in real-time, and ensure every invoice is accepted.
+                    </p>
+                    <div class="flex flex-col sm:flex-row items-center gap-4">
+                        <a href="/register" class="w-full sm:w-auto px-6 py-3.5 bg-emerald-700 text-white rounded-lg text-base font-bold solid-button text-center flex items-center justify-center gap-2">
+                            Start 3-Day Trial
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                        </a>
+                        <p class="text-xs text-slate-500 font-mono">No credit card required</p>
+                    </div>
                 </div>
-                <h1 class="di-hero-heading text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight">
-                    Digital Invoice<br>
-                    <span class="text-emerald-200/90">FBR Tax Compliance</span>
-                </h1>
-                <p class="mt-6 text-base sm:text-lg text-emerald-100/80 max-w-2xl mx-auto">
-                    Enterprise-grade FBR digital invoicing. Real-time synchronous submission via PRAL API v1.12, HS Intelligence, compliance scoring, risk detection, and immutable audit logs.
-                </p>
-                <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <a href="/register" class="w-full sm:w-auto px-8 py-3.5 bg-white dark:bg-gray-900 text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-50 transition shadow-2xl shadow-white/20 text-center">Start 3-Day Free Trial</a>
-                    <button @click="showLoginModal = true" class="w-full sm:w-auto px-8 py-3.5 border border-white/30 bg-white/5 backdrop-blur-sm text-white rounded-xl text-sm font-bold hover:bg-white/15 hover:border-white/50 transition">Login to Dashboard</button>
+                <div class="relative lg:-mr-12 xl:-mr-24 reveal-on-scroll" style="transition-delay: 0.2s">
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden solid-card">
+                        <div class="bg-slate-50 border-b border-slate-200 px-4 py-3 flex items-center gap-2">
+                            <div class="flex gap-1.5">
+                                <div class="w-3 h-3 rounded-full bg-slate-300"></div>
+                                <div class="w-3 h-3 rounded-full bg-slate-300"></div>
+                                <div class="w-3 h-3 rounded-full bg-slate-300"></div>
+                            </div>
+                            <div class="ml-4 px-3 py-1 bg-white border border-slate-200 rounded text-[10px] font-mono text-slate-500 flex-1 max-w-[200px] truncate">
+                                taxnest.com/digital-invoice
+                            </div>
+                        </div>
+                        <img src="{{ asset('images/screenshots/di-dash.jpg') }}" alt="Digital Invoice Dashboard" class="w-full h-auto block">
+                    </div>
+                    <!-- Decorative element indicating precision -->
+                    <div class="absolute -bottom-6 -left-6 bg-slate-900 text-white px-4 py-3 rounded-lg shadow-lg font-mono text-xs hidden sm:block border border-slate-700">
+                        <div class="flex items-center gap-2 text-emerald-400 mb-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            <span>Validation Passed</span>
+                        </div>
+                        <span class="text-slate-400">Payload ready for PRAL API</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Features Ledger Section -->
+    <section id="features" class="py-24 bg-white border-b border-slate-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="mb-16 max-w-3xl reveal-on-scroll">
+                <h2 class="text-3xl font-bold text-slate-900 tracking-tight mb-4">Precision-engineered for compliance.</h2>
+                <p class="text-lg text-slate-600">Every feature is built around a single goal: ensuring your invoices are structurally perfect before FBR ever sees them.</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Feature 1 -->
+                <div class="solid-card p-8 rounded-xl reveal-on-scroll">
+                    <div class="w-10 h-10 bg-emerald-50 border border-emerald-100 text-emerald-700 flex items-center justify-center rounded-lg mb-6">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-900 mb-2">Pre-Submission Validation</h3>
+                    <p class="text-slate-600 text-sm leading-relaxed">Tax-schedule validation (ScheduleEngine) and payload checking ensure errors are caught and fixed before FBR sees them, preventing rejected submissions.</p>
+                </div>
+
+                <!-- Feature 2 -->
+                <div class="solid-card p-8 rounded-xl reveal-on-scroll">
+                    <div class="w-10 h-10 bg-slate-50 border border-slate-200 text-slate-700 flex items-center justify-center rounded-lg mb-6">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-900 mb-2">HS Code Intelligence</h3>
+                    <p class="text-slate-600 text-sm leading-relaxed">Receive real-time HS code suggestions while creating your invoice. Never guess a tax rate again; the system guides you to the right classification.</p>
+                </div>
+
+                <!-- Feature 3 -->
+                <div class="solid-card p-8 rounded-xl reveal-on-scroll">
+                    <div class="w-10 h-10 bg-slate-50 border border-slate-200 text-slate-700 flex items-center justify-center rounded-lg mb-6">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-900 mb-2">Sandbox & Production Modes</h3>
+                    <p class="text-slate-600 text-sm leading-relaxed">Train your staff safely in Sandbox mode without affecting real FBR data. Switch to Production instantly when you're ready to go live.</p>
+                </div>
+
+                <!-- Feature 4 -->
+                <div class="solid-card p-8 rounded-xl reveal-on-scroll">
+                    <div class="w-10 h-10 bg-slate-50 border border-slate-200 text-slate-700 flex items-center justify-center rounded-lg mb-6">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-900 mb-2">Clean B&W PDFs</h3>
+                    <p class="text-slate-600 text-sm leading-relaxed">Generate perfectly formatted, clean black-and-white invoice PDFs featuring dual invoice numbering (internal + FBR) and all required per-item FBR fields.</p>
+                </div>
+
+                <!-- Feature 5 -->
+                <div class="solid-card p-8 rounded-xl reveal-on-scroll">
+                    <div class="w-10 h-10 bg-slate-50 border border-slate-200 text-slate-700 flex items-center justify-center rounded-lg mb-6">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-900 mb-2">Ledger & WHT Manager</h3>
+                    <p class="text-slate-600 text-sm leading-relaxed">Integrated customer ledger with automatic debits, alongside a dedicated WHT manager to keep track of withholdings seamlessly.</p>
+                </div>
+
+                <!-- Feature 6 -->
+                <div class="solid-card p-8 rounded-xl reveal-on-scroll">
+                    <div class="w-10 h-10 bg-slate-50 border border-slate-200 text-slate-700 flex items-center justify-center rounded-lg mb-6">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-900 mb-2">Immutable Audit Logs</h3>
+                    <p class="text-slate-600 text-sm leading-relaxed">Every action leaves a permanent trace. MIS reports and immutable audit logs ensure complete transparency across multi-branch setups.</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <section id="features" class="py-24 lg:py-28 bg-white dark:bg-gray-900">
+    <!-- Workflow / UI Showcase -->
+    <section class="py-24 bg-slate-50 border-b border-slate-200 overflow-hidden">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-16">
-                <h2 class="text-3xl font-bold text-gray-900">Everything You Need for FBR Compliance</h2>
-                <p class="mt-4 text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">Purpose-built for Pakistan's Federal Board of Revenue regulations with enterprise-grade infrastructure.</p>
+            <div class="grid lg:grid-cols-2 gap-16 items-center">
+                <div class="order-2 lg:order-1 reveal-on-scroll">
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-lg p-2 solid-card">
+                        <img src="{{ asset('images/screenshots/di-create.jpg') }}" alt="Invoice Creation Form" class="w-full h-auto rounded border border-slate-100">
+                    </div>
+                </div>
+                <div class="order-1 lg:order-2 reveal-on-scroll">
+                    <h2 class="text-3xl font-bold text-slate-900 tracking-tight mb-6">A clear interface for complex data.</h2>
+                    <p class="text-lg text-slate-600 mb-8">No more staring at dense portal screens. We've organized the required FBR data points into a logical, airy layout that feels like a modern spreadsheet.</p>
+                    
+                    <ul class="space-y-4">
+                        <li class="flex items-start gap-3">
+                            <div class="w-6 h-6 rounded bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="text-slate-700 font-medium">Per-item FBR fields clearly exposed and validated.</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <div class="w-6 h-6 rounded bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="text-slate-700 font-medium">Real-time feedback before you hit submit.</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <div class="w-6 h-6 rounded bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="text-slate-700 font-medium">Installable PWA for fast desktop access.</span>
+                        </li>
+                    </ul>
+                </div>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <div class="di-card-accent bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
-                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
-                        <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Real-time FBR Submission</h3>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">Direct synchronous submission to FBR via PRAL API v1.12. Instant confirmation, automatic invoice locking, and QR code generation.</p>
+
+            <div class="grid lg:grid-cols-2 gap-16 items-center mt-32">
+                <div class="reveal-on-scroll">
+                    <h2 class="text-3xl font-bold text-slate-900 tracking-tight mb-6">Track every submission meticulously.</h2>
+                    <p class="text-lg text-slate-600 mb-8">Maintain a perfect historical record. The invoice list provides immediate status visibility and quick access to clean PDFs.</p>
+                    <a href="/register" class="text-emerald-700 font-bold hover:text-emerald-800 transition flex items-center gap-1">
+                        Try the workflow yourself
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                    </a>
                 </div>
-                <div class="di-card-accent bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
-                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
-                        <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                <div class="reveal-on-scroll">
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-lg p-2 solid-card">
+                        <img src="{{ asset('images/screenshots/di-list.jpg') }}" alt="Invoice List" class="w-full h-auto rounded border border-slate-100">
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">HS Intelligence Engine</h3>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">AI-powered HS code suggestions with confidence scoring. Auto-suggests tax rates, SRO numbers, and learns from every submission.</p>
-                </div>
-                <div class="di-card-accent bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
-                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
-                        <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Risk Detection Engine</h3>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">Pre-submission risk analysis with anomaly scoring. Blocks problematic invoices before they reach FBR.</p>
-                </div>
-                <div class="di-card-accent bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
-                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
-                        <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Compliance Scoring</h3>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">Formula-based scoring system rates every invoice before submission. Ensures maximum compliance with FBR regulations.</p>
-                </div>
-                <div class="di-card-accent bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
-                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
-                        <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">PDF + QR Generation</h3>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">FBR-compliant PDF invoices with watermarks, QR codes, and dual invoice numbering (internal + FBR).</p>
-                </div>
-                <div class="di-card-accent bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
-                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
-                        <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Immutable Audit Logs</h3>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">SHA-256 signed audit trail with integrity verification. Tamper-proof activity tracking for compliance.</p>
-                </div>
-                <div class="di-card-accent bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
-                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
-                        <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Multi-Branch Support</h3>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">Manage multiple business branches with centralized invoicing, customer ledger, and role-based access control.</p>
-                </div>
-                <div class="di-card-accent bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
-                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
-                        <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Enterprise Analytics</h3>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">KPIs, compliance metrics, customer ledger analytics, and detailed MIS dashboards for business intelligence.</p>
-                </div>
-                <div class="di-card-accent bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700/50 transition duration-300 hover:-translate-y-1 hover:shadow-xl group">
-                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-teal-400/20 group-hover:from-emerald-400/30 group-hover:to-teal-400/30 flex items-center justify-center mb-4 transition">
-                        <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">6 Login Methods</h3>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">Email, Phone, Username, CNIC, NTN, or FBR Registration number. Maximum flexibility for all business types.</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <section id="pricing" class="py-24 lg:py-28 bg-gray-50 dark:bg-gray-800">
+    <!-- Pricing Section -->
+    <section id="pricing" class="py-24 bg-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-12">
-                <h2 class="text-3xl font-bold text-gray-900">Digital Invoice Plans</h2>
-                <p class="mt-4 text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">Flexible billing cycles with savings on longer commitments</p>
+            <div class="text-center mb-16 reveal-on-scroll">
+                <h2 class="text-3xl font-bold text-slate-900 tracking-tight mb-4">Simple, predictable pricing.</h2>
+                <p class="text-lg text-slate-600 max-w-2xl mx-auto">Choose the billing cycle that fits your business. All plans include 3-day free trial.</p>
             </div>
 
             <div x-data="{
@@ -293,158 +355,127 @@
                     calcMonthly(base) {
                         return Math.round(this.calcPrice(base) / this.months[this.cycle]);
                     }
-                }">
-                <div class="flex justify-center mb-8 overflow-x-auto">
-                    <div class="inline-flex bg-white dark:bg-gray-900 rounded-xl p-1 border border-gray-200 dark:border-gray-700 shadow-sm flex-shrink-0">
-                        <button @click="cycle = 'monthly'" :class="cycle === 'monthly' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Monthly</button>
-                        <button @click="cycle = 'quarterly'" :class="cycle === 'quarterly' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Quarterly <span class="text-[10px] opacity-75">-1%</span></button>
-                        <button @click="cycle = 'semi_annual'" :class="cycle === 'semi_annual' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Semi-Annual <span class="text-[10px] opacity-75">-3%</span></button>
-                        <button @click="cycle = 'annual'" :class="cycle === 'annual' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Annual <span class="text-[10px] opacity-75">-6%</span></button>
+                }" class="reveal-on-scroll">
+                
+                <!-- Billing Toggle -->
+                <div class="flex justify-center mb-12">
+                    <div class="inline-flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+                        <button @click="cycle = 'monthly'" :class="cycle === 'monthly' ? 'bg-white shadow-sm border-slate-200 text-slate-900' : 'border-transparent text-slate-600 hover:text-slate-900'" class="px-5 py-2 rounded-md text-sm font-bold transition border">Monthly</button>
+                        <button @click="cycle = 'quarterly'" :class="cycle === 'quarterly' ? 'bg-white shadow-sm border-slate-200 text-slate-900' : 'border-transparent text-slate-600 hover:text-slate-900'" class="px-5 py-2 rounded-md text-sm font-bold transition border flex items-center gap-1.5">Quarterly <span class="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded text-[10px] font-mono leading-none">-1%</span></button>
+                        <button @click="cycle = 'semi_annual'" :class="cycle === 'semi_annual' ? 'bg-white shadow-sm border-slate-200 text-slate-900' : 'border-transparent text-slate-600 hover:text-slate-900'" class="px-5 py-2 rounded-md text-sm font-bold transition border flex items-center gap-1.5">Semi-Annual <span class="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded text-[10px] font-mono leading-none">-3%</span></button>
+                        <button @click="cycle = 'annual'" :class="cycle === 'annual' ? 'bg-white shadow-sm border-slate-200 text-slate-900' : 'border-transparent text-slate-600 hover:text-slate-900'" class="px-5 py-2 rounded-md text-sm font-bold transition border flex items-center gap-1.5">Annual <span class="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded text-[10px] font-mono leading-none">-6%</span></button>
                     </div>
                 </div>
 
                 @if(isset($plans) && $plans->count())
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
-                @foreach($plans as $plan)
-                @php
-                    $isPopular = $plan->name === 'Business';
-                    $hasOffer = $plan->sale_percent > 0;
-                @endphp
-                <div class="relative rounded-xl shadow-md overflow-hidden transition duration-300 hover:-translate-y-1 hover:shadow-xl {{ $isPopular ? 'ring-2 ring-emerald-400/80 shadow-lg shadow-emerald-500/10' : '' }}">
-                    @if($isPopular)
-                    <div class="bg-gradient-to-r from-emerald-500 to-teal-500 text-center py-1.5">
-                        <span class="text-white text-xs font-bold tracking-wide">BEST VALUE</span>
-                    </div>
-                    @endif
-                    <div class="{{ $isPopular ? 'bg-gradient-to-b from-emerald-50/50 to-white border-emerald-400/30 border-t-0 rounded-b-xl' : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 rounded-xl' }} border p-5">
-                        <h3 class="text-lg font-bold text-gray-900">{{ $plan->name }}</h3>
-                        @if($hasOffer)
-                        <span class="inline-block mt-2 px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full text-[11px] font-bold">{{ $plan->sale_badge }}</span>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+                    @foreach($plans as $plan)
+                    @php
+                        $isPopular = $plan->name === 'Business';
+                        $hasOffer = $plan->sale_percent > 0;
+                    @endphp
+                    <div class="solid-card rounded-xl overflow-hidden flex flex-col {{ $isPopular ? 'border-emerald-600 ring-1 ring-emerald-600' : '' }}">
+                        @if($isPopular)
+                        <div class="bg-emerald-600 text-white text-xs font-bold font-mono text-center py-2 uppercase tracking-widest border-b border-emerald-700">
+                            Recommended
+                        </div>
                         @endif
-                        <div class="mt-3 mb-1">
-                            <div x-show="cycle === 'monthly'">
-                                @if($hasOffer)<span class="text-lg text-gray-400 line-through mr-1">PKR {{ number_format($plan->price, 0) }}</span>@endif
-                                <span class="text-3xl font-black text-gray-900">PKR {{ number_format($plan->sale_price, 0) }}</span>
-                                <span class="text-gray-400 text-sm">/mo</span>
+                        <div class="p-6 flex-1 flex flex-col">
+                            <h3 class="text-xl font-bold text-slate-900">{{ $plan->name }}</h3>
+                            
+                            <div class="mt-6 mb-8">
+                                <div x-show="cycle === 'monthly'">
+                                    @if($hasOffer)<span class="text-sm text-slate-400 line-through block mb-1">PKR {{ number_format($plan->price, 0) }}</span>@endif
+                                    <div class="flex items-baseline gap-1">
+                                        <span class="text-3xl font-bold text-slate-900 tracking-tight">PKR {{ number_format($plan->sale_price, 0) }}</span>
+                                        <span class="text-slate-500 font-mono text-sm">/mo</span>
+                                    </div>
+                                </div>
+                                <div x-show="cycle !== 'monthly'" style="display:none;">
+                                    @if($hasOffer)<span class="text-sm text-slate-400 line-through block mb-1">PKR <span x-text="calcMonthly({{ $plan->price }}).toLocaleString()"></span></span>@endif
+                                    <div class="flex items-baseline gap-1">
+                                        <span class="text-3xl font-bold text-slate-900 tracking-tight">PKR <span x-text="calcMonthly({{ $plan->sale_price }}).toLocaleString()"></span></span>
+                                        <span class="text-slate-500 font-mono text-sm">/mo</span>
+                                    </div>
+                                    <div class="mt-2 text-xs text-emerald-700 bg-emerald-50 inline-block px-2 py-1 rounded font-mono border border-emerald-100">
+                                        Billed PKR <span x-text="calcPrice({{ $plan->sale_price }}).toLocaleString()"></span>
+                                    </div>
+                                </div>
                             </div>
-                            <div x-show="cycle !== 'monthly'" style="display:none;">
-                                @if($hasOffer)<span class="text-lg text-gray-400 line-through mr-1">PKR <span x-text="calcMonthly({{ $plan->price }}).toLocaleString()"></span></span>@endif
-                                <span class="text-3xl font-black text-gray-900">PKR <span x-text="calcMonthly({{ $plan->sale_price }}).toLocaleString()"></span></span>
-                                <span class="text-gray-400 text-sm">/mo</span>
-                                <p class="text-xs text-gray-500 mt-1">@if($hasOffer)<span class="line-through mr-1">PKR <span x-text="calcPrice({{ $plan->price }}).toLocaleString()"></span></span> @endif PKR <span x-text="calcPrice({{ $plan->sale_price }}).toLocaleString()"></span> total</p>
-                            </div>
-                        </div>
-                        <p class="text-xs text-emerald-600 font-medium" x-show="cycle === 'monthly'">Save up to 6% on annual billing</p>
 
-                        @php
-                            $diFeatures = is_array($plan->features) ? $plan->features : (is_string($plan->features) ? json_decode($plan->features, true) : []);
-                        @endphp
-                        <div class="mt-4 pt-4 border-t border-gray-100 space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                            @if(!empty($diFeatures))
-                                @foreach($diFeatures as $feature)
-                                <div class="flex items-center gap-2">
-                                    <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                    {{ $feature }}
-                                </div>
-                                @endforeach
-                            @else
-                                <div class="flex items-center gap-2">
-                                    <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                    {{ $plan->invoice_limit > 0 ? number_format($plan->invoice_limit) . ' invoices/mo' : 'Unlimited invoices' }}
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                    FBR real-time submission
-                                </div>
-                            @endif
-                        </div>
+                            @php
+                                $diFeatures = is_array($plan->features) ? $plan->features : (is_string($plan->features) ? json_decode($plan->features, true) : []);
+                            @endphp
+                            
+                            <ul class="space-y-3 mb-8 flex-1">
+                                @if(!empty($diFeatures))
+                                    @foreach($diFeatures as $feature)
+                                    <li class="flex items-start gap-3 text-sm text-slate-600">
+                                        <svg class="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                        {{ $feature }}
+                                    </li>
+                                    @endforeach
+                                @else
+                                    <li class="flex items-start gap-3 text-sm text-slate-600">
+                                        <svg class="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                        {{ $plan->invoice_limit > 0 ? number_format($plan->invoice_limit) . ' invoices/mo' : 'Unlimited invoices' }}
+                                    </li>
+                                    <li class="flex items-start gap-3 text-sm text-slate-600">
+                                        <svg class="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                        FBR PRAL API Submission
+                                    </li>
+                                @endif
+                            </ul>
 
-                        <div class="mt-5">
-                            <a href="/register" class="block w-full py-2.5 rounded-lg text-sm font-semibold text-center transition shadow-md hover:shadow-lg {{ $isPopular ? 'bg-gradient-to-r from-emerald-500 to-emerald-700 text-white' : 'bg-gray-900 text-white hover:bg-gray-800' }}">Start Free Trial</a>
+                            <a href="/register" class="block w-full py-3 rounded-lg text-sm font-bold text-center solid-button {{ $isPopular ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-900 border border-slate-300 hover:bg-slate-200' }}">
+                                Start Free Trial
+                            </a>
                         </div>
                     </div>
+                    @endforeach
                 </div>
-                @endforeach
-            </div>
-
-            <div class="mt-8 text-center">
-                <div class="inline-flex flex-wrap items-center justify-center gap-6 text-xs text-gray-400">
-                    <span class="flex items-center gap-1.5">
-                        <svg class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                        FBR compliant
-                    </span>
-                    <span class="flex items-center gap-1.5">
-                        <svg class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        3-day free trial
-                    </span>
-                    <span class="flex items-center gap-1.5">
-                        <svg class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-                        No credit card required
-                    </span>
-                </div>
-            </div>
-            @endif
+                @endif
             </div>
         </div>
     </section>
 
-    <section id="how-it-works" class="py-24 lg:py-28 bg-white dark:bg-gray-900">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-12">
-                <h2 class="text-3xl font-bold text-gray-900">How Digital Invoice Works</h2>
-                <p class="mt-4 text-gray-600 dark:text-gray-400">Simple 5-step process from invoice creation to FBR submission</p>
-            </div>
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-6">
-                <div class="text-center di-step-connector">
-                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 text-white flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-lg shadow-emerald-500/25">1</div>
-                    <h4 class="font-bold text-gray-900 mb-2">Create Invoice</h4>
-                    <p class="text-xs text-gray-600 dark:text-gray-400">Add buyer details, line items, HS codes, and tax rates using the smart invoice builder</p>
+    <!-- Footer CTA & Footer -->
+    <footer class="mt-auto border-t border-slate-200 bg-slate-900">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
+            <h2 class="text-3xl font-bold text-white tracking-tight mb-6">Ready for a calmer month-end?</h2>
+            <p class="text-slate-400 mb-8 max-w-xl mx-auto">Get full access to Digital Invoice for 3 days. No credit card required. Experience validation that actually works.</p>
+            <a href="/register" class="inline-flex px-8 py-4 bg-emerald-600 text-white rounded-lg text-base font-bold solid-button hover:bg-emerald-500 transition-colors">
+                Start Trial Account
+            </a>
+        </div>
+        <div class="border-t border-slate-800 py-8">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-6">
+                    <img src="{{ asset('images/brand/taxnest-logo-white.svg') }}" alt="TaxNest" class="h-6 opacity-50">
+                    <p class="text-sm font-mono text-slate-500">© {{ date('Y') }} TaxNest. All rights reserved.</p>
                 </div>
-                <div class="text-center di-step-connector">
-                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 text-white flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-lg shadow-emerald-500/25">2</div>
-                    <h4 class="font-bold text-gray-900 mb-2">AI Validation</h4>
-                    <p class="text-xs text-gray-600 dark:text-gray-400">HS Intelligence auto-suggests codes, risk engine checks for anomalies, compliance score calculated</p>
-                </div>
-                <div class="text-center di-step-connector">
-                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 text-white flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-lg shadow-emerald-500/25">3</div>
-                    <h4 class="font-bold text-gray-900 mb-2">Submit to FBR</h4>
-                    <p class="text-xs text-gray-600 dark:text-gray-400">One-click real-time submission to FBR via PRAL API. Idempotency shield prevents duplicates</p>
-                </div>
-                <div class="text-center di-step-connector">
-                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 text-white flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-lg shadow-emerald-500/25">4</div>
-                    <h4 class="font-bold text-gray-900 mb-2">FBR Confirmation</h4>
-                    <p class="text-xs text-gray-600 dark:text-gray-400">Receive FBR invoice number, QR code, and confirmation. Invoice auto-locked for compliance</p>
-                </div>
-                <div class="text-center di-step-connector">
-                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 text-white flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow-lg shadow-emerald-500/25">5</div>
-                    <h4 class="font-bold text-gray-900 mb-2">Download PDF</h4>
-                    <p class="text-xs text-gray-600 dark:text-gray-400">Generate FBR-compliant PDF with watermarks, QR codes, and dual invoice numbering</p>
+                <div class="flex items-center gap-6">
+                    <a href="/pos" class="text-sm font-mono text-slate-500 hover:text-white transition">PRA POS</a>
+                    <a href="/fbr-pos-landing" class="text-sm font-mono text-slate-500 hover:text-white transition">FBR POS</a>
                 </div>
             </div>
         </div>
-    </section>
+    </footer>
 
-    <section class="py-24 lg:py-28 bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-800 relative overflow-hidden">
-        <div class="absolute inset-0">
-            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-400/10 rounded-full blur-3xl"></div>
-        </div>
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-            <h2 class="text-3xl font-bold text-white mb-4 di-hero-heading">Ready to Get FBR Compliant?</h2>
-            <p class="text-emerald-100/80 mb-8">Start your 3-day free trial. No credit card required.</p>
-            <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <a href="/register" class="w-full sm:w-auto px-8 py-3.5 bg-white dark:bg-gray-900 text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-50 transition shadow-2xl shadow-white/15 text-center">Create Free Account</a>
-                <button @click="showLoginModal = true" class="w-full sm:w-auto px-8 py-3.5 border border-white/30 bg-white/5 backdrop-blur-sm text-white rounded-xl text-sm font-bold hover:bg-white/15 hover:border-white/50 transition">Login to Dashboard</button>
-            </div>
-        </div>
-    </section>
+    <script>
+        // Simple scroll reveal
+        document.addEventListener('DOMContentLoaded', () => {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('is-visible');
+                    }
+                });
+            }, { threshold: 0.1 });
 
-    <div class="bg-gray-900 py-4 border-t border-gradient-to-r" style="border-image: linear-gradient(90deg, #10b981, #14b8a6, #059669) 1;">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
-            <p class="text-xs text-gray-500 dark:text-gray-400">&copy; {{ date('Y') }} TaxNest. All rights reserved.</p>
-            <span class="text-xs text-gray-500 dark:text-gray-400 flex items-center"><svg class="w-3.5 h-3.5 mr-1 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>FBR API v1.12 Integrated</span>
-        </div>
-    </div>
-
-        <x-whatsapp-support />
+            document.querySelectorAll('.reveal-on-scroll').forEach(el => observer.observe(el));
+        });
+    </script>
+    <x-whatsapp-support />
 </body>
 </html>

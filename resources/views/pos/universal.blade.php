@@ -189,10 +189,6 @@ window.addEventListener('popstate', function() {
 </script>
 
 <div x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
-    <div class="bg-purple-600 text-white text-[10px] font-bold tracking-wider uppercase px-3 py-1 text-center shadow-sm">
-        ⚡ UNIVERSAL POS · Category: {{ $company->business_category ?? 'default' }} · BUILD {{ now()->format('H:i:s') }} · v18-PROFIT-BI
-    </div>
-
     {{-- PRA Reporting + Auto-Print toggles strip (visible to admin + cashier).
          autoPrintEnabled lives on the parent restaurantPos() scope (mirrors kitchenSettings.print_on_pay)
          so toggling immediately updates the receipt-iframe URL on the very next sale, no refresh needed. --}}

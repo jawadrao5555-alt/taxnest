@@ -29,28 +29,6 @@
         .font-mono { font-family: 'JetBrains Mono', monospace; }
         
         [x-cloak] { display: none !important; }
-        
-        .fade-in-up {
-            opacity: 0;
-            transform: translateY(20px);
-            transition: opacity 0.8s ease-out, transform 0.8s ease-out;
-        }
-        .fade-in-up.is-visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        /* Solid components, neutral shadows */
-        .card-solid {
-            background: #FFFFFF;
-            border: 1px solid rgba(0,0,0,0.08);
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        .card-solid:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04);
-        }
 
         .btn-solid {
             display: inline-flex;
@@ -59,66 +37,50 @@
             padding: 0.75rem 1.5rem;
             font-weight: 600;
             font-size: 0.875rem;
-            border-radius: 0.375rem;
+            border-radius: 0;
             transition: all 0.2s ease;
-        }
-        .btn-primary {
-            background-color: var(--teal-dark);
-            color: #FFFFFF;
-            border: 1px solid transparent;
-        }
-        .btn-primary:hover {
-            background-color: var(--teal-main);
-        }
-        .btn-secondary {
-            background-color: #FFFFFF;
-            color: var(--teal-dark);
-            border: 1px solid rgba(0,0,0,0.15);
-            box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
-        }
-        .btn-secondary:hover {
-            background-color: #F9FAFB;
-            border-color: rgba(0,0,0,0.25);
-        }
-        
-        /* NestPOS Accent */
-        .accent-product { color: #7C3AED; }
-        .bg-accent-product { background-color: #7C3AED; }
-        .border-accent-product { border-color: #7C3AED; }
-
-        /* Grid Backgrounds */
-        .bg-grid-pattern {
-            background-image: linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
-                              linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px);
-            background-size: 40px 40px;
-        }
-        .bg-grid-pattern-dark {
-            background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-                              linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-            background-size: 40px 40px;
         }
 
         /* Nav Transition */
         .nav-scrolled {
-            background-color: rgba(253, 251, 247, 0.95);
+            background-color: rgba(5, 39, 48, 0.85);
             backdrop-filter: blur(8px);
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-            box-shadow: 0 1px 3px 0 rgba(0,0,0,0.05);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
         }
         .nav-transparent {
             background-color: transparent;
             border-bottom: 1px solid transparent;
         }
         
-        .key-cap {
-            background: #ffffff;
-            border: 1px solid #d1d5db;
-            border-bottom-width: 3px;
-            border-radius: 4px;
-            padding: 2px 6px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: #4b5563;
+        .thermal-receipt {
+            background: #fff;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+        .thermal-receipt::before {
+            content: "";
+            position: absolute;
+            top: -5px;
+            left: 0;
+            right: 0;
+            height: 10px;
+            background: linear-gradient(-45deg, transparent 5px, #fff 0), linear-gradient(45deg, transparent 5px, #fff 0);
+            background-repeat: repeat-x;
+            background-size: 10px 10px;
+            background-position: left top;
+        }
+        .thermal-receipt::after {
+            content: "";
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            right: 0;
+            height: 10px;
+            background: linear-gradient(-45deg, transparent 5px, #fff 0), linear-gradient(45deg, transparent 5px, #fff 0);
+            background-repeat: repeat-x;
+            background-size: 10px 10px;
+            background-position: left bottom;
+            transform: rotate(180deg);
         }
     </style>
 </head>
@@ -129,88 +91,120 @@
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-20">
                 <a href="/" class="flex items-center space-x-2 group flex-shrink-0">
-                    <img src="{{ asset('images/brand/taxnest-logo.svg') }}" x-show="scrolled || mobileMenuOpen" alt="TaxNest" class="h-6 w-auto">
-                    <img src="{{ asset('images/brand/taxnest-logo-white.svg') }}" x-show="!scrolled && !mobileMenuOpen" alt="TaxNest" class="h-6 w-auto">
-                    <div class="h-4 w-px mx-2" :class="(scrolled || mobileMenuOpen) ? 'bg-gray-300' : 'bg-white/30'"></div>
+                    <img src="{{ asset('images/brand/taxnest-logo-white.svg') }}" alt="TaxNest" class="h-6 w-auto">
+                    <div class="h-4 w-px mx-2 bg-white/30"></div>
                     <div>
-                        <span class="text-lg font-serif font-bold tracking-tight block leading-none" :class="(scrolled || mobileMenuOpen) ? 'text-[#052730]' : 'text-white'">NestPOS</span>
+                        <span class="text-lg font-serif font-bold tracking-tight block leading-none text-white">NestPOS</span>
                     </div>
                 </a>
                 
                 <div class="hidden md:flex items-center space-x-8">
-                    <a href="#features" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Features</a>
-                    <a href="#editions" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Editions & Pricing</a>
+                    <a href="#features" class="text-sm font-medium text-gray-200 hover:text-white transition-colors">Features</a>
+                    <a href="#editions" class="text-sm font-medium text-gray-200 hover:text-white transition-colors">Editions & Pricing</a>
                 </div>
                 
                 <div class="flex items-center space-x-4">
-                    <a href="/pos/login" class="hidden sm:inline text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Log In</a>
-                    <a href="/pos/register" class="btn-solid" :class="scrolled ? 'btn-primary' : 'bg-white text-[#052730] hover:bg-gray-100'">Start Free Trial</a>
+                    <a href="/pos/login" class="hidden sm:inline text-sm font-medium text-gray-200 hover:text-white transition-colors">Log In</a>
+                    <a href="/pos/register" class="btn-solid bg-white text-[#052730] hover:bg-gray-100">Start Free Trial</a>
                     <button @click="mobileMenuOpen = !mobileMenuOpen" class="md:hidden p-2 -mr-2" aria-label="Menu">
-                        <svg x-show="!mobileMenuOpen" class="w-6 h-6" :class="scrolled ? 'text-gray-800' : 'text-white'" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-                        <svg x-show="mobileMenuOpen" x-cloak class="w-6 h-6 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        <svg x-show="!mobileMenuOpen" class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                        <svg x-show="mobileMenuOpen" x-cloak class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
             </div>
             
-            <div x-show="mobileMenuOpen" x-cloak @click.away="mobileMenuOpen = false" class="md:hidden border-t border-gray-200 py-4 space-y-1 bg-[#FDFBF7]">
-                <a href="#features" @click="mobileMenuOpen = false" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Features</a>
-                <a href="#editions" @click="mobileMenuOpen = false" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Editions & Pricing</a>
-                <a href="/pos/login" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Log In</a>
+            <div x-show="mobileMenuOpen" x-cloak @click.away="mobileMenuOpen = false" class="md:hidden border-t border-white/10 py-4 space-y-1 bg-[#052730]">
+                <a href="#features" @click="mobileMenuOpen = false" class="block px-4 py-2.5 text-sm font-medium text-gray-200 hover:bg-white/5">Features</a>
+                <a href="#editions" @click="mobileMenuOpen = false" class="block px-4 py-2.5 text-sm font-medium text-gray-200 hover:bg-white/5">Editions & Pricing</a>
+                <a href="/pos/login" class="block px-4 py-2.5 text-sm font-medium text-gray-200 hover:bg-white/5">Log In</a>
             </div>
         </div>
     </nav>
 
     <!-- Hero Section -->
     <section class="relative bg-[#052730] pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden border-b border-[#0A4D5C]">
-        <div class="absolute inset-0 bg-grid-pattern-dark opacity-50"></div>
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+            <div class="flex flex-col lg:flex-row gap-12 lg:gap-24 items-start">
                 
-                <div class="lg:col-span-6 lg:pr-8 fade-in-up">
-                    <div class="inline-flex items-center px-3 py-1 bg-white/10 border border-white/20 backdrop-blur rounded-full text-xs font-medium text-white/90 tracking-wide uppercase mb-8">
-                        <span class="w-1.5 h-1.5 rounded-full bg-accent-product mr-2"></span>
-                        Punjab PRA Compliant
+                <div class="w-full lg:w-6/12 pt-8 lg:pt-16">
+                    <div class="inline-block border-l-2 border-purple-700 pl-3 text-purple-400 font-mono text-xs uppercase tracking-widest mb-8">
+                        PRA Integrated POS
                     </div>
                     
-                    <h1 class="text-4xl sm:text-5xl lg:text-7xl font-serif text-white leading-tight mb-8">
-                        Ring Up <span class="italic text-[#E7BF3B]">Faster.</span>
+                    <h1 class="text-5xl sm:text-6xl lg:text-7xl font-serif text-white leading-tight mb-8">
+                        The rush hour register.
                     </h1>
-                    <p class="text-lg lg:text-xl text-white/70 leading-relaxed mb-10 font-light">
-                        A keyboard-fast point of sale built for Punjab's real shop counters. Process a queue of customers at rush hour without lifting your hands from the keys. PRA compliance is built in, so you never think about it.
+                    <p class="text-lg lg:text-xl text-gray-300 leading-relaxed mb-12 font-light max-w-lg">
+                        A point of sale built for Punjab's busiest shop counters. Clear the evening queue using only the keyboard. PRA fiscal reporting happens automatically in the background.
                     </p>
                     
-                    <div class="flex flex-col sm:flex-row items-start gap-4">
-                        <a href="/pos/register" class="btn-solid bg-[#E7BF3B] text-[#062A33] hover:bg-[#F2D06B]">
+                    <div class="flex flex-col sm:flex-row items-start gap-6">
+                        <a href="/pos/register" class="btn-solid bg-[#E7BF3B] text-[#062A33] hover:bg-[#F2D06B] px-8 py-4 text-base">
                             Start 3-Day Free Trial
                         </a>
-                        <a href="#features" class="btn-solid bg-white/10 border border-white/20 text-white hover:bg-white/20 backdrop-blur">
-                            Explore Features
-                        </a>
-                    </div>
-                    
-                    <div class="mt-8 flex items-center space-x-6 text-sm text-white/50">
-                        <span class="flex items-center"><svg class="w-4 h-4 mr-2 text-[#2EA0B3]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> No Credit Card</span>
-                        <span class="flex items-center"><svg class="w-4 h-4 mr-2 text-[#2EA0B3]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Instant Setup</span>
+                        <div class="flex items-center h-full pt-4 sm:pt-0">
+                            <span class="font-mono text-xs text-white/50">No credit card required.</span>
+                        </div>
                     </div>
                 </div>
 
-                <div class="lg:col-span-6 relative fade-in-up" style="transition-delay: 200ms;">
-                    <div class="absolute inset-0 bg-[#063B47] transform translate-x-4 translate-y-4 rounded-lg border border-white/10"></div>
-                    <div class="relative bg-[#052730] rounded-lg border border-white/15 overflow-hidden z-10 flex flex-col shadow-2xl">
-                        <div class="bg-white/5 border-b border-white/10 px-4 py-3 flex items-center space-x-2 backdrop-blur">
-                            <div class="w-3 h-3 rounded-full bg-white/20"></div>
-                            <div class="w-3 h-3 rounded-full bg-white/20"></div>
-                            <div class="w-3 h-3 rounded-full bg-white/20"></div>
-                            <div class="ml-4 font-mono text-xs text-white/40">nestpos-terminal</div>
+                <div class="w-full lg:w-5/12 relative mt-8 lg:mt-0 lg:ml-auto">
+                    <!-- HTML Receipt Artifact -->
+                    <div class="thermal-receipt text-gray-800 font-mono text-sm p-8 max-w-sm mx-auto transform rotate-2">
+                        <div class="text-center mb-6 border-b-2 border-dashed border-gray-300 pb-6">
+                            <h3 class="font-bold text-xl uppercase mb-1">Bismillah Kiryana</h3>
+                            <p class="text-xs">Main Bazar, Model Town, Lahore</p>
+                            <p class="text-xs">NTN: 4123456-7</p>
+                            <p class="text-xs">PNTN: P4123456-7</p>
                         </div>
-                        <img src="{{ asset('images/screenshots/pos-sale.jpg') }}" alt="NestPOS Sale Screen" class="w-full object-cover block border-t border-white/5" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48cmVjdCBmaWxsPSIjZjNmMTRiIiB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIvPjx0ZXh0IGZpbGw9IiM5Y2EzYWYiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBkeT0iMTAuNSIgZm9udC13ZWlnaHQ9ImJvbGQiIHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5OZXN0UE9TIFNjcmVlbnNob3Q8L3RleHQ+PC9zdmc+'">
-                    </div>
-                    
-                    <!-- Floating tactile elements -->
-                    <div class="absolute -bottom-5 -left-5 bg-white/10 border border-white/20 backdrop-blur px-4 py-3 rounded-lg z-20 transform -rotate-2 shadow-lg">
-                        <div class="flex items-center space-x-3">
-                            <span class="key-cap text-slate-800 bg-white border-slate-300">ENTER</span>
-                            <span class="text-sm font-medium text-white shadow-sm">to advance</span>
+                        <div class="flex justify-between text-xs mb-4 text-gray-600">
+                            <span>Date: {{ date('d/m/Y') }}</span>
+                            <span>Time: 19:42</span>
+                        </div>
+                        <div class="flex justify-between text-xs mb-2 font-bold border-b border-gray-300 pb-2">
+                            <span>Item</span>
+                            <span>Amount</span>
+                        </div>
+                        <div class="space-y-2 text-xs mb-4">
+                            <div class="flex justify-between">
+                                <span>Sugar Premium 1kg</span>
+                                <span>165</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Dal Chana 1kg</span>
+                                <span>320</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Surf Excel 1kg</span>
+                                <span>550</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Lipton Yellow 500g</span>
+                                <span>480</span>
+                            </div>
+                        </div>
+                        <div class="border-t border-gray-300 pt-2 space-y-1 text-xs text-gray-600">
+                            <div class="flex justify-between">
+                                <span>Subtotal</span>
+                                <span>1515</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>PRA Tax (16%)</span>
+                                <span>242</span>
+                            </div>
+                        </div>
+                        <div class="border-t-2 border-gray-800 mt-2 pt-2 mb-6">
+                            <div class="flex justify-between font-bold text-base">
+                                <span>Total</span>
+                                <span>Rs 1757</span>
+                            </div>
+                        </div>
+                        <div class="text-center text-xs space-y-3">
+                            <div class="inline-block border border-gray-800 px-3 py-1 text-gray-800 font-bold tracking-widest uppercase">
+                                PRA Verified
+                            </div>
+                            <p class="text-gray-500">Invoice: 1004593</p>
+                            <p class="text-gray-500">Thank you for shopping!</p>
                         </div>
                     </div>
                 </div>
@@ -219,164 +213,82 @@
         </div>
     </section>
 
-    <!-- Core Facts Grid -->
-    <section id="features" class="py-24 bg-grid-pattern">
+    <!-- Stat Band -->
+    <section class="border-b border-[#0A4D5C] bg-[#07333E] py-12">
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="mb-16 max-w-2xl fade-in-up">
-                <h2 class="text-sm font-bold tracking-widest uppercase text-gray-500 mb-4">Architecture</h2>
-                <h3 class="text-3xl sm:text-4xl font-serif text-[#052730] mb-6">Built for rush hour.</h3>
-                <p class="text-gray-600 leading-relaxed text-lg">
-                    When the queue is out the door, you need a system that keeps up. Every feature is optimized for speed, precision, and absolute compliance.
-                </p>
+            <div class="flex flex-col md:flex-row justify-between items-center text-center md:text-left gap-8">
+                <div class="font-serif text-3xl lg:text-4xl text-white">Faster checkouts.</div>
+                <div class="font-serif text-3xl lg:text-4xl text-[#E7BF3B] italic">Zero compliance headaches.</div>
             </div>
+        </div>
+    </section>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+    <!-- Editorial Features -->
+    <section id="features" class="py-24 bg-[#FDFBF7]">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="max-w-3xl mb-20">
+                <h2 class="text-4xl sm:text-5xl font-serif text-[#052730] mb-6">Built for speed and compliance.</h2>
+                <p class="text-xl text-gray-600 font-light">Every feature serves one purpose: getting the customer checked out quickly while keeping your business completely compliant with government regulations.</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-20">
                 <!-- Feature 1 -->
-                <div class="card-solid p-8 rounded-lg fade-in-up">
-                    <div class="w-10 h-10 bg-[#0F6171]/10 rounded mb-6 flex items-center justify-center">
-                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                    </div>
-                    <h4 class="font-serif text-xl text-[#052730] mb-3">Keyboard-First Flow</h4>
-                    <p class="text-sm text-gray-600 leading-relaxed">
-                        Guided billing flow where <span class="key-cap">Enter</span> advances each step. Process entire orders without touching a mouse.
-                    </p>
+                <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
+                    <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">1</div>
+                    <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Keyboard billing</h3>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Guided billing walks the cashier from scanning to payment on the Enter key alone. Process entire orders without ever touching a mouse.</p>
                 </div>
-
+                
                 <!-- Feature 2 -->
-                <div class="card-solid p-8 rounded-lg fade-in-up" style="transition-delay: 100ms;">
-                    <div class="w-10 h-10 bg-[#0F6171]/10 rounded mb-6 flex items-center justify-center">
-                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                    </div>
-                    <h4 class="font-serif text-xl text-[#052730] mb-3">PRA Fiscal Integration</h4>
-                    <p class="text-sm text-gray-600 leading-relaxed">
-                        Direct connection to Punjab Revenue Authority via Cloud Mode or Desktop Sync Agent. Fully compliant.
-                    </p>
+                <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
+                    <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">2</div>
+                    <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">PRA fiscal integration</h3>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Direct connection to the Punjab Revenue Authority. Choose between cloud submission or desktop fiscal-device mode for immediate, background compliance.</p>
                 </div>
 
                 <!-- Feature 3 -->
-                <div class="card-solid p-8 rounded-lg fade-in-up" style="transition-delay: 200ms;">
-                    <div class="w-10 h-10 bg-[#0F6171]/10 rounded mb-6 flex items-center justify-center">
-                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/></svg>
-                    </div>
-                    <h4 class="font-serif text-xl text-[#052730] mb-3">Offline Resilience</h4>
-                    <p class="text-sm text-gray-600 leading-relaxed">
-                        Internet down? Keep billing. The system automatically syncs provisional bills when the connection returns.
-                    </p>
+                <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
+                    <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">3</div>
+                    <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Offline resilience</h3>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Internet outages shouldn't stop your register. Bills print offline and synchronize automatically with the PRA the moment your connection returns.</p>
                 </div>
 
                 <!-- Feature 4 -->
-                <div class="card-solid p-8 rounded-lg fade-in-up">
-                    <div class="w-10 h-10 bg-[#0F6171]/10 rounded mb-6 flex items-center justify-center">
-                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
-                    </div>
-                    <h4 class="font-serif text-xl text-[#052730] mb-3">Exact-Match Scanning</h4>
-                    <p class="text-sm text-gray-600 leading-relaxed">
-                        Lightning fast Barcode/SKU scanning that exactly matches inventory. No delays or misreads.
-                    </p>
-                </div>
-
-                <!-- Feature 5 -->
-                <div class="card-solid p-8 rounded-lg fade-in-up" style="transition-delay: 100ms;">
-                    <div class="w-10 h-10 bg-[#0F6171]/10 rounded mb-6 flex items-center justify-center">
-                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                    </div>
-                    <h4 class="font-serif text-xl text-[#052730] mb-3">Restaurant Module</h4>
-                    <p class="text-sm text-gray-600 leading-relaxed">
-                        Kitchen Order Tickets (KOT), Kitchen Displays, order types (Dine-in, Takeaway), and per-item tax toggles.
-                    </p>
-                </div>
-
-                <!-- Feature 6 -->
-                <div class="card-solid p-8 rounded-lg fade-in-up" style="transition-delay: 200ms;">
-                    <div class="w-10 h-10 bg-[#0F6171]/10 rounded mb-6 flex items-center justify-center">
-                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                    </div>
-                    <h4 class="font-serif text-xl text-[#052730] mb-3">Hardened Thermal Print</h4>
-                    <p class="text-sm text-gray-600 leading-relaxed">
-                        Optimized for cheap thermal printers. Clear layouts, QR codes, and day-close reports that just work.
-                    </p>
+                <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
+                    <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">4</div>
+                    <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Restaurant ready</h3>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Full support for kitchen order tickets (KOT), dine-in table management, delivery orders, and item-specific tax toggles built right in.</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Deep Dive / Screenshots -->
-    <section class="py-24 bg-[#07333E] text-white border-y border-[#052730]">
-        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
-            
-            <!-- Dashboard UI -->
-            <div class="flex flex-col lg:flex-row gap-16 items-center mb-32 fade-in-up">
-                <div class="w-full lg:w-1/2 relative">
-                    <div class="absolute inset-0 bg-[#052730] transform -translate-x-3 translate-y-3 rounded-lg border border-white/10"></div>
-                    <img src="{{ asset('images/screenshots/pos-dash.jpg') }}" alt="NestPOS Dashboard" class="relative z-10 w-full border border-white/15 rounded-lg shadow-xl" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48cmVjdCBmaWxsPSIjZjNmMTRiIiB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIvPjx0ZXh0IGZpbGw9IiM5Y2EzYWYiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBkeT0iMTAuNSIgZm9udC13ZWlnaHQ9ImJvbGQiIHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5OZXN0UE9TIERhc2hib2FyZDwvdGV4dD48L3N2Zz4='">
-                </div>
-                <div class="w-full lg:w-1/2">
-                    <h3 class="text-3xl font-serif mb-6 text-white">Complete Store Management</h3>
-                    <p class="text-white/70 leading-relaxed mb-8">Track profit and business intelligence from anywhere. Manage inventory, view the customer ledger, and handle multi-branch operations from a single dashboard.</p>
-                    <ul class="space-y-4">
-                        <li class="flex items-start">
-                            <svg class="w-5 h-5 mr-3 text-[#2EA0B3] mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                            <span class="text-sm text-white/80">Real-time Inventory Management</span>
-                        </li>
-                        <li class="flex items-start">
-                            <svg class="w-5 h-5 mr-3 text-[#2EA0B3] mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                            <span class="text-sm text-white/80">Multi-branch Support</span>
-                        </li>
-                        <li class="flex items-start">
-                            <svg class="w-5 h-5 mr-3 text-[#2EA0B3] mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                            <span class="text-sm text-white/80">Detailed Day-Close Reports</span>
-                        </li>
-                    </ul>
-                </div>
+    <!-- Testimonial -->
+    <section class="py-24 bg-[#052730] text-white border-y border-[#0A4D5C]">
+        <div class="max-w-[1000px] mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 class="text-3xl sm:text-4xl lg:text-5xl font-serif leading-tight mb-10 text-white/90">"At 7 PM, my counter is packed. I cannot afford a system that freezes or requires five clicks per customer. NestPOS lets my cashier ring up items as fast as he can scan them. The PRA guys are happy, and my line keeps moving."</h2>
+            <div class="text-[#E7BF3B] font-mono text-sm tracking-widest uppercase">
+                — M. Tariq, Madina Super Mart, Faisalabad
             </div>
-
-            <!-- Transactions UI -->
-            <div class="flex flex-col lg:flex-row-reverse gap-16 items-center fade-in-up">
-                <div class="w-full lg:w-1/2 relative">
-                    <div class="absolute inset-0 bg-[#052730] transform translate-x-3 translate-y-3 rounded-lg border border-white/10"></div>
-                    <img src="{{ asset('images/screenshots/pos-tx.jpg') }}" alt="NestPOS Transactions" class="relative z-10 w-full border border-white/15 rounded-lg shadow-xl" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48cmVjdCBmaWxsPSIjZjNmMTRiIiB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIvPjx0ZXh0IGZpbGw9IiM5Y2EzYWYiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBkeT0iMTAuNSIgZm9udC13ZWlnaHQ9ImJvbGQiIHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5OZXN0UE9TIFRyYW5zYWN0aW9uczwvdGV4dD48L3N2Zz4='">
-                </div>
-                <div class="w-full lg:w-1/2">
-                    <h3 class="text-3xl font-serif mb-6 text-white">Transactions & Ledgers</h3>
-                    <p class="text-white/70 leading-relaxed mb-8">Review every transaction instantly. Convert provisional local bills to permanent ones, manage refunds, and track the customer ledger accurately.</p>
-                    <ul class="space-y-4">
-                        <li class="flex items-start">
-                            <svg class="w-5 h-5 mr-3 text-[#2EA0B3] mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                            <span class="text-sm text-white/80">Installable PWA for quick access</span>
-                        </li>
-                        <li class="flex items-start">
-                            <svg class="w-5 h-5 mr-3 text-[#2EA0B3] mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                            <span class="text-sm text-white/80">Customer Ledger tracking</span>
-                        </li>
-                        <li class="flex items-start">
-                            <svg class="w-5 h-5 mr-3 text-[#2EA0B3] mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                            <span class="text-sm text-white/80">Multiple visual themes</span>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-
         </div>
     </section>
 
     <!-- Pricing Section -->
-    <section id="editions" class="py-24 bg-white border-b border-gray-200">
+    <section id="editions" class="py-24 bg-[#FDFBF7]">
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center max-w-3xl mx-auto mb-16 fade-in-up">
-                <h2 class="text-sm font-bold tracking-widest uppercase text-gray-500 mb-4">Pricing</h2>
-                <h3 class="text-3xl sm:text-4xl font-serif text-[#052730] mb-6">Two solid editions.</h3>
-                <p class="text-gray-600 leading-relaxed text-lg">Choose PRA Integration for compliance, or Standalone for just the tools. Annual billing only, with a built-in discount.</p>
+            <div class="text-center max-w-2xl mx-auto mb-16">
+                <h2 class="text-4xl font-serif text-[#052730] mb-6">Simple pricing.</h2>
+                <p class="text-gray-600 font-light text-lg">Choose the edition that fits your regulatory requirement.</p>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
-                
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
                 <!-- Standalone Edition -->
-                <div class="card-solid p-8 rounded-lg flex flex-col relative fade-in-up">
-                    <div class="inline-block px-3 py-1 bg-gray-100 border border-gray-200 text-gray-700 font-semibold text-xs uppercase tracking-widest mb-6 self-start rounded-full">
-                        Standalone Edition
+                <div class="bg-white border-t-4 border-gray-300 shadow-sm p-8 flex flex-col">
+                    <div class="inline-block px-3 py-1 bg-gray-100 text-gray-600 font-bold text-xs uppercase tracking-widest mb-6 self-start">
+                        Standalone
                     </div>
-                    <h4 class="text-2xl font-serif text-[#052730] mb-3">No Government Integration</h4>
-                    <p class="text-sm text-gray-600 mb-8">The complete point of sale system for shops that don't need PRA compliance.</p>
+                    <h4 class="text-2xl font-serif text-[#052730] mb-3">POS Only</h4>
+                    <p class="text-sm text-gray-600 mb-8">Fast retail and restaurant billing without government integration.</p>
                     
                     <div class="flex-grow space-y-4">
                         @if(isset($standalonePlans) && $standalonePlans->count())
@@ -384,10 +296,9 @@
                                 @php
                                     $perMonth = round($plan->sale_price / 12);
                                     $hasOffer = $plan->sale_percent > 0;
-                                    $comparePerMonth = $hasOffer ? round($plan->price / 12) : 0;
                                     $features = is_array($plan->features) ? $plan->features : (is_string($plan->features) ? json_decode($plan->features, true) : []);
                                 @endphp
-                                <div class="p-5 bg-gray-50 border border-gray-200 rounded-lg">
+                                <div class="p-5 border border-gray-200">
                                     <div class="flex justify-between items-start mb-2">
                                         <h5 class="font-bold text-gray-900">{{ $plan->name }}</h5>
                                         <div class="text-right">
@@ -396,10 +307,10 @@
                                     </div>
                                     <p class="text-xs text-gray-500 mb-4">Effective: PKR {{ number_format($perMonth) }}/mo</p>
                                     @if(!empty($features))
-                                        <ul class="space-y-2.5 mt-4 border-t border-gray-200 pt-4">
+                                        <ul class="space-y-2 mt-4 border-t border-gray-100 pt-4">
                                             @foreach(array_slice($features, 0, 3) as $feature)
                                             <li class="flex items-start text-sm text-gray-700">
-                                                <svg class="w-4 h-4 mr-2 text-[#0A4D5C] mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                <span class="text-gray-400 mr-2 mt-0.5 text-xs">■</span>
                                                 {{ $feature }}
                                             </li>
                                             @endforeach
@@ -408,7 +319,7 @@
                                 </div>
                             @endforeach
                         @else
-                            <div class="p-6 bg-gray-50 border border-gray-200 rounded-lg text-center text-gray-500 text-sm">
+                            <div class="p-6 border border-gray-200 text-center text-gray-500 text-sm">
                                 Plans loading...
                             </div>
                         @endif
@@ -416,15 +327,12 @@
                 </div>
 
                 <!-- PRA Integrated Edition -->
-                <div class="bg-white border border-gray-200 shadow-xl rounded-lg p-8 flex flex-col relative fade-in-up" style="transition-delay: 100ms;">
-                    <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-accent-product text-white px-4 py-1 rounded-full text-xs font-semibold uppercase tracking-wider shadow-sm">
-                        Most Popular
-                    </div>
-                    <div class="inline-block px-3 py-1 bg-purple-50 border border-purple-200 text-accent-product font-semibold text-xs uppercase tracking-widest mb-6 self-start rounded-full">
+                <div class="bg-white border-t-4 border-purple-700 shadow-xl p-8 flex flex-col relative">
+                    <div class="inline-block px-3 py-1 bg-purple-50 text-purple-700 font-bold text-xs uppercase tracking-widest mb-6 self-start">
                         PRA Integrated
                     </div>
                     <h4 class="text-2xl font-serif text-[#052730] mb-3">Full PRA Compliance</h4>
-                    <p class="text-sm text-gray-600 mb-8">Includes everything in Standalone, plus automatic Punjab Revenue Authority fiscal integration.</p>
+                    <p class="text-sm text-gray-600 mb-8">Includes everything in Standalone, plus automatic Punjab Revenue Authority fiscal reporting.</p>
                     
                     <div class="flex-grow space-y-4">
                         @if(isset($plans) && $plans->count())
@@ -432,12 +340,11 @@
                                 @php
                                     $perMonth = round($plan->sale_price / 12);
                                     $hasOffer = $plan->sale_percent > 0;
-                                    $comparePerMonth = $hasOffer ? round($plan->price / 12) : 0;
                                     $features = is_array($plan->features) ? $plan->features : (is_string($plan->features) ? json_decode($plan->features, true) : []);
                                 @endphp
-                                <div class="p-5 bg-white border border-[#0A4D5C]/20 rounded-lg shadow-sm relative overflow-hidden">
+                                <div class="p-5 border border-purple-700/20 bg-purple-50/30 relative overflow-hidden">
                                     @if($hasOffer)
-                                        <div class="absolute top-0 right-0 bg-[#0A4D5C] text-white text-[10px] font-bold px-2 py-0.5 rounded-bl">
+                                        <div class="absolute top-0 right-0 bg-[#0A4D5C] text-white text-[10px] font-bold px-2 py-0.5">
                                             {{ $plan->sale_badge }}
                                         </div>
                                     @endif
@@ -452,10 +359,10 @@
                                     </div>
                                     <p class="text-xs text-gray-500 mb-4">Effective: PKR {{ number_format($perMonth) }}/mo</p>
                                     @if(!empty($features))
-                                        <ul class="space-y-2.5 mt-4 border-t border-gray-100 pt-4">
+                                        <ul class="space-y-2 mt-4 border-t border-purple-700/10 pt-4">
                                             @foreach(array_slice($features, 0, 4) as $feature)
                                             <li class="flex items-start text-sm text-gray-700">
-                                                <svg class="w-4 h-4 mr-2 text-[#0A4D5C] mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                <span class="text-[#0A4D5C] mr-2 mt-0.5 text-xs">■</span>
                                                 {{ $feature }}
                                             </li>
                                             @endforeach
@@ -464,7 +371,7 @@
                                 </div>
                             @endforeach
                         @else
-                            <div class="p-6 bg-gray-50 border border-gray-200 rounded-lg text-center text-gray-500 text-sm">
+                            <div class="p-6 border border-gray-200 text-center text-gray-500 text-sm">
                                 Plans loading...
                             </div>
                         @endif
@@ -473,64 +380,56 @@
 
             </div>
             
-            <div class="mt-16 text-center fade-in-up" style="transition-delay: 200ms;">
+            <div class="mt-16 text-center">
                 <a href="/pos/register" class="btn-solid bg-[#052730] text-white hover:bg-[#0A4D5C] px-8 py-4 text-base">
                     Start Your Free Trial
                 </a>
-                <p class="mt-4 text-xs font-medium text-gray-500">3-day free trial. No credit card required.</p>
+                <p class="mt-4 text-xs font-medium text-gray-500 font-mono">3-day trial. No credit card.</p>
             </div>
         </div>
     </section>
 
     <!-- FAQ -->
-    <section class="py-24 bg-[#FDFBF7]">
+    <section class="py-24 bg-white border-t border-gray-200">
         <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-16 fade-in-up">
-                <h2 class="text-sm font-bold tracking-widest uppercase text-gray-500 mb-4">FAQ</h2>
-                <h3 class="text-3xl font-serif text-[#052730]">Straight answers</h3>
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-serif text-[#052730]">Common Questions</h2>
             </div>
-            <div class="space-y-4 fade-in-up" x-data="{ open: null }">
-                <div class="card-solid rounded-lg">
-                    <button @click="open = (open === 1 ? null : 1)" class="w-full flex items-center justify-between p-5 text-left">
-                        <span class="font-semibold text-gray-900 text-sm">How does the PRA connection actually work?</span>
-                        <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 1 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            <div class="space-y-2" x-data="{ open: null }">
+                <div class="border-b border-gray-200">
+                    <button @click="open = (open === 1 ? null : 1)" class="w-full flex items-center justify-between py-6 text-left">
+                        <span class="font-serif text-lg text-gray-900">How does the PRA connection actually work?</span>
+                        <span class="text-gray-400 font-mono text-xl" x-text="open === 1 ? '-' : '+'">+</span>
                     </button>
-                    <div x-show="open === 1" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed border-t border-gray-100 pt-4 mt-2">Two modes. Cloud mode submits bills straight from our servers to PRA. Fiscal-device mode runs a small desktop agent on your counter PC for shops whose PRA registration requires the local fiscal service — the system queues bills and the agent fiscalizes them automatically.</div>
+                    <div x-show="open === 1" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Two modes. Cloud mode submits bills straight from our servers to PRA. Fiscal-device mode runs a small desktop agent on your counter PC for shops whose PRA registration requires the local fiscal service — the system queues bills and the agent fiscalizes them automatically.</div>
                 </div>
-                <div class="card-solid rounded-lg">
-                    <button @click="open = (open === 2 ? null : 2)" class="w-full flex items-center justify-between p-5 text-left">
-                        <span class="font-semibold text-gray-900 text-sm">Does it work for restaurants?</span>
-                        <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 2 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                <div class="border-b border-gray-200">
+                    <button @click="open = (open === 2 ? null : 2)" class="w-full flex items-center justify-between py-6 text-left">
+                        <span class="font-serif text-lg text-gray-900">Does it work for restaurants?</span>
+                        <span class="text-gray-400 font-mono text-xl" x-text="open === 2 ? '-' : '+'">+</span>
                     </button>
-                    <div x-show="open === 2" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed border-t border-gray-100 pt-4 mt-2">Yes — a full restaurant module: dine-in / takeaway / delivery order types, table management, kitchen order tickets and held orders, all on the same keyboard-fast sale screen.</div>
+                    <div x-show="open === 2" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Yes — a full restaurant module: dine-in / takeaway / delivery order types, table management, kitchen order tickets and held orders, all on the same keyboard-fast sale screen.</div>
                 </div>
-                <div class="card-solid rounded-lg">
-                    <button @click="open = (open === 3 ? null : 3)" class="w-full flex items-center justify-between p-5 text-left">
-                        <span class="font-semibold text-gray-900 text-sm">What if my internet goes down mid-day?</span>
-                        <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 3 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                <div class="border-b border-gray-200">
+                    <button @click="open = (open === 3 ? null : 3)" class="w-full flex items-center justify-between py-6 text-left">
+                        <span class="font-serif text-lg text-gray-900">What if my internet goes down mid-day?</span>
+                        <span class="text-gray-400 font-mono text-xl" x-text="open === 3 ? '-' : '+'">+</span>
                     </button>
-                    <div x-show="open === 3" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed border-t border-gray-100 pt-4 mt-2">Keep selling. Bills print offline and sync to PRA automatically when the connection returns — no manual re-entry, no lost sales.</div>
+                    <div x-show="open === 3" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Keep selling. Bills print offline and sync to PRA automatically when the connection returns — no manual re-entry, no lost sales.</div>
                 </div>
-                <div class="card-solid rounded-lg">
-                    <button @click="open = (open === 4 ? null : 4)" class="w-full flex items-center justify-between p-5 text-left">
-                        <span class="font-semibold text-gray-900 text-sm">Can cashiers work without touching the mouse?</span>
-                        <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 4 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                <div class="border-b border-gray-200">
+                    <button @click="open = (open === 4 ? null : 4)" class="w-full flex items-center justify-between py-6 text-left">
+                        <span class="font-serif text-lg text-gray-900">Is there a version without PRA integration?</span>
+                        <span class="text-gray-400 font-mono text-xl" x-text="open === 4 ? '-' : '+'">+</span>
                     </button>
-                    <div x-show="open === 4" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed border-t border-gray-100 pt-4 mt-2">That's the whole point. Guided keyboard billing walks the cashier from customer to items to payment on Enter alone, with barcode scanning, quick manual entry and shortcut keys for tax and discounts.</div>
-                </div>
-                <div class="card-solid rounded-lg">
-                    <button @click="open = (open === 5 ? null : 5)" class="w-full flex items-center justify-between p-5 text-left">
-                        <span class="font-semibold text-gray-900 text-sm">Is there a version without PRA integration?</span>
-                        <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 5 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                    </button>
-                    <div x-show="open === 5" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed border-t border-gray-100 pt-4 mt-2">Yes — the Standalone edition. Same POS, same speed, zero government integration, at a lower annual price. You can upgrade a standalone shop to full PRA mode later; the switch is one-way.</div>
+                    <div x-show="open === 4" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Yes — the Standalone edition. Same POS, same speed, zero government integration, at a lower annual price. You can upgrade a standalone shop to full PRA mode later; the switch is one-way.</div>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- Footer -->
-    <footer class="bg-[#052730] border-t border-[#0A4D5C] py-12">
+    <footer class="bg-[#052730] py-12">
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center">
             <div class="flex items-center space-x-2 mb-4 md:mb-0">
                 <img src="{{ asset('images/brand/taxnest-logo-white.svg') }}" alt="TaxNest" class="h-6 w-auto opacity-50">
@@ -547,32 +446,5 @@
 
     <x-whatsapp-support />
 
-    <!-- Intersection Observer for fade-in animations -->
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        entry.target.classList.add('is-visible');
-                        observer.unobserve(entry.target);
-                    }
-                });
-            }, { threshold: 0.1 });
-
-            document.querySelectorAll('.fade-in-up').forEach(el => {
-                observer.observe(el);
-            });
-            
-            // Trigger initial visible elements immediately
-            setTimeout(() => {
-                document.querySelectorAll('.fade-in-up').forEach(el => {
-                    const rect = el.getBoundingClientRect();
-                    if (rect.top < window.innerHeight) {
-                        el.classList.add('is-visible');
-                    }
-                });
-            }, 100);
-        });
-    </script>
 </body>
 </html>

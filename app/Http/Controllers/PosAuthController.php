@@ -161,6 +161,9 @@ class PosAuthController extends Controller
             'email' => $request->email,
             'phone' => $request->phone,
             'company_status' => 'pending',
+            // Keep BOTH status columns coherent: the admin panel's Approve button
+            // and the CheckCompanyApproval view-only gate key off `status`.
+            'status' => 'pending',
             'product_type' => 'pos',
             'pos_type' => $posType,
             'restaurant_mode' => ($posType === 'restaurant'),

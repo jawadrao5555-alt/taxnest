@@ -36,7 +36,10 @@ class CheckCompanyApproval
             // dead-locked on /onboarding: dashboard force-redirects there until the
             // flag is set, but every onboarding action (including Skip) is a POST
             // and would be blocked, leaving the user unable to view anything else.
-            if ($request->is('onboarding/*')) {
+            // Same dead-lock applies to the POS first-run wizard: /pos/dashboard
+            // force-redirects to /pos/features?welcome=1 until pos_setup_completed,
+            // and completing the wizard is a POST to /pos/features.
+            if ($request->is('onboarding/*') || $request->is('pos/features*')) {
                 return $next($request);
             }
 

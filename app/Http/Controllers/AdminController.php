@@ -248,11 +248,14 @@ class AdminController extends Controller
 
     public function suspendCompany(Company $company)
     {
+        // Dual-column flip — POS/FBR panels enforce via `status` (CheckCompanyApproval),
+        // DI/admin listings via `company_status`. Flipping only one strands the company
+        // half-suspended (mirrors SaasAdmin\AdminCompanyController::suspend/activate).
         if ($company->company_status === 'suspended') {
-            $company->update(['company_status' => 'active', 'suspended_at' => null]);
+            $company->update(['status' => 'approved', 'company_status' => 'active', 'suspended_at' => null]);
             $action = 'unsuspended';
         } else {
-            $company->update(['company_status' => 'suspended', 'suspended_at' => now()]);
+            $company->update(['status' => 'suspended', 'company_status' => 'suspended', 'suspended_at' => now()]);
             $action = 'suspended';
         }
 
@@ -281,7 +284,7 @@ class AdminController extends Controller
 
     public function approveCompany(Company $company)
     {
-        $company->update(['company_status' => 'active']);
+        $company->update(['company_status' => 'active', 'status' => 'approved']);
         SecurityLogService::log('company_approved', auth()->id(), ['company_id' => $company->id, 'name' => $company->name]);
         AuditLogService::log('company_approved', 'Company', $company->id, null, ['name' => $company->name]);
         return redirect('/admin/company/' . $company->id)->with('success', 'Company approved successfully.');
@@ -289,7 +292,7 @@ class AdminController extends Controller
 
     public function rejectCompany(Company $company)
     {
-        $company->update(['company_status' => 'rejected']);
+        $company->update(['company_status' => 'rejected', 'status' => 'rejected']);
         SecurityLogService::log('company_rejected', auth()->id(), ['company_id' => $company->id, 'name' => $company->name]);
         AuditLogService::log('company_rejected', 'Company', $company->id, null, ['name' => $company->name]);
         return redirect('/admin/company/' . $company->id)->with('success', 'Company rejected successfully.');

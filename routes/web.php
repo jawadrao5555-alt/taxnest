@@ -429,7 +429,7 @@ Route::middleware('auth')->group(function () {
         ->name('payment-proof.store')->middleware('throttle:6,1');
 });
 
-Route::middleware(['pos.auth'])->prefix('pos')->group(function () {
+Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(function () {
     Route::get('/agent', [\App\Http\Controllers\AgentManagementController::class, 'show'])->name('pos.agent');
     Route::post('/agent/generate-key', [\App\Http\Controllers\AgentManagementController::class, 'generateKey'])->name('pos.agent.generate');
     Route::post('/agent/regenerate-key', [\App\Http\Controllers\AgentManagementController::class, 'regenerateKey'])->name('pos.agent.regenerate');
@@ -787,7 +787,7 @@ Route::get('/fbr-pos/register', [FbrPosAuthController::class, 'showRegister'])->
 Route::post('/fbr-pos/register', [FbrPosAuthController::class, 'register']);
 Route::post('/fbr-pos/logout', [FbrPosAuthController::class, 'logout'])->name('fbrpos.logout');
 
-Route::prefix('fbr-pos')->middleware(['fbrpos.auth'])->group(function () {
+Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group(function () {
     Route::get('/dashboard', [FbrPosController::class, 'dashboard'])->name('fbrpos.dashboard');
     Route::post('/payment-proof', [\App\Http\Controllers\PaymentProofController::class, 'store'])
         ->name('fbrpos.payment-proof.store')->middleware('throttle:6,1');

@@ -534,7 +534,21 @@ class RestaurantPosController extends Controller
         // button on the transaction-show provisional card).
         $saveAsProvisional = (bool) $request->input('save_as_provisional', false);
         $praEnabled = (bool) $company->pra_reporting_enabled && !$saveAsProvisional;
-        $invoiceMode = $praEnabled ? 'pra' : 'local';
+        // Reporting-OFF Finals Invariant — three-branch (mirrors PosController::storeInvoice):
+        // provisional → local/'local'; reporting-ON final → pra/'pending';
+        // reporting-OFF FINAL → pra/NULL (NEVER 'local' — local mode hides the bill from
+        // the normal panel and pollutes the F10 provisional modal where cashiers could
+        // edit/delete a final bill).
+        if ($saveAsProvisional) {
+            $invoiceMode = 'local';
+            $initialPraStatus = 'local';
+        } elseif ($praEnabled) {
+            $invoiceMode = 'pra';
+            $initialPraStatus = 'pending';
+        } else {
+            $invoiceMode = 'pra';
+            $initialPraStatus = null;
+        }
 
         DB::beginTransaction();
         try {
@@ -570,7 +584,7 @@ class RestaurantPosController extends Controller
                 'total_amount' => (float) $totalAmount,
                 'payment_method' => $paymentMethod,
                 'status' => 'completed',
-                'pra_status' => $praEnabled ? 'pending' : 'local',
+                'pra_status' => $initialPraStatus,
                 'submission_hash' => $submissionHash,
                 'created_by' => (int) $user->id,
                 'notes' => $order->kitchen_notes,

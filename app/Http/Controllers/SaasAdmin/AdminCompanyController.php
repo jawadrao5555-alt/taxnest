@@ -212,9 +212,12 @@ class AdminCompanyController extends Controller
         $extraStats = [];
         if ($company->product_type === 'di') {
             $extraStats['total_invoices'] = Invoice::where('company_id', $id)->count();
-            $extraStats['locked_invoices'] = Invoice::where('company_id', $id)->where('fbr_status', 'locked')->count();
-            $extraStats['total_revenue'] = Invoice::where('company_id', $id)->where('fbr_status', 'locked')->sum('total_amount');
-            $extraStats['draft_invoices'] = Invoice::where('company_id', $id)->where('fbr_status', 'draft')->count();
+            // Invoice lifecycle lives in `status` (draft/locked/...); `fbr_status`
+            // only holds submission state (NULL/production/submitted/failed) and
+            // NEVER 'locked' — filtering on it silently yields zero.
+            $extraStats['locked_invoices'] = Invoice::where('company_id', $id)->where('status', 'locked')->count();
+            $extraStats['total_revenue'] = Invoice::where('company_id', $id)->where('status', 'locked')->sum('total_amount');
+            $extraStats['draft_invoices'] = Invoice::where('company_id', $id)->where('status', 'draft')->count();
         } else {
             $extraStats['total_transactions'] = PosTransaction::where('company_id', $id)->where('status', 'completed')->count();
             $extraStats['total_revenue'] = PosTransaction::where('company_id', $id)->where('status', 'completed')->sum('total_amount');
@@ -447,7 +450,10 @@ class AdminCompanyController extends Controller
     public function approve($id)
     {
         $company = Company::findOrFail($id);
-        $company->update(['status' => 'approved']);
+        // Flip BOTH status columns: `status` drives the CheckCompanyApproval
+        // view-only gate + admin UI badges; `company_status` drives login-time
+        // checks (CompanyIsolation) — leaving it 'pending' would strand the company.
+        $company->update(['status' => 'approved', 'company_status' => 'active']);
         AdminAuditLog::log(auth('admin')->id(), 'Company approved', 'Company', $id, ['name' => $company->name]);
         return back()->with('success', "Company '{$company->name}' has been approved.");
     }
@@ -455,7 +461,7 @@ class AdminCompanyController extends Controller
     public function reject($id)
     {
         $company = Company::findOrFail($id);
-        $company->update(['status' => 'rejected']);
+        $company->update(['status' => 'rejected', 'company_status' => 'rejected']);
         AdminAuditLog::log(auth('admin')->id(), 'Company rejected', 'Company', $id, ['name' => $company->name]);
         return back()->with('success', "Company '{$company->name}' has been rejected.");
     }
@@ -463,7 +469,7 @@ class AdminCompanyController extends Controller
     public function suspend($id)
     {
         $company = Company::findOrFail($id);
-        $company->update(['status' => 'suspended', 'suspended_at' => now()]);
+        $company->update(['status' => 'suspended', 'company_status' => 'suspended', 'suspended_at' => now()]);
         AdminAuditLog::log(auth('admin')->id(), 'Company suspended', 'Company', $id, ['name' => $company->name]);
         return back()->with('success', "Company '{$company->name}' has been suspended.");
     }
@@ -471,7 +477,7 @@ class AdminCompanyController extends Controller
     public function activate($id)
     {
         $company = Company::findOrFail($id);
-        $company->update(['status' => 'approved', 'suspended_at' => null]);
+        $company->update(['status' => 'approved', 'company_status' => 'active', 'suspended_at' => null]);
         AdminAuditLog::log(auth('admin')->id(), 'Company activated', 'Company', $id, ['name' => $company->name]);
         return back()->with('success', "Company '{$company->name}' has been activated.");
     }

@@ -87,6 +87,11 @@ class FbrPosController extends Controller
         if (!empty($pinCompany?->confidential_pin) && !$this->isPinSessionValid()) {
             return response()->json(['success' => false, 'pin_required' => true, 'message' => 'PIN verification required.'], 403);
         }
+        // Reporting-OFF Finals Invariant — mirrors PosController::apiPromoteProvisional:
+        // reporting-ON promote → fbr/'pending' (queued for submission);
+        // reporting-OFF promote → fbr/NULL (FINAL, no submission — NEVER leave 'pending',
+        // it would sit forever in the fail-queue/agent lists with reporting disabled).
+        $reportingOn = (bool) (($pinCompany ?? Company::find($companyId))?->fbr_reporting_enabled ?? false);
         // 🔒 Race-safe atomic claim: only flips if still local — prevents double-promote
         $affected = \App\Models\FbrPosTransaction::where('id', $id)
             ->where('company_id', $companyId)
@@ -94,11 +99,19 @@ class FbrPosController extends Controller
             ->where('fbr_status', 'local')
             ->update([
                 'invoice_mode' => 'fbr',
-                'fbr_status' => 'pending',
+                'fbr_status' => $reportingOn ? 'pending' : null,
                 'updated_at' => now(),
             ]);
         if ($affected === 0) {
             return response()->json(['success' => false, 'message' => 'Bill not found or already promoted'], 409);
+        }
+        if (!$reportingOn) {
+            return response()->json([
+                'success'   => true,
+                'submitted' => false,
+                'message'   => '✓ Bill is now FINAL — FBR reporting is OFF, no submission needed.',
+                'id'        => $id,
+            ]);
         }
         return response()->json(['success' => true, 'redirect' => route('fbrpos.failQueue')]);
     }

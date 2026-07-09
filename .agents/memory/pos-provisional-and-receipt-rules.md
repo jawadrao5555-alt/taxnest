@@ -43,6 +43,15 @@ WITHOUT submission, not a "enable PRA first" block), `FbrPosController::store` (
 FbrService submission entirely and charges NO Rs-1 fee when `$initialFbrStatus === null`).
 Any NEW save/edit/promote path must follow the same three-branch or the invariant breaks.
 
+**Recurring regression (Jul 2026 e2e found 2 more violators):** write paths keep re-introducing
+the old TWO-branch (`praEnabled ? 'pra' : 'local'`). Fixed then: `RestaurantPosController::payOrder`
+(reporting-OFF held-order pay stored final as local/'local' with an L- number) and
+`FbrPosController::apiPromoteProvisional` (unconditionally flipped to fbr/'pending' even with
+reporting OFF — bill sat in the fail-queue forever). When auditing, grep every place that writes
+`pra_status`/`fbr_status` and check for a ternary on the reporting flag — that shape IS the bug.
+Historic prod rows from before these fixes are NOT backfilled (local/'local' finals are
+indistinguishable from deliberate provisionals).
+
 # Receipt tax display rule (OWNER OVERRIDE, Jul 2026)
 
 The `companies.pos_receipt_show_tax` toggle applies to ALL receipts — including PRA fiscal ones.

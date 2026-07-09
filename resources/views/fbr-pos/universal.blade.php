@@ -3204,9 +3204,9 @@ function restaurantPos() {
             //   • Alt+T — ALWAYS toggles (no matter what's focused / typed)
             //   • Plain T — toggles when:
             //       (a) target is body / non-input element, OR
-            //       (b) target is search input AND searchQuery is empty, OR
-            //       (c) target is qty input (handled at element level too)
-            //   This way "tea", "tomato" etc still work when user has started typing.
+            //       (b) target is qty input (handled at element level too)
+            //   Inside the SEARCH input plain T always TYPES (even when empty) —
+            //   the old empty-search shortcut ate the first letter of "Tapal"/"tea".
             // Always operates on activeCartIndex if valid, else on the LAST cart row.
             // ═══════════════════════════════════════════════════════════════
             if ((e.key === 't' || e.key === 'T' || e.code === 'KeyT') && !e.ctrlKey && !e.metaKey) {
@@ -3221,11 +3221,12 @@ function restaurantPos() {
                     shouldToggle = true; // Alt+T — always
                 } else if (isQtyInput) {
                     shouldToggle = true; // qty input — element-level handler also catches, but safety here
-                } else if (isSearchInput && !this.searchQuery) {
-                    shouldToggle = true; // search empty — T is free for shortcut
                 } else if (!isSearchInput && !isCustPhone && !isOtherInput) {
                     shouldToggle = true; // body / non-input
                 }
+                // NOTE: plain T inside the search input is NEVER a shortcut anymore —
+                // even when empty. It swallowed the FIRST letter of product names
+                // ("Tapal", "tea") during quick-create typing. Use Alt+T there.
 
                 if (shouldToggle) {
                     e.preventDefault();
@@ -3273,8 +3274,9 @@ function restaurantPos() {
                 const isOtherInput  = tgt && tgt.closest && tgt.closest('input, textarea, select') && !isSearchInput && !isCustPhone;
                 let shouldToggle = false;
                 if (e.altKey) shouldToggle = true;
-                else if (isSearchInput && !this.searchQuery) shouldToggle = true;
                 else if (!isSearchInput && !isCustPhone && !isOtherInput) shouldToggle = true;
+                // Plain D inside the search input (even empty) must TYPE, not toggle —
+                // it was eating the first letter of names like "Dahi". Alt+D still works.
                 if (shouldToggle) {
                     e.preventDefault();
                     e.stopPropagation();
@@ -3310,9 +3312,10 @@ function restaurantPos() {
                 const isOtherInput  = tgt && tgt.closest && tgt.closest('input, textarea, select') && !isSearchInput && !isCustPhone && !isQtyInput;
                 let shouldFocus = false;
                 if (e.altKey) shouldFocus = true;
-                else if (isSearchInput && !this.searchQuery) shouldFocus = true;
                 else if (isQtyInput) shouldFocus = true;
                 else if (!isSearchInput && !isCustPhone && !isOtherInput) shouldFocus = true;
+                // Plain N inside the search input (even empty) must TYPE, not jump to
+                // notes — it was eating the first letter of names like "Naan". Alt+N works.
                 if (shouldFocus) {
                     e.preventDefault();
                     e.stopPropagation();

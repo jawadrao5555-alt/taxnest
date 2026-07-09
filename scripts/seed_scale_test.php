@@ -4,6 +4,7 @@
  * All seeded rows are identifiable via email domain @scaletest.pk for one-command purge.
  *
  * Run:   env -u DATABASE_URL -u DB_CONNECTION -u PGHOST -u PGPORT -u PGUSER -u PGPASSWORD -u PGDATABASE php scripts/seed_scale_test.php
+ * Add:   env -u ... php scripts/seed_scale_test.php --more=500   (adds N MORE companies per product, continues numbering)
  * Purge: env -u ... php scripts/seed_scale_test.php --purge
  */
 
@@ -14,7 +15,11 @@ $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 use Illuminate\Support\Facades\DB;
 
 const DOMAIN = 'scaletest.pk';
-const PER_PRODUCT = 1000;
+
+$perProduct = 1000;
+foreach ($argv as $arg) {
+    if (preg_match('/^--more=(\d+)$/', $arg, $m)) $perProduct = (int) $m[1];
+}
 
 // ---------------------------------------------------------------- purge mode
 if (in_array('--purge', $argv)) {
@@ -80,14 +85,24 @@ foreach (DB::table('pricing_plans')->get() as $p) $plans[$p->product_type][] = $
 
 function pick(array $a) { return $a[array_rand($a)]; }
 
-$ntnSeq = 8100000; $phoneSeq = 300000000; $emailSeq = 1;
+// Continue numbering from any previous run so batches never collide.
+$maxEmailNum = 0;
+foreach (DB::table('companies')->where('email', 'like', '%@' . DOMAIN)->pluck('email') as $e) {
+    if (preg_match('/(\d+)@/', $e, $m)) $maxEmailNum = max($maxEmailNum, (int) $m[1]);
+}
+$emailSeq = $maxEmailNum + 1;
+$phoneSeq = 300000000 + $maxEmailNum;
+$maxNtn = (int) DB::table('companies')->where('email', 'like', '%@' . DOMAIN)
+    ->selectRaw('MAX(CAST(ntn AS UNSIGNED)) m')->value('m');
+$ntnSeq = max(8100000, $maxNtn + 1);
+if ($maxEmailNum > 0) echo "Incremental batch: continuing from #" . $maxEmailNum . " (ntn {$ntnSeq})\n";
 $summary = [];
 
 foreach (['di', 'pos', 'fbrpos'] as $product) {
     echo strtoupper($product) . ": companies";
     $suffixes = $suffixByProduct[$product];
     $companies = []; $meta = [];
-    for ($i = 0; $i < PER_PRODUCT; $i++) {
+    for ($i = 0; $i < $perProduct; $i++) {
         $ownerFirst = pick($firstNames); $ownerLast = pick($lastNames);
         $name = pick($prefixes) . ' ' . pick($suffixes);
         if (mt_rand(1, 100) <= 25) $name = $ownerLast . ' ' . pick($suffixes); // family-named businesses
@@ -123,6 +138,7 @@ foreach (['di', 'pos', 'fbrpos'] as $product) {
         } else {
             $row['pos_type'] = $isRestaurant ? 'restaurant' : 'general';
             $row['restaurant_mode'] = $isRestaurant ? 1 : 0;
+            $row['pos_setup_completed'] = 1; // established shops — skip first-run setup wizard
             if ($product === 'pos') {
                 $row['pos_integration_mode'] = $standalone ? 'standalone' : 'pra';
                 $row['pra_reporting_enabled'] = (!$standalone && $reporting) ? 1 : 0;
@@ -141,8 +157,12 @@ foreach (['di', 'pos', 'fbrpos'] as $product) {
     foreach (array_chunk($companies, 500) as $chunk) DB::table('companies')->insert($chunk);
     echo " ✓";
 
-    // map ids
-    $rows = DB::table('companies')->where('email', 'like', 'st' . $product . '%@' . DOMAIN)->get(['id', 'email', 'name', 'ntn', 'created_at', 'invoice_number_prefix', 'pos_integration_mode', 'pra_reporting_enabled', 'fbr_reporting_enabled', 'restaurant_mode', 'status']);
+    // map ids — ONLY the emails created in THIS run (incremental-safe)
+    $newEmails = array_column($companies, 'email');
+    $rows = collect();
+    foreach (array_chunk($newEmails, 500) as $ec) {
+        $rows = $rows->merge(DB::table('companies')->whereIn('email', $ec)->get(['id', 'email', 'name', 'ntn', 'created_at', 'invoice_number_prefix', 'pos_integration_mode', 'pra_reporting_enabled', 'fbr_reporting_enabled', 'restaurant_mode', 'status']));
+    }
 
     // users
     $users = [];
@@ -156,7 +176,10 @@ foreach (['di', 'pos', 'fbrpos'] as $product) {
         ];
     }
     foreach (array_chunk($users, 500) as $chunk) DB::table('users')->insert($chunk);
-    $userIds = DB::table('users')->where('email', 'like', 'st' . $product . '%@' . DOMAIN)->pluck('id', 'company_id');
+    $userIds = collect();
+    foreach (array_chunk($newEmails, 500) as $ec) {
+        $userIds = $userIds->union(DB::table('users')->whereIn('email', $ec)->pluck('id', 'company_id'));
+    }
     echo " users ✓";
 
     // subscriptions

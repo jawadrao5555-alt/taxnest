@@ -69,7 +69,7 @@
                     @endphp
                     <tr class="hover:bg-gray-50/80 dark:hover:bg-gray-800/30 transition">
                         <td class="px-5 py-3.5 text-gray-600 dark:text-gray-400 whitespace-nowrap text-xs">{{ $m->created_at->format('d M Y H:i') }}</td>
-                        <td class="px-5 py-3.5 font-semibold text-gray-900 dark:text-white">{{ $m->product->name ?? 'Unknown' }}</td>
+                        <td class="px-5 py-3.5 font-semibold text-gray-900 dark:text-white">{{ $m->posProduct->name ?? 'Unknown' }}</td>
                         <td class="px-5 py-3.5 whitespace-nowrap">
                             <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold {{ $typeColors[$m->type] ?? 'bg-gray-100 text-gray-600' }}">
                                 {{ ucwords(str_replace('_', ' ', $m->type)) }}

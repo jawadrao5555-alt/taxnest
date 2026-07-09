@@ -26,7 +26,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             @foreach($outOfStock as $item)
             <div class="flex items-center justify-between bg-white/80 dark:bg-gray-900/80 rounded-xl p-3.5 border border-red-100 dark:border-red-800/50 backdrop-blur-sm">
-                <span class="font-semibold text-sm text-gray-900 dark:text-white truncate mr-2">{{ $item->product->name ?? 'Unknown' }}</span>
+                <span class="font-semibold text-sm text-gray-900 dark:text-white truncate mr-2">{{ $item->posProduct->name ?? 'Unknown' }}</span>
                 <div class="flex items-center gap-2 flex-shrink-0">
                     <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400">0</span>
                     <a href="{{ route('pos.inventory.adjust') }}?product_id={{ $item->product_id }}" class="text-xs text-purple-600 hover:text-purple-800 font-bold transition">Restock</a>
@@ -99,7 +99,7 @@
                         $urgencyClass = $pct < 25 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 ring-1 ring-red-200 dark:ring-red-800' : ($pct < 50 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 ring-1 ring-yellow-200 dark:ring-yellow-800');
                     @endphp
                     <tr class="hover:bg-gray-50/80 dark:hover:bg-gray-800/30 transition {{ $pct < 25 ? 'bg-red-50/30 dark:bg-red-900/5' : '' }}">
-                        <td class="px-5 py-4 font-semibold text-gray-900 dark:text-white">{{ $item->product->name ?? 'Unknown' }}</td>
+                        <td class="px-5 py-4 font-semibold text-gray-900 dark:text-white">{{ $item->posProduct->name ?? 'Unknown' }}</td>
                         <td class="px-5 py-4">
                             <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider {{ $urgencyClass }}">
                                 @if($pct < 25)<svg class="w-3 h-3 mr-1 animate-pulse" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="5"/></svg>@endif

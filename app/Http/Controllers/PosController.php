@@ -2877,6 +2877,35 @@ class PosController extends Controller
         $product = \DB::transaction(function () use ($data, $request, $companyId, &$recipeAdded, &$recipeSkipped) {
             $product = PosProduct::create($data);
 
+            // Inventory mirror seed: when the inventory module is ON and the
+            // cashier gave an opening stock, create the authoritative
+            // inventory_stocks row (+ opening movement) so the module and the
+            // products page start in sync instead of the module seeing 0.
+            $companyRow = \App\Models\Company::find($companyId);
+            if ($companyRow && $companyRow->inventory_enabled && $product->stock_quantity !== null) {
+                $stockRow = \App\Models\InventoryStock::firstOrCreate(
+                    ['company_id' => $companyId, 'product_id' => $product->id, 'branch_id' => null],
+                    [
+                        'quantity' => (float) $product->stock_quantity,
+                        'min_stock_level' => (float) ($product->low_stock_threshold ?? 0),
+                        'avg_purchase_price' => (float) ($product->cost_price ?? 0),
+                        'last_purchase_price' => (float) ($product->cost_price ?? 0),
+                    ]
+                );
+                if ($stockRow->wasRecentlyCreated && $product->stock_quantity > 0) {
+                    \App\Models\InventoryMovement::create([
+                        'company_id' => $companyId,
+                        'product_id' => $product->id,
+                        'type' => \App\Models\InventoryMovement::TYPE_OPENING,
+                        'quantity' => (float) $product->stock_quantity,
+                        'balance_after' => (float) $product->stock_quantity,
+                        'reference_type' => 'product_create',
+                        'notes' => 'Opening stock from product creation',
+                        'created_by' => auth('pos')->id(),
+                    ]);
+                }
+            }
+
             // Prefer JSON payload (robust to Alpine template-nesting); fall back to array form fields.
             $ingredientRows = [];
             if ($request->filled('ingredients_json')) {
@@ -3200,6 +3229,53 @@ class PosController extends Controller
             $data['image'] = $imageName;
         }
 
+        // Inventory mirror sync on edit: apply an explicit stock_quantity change
+        // as a 'set' adjustment on the inventory module (movement + audit row),
+        // never a blind overwrite. Runs only when the module is ON and the
+        // submitted value actually differs from the current one.
+        $companyRow = \App\Models\Company::find($companyId);
+        $oldStockQty = $product->stock_quantity;
+        $newStockQty = $data['stock_quantity'];
+        if (
+            $companyRow && $companyRow->inventory_enabled
+            && $newStockQty !== null && (int) $newStockQty !== (int) ($oldStockQty ?? PHP_INT_MIN)
+        ) {
+            \DB::transaction(function () use ($companyId, $product, $newStockQty) {
+                $stockRow = \App\Models\InventoryStock::firstOrCreate(
+                    ['company_id' => $companyId, 'product_id' => $product->id, 'branch_id' => null],
+                    ['quantity' => 0, 'min_stock_level' => 0, 'avg_purchase_price' => 0, 'last_purchase_price' => 0]
+                );
+                $prevQty = (float) $stockRow->quantity;
+                $setQty = (float) $newStockQty;
+                if ($prevQty !== $setQty) {
+                    $stockRow->update(['quantity' => $setQty]);
+                    \App\Models\InventoryMovement::create([
+                        'company_id' => $companyId,
+                        'product_id' => $product->id,
+                        'type' => $setQty > $prevQty
+                            ? \App\Models\InventoryMovement::TYPE_ADJUSTMENT_IN
+                            : \App\Models\InventoryMovement::TYPE_ADJUSTMENT_OUT,
+                        'quantity' => abs($setQty - $prevQty),
+                        'balance_after' => $setQty,
+                        'reference_type' => 'adjustment',
+                        'notes' => 'Stock set via product edit',
+                        'created_by' => auth('pos')->id(),
+                    ]);
+                    \App\Models\InventoryAdjustment::create([
+                        'company_id' => $companyId,
+                        'product_id' => $product->id,
+                        'type' => 'set',
+                        'quantity' => $setQty,
+                        'previous_quantity' => $prevQty,
+                        'new_quantity' => $setQty,
+                        'reason' => 'Product edit',
+                        'notes' => null,
+                        'created_by' => auth('pos')->id(),
+                    ]);
+                }
+            });
+        }
+
         $product->update($data);
 
         // Auto-fetch image ONLY if cashier explicitly chose image_mode=auto on edit.
@@ -3221,6 +3297,11 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $product = PosProduct::where('company_id', $companyId)->findOrFail($id);
         $product->delete();
+        // Inventory mirror cleanup — otherwise deleted products linger in the
+        // module's tracked/out-of-stock counts forever (movement history stays).
+        \App\Models\InventoryStock::where('company_id', $companyId)
+            ->where('product_id', $product->id)
+            ->delete();
         return back()->with('success', 'Product deleted successfully.');
     }
 

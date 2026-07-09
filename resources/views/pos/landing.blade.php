@@ -95,6 +95,7 @@
                     <div class="h-4 w-px mx-2 bg-white/30"></div>
                     <div>
                         <span class="text-lg font-serif font-bold tracking-tight block leading-none text-white">NestPOS</span>
+                        <span class="text-[10px] font-semibold uppercase tracking-widest text-white/70 block leading-none mt-1">PRA POS</span>
                     </div>
                 </a>
                 

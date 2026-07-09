@@ -86,7 +86,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             @foreach($lowStockItems->take(6) as $item)
             <div class="flex items-center justify-between bg-white/80 dark:bg-gray-900/80 rounded-xl p-3 border border-amber-100 dark:border-amber-800/50 backdrop-blur-sm">
-                <span class="text-sm font-medium text-gray-900 dark:text-white truncate mr-2">{{ $item->product->name ?? 'Unknown' }}</span>
+                <span class="text-sm font-medium text-gray-900 dark:text-white truncate mr-2">{{ $item->posProduct->name ?? 'Unknown' }}</span>
                 <div class="flex items-center gap-2 flex-shrink-0">
                     <div class="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
                         @php $pct = $item->min_stock_level > 0 ? min(($item->quantity / $item->min_stock_level) * 100, 100) : 0; @endphp
@@ -189,7 +189,7 @@
                             @endif
                         </div>
                         <div>
-                            <p class="font-semibold text-gray-900 dark:text-white text-sm">{{ $m->product->name ?? 'Unknown' }}</p>
+                            <p class="font-semibold text-gray-900 dark:text-white text-sm">{{ $m->posProduct->name ?? 'Unknown' }}</p>
                             <p class="text-xs text-gray-400">{{ ucwords(str_replace('_', ' ', $m->type)) }} &middot; {{ $m->created_at->diffForHumans() }}</p>
                         </div>
                     </div>
@@ -222,7 +222,7 @@
                 <div class="flex items-center justify-between text-sm border-b border-gray-50 dark:border-gray-800 pb-3 last:border-0 last:pb-0">
                     <div class="flex items-center gap-3">
                         <span class="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center text-xs font-bold text-white shadow-sm">{{ $i + 1 }}</span>
-                        <span class="font-semibold text-gray-900 dark:text-white">{{ $m->product->name ?? 'Unknown' }}</span>
+                        <span class="font-semibold text-gray-900 dark:text-white">{{ $m->posProduct->name ?? 'Unknown' }}</span>
                     </div>
                     <div class="flex items-center gap-2">
                         <div class="w-16 bg-gray-100 dark:bg-gray-800 rounded-full h-1.5 hidden sm:block">

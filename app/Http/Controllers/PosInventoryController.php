@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
-use App\Models\Product;
+use App\Models\PosProduct;
 use App\Models\InventoryStock;
 use App\Models\InventoryMovement;
 use App\Models\InventoryAdjustment;
@@ -28,14 +28,14 @@ class PosInventoryController extends Controller
     {
         [$companyId, $company] = $this->ensureInventoryEnabled();
 
-        $totalProducts = Product::where('company_id', $companyId)->where('is_active', true)->count();
+        $totalProducts = PosProduct::where('company_id', $companyId)->where('is_active', true)->count();
         $totalStockValue = InventoryStock::where('company_id', $companyId)
             ->selectRaw('COALESCE(SUM(quantity * avg_purchase_price), 0) as value')
             ->value('value');
 
         $lowStockItems = InventoryStock::where('company_id', $companyId)
             ->lowStock()
-            ->with('product')
+            ->with('posProduct')
             ->get();
 
         $outOfStockCount = InventoryStock::where('company_id', $companyId)
@@ -46,7 +46,7 @@ class PosInventoryController extends Controller
         $healthyCount = InventoryStock::where('company_id', $companyId)->whereRaw('quantity > min_stock_level')->count();
 
         $recentMovements = InventoryMovement::where('company_id', $companyId)
-            ->with(['product', 'creator'])
+            ->with(['posProduct', 'creator'])
             ->orderBy('created_at', 'desc')
             ->take(10)
             ->get();
@@ -58,7 +58,7 @@ class PosInventoryController extends Controller
             ->groupBy('product_id')
             ->orderByDesc('total_sold')
             ->take(5)
-            ->with('product')
+            ->with('posProduct')
             ->get();
 
         return view('pos.inventory.dashboard', compact(
@@ -71,11 +71,11 @@ class PosInventoryController extends Controller
     {
         [$companyId, $company] = $this->ensureInventoryEnabled();
 
-        $query = InventoryStock::where('company_id', $companyId)->with('product');
+        $query = InventoryStock::where('company_id', $companyId)->with('posProduct');
 
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->whereHas('product', function ($q) use ($search) {
+            $query->whereHas('posProduct', function ($q) use ($search) {
                 $q->where('name', \App\Helpers\DbCompat::like(), "%{$search}%");
             });
         }
@@ -97,7 +97,7 @@ class PosInventoryController extends Controller
     {
         [$companyId, $company] = $this->ensureInventoryEnabled();
 
-        $query = InventoryMovement::where('company_id', $companyId)->with(['product', 'creator']);
+        $query = InventoryMovement::where('company_id', $companyId)->with(['posProduct', 'creator']);
 
         if ($request->filled('type')) {
             $query->where('type', $request->type);
@@ -115,7 +115,7 @@ class PosInventoryController extends Controller
         }
 
         $movements = $query->orderBy('created_at', 'desc')->paginate(30)->appends($request->all());
-        $products = Product::where('company_id', $companyId)->where('is_active', true)->orderBy('name')->get();
+        $products = PosProduct::where('company_id', $companyId)->where('is_active', true)->orderBy('name')->get();
 
         return view('pos.inventory.movements', compact('company', 'movements', 'products'));
     }
@@ -126,13 +126,13 @@ class PosInventoryController extends Controller
 
         $alerts = InventoryStock::where('company_id', $companyId)
             ->lowStock()
-            ->with('product')
+            ->with('posProduct')
             ->orderByRaw('quantity - min_stock_level ASC')
             ->get();
 
         $outOfStock = InventoryStock::where('company_id', $companyId)
             ->where('quantity', '<=', 0)
-            ->with('product')
+            ->with('posProduct')
             ->get();
 
         return view('pos.inventory.low-stock', compact('company', 'alerts', 'outOfStock'));
@@ -143,12 +143,12 @@ class PosInventoryController extends Controller
         [$companyId, $company] = $this->ensureInventoryEnabled();
 
         if ($request->isMethod('get')) {
-            $products = Product::where('company_id', $companyId)->where('is_active', true)->orderBy('name')->get();
+            $products = PosProduct::where('company_id', $companyId)->where('is_active', true)->orderBy('name')->get();
             return view('pos.inventory.adjust-stock', compact('company', 'products'));
         }
 
         $request->validate([
-            'product_id' => 'required|exists:products,id',
+            'product_id' => 'required|exists:pos_products,id',
             'type' => 'required|in:add,remove,set',
             'quantity' => 'required|numeric|min:0.01',
             'reason' => 'required|string|max:255',
@@ -156,7 +156,7 @@ class PosInventoryController extends Controller
             'purchase_price' => 'nullable|numeric|min:0',
         ]);
 
-        $product = Product::where('company_id', $companyId)->findOrFail($request->product_id);
+        $product = PosProduct::where('company_id', $companyId)->findOrFail($request->product_id);
 
         DB::beginTransaction();
         try {
@@ -196,6 +196,13 @@ class PosInventoryController extends Controller
 
             $stock->update($stockUpdate);
 
+            // Mirror sync: keep pos_products.stock_quantity (shown on the
+            // /pos/products page + sale-screen loaders) in step with the
+            // inventory module's authoritative inventory_stocks.quantity.
+            if ($product->stock_quantity !== null) {
+                $product->update(['stock_quantity' => (int) round($newQty)]);
+            }
+
             InventoryMovement::create([
                 'company_id' => $companyId,
                 'product_id' => $product->id,
@@ -233,12 +240,16 @@ class PosInventoryController extends Controller
         [$companyId, $company] = $this->ensureInventoryEnabled();
 
         $request->validate([
-            'product_id' => 'required|exists:products,id',
+            'product_id' => 'required|exists:pos_products,id',
             'min_stock_level' => 'required|numeric|min:0',
         ]);
 
+        // Ownership check — PosProduct has no global company scope, so without
+        // this a POS user could seed stock rows for another company's product.
+        $product = PosProduct::where('company_id', $companyId)->findOrFail($request->product_id);
+
         $stock = InventoryStock::firstOrCreate(
-            ['company_id' => $companyId, 'product_id' => $request->product_id, 'branch_id' => null],
+            ['company_id' => $companyId, 'product_id' => $product->id, 'branch_id' => null],
             ['quantity' => 0, 'avg_purchase_price' => 0, 'last_purchase_price' => 0]
         );
 
@@ -306,6 +317,14 @@ class PosInventoryController extends Controller
                 }
 
                 $stock->update(['quantity' => $newQty]);
+
+                // Mirror sync: pos_products.stock_quantity feeds the products
+                // page + sale-screen loaders; keep it in step (atomic decrement,
+                // only when the product actually tracks a quantity).
+                \App\Models\PosProduct::where('id', $productId)
+                    ->where('company_id', $companyId)
+                    ->whereNotNull('stock_quantity')
+                    ->decrement('stock_quantity', (int) round($qty));
 
                 InventoryMovement::create([
                     'company_id' => $companyId,

@@ -35,6 +35,13 @@ class InventoryStock extends Model
         return $this->belongsTo(Product::class);
     }
 
+    // POS panel rows store pos_products ids in the same product_id column
+    // (DI and POS companies are fully isolated, so ids never mix per-company).
+    public function posProduct()
+    {
+        return $this->belongsTo(PosProduct::class, 'product_id');
+    }
+
     public function branch()
     {
         return $this->belongsTo(Branch::class);

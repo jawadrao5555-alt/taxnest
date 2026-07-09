@@ -79,7 +79,7 @@
                         <td class="px-5 py-4">
                             <div class="flex items-center gap-2.5">
                                 <div class="w-2 h-2 rounded-full {{ $stock->quantity <= 0 ? 'bg-red-500' : ($stock->isLowStock() ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500') }}"></div>
-                                <span class="font-semibold text-gray-900 dark:text-white">{{ $stock->product->name ?? 'Unknown' }}</span>
+                                <span class="font-semibold text-gray-900 dark:text-white">{{ $stock->posProduct->name ?? 'Unknown' }}</span>
                             </div>
                         </td>
                         <td class="px-5 py-4">

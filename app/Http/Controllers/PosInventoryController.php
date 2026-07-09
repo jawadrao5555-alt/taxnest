@@ -294,7 +294,9 @@ class PosInventoryController extends Controller
                     ->first();
 
                 if (!$stock) {
-                    $posProduct = \App\Models\PosProduct::find($productId);
+                    // Company-scoped lookup — PosProduct has no global scope, so
+                    // a tampered foreign item_id must NOT seed a stock row here.
+                    $posProduct = \App\Models\PosProduct::where('company_id', $companyId)->find($productId);
                     if (!$posProduct) continue;
 
                     $stock = InventoryStock::create([
@@ -312,7 +314,7 @@ class PosInventoryController extends Controller
                 $newQty = $stock->quantity - $qty;
 
                 if ($newQty < 0) {
-                    $productName = \App\Models\PosProduct::find($productId)?->name ?? 'Unknown';
+                    $productName = \App\Models\PosProduct::where('company_id', $companyId)->find($productId)?->name ?? 'Unknown';
                     $warnings[] = "Low stock warning: {$productName} (Available: {$previousQty}, Sold: {$qty})";
                 }
 

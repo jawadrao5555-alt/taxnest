@@ -131,7 +131,7 @@ class PosAuthController extends Controller
     {
         $request->validate([
             'company_name' => 'required|string|max:255',
-            'company_ntn' => 'required|string|max:50|unique:companies,ntn',
+            'company_ntn' => 'nullable|string|max:50|unique:companies,ntn',
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'phone' => 'nullable|string|max:20',

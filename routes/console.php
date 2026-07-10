@@ -20,3 +20,5 @@ Schedule::job(new SyncFbrPosOfflineInvoicesJob)->everyTwoMinutes();
 Schedule::command('pos:clean-zombie-tables')->everyFifteenMinutes();
 Schedule::job(new CheckTrialExpiryJob)->dailyAt('03:00');
 Schedule::command('trial:reminders')->dailyAt('08:00');
+// Auto-close prior POS trading days for companies that opted into 24h auto day-close.
+Schedule::command('pos:auto-dayclose')->hourly()->withoutOverlapping();

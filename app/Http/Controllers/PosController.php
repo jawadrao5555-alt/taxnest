@@ -1089,6 +1089,14 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
+
+        // Cashiers may create sales and finalize provisional bills, but NEVER delete —
+        // deletion is a company-admin decision (owner rule Jul 2026).
+        $posUser = auth('pos')->user();
+        if ($posUser && $posUser->isPosCashier()) {
+            return back()->with('error', 'Aap ke paas bill delete karne ki ijazat nahi — sirf company admin bill delete kar sakta hai.');
+        }
+
         $transaction = PosTransaction::where('company_id', $companyId)->with('items')->findOrFail($id);
 
         if ($transaction->pra_invoice_number) {
@@ -1308,6 +1316,17 @@ class PosController extends Controller
     public function apiDeleteProvisional(Request $request, $id)
     {
         $companyId = app('currentCompanyId');
+
+        // Cashiers may create + finalize provisional bills, but NEVER delete —
+        // deletion is a company-admin decision (owner rule Jul 2026).
+        $posUser = auth('pos')->user();
+        if ($posUser && $posUser->isPosCashier()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Aap ke paas bill delete karne ki ijazat nahi — sirf company admin delete kar sakta hai.',
+            ], 403);
+        }
+
         $company = Company::find($companyId);
         $tx = PosTransaction::where('company_id', $companyId)->where('id', $id)->with('items')->first();
 
@@ -2377,6 +2396,13 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
+        // PRA integration submits your NTN with every fiscal invoice — require it on file
+        // first. NTN is optional at registration; the company adds it here in the profile.
+        if (empty($company->ntn)) {
+            return redirect()->route('pos.business-profile')
+                ->with('error', 'PRA integration se pehle apna NTN (National Tax Number) Business Profile mein daalein.');
+        }
+
         if (($company->pos_integration_mode ?? 'pra') === 'standalone') {
             $company->pos_integration_mode = 'pra';
             $company->save();
@@ -2401,6 +2427,16 @@ class PosController extends Controller
             ], 422);
         }
 
+        // Turning PRA Reporting ON requires an NTN on file (submitted with every fiscal
+        // invoice). Turning it OFF is always allowed. NTN is optional at registration.
+        if (!$company->pra_reporting_enabled && empty($company->ntn)) {
+            return response()->json([
+                'success' => false,
+                'enabled' => false,
+                'message' => 'PRA Reporting on karne se pehle apna NTN Business Profile mein daalein.',
+            ], 422);
+        }
+
         $company->pra_reporting_enabled = !$company->pra_reporting_enabled;
         $company->save();
 
@@ -2408,6 +2444,50 @@ class PosController extends Controller
             'success' => true,
             'enabled' => $company->pra_reporting_enabled,
             'message' => $company->pra_reporting_enabled ? 'PRA Reporting enabled' : 'PRA Reporting disabled',
+        ]);
+    }
+
+    /**
+     * Customize POS → Local Bills — persist "auto-archive local bills on day-close".
+     * When ON, EVERY day-close (manual or the 24h auto command) archives that day's
+     * local/provisional bills to the Archive Portal. Rows are kept, never deleted.
+     */
+    public function toggleAutoPurgeLocal(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) {
+            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+        }
+        $company = Company::find(app('currentCompanyId'));
+        $company->pos_auto_purge_local_on_dayclose = $request->boolean('enabled');
+        $company->save();
+
+        return response()->json([
+            'success' => true,
+            'enabled' => (bool) $company->pos_auto_purge_local_on_dayclose,
+            'message' => $company->pos_auto_purge_local_on_dayclose ? 'Auto-archive on day-close enabled' : 'Auto-archive on day-close disabled',
+        ]);
+    }
+
+    /**
+     * Customize POS → Local Bills — persist "auto day-close after 24h".
+     * When ON, the scheduled pos:auto-dayclose command closes any un-closed prior day
+     * once 24h have elapsed since its last transaction (see routes/console.php).
+     */
+    public function toggleAutoDayclose(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) {
+            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+        }
+        $company = Company::find(app('currentCompanyId'));
+        $company->pos_auto_dayclose_24h = $request->boolean('enabled');
+        $company->save();
+
+        return response()->json([
+            'success' => true,
+            'enabled' => (bool) $company->pos_auto_dayclose_24h,
+            'message' => $company->pos_auto_dayclose_24h ? '24h auto day-close enabled' : '24h auto day-close disabled',
         ]);
     }
 
@@ -4236,6 +4316,13 @@ class PosController extends Controller
 
             $request->validate($rules);
 
+            // NTN is submitted with EVERY PRA fiscal invoice — do not allow clearing it
+            // while PRA reporting is live, or subsequent submissions would carry a null NTN.
+            // (NTN is optional at registration; it only becomes mandatory once PRA is ON.)
+            if ($company->pra_reporting_enabled && $request->has('ntn') && trim((string) $request->input('ntn')) === '') {
+                return back()->withInput()->with('error', 'PRA Reporting on hai — NTN khali nahi kiya ja sakta. Pehle PRA Reporting band karein ya sahi NTN daalein.');
+            }
+
             $data = $request->only(['name', 'owner_name', 'ntn', 'email', 'phone', 'mobile', 'address', 'city', 'business_activity', 'website']);
 
             // Receipt display preferences (per-company, POS product scope)
@@ -4370,24 +4457,57 @@ class PosController extends Controller
     public function closeDayReport(Request $request)
     {
         $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
         $user = \Illuminate\Support\Facades\Auth::guard('pos')->user();
         $date = $request->input('date', today()->format('Y-m-d'));
 
-        // Destructive purge guard — only POS admin / company admin may request local-bill
-        // purge. Cashiers can still close the day, but their purge flag is silently
-        // ignored (no destructive operation under cashier authority).
-        $wantsPurge = $request->boolean('purge_local_bills');
+        // Destructive purge guard — only POS admin / company admin may REQUEST a local-bill
+        // purge from the checkbox. Cashiers can still close the day, but a manual purge flag
+        // under cashier authority is rejected.
+        $requestedPurge = $request->boolean('purge_local_bills');
         $canPurge = $user && in_array(($user->pos_role ?? null), ['pos_admin', 'company_admin'], true);
-        if ($wantsPurge && !$canPurge) {
+        if ($requestedPurge && !$canPurge) {
             return back()->with('error', 'Only POS admin can purge local/provisional bills at day-close.');
         }
 
+        // Company policy (Customize POS → Local Bills) auto-purges on EVERY day-close,
+        // regardless of who closes the day — a standing admin decision, not cashier authority.
+        // By this point a manual purge request is already admin-validated above.
+        $purge = $requestedPurge || (bool) ($company->pos_auto_purge_local_on_dayclose ?? false);
+
+        $result = $this->performDayClose($companyId, $date, $user?->id, $purge, $request->input('notes'));
+
+        if ($result['status'] === 'exists') {
+            return back()->with('error', 'Day Close Report for this date already exists.');
+        }
+        if ($result['status'] === 'empty') {
+            return back()->with('error', 'No transactions found for this date.');
+        }
+
+        $msg = 'Day Close Report ' . $result['report_number'] . ' generated for ' . \Carbon\Carbon::parse($date)->format('d M Y');
+        if ($result['archived'] > 0) {
+            $msg .= " — {$result['archived']} local/provisional bill(s) moved to Archive.";
+        }
+        return back()->with('success', $msg);
+    }
+
+    /**
+     * Core day-close logic shared by the HTTP endpoint (closeDayReport) and the
+     * 24h auto-close command (pos:auto-dayclose). The caller decides whether to
+     * $purge (archive local bills) and who $closedBy is — this method does NOT
+     * enforce role authority, so authorize before calling.
+     *
+     * @return array{status:string,report:?\App\Models\PosDayCloseReport,archived:int,report_number:?string}
+     *         status is one of 'created' | 'exists' | 'empty'.
+     */
+    public function performDayClose(int $companyId, string $date, ?int $closedBy, bool $purge, ?string $notes = null): array
+    {
         $existing = PosDayCloseReport::where('company_id', $companyId)
             ->where('report_date', $date)
             ->first();
 
         if ($existing) {
-            return back()->with('error', 'Day Close Report for this date already exists.');
+            return ['status' => 'exists', 'report' => $existing, 'archived' => 0, 'report_number' => $existing->report_number];
         }
 
         // Local (non-PRA) bills stay OUT of the stored day-close figures — they are
@@ -4408,7 +4528,7 @@ class PosController extends Controller
             ->exists();
 
         if ($transactions->isEmpty() && !$hasLocalBills) {
-            return back()->with('error', 'No transactions found for this date.');
+            return ['status' => 'empty', 'report' => null, 'archived' => 0, 'report_number' => null];
         }
 
         $reportCount = PosDayCloseReport::where('company_id', $companyId)->count();
@@ -4434,33 +4554,29 @@ class PosController extends Controller
             'last_invoice_number' => $transactions->last()->invoice_number ?? null,
             'first_invoice_time' => $transactions->first()->created_at ?? null,
             'last_invoice_time' => $transactions->last()->created_at ?? null,
-            'closed_by' => $user->id,
-            'notes' => $request->input('notes'),
+            'closed_by' => $closedBy,
+            'notes' => $notes,
         ];
 
         $hashString = json_encode($data);
         $data['hash'] = hash('sha256', $hashString);
 
-        // Vendor request — optional auto-purge of local/provisional bills at day-close.
-        // Only deletes pra_status='local' bills (never PRA-submitted ones); fully audit-safe.
-        // Admin-only (guarded above). Wrapped in a single DB transaction so report creation
-        // and purge succeed/fail atomically — no half-purged state on partial failure.
-        // Archive (NOT delete) — local bills get is_archived=true and move to the
-        // separate Archive Portal (only accessible by users with pos_role='archive_viewer').
-        // No row destruction — fully reversible, audit-safe, and invisible to normal POS UI
-        // thanks to the global 'hide_archived' scope on PosTransaction.
+        // Optional archive of local/provisional bills at day-close. Uses the CANONICAL
+        // local-bill definition — invoice_mode='local' AND pra_status='local' — so
+        // reporting-OFF finals (invoice_mode='pra' + NULL pra_status) are NEVER swept in.
+        // Archive (NOT delete): is_archived=true hides rows via the global 'hide_archived'
+        // scope while keeping them fully recoverable/audit-safe. Wrapped in one DB
+        // transaction so report creation + archive succeed/fail atomically.
         $archivedCount = 0;
-        \DB::transaction(function () use ($data, $companyId, $date, $wantsPurge, $canPurge, &$archivedCount) {
+        $report = null;
+        \DB::transaction(function () use ($data, $companyId, $date, $purge, &$archivedCount, &$report) {
             $report = PosDayCloseReport::create($data);
-            if ($wantsPurge && $canPurge) {
-                // Match the same definition used for stats above:
-                // pra_status IN ('local', NULL) AND no PRA invoice yet → counts as local/provisional.
+            if ($purge) {
                 $archivedCount = PosTransaction::withoutGlobalScope('hide_archived')
                     ->where('company_id', $companyId)
                     ->whereDate('created_at', $date)
-                    ->where(function ($q) {
-                        $q->where('pra_status', 'local')->orWhereNull('pra_status');
-                    })
+                    ->where('invoice_mode', 'local')
+                    ->where('pra_status', 'local')
                     ->whereNull('pra_invoice_number')
                     ->where('is_archived', false)
                     ->update([
@@ -4471,11 +4587,7 @@ class PosController extends Controller
             }
         });
 
-        $msg = 'Day Close Report ' . $reportNumber . ' generated for ' . \Carbon\Carbon::parse($date)->format('d M Y');
-        if ($archivedCount > 0) {
-            $msg .= " — {$archivedCount} local/provisional bill(s) moved to Archive.";
-        }
-        return back()->with('success', $msg);
+        return ['status' => 'created', 'report' => $report, 'archived' => $archivedCount, 'report_number' => $reportNumber];
     }
 
     public function dayCloseReportPdf($id)

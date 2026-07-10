@@ -54,7 +54,7 @@
         ];
     @endphp
 
-    <div x-data="{ currentTheme: '{{ $company->pos_theme ?? 'purple' }}', guidedOn: {{ ($company->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }}, savingGuided: false, invOn: {{ $invOn ? 'true' : 'false' }}, savingInv: false, restockOn: {{ ($company->pos_restock_on_void ?? true) ? 'true' : 'false' }}, savingRestock: false }"
+    <div x-data="{ currentTheme: '{{ $company->pos_theme ?? 'purple' }}', guidedOn: {{ ($company->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }}, savingGuided: false, invOn: {{ $invOn ? 'true' : 'false' }}, savingInv: false, restockOn: {{ ($company->pos_restock_on_void ?? true) ? 'true' : 'false' }}, savingRestock: false, autoPurgeOn: {{ ($company->pos_auto_purge_local_on_dayclose ?? false) ? 'true' : 'false' }}, savingPurge: false, autoDaycloseOn: {{ ($company->pos_auto_dayclose_24h ?? false) ? 'true' : 'false' }}, savingDayclose: false }"
          class="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
 
         {{-- ═══════════ HERO ═══════════ --}}
@@ -147,6 +147,48 @@
                         @click="restockOn=!restockOn; savingRestock=true; fetch('/pos/settings/restock-toggle', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({enabled:restockOn})}).then(r=>r.json()).catch(()=>{}).finally(()=>{ savingRestock=false; })"
                         class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200" :class="restockOn ? 'bg-amber-500' : 'bg-gray-300 dark:bg-gray-600'">
                         <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="restockOn && 'translate-x-6'"></span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        {{-- ═══════════ LOCAL BILLS & DAY-CLOSE ═══════════ --}}
+        <section>
+            <div class="px-1 mb-3">
+                <h2 class="text-sm font-extrabold text-gray-900 dark:text-white uppercase tracking-wide">Local Bills &amp; Day-Close</h2>
+                <p class="text-[12px] text-gray-500 dark:text-gray-400">Provisional / local bills ka day-close par kya ho — yahin se control karein</p>
+            </div>
+            <div class="grid sm:grid-cols-2 gap-4">
+
+                {{-- Auto-archive local bills on day-close --}}
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400 flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">Day-close par local bills archive</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">Har day-close par local/provisional bills khud archive ho jayein — data safe rehta hai, delete nahi hota</p>
+                    </div>
+                    <button type="button"
+                        @click="autoPurgeOn=!autoPurgeOn; savingPurge=true; fetch('/pos/settings/auto-purge-local-toggle', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({enabled:autoPurgeOn})}).then(r=>r.json()).catch(()=>{}).finally(()=>{ savingPurge=false; })"
+                        class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200" :class="autoPurgeOn ? 'bg-teal-600' : 'bg-gray-300 dark:bg-gray-600'">
+                        <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="autoPurgeOn && 'translate-x-6'"></span>
+                    </button>
+                </div>
+
+                {{-- Auto day-close after 24h of inactivity --}}
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400 flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">24 ghante baad auto day-close</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">Din manually close na ho to system 24 ghante ki inactivity ke baad khud report bana kar close kar de</p>
+                    </div>
+                    <button type="button"
+                        @click="autoDaycloseOn=!autoDaycloseOn; savingDayclose=true; fetch('/pos/settings/auto-dayclose-toggle', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({enabled:autoDaycloseOn})}).then(r=>r.json()).catch(()=>{}).finally(()=>{ savingDayclose=false; })"
+                        class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200" :class="autoDaycloseOn ? 'bg-teal-600' : 'bg-gray-300 dark:bg-gray-600'">
+                        <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="autoDaycloseOn && 'translate-x-6'"></span>
                     </button>
                 </div>
             </div>

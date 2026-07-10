@@ -158,8 +158,8 @@
                         </div>
 
                         <div>
-                            <label for="company_ntn" class="block text-sm font-medium text-purple-100/70 mb-1.5">NTN (National Tax Number)</label>
-                            <input id="company_ntn" type="text" name="company_ntn" value="{{ old('company_ntn') }}" required placeholder="1234567-8" class="w-full rounded-xl text-sm text-white placeholder-purple-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(139,92,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
+                            <label for="company_ntn" class="block text-sm font-medium text-purple-100/70 mb-1.5">NTN (National Tax Number) <span class="text-purple-300/50 font-normal">— optional</span></label>
+                            <input id="company_ntn" type="text" name="company_ntn" value="{{ old('company_ntn') }}" placeholder="Optional — add later for PRA integration" class="w-full rounded-xl text-sm text-white placeholder-purple-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(139,92,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
                         </div>
 
                         <div style="border-top: 1px solid rgba(255,255,255,0.08); margin-top: 8px; padding-top: 12px;">

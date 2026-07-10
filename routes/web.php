@@ -444,6 +444,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/settings/guided-flow', [PosController::class, 'updateGuidedFlow'])->name('pos.settings.guided-flow');
     Route::post('/settings/inventory-toggle', [PosController::class, 'updateInventoryToggle'])->name('pos.settings.inventory-toggle');
     Route::post('/settings/restock-toggle', [PosController::class, 'updateRestockToggle'])->name('pos.settings.restock-toggle');
+    Route::post('/settings/auto-purge-local-toggle', [PosController::class, 'toggleAutoPurgeLocal'])->name('pos.settings.auto-purge-local-toggle');
+    Route::post('/settings/auto-dayclose-toggle', [PosController::class, 'toggleAutoDayclose'])->name('pos.settings.auto-dayclose-toggle');
     Route::get('/invoice/create', [PosController::class, 'createInvoice'])->name('pos.invoice.create');
     Route::get('/v2/invoice/create', [PosController::class, 'universalCreateInvoice'])->name('pos.v2.invoice.create');
     Route::get('/features', [PosController::class, 'featureSettings'])->name('pos.features');

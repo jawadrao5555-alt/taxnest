@@ -22,6 +22,27 @@ F10 provisional modal and mismatches the Transactions "Local" tab — this cause
 - Both save paths already land provisional correctly: retail `storeInvoice` and restaurant
   `RestaurantPosController::payHeldOrder` set completed + local + local when `save_as_provisional`.
 
+# Promoting a provisional → PRA final (re-tax + renumber, Jul 2026)
+
+Promoting an F10 "Local" bill to final is NOT a status-flip only. It must:
+1. **Ask cash vs card at promote time and RE-TAX** — the two carry different PRA rates
+   (global 16% cash / 8% card). The picker preselects the stored `payment_method`; the chosen
+   method re-drives `PosTaxRule::getRateForMethod()` and the whole bill is recomputed.
+2. **Allot a fresh POS serial** (`generateInvoiceNumber` → `POS-YYYY-NNNNN`), replacing the
+   provisional `L-NNN` — a final bill must never keep the local number. New `submission_hash` too.
+
+**Why:** cashiers save provisionals before the customer decides how to pay; the final tax + number
+are only knowable at promote. `PraIntegrationService::sendInvoice` sends `invoice_number` as the
+**USIN** and builds the payload from **per-item `tax_rate`** — so BOTH the renumber AND the per-item
+re-tax MUST happen BEFORE the submit call, or PRA fiscalizes the L- number with stale rates.
+
+**How to apply:** recompute mirrors `storeInvoice` exactly — from STORED data (`tx->subtotal`,
+absolute `tx->discount_amount`, sum of non-exempt `item->subtotal`); header tax+total whole-rupee,
+item lines 2dp. Do it all inside ONE `DB::transaction` with `lockForUpdate` + re-check the three
+provisional fields (race-safe against F10 double-Enter), then PRA `sendInvoice` STRICTLY after commit.
+`PosPayment::updateOrCreate` keyed on `transaction_id` (restaurant-origin provisionals may lack a row).
+Frontend: the `praEnabled` gate on "Make Final" must be REMOVED (reporting-OFF finalize is valid).
+
 # Reporting-OFF finals invariant (PRA & FBR POS — Jul 2026)
 
 A FINAL sale for a company whose regulator reporting is OFF (`pra_reporting_enabled=0` /

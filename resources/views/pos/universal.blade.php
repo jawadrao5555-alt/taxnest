@@ -1132,7 +1132,7 @@ window.addEventListener('popstate', function() {
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V3a1 1 0 011-1h4a1 1 0 011 1v4"/></svg>
                                 Delete
                             </button>
-                            <button @click="promoteProvisional(bill)" :disabled="!praEnabled" :title="praEnabled ? 'Submit this bill to PRA as final invoice' : 'PRA reporting is disabled — enable from settings'" class="flex-1 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
+                            <button @click="askPromoteMethod(bill)" :title="praEnabled ? 'Choose cash/card, then submit to PRA as a final invoice' : 'Choose cash/card, then finalize (PRA reporting OFF — no submission)'" class="flex-1 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                                 Make Final
                             </button>
@@ -1142,6 +1142,41 @@ window.addEventListener('popstate', function() {
             </div>
             <div x-show="localBills.length > 0" class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-[11px] text-gray-500">
                 <span>💡 Provisional bills NOT reported to PRA — edit/delete anytime, or "Make Final" to lock & submit.</span>
+            </div>
+        </div>
+    </div>
+
+    {{-- ─────────────────────────────────────────────────────────────────────── --}}
+    {{-- PROMOTE METHOD PICKER — F10 "Make Final": pick cash/card before final. --}}
+    {{-- Cash vs card carry different PRA tax rates, so the bill is RE-TAXED and --}}
+    {{-- given a real POS serial. Keys: ←→/↑↓ move, 1=Cash, 2=Card, Enter=go.    --}}
+    {{-- Rendered AFTER the Local modal so it stacks on top at the same z-50.    --}}
+    {{-- ─────────────────────────────────────────────────────────────────────── --}}
+    <div x-show="showPromoteMethod" x-cloak x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="if(!promoteSubmitting){ showPromoteMethod = false; promoteTarget = null; }">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" x-transition.scale.90>
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-purple-50 to-purple-50/40 dark:from-purple-900/20 dark:to-gray-900">
+                <h3 class="text-base font-black text-gray-900 dark:text-white flex items-center gap-2">
+                    <svg class="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    Make Final — choose payment
+                </h3>
+                <p class="text-[11px] text-gray-500 mt-1">
+                    <span class="font-bold text-gray-700 dark:text-gray-300" x-text="promoteTarget ? (promoteTarget.invoice_number || ('#' + promoteTarget.id)) : ''"></span>
+                    <span x-show="promoteTarget"> • current Rs. <span x-text="promoteTarget ? Number(promoteTarget.total_amount).toLocaleString() : ''"></span></span>
+                </p>
+                <p class="text-[10px] text-amber-600 dark:text-amber-400 mt-1" x-text="praEnabled ? 'Tax is re-applied for the chosen method, then submitted to PRA with a new POS number.' : 'Tax is re-applied for the chosen method, then finalized (PRA OFF — no submission).'"></p>
+            </div>
+            <div class="p-5 grid grid-cols-2 gap-3">
+                <button @click="promoteMethodIndex = 0; promoteProvisional(promoteTarget, 'cash')" :disabled="promoteSubmitting" :class="promoteMethodIndex === 0 ? 'ring-2 ring-green-500 ring-offset-2 dark:ring-offset-gray-900 scale-105 border-green-400' : ''" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:bg-green-100 hover:border-green-400">
+                    <span class="block text-sm font-black text-green-700 dark:text-green-400">Cash</span>
+                    <span class="block text-[10px] font-semibold mt-0.5 text-green-600/60" x-text="'Tax: ' + (taxRules['cash'] || 16) + '%'"></span>
+                </button>
+                <button @click="promoteMethodIndex = 1; promoteProvisional(promoteTarget, 'card')" :disabled="promoteSubmitting" :class="promoteMethodIndex === 1 ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900 scale-105 border-blue-400' : ''" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 hover:border-blue-400">
+                    <span class="block text-sm font-black text-blue-700 dark:text-blue-400">Card</span>
+                    <span class="block text-[10px] font-semibold mt-0.5 text-blue-600/60" x-text="'Tax: ' + (taxRules['debit_card'] || taxRules['card'] || 8) + '%'"></span>
+                </button>
+            </div>
+            <div class="px-5 pb-5">
+                <button @click="if(!promoteSubmitting){ showPromoteMethod = false; promoteTarget = null; }" :disabled="promoteSubmitting" class="w-full py-2.5 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition disabled:opacity-50">Cancel (Esc)</button>
             </div>
         </div>
     </div>
@@ -2036,6 +2071,14 @@ function restaurantPos() {
         // and can be promoted to final later via the "Submit to PRA — Make Final"
         // button on transaction-show. Toggle key: P (while pay modal is open).
         saveAsProvisional: false,
+        // ── PROMOTE METHOD PICKER (F10 → Make Final) ─────────────────────────
+        // When promoting a provisional to a PRA final, the cashier re-picks the
+        // settlement method (cash vs card carry different PRA tax rates), so the
+        // bill is re-taxed + given a real POS serial server-side. 0=Cash, 1=Card.
+        showPromoteMethod: false,
+        promoteTarget: null,
+        promoteMethodIndex: 0,
+        promoteSubmitting: false,
         showHeldOrders: false,
         // ── PRA REPORTING TOGGLE (root scope so modals/buttons can read it) ───
         // Mirrors $company->pra_reporting_enabled. Used by Provisional/Failed bill
@@ -3353,11 +3396,22 @@ function restaurantPos() {
                 else if (e.key === 'Escape') { e.preventDefault(); this.showHeldOrders = false; }
                 return;
             }
+            // PROMOTE METHOD PICKER — highest priority so keys don't leak to the
+            // Local-bills list underneath. ←→/↑↓ move, 1=Cash, 2=Card, Enter=confirm.
+            if (this.showPromoteMethod) {
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowUp')    { e.preventDefault(); e.stopPropagation(); this.promoteMethodIndex = 0; return; }
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); e.stopPropagation(); this.promoteMethodIndex = 1; return; }
+                if (e.key === '1') { e.preventDefault(); e.stopPropagation(); this.promoteMethodIndex = 0; this.promoteProvisional(this.promoteTarget, 'cash'); return; }
+                if (e.key === '2') { e.preventDefault(); e.stopPropagation(); this.promoteMethodIndex = 1; this.promoteProvisional(this.promoteTarget, 'card'); return; }
+                if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); e.stopPropagation(); this.promoteProvisional(this.promoteTarget, this.promoteMethodIndex === 1 ? 'card' : 'cash'); return; }
+                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!this.promoteSubmitting) { this.showPromoteMethod = false; this.promoteTarget = null; } return; }
+                return;
+            }
             // PROVISIONAL BILLS modal — keyboard navigation (mirror of held-orders shortcuts)
             if (this.showLocalBills && this.localBills.length > 0) {
                 if (e.key === 'ArrowDown') { e.preventDefault(); this.activeLocalIndex = Math.min(this.activeLocalIndex + 1, this.localBills.length - 1); }
                 else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeLocalIndex = Math.max(this.activeLocalIndex - 1, 0); }
-                else if (e.key === 'Enter') { e.preventDefault(); this.promoteProvisional(this.localBills[this.activeLocalIndex]); }
+                else if (e.key === 'Enter') { e.preventDefault(); this.askPromoteMethod(this.localBills[this.activeLocalIndex]); }
                 else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); window.location.href = '{{ url('/pos/transaction') }}/' + this.localBills[this.activeLocalIndex].id + '/edit'; }
                 else if ((e.key === 'd' || e.key === 'D') && this.posRole !== 'pos_cashier') { e.preventDefault(); this.deleteProvisional(this.localBills[this.activeLocalIndex]); }
                 else if (e.key === 'Escape') { e.preventDefault(); this.showLocalBills = false; }
@@ -4145,14 +4199,25 @@ function restaurantPos() {
                 }
             } catch (e) { console.error('deleteProvisional', e); this.showToast('Network error', 'error'); }
         },
-        async promoteProvisional(bill) {
+        // Open the cash/card picker for a provisional before finalizing. Cash vs card
+        // carry different PRA tax rates, so the method is chosen at promote time and
+        // the bill is re-taxed + given a real POS serial server-side.
+        askPromoteMethod(bill) {
             if (!bill) return;
-            if (!this.praEnabled) { this.showToast('PRA reporting is disabled — enable from settings', 'error'); return; }
-            if (!confirm('Submit bill ' + (bill.invoice_number || '#' + bill.id) + ' to PRA as a FINAL invoice?\n\nOnce reported, the bill will be locked — no more edit or delete. Continue?')) return;
+            this.promoteTarget = bill;
+            // Preselect the method the bill was saved with (card family → index 1).
+            this.promoteMethodIndex = (bill.payment_method && bill.payment_method !== 'cash') ? 1 : 0;
+            this.showPromoteMethod = true;
+        },
+        async promoteProvisional(bill, method) {
+            if (!bill) return;
+            if (this.promoteSubmitting) return;
+            this.promoteSubmitting = true;
             try {
                 const res = await fetch('{{ url('/pos/api/provisional-bills') }}/' + bill.id + '/promote', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ payment_method: method || 'cash' }),
                 });
                 const data = await res.json();
                 if (data && data.success) {
@@ -4160,13 +4225,25 @@ function restaurantPos() {
                     this.localBills = this.localBills.filter(b => b.id !== bill.id);
                     if (this.activeLocalIndex >= this.localBills.length) this.activeLocalIndex = Math.max(0, this.localBills.length - 1);
                     if (this.localBills.length === 0) { this.showLocalBills = false; this.activeLocalIndex = 0; }
-                    this.showToast(data.message || 'Submitted to PRA', 'success');
+                    this.showPromoteMethod = false;
+                    this.promoteTarget = null;
+                    this.showToast(data.message || ('Finalized' + (data.invoice_number ? ' — ' + data.invoice_number : '')), 'success');
                 } else {
                     // Failed — refresh list so cashier sees current state.
                     this.showToast((data && data.message) || 'Submit failed', 'error');
+                    this.showPromoteMethod = false;
+                    this.promoteTarget = null;
                     this.loadLocalBills();
                 }
-            } catch (e) { console.error('promoteProvisional', e); this.showToast('Network error', 'error'); this.loadLocalBills(); }
+            } catch (e) {
+                console.error('promoteProvisional', e);
+                this.showToast('Network error', 'error');
+                this.showPromoteMethod = false;
+                this.promoteTarget = null;
+                this.loadLocalBills();
+            } finally {
+                this.promoteSubmitting = false;
+            }
         },
 
         // ─── FAILED BILLS API helpers (F11 modal) ───────────────────────────

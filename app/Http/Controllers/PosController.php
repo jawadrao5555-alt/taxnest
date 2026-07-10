@@ -1287,7 +1287,7 @@ class PosController extends Controller
             ->where('pra_status', 'local')
             ->orderBy('id', 'desc')
             ->limit(100)
-            ->get(['id', 'invoice_number', 'customer_name', 'total_amount', 'created_at']);
+            ->get(['id', 'invoice_number', 'customer_name', 'total_amount', 'payment_method', 'created_at']);
 
         $data = $bills->map(function ($b) {
             return [
@@ -1295,6 +1295,7 @@ class PosController extends Controller
                 'invoice_number' => $b->invoice_number,
                 'customer_name'  => $b->customer_name,
                 'total_amount'   => (float) $b->total_amount,
+                'payment_method' => $b->payment_method,
                 'items_count'    => PosTransactionItem::where('transaction_id', $b->id)->count(),
                 'created_human'  => $b->created_at?->diffForHumans(),
                 'created_at'     => $b->created_at?->toDateTimeString(),
@@ -1375,51 +1376,143 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        $tx = PosTransaction::where('company_id', $companyId)->where('id', $id)->first();
 
-        if (!$tx) {
-            return response()->json(['success' => false, 'message' => 'Bill not found'], 404);
-        }
-        if ($tx->pra_status !== 'local' || $tx->status !== 'completed' || $tx->invoice_mode !== 'local') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Only completed provisional (local) bills can be promoted. Current status: ' . $tx->status . '/' . $tx->pra_status,
-            ], 422);
-        }
         if (!$company) {
             return response()->json(['success' => false, 'message' => 'Company not found'], 404);
         }
-        if (!$company->pra_reporting_enabled) {
-            // PRA-reporting-OFF company — finalize WITHOUT any PRA submission:
-            // 'pra' mode + NULL pra_status = normal final bill (visible in
-            // transactions/KPIs, out of the F10 provisional modal).
-            $tx->update([
-                'pra_status'        => null,
-                'invoice_mode'      => 'pra',
-                'pra_response_code' => null,
-            ]);
+
+        // Cashier picks the settlement method AT promote time — cash vs card carry
+        // different PRA tax rates (e.g. 16% vs 8%), so the bill is RE-TAXED for the
+        // chosen method. Falls back to the stored method when none is supplied.
+        $method = $request->input('payment_method');
+        if ($method === 'card') {
+            $method = 'debit_card';
+        }
+        if (!in_array($method, ['cash', 'debit_card', 'credit_card', 'qr_payment'], true)) {
+            $method = null; // resolve from the stored value inside the transaction
+        }
+
+        $reportingOn = (bool) $company->pra_reporting_enabled;
+        $newNumber = null;
+        $newTotal  = null;
+
+        try {
+            DB::transaction(function () use ($companyId, $company, $id, $method, $reportingOn, &$newNumber, &$newTotal) {
+                // Race-safe: lock the row and re-verify it is still a genuine provisional.
+                // The F10 modal fires promote on Enter, so double-Enter is a real
+                // double-promote path — the lock + re-check closes it.
+                $tx = PosTransaction::where('company_id', $companyId)
+                    ->where('id', $id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$tx) {
+                    throw new \RuntimeException('NOT_FOUND');
+                }
+                if ($tx->pra_status !== 'local' || $tx->status !== 'completed' || $tx->invoice_mode !== 'local') {
+                    throw new \RuntimeException('NOT_PROVISIONAL:' . $tx->status . '/' . $tx->pra_status);
+                }
+
+                $payMethod = $method ?? $tx->payment_method;
+
+                // Recompute tax from the STORED bill for the chosen method — mirrors
+                // storeInvoice (stored subtotal, absolute discount, non-exempt lines).
+                $items = $tx->items()->get();
+                $subtotal = (float) $tx->subtotal;
+                $discountAmount = (float) $tx->discount_amount;
+                $afterDiscount = $subtotal - $discountAmount;
+                $taxableSubtotal = (float) $items->reject(fn($it) => (bool) $it->is_tax_exempt)->sum('subtotal');
+                $taxableAfterDiscount = $subtotal > 0 ? round($taxableSubtotal / $subtotal * $afterDiscount, 2) : 0;
+                $exemptAfterDiscount = round($afterDiscount - $taxableAfterDiscount, 2);
+
+                $taxRate = PosTaxRule::getRateForMethod($payMethod, $company);
+                // Whole-rupee tax + total (Pakistan POS convention) — item lines stay 2dp.
+                $taxAmount = (float) round($taxableAfterDiscount * $taxRate / 100);
+                $totalAmount = (float) round($afterDiscount + $taxAmount);
+
+                // Allot a real POS serial (replaces the provisional L-NNN). generateInvoiceNumber's
+                // lockForUpdate is now effective inside this transaction.
+                $newInvoiceNumber = $this->generateInvoiceNumber($companyId);
+                $newHash = hash('sha256', $companyId . '|' . $newInvoiceNumber . '|' . $totalAmount . '|' . now()->timestamp);
+
+                $tx->update([
+                    'invoice_number'    => $newInvoiceNumber,
+                    'payment_method'    => $payMethod,
+                    'tax_rate'          => $taxRate,
+                    'tax_amount'        => $taxAmount,
+                    'exempt_amount'     => $exemptAfterDiscount,
+                    'total_amount'      => $totalAmount,
+                    'cash_received'     => $payMethod === 'cash' ? $totalAmount : null,
+                    'change_due'        => null,
+                    'submission_hash'   => $newHash,
+                    // Finalize out of 'local'. Reporting-OFF = 'pra' mode + NULL status
+                    // (normal final, no submission). Reporting-ON = 'pending' for submit.
+                    'invoice_mode'      => 'pra',
+                    'pra_status'        => $reportingOn ? 'pending' : null,
+                    'pra_response_code' => null,
+                ]);
+
+                // Re-tax each line for the new rate — the PRA payload reads per-item tax_rate.
+                foreach ($items as $it) {
+                    $itemTaxRate = (bool) $it->is_tax_exempt ? 0 : $taxRate;
+                    $itemDiscountShare = $subtotal > 0 ? round($discountAmount * ((float) $it->subtotal / $subtotal), 2) : 0;
+                    $itemTaxableAmount = (float) $it->subtotal - $itemDiscountShare;
+                    $itemTaxAmount = round($itemTaxableAmount * $itemTaxRate / 100, 2);
+                    $it->update([
+                        'tax_rate'   => $itemTaxRate,
+                        'tax_amount' => $itemTaxAmount,
+                    ]);
+                }
+
+                // Sync the payment record — restaurant-origin provisionals may have none,
+                // so updateOrCreate (a plain update would silently no-op).
+                PosPayment::updateOrCreate(
+                    ['transaction_id' => $tx->id],
+                    ['payment_method' => $payMethod, 'amount' => $totalAmount]
+                );
+
+                $newNumber = $newInvoiceNumber;
+                $newTotal  = $totalAmount;
+            });
+        } catch (\RuntimeException $e) {
+            $msg = $e->getMessage();
+            if ($msg === 'NOT_FOUND') {
+                return response()->json(['success' => false, 'message' => 'Bill not found'], 404);
+            }
+            if (str_starts_with($msg, 'NOT_PROVISIONAL:')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Only completed provisional (local) bills can be promoted. Current status: ' . substr($msg, 16),
+                ], 422);
+            }
+            return response()->json(['success' => false, 'message' => 'Promote failed: ' . $msg], 500);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => 'Promote failed: ' . $e->getMessage()], 500);
+        }
+
+        // ── Post-commit: PRA submission happens STRICTLY outside the transaction ──
+        if (!$reportingOn) {
             return response()->json([
-                'success'   => true,
-                'submitted' => false,
-                'message'   => '✓ Bill ' . $tx->invoice_number . ' is now FINAL — PRA reporting is OFF, no submission needed.',
-                'id'        => $id,
+                'success'        => true,
+                'submitted'      => false,
+                'invoice_number' => $newNumber,
+                'total_amount'   => $newTotal,
+                'message'        => '✓ Bill ' . $newNumber . ' is now FINAL (Rs. ' . number_format($newTotal) . ') — PRA reporting is OFF, no submission needed.',
+                'id'             => $id,
             ]);
         }
 
-        // Flip provisional → pending + lock to PRA mode (same as retryPra L897-902).
-        $tx->update([
-            'pra_status'        => 'pending',
-            'invoice_mode'      => 'pra',
-            'pra_response_code' => null,
-        ]);
+        $tx = PosTransaction::where('company_id', $companyId)->where('id', $id)->first();
 
         // Agent-enabled: just leave it queued — desktop agent picks it up within 10s.
         if ($company->agent_enabled) {
             return response()->json([
-                'success' => true,
-                'queued'  => true,
-                'message' => '🟡 Re-queued for desktop agent — will sync within seconds.',
-                'id'      => $id,
+                'success'        => true,
+                'queued'         => true,
+                'invoice_number' => $newNumber,
+                'total_amount'   => $newTotal,
+                'message'        => '🟡 Bill ' . $newNumber . ' re-queued for desktop agent — will sync within seconds.',
+                'id'             => $id,
             ]);
         }
 
@@ -1430,11 +1523,13 @@ class PosController extends Controller
 
             if (!empty($result['success'])) {
                 return response()->json([
-                    'success'    => true,
-                    'submitted'  => true,
-                    'message'    => 'PRA submission successful! PRA Fiscal Invoice Number: ' . ($tx->pra_invoice_number ?? 'N/A'),
-                    'pra_number' => $tx->pra_invoice_number,
-                    'id'         => $id,
+                    'success'        => true,
+                    'submitted'      => true,
+                    'invoice_number' => $newNumber,
+                    'total_amount'   => $newTotal,
+                    'message'        => 'PRA submission successful! PRA Fiscal Invoice Number: ' . ($tx->pra_invoice_number ?? 'N/A'),
+                    'pra_number'     => $tx->pra_invoice_number,
+                    'id'             => $id,
                 ]);
             }
 

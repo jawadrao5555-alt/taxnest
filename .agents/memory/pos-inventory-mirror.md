@@ -34,6 +34,24 @@ companies. Never re-add a FK on that column to either table.
 - Negative inventory_stocks quantities are allowed by design (oversell warning,
   no clamp).
 
+## Restock-on-void (bill delete/edit stock restore) — OPTIONAL per-company toggle
+- Gated by `companies.pos_restock_on_void` (default TRUE) shown in Customize POS.
+  Restore runs only when `inventory_enabled && pos_restock_on_void`.
+- `PosInventoryController::restoreStockForInvoice()` mirrors `deductStockForInvoice`
+  (company-scoped tamper-safe PosProduct lookup, lockForUpdate, keeps
+  pos_products.stock_quantity in lockstep, writes InventoryMovement TYPE_RETURN_IN).
+- **Every delete surface must restore, not just the transaction page.** Provisional
+  bills deduct stock at sale time too, and cashiers delete them from the **F10 "Local"
+  modal** (`apiDeleteProvisional`), NOT `pos/transaction/{id}` DELETE. Wiring only
+  `deleteTransaction` leaves the primary provisional-delete path drifting. Both wired.
+- Edit (`updateTransaction`) reconciles: snapshot OLD items BEFORE `items()->delete()`,
+  then restore-old + deduct-new inside the same DB::transaction (order-independent —
+  deduct has no zero-clamp). Promote-provisional does NOT touch stock (bill still exists).
+- FBR POS does NOT deduct stock via deductStockForInvoice, so its delete paths are
+  out of scope — do not add restore there unless FBR starts deducting.
+
+**Why:** a deleted/voided sale should return goods to the shelf, but some owners treat
+a deleted bill as consumed/damaged — hence the toggle, default ON (correct accounting).
+
 ## Known remaining drift gaps (owner decision pending, do not "fix" silently)
-- Bill delete / edit-transaction do NOT restore deducted stock.
 - CSV product import sets no stock (by design, no backfill there).

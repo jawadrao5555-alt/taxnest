@@ -443,6 +443,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/settings/dashboard-style', [PosController::class, 'updateDashboardStyle'])->name('pos.settings.dashboard-style');
     Route::post('/settings/guided-flow', [PosController::class, 'updateGuidedFlow'])->name('pos.settings.guided-flow');
     Route::post('/settings/inventory-toggle', [PosController::class, 'updateInventoryToggle'])->name('pos.settings.inventory-toggle');
+    Route::post('/settings/restock-toggle', [PosController::class, 'updateRestockToggle'])->name('pos.settings.restock-toggle');
     Route::get('/invoice/create', [PosController::class, 'createInvoice'])->name('pos.invoice.create');
     Route::get('/v2/invoice/create', [PosController::class, 'universalCreateInvoice'])->name('pos.v2.invoice.create');
     Route::get('/features', [PosController::class, 'featureSettings'])->name('pos.features');

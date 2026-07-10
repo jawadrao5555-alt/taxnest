@@ -67,6 +67,18 @@ class PosController extends Controller
         return response()->json(['success' => true, 'enabled' => $enabled]);
     }
 
+    public function updateRestockToggle(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) {
+            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+        }
+        $enabled = $request->boolean('enabled');
+        $companyId = app('currentCompanyId');
+        Company::where('id', $companyId)->update(['pos_restock_on_void' => $enabled]);
+        return response()->json(['success' => true, 'enabled' => $enabled]);
+    }
+
     public function updateInventoryToggle(Request $request)
     {
         $user = auth('pos')->user();
@@ -894,12 +906,25 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        $transaction = PosTransaction::where('company_id', $companyId)->findOrFail($id);
+        $transaction = PosTransaction::where('company_id', $companyId)->with('items')->findOrFail($id);
 
         if ($transaction->pra_invoice_number) {
             return redirect()->route('pos.transaction.show', $id)
                 ->with('error', 'Cannot edit — this invoice has been submitted to PRA.');
         }
+
+        // Snapshot the OLD line items before they are replaced, so the edit can
+        // reconcile inventory (restore old qty, deduct new qty) when the owner
+        // opted into restock-on-void. Captured now — items are deleted below.
+        $restockOnEdit = $company && $company->inventory_enabled && $company->pos_restock_on_void;
+        $oldStockItems = $restockOnEdit
+            ? $transaction->items->map(fn ($i) => [
+                'type' => $i->item_type ?? 'product',
+                'item_id' => $i->item_id,
+                'quantity' => (float) $i->quantity,
+                'unit_price' => (float) $i->unit_price,
+            ])->all()
+            : [];
 
         $request->validate([
             'items' => 'required|array|min:1|max:200',
@@ -1006,6 +1031,24 @@ class PosController extends Controller
                 'reference_number' => $request->reference_number,
             ]);
 
+            // Reconcile inventory for the edit: put the old quantities back, then
+            // deduct the new quantities. Net effect keeps stock true to the bill
+            // as it now stands (only when restock-on-void is enabled).
+            if ($restockOnEdit) {
+                PosInventoryController::restoreStockForInvoice(
+                    $companyId, $oldStockItems, $transaction->id, $transaction->invoice_number, auth('pos')->id(), 'pos_edit'
+                );
+                $newStockItems = array_map(fn ($ri) => [
+                    'type' => $ri['type'],
+                    'item_id' => $ri['item_id'],
+                    'quantity' => (float) $ri['quantity'],
+                    'unit_price' => (float) $ri['price'],
+                ], $companyItems);
+                PosInventoryController::deductStockForInvoice(
+                    $companyId, $newStockItems, $transaction->id, $transaction->invoice_number, auth('pos')->id()
+                );
+            }
+
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
@@ -1045,7 +1088,8 @@ class PosController extends Controller
     public function deleteTransaction($id)
     {
         $companyId = app('currentCompanyId');
-        $transaction = PosTransaction::where('company_id', $companyId)->findOrFail($id);
+        $company = Company::find($companyId);
+        $transaction = PosTransaction::where('company_id', $companyId)->with('items')->findOrFail($id);
 
         if ($transaction->pra_invoice_number) {
             return redirect()->route('pos.transaction.show', $id)
@@ -1054,6 +1098,20 @@ class PosController extends Controller
 
         DB::beginTransaction();
         try {
+            // Return the sold stock to inventory before the items disappear —
+            // only when tracking is on AND the owner opted into restock-on-void.
+            if ($company && $company->inventory_enabled && $company->pos_restock_on_void) {
+                $restoreItems = $transaction->items->map(fn ($i) => [
+                    'type' => $i->item_type ?? 'product',
+                    'item_id' => $i->item_id,
+                    'quantity' => (float) $i->quantity,
+                    'unit_price' => (float) $i->unit_price,
+                ])->all();
+                PosInventoryController::restoreStockForInvoice(
+                    $companyId, $restoreItems, $transaction->id, $transaction->invoice_number, auth('pos')->id(), 'pos_void'
+                );
+            }
+
             $transaction->items()->delete();
             $transaction->payments()->delete();
             $transaction->praLogs()->delete();
@@ -1250,7 +1308,8 @@ class PosController extends Controller
     public function apiDeleteProvisional(Request $request, $id)
     {
         $companyId = app('currentCompanyId');
-        $tx = PosTransaction::where('company_id', $companyId)->where('id', $id)->first();
+        $company = Company::find($companyId);
+        $tx = PosTransaction::where('company_id', $companyId)->where('id', $id)->with('items')->first();
 
         if (!$tx) {
             return response()->json(['success' => false, 'message' => 'Bill not found'], 404);
@@ -1262,7 +1321,24 @@ class PosController extends Controller
             ], 422);
         }
 
-        DB::transaction(function () use ($tx) {
+        // Provisional bills deduct stock at sale time just like finals, so the
+        // F10 "Local" modal delete must restore it too — same rule as
+        // deleteTransaction (only when tracking + restock-on-void are on).
+        $restoreItems = ($company && $company->inventory_enabled && $company->pos_restock_on_void)
+            ? $tx->items->map(fn ($i) => [
+                'type' => $i->item_type ?? 'product',
+                'item_id' => $i->item_id,
+                'quantity' => (float) $i->quantity,
+                'unit_price' => (float) $i->unit_price,
+            ])->all()
+            : [];
+
+        DB::transaction(function () use ($tx, $companyId, $restoreItems) {
+            if (!empty($restoreItems)) {
+                PosInventoryController::restoreStockForInvoice(
+                    $companyId, $restoreItems, $tx->id, $tx->invoice_number, auth('pos')->id(), 'pos_void'
+                );
+            }
             PosTransactionItem::where('transaction_id', $tx->id)->delete();
             PosPayment::where('transaction_id', $tx->id)->delete();
             $tx->delete();

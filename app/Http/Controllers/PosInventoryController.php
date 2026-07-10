@@ -351,4 +351,88 @@ class PosInventoryController extends Controller
 
         return ['skipped' => false, 'warnings' => $warnings];
     }
+
+    /**
+     * Reverse a prior POS-sale deduction — adds the sold quantities back to
+     * inventory when a bill is deleted/voided or its items are edited. Mirror of
+     * deductStockForInvoice: same company-scoped, tamper-safe product lookup, and
+     * it keeps pos_products.stock_quantity in lockstep with inventory_stocks.
+     * No-ops when inventory tracking is off (nothing was ever deducted).
+     */
+    public static function restoreStockForInvoice(int $companyId, array $items, int $transactionId, string $invoiceNumber, ?int $userId = null, string $referenceType = 'pos_void'): array
+    {
+        $company = Company::find($companyId);
+        if (!$company || !$company->inventory_enabled) {
+            return ['skipped' => true, 'message' => 'Inventory not enabled'];
+        }
+
+        $warnings = [];
+
+        foreach ($items as $item) {
+            if (($item['type'] ?? 'product') !== 'product' || empty($item['item_id'])) {
+                continue;
+            }
+
+            $productId = (int) $item['item_id'];
+            $qty = (float) ($item['quantity'] ?? 0);
+            if ($qty <= 0) continue;
+
+            try {
+                $stock = InventoryStock::where('company_id', $companyId)
+                    ->where('product_id', $productId)
+                    ->where('branch_id', null)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$stock) {
+                    // Company-scoped lookup — PosProduct has no global scope, so
+                    // a tampered foreign item_id must NOT seed a stock row here.
+                    $posProduct = \App\Models\PosProduct::where('company_id', $companyId)->find($productId);
+                    if (!$posProduct) continue;
+
+                    $stock = InventoryStock::create([
+                        'company_id' => $companyId,
+                        'product_id' => $productId,
+                        'branch_id' => null,
+                        'quantity' => 0,
+                        'min_stock_level' => 0,
+                        'avg_purchase_price' => 0,
+                        'last_purchase_price' => 0,
+                    ]);
+                }
+
+                $newQty = $stock->quantity + $qty;
+                $stock->update(['quantity' => $newQty]);
+
+                // Mirror sync: pos_products.stock_quantity feeds the products
+                // page + sale-screen loaders; keep it in step (atomic increment,
+                // only when the product actually tracks a quantity).
+                \App\Models\PosProduct::where('id', $productId)
+                    ->where('company_id', $companyId)
+                    ->whereNotNull('stock_quantity')
+                    ->increment('stock_quantity', (int) round($qty));
+
+                InventoryMovement::create([
+                    'company_id' => $companyId,
+                    'product_id' => $productId,
+                    'type' => InventoryMovement::TYPE_RETURN_IN,
+                    'quantity' => $qty,
+                    'unit_price' => (float) ($item['unit_price'] ?? 0),
+                    'total_price' => round($qty * (float) ($item['unit_price'] ?? 0), 2),
+                    'balance_after' => $newQty,
+                    'reference_type' => $referenceType,
+                    'reference_id' => $transactionId,
+                    'reference_number' => $invoiceNumber,
+                    'notes' => 'Stock restored (bill void/edit)',
+                    'created_by' => $userId,
+                ]);
+            } catch (\Exception $e) {
+                $productName = \App\Models\PosProduct::find($productId)?->name ?? "Product #{$productId}";
+                $warnings[] = "Inventory restore skipped for {$productName}: " . $e->getMessage();
+                continue;
+            }
+        }
+
+        return ['skipped' => false, 'warnings' => $warnings];
+    }
 }

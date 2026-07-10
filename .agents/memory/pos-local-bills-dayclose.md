@@ -1,13 +1,13 @@
 ---
-name: POS local bills, day-close purge & 24h auto-close
-description: Retention rules, cashier-gate trap, and 24h auto-close semantics for NestPOS local/provisional bills
+name: POS local bills, day-close purge & auto-close
+description: Retention rules, cashier-gate trap, and midnight auto-close semantics for NestPOS local/provisional bills
 ---
 
 # NestPOS Local Bills / Day-Close
 
 ## Retention (owner-approved)
 - Manual delete (F10 Local modal / deleteTransaction / apiDeleteProvisional) = PERMANENT hard-delete.
-- Day-close purge AND the 24h auto-close = ARCHIVE (is_archived=true), recoverable via Archive Portal. NEVER hard-delete on any day-close path.
+- Day-close purge AND the auto-close = ARCHIVE (is_archived=true), recoverable via Archive Portal. NEVER hard-delete on any day-close path.
 - **Why:** owner wants the day-close cleanup to be safe/reversible, but a deliberate cashier/admin delete to be final.
 
 ## Purge query invariant
@@ -15,7 +15,8 @@ description: Retention rules, cashier-gate trap, and 24h auto-close semantics fo
 
 ## Toggle B / Toggle C
 - Toggle B = `companies.pos_auto_purge_local_on_dayclose` (archive locals on every day-close). Effective purge = `requestedPurge || company.toggleB`. A cashier-requested manual purge is rejected, but the company policy still applies regardless of who closes.
-- Toggle C = `companies.pos_auto_dayclose_24h`. The `pos:auto-dayclose` command (hourly, withoutOverlapping) closes prior un-closed days once `MAX(created_at) <= 24h ago`; it calls performDayClose and its purge follows Toggle B (NOT forced on).
+- Toggle C = `companies.pos_auto_dayclose_24h` (column name kept for stability; behavior is NO LONGER 24h-inactivity). The `pos:auto-dayclose` command (hourly, withoutOverlapping) is MIDNIGHT-BASED with a 1-full-day grace: it sweeps un-closed days whose calendar date is `< today()->subDay()` (i.e. older than yesterday) — so Monday's day auto-closes at Wednesday 00:00, NOT last-bill+24h. App tz = Asia/Karachi so "midnight" = Pakistan midnight. Yesterday is deliberately left open (grace). It calls performDayClose and its purge follows Toggle B (NOT forced on).
+- **Why:** owner (Jul 2026) wanted auto-close tied to the calendar/midnight with one grace day, not to inactivity since the last sale. Do NOT re-add the `havingRaw('MAX(created_at) <= cutoff')` inactivity filter.
 
 ## Cashier-gate trap (IMPORTANT)
 - Every POS `/pos/settings/*` POST endpoint MUST carry the `isPosCashier() → 403` gate. The Customize page being admin-only is NOT enough — the POST routes are directly reachable by any authenticated POS user.

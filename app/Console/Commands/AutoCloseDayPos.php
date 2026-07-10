@@ -15,7 +15,7 @@ class AutoCloseDayPos extends Command
 {
     protected $signature = 'pos:auto-dayclose';
 
-    protected $description = 'Auto-close prior POS trading days for companies that opted into 24h auto day-close (Customize POS → Local Bills).';
+    protected $description = 'Auto-close prior POS trading days for companies that opted into midnight auto day-close (Customize POS → Local Bills). A day closes at the second midnight after it (1 full day grace).';
 
     public function handle(PosController $pos): int
     {
@@ -30,25 +30,28 @@ class AutoCloseDayPos extends Command
             ->get(['id', 'pos_auto_purge_local_on_dayclose']);
 
         if ($companies->isEmpty()) {
-            $this->info('No companies with 24h auto day-close enabled.');
+            $this->info('No companies with midnight auto day-close enabled.');
             return self::SUCCESS;
         }
 
-        $today  = today()->toDateString();
-        $cutoff = now()->subDay()->toDateTimeString(); // 24h of inactivity
+        // MIDNIGHT-BASED with a 1-full-day grace (owner decision Jul 2026): a trading
+        // day is auto-closed at the SECOND midnight after it — e.g. Monday's day closes
+        // at Wednesday 00:00 (Pakistan time; app tz = Asia/Karachi). This is NOT the
+        // old "last bill + 24h inactivity" rule; it is purely calendar/midnight based.
+        // So we only sweep days whose calendar date is strictly BEFORE yesterday.
+        $graceCutoff = today()->subDay()->toDateString(); // = yesterday; close days < yesterday
         $closedTotal = 0;
 
         foreach ($companies as $company) {
             try {
-                // Prior trading days (before today) whose LAST bill is >= 24h old and
-                // that are not yet closed. Include archived rows so a day is still
-                // detected even if some of its bills were archived earlier.
+                // Prior trading days OLDER than yesterday that are not yet closed
+                // (yesterday itself is still within its grace day). Include archived
+                // rows so a day is still detected even if some bills were archived.
                 $dates = PosTransaction::withoutGlobalScope('hide_archived')
                     ->where('company_id', $company->id)
-                    ->whereDate('created_at', '<', $today)
+                    ->whereDate('created_at', '<', $graceCutoff)
                     ->selectRaw('DATE(created_at) as d')
                     ->groupBy('d')
-                    ->havingRaw('MAX(created_at) <= ?', [$cutoff])
                     ->pluck('d');
 
                 if ($dates->isEmpty()) {
@@ -74,7 +77,7 @@ class AutoCloseDayPos extends Command
                         $date,
                         $adminId,
                         $purge,
-                        'Auto-closed by system (24h inactivity)'
+                        'Auto-closed by system (midnight, 1-day grace)'
                     );
 
                     if ($result['status'] === 'created') {

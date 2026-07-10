@@ -2544,7 +2544,7 @@ class PosController extends Controller
 
     /**
      * Customize POS → Local Bills — persist "auto-archive local bills on day-close".
-     * When ON, EVERY day-close (manual or the 24h auto command) archives that day's
+     * When ON, EVERY day-close (manual or the midnight auto command) archives that day's
      * local/provisional bills to the Archive Portal. Rows are kept, never deleted.
      */
     public function toggleAutoPurgeLocal(Request $request)
@@ -2565,9 +2565,10 @@ class PosController extends Controller
     }
 
     /**
-     * Customize POS → Local Bills — persist "auto day-close after 24h".
+     * Customize POS → Local Bills — persist "auto day-close at midnight".
      * When ON, the scheduled pos:auto-dayclose command closes any un-closed prior day
-     * once 24h have elapsed since its last transaction (see routes/console.php).
+     * at the second midnight after it (1 full day grace — yesterday stays open;
+     * see routes/console.php).
      */
     public function toggleAutoDayclose(Request $request)
     {
@@ -2582,7 +2583,7 @@ class PosController extends Controller
         return response()->json([
             'success' => true,
             'enabled' => (bool) $company->pos_auto_dayclose_24h,
-            'message' => $company->pos_auto_dayclose_24h ? '24h auto day-close enabled' : '24h auto day-close disabled',
+            'message' => $company->pos_auto_dayclose_24h ? 'Auto day-close enabled' : 'Auto day-close disabled',
         ]);
     }
 
@@ -4588,7 +4589,7 @@ class PosController extends Controller
 
     /**
      * Core day-close logic shared by the HTTP endpoint (closeDayReport) and the
-     * 24h auto-close command (pos:auto-dayclose). The caller decides whether to
+     * midnight auto-close command (pos:auto-dayclose). The caller decides whether to
      * $purge (archive local bills) and who $closedBy is — this method does NOT
      * enforce role authority, so authorize before calling.
      *

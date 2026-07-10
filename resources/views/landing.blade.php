@@ -428,7 +428,7 @@
                         <tr class="border-b border-gray-100">
                             <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Starting at</td>
                             <td class="p-5 font-bold text-[#052730]">PKR 499 / month</td>
-                            <td class="p-5 font-bold text-[#052730]">PKR 4,999 / year</td>
+                            <td class="p-5 font-bold text-[#052730]">PKR 9,999 / year</td>
                             <td class="p-5 font-bold text-[#052730]">PKR 5,629 / year</td>
                         </tr>
                         <tr class="border-b border-gray-100">

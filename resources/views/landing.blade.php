@@ -266,12 +266,12 @@
                 <!-- Digital Invoice -->
                 <div class="flex flex-col lg:flex-row gap-12 items-center fade-in-up">
                     <div class="w-full lg:w-1/2">
-                        <div class="bg-gray-100 rounded-lg p-2 border border-gray-200">
+                        <div class="rounded-xl bg-white p-2 border border-gray-200 shadow-xl transition-transform duration-300 hover:-translate-y-1">
                             <img src="{{ asset('images/screenshots/di-dash.jpg') }}" alt="Digital Invoice Dashboard" class="w-full h-auto rounded border border-gray-300 shadow-sm" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48cmVjdCBmaWxsPSIjZjNmMTRiIiB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIvPjx0ZXh0IGZpbGw9IiM5Y2EzYWYiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBkeT0iMTAuNSIgZm9udC13ZWlnaHQ9ImJvbGQiIHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5EaWdpdGFsIEludm9pY2UgU2NyZWVuc2hvdDwvdGV4dD48L3N2Zz4='">
                         </div>
                     </div>
                     <div class="w-full lg:w-1/2 lg:pl-10">
-                        <div class="inline-block px-3 py-1 mb-6 border border-gray-200 rounded-full text-xs font-semibold uppercase tracking-widest accent-emerald">
+                        <div class="inline-block px-3 py-1 mb-6 bg-emerald-50 border border-emerald-100 rounded-full text-xs font-semibold uppercase tracking-widest accent-emerald">
                             FBR Digital Invoicing
                         </div>
                         <h4 class="text-3xl font-serif text-[#052730] mb-4">Digital Invoice</h4>
@@ -299,17 +299,17 @@
                     </div>
                 </div>
 
-                <hr class="border-gray-200">
+                <div class="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
 
                 <!-- NestPOS -->
                 <div class="flex flex-col lg:flex-row-reverse gap-12 items-center fade-in-up">
                     <div class="w-full lg:w-1/2">
-                        <div class="bg-gray-100 rounded-lg p-2 border border-gray-200">
+                        <div class="rounded-xl bg-white p-2 border border-gray-200 shadow-xl transition-transform duration-300 hover:-translate-y-1">
                             <img src="{{ asset('images/screenshots/pos-sale.jpg') }}" alt="NestPOS Sale Screen" class="w-full h-auto rounded border border-gray-300 shadow-sm" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48cmVjdCBmaWxsPSIjZjNmMTRiIiB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIvPjx0ZXh0IGZpbGw9IiM5Y2EzYWYiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBkeT0iMTAuNSIgZm9udC13ZWlnaHQ9ImJvbGQiIHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5OZXN0UE9TIFNjcmVlbnNob3Q8L3RleHQ+PC9zdmc+'">
                         </div>
                     </div>
                     <div class="w-full lg:w-1/2 lg:pr-10">
-                        <div class="inline-block px-3 py-1 mb-6 border border-gray-200 rounded-full text-xs font-semibold uppercase tracking-widest accent-purple">
+                        <div class="inline-block px-3 py-1 mb-6 bg-purple-50 border border-purple-100 rounded-full text-xs font-semibold uppercase tracking-widest accent-purple">
                             Punjab Revenue Authority POS
                         </div>
                         <h4 class="text-3xl font-serif text-[#052730] mb-4">NestPOS <span class="text-xl text-gray-500 font-sans font-medium">— PRA POS</span></h4>
@@ -337,17 +337,17 @@
                     </div>
                 </div>
 
-                <hr class="border-gray-200">
+                <div class="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
 
                 <!-- FBR POS -->
                 <div class="flex flex-col lg:flex-row gap-12 items-center fade-in-up">
                     <div class="w-full lg:w-1/2">
-                        <div class="bg-gray-100 rounded-lg p-2 border border-gray-200">
+                        <div class="rounded-xl bg-white p-2 border border-gray-200 shadow-xl transition-transform duration-300 hover:-translate-y-1">
                             <img src="{{ asset('images/screenshots/fbr-sale.jpg') }}" alt="FBR POS Sale Screen" class="w-full h-auto rounded border border-gray-300 shadow-sm" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48cmVjdCBmaWxsPSIjZjNmMTRiIiB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIvPjx0ZXh0IGZpbGw9IiM5Y2EzYWYiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBkeT0iMTAuNSIgZm9udC13ZWlnaHQ9ImJvbGQiIHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5GQlIgUE9TIFNjcmVlbnNob3Q8L3RleHQ+PC9zdmc+'">
                         </div>
                     </div>
                     <div class="w-full lg:w-1/2 lg:pl-10">
-                        <div class="inline-block px-3 py-1 mb-6 border border-gray-200 rounded-full text-xs font-semibold uppercase tracking-widest accent-blue">
+                        <div class="inline-block px-3 py-1 mb-6 bg-blue-50 border border-blue-100 rounded-full text-xs font-semibold uppercase tracking-widest accent-blue">
                             FBR Point of Sale
                         </div>
                         <h4 class="text-3xl font-serif text-[#052730] mb-4">FBR POS</h4>

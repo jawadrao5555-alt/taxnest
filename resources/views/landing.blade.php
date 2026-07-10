@@ -132,6 +132,7 @@
                     <a href="/pos" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">NestPOS (PRA)</a>
                     <a href="/fbr-pos-landing" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">FBR POS</a>
                     <a href="#compare" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Compare</a>
+                    <a href="/contact" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Contact</a>
                 </div>
                 <div class="flex items-center space-x-4">
                     <a href="/login" class="hidden sm:inline text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Log In</a>
@@ -147,36 +148,74 @@
                 <a href="/pos" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">NestPOS (PRA POS)</a>
                 <a href="/fbr-pos-landing" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">FBR POS</a>
                 <a href="#compare" @click="mobileOpen = false" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Compare Products</a>
+                <a href="/contact" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Contact</a>
                 <a href="/login" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Log In</a>
             </div>
         </div>
     </nav>
 
     <!-- Hero Section -->
-    <section class="relative bg-[#052730] pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden border-b border-[#0A4D5C]">
+    <section class="relative bg-[#052730] pt-32 pb-20 lg:pt-40 lg:pb-28 overflow-hidden border-b border-[#0A4D5C]">
         <div class="absolute inset-0 bg-grid-pattern-dark opacity-50"></div>
+        <div class="absolute -top-32 -right-24 w-[520px] h-[520px] rounded-full pointer-events-none" style="background: radial-gradient(circle, rgba(231,191,59,0.10), transparent 62%);"></div>
+        <div class="absolute top-1/3 -left-40 w-[460px] h-[460px] rounded-full pointer-events-none" style="background: radial-gradient(circle, rgba(27,124,140,0.20), transparent 62%);"></div>
+
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <div class="max-w-3xl">
-                <div class="inline-flex items-center px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs font-medium text-white/80 tracking-wide uppercase mb-8">
-                    <span class="w-1.5 h-1.5 rounded-full bg-[#E7BF3B] mr-2"></span>
-                    Tax Compliance Platform
-                </div>
-                <h1 class="text-4xl sm:text-5xl lg:text-7xl font-serif text-white leading-tight mb-8">
-                    Compliance,<br>
-                    <span class="text-white/80 italic">Structured for Pakistan.</span>
-                </h1>
-                <p class="text-lg lg:text-xl text-white/70 leading-relaxed mb-10 max-w-2xl font-light">
-                    Three fully isolated products under one roof. FBR Digital Invoicing, PRA Point of Sale, and FBR POS — built by a dedicated team to keep your business compliant with confidence.
-                </p>
-                <div class="flex flex-col sm:flex-row items-start gap-4">
-                    <a href="#products" class="btn-solid bg-[#E7BF3B] text-[#052730] hover:bg-[#F2D06B]">
-                        Explore the Platform
-                    </a>
-                    <div class="text-sm text-white/50 flex flex-col justify-center py-2">
-                        <span>3-day free trial.</span>
-                        <span>No credit card required.</span>
+            <div class="grid lg:grid-cols-12 gap-12 lg:gap-10 items-center">
+
+                <!-- Copy -->
+                <div class="lg:col-span-6">
+                    <div class="inline-flex items-center px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs font-medium text-white/80 tracking-wide uppercase mb-8">
+                        <span class="w-1.5 h-1.5 rounded-full bg-[#E7BF3B] mr-2"></span>
+                        Tax Compliance Platform · Pakistan
+                    </div>
+                    <h1 class="text-4xl sm:text-5xl lg:text-6xl font-serif text-white leading-[1.1] mb-8">
+                        Compliance,<br>
+                        <span class="text-white/80 italic">structured for Pakistan.</span>
+                    </h1>
+                    <p class="text-lg text-white/70 leading-relaxed mb-10 max-w-xl font-light">
+                        Three fully isolated products under one roof — FBR Digital Invoicing, PRA Point of Sale, and FBR POS. Built by a dedicated team to keep your business compliant with confidence.
+                    </p>
+                    <div class="flex flex-col sm:flex-row items-start gap-4 mb-10">
+                        <a href="#products" class="btn-solid bg-[#E7BF3B] text-[#052730] hover:bg-[#F2D06B]">
+                            Explore the Platform
+                        </a>
+                        <a href="/register" class="btn-solid border border-white/25 text-white hover:bg-white/5">
+                            Start Free Trial
+                        </a>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-white/50">
+                        <span class="flex items-center gap-1.5"><svg class="w-4 h-4 text-[#E7BF3B]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> 3-day free trial</span>
+                        <span class="flex items-center gap-1.5"><svg class="w-4 h-4 text-[#E7BF3B]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> No credit card</span>
+                        <span class="flex items-center gap-1.5"><svg class="w-4 h-4 text-[#E7BF3B]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> FBR &amp; PRA integrated</span>
                     </div>
                 </div>
+
+                <!-- Product vignette -->
+                <div data-hero-vignette class="lg:col-span-6 relative hidden lg:block">
+                    <div class="relative mx-auto max-w-lg">
+                        <div class="absolute -top-6 -right-4 w-full h-full rounded-xl bg-white/5 border border-white/10 rotate-3"></div>
+                        <div class="relative rounded-xl bg-white shadow-2xl border border-white/10 overflow-hidden">
+                            <div class="flex items-center gap-1.5 px-4 py-3 bg-gray-100 border-b border-gray-200">
+                                <span class="w-2.5 h-2.5 rounded-full bg-red-400"></span>
+                                <span class="w-2.5 h-2.5 rounded-full bg-yellow-400"></span>
+                                <span class="w-2.5 h-2.5 rounded-full bg-green-400"></span>
+                                <span class="ml-3 text-[11px] text-gray-400 font-medium">app.taxnest — Digital Invoice</span>
+                            </div>
+                            <img src="{{ asset('images/screenshots/di-dash.jpg') }}" alt="TaxNest Digital Invoice dashboard" class="w-full h-auto" onerror="this.closest('[data-hero-vignette]').style.display='none'">
+                        </div>
+                        <div class="absolute -bottom-5 -left-5 bg-white rounded-lg shadow-xl border border-gray-100 px-4 py-3 flex items-center gap-3">
+                            <span class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                            </span>
+                            <div>
+                                <p class="text-xs font-bold text-gray-900 leading-none">Invoice submitted</p>
+                                <p class="text-[11px] text-gray-400 mt-1">Accepted by FBR · PRAL</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </section>
@@ -498,41 +537,7 @@
     </section>
 
     <!-- Footer -->
-    <footer class="bg-[#052730] pt-16 pb-8 border-t-4 border-[#0A4D5C]">
-        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
-                <div class="col-span-1 md:col-span-2">
-                    <img src="{{ asset('images/brand/taxnest-logo-white.svg') }}" alt="TaxNest" class="h-8 w-auto mb-6">
-                    <p class="text-white/60 text-sm leading-relaxed max-w-sm">
-                        Pakistan's definitive tax compliance software. Built by a serious team for real businesses enforcing structural financial integrity.
-                    </p>
-                </div>
-                <div>
-                    <h5 class="text-xs font-bold uppercase tracking-widest text-[#E7BF3B] mb-4">Products</h5>
-                    <ul class="space-y-3">
-                        <li><a href="/digital-invoice" class="text-white/70 hover:text-white text-sm transition">Digital Invoice</a></li>
-                        <li><a href="/pos" class="text-white/70 hover:text-white text-sm transition">NestPOS (PRA)</a></li>
-                        <li><a href="/fbr-pos-landing" class="text-white/70 hover:text-white text-sm transition">FBR POS</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <h5 class="text-xs font-bold uppercase tracking-widest text-[#E7BF3B] mb-4">Platform</h5>
-                    <ul class="space-y-3">
-                        <li><a href="/login" class="text-white/70 hover:text-white text-sm transition">Sign In</a></li>
-                        <li><a href="/register" class="text-white/70 hover:text-white text-sm transition">Create Account</a></li>
-                    </ul>
-                </div>
-            </div>
-            <div class="border-t border-white/10 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-                <p class="text-white/40 text-xs">
-                    &copy; {{ date('Y') }} TaxNest. All rights reserved.
-                </p>
-                <div class="flex items-center space-x-4">
-                    <span class="text-white/40 text-xs flex items-center"><span class="w-1.5 h-1.5 rounded-full bg-green-500 mr-2"></span> System Operational</span>
-                </div>
-            </div>
-        </div>
-    </footer>
+    <x-site-footer />
 
     <script>
         // Intersection Observer for scroll animations

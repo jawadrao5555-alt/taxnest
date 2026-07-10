@@ -544,21 +544,7 @@
     </section>
 
     <!-- Footer -->
-    <footer class="bg-[#052730] py-10 border-t border-[#0A4D5C]">
-        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between">
-            <div class="flex items-center mb-6 md:mb-0">
-                <img src="{{ asset('images/brand/taxnest-logo-white.svg') }}" alt="TaxNest" class="h-6 w-auto opacity-70">
-                <span class="ml-4 pl-4 border-l border-white/20 text-sm font-semibold tracking-widest uppercase text-white/50">FBR POS</span>
-            </div>
-            <div class="flex items-center space-x-8">
-                <span class="text-xs font-semibold text-white/40 uppercase tracking-widest">Audit-Proof</span>
-                <span class="text-xs font-semibold text-white/40 uppercase tracking-widest">Secure</span>
-            </div>
-            <div class="mt-6 md:mt-0 text-sm text-white/40 font-medium">
-                &copy; {{ date('Y') }} TaxNest. All rights reserved.
-            </div>
-        </div>
-    </footer>
+    <x-site-footer login-url="/fbr-pos/login" login-label="FBR POS Log In" />
 
     <x-whatsapp-support />
 

@@ -41,3 +41,4 @@
 - [Company status dual-column](company-status-dual-column.md) — companies.status + company_status BOTH live (different panels read each); every approve/suspend/register flip must set both, in BOTH admin controllers.
 - [Scale-test dataset & dashboard cap](scale-test-dataset.md) — 4500 @scaletest.pk companies, seeder --more=N incremental + purge cmd; admin dashboard capped 50/tab; DI locked revenue = status='locked', never fbr_status.
 - [Plan price storage per product_type](plan-price-storage.md) — pos/standalone store ANNUAL, di/fbrpos store MONTHLY; any price surface must copy the matching billing.blade.php formula, never assume.
+- [Shared marketing footer & panel login](shared-marketing-footer-panel-login.md) — one shared site-footer across all landings; login link must be panel-aware (POS/FBR pass own login-url) or POS/FBR visitors hit "Invalid credentials"; public contact info = admin-editable SystemSetting keys.

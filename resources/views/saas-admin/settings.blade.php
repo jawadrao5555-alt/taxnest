@@ -21,6 +21,48 @@
 
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
             <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+                <svg class="w-5 h-5 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                Contact Details
+            </h2>
+            <p class="text-[11px] text-gray-500 -mt-2">Shown publicly on the Contact page and in the site footer. Update here and it changes everywhere automatically.</p>
+            <div>
+                <label class="block text-xs font-medium text-gray-400 mb-1">Company Legal Name</label>
+                <input type="text" name="company_legal_name" value="{{ old('company_legal_name', $settings['company_legal_name']) }}"
+                       placeholder="e.g. TaxNest Technologies (Pvt) Ltd"
+                       class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+                @error('company_legal_name') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Support Email</label>
+                    <input type="email" name="contact_email" value="{{ old('contact_email', $settings['contact_email']) }}"
+                           placeholder="support@taxnest.com"
+                           class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+                    @error('contact_email') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Phone</label>
+                    <input type="text" name="contact_phone" value="{{ old('contact_phone', $settings['contact_phone']) }}"
+                           placeholder="e.g. +92 42 1234567"
+                           class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-400 mb-1">Office Address</label>
+                <input type="text" name="contact_address" value="{{ old('contact_address', $settings['contact_address']) }}"
+                       placeholder="e.g. Office 12, Gulberg III, Lahore, Pakistan"
+                       class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-400 mb-1">Support Hours</label>
+                <input type="text" name="support_hours" value="{{ old('support_hours', $settings['support_hours']) }}"
+                       placeholder="e.g. Mon\u2013Sat, 9:00 AM \u2013 8:00 PM (PKT)"
+                       class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+            </div>
+        </div>
+
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
+            <h2 class="text-sm font-semibold text-white flex items-center gap-2">
                 <svg class="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                 Bank / Payment Account Details
             </h2>

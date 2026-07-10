@@ -14,6 +14,11 @@ class AdminSettingsController extends Controller
      */
     private array $keys = [
         'support_whatsapp_number',
+        'company_legal_name',
+        'contact_email',
+        'contact_phone',
+        'contact_address',
+        'support_hours',
         'payment_bank_name',
         'payment_account_title',
         'payment_account_number',
@@ -35,6 +40,11 @@ class AdminSettingsController extends Controller
     {
         $data = $request->validate([
             'support_whatsapp_number' => ['nullable', 'string', 'max:25'],
+            'company_legal_name' => ['nullable', 'string', 'max:150'],
+            'contact_email' => ['nullable', 'email', 'max:150'],
+            'contact_phone' => ['nullable', 'string', 'max:60'],
+            'contact_address' => ['nullable', 'string', 'max:300'],
+            'support_hours' => ['nullable', 'string', 'max:150'],
             'payment_bank_name' => ['nullable', 'string', 'max:120'],
             'payment_account_title' => ['nullable', 'string', 'max:120'],
             'payment_account_number' => ['nullable', 'string', 'max:60'],

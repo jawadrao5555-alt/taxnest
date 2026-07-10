@@ -607,8 +607,8 @@
         </div>
     </section>
 
-    <!-- Footer CTA & Footer -->
-    <footer class="mt-auto bg-[#052730] border-t border-[#0A4D5C]">
+    <!-- Footer CTA -->
+    <section class="bg-[#052730] border-t border-[#0A4D5C]">
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-24 text-center relative z-10">
             <h2 class="text-4xl font-serif font-bold text-white mb-6">Ready to issue compliant invoices?</h2>
             <p class="text-lg text-white/70 mb-10 max-w-2xl mx-auto font-light">Join the manufacturers and traders trusting TaxNest for their FBR submissions. Create your first formal invoice today.</p>
@@ -616,19 +616,9 @@
                 Start Trial Account
             </a>
         </div>
-        <div class="border-t border-white/10 py-8 relative z-10 bg-[#03151A]">
-            <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
-                <div class="flex items-center gap-6">
-                    <img src="{{ asset('images/brand/taxnest-logo-white.svg') }}" alt="TaxNest" class="h-5 opacity-40">
-                    <p class="text-sm text-white/40 tracking-wider">© {{ date('Y') }} TaxNest. All rights reserved.</p>
-                </div>
-                <div class="flex items-center gap-8">
-                    <a href="/pos" class="text-sm text-white/50 hover:text-white transition tracking-wide">PRA POS</a>
-                    <a href="/fbr-pos-landing" class="text-sm text-white/50 hover:text-white transition tracking-wide">FBR POS</a>
-                </div>
-            </div>
-        </div>
-    </footer>
+    </section>
+
+    <x-site-footer />
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {

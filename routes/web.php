@@ -125,6 +125,8 @@ Route::get('/', function () {
     ]);
 });
 
+Route::get('/contact', fn () => view('contact'))->name('contact');
+
 Route::get('/digital-invoice', function () {
     $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'di')->orderBy('price')->get();
     return view('di-landing', ['plans' => $plans]);

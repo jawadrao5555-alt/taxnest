@@ -430,20 +430,7 @@
     </section>
 
     <!-- Footer -->
-    <footer class="bg-[#052730] py-12">
-        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center">
-            <div class="flex items-center space-x-2 mb-4 md:mb-0">
-                <img src="{{ asset('images/brand/taxnest-logo-white.svg') }}" alt="TaxNest" class="h-6 w-auto opacity-50">
-            </div>
-            <div class="text-white/40 text-sm font-medium">
-                &copy; {{ date('Y') }} TaxNest. All rights reserved.
-            </div>
-            <div class="flex space-x-6 mt-4 md:mt-0 text-sm font-medium text-white/40">
-                <a href="/" class="hover:text-white transition-colors">Main Site</a>
-                <a href="/pos/login" class="hover:text-white transition-colors">Log In</a>
-            </div>
-        </div>
-    </footer>
+    <x-site-footer login-url="/pos/login" login-label="POS Log In" />
 
     <x-whatsapp-support />
 

@@ -4,7 +4,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Session\TokenMismatchException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 
@@ -93,7 +93,17 @@ return Application::configure(basePath: dirname(__DIR__))
             return redirect($redirectTo)->with('error', 'This page cannot be accessed directly.');
         });
 
-        $exceptions->renderable(function (TokenMismatchException $e, $request) {
+        // CSRF token failures (419 "Page Expired"). Laravel's prepareException()
+        // converts the underlying TokenMismatchException into a generic HttpException(419)
+        // BEFORE the render callbacks run, so a callback type-hinted on
+        // TokenMismatchException never fires — we must catch the HttpException and gate on
+        // the 419 status here. Anything that is not a 419 is passed through untouched
+        // (return null → the framework's default handling / other callbacks take over).
+        $exceptions->renderable(function (HttpException $e, $request) {
+            if ($e->getStatusCode() !== 419) {
+                return null;
+            }
+
             if ($request->expectsJson()) {
                 return response()->json(['error' => 'Session expired. Please refresh and try again.'], 419);
             }

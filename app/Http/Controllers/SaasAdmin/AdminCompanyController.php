@@ -243,6 +243,119 @@ class AdminCompanyController extends Controller
     }
 
     /**
+     * View as Company — start a VIEW-ONLY impersonation session.
+     *
+     * The admin guard uses a separate provider (admin_users), so logging the
+     * company's admin user into that company's panel guard (web/pos/fbrpos) leaves
+     * the admin session fully intact. All state-changing requests are then blocked
+     * by ReadOnlyImpersonation while the session flag is set.
+     */
+    public function impersonate(Request $request, $id)
+    {
+        $this->assertSuperAdmin();
+
+        $company = Company::findOrFail($id);
+
+        // Only active companies can be viewed — CompanyIsolation force-logs-out any
+        // non-active company_status, which would instantly bounce the session.
+        if (($company->company_status ?? null) !== 'active') {
+            return back()->with('error', 'Only active companies can be viewed. Approve/activate this company first.');
+        }
+
+        // Map product type → panel guard + dashboard.
+        $guard = match ($company->product_type) {
+            'pos' => 'pos',
+            'fbrpos' => 'fbrpos',
+            default => 'web',
+        };
+
+        if ($guard === 'fbrpos' && !$company->fbr_pos_enabled) {
+            return back()->with('error', 'FBR POS is not enabled for this company — cannot view its FBR POS panel.');
+        }
+
+        // Find the company's admin user for this panel (must be active or the panel
+        // middleware will immediately log it out).
+        $user = User::where('company_id', $company->id)
+            ->where('role', 'company_admin')
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->first();
+
+        if (!$user && $guard === 'pos') {
+            $user = User::where('company_id', $company->id)
+                ->where('pos_role', 'pos_admin')
+                ->where('is_active', true)
+                ->orderBy('id')
+                ->first();
+        }
+
+        if (!$user) {
+            return back()->with('error', 'No active admin user found for this company — cannot start view-only session.');
+        }
+
+        // If a previous view-only session is still open, close its guard first so we
+        // never leave a stale panel login behind when switching companies/guards.
+        $existing = $request->session()->get('impersonation');
+        if (is_array($existing) && !empty($existing['guard']) && auth($existing['guard'])->check()) {
+            auth($existing['guard'])->logout();
+        }
+
+        // Log the company user into the panel guard (admin guard survives untouched).
+        auth($guard)->login($user);
+
+        // Anti-fixation: rotate the session id, preserving all session data (both the
+        // admin login and the freshly-added panel login migrate to the new id).
+        $request->session()->regenerate();
+
+        $request->session()->put('impersonation', [
+            'admin_id' => auth('admin')->id(),
+            'company_id' => $company->id,
+            'company_name' => $company->name,
+            'guard' => $guard,
+            'readonly' => true,
+        ]);
+
+        AdminAuditLog::log(auth('admin')->id(), 'Started view-as (read-only)', 'Company', $company->id, [
+            'company' => $company->name,
+            'guard' => $guard,
+        ]);
+
+        $dashboard = match ($guard) {
+            'pos' => '/pos/dashboard',
+            'fbrpos' => '/fbr-pos/dashboard',
+            default => '/dashboard',
+        };
+
+        return redirect($dashboard);
+    }
+
+    /**
+     * Stop view-as — log out ONLY the panel guard and clear the flag.
+     * NEVER session()->invalidate() here — that would destroy the admin session too.
+     */
+    public function stopImpersonation(Request $request)
+    {
+        $imp = $request->session()->get('impersonation');
+
+        if (is_array($imp)) {
+            $guard = $imp['guard'] ?? 'web';
+            if (auth($guard)->check()) {
+                auth($guard)->logout();
+            }
+            AdminAuditLog::log(auth('admin')->id(), 'Stopped view-as', 'Company', $imp['company_id'] ?? null, [
+                'company' => $imp['company_name'] ?? null,
+            ]);
+        }
+
+        $request->session()->forget('impersonation');
+
+        $companyId = $imp['company_id'] ?? null;
+
+        return redirect($companyId ? route('saas.admin.companies.show', $companyId) : route('saas.admin.companies'))
+            ->with('success', 'View-only session ended.');
+    }
+
+    /**
      * Archive Viewer Account — Super-admin creates a dedicated read-only login for the
      * company's "Local Bills Archive". This account uses the SAME /pos/login URL (auto-detected
      * by pos_role) and is invisible to POS admin/cashier (Team page filters it out).

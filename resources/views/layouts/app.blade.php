@@ -194,6 +194,7 @@
         </style>
     </head>
     <body class="h-screen overflow-hidden font-sans antialiased">
+        @include('partials.impersonation-banner')
         <x-pwa-init />
         @auth
         <div id="sidebarOverlay" class="fixed inset-0 bg-black/40 z-40 lg:hidden hidden" onclick="closeSidebar()"></div>

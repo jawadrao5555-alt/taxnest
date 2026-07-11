@@ -35,6 +35,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'restaurant.only' => \App\Http\Middleware\RestaurantOnly::class,
             'feature' => \App\Http\Middleware\FeatureEnabled::class,
         ]);
+
+        // VIEW-ONLY "View as Company" enforcement. Must sit on the web group (runs
+        // AFTER StartSession) — a global append would run before sessions boot and
+        // silently no-op.
+        $middleware->web(append: [
+            \App\Http\Middleware\ReadOnlyImpersonation::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->renderable(function (NotFoundHttpException $e, $request) {

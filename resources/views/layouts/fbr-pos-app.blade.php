@@ -238,6 +238,7 @@
         </script>
     </head>
     <body class="h-screen overflow-hidden antialiased" data-theme="{{ $fbrTheme }}">
+        @include('partials.impersonation-banner')
         <x-pwa-init />
         <div class="flex flex-col h-full" x-data="fbrPosHeader('{{ $fbrTheme }}')" x-init="init()" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false; localOpen = false; failedOpen = false; sidebarOpen = false">
 

@@ -56,7 +56,19 @@ vice-versa — env must match the token), copy-paste whitespace/newline in the t
 column is TEXT (not truncated). This is a CONFIG issue, not a code bug — the endpoint/path is correct.
 FBR-confirmed #1 cause of 900901 is **sandbox token on the production URL** (WSO2 routes by token type). A business
 gets a **production token ONLY after passing FBR sandbox certification**, so a live 900901 usually means they only
-hold a sandbox token yet → steer them to test on Sandbox first, then FBR issues the prod token. The settings token
+hold a sandbox token yet → steer them to test on Sandbox first, then FBR issues the prod token.
+
+**Disambiguation probe (proven technique):** to tell a *DI-only* token apart from a *POS-enrolled* token, POST a
+throwaway `{}` (or minimal body) with the SAME token to BOTH gateways and compare the fault:
+- `imsp/v1/api/Live/PostData` → `900908 Resource forbidden` **and** `di_data/v1/di/postinvoicedata` → HTTP 200 with a
+  DI business-validation error (e.g. errorCode `0012` buyer-type) ⇒ the token is a **Digital Invoicing token, NOT a
+  POS token**. It authenticates fine but its WSO2 application is only subscribed to `di_data/v1`, never `imsp/v1`.
+  Fix is 100% on FBR's side: the owner must enroll/subscribe THIS token's application for the IMS POS (POS
+  fiscalization, SRO 1279/2021) service tied to their POS Registration No — a DI token can NEVER submit POS bills.
+- `900908` on BOTH endpoints ⇒ token valid but NTN not production-enrolled for either service.
+- `900901` on both ⇒ token itself invalid/expired/sandbox-on-prod.
+A real prod submission for X-WAY SHOES (POSID 196339) with the owner-supplied production token confirmed the first
+case: 900908 on IMS, 200-with-DI-validation on DI ⇒ it is a DI token, hence every FBR POS bill fails. The settings token
 mask (`$maskedPosToken`) is DISPLAY-ONLY (blade placeholder + status line); the save path only writes on
 `$request->filled(...)` and always stores the full encrypted token, and getFbrPosToken sends the full decrypted
 token — masking never touches what is stored or sent, so it can NEVER cause 900901. `testConnection()` now parses

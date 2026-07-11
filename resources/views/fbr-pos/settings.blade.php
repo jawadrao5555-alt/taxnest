@@ -9,8 +9,83 @@
     <div class="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm">{{ session('error') }}</div>
     @endif
 
+    @php
+        $fbrMode = $company->fbr_connection_mode ?? 'cloud';
+        $isAgentMode = $fbrMode === 'fiscal_device';
+        $agentOnline = $company->agent_last_seen && \Carbon\Carbon::parse($company->agent_last_seen)->gt(now()->subMinutes(2));
+    @endphp
+
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="lg:col-span-2 space-y-6">
+            {{-- Submission Mode selector — Direct to FBR vs Fiscal Device (Agent), PRA-style --}}
+            <div class="bg-white dark:bg-gray-900 rounded-xl border-2 {{ $isAgentMode ? 'border-blue-300 dark:border-blue-700' : 'border-gray-200 dark:border-gray-700' }} shadow-md p-5">
+                <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Submission Mode</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">FBR bills kaise bhejni hain. Kabhi bhi switch karen — restart ki zaroorat nahi.</p>
+                    </div>
+                    <span class="px-3 py-1 rounded-full text-xs font-bold {{ $isAgentMode ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-300 dark:border-blue-700' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-300 dark:border-gray-700' }}">
+                        Abhi: {{ $isAgentMode ? 'Fiscal Device (Agent)' : 'Direct to FBR' }}
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {{-- Direct to FBR --}}
+                    <div class="relative p-5 rounded-xl border-2 transition {{ !$isAgentMode ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 opacity-70' }}">
+                        @if(!$isAgentMode)
+                        <span class="absolute top-2 right-2 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-600 text-white">Active</span>
+                        @endif
+                        <div class="font-bold text-gray-900 dark:text-white mb-1">Direct to FBR (Cloud)</div>
+                        <p class="text-xs text-gray-600 dark:text-gray-400 mb-3 leading-relaxed">Server FBR IMS ko seedha bill submit karega. Koi desktop agent zaroori nahi.</p>
+                        <ul class="text-[11px] text-gray-600 dark:text-gray-300 space-y-1 mb-3">
+                            <li>✓ Sab se saada — bus is mode pe rahen</li>
+                            <li>⚠ FBR ne naye POS ke liye cloud PostData band kiya (Code 112) — zyada tar naye POS ko Fiscal Device chahiye</li>
+                        </ul>
+                        @if($isAgentMode)
+                        <form method="POST" action="{{ route('fbrpos.settings') }}" onsubmit="return confirm('Direct to FBR mode enable karen? Bills server se seedha FBR jayengi (agent bypass).');">
+                            @csrf
+                            <input type="hidden" name="fbr_pos_environment" value="{{ $company->fbr_pos_environment ?? 'sandbox' }}">
+                            <input type="hidden" name="fbr_connection_mode" value="cloud">
+                            <button type="submit" class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-semibold transition">Switch to Direct</button>
+                        </form>
+                        @else
+                        <div class="w-full px-4 py-2 bg-blue-600/10 text-blue-700 dark:text-blue-300 text-sm rounded-lg font-semibold text-center border border-blue-300 dark:border-blue-700">✓ Active Mode</div>
+                        @endif
+                    </div>
+
+                    {{-- Fiscal Device (Agent) --}}
+                    <div class="relative p-5 rounded-xl border-2 transition {{ $isAgentMode ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 opacity-70' }}">
+                        @if($isAgentMode)
+                        <span class="absolute top-2 right-2 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-600 text-white">Active</span>
+                        @endif
+                        <div class="font-bold text-gray-900 dark:text-white mb-1">Fiscal Device (via Agent)</div>
+                        <p class="text-xs text-gray-600 dark:text-gray-400 mb-3 leading-relaxed">Shop PC pe desktop agent bills uthata hai aur local FBR IMS component (localhost:8524) ko bhejta hai. FBR invoice number khud wapas aata hai.</p>
+                        <ul class="text-[11px] text-gray-600 dark:text-gray-300 space-y-1 mb-3">
+                            <li>✓ Naye POS registrations ke liye zaroori (Code 112)</li>
+                            <li>✓ Wahi agent jo PRA use karta hai</li>
+                            <li>⚠ Agent install + chalu rehna zaroori</li>
+                        </ul>
+                        @if(!$isAgentMode)
+                        <form method="POST" action="{{ route('fbrpos.settings') }}" onsubmit="return confirm('Fiscal Device (Agent) mode enable karen? Bills pending jayengi aur shop PC ka agent unhe FBR ko bhejega.');">
+                            @csrf
+                            <input type="hidden" name="fbr_pos_environment" value="{{ $company->fbr_pos_environment ?? 'sandbox' }}">
+                            <input type="hidden" name="fbr_connection_mode" value="fiscal_device">
+                            <button type="submit" class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-semibold transition">Switch to Fiscal Device</button>
+                        </form>
+                        @else
+                        <div class="w-full px-4 py-2 bg-blue-600/10 text-blue-700 dark:text-blue-300 text-sm rounded-lg font-semibold text-center border border-blue-300 dark:border-blue-700 flex items-center justify-center gap-2">
+                            ✓ Active Mode
+                            @if($agentOnline)
+                            <span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500 text-white">● ONLINE</span>
+                            @else
+                            <span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-red-500 text-white">OFFLINE</span>
+                            @endif
+                        </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">FBR POS Configuration</h3>
                 <form method="POST" action="{{ route('fbrpos.settings') }}" class="space-y-4">
@@ -22,13 +97,8 @@
                             <option value="production" {{ ($company->fbr_pos_environment ?? 'sandbox') === 'production' ? 'selected' : '' }}>Production (Live)</option>
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Submission Mode</label>
-                        <select name="fbr_connection_mode" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
-                            <option value="cloud" {{ ($company->fbr_connection_mode ?? 'cloud') === 'cloud' ? 'selected' : '' }}>Cloud — Direct to FBR</option>
-                            <option value="fiscal_device" {{ ($company->fbr_connection_mode ?? 'cloud') === 'fiscal_device' ? 'selected' : '' }}>Fiscal Device — Local component on shop PC</option>
-                        </select>
-                        <p class="text-xs text-gray-400 mt-1">FBR has retired cloud bulk upload for POS. New POS registrations must use <strong>Fiscal Device</strong> — bills sync through the FBR IMS component installed on your shop PC via the Desktop Sync Agent.</p>
+                    <div class="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2.5">
+                        Submission Mode (<strong>Direct to FBR</strong> ya <strong>Fiscal Device</strong>) upar wale <strong>Submission Mode</strong> card se chunen.
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">FBR POS Registration ID <span class="text-red-500">*</span></label>
@@ -63,27 +133,51 @@
                 </div>
             </div>
 
-            @if(($company->fbr_connection_mode ?? 'cloud') === 'fiscal_device')
+            @if($isAgentMode)
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-blue-200 dark:border-blue-800 shadow-md p-5">
-                <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
-                    Desktop Sync Agent
-                    <span class="text-[9px] px-1.5 py-0.5 bg-blue-600 text-white rounded font-bold uppercase tracking-wider">Fiscal Device</span>
-                </h3>
+                <div class="flex items-center justify-between mb-1 flex-wrap gap-2">
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        Connect the Desktop Sync Agent
+                        <span class="text-[9px] px-1.5 py-0.5 bg-blue-600 text-white rounded font-bold uppercase tracking-wider">Fiscal Device</span>
+                    </h3>
+                    @if($agentOnline)
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500 text-white text-[10px] font-bold"><span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span> ONLINE</span>
+                    @else
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-500 text-white text-[10px] font-bold"><span class="w-1.5 h-1.5 rounded-full bg-gray-300"></span> OFFLINE</span>
+                    @endif
+                </div>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                    In Fiscal Device mode this server never submits directly to FBR. Bills are queued and the Desktop Sync Agent, running on your shop PC, forwards each one to the local FBR IMS Fiscal component (<code>localhost:8524</code>). The FBR invoice number then flows back automatically.
+                    Fiscal Device mode mein yeh server FBR ko seedha submit nahi karta. Bills queue hoti hain aur shop PC ka Desktop Sync Agent har bill ko local FBR IMS component (<code>localhost:8524</code>) ko bhejta hai. FBR invoice number khud wapas aa jata hai.
                 </p>
 
-                <div class="mb-3">
-                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Agent API Key</label>
-                    <div class="flex gap-2">
-                        <input type="text" id="agentKey" readonly value="{{ $company->agent_api_key ?? '' }}"
-                               placeholder="Select Fiscal Device + Save Settings to generate a key"
-                               class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs font-mono focus:ring-blue-500 focus:border-blue-500">
-                        <button type="button" onclick="copyAgentKey()" class="px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition whitespace-nowrap">Copy</button>
+                {{-- 3 fields the agent needs to connect --}}
+                <div class="space-y-3 mb-4">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">1. Server URL</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="agentServerUrl" readonly value="{{ url('/api/agent') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs font-mono focus:ring-blue-500 focus:border-blue-500">
+                            <button type="button" onclick="copyField('agentServerUrl', this)" class="px-3 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs rounded-lg whitespace-nowrap">Copy</button>
+                        </div>
                     </div>
-                    <p class="text-xs text-gray-400 mt-1">Paste this key into the Desktop Sync Agent on the shop PC to link it to this company.</p>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">2. Company ID</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="agentCompanyId" readonly value="{{ $company->id }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs font-mono focus:ring-blue-500 focus:border-blue-500">
+                            <button type="button" onclick="copyField('agentCompanyId', this)" class="px-3 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs rounded-lg whitespace-nowrap">Copy</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">3. Agent API Key</label>
+                        <div class="flex gap-2">
+                            <input type="password" id="agentKey" readonly value="{{ $company->agent_api_key ?? '' }}" placeholder="Fiscal Device mode mein Save karen — key ban jayegi" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs font-mono focus:ring-blue-500 focus:border-blue-500">
+                            <button type="button" onclick="toggleAgentKey()" id="agentKeyToggle" class="px-3 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs rounded-lg whitespace-nowrap">Show</button>
+                            <button type="button" onclick="copyField('agentKey', this)" class="px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition whitespace-nowrap">Copy</button>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1">⚠️ Yeh key secret rakhen — jis ke paas ho woh aap ki company ke FBR bills bhej sakta hai.</p>
+                    </div>
                 </div>
 
+                {{-- Download + regenerate --}}
                 <div class="mb-4">
                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Download Desktop Sync Agent (Windows)</label>
                     <div class="flex flex-wrap gap-2">
@@ -96,8 +190,16 @@
                            class="inline-flex items-center gap-1.5 px-3 py-2 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-400 text-xs font-semibold rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition">
                             Portable (.zip)
                         </a>
+                        @if($company->agent_api_key)
+                        <form method="POST" action="{{ route('fbrpos.settings') }}" onsubmit="return confirm('Purani key band ho jayegi aur agent ko dobara connect karna hoga. Continue?')" class="inline">
+                            @csrf
+                            <input type="hidden" name="fbr_pos_environment" value="{{ $company->fbr_pos_environment ?? 'sandbox' }}">
+                            <input type="hidden" name="regenerate_agent_key" value="1">
+                            <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-2 border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 text-xs font-semibold rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 transition">Regenerate Key</button>
+                        </form>
+                        @endif
                     </div>
-                    <p class="text-xs text-gray-400 mt-1">Install on the shop PC (same PC as the FBR IMS component). This is the <strong>same</strong> agent used for PRA — no separate FBR version.</p>
+                    <p class="text-xs text-gray-400 mt-1">Shop PC pe install karen (wahi PC jahan FBR IMS component hai). Yeh <strong>wahi</strong> agent hai jo PRA use karta hai — FBR ke liye alag version nahi.</p>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3 text-sm mb-4">
@@ -112,12 +214,13 @@
                 </div>
 
                 <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                    <p class="text-xs font-semibold text-blue-700 dark:text-blue-400 mb-1">Setup on the shop PC</p>
+                    <p class="text-xs font-semibold text-blue-700 dark:text-blue-400 mb-1">📖 Agent connect karne ka tareeqa (shop PC pe)</p>
                     <ol class="text-xs text-blue-700 dark:text-blue-400 list-decimal list-inside space-y-0.5">
-                        <li>Install PRAL's FBR IMS Fiscal Device service on the shop PC (from your FBR registration).</li>
-                        <li>Install &amp; run the TaxNest Desktop Sync Agent on the same PC.</li>
-                        <li>Paste the Agent API Key above into the agent and click Connect.</li>
-                        <li>Keep the PC on during business hours — bills sync automatically.</li>
+                        <li>Shop PC pe FBR IMS Fiscal component install karen (aap ki FBR registration se) — <code>localhost:8524</code> chalu ho.</li>
+                        <li>Upar se <strong>Download Agent (.exe)</strong> usi PC pe install karen.</li>
+                        <li>Agent kholen aur teen khaane bharen: <strong>Server URL</strong>, <strong>Company ID</strong>, <strong>API Key</strong> (upar se Copy karen).</li>
+                        <li><strong>Connect</strong> dabayen — upar status <strong>ONLINE</strong> ho jayega.</li>
+                        <li>PC business hours mein on rakhen — bills khud-ba-khud sync hongi.</li>
                     </ol>
                 </div>
             </div>
@@ -266,17 +369,29 @@
 </div>
 
 <script>
-function copyAgentKey() {
-    const input = document.getElementById('agentKey');
-    if (!input || !input.value) return;
-    input.select();
-    input.setSelectionRange(0, 99999);
+function copyField(id, btn) {
+    const input = document.getElementById(id);
+    if (!input || input.value === '') return;
+    const wasPassword = input.type === 'password';
     navigator.clipboard.writeText(input.value).then(() => {
-        const btn = event.target;
         const orig = btn.textContent;
-        btn.textContent = 'Copied!';
+        btn.textContent = '✓ Copied';
         setTimeout(() => { btn.textContent = orig; }, 1500);
-    }).catch(() => { document.execCommand('copy'); });
+    }).catch(() => {
+        input.type = 'text';
+        input.select();
+        input.setSelectionRange(0, 99999);
+        document.execCommand('copy');
+        if (wasPassword) input.type = 'password';
+    });
+}
+
+function toggleAgentKey() {
+    const input = document.getElementById('agentKey');
+    const btn = document.getElementById('agentKeyToggle');
+    if (!input) return;
+    if (input.type === 'password') { input.type = 'text'; if (btn) btn.textContent = 'Hide'; }
+    else { input.type = 'password'; if (btn) btn.textContent = 'Show'; }
 }
 
 function testFbrConnection() {

@@ -1440,6 +1440,17 @@ class FbrPosController extends Controller
                 return back()->with('error', 'Please enter a valid 4-6 digit PIN.');
             }
 
+            // Regenerate the Desktop Sync Agent API key (Fiscal Device mode). Invalidates the old key,
+            // so any agent using the previous key must be reconnected with the new one.
+            if ($request->has('regenerate_agent_key')) {
+                $company->update([
+                    'fbr_connection_mode' => 'fiscal_device',
+                    'agent_enabled' => true,
+                    'agent_api_key' => 'tnk_' . \Illuminate\Support\Str::random(48),
+                ]);
+                return back()->with('success', 'Agent API key regenerated. Re-enter it in the Desktop Sync Agent on the shop PC.');
+            }
+
             $request->validate([
                 'fbr_pos_environment' => 'required|in:sandbox,production',
                 'fbr_connection_mode' => 'nullable|in:cloud,fiscal_device',

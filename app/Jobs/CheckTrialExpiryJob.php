@@ -40,5 +40,8 @@ class CheckTrialExpiryJob implements ShouldQueue
                 'read' => false,
             ]);
         }
+
+        // Lock companies whose admin-granted temporary / grace access has ended.
+        \App\Services\SubscriptionAccessService::reconcileExpiredGrants();
     }
 }

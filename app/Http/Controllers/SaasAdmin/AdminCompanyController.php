@@ -182,6 +182,9 @@ class AdminCompanyController extends Controller
 
     public function index(Request $request)
     {
+        // Lazily lock any company whose date-based grant has expired (cron-safe).
+        \App\Services\SubscriptionAccessService::reconcileExpiredGrants();
+
         $query = Company::query()->with(['franchise', 'activeSubscription']);
 
         if ($request->filled('product_type')) {
@@ -748,6 +751,23 @@ class AdminCompanyController extends Controller
         });
     }
 
+    /**
+     * A subscription grant should unlock the company it is given to. Lift a
+     * pending / not-yet-approved company to approved + active so the grant
+     * takes effect immediately. Never reverses a deliberate suspension or
+     * rejection — use unsuspend / approve for those.
+     */
+    private function activateForGrant(Company $company): void
+    {
+        if (in_array($company->status, ['suspended', 'rejected'], true)
+            || in_array($company->company_status, ['suspended', 'rejected'], true)) {
+            return;
+        }
+        if ($company->status !== 'approved' || $company->company_status !== 'active') {
+            $company->update(['status' => 'approved', 'company_status' => 'active']);
+        }
+    }
+
     public function grantLifetime(Request $request, $id)
     {
         $request->validate(['reason' => 'nullable|string|max:255']);
@@ -760,6 +780,7 @@ class AdminCompanyController extends Controller
             'override_reason' => $request->input('reason', 'Lifetime free access granted by admin'),
             'override_by' => auth('admin')->id(),
         ]);
+        $this->activateForGrant($company);
         AdminAuditLog::log(auth('admin')->id(), 'Override granted: LIFETIME', 'Subscription', $sub->id, [
             'company' => $company->name, 'reason' => $sub->override_reason,
         ]);
@@ -781,6 +802,7 @@ class AdminCompanyController extends Controller
             'override_reason' => $request->input('reason', 'Temporary access granted by admin'),
             'override_by' => auth('admin')->id(),
         ]);
+        $this->activateForGrant($company);
         AdminAuditLog::log(auth('admin')->id(), 'Override granted: TEMPORARY', 'Subscription', $sub->id, [
             'company' => $company->name, 'until' => $sub->override_until?->toDateString(), 'reason' => $sub->override_reason,
         ]);
@@ -803,6 +825,7 @@ class AdminCompanyController extends Controller
             'override_reason' => $request->input('reason', $request->input('days') . '-day grace period'),
             'override_by' => auth('admin')->id(),
         ]);
+        $this->activateForGrant($company);
         AdminAuditLog::log(auth('admin')->id(), 'Override granted: GRACE', 'Subscription', $sub->id, [
             'company' => $company->name, 'days' => $request->input('days'), 'until' => $until->toDateString(),
         ]);
@@ -824,6 +847,7 @@ class AdminCompanyController extends Controller
             'override_reason' => $request->input('reason', "Free invoice limit: " . $request->input('free_invoice_limit')),
             'override_by' => auth('admin')->id(),
         ]);
+        $this->activateForGrant($company);
         AdminAuditLog::log(auth('admin')->id(), 'Override granted: USAGE_FREE', 'Subscription', $sub->id, [
             'company' => $company->name, 'limit' => $sub->free_invoice_limit,
         ]);

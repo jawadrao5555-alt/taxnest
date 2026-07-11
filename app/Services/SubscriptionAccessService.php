@@ -183,4 +183,60 @@ class SubscriptionAccessService
             ->where('company_id', $company->id)
             ->count();
     }
+
+    /**
+     * Grant-status reconciliation. When a DATE-based grant (temporary / grace)
+     * has passed its override_until, the company that was unlocked by that grant
+     * must fall back to 'pending' (view-only) — mirroring a freshly registered
+     * company — and the spent grant is cleared so it can never re-trigger nor
+     * fight a later manual re-approval.
+     *
+     * NOT touched here:
+     *   - lifetime  : never expires.
+     *   - usage_free: capped by invoice count (handled in hasAccess), not by date.
+     *   - suspended / rejected companies: left exactly as an admin set them.
+     *   - companies that have SINCE gained valid access (paid plan / lifetime):
+     *     confirmed via hasAccess() so a paying customer is never locked out.
+     *
+     * Idempotent — safe to call on every admin list load and from the daily job.
+     *
+     * @return int number of companies flipped back to pending
+     */
+    public static function reconcileExpiredGrants(): int
+    {
+        // Every subscription whose DATE-based grant (temporary / grace) has lapsed.
+        $expired = fn () => Subscription::whereIn('override_type', ['temporary', 'grace'])
+            ->whereNotNull('override_until')
+            ->where('override_until', '<', now());
+
+        $companyIds = $expired()->where('active', true)->distinct()->pluck('company_id');
+
+        $flipped = 0;
+        if ($companyIds->isNotEmpty()) {
+            $companies = Company::whereIn('id', $companyIds)
+                ->where('company_status', 'active')
+                ->whereNotIn('status', ['suspended', 'rejected'])
+                ->get();
+
+            foreach ($companies as $company) {
+                // A company that has SINCE gained valid access (paid plan, active
+                // trial, lifetime) keeps working — only lock those whose effective
+                // access is now gone.
+                if (self::hasAccess($company)['allowed'] ?? false) {
+                    continue;
+                }
+                $company->update(['status' => 'pending', 'company_status' => 'pending']);
+                $flipped++;
+            }
+        }
+
+        // Clear EVERY spent grant — flipped, still-valid, or suspended alike — so
+        // it is never re-scanned and a stale expired grant can never silently
+        // demote a company whose paid plan lapses later. hasAccess() already
+        // treats an expired temporary/grace grant identically to 'none', so this
+        // clears no access that still mattered.
+        $expired()->update(['override_type' => 'none', 'override_until' => null]);
+
+        return $flipped;
+    }
 }

@@ -13,3 +13,13 @@ The `pricing_plans.price` / sale accessors do NOT mean the same period across pr
 **How to apply:** Any surface quoting a price (landing pages, emails, receipts, admin) must mirror the in-app billing page math for that product_type — open the corresponding `*/billing.blade.php` and copy its formula; never assume the storage period.
 
 Note (pre-existing conflict, unresolved as of Jul 2026): replit.md says POS billing is annual-only, but `fbr-pos/billing.blade.php` has the full DI-style cycle toggle. Owner confirmation pending; landing quotes annual ×12×0.94 to match billing's annual option.
+
+## Plan-purchase / approval flow: single pricing source + lockstep product_type
+
+`SubscriptionAssignmentService::computePrice($plan, $cycle)` is the ONE canonical pricing entry point for the payment-proof → admin-approve → subscription flow (returns `{cycle, final_price, discount_percent}`; forces annual for pos/standalone/fbrpos; `normalizeCycle` maps legacy `'yearly'→'annual'`). `assign()` builds end_date from the SAME computed cycle so charge and expiry always agree. Never re-derive a price inline on any surface — call computePrice.
+
+**Lockstep rule:** the company-side capture (`components/trial-lock-modal.blade.php` `$lockProductType`) and the server validation (`PaymentProofController::resolveProductType`) resolve a company's product line by the IDENTICAL guard chain + standalone check: `pos` guard → `standalone` when `company.pos_integration_mode==='standalone'` else `pos`; `fbrpos` guard → `fbrpos`; else `di`. The modal only offers `is_trial=0 AND product_type=X` plans (di=4 cycles, others annual-only).
+
+**Why:** the store() validator rejects any plan whose product_type ≠ the company's resolved type. If these two resolutions ever drift, a company's own valid selection gets server-rejected (silent dead-end). Keep them changed together.
+
+**How to apply:** admin approve recomputes price from the plan/cycle the admin actually picked (never trusts the customer-entered `amount`); the requested plan/cycle is stored on the proof and pre-selected in the approve form, but admin may change either. Filter `is_trial=0` out of any admin plan dropdown too.

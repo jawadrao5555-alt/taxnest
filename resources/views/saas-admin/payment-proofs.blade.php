@@ -29,6 +29,7 @@
                     <thead>
                         <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-800 bg-gray-800/50">
                             <th class="px-4 py-3">Company</th>
+                            <th class="px-4 py-3">Requested Plan</th>
                             <th class="px-4 py-3">Amount</th>
                             <th class="px-4 py-3 hidden md:table-cell">Reference</th>
                             <th class="px-4 py-3 hidden lg:table-cell">Paid On</th>
@@ -45,6 +46,18 @@
                                 {{ $proof->company->name ?? ('#' . $proof->company_id) }}
                                 @if($proof->notes)
                                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-[220px]">{{ $proof->notes }}</p>
+                                @endif
+                            </td>
+                            <td class="px-4 py-3 text-gray-300">
+                                @if($proof->pricingPlan)
+                                    @php
+                                        $reqCycle = \App\Services\SubscriptionAssignmentService::normalizeCycle($proof->billing_cycle);
+                                        $reqPriced = \App\Services\SubscriptionAssignmentService::computePrice($proof->pricingPlan, $reqCycle);
+                                    @endphp
+                                    <span class="text-white font-medium">{{ $proof->pricingPlan->name }}</span>
+                                    <span class="block text-[11px] text-gray-500 dark:text-gray-400">{{ \App\Models\Subscription::getCycleLabel($reqPriced['cycle']) }} · PKR {{ number_format($reqPriced['final_price']) }}</span>
+                                @else
+                                    <span class="text-gray-500 dark:text-gray-400">—</span>
                                 @endif
                             </td>
                             <td class="px-4 py-3 text-gray-300">{{ $proof->amount !== null ? 'PKR ' . number_format((float) $proof->amount) : '—' }}</td>
@@ -77,17 +90,25 @@
                                     <button @click="panel = (panel === 'reject' ? null : 'reject')" class="text-xs text-red-400 hover:text-red-300">Reject</button>
 
                                     <div x-show="panel === 'approve'" x-cloak class="mt-3 text-left bg-gray-800/60 border border-gray-700 rounded-lg p-3 space-y-2 min-w-[240px]">
+                                        @php $reqCycleSel = \App\Services\SubscriptionAssignmentService::normalizeCycle($proof->billing_cycle); @endphp
+                                        @if($proof->pricingPlan)
+                                            <p class="text-[11px] text-gray-400 mb-1">Requested: <span class="text-gray-200 font-medium">{{ $proof->pricingPlan->name }}</span> · {{ \App\Models\Subscription::getCycleLabel($reqCycleSel) }}. Approve as-is or change below.</p>
+                                        @else
+                                            <p class="text-[11px] text-gray-400 mb-1">No package requested — choose one to assign.</p>
+                                        @endif
                                         <form method="POST" action="{{ route('saas.admin.payment-proofs.approve', $proof->id) }}" class="space-y-2">
                                             @csrf
                                             <select name="pricing_plan_id" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
                                                 <option value="">Select Plan</option>
                                                 @foreach($plans as $p)
-                                                    <option value="{{ $p->id }}">{{ $p->name }} (PKR {{ number_format($p->price) }})</option>
+                                                    <option value="{{ $p->id }}" @selected($proof->pricing_plan_id == $p->id)>{{ $p->name }} — {{ strtoupper($p->product_type ?? 'di') }} (PKR {{ number_format($p->price) }})</option>
                                                 @endforeach
                                             </select>
                                             <select name="billing_cycle" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
-                                                <option value="monthly">Monthly</option>
-                                                <option value="yearly">Yearly</option>
+                                                <option value="monthly" @selected($reqCycleSel === 'monthly')>Monthly</option>
+                                                <option value="quarterly" @selected($reqCycleSel === 'quarterly')>Quarterly</option>
+                                                <option value="semi_annual" @selected($reqCycleSel === 'semi_annual')>Semi-Annual</option>
+                                                <option value="annual" @selected($reqCycleSel === 'annual')>Annual</option>
                                             </select>
                                             <button type="submit" class="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">Approve &amp; Unlock</button>
                                         </form>
@@ -106,7 +127,7 @@
                             </td>
                         </tr>
                         @empty
-                        <tr><td colspan="8" class="px-4 py-12 text-center text-gray-500 dark:text-gray-400">No payment proofs found.</td></tr>
+                        <tr><td colspan="9" class="px-4 py-12 text-center text-gray-500 dark:text-gray-400">No payment proofs found.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

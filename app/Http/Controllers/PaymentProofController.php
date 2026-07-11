@@ -28,13 +28,31 @@ class PaymentProofController extends Controller
                 ->with('payment_proof', 'error');
         }
 
+        $company = \App\Models\Company::find($companyId);
+        $productType = $this->resolveProductType($company);
+        $allowedCycles = $productType === 'di'
+            ? ['monthly', 'quarterly', 'semi_annual', 'annual']
+            : ['annual'];
+
         $validated = $request->validate([
+            'pricing_plan_id' => 'required|exists:pricing_plans,id',
+            'billing_cycle' => 'required|in:' . implode(',', $allowedCycles),
             'amount' => 'nullable|numeric|min:0',
             'reference' => 'nullable|string|max:120',
             'payment_date' => 'nullable|date',
             'notes' => 'nullable|string|max:500',
             'proof' => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120',
         ]);
+
+        // The selected package must be a real, non-trial plan for THIS account's
+        // product line — a company can never request a plan from another panel.
+        $plan = \App\Models\PricingPlan::find($validated['pricing_plan_id']);
+        if (!$plan || $plan->is_trial || ($plan->product_type ?? 'di') !== $productType) {
+            return back()
+                ->withErrors(['pricing_plan_id' => 'Please select a valid package for your account.'])
+                ->withInput()
+                ->with('payment_proof', 'error');
+        }
 
         // One pending proof at a time — avoid duplicate review queue entries.
         $existing = PaymentProof::where('company_id', $companyId)
@@ -50,6 +68,8 @@ class PaymentProofController extends Controller
 
         PaymentProof::create([
             'company_id' => $companyId,
+            'pricing_plan_id' => $plan->id,
+            'billing_cycle' => \App\Services\SubscriptionAssignmentService::normalizeCycle($validated['billing_cycle']),
             'amount' => $validated['amount'] ?? null,
             'reference' => $validated['reference'] ?? null,
             'payment_date' => $validated['payment_date'] ?? null,
@@ -81,5 +101,23 @@ class PaymentProofController extends Controller
             }
         }
         return null;
+    }
+
+    /**
+     * Map the acting panel/company to its pricing product line so a company can
+     * only request (and be shown) plans from its own panel.
+     *  - pos guard    → 'standalone' when the company runs standalone POS, else 'pos'
+     *  - fbrpos guard → 'fbrpos'
+     *  - web guard    → 'di'
+     */
+    private function resolveProductType(?\App\Models\Company $company): string
+    {
+        if (auth('pos')->check()) {
+            return (($company->pos_integration_mode ?? 'pra') === 'standalone') ? 'standalone' : 'pos';
+        }
+        if (auth('fbrpos')->check()) {
+            return 'fbrpos';
+        }
+        return 'di';
     }
 }

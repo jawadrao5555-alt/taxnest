@@ -48,7 +48,32 @@
             $pendingProof = \App\Models\PaymentProof::where('company_id', $companyId)
                 ->where('status', 'pending')->exists();
         }
-        $forceOpen = session('payment_proof') || $errors->has('proof') || $errors->has('amount');
+        $forceOpen = session('payment_proof') || $errors->has('proof') || $errors->has('amount')
+            || $errors->has('pricing_plan_id') || $errors->has('billing_cycle');
+
+        // Package + duration the company is paying for — filtered to THIS panel's
+        // product line so a POS company never sees DI plans (and vice-versa).
+        if (auth('pos')->check()) {
+            $lockProductType = (($lockCompany->pos_integration_mode ?? 'pra') === 'standalone') ? 'standalone' : 'pos';
+        } elseif (auth('fbrpos')->check()) {
+            $lockProductType = 'fbrpos';
+        } else {
+            $lockProductType = 'di';
+        }
+
+        // DI = full toggle; POS / standalone / FBR POS = annual-only.
+        $lockCycles = $lockProductType === 'di'
+            ? [['key' => 'monthly', 'label' => 'Monthly'], ['key' => 'quarterly', 'label' => 'Quarterly'], ['key' => 'semi_annual', 'label' => 'Semi-Annual'], ['key' => 'annual', 'label' => 'Annual']]
+            : [['key' => 'annual', 'label' => 'Annual']];
+
+        $lockPlans = [];
+        foreach (\App\Models\PricingPlan::where('is_trial', false)->where('product_type', $lockProductType)->orderBy('price')->get() as $lp) {
+            $prices = [];
+            foreach ($lockCycles as $lc) {
+                $prices[$lc['key']] = \App\Services\SubscriptionAssignmentService::computePrice($lp, $lc['key'])['final_price'];
+            }
+            $lockPlans[] = ['id' => $lp->id, 'name' => $lp->name, 'prices' => $prices];
+        }
     }
 @endphp
 
@@ -139,11 +164,57 @@
                     <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <span>Your payment proof is <strong>under review</strong>. We'll unlock your account as soon as our team verifies it.</span>
                 </div>
+                @elseif($submitAction && empty($lockPlans))
+                <div class="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 text-sm text-amber-700 dark:text-amber-300">
+                    No subscription packages are available for your account yet. Please contact support to subscribe.
+                </div>
                 @elseif($submitAction)
                 <form method="POST" action="{{ $submitAction }}" enctype="multipart/form-data"
+                      x-data="{
+                        plans: {{ \Illuminate\Support\Js::from($lockPlans) }},
+                        cycles: {{ \Illuminate\Support\Js::from($lockCycles) }},
+                        planId: '{{ old('pricing_plan_id') }}',
+                        cycle: '{{ old('billing_cycle', $lockProductType === 'di' ? 'monthly' : 'annual') }}',
+                        get price() {
+                            const p = this.plans.find(x => String(x.id) === String(this.planId));
+                            return p ? (p.prices[this.cycle] ?? null) : null;
+                        },
+                        get cycleLabel() {
+                            const c = this.cycles.find(x => x.key === this.cycle);
+                            return c ? c.label : '';
+                        }
+                      }"
                       class="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-4 space-y-3">
                     @csrf
-                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Already paid? Submit your receipt</p>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Choose your package &amp; submit your receipt</p>
+
+                    <div class="grid grid-cols-1 {{ count($lockCycles) > 1 ? 'sm:grid-cols-2' : '' }} gap-2">
+                        <select name="pricing_plan_id" x-model="planId" required
+                                class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">
+                            <option value="">Select your package</option>
+                            <template x-for="p in plans" :key="p.id">
+                                <option :value="p.id" x-text="p.name"></option>
+                            </template>
+                        </select>
+                        @if(count($lockCycles) > 1)
+                        <select name="billing_cycle" x-model="cycle" required
+                                class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">
+                            <template x-for="c in cycles" :key="c.key">
+                                <option :value="c.key" x-text="c.label"></option>
+                            </template>
+                        </select>
+                        @else
+                        <input type="hidden" name="billing_cycle" value="annual">
+                        @endif
+                    </div>
+                    @error('pricing_plan_id')<p class="text-xs text-red-500">{{ $message }}</p>@enderror
+                    @error('billing_cycle')<p class="text-xs text-red-500">{{ $message }}</p>@enderror
+
+                    <div x-show="price !== null" x-cloak class="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">
+                        <span x-text="cycleLabel"></span> package total:
+                        <span class="font-bold">PKR <span x-text="price !== null ? Number(price).toLocaleString() : ''"></span></span>
+                    </div>
+
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <input type="number" step="0.01" min="0" name="amount" value="{{ old('amount') }}" placeholder="Amount paid (PKR)"
                                class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">

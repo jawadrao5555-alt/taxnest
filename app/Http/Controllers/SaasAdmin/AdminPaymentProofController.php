@@ -27,13 +27,13 @@ class AdminPaymentProofController extends Controller
 
         $status = $request->get('status', 'pending');
 
-        $query = PaymentProof::with('company')->orderByDesc('created_at');
+        $query = PaymentProof::with(['company', 'pricingPlan'])->orderByDesc('created_at');
         if (in_array($status, ['pending', 'verified', 'rejected'], true)) {
             $query->where('status', $status);
         }
 
         $proofs = $query->paginate(20)->appends($request->all());
-        $plans = PricingPlan::orderBy('price')->get();
+        $plans = PricingPlan::where('is_trial', false)->orderBy('price')->get();
 
         return view('saas-admin.payment-proofs', [
             'proofs' => $proofs,
@@ -47,7 +47,7 @@ class AdminPaymentProofController extends Controller
     {
         $request->validate([
             'pricing_plan_id' => 'required|exists:pricing_plans,id',
-            'billing_cycle' => 'required|in:monthly,yearly',
+            'billing_cycle' => 'required|in:monthly,quarterly,semi_annual,annual,yearly',
         ]);
 
         $proof = PaymentProof::findOrFail($id);
@@ -68,7 +68,7 @@ class AdminPaymentProofController extends Controller
             $locked->update([
                 'status' => 'verified',
                 'pricing_plan_id' => $request->pricing_plan_id,
-                'billing_cycle' => $request->billing_cycle,
+                'billing_cycle' => SubscriptionAssignmentService::normalizeCycle($request->billing_cycle),
                 'subscription_id' => $sub->id,
                 'verified_by' => auth('admin')->id(),
                 'verified_at' => now(),

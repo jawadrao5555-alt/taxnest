@@ -1504,16 +1504,49 @@ class FbrPosController extends Controller
                 ]);
             }
 
-            if ($httpCode === 401) {
+            $body = (string) $response;
+            $faultCode = null;
+            $decoded = json_decode($body, true);
+            if (is_array($decoded) && isset($decoded['fault']['code'])) {
+                $faultCode = (string) $decoded['fault']['code'];
+            } elseif (preg_match('/\b(9009\d{2})\b/', $body, $m)) {
+                $faultCode = $m[1];
+            }
+
+            $envLabel = $env === 'production' ? 'Production (Live)' : 'Sandbox (Testing)';
+            $otherLabel = $env === 'production' ? 'Sandbox' : 'Production';
+
+            if ($faultCode === '900901' || $httpCode === 401) {
                 return response()->json([
                     'success' => false,
-                    'message' => "Authentication failed (401). Token may be invalid or expired for {$env} environment.",
+                    'message' => "FBR rejected this token (900901 – Invalid Credentials). Your token does NOT match the \"{$envLabel}\" environment. Fix: enter the {$envLabel} token from your FBR IRIS portal, OR switch the environment to {$otherLabel} and use its token. Sandbox and Production tokens are different.",
+                ]);
+            }
+
+            if ($faultCode === '900908') {
+                return response()->json([
+                    'success' => false,
+                    'message' => "FBR says this API is not enabled for your account in {$envLabel} (900908). Your NTN is not yet enrolled for IMS POS in this environment. Contact FBR/PRAL to enable IMS POS for your NTN.",
+                ]);
+            }
+
+            if ($faultCode === '900902') {
+                return response()->json([
+                    'success' => false,
+                    'message' => "No token was received by FBR (900902). Please re-enter your FBR IMS POS token and save again.",
+                ]);
+            }
+
+            if ($faultCode !== null) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "FBR gateway rejected the request (code {$faultCode}) in {$envLabel}. Check your token and environment.",
                 ]);
             }
 
             return response()->json([
                 'success' => true,
-                'message' => "Connected to FBR {$env} server successfully (HTTP {$httpCode}). Token is valid.",
+                'message' => "Token accepted by FBR {$envLabel} server (HTTP {$httpCode}). Your token and environment match — you are ready to submit invoices.",
                 'environment' => $env,
                 'http_code' => $httpCode,
             ]);

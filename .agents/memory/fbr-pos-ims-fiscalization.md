@@ -54,6 +54,14 @@ was sent and rejected → causes: wrong/expired/mistyped token, sandbox token on
 vice-versa — env must match the token), copy-paste whitespace/newline in the token (now defended by
 `trim()` on both save and read), or the NTN not yet enrolled for IMS POS on the FBR portal. Token
 column is TEXT (not truncated). This is a CONFIG issue, not a code bug — the endpoint/path is correct.
+FBR-confirmed #1 cause of 900901 is **sandbox token on the production URL** (WSO2 routes by token type). A business
+gets a **production token ONLY after passing FBR sandbox certification**, so a live 900901 usually means they only
+hold a sandbox token yet → steer them to test on Sandbox first, then FBR issues the prod token. The settings token
+mask (`$maskedPosToken`) is DISPLAY-ONLY (blade placeholder + status line); the save path only writes on
+`$request->filled(...)` and always stores the full encrypted token, and getFbrPosToken sends the full decrypted
+token — masking never touches what is stored or sent, so it can NEVER cause 900901. `testConnection()` now parses
+the response BODY for `fault.code` (json + `\b9009\d{2}\b` regex fallback) so it reports 900901/900908/900902
+accurately instead of only checking HTTP 401.
 
 **Sandbox-verify (spec ambiguity, not bugs):** whether FBR expects header `Discount` = ALL discounts
 (item+bill) vs bill-only, and whether item `TotalAmount` = SaleValue+Tax vs SaleValue+Tax−Discount.

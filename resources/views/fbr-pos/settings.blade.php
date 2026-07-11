@@ -84,6 +84,22 @@
                     <p class="text-xs text-gray-400 mt-1">Paste this key into the Desktop Sync Agent on the shop PC to link it to this company.</p>
                 </div>
 
+                <div class="mb-4">
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Download Desktop Sync Agent (Windows)</label>
+                    <div class="flex flex-wrap gap-2">
+                        <a href="{{ route('fbrpos.agent.download') }}?type=exe"
+                           class="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                            Download Agent (.exe)
+                        </a>
+                        <a href="{{ route('fbrpos.agent.download') }}?type=zip"
+                           class="inline-flex items-center gap-1.5 px-3 py-2 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-400 text-xs font-semibold rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition">
+                            Portable (.zip)
+                        </a>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1">Install on the shop PC (same PC as the FBR IMS component). This is the <strong>same</strong> agent used for PRA — no separate FBR version.</p>
+                </div>
+
                 <div class="grid grid-cols-2 gap-3 text-sm mb-4">
                     <div class="flex flex-col">
                         <span class="text-gray-500 text-xs">Agent</span>

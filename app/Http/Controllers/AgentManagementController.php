@@ -111,7 +111,11 @@ class AgentManagementController extends Controller
         });
 
         $needle = $type === 'zip' ? '.zip' : '.exe';
-        $asset = collect($assets['assets'])->first(fn($a) => str_ends_with(strtolower($a['name']), $needle));
+        // Prefer the LARGEST matching asset — the real full installer, not a stale 0.2 MB stub.
+        $asset = collect($assets['assets'])
+            ->filter(fn($a) => str_ends_with(strtolower($a['name']), $needle))
+            ->sortByDesc('size')
+            ->first();
 
         if ($asset) {
             return redirect()->away($asset['url']);
@@ -146,8 +150,8 @@ class AgentManagementController extends Controller
             return ['tag' => null, 'assets' => []];
         });
 
-        $exe = collect($info['assets'])->first(fn($a) => str_ends_with(strtolower($a['name']), '.exe'));
-        $zip = collect($info['assets'])->first(fn($a) => str_ends_with(strtolower($a['name']), '.zip'));
+        $exe = collect($info['assets'])->filter(fn($a) => str_ends_with(strtolower($a['name']), '.exe'))->sortByDesc('size')->first();
+        $zip = collect($info['assets'])->filter(fn($a) => str_ends_with(strtolower($a['name']), '.zip'))->sortByDesc('size')->first();
 
         return [
             'tag' => $info['tag'],

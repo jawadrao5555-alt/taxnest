@@ -128,3 +128,25 @@ Separate DI system: pdi/DigitalInvoicing uses a `bposid` model, DIFFERENT from I
   Agent (fiscal_device mode). Direct server->cloud submission is a dead end for POS (Code 112).
 - Operative blocker ladder is now: 900901 (token not activated/wrong) -> [activate token] -> Code 112 (bulk
   cloud retired) -> [use local fiscal device]. Do not chase cloud PostData after Code 112.
+
+## IMPLEMENTED (Jul 2026): FBR POS fiscal_device mode — mirrors PRA, DO NOT rebuild
+The Code-112 resolution is BUILT. Key non-obvious facts:
+- `companies.fbr_connection_mode` ('cloud'|'fiscal_device', default cloud); `Company::agentServesFbr()` =
+  fbr_pos_enabled && mode==fiscal_device. Enable via FBR POS Settings → Submission Mode → Fiscal Device → Save
+  (auto force-enables agent + mints `tnk_`+48 agent_api_key).
+- **Reuses the SAME Desktop Sync Agent (pra-agent) + Agent API (`/api/agent/*`) + `agent_*` columns as PRA —
+  ZERO agent code changes.** The agent generically POSTs each `invoice.payload` to whatever `pra_endpoint` the
+  server returns; for FBR that = `localhost:8524/api/IMSFiscal/GetInvoiceNumberByModel`, `pra_mode='fiscal_device'`,
+  `pra_token=''`. The company's FBR cloud token is NEVER shipped to the agent.
+- In fiscal_device mode the server NEVER cloud-submits: `submitFbrPosTransaction` short-circuits to
+  `'queued_agent'` (leaves `fbr_status='pending'`) AFTER the already-submitted check but BEFORE the hash-lock;
+  `store()` queues; `RetryFbrPosSubmissionJob` treats `queued_agent` as terminal.
+- **Agent invariant (preserves the FBR three-branch write rule):** the agent ONLY ever receives reporting-ON
+  PENDING finals. Deliberate 'local' provisionals (`fbr_status='local'`) and reporting-OFF finals (NULL) are
+  NEVER handed out — `pendingInvoices` filters status ∈ (offline,pending,failed) AND `invoice_mode != 'local'`.
+- `AgentController`'s 3 methods branch on `agentServesFbr()`; FBR branch writes `fbr_pos_transactions`
+  (submitted/failed + fbr_invoice_number + fbr_response_code), NO PRA regex; success = agent-reported success
+  AND non-empty invoice number. **Shared-agent constraint:** one company cannot run PRA-fiscal AND FBR-fiscal at
+  once (agentServesFbr routes ALL agent endpoints to the FBR branch).
+- Shop-PC install guide: `pra-agent/FBR-FISCAL-DEVICE-SETUP.md`. X-WAY SHOES (NTN 2595908-5, POSID 196354) is
+  prod-only (not in dev DB) — enable via the prod UI toggle after deploy; e2e proven in dev on company 16.

@@ -7,7 +7,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\Company;
 use App\Models\PosTransaction;
+use App\Models\FbrPosTransaction;
 use App\Services\PraIntegrationService;
+use App\Services\FbrService;
 
 class AgentController extends Controller
 {
@@ -20,6 +22,12 @@ class AgentController extends Controller
             'agent_version' => $request->input('version', $company->agent_version),
         ]);
 
+        // ===== FBR POS Fiscal Device company =====
+        if ($company->agentServesFbr()) {
+            return $this->fbrHeartbeat($company);
+        }
+
+        // ===== PRA POS company (default) =====
         // Phase 5a — self-heal: rows that already have a fiscal # but never got their status flipped.
         $healed = DB::table('pos_transactions')
             ->where('company_id', $company->id)
@@ -74,12 +82,77 @@ class AgentController extends Controller
         ]);
     }
 
+    /** FBR POS equivalent of the PRA self-heal sweep, operating on fbr_pos_transactions. */
+    private function fbrHeartbeat(Company $company)
+    {
+        // Self-heal: rows with a fiscal invoice # but a stale status.
+        $healed = DB::table('fbr_pos_transactions')
+            ->where('company_id', $company->id)
+            ->whereNotNull('fbr_invoice_number')
+            ->where('fbr_invoice_number', '!=', '')
+            ->whereIn('fbr_status', ['offline', 'pending', 'failed'])
+            ->update([
+                'fbr_status' => 'submitted',
+                'updated_at' => now(),
+            ]);
+
+        // Re-promote stale 'offline' finals back to 'pending' (never touches 'local' provisionals).
+        $repromoted = DB::table('fbr_pos_transactions')
+            ->where('company_id', $company->id)
+            ->where('fbr_status', 'offline')
+            ->whereNull('fbr_invoice_number')
+            ->update([
+                'fbr_status' => 'pending',
+                'updated_at' => now(),
+            ]);
+
+        $stuckIds = DB::table('fbr_pos_transactions')
+            ->where('company_id', $company->id)
+            ->whereIn('fbr_status', ['pending', 'failed', 'offline'])
+            ->whereNull('fbr_invoice_number')
+            ->where(function ($q) {
+                $q->whereNull('invoice_mode')->orWhere('invoice_mode', '!=', 'local');
+            })
+            ->orderByDesc('id')
+            ->limit(50)
+            ->pluck('id');
+
+        if ($healed > 0 || $repromoted > 0) {
+            Log::info('Agent heartbeat (FBR): self-heal sweep', [
+                'company_id' => $company->id,
+                'healed_count' => $healed,
+                'repromoted_count' => $repromoted,
+                'stuck_count' => $stuckIds->count(),
+            ]);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'company' => [
+                'id' => $company->id,
+                'name' => $company->name,
+                'pra_pos_id' => $company->fbr_pos_id,
+                'pra_environment' => $company->fbr_pos_environment,
+            ],
+            'healed' => $healed,
+            'repromoted' => $repromoted,
+            'stuck_transaction_ids' => $stuckIds,
+            'server_time' => now()->toIso8601String(),
+        ]);
+    }
+
     public function pendingInvoices(Request $request)
     {
         $company = $request->attributes->get('agent_company');
 
         $company->update(['agent_last_seen' => now()]);
 
+        // ===== FBR POS Fiscal Device company =====
+        if ($company->agentServesFbr()) {
+            return $this->fbrPendingInvoices($company);
+        }
+
+        // ===== PRA POS company (default) =====
         $pending = PosTransaction::where('company_id', $company->id)
             ->whereIn('pra_status', ['offline', 'pending', 'failed'])
             ->whereNull('pra_invoice_number')
@@ -126,6 +199,58 @@ class AgentController extends Controller
         ]);
     }
 
+    /**
+     * FBR POS pending invoices for the Desktop Sync Agent. Same response shape as the PRA
+     * path so the agent needs zero changes: it POSTs each `payload` to `pra_endpoint`
+     * (the local FBR IMS component on localhost:8524) and reports back via /submit-result.
+     */
+    private function fbrPendingInvoices(Company $company)
+    {
+        $pending = FbrPosTransaction::where('company_id', $company->id)
+            ->whereIn('fbr_status', ['offline', 'pending', 'failed'])
+            ->whereNull('fbr_invoice_number')
+            ->where(function ($q) {
+                // Never hand the agent a deliberate 'local' provisional bill.
+                $q->whereNull('invoice_mode')->orWhere('invoice_mode', '!=', 'local');
+            })
+            ->orderBy('id', 'asc')
+            ->limit(20)
+            ->get();
+
+        $fbrService = new FbrService();
+
+        $invoices = [];
+        foreach ($pending as $txn) {
+            try {
+                $txn->loadMissing(['items', 'company']);
+                $payload = $fbrService->buildFbrPosPayload($txn);
+                $invoices[] = [
+                    'transaction_id' => $txn->id,
+                    'invoice_number' => $txn->invoice_number,
+                    'payload' => $payload,
+                    'created_at' => $txn->created_at?->toIso8601String(),
+                ];
+            } catch (\Throwable $e) {
+                Log::warning('Agent: FBR payload generation failed', [
+                    'transaction_id' => $txn->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // FBR retired cloud bulk PostData (Code 112) → the agent posts to the LOCAL FBR IMS
+        // fiscal component. The local service is authenticated by its own on-PC installation,
+        // so no bearer token is needed (sent blank).
+        return response()->json([
+            'count' => count($invoices),
+            'invoices' => $invoices,
+            'pra_endpoint' => 'http://localhost:8524/api/IMSFiscal/GetInvoiceNumberByModel',
+            'pra_mode' => 'fiscal_device',
+            'pra_token' => '',
+            'pra_pos_id' => $company->fbr_pos_id,
+        ]);
+    }
+
     public function submitResult(Request $request)
     {
         $company = $request->attributes->get('agent_company');
@@ -138,6 +263,12 @@ class AgentController extends Controller
             'error' => 'nullable|string',
         ]);
 
+        // ===== FBR POS Fiscal Device company =====
+        if ($company->agentServesFbr()) {
+            return $this->fbrSubmitResult($request, $company);
+        }
+
+        // ===== PRA POS company (default) =====
         $txnId = $request->input('transaction_id');
 
         $txn = DB::table('pos_transactions')
@@ -179,6 +310,65 @@ class AgentController extends Controller
             ]);
 
             Log::warning('Agent: PRA submission failed', [
+                'company_id' => $company->id,
+                'transaction_id' => $txnId,
+                'error' => $errMsg,
+                'response' => $request->input('response'),
+            ]);
+        }
+
+        $company->update(['agent_last_seen' => now()]);
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * FBR POS submit-result callback. Writes to fbr_pos_transactions. Success requires the
+     * agent to report success=true WITH a non-empty invoice number — the PRA-specific
+     * fiscal-number regex is deliberately NOT applied (FBR IMS invoice formats differ).
+     */
+    private function fbrSubmitResult(Request $request, Company $company)
+    {
+        $txnId = $request->input('transaction_id');
+
+        $txn = FbrPosTransaction::where('id', $txnId)
+            ->where('company_id', $company->id)
+            ->first();
+
+        if (!$txn) {
+            return response()->json(['error' => 'Transaction not found'], 404);
+        }
+
+        $fbrInvoiceNumber = $request->input('pra_invoice_number');
+        $treatAsSuccess = $request->boolean('success') && !empty($fbrInvoiceNumber);
+
+        if ($treatAsSuccess) {
+            $response = $request->input('response');
+            $code = is_array($response) ? ($response['Code'] ?? $response['response_code'] ?? $response['code'] ?? '100') : '100';
+
+            $txn->update([
+                'fbr_status' => 'submitted',
+                'fbr_invoice_number' => $fbrInvoiceNumber,
+                'fbr_response_code' => substr((string) $code, 0, 250),
+                'fbr_response' => is_array($response) ? $response : null,
+                'fbr_submission_hash' => null,
+            ]);
+
+            Log::info('Agent: FBR submission success', [
+                'company_id' => $company->id,
+                'transaction_id' => $txnId,
+                'fbr_invoice' => $fbrInvoiceNumber,
+            ]);
+        } else {
+            $errMsg = (string) $request->input('error', 'FBR submission failed');
+
+            $txn->update([
+                'fbr_status' => 'failed',
+                'fbr_response_code' => substr($errMsg, 0, 250),
+                'fbr_submission_hash' => null,
+            ]);
+
+            Log::warning('Agent: FBR submission failed', [
                 'company_id' => $company->id,
                 'transaction_id' => $txnId,
                 'error' => $errMsg,

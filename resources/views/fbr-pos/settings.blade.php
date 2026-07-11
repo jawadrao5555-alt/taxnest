@@ -23,6 +23,14 @@
                         </select>
                     </div>
                     <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Submission Mode</label>
+                        <select name="fbr_connection_mode" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="cloud" {{ ($company->fbr_connection_mode ?? 'cloud') === 'cloud' ? 'selected' : '' }}>Cloud — Direct to FBR</option>
+                            <option value="fiscal_device" {{ ($company->fbr_connection_mode ?? 'cloud') === 'fiscal_device' ? 'selected' : '' }}>Fiscal Device — Local component on shop PC</option>
+                        </select>
+                        <p class="text-xs text-gray-400 mt-1">FBR has retired cloud bulk upload for POS. New POS registrations must use <strong>Fiscal Device</strong> — bills sync through the FBR IMS component installed on your shop PC via the Desktop Sync Agent.</p>
+                    </div>
+                    <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">FBR POS Registration ID <span class="text-red-500">*</span></label>
                         <input type="text" name="fbr_pos_id" value="{{ $company->fbr_pos_id }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="e.g. 196339">
                         <p class="text-xs text-gray-400 mt-1">Your FBR-assigned POS Registration Number (POSID). Required for IMS submission.</p>
@@ -54,6 +62,50 @@
                     <div id="testResultContent" class="p-3 rounded-lg text-sm"></div>
                 </div>
             </div>
+
+            @if(($company->fbr_connection_mode ?? 'cloud') === 'fiscal_device')
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-blue-200 dark:border-blue-800 shadow-md p-5">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+                    Desktop Sync Agent
+                    <span class="text-[9px] px-1.5 py-0.5 bg-blue-600 text-white rounded font-bold uppercase tracking-wider">Fiscal Device</span>
+                </h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                    In Fiscal Device mode this server never submits directly to FBR. Bills are queued and the Desktop Sync Agent, running on your shop PC, forwards each one to the local FBR IMS Fiscal component (<code>localhost:8524</code>). The FBR invoice number then flows back automatically.
+                </p>
+
+                <div class="mb-3">
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Agent API Key</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="agentKey" readonly value="{{ $company->agent_api_key ?? '' }}"
+                               placeholder="Select Fiscal Device + Save Settings to generate a key"
+                               class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs font-mono focus:ring-blue-500 focus:border-blue-500">
+                        <button type="button" onclick="copyAgentKey()" class="px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition whitespace-nowrap">Copy</button>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1">Paste this key into the Desktop Sync Agent on the shop PC to link it to this company.</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 text-sm mb-4">
+                    <div class="flex flex-col">
+                        <span class="text-gray-500 text-xs">Agent</span>
+                        <span class="{{ $company->agent_enabled ? 'text-blue-600 font-semibold' : 'text-red-500' }}">{{ $company->agent_enabled ? 'Enabled' : 'Disabled' }}</span>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-gray-500 text-xs">Last Seen</span>
+                        <span class="text-gray-900 dark:text-white">{{ $company->agent_last_seen ? \Carbon\Carbon::parse($company->agent_last_seen)->diffForHumans() : 'Never connected' }}</span>
+                    </div>
+                </div>
+
+                <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                    <p class="text-xs font-semibold text-blue-700 dark:text-blue-400 mb-1">Setup on the shop PC</p>
+                    <ol class="text-xs text-blue-700 dark:text-blue-400 list-decimal list-inside space-y-0.5">
+                        <li>Install PRAL's FBR IMS Fiscal Device service on the shop PC (from your FBR registration).</li>
+                        <li>Install &amp; run the TaxNest Desktop Sync Agent on the same PC.</li>
+                        <li>Paste the Agent API Key above into the agent and click Connect.</li>
+                        <li>Keep the PC on during business hours — bills sync automatically.</li>
+                    </ol>
+                </div>
+            </div>
+            @endif
 
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">Confidential PIN</h3>
@@ -169,7 +221,7 @@
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-500">Connection</span>
-                        <span class="text-blue-600 font-semibold">IMS POS (Direct)</span>
+                        <span class="text-blue-600 font-semibold">{{ ($company->fbr_connection_mode ?? 'cloud') === 'fiscal_device' ? 'Fiscal Device (Local)' : 'IMS POS (Direct Cloud)' }}</span>
                     </div>
                 </div>
             </div>
@@ -198,6 +250,19 @@
 </div>
 
 <script>
+function copyAgentKey() {
+    const input = document.getElementById('agentKey');
+    if (!input || !input.value) return;
+    input.select();
+    input.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(input.value).then(() => {
+        const btn = event.target;
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = orig; }, 1500);
+    }).catch(() => { document.execCommand('copy'); });
+}
+
 function testFbrConnection() {
     const btn = document.getElementById('testBtn');
     const resultDiv = document.getElementById('testResult');

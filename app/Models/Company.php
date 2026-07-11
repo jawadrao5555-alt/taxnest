@@ -101,6 +101,7 @@ class Company extends Model
         'fbr_pos_id',
         'fbr_pos_token',
         'fbr_pos_environment',
+        'fbr_connection_mode',
         'manager_override_pin',
         'cashier_discount_limit',
         'manager_discount_limit',
@@ -189,6 +190,18 @@ class Company extends Model
     public function isPending()
     {
         return $this->company_status === 'pending';
+    }
+
+    /**
+     * True when this FBR POS company routes submissions through the LOCAL FBR IMS
+     * fiscal component (localhost:8524) via the Desktop Sync Agent, instead of the
+     * (now-retired) cloud bulk PostData API. Single predicate used everywhere so
+     * there is no PRA-vs-FBR ambiguity in the shared Agent API.
+     */
+    public function agentServesFbr(): bool
+    {
+        return (bool) $this->fbr_pos_enabled
+            && ($this->fbr_connection_mode ?? 'cloud') === 'fiscal_device';
     }
 
     public function getActiveFbrTokenAttribute()

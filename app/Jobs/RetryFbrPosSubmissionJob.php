@@ -74,6 +74,11 @@ class RetryFbrPosSubmissionJob implements ShouldQueue
             return;
         }
 
+        if (($result['status'] ?? null) === 'queued_agent') {
+            Log::info("RetryFbrPosSubmissionJob: Transaction #{$this->transactionId} queued for Desktop Sync Agent (Fiscal Device), skip");
+            return;
+        }
+
         $errors = implode('; ', $result['errors'] ?? ['Unknown error']);
         Log::warning("RetryFbrPosSubmissionJob: Transaction #{$this->transactionId} failed on attempt {$attempt}: {$errors}");
 

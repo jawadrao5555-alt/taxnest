@@ -1766,6 +1766,19 @@ class FbrService
             ];
         }
 
+        // FISCAL DEVICE MODE (central guard) — FBR retired cloud bulk PostData (Code 112).
+        // In fiscal_device mode the server NEVER direct-submits: the bill is queued 'pending' and
+        // the Desktop Sync Agent POSTs it to the LOCAL FBR IMS component (localhost:8524) on the
+        // shop PC. This guard sits BEFORE the hash-lock so a stale hash can never strand the bill,
+        // and it covers EVERY call site (store, retryFbr, editRetry, retry/sync jobs).
+        if ($company && $company->agentServesFbr() && $company->agent_enabled) {
+            $transaction->update(['fbr_status' => 'pending']);
+            return [
+                'status' => 'queued_agent',
+                'message' => 'Queued for Desktop Sync Agent (Fiscal Device mode).',
+            ];
+        }
+
         if (!empty($transaction->fbr_submission_hash)) {
             return [
                 'status' => 'blocked',

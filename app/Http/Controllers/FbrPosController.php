@@ -830,6 +830,29 @@ class FbrPosController extends Controller
                     ->with('success', "Bill #{$transaction->invoice_number} created (PKR " . number_format($transaction->total_amount, 2) . "). FBR Reporting is OFF.");
             }
 
+            // FISCAL DEVICE MODE — FBR retired cloud bulk PostData (Code 112). Instead of a direct
+            // cloud submit, queue the reporting-ON final bill 'pending' for the Desktop Sync Agent,
+            // which POSTs it to the LOCAL FBR IMS component (localhost:8524) on the shop PC. The FBR
+            // invoice number lands later via the agent's submit-result callback.
+            if ($company->agentServesFbr() && $company->agent_enabled) {
+                $transaction->update(['fbr_status' => 'pending']);
+                if ($request->wantsJson()) {
+                    return response()->json([
+                        'success' => true,
+                        'transaction_id' => $transaction->id,
+                        'invoice_number' => $transaction->invoice_number,
+                        'total_amount' => (float) $transaction->total_amount,
+                        'change_due' => (float) $transaction->change_due,
+                        'invoice_mode' => 'fbr',
+                        'fbr_status' => 'pending',
+                        'fbr_invoice_number' => null,
+                        'message' => "✓ Bill #{$transaction->invoice_number} saved — queued for FBR Fiscal Device. The invoice number appears once the shop PC submits it.",
+                    ]);
+                }
+                return redirect()->route('fbrpos.show', $transaction->id)
+                    ->with('success', "Bill #{$transaction->invoice_number} saved (PKR " . number_format($transaction->total_amount, 2) . "). Queued for FBR Fiscal Device — the invoice number appears once it is submitted from the shop PC.");
+            }
+
             $transaction->load(['items', 'company']);
             $fbrService = new FbrService();
             $fbrResult = $fbrService->submitFbrPosTransaction($transaction);
@@ -1419,6 +1442,7 @@ class FbrPosController extends Controller
 
             $request->validate([
                 'fbr_pos_environment' => 'required|in:sandbox,production',
+                'fbr_connection_mode' => 'nullable|in:cloud,fiscal_device',
                 'fbr_pos_id' => 'nullable|string|max:100',
                 'fbr_pos_token' => 'nullable|string|max:2000',
             ]);
@@ -1426,6 +1450,19 @@ class FbrPosController extends Controller
             $updateData = [
                 'fbr_pos_environment' => $request->fbr_pos_environment,
             ];
+
+            if ($request->filled('fbr_connection_mode')) {
+                $updateData['fbr_connection_mode'] = $request->fbr_connection_mode;
+
+                // Fiscal Device submissions only happen from the shop PC — the desktop agent is
+                // mandatory (FBR retired cloud bulk PostData, Code 112). Auto-enable it + mint a key.
+                if ($request->fbr_connection_mode === 'fiscal_device') {
+                    $updateData['agent_enabled'] = true;
+                    if (empty($company->agent_api_key)) {
+                        $updateData['agent_api_key'] = 'tnk_' . \Illuminate\Support\Str::random(48);
+                    }
+                }
+            }
 
             if ($request->filled('fbr_pos_id')) {
                 $updateData['fbr_pos_id'] = $request->fbr_pos_id;
